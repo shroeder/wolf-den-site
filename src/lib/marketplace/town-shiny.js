@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { GLINT_DECOS, decorationById } from "@/lib/marketplace/decorations.js";
 import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { awardXp } from "@/lib/marketplace/xp.js";
+import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── THE HIDDEN SHINY GLINT ───────────────────────────────────────────────────────────────────────────────────
 // A rare sparkle that drifts through the Town background 0-2× a day. It's barely visible (tiny + faint, tucked up
@@ -24,6 +26,13 @@ const SHINY_SPOTS = [
     { x: 81, y: 37, at: "the Vault gable" },
     { x: 92, y: 39, at: "the Festival Stage rigging" },
 ];
+
+// The glimmer appears at most twice a day, lasts 3 hours, and exactly ONE person in the whole Den can ever claim
+// each one. A decoration alone was too thin a prize for that — especially for a member who doesn't care about
+// farming — so it also pays gold, XP and a chest.
+const SHINY_GOLD = 750;
+const SHINY_XP = 500;
+const SHINY_CHEST = "gold";
 
 const SHINY_MAX_PER_DAY = 2;
 const SHINY_TTL_HOURS = 3;           // an unclaimed glint fades after a few hours
@@ -71,7 +80,15 @@ export async function claimShiny(buyerId, shinyId) {
     ).catch(() => null);
     if (!claimed) return { ok: false, error: "gone" }; // someone else got it (or it faded)
     await grantDecoration(buyerId, reward, 1, "glint").catch(() => {});
-    await trackActivity(buyerId, "shiny_claim", { decoId: reward }).catch(() => {});
+    // Spotting it is the rarest thing a member can do in a day, so it pays like it: gold, XP and a Gold Chest on
+    // top of the source-exclusive decoration. awardXp handles the gold so the coin ledger stays consistent.
+    await awardXp(buyerId, "shiny_claim", { points: SHINY_XP, gold: SHINY_GOLD }).catch(() => {});
+    await addChests(buyerId, { [SHINY_CHEST]: 1 }, { source: "shiny_glint" }).catch(() => {});
+    await trackActivity(buyerId, "shiny_claim", { decoId: reward, gold: SHINY_GOLD, xp: SHINY_XP }).catch(() => {});
     const d = decorationById(reward);
-    return { ok: true, deco: d ? { id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, buff: d.buff } : { id: reward } };
+    return {
+        ok: true,
+        deco: d ? { id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, buff: d.buff } : { id: reward },
+        gold: SHINY_GOLD, xp: SHINY_XP, chest: SHINY_CHEST,
+    };
 }

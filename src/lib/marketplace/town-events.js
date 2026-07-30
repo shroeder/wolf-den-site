@@ -466,15 +466,43 @@ async function resolveTownEvent(eventId, outcome) {
         }
         return;
     }
-    // Skirmish raid over: per-duel rewards were already paid, but tally hard badges + a slim raid-pet chance for
-    // everyone who came down and fought.
+    // Skirmish raid over. Per-duel spoils were already paid as they fought; the COMPLETION bonus now scales with
+    // how far the pack actually pushed, so clearing waves is worth something and a raid that stalled in wave 1
+    // doesn't pay like a Chieftain kill. Waves cleared is the honest measure of the fight.
+    const clearedWaves = await db.queryOne(
+        `SELECT COALESCE(MAX(wave), 0)::int AS w FROM mkt_town_enemy
+          WHERE event_id = $1 AND died_at IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM mkt_town_enemy o WHERE o.event_id = $1 AND o.wave = mkt_town_enemy.wave AND o.died_at IS NULL)`,
+        [eventId]
+    ).catch(() => null);
+    const waves = Number(clearedWaves?.w || 0);
+    const chieftainDown = waves >= CHIEFTAIN_WAVE;
+    // 0 waves → participation only; each wave adds a slice; the Chieftain pays the full purse.
+    const progress = chieftainDown ? 1 : Math.min(1, waves / CHIEFTAIN_WAVE);
+    const compGold = Math.round(RAID_MAX_GOLD * progress);
+    const compXp = Math.round(RAID_PARTICIPATION_XP * (0.35 + 0.65 * progress)); // showing up is always worth XP
+
     for (const h of hits) {
+        if (compGold > 0) {
+            const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, compGold]).catch(() => null);
+            await logCoin(h.buyer_id, compGold, "raid_complete", { balanceAfter: paid?.gold, ref: String(eventId), meta: { waves, chieftainDown } }).catch(() => {});
+        }
+        if (compXp > 0) await awardXp(h.buyer_id, "raid_complete", { points: compXp, gold: 0, dedupeKey: `raid_complete:${eventId}:${h.buyer_id}` }).catch(() => {});
+        await db.query(
+            `UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = COALESCE(reward_gold,0) + $3, reward_xp = COALESCE(reward_xp,0) + $4
+              WHERE event_id = $1 AND buyer_id = $2`,
+            [eventId, h.buyer_id, compGold, compXp]
+        ).catch(() => {});
         await checkTownRaidBadges(h.buyer_id).catch(() => {});
-        await maybeGrantRaidPet(h.buyer_id, { boss: false, killed: false }).catch(() => {});
+        // A Chieftain kill is the real achievement, so it carries the better pet odds.
+        await maybeGrantRaidPet(h.buyer_id, { boss: chieftainDown, killed: chieftainDown }).catch(() => {});
     }
     if (!ev.meta?.silent) {
         // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
-        await broadcastWebPush({ kind: "raid", title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+        const body = chieftainDown
+            ? `The Chieftain is down! ${n} ${n === 1 ? "wolf" : "wolves"} share the full purse.`
+            : `Pushed to wave ${waves} of ${CHIEFTAIN_WAVE} — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils.`;
+        await broadcastWebPush({ kind: "raid", title: chieftainDown ? `🏆 ${ev.name} broken!` : `✅ ${ev.name} over`, body, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
     }
 }
 

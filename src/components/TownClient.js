@@ -1485,7 +1485,14 @@ export default function TownClient({ initial }) {
                                 <div style={{ fontSize: "2.8rem", position: "relative", zIndex: 2 }}>{shinyReward.deco?.emoji || "✨"}</div>
                                 <div className="tw-duel-verdict win" style={{ fontSize: "1.25rem", position: "relative", zIndex: 2 }}>✨ You caught the glimmer!</div>
                                 <div style={{ fontWeight: 900, fontSize: "1.05rem", margin: "2px 0", position: "relative", zIndex: 2 }}>{shinyReward.deco?.name || "A rare decoration"}</div>
-                                <div className="muted" style={{ margin: "2px 0 10px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>A {shinyReward.deco?.rarity || "rare"} decoration only ever found this way — it&apos;s in your Farm decorations.</div>
+                                <div className="muted" style={{ margin: "2px 0 8px", fontSize: "0.82rem", position: "relative", zIndex: 2 }}>A {shinyReward.deco?.rarity || "rare"} decoration only ever found this way — it&apos;s in your Farm decorations.</div>
+                                {/* The glimmer pays real spoils too — show them, or the prize reads as thin for
+                                    anyone who doesn't care about farm decorations. */}
+                                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", margin: "0 0 10px", position: "relative", zIndex: 2 }}>
+                                    {shinyReward.gold ? <span className="tw-recap-chip">🪙 +{Number(shinyReward.gold).toLocaleString()}</span> : null}
+                                    {shinyReward.xp ? <span className="tw-recap-chip">⭐ +{Number(shinyReward.xp).toLocaleString()} XP</span> : null}
+                                    {shinyReward.chest ? <span className="tw-recap-chip">🎁 {shinyReward.chest} chest</span> : null}
+                                </div>
                             </>
                         )}
                         <button type="button" className="tw-levelup-btn" onClick={() => setShinyReward(null)}>{shinyReward === "gone" ? "Aw, next time" : "Sweet! ✨"}</button>
