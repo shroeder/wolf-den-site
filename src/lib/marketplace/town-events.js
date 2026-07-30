@@ -252,6 +252,16 @@ export async function lastRaidRecap(buyerId) {
     ).catch(() => null);
     if (!mine) return null;
 
+    // WAIT FOR THE PAYOUT before showing anyone anything. resolveTownEvent flips the event to `defeated`
+    // FIRST and only then walks the fighters granting gold, XP, chests, badges and pet rolls — dozens of
+    // awaits. This recap becomes visible the instant that status flips, so a poll landing mid-payout returned
+    // a recap with reward_gold = 0, and the client caches the first recap it sees for an event forever. Result:
+    // a felled Treasure Golem showed a full damage board and "No payout on this one" — permanently — to people
+    // who had in fact each been paid 900 gold, 800 XP and a gold chest.
+    //
+    // Returning null here just means the client asks again a second later, by which point it's settled.
+    if (!mine.rewarded) return null;
+
     const board = await db.query(
         `SELECT h.buyer_id, h.damage, h.hits, h.passive_damage,
                 COALESCE(NULLIF(b.display_name,''), b.alias, 'Wolf') AS name,

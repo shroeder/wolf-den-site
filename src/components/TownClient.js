@@ -804,10 +804,23 @@ export default function TownClient({ initial }) {
     const seenRecapRef = useRef(null);
     useEffect(() => {
         const rc = state?.raidRecap;
-        if (!rc || seenRecapRef.current === rc.eventId) return;
-        seenRecapRef.current = rc.eventId;
+        if (!rc) return;
+        // Belt and braces on the payout race (the server now withholds the recap until rewards are settled):
+        // if a recap somehow arrives with nothing itemised, don't burn the "seen" marker on it — let a later
+        // poll replace it. Freezing on the first payload is what made an empty recap permanent.
+        const settled = Boolean(rc.me?.rewarded || rc.me?.gold || rc.me?.xp || rc.me?.chest);
+        if (seenRecapRef.current === rc.eventId && settled) return;
+        if (settled) seenRecapRef.current = rc.eventId;
         setBossRecap(rc);
         setRaidRecap(null); // the server recap supersedes the thin client one
+        // Felling a raid boss is the biggest thing that happens in the Town — make it land in the hand too,
+        // longer for the podium. Best-effort; plenty of browsers have no vibrate.
+        if (settled && rc.killed) {
+            try {
+                const podium = rc.me?.rank && rc.me.rank <= 3;
+                navigator.vibrate?.(podium ? [40, 60, 40, 60, 90] : [30, 70, 55]);
+            } catch { /* no haptics here */ }
+        }
     }, [state?.raidRecap]);
     // Owner test control: spawn an event from inside the Town (real trigger is the admin app).
     const spawnEvent = useCallback(async (kind) => {
@@ -1511,24 +1524,53 @@ export default function TownClient({ initial }) {
                             </p>
                         </div>
 
+                        {/* YOUR PERFORMANCE — a medal for the podium, your share drawn as a bar, and the
+                            damage split into what you swung for and what you earned by holding the square. */}
                         <div className="tw-recap-you">
-                            <div className="tw-recap-yourow">
-                                <span>Your damage</span>
-                                <b>{Number(bossRecap.me.damage).toLocaleString()}</b>
+                            <div className="tw-recap-perf">
+                                <span className="tw-recap-medal" aria-hidden="true">
+                                    {bossRecap.me.rank === 1 ? "🥇" : bossRecap.me.rank === 2 ? "🥈" : bossRecap.me.rank === 3 ? "🥉" : "⚔️"}
+                                </span>
+                                <span className="tw-recap-perfbody">
+                                    <b>{bossRecap.me.rank ? `#${bossRecap.me.rank} of ${bossRecap.fighters}` : "You fought"}</b>
+                                    <em>{Number(bossRecap.me.damage).toLocaleString()} damage · {bossRecap.me.share}% of the pack&apos;s total</em>
+                                </span>
+                            </div>
+                            <div className="tw-recap-sharebar" aria-hidden="true">
+                                <span style={{ width: `${Math.max(2, Math.min(100, bossRecap.me.share))}%` }} />
                             </div>
                             <div className="tw-recap-yousub">
-                                {bossRecap.me.rank ? `#${bossRecap.me.rank} of ${bossRecap.fighters}` : "joined"} · {bossRecap.me.share}% of the total
-                                {bossRecap.me.passive ? ` · ${Number(bossRecap.me.passive).toLocaleString()} from holding the square` : ""}
-                                {bossRecap.me.hits ? ` · ${bossRecap.me.hits} strike${bossRecap.me.hits === 1 ? "" : "s"}` : ""}
+                                {bossRecap.me.hits ? `${bossRecap.me.hits} strike${bossRecap.me.hits === 1 ? "" : "s"}` : "no strikes"}
+                                {bossRecap.me.passive ? ` · ${Number(bossRecap.me.passive).toLocaleString()} just for holding the square` : ""}
                             </div>
                         </div>
 
-                        <div className="tw-recap-rewards">
-                            {bossRecap.me.gold ? <span className="tw-recap-chip">🪙 +{Number(bossRecap.me.gold).toLocaleString()} gold</span> : null}
-                            {bossRecap.me.xp ? <span className="tw-recap-chip">⭐ +{Number(bossRecap.me.xp).toLocaleString()} XP</span> : null}
-                            {bossRecap.me.chest ? <span className="tw-recap-chip">🎁 {bossRecap.me.chest} chest</span> : null}
-                            {!bossRecap.me.gold && !bossRecap.me.xp && !bossRecap.me.chest ? <span className="muted" style={{ fontSize: "0.82rem" }}>No payout on this one.</span> : null}
+                        {/* THE HAUL — big cards, not chips. This is the payoff for the whole raid. */}
+                        <div className="tw-recap-hauline">Your haul</div>
+                        <div className="tw-recap-haul">
+                            {bossRecap.me.gold ? (
+                                <div className="tw-recap-prize is-gold" style={{ animationDelay: "0.05s" }}>
+                                    <span className="tw-recap-prize-ico" aria-hidden="true">🪙</span>
+                                    <b>+{Number(bossRecap.me.gold).toLocaleString()}</b><em>gold</em>
+                                </div>
+                            ) : null}
+                            {bossRecap.me.xp ? (
+                                <div className="tw-recap-prize is-xp" style={{ animationDelay: "0.16s" }}>
+                                    <span className="tw-recap-prize-ico" aria-hidden="true">⭐</span>
+                                    <b>+{Number(bossRecap.me.xp).toLocaleString()}</b><em>XP</em>
+                                </div>
+                            ) : null}
+                            {bossRecap.me.chest ? (
+                                <div className="tw-recap-prize is-chest" style={{ animationDelay: "0.27s" }}>
+                                    <span className="tw-recap-prize-ico" aria-hidden="true">🧰</span>
+                                    <b>{bossRecap.me.chest[0].toUpperCase() + bossRecap.me.chest.slice(1)}</b><em>chest</em>
+                                </div>
+                            ) : null}
+                            {!bossRecap.me.gold && !bossRecap.me.xp && !bossRecap.me.chest ? (
+                                <span className="muted" style={{ fontSize: "0.82rem" }}>Still counting the spoils — one moment.</span>
+                            ) : null}
                         </div>
+                        {bossRecap.me.chest ? <p className="tw-recap-chesthint">Open it from your Chests — that&apos;s where the gear is.</p> : null}
 
                         <div className="tw-recap-boardhead">Damage board</div>
                         <div className="tw-recap-board">
@@ -1841,6 +1883,31 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-recap-yousub { margin-top: 3px; font-size: 0.75rem; color: #b7c0cf; text-align: left; line-height: 1.35; }
 .tw-recap-rewards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
 .tw-recap-chip { font-size: 0.82rem; font-weight: 800; color: #e7dcc4; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); border-radius: 999px; padding: 5px 10px; }
+/* ── Victory recap: your performance, then the haul ─────────────────────────────────────────────────────── */
+.tw-recap-emoji { animation: twTrophyPop 0.7s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes twTrophyPop { 0% { transform: scale(0.2) rotate(-22deg); opacity: 0; } 60% { transform: scale(1.25) rotate(6deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+.tw-recap-perf { display: flex; align-items: center; gap: 11px; }
+.tw-recap-medal { font-size: 30px; line-height: 1; flex: 0 0 auto; }
+.tw-recap-perfbody { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
+.tw-recap-perfbody b { font-size: 1.02rem; color: #ffe488; }
+.tw-recap-perfbody em { font-style: normal; font-size: 0.78rem; color: #b7c0cf; }
+.tw-recap-sharebar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 9px 0 5px; }
+.tw-recap-sharebar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#f3b23a,#ffe488); animation: twShareGrow 0.9s cubic-bezier(.2,1,.3,1) both; }
+@keyframes twShareGrow { from { width: 0 !important; } }
+.tw-recap-hauline { font-size: 0.64rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd75e; margin: 14px 0 7px; }
+.tw-recap-haul { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 4px; }
+/* Each prize lands separately — the stagger is the point, so three rewards read as three events. */
+.tw-recap-prize { flex: 1 1 92px; max-width: 140px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 12px 8px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03)); border: 1px solid rgba(255,255,255,0.16);
+    animation: twPrizeIn 0.5s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes twPrizeIn { 0% { transform: translateY(14px) scale(0.8); opacity: 0; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+.tw-recap-prize.is-gold { border-color: rgba(255,215,94,0.5); box-shadow: 0 0 22px rgba(255,215,94,0.22); }
+.tw-recap-prize.is-xp { border-color: rgba(143,227,255,0.45); box-shadow: 0 0 22px rgba(143,227,255,0.18); }
+.tw-recap-prize.is-chest { border-color: rgba(201,162,255,0.5); box-shadow: 0 0 22px rgba(201,162,255,0.22); }
+.tw-recap-prize-ico { font-size: 30px; line-height: 1; }
+.tw-recap-prize b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.tw-recap-prize em { font-style: normal; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: #8b93a0; }
+.tw-recap-chesthint { margin: 2px 0 10px; font-size: 0.73rem; color: #8b93a0; }
 .tw-recap-boardhead { text-align: left; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; color: #8b93a0; margin-bottom: 5px; }
 .tw-recap-board { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
 .tw-recap-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 9px; background: rgba(255,255,255,0.03); }
