@@ -332,6 +332,10 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
 // BOSS RAID battle — the whole pack rallies on ONE shared boss (like the weekly boss fight). Your hero AUTO-
 // attacks while you're here (engaging = being at the fight); everyone who's actively fighting shows as their real
 // hero sprite lunging at the boss. Shared HP bar drains for the pack; killing it ends the raid.
+// One swing per this long, matched EXACTLY to the server's BOSS_STRIKE_THROTTLE_MS. The marker's full
+// ping-pong is half of it each way, so the bar is back at the edge the instant the button re-arms.
+const STRIKE_CD_MS = 2600;
+
 function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     const [floats, setFloats] = useState([]); // { id, dmg, crit }
     const [localPct, setLocalPct] = useState(ev.hpPct ?? 100);
@@ -344,11 +348,18 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     // decides the multiplier. This replaced a 1.3s auto-attack, which meant a raid was really "leave the tab
     // open and it swings for you" — no skill, and four players alone spiked Vercel to 17x invocations. Standing
     // in the square still does passive damage server-side, so a tap is a burst on top rather than an obligation.
-    const [marker, setMarker] = useState(0.5);
     const [grade, setGrade] = useState(null); // { key, label, dmg } — last swing's result
+    const [cooling, setCooling] = useState(false); // drives the button's look; the marker never re-renders
     const markerRef = useRef(0.5);
+    const cdUntilRef = useRef(0);
     const swingRef = useRef(false);
-    const SWEEP_MS = 1150;
+    // A full ping-pong is EXACTLY the strike cooldown. They used to be 2300ms and 2600ms — so every swing left
+    // 300ms of dead air where the marker kept sweeping and the button did nothing, and the two drifted out of
+    // phase, meaning the bar sat somewhere different every time it came back. That mismatch is what read as
+    // "the timing is off". Now the button re-arms at the exact moment the marker returns to the left edge.
+    const SWEEP_MS = STRIKE_CD_MS / 2;
+    const markerElRef = useRef(null);
+    const cdElRef = useRef(null);
 
     useEffect(() => {
         let raf = 0;
@@ -358,17 +369,28 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
             const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
             const pos = phase <= 1 ? phase : 2 - phase;
             markerRef.current = pos;
-            setMarker(pos);
+            // Written straight to the DOM rather than through setState. A state update per animation frame
+            // re-rendered this whole modal 60x a second, so the marker you SAW lagged behind the markerRef the
+            // server is scored against — you were aiming at a stale position and the hit felt like it missed.
+            if (markerElRef.current) markerElRef.current.style.left = `${pos * 100}%`;
+            // Cooldown sweep on the button, same frame, so "when can I swing again" is visible rather than felt.
+            if (cdElRef.current) {
+                const left = Math.max(0, cdUntilRef.current - Date.now());
+                cdElRef.current.style.transform = `scaleX(${left / STRIKE_CD_MS})`;
+            }
             raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
-    }, []);
+    }, [SWEEP_MS]);
 
     const strike = useCallback(async () => {
         if (cdRef.current || swingRef.current) return;
         swingRef.current = true;
-        cdRef.current = true; setTimeout(() => { cdRef.current = false; }, 2600); // matches server throttle
+        cdRef.current = true;
+        cdUntilRef.current = Date.now() + STRIKE_CD_MS;
+        setTimeout(() => { cdRef.current = false; setCooling(false); }, STRIKE_CD_MS); // matches server throttle
+        setCooling(true);
         const dist = Math.abs(markerRef.current - 0.5);
         const r = await onStrike(dist);
         swingRef.current = false;
@@ -430,14 +452,19 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                         <span className="tw-strike-zone" style={{ left: "37%" }}>GOOD</span>
                         <span className="tw-strike-zone" style={{ left: "50%" }}>PERFECT</span>
                         <span className="tw-strike-zone" style={{ left: "63%" }}>GOOD</span>
-                        <span className="tw-strike-marker" style={{ left: `${marker * 100}%` }} />
+                        <span className="tw-strike-marker" ref={markerElRef} style={{ left: "50%" }} />
                     </div>
+                    {/* The button stays PRESSABLE the whole time. It used to just go dead for 2.6 seconds with
+                        no indication of when it would come back, which reads as broken rather than as a
+                        cooldown. Now a bar drains across it and the marker returns to the edge as it empties,
+                        so the rhythm is visible: swing, watch it sweep back, swing again. */}
                     <button
                         type="button"
-                        className={`tw-strike-btn${cdRef.current ? " is-cooling" : ""}`}
+                        className={`tw-strike-btn${cooling ? " is-cooling" : ""}`}
                         onClick={strike}
                     >
-                        ⚔️ Strike
+                        <span className="tw-strike-cd" ref={cdElRef} aria-hidden="true" />
+                        <span className="tw-strike-btn-label">⚔️ Strike</span>
                     </button>
                     {grade ? (
                         <div className={`tw-strike-grade is-${grade.key}`}>{grade.label} · {Number(grade.dmg).toLocaleString()}</div>
@@ -1199,11 +1226,13 @@ export default function TownClient({ initial }) {
                     {you ? <Avatar a={{ ...me, name: "You", sprite: you.sprite, flip: you.flip, status: "🐺 you", chat: myChat, pet: you.pet, petFlip: you.petFlip }} isYou raiding={raidActive} /> : null}
                 </div>
 
-                {/* Market Day — the shop is physically OPEN: a festive ribbon + a live +XP nudge to match the crier's hype */}
+                {/* The shop is physically OPEN. This is a REAL-WORLD fact about a real business — the shouty
+                    party-popper ribbon read as a mobile-game promo rather than "the store you can drive to is
+                    serving customers right now". Quiet, factual, and it still carries the +XP. */}
                 {marketDay ? (
                     <div className="tw-marketday" aria-hidden="true">
-                        <span className="tw-marketday-glow" />
-                        🎉 Market Day — the Den&apos;s OPEN til {state.store.closesLabel}! <b>+10% XP</b>
+                        <span className="tw-marketday-dot" />
+                        Open until {state.store.closesLabel}<span className="tw-marketday-sep">·</span><b>+10% XP</b>
                     </div>
                 ) : null}
 
@@ -1860,7 +1889,12 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     background: linear-gradient(90deg, rgba(255,228,136,0) 0%, rgba(255,228,136,0.28) 100%); pointer-events: none; }
 .tw-strike-bar.is-hit { animation: twStrikeFlash 0.3s ease-out; }
 @keyframes twStrikeFlash { 0% { filter: brightness(2.4); transform: scale(1.03); } 100% { filter: brightness(1); transform: scale(1); } }
-.tw-strike-btn { width: 100%; margin-top: 10px; padding: 17px; border: none; border-radius: 14px; font-weight: 900; font-size: 1.15rem; letter-spacing: 0.02em; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22, 0 6px 18px rgba(0,0,0,0.4); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tw-strike-btn { position: relative; overflow: hidden; width: 100%; margin-top: 10px; padding: 17px; border: none; border-radius: 14px; font-weight: 900; font-size: 1.15rem; letter-spacing: 0.02em; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22, 0 6px 18px rgba(0,0,0,0.4); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tw-strike-btn-label { position: relative; z-index: 2; }
+/* The cooldown drains left-to-right across the button. A dead button that comes back at an unannounced moment
+   reads as broken; a visible drain reads as a rhythm you can play to. */
+.tw-strike-cd { position: absolute; inset: 0; z-index: 1; transform-origin: right center; transform: scaleX(0);
+    background: rgba(0,0,0,0.32); pointer-events: none; }
 .tw-strike-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b57f22; }
 .tw-strike-btn.is-cooling { opacity: 0.55; box-shadow: none; }
 .tw-strike-grade { text-align: center; margin-top: 6px; font-weight: 900; font-size: 0.95rem; animation: twStrikePop 0.35s ease-out; }
@@ -1981,8 +2015,20 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-building.is-openshop .tw-building-art, .tw-building.is-openshop .tw-building-card { filter: drop-shadow(0 0 14px rgba(255,201,92,0.85)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); animation: twShopGlow 2.4s ease-in-out infinite; }
 @keyframes twShopGlow { 0%,100% { filter: drop-shadow(0 0 10px rgba(255,201,92,0.6)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); } 50% { filter: drop-shadow(0 0 20px rgba(255,220,120,0.95)) drop-shadow(0 6px 10px rgba(0,0,0,0.5)); } }
 .tw-openflag { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 2; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.08em; color: #2a1a06; background: linear-gradient(180deg,#8fe39a,#3ec06a); padding: 2px 8px; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.5); animation: twWellBob 1.5s ease-in-out infinite; }
-.tw-marketday { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 480; pointer-events: none; max-width: calc(100% - 96px); text-align: center; font-size: 0.74rem; font-weight: 800; color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); padding: 5px 14px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); overflow: hidden; }
-.tw-marketday b { color: #7a3b00; }
+/* "Open until 9 PM · +10% XP" — a statement about a real shop, so it's styled like a status, not a sale.
+   Dark glass with a live green dot, matching the "Open til 9 PM" chip on the header rather than shouting over
+   the artwork in gold. */
+.tw-marketday { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 480; pointer-events: none;
+    max-width: calc(100% - 96px); display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.01em; color: #e8f2e6;
+    background: rgba(12,18,14,0.78); border: 1px solid rgba(126,213,126,0.45); backdrop-filter: blur(6px);
+    padding: 5px 13px; border-radius: 999px; box-shadow: 0 4px 14px rgba(0,0,0,0.45); overflow: hidden; }
+.tw-marketday b { color: #9ce8a0; font-weight: 800; }
+.tw-marketday-sep { color: rgba(232,242,230,0.35); }
+/* The live dot does the work the party popper was doing — "this is happening right now" — without the noise. */
+.tw-marketday-dot { width: 7px; height: 7px; border-radius: 50%; background: #7ed57e; flex: 0 0 auto;
+    box-shadow: 0 0 8px rgba(126,213,126,0.9); animation: twOpenPulse 2.2s ease-in-out infinite; }
+@keyframes twOpenPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
 .tw-marketday-glow { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.65) 50%, transparent 80%); transform: translateX(-100%); animation: twSheen 3.2s ease-in-out infinite; }
 @keyframes twSheen { 0% { transform: translateX(-100%); } 60%,100% { transform: translateX(100%); } }
 .tw-building:hover { transform: translate(-50%, -100%) translateY(-4px); }
