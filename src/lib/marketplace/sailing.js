@@ -21,7 +21,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
-import { fishingView, castLine, landFish, denFishRecords, denTopCatches, denSkies } from "@/lib/marketplace/fishing.js";
+import { fishingView, castLine, landFish, denFishRecords, denTopCatches } from "@/lib/marketplace/fishing.js";
 // Fishing is still in development — owner-only until the design settles. See fishingUnlocked() below.
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -814,7 +814,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // cast count and anything currently on the line all come along for free with no extra query.
         // Owner-only while the design settles. A null here removes the whole surface: SailingClient guards every
         // fishing affordance on `state.fishing`, so members see no rail button, no scene, no trace of it.
-        fishing: fishingUnlocked(row?.buyer_id) ? fishingView(row, angling, status, sky) : null,
+        fishing: fishingUnlocked(row?.buyer_id) ? fishingView(row, angling, status) : null,
     };
 }
 
@@ -884,7 +884,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     void skyKey;
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap, chestArt, sea, raidExtras, skies] = await Promise.all([
+    const [row, goldRow, others, petMap, chestArt, sea, raidExtras] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -907,8 +907,6 @@ export async function getSailingState(buyerId, skyKey = null) {
         getChestArt().catch(() => ({})),
         equippedSeaAffinity(buyerId),
         equippedRaidExtras(buyerId),
-        // The Den's real sky — cached 15 min in sky.js, so this is a map lookup on all but the first call.
-        denSkies().catch(() => []),
     ]);
     const seaEff = seaEffects(sea);
     const fleet = (others || []).map((o) => {
@@ -928,7 +926,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, skies), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {

@@ -214,6 +214,15 @@ export const COLLECTIBLES = [
     { id: "bandit_shade", name: "Bandit King's Shade", Icon: GiSpectre, color: "#9b7fe0", rarity: "mythic", source: "raid", raidExclusive: true, eliteOnly: true, raidChance: 0.0002, activeStat: "gold_find", hint: "The ghost of a raider felled in the plaza", spritePrompt: "a translucent purple ghostly bandit chief in a hooded cloak clutching a spectral coin purse, wisps of shadow trailing" },
     { id: "goblin_warchief", name: "Goblin Warchief", Icon: GiMinotaur, color: "#6fae3a", rarity: "ascendant", source: "raid", raidExclusive: true, eliteOnly: true, raidChance: 0.00005, activeStat: "ferocity", hint: "Only the fiercest raids yield this brute", spritePrompt: "a hulking green goblin warchief in crude spiked armor hoisting a jagged cleaver, roaring with tusks bared" },
     { id: "golem_heart", name: "Golem's Heart", Icon: GiRockGolem, color: "#37f5c0", rarity: "eternal", source: "raid", raidExclusive: true, eliteOnly: true, raidChance: 0.000005, activeStat: "crit_power", hint: "The living gem-core of a felled Treasure Golem — rarest of all", spritePrompt: "a small floating stone-and-crystal golem heart, a glowing teal gemstone core wrapped in rocky armored plates, radiating treasure light" },
+
+    // ── FISHING EXCLUSIVES ─────────────────────────────────────────────────────────────────────────────────
+    // The ONLY source is landing a fish, and the odds ride the rarity of what you caught (see
+    // maybeGrantFishingPet). Four of them, escalating: the seahorse turns up for anyone who fishes regularly,
+    // the Tidecaller effectively requires a mythic on the line.
+    { id: "reef_seahorse", name: "Reef Seahorse", Icon: GiSeahorse, color: "#7ec8ff", rarity: "rare", source: "fishing", fishTier: 0, activeStat: "fortune", hint: "Curled around your line one quiet morning", spritePrompt: "a small curled seahorse in bright coral pink and cyan, delicate fins fluttering" },
+    { id: "lantern_jelly", name: "Lantern Jelly", Icon: GiJellyfish, color: "#c9a2ff", rarity: "epic", source: "fishing", fishTier: 1, activeStat: "gold_find", hint: "Rose out of the dark still glowing", spritePrompt: "a translucent violet jellyfish glowing softly from within, long trailing luminous tendrils" },
+    { id: "deep_angler", name: "Deep Angler", Icon: GiAnglerFish, color: "#ffd75e", rarity: "legendary", source: "fishing", fishTier: 2, eliteOnly: true, activeStat: "crit_chance", hint: "Followed something bigger up from the deep", spritePrompt: "a small deep-sea anglerfish companion with an oversized toothy grin and a bright glowing lure bobbing above its head" },
+    { id: "tidecaller", name: "Tidecaller", Icon: GiWhaleTail, color: "#37f5c0", rarity: "mythic", source: "fishing", fishTier: 3, eliteOnly: true, activeStat: "might", hint: "The sea sent something back with you", spritePrompt: "a small serene whale calf wreathed in swirling turquoise water and glowing runes, trailing sea-foam" },
 ];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));

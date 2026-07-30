@@ -39,11 +39,28 @@ const RARITY_COLOR = {
 };
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "Legendary", mythic: "Mythic" };
 
-// A length in cm, written the way an angler would say it.
-function lengthLabel(cm) {
-    const n = Number(cm) || 0;
-    if (n >= 100) return `${(n / 100).toFixed(2)} m`;
-    return `${n.toFixed(1)} cm`;
+// A weight in pounds, written the way an angler would say it — ounces for the tiddlers, whole pounds once
+// it's a real fish, and no decimals at all on the monsters where a tenth of a pound is noise.
+function weightLabel(lb) {
+    const n = Number(lb) || 0;
+    if (!n) return "—";
+    if (n < 1) return `${Math.round(n * 16)} oz`;
+    if (n < 10) return `${n.toFixed(1)} lb`;
+    return `${Math.round(n).toLocaleString()} lb`;
+}
+
+// The species sprite, with the old emoji as the fallback until its PNG is in place.
+function FishArt({ id, emoji, size = 44, className = "" }) {
+    const [failed, setFailed] = useState(false);
+    if (!id || failed) return <span className={className} style={{ fontSize: size * 0.8 }} aria-hidden="true">{emoji}</span>;
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            className={className} src={`/images/fish/${id}.png`} alt="" aria-hidden="true"
+            width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }}
+            onError={() => setFailed(true)}
+        />
+    );
 }
 
 // ── SOUND ── best-effort Web Audio, no asset files. Silent if the browser blocks it.
@@ -213,8 +230,8 @@ function FishingLog({ log, known, total, records, onClose }) {
                     <p className="fish-log-progress">{known} of {total} species logged</p>
                     <div className="fish-log-grid">
                         {(log || []).map((f) => (
-                            <div key={f.id} className={`fish-log-row${f.caught ? "" : " is-unknown"}${f.biting ? " is-biting" : ""}`}>
-                                <span className="fish-log-emoji" style={{ color: RARITY_COLOR[f.rarity] }}>{f.caught ? f.emoji : "❓"}</span>
+                            <div key={f.id} className={`fish-log-row${f.caught ? "" : " is-unknown"}`}>
+                                {f.caught ? <FishArt id={f.id} emoji={f.emoji} size={34} className="fish-log-art" /> : <span className="fish-log-emoji" style={{ color: RARITY_COLOR[f.rarity] }}>❓</span>}
                                 <span className="fish-log-name">
                                     {f.caught ? f.name : "???"}
                                     <em style={{ color: RARITY_COLOR[f.rarity] }}>{RARITY_LABEL[f.rarity]}</em>
@@ -222,12 +239,12 @@ function FishingLog({ log, known, total, records, onClose }) {
                                 <span className="fish-log-best">
                                     {f.caught ? (
                                         <>
-                                            <strong>{lengthLabel(f.best)}</strong>
+                                            <strong>{weightLabel(f.best)}</strong>
                                             <em>×{f.caught}</em>
                                         </>
-                                    ) : <em>{f.hint}</em>}
+                                    ) : <em>{f.odds >= 1 ? `${f.odds}% chance` : `1 in ${Math.round(100 / f.odds)}`}</em>}
                                 </span>
-                                {f.biting ? <span className="fish-log-biting" title="This one can bite right now">🎣</span> : null}
+                                
                             </div>
                         ))}
                     </div>
@@ -239,15 +256,15 @@ function FishingLog({ log, known, total, records, onClose }) {
                     <p className="fish-log-progress">Best catches in the Den — how close each came to the biggest that species gets</p>
                     <div className="fish-log-grid">
                         {top.map((r, i) => (
-                            <div key={`${r.species}-${r.alias}-${r.cm}-${i}`} className="fish-log-row">
+                            <div key={`${r.species}-${r.alias}-${r.lb}-${i}`} className="fish-log-row">
                                 <span className="fish-top-rank">{i + 1}</span>
-                                <span className="fish-log-emoji" style={{ color: RARITY_COLOR[r.rarity] }}>{r.emoji}</span>
+                                <FishArt id={r.species} emoji={r.emoji} size={34} className="fish-log-art" />
                                 <span className="fish-log-name">
                                     {r.name}
                                     <em>{r.who ? `@${r.alias}` : "—"}</em>
                                 </span>
                                 <span className="fish-log-best">
-                                    <strong>{lengthLabel(r.cm)}</strong>
+                                    <strong>{weightLabel(r.lb)}</strong>
                                     <em>{r.pct}% of max</em>
                                 </span>
                             </div>
@@ -259,10 +276,10 @@ function FishingLog({ log, known, total, records, onClose }) {
                 <div className="fish-log-grid">
                     {perSpecies.map((r) => (
                         <div key={r.id} className={`fish-log-row${r.record ? "" : " is-unknown"}`}>
-                            <span className="fish-log-emoji" style={{ color: RARITY_COLOR[r.rarity] }}>{r.emoji}</span>
+                            <FishArt id={r.id} emoji={r.emoji} size={34} className="fish-log-art" />
                             <span className="fish-log-name">{r.name}<em>{r.who ? `@${r.alias}` : "unclaimed"}</em></span>
                             <span className="fish-log-best">
-                                {r.record ? <strong>{lengthLabel(r.record)}</strong> : <em>be the first</em>}
+                                {r.record ? <strong>{weightLabel(r.record)}</strong> : <em>be the first</em>}
                             </span>
                         </div>
                     ))}
@@ -435,17 +452,27 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         {result.denRecord ? <div className="fish-banner is-den">🥇 BIGGEST IN THE DEN!</div>
                             : result.firstEver ? <div className="fish-banner is-new">✨ NEW SPECIES!</div>
                                 : result.personalBest ? <div className="fish-banner">📈 PERSONAL BEST!</div> : null}
-                        <div className="fish-reveal" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{result.fish.emoji}</div>
+                        <div className="fish-reveal"><FishArt id={result.fish.id} emoji={result.fish.emoji} size={140} /></div>
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{result.fish.name}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{RARITY_LABEL[result.fish.rarity]}</div>
-                        <div className="fish-size">{lengthLabel(result.fish.cm)}</div>
+                        <div className="fish-size">{weightLabel(result.fish.lb)}</div>
                         <div className="fish-pct">
                             <div className="fish-pct-bar"><div className="fish-pct-fill" style={{ width: `${result.pct}%`, background: RARITY_COLOR[result.fish.rarity] }} /></div>
-                            <span>{result.pct}% of the biggest ever recorded for the species</span>
+                            <span>{result.pct}% of the biggest this species gets</span>
                         </div>
-                        {result.previousBest && !result.firstEver ? (
-                            <p className="muted fish-prev">{result.personalBest ? `Beat your old best of ${lengthLabel(result.previousBest)}` : `Your best is still ${lengthLabel(result.previousBest)}`}</p>
-                        ) : null}
+                        {/* Weight against the two numbers that actually mean something: what YOU'VE landed
+                            before, and what the species can reach. Without these a weight is just a number. */}
+                        <div className="fish-compare">
+                            <div className={`fish-compare-cell${result.personalBest ? " is-beat" : ""}`}>
+                                <em>your best</em>
+                                <b>{result.personalBest && result.previousBest ? weightLabel(result.previousBest) : weightLabel(result.previousBest || result.fish.lb)}</b>
+                                {result.personalBest ? <span className="fish-compare-tag">BEATEN</span> : null}
+                            </div>
+                            <div className="fish-compare-cell">
+                                <em>species max</em>
+                                <b>{weightLabel(result.fish.range?.[1])}</b>
+                            </div>
+                        </div>
                         <div className="fish-spoils">
                             <span className="fish-chip gold">+{result.gold} 🪙</span>
                             <span className="fish-chip xp">+{result.xp} ✨ XP</span>

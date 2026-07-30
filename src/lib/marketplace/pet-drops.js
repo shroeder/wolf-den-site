@@ -51,6 +51,23 @@ export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     return grantDrop(buyerId, pet, "boss", {});
 }
 
+// EXCLUSIVE fishing pets — the ONLY source is landing a fish. Called when fishing's haul table has already
+// rolled "pet", so the odds of reaching here are the rare part (see HAUL in fishing.js); this just decides
+// WHICH one. `fishTier` ranks the four, and the fish's rarity caps how deep you can reach: a common fish can
+// only ever surface the Reef Seahorse, and the Tidecaller effectively needs a mythic on the line. Rarest
+// eligible first, so the best pet you qualify for is the one you get.
+const FISH_TIER_CAP = { common: 0, rare: 1, epic: 2, legendary: 2, mythic: 3 };
+export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
+    if (!buyerId) return null;
+    const cap = FISH_TIER_CAP[fishRarity] ?? 0;
+    const owned = await ownedPetSet(buyerId);
+    const eligible = COLLECTIBLES
+        .filter((p) => p.source === "fishing" && (p.fishTier ?? 0) <= cap && !owned.has(p.id))
+        .sort((a, b) => (b.fishTier ?? 0) - (a.fishTier ?? 0));
+    if (!eligible.length) return null;
+    return grantDrop(buyerId, eligible[0], "fishing", { fishRarity });
+}
+
 // EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a genuine prestige trophy.
 // Each pet has its own ABSOLUTE per-raid-completion drop chance (`raidChance`), tuned to be exceedingly rare:
 // the easiest (mythic) ~0.025%, the rarest (eternal Golem's Heart) ~0.0005%. The Golem's Heart can ONLY drop

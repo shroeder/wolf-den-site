@@ -29,13 +29,18 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 // rarer one, and the landing is guarded by an atomic clear of that column so a resubmit can't double-pay.
 
 // ── THE SPECIES ──────────────────────────────────────────────────────────────────────────────────────────────
-// weight   relative likelihood within the pool you're fishing (before rarity gating)
-// cm       [min, max] length — where personal bests come from
-// gold/xp  paid at the TOP of the size range and scaled down by how big yours actually was
-// minVoyages  progression gate: the deep-water monsters simply aren't there until you've sailed a while
-// sky      optional weather/time gate, which is why the real-world sky matters: some fish only bite at night,
-//          some only in a storm. Nothing else in the game rewards you for playing at 11pm in the rain.
-const F = (id, name, emoji, rarity, weight, cm, gold, xp, extra = {}) => ({ id, name, emoji, rarity, weight, cm, gold, xp, minVoyages: 0, sky: null, ...extra });
+// odds     percentage chance of being what bites — the whole table sums to 100
+// lb       [min, max] weight in pounds; personal bests and the record board are measured here
+// gold/xp  paid at the TOP of the weight range and scaled down by how heavy yours actually was
+//
+// `odds` is the ONLY thing deciding what bites. No voyage gates, no weather gates, no unlock ladder — the sea
+// is the same for a first-day member and a hundred-voyage veteran, and rarity is expressed purely as odds.
+// That was a deliberate reversal: gating meant most of the roster was invisible for weeks (and, when the gate
+// was weather, invisible forever for anyone who declined a location prompt).
+//
+// `lb` is the weight range in pounds. Fishing records are kept by weight everywhere in the real world, and the
+// catch screen compares yours against the species best, so weight is the unit the whole feature speaks.
+const F = (id, name, emoji, rarity, odds, lb, gold, xp) => ({ id, name, emoji, rarity, odds, lb, gold, xp });
 
 // PAYOUT TUNING, and the story behind these numbers so nobody re-derives them from scratch:
 //
@@ -47,43 +52,42 @@ const F = (id, name, emoji, rarity, weight, cm, gold, xp, extra = {}) => ({ id, 
 // These sit at roughly HALF the original: a day lands around 60-120 gold, a mythic near 300. Still well under
 // a daily quest at 110-140, so it can't be farmed as an income source, but a legendary is worth landing and a
 // mythic — which shows up about twice a month — actually feels like an event.
+// Odds are literal percentages of a catch and sum to 100, so the table can be read straight down without doing
+// any arithmetic: a Sardine is 14 casts in 100, a Leviathan Fry is 1 in 500.
 export const FISH = [
-    // ── COMMON · the harbour regulars (always available, so a brand-new member always catches something) ──
-    F("fish_sardine", "Sardine", "🐟", "common", 100, [8, 22], 4, 4),
-    F("fish_perch", "Silver Perch", "🐟", "common", 90, [14, 38], 4, 4),
-    F("fish_mackerel", "Mackerel", "🐟", "common", 80, [20, 46], 6, 6),
-    F("fish_crab", "Rock Crab", "🦀", "common", 60, [9, 26], 6, 6),
-    F("fish_squid", "Bay Squid", "🦑", "common", 55, [18, 55], 8, 6),
+    // ── COMMON · 62% of catches ──
+    F("fish_sardine", "Sardine", "🐟", "common", 14.0, [0.1, 0.8], 4, 4),
+    F("fish_perch", "Silver Perch", "🐟", "common", 13.0, [0.4, 3.0], 4, 4),
+    F("fish_mackerel", "Mackerel", "🐟", "common", 12.0, [0.8, 6.0], 6, 6),
+    F("fish_crab", "Rock Crab", "🦀", "common", 11.5, [0.5, 4.0], 6, 6),
+    F("fish_squid", "Bay Squid", "🦑", "common", 11.5, [1.0, 9.0], 8, 6),
 
-    // ── RARE · worth stopping for ──
-    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 46, [26, 62], 14, 10),
-    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 40, [10, 24], 12, 8),
-    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 34, [16, 40], 16, 10),
-    F("fish_lobster", "Blue Lobster", "🦞", "rare", 26, [22, 58], 20, 14),
-    F("fish_octopus", "Reef Octopus", "🐙", "rare", 24, [30, 90], 18, 12, { minVoyages: 4 }),
-    F("fish_moonfish", "Moonfish", "🌙", "rare", 22, [24, 70], 20, 14, { sky: ["night"], minVoyages: 3 }),
+    // ── RARE · 28% ──
+    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 6.0, [2.0, 16.0], 14, 10),
+    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 5.5, [0.2, 1.5], 12, 8),
+    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 5.0, [1.0, 7.0], 16, 10),
+    F("fish_lobster", "Blue Lobster", "🦞", "rare", 4.5, [1.5, 12.0], 20, 14),
+    F("fish_octopus", "Reef Octopus", "🐙", "rare", 4.0, [3.0, 34.0], 18, 12),
+    F("fish_moonfish", "Moonfish", "🌙", "rare", 3.0, [2.0, 24.0], 20, 14),
 
-    // ── EPIC · a story when you land one ──
-    F("fish_swordfish", "Swordfish", "🗡️", "epic", 16, [90, 240], 40, 26, { minVoyages: 8 }),
-    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 15, [80, 220], 36, 24, { minVoyages: 8 }),
-    F("fish_manta", "Manta Ray", "🪁", "epic", 11, [120, 340], 46, 30, { minVoyages: 12 }),
-    F("fish_stormpike", "Storm Pike", "⚡", "epic", 10, [60, 160], 48, 32, { sky: ["storm"], minVoyages: 6 }),
-    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 9, [18, 52], 44, 28, { sky: ["night", "dusk"], minVoyages: 10 }),
+    // ── EPIC · 8% ──
+    F("fish_swordfish", "Swordfish", "🗡️", "epic", 2.0, [45, 700], 40, 26),
+    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 2.0, [60, 900], 36, 24),
+    F("fish_manta", "Manta Ray", "🪁", "epic", 1.6, [150, 2400], 46, 30),
+    F("fish_stormpike", "Storm Pike", "⚡", "epic", 1.4, [6, 48], 48, 32),
+    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 1.0, [2, 18], 44, 28),
 
-    // ── LEGENDARY · the deep ──
-    F("fish_shark", "Great White", "🦈", "legendary", 5, [280, 620], 96, 66, { minVoyages: 16 }),
-    // Fog + overcast, not fog alone. Open-Meteo only reports fog for WMO 45/48, which at the Den is a handful
-    // of autumn mornings a year — this fish was effectively unobtainable. Overcast/drizzle is the same grey
-    // weather to look at and happens often enough for a legendary to be a real chase rather than a lottery.
-    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 4, [190, 330], 88, 60, { sky: ["fog", "overcast"], minVoyages: 14 }),
-    F("fish_marlin", "Black Marlin", "🐟", "legendary", 4, [240, 500], 104, 72, { minVoyages: 20 }),
-    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 3, [110, 200], 120, 84, { minVoyages: 24 }),
+    // ── LEGENDARY · 1.6% ──
+    F("fish_shark", "Great White", "🦈", "legendary", 0.5, [400, 2800], 96, 66),
+    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 0.45, [180, 700], 88, 60),
+    F("fish_marlin", "Black Marlin", "🐟", "legendary", 0.4, [220, 1600], 104, 72),
+    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 0.25, [60, 240], 120, 84),
 
-    // ── MYTHIC · four of these exist in the whole ocean ──
-    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 2, [900, 2600], 210, 156, { minVoyages: 30 }),
-    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 1.5, [400, 1200], 240, 180, { sky: ["storm", "night"], minVoyages: 34 }),
-    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 1, [520, 1800], 280, 204, { minVoyages: 40 }),
-    F("fish_starfish", "Fallen Star", "⭐", "mythic", 1, [30, 90], 300, 228, { sky: ["night"], minVoyages: 26 }),
+    // ── MYTHIC · 0.4% — four of these exist in the whole ocean ──
+    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 0.15, [4000, 40000], 210, 156),
+    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 0.1, [300, 4200], 240, 180),
+    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 0.1, [500, 6000], 280, 204),
+    F("fish_starfish", "Fallen Star", "⭐", "mythic", 0.05, [0.5, 9.0], 300, 228),
 ];
 
 const BY_ID = new Map(FISH.map((f) => [f.id, f]));
@@ -109,15 +113,77 @@ const RARE_TILT_CAP = 0.9;
 // the chase for a rare species the point.
 const SIZE_FROM_QUALITY = 0.62;
 const SIZE_FROM_ROLL = 0.38;
-// Fragment/chest sprinkles, so fishing feeds the existing forge loop rather than being a closed economy.
-// Halfway back up with the gold. A mythic surfaces roughly twice a month, so it keeps the gold chest.
-const FRAGMENT_CHANCE = { epic: 0.14, legendary: 0.30, mythic: 0.60 };
-const CHEST_ON_MYTHIC = "gold";
-const CHEST_ON_RECORD_LEGENDARY = "wooden";  // a personal best on a legendary+ also drops a chest
+// ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Every cast rolls ONE bonus alongside the fish (or nothing, which is still the most common outcome). Rolled as
+// a single weighted table rather than a stack of independent chances, so the odds are legible and a cast can't
+// accidentally pay out four things at once.
+//
+// Rarer fish shift the table toward the good end — a mythic on the line is the moment to hand out something
+// memorable — but even a Sardine can drop a seed or a fragment, so an ordinary cast is never truly empty.
+//
+// Balance: ~45% of casts on a common fish return a bonus, almost always a seed or fragments. Gear and chests
+// sit deliberately below the rates the Forge and dig already pay, because fishing is 10 casts a day on top of
+// everything else — it should feed those loops, never replace them.
+const HAUL = {
+    //                       nothing  fragment  seed  consumable  gear  chest  pet
+    common: { nothing: 55, fragment: 22, seed: 18, consumable: 4, gear: 0.8, chest: 0.2, pet: 0 },
+    rare: { nothing: 44, fragment: 24, seed: 18, consumable: 9, gear: 3.5, chest: 1.4, pet: 0.1 },
+    epic: { nothing: 28, fragment: 26, seed: 14, consumable: 16, gear: 10, chest: 5.6, pet: 0.4 },
+    legendary: { nothing: 12, fragment: 24, seed: 8, consumable: 20, gear: 21, chest: 14, pet: 1.0 },
+    mythic: { nothing: 0, fragment: 14, seed: 4, consumable: 20, gear: 30, chest: 28, pet: 4.0 },
+};
+// How many fragments a fragment-drop is worth, by fish rarity.
+const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
+// Which chest a chest-drop gives. Wooden is the floor so a common's rare chest hit isn't better than a raid's.
+const CHEST_TIER = { common: "wooden", rare: "wooden", epic: "iron", legendary: "iron", mythic: "gold" };
+// Consumables fishing can hand out: sailing relics, farm supplies and pet treats. Deliberately NOT the combat
+// potions — fishing shouldn't be a route to boss damage, and every one of these feeds a loop fishing touches.
+// Rarer fish draw from the back of this list, so a mythic hands out a Kraken Bait rather than a Pet Treat.
+const FISH_CONSUMABLES = [
+    "treat_bone", "farm_growth_tonic", "treat_snack", "farm_harvest_charm",
+    "sail_lucky_lure", "sail_war_drum", "sail_treasure_map", "sail_storm_bottle", "sail_kraken_bait",
+];
+// How far up that list a rarity can reach (index cap), so the good relics stay attached to the good fish.
+const CONSUMABLE_REACH = { common: 2, rare: 4, epic: 6, legendary: 8, mythic: 9 };
+
+// One weighted pick off the rarity's table.
+function rollHaul(rarity) {
+    const table = HAUL[rarity] || HAUL.common;
+    const entries = Object.entries(table);
+    const total = entries.reduce((a, [, w]) => a + w, 0);
+    let r = Math.random() * total;
+    for (const [kind, w] of entries) { r -= w; if (r <= 0) return kind; }
+    return "nothing";
+}
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────────────────────────────────────
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
 const round1 = (n) => Math.round(n * 10) / 10;
+const randInt = (n) => Math.floor(Math.random() * n);
+
+// A random piece of gear the member doesn't already own, at a rarity the fish deserves. Mirrors how chests
+// pick: never hand out a duplicate, and fall back down the rarity ladder rather than giving nothing.
+// Fish rarity → the gear rarities it can pull, best first. Ascendant/eternal are never in reach: those are the
+// Forge's and the raid's to give, and fishing should feed those loops rather than short-circuit them.
+const GEAR_RARITY = {
+    common: ["common"], rare: ["rare", "common"], epic: ["epic", "rare"],
+    legendary: ["legendary", "epic"], mythic: ["mythic", "legendary"],
+};
+async function grantFishingGear(buyerId, fishRarity) {
+    const [{ ITEMS }, { grantItem }] = await Promise.all([
+        import("@/lib/marketplace/items.js"),
+        import("@/lib/marketplace/inventory.js"),
+    ]);
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+    for (const rarity of GEAR_RARITY[fishRarity] || ["common"]) {
+        const pool = (ITEMS || []).filter((i) => i.rarity === rarity && !owned.has(i.id));
+        if (!pool.length) continue;
+        const item = pool[randInt(pool.length)];
+        await grantItem(buyerId, item.id, "fishing").catch(() => {});
+        return { id: item.id, name: item.name, rarity: item.rarity };
+    }
+    return null;
+}
 
 // Angling points → the two things they buy.
 export function anglingEffects(angling = 0) {
@@ -130,79 +196,33 @@ export function anglingEffects(angling = 0) {
 
 export const castsPerDay = (angling = 0) => Math.min(CASTS_MAX, CASTS_PER_DAY + anglingEffects(angling).bonusCasts);
 
-// ── WHAT SKY ARE YOU ACTUALLY UNDER? ─────────────────────────────────────────────────────────────────────────
-// The weather-gated species are the reason to fish at 11pm in a thunderstorm, so the gate has to mean something
-// — and, crucially, has to be REACHABLE.
-//
-// It wasn't. The gate used to read the sky the CLIENT said it was rendering, which comes from the ambiance
-// route and needs the member's granted coordinates. Most members never granted location, so `sky` arrived null
-// and nine of the twenty-four species — every weather-gated one — could never bite for them. Silently. With no
-// way to tell from inside the game that a permission prompt was the reason.
-//
-// Both halves are now resolved on the SERVER, and the weather half is the sky over THE DEN itself:
-//
-//   TIME-OF-DAY (night, dusk)      — server clock, store-local. Unspoofable, same for everyone.
-//   WEATHER (storm, fog, aurora…)  — live weather at the shop's own coordinates, via sky.js.
-//
-// One shop, one sky, everybody fishing under the same weather. Nothing the client sends is trusted any more,
-// and nobody is gated behind a browser permission they declined.
-// Exactly the sky types sky.js can actually return. "aurora" used to be listed here and on two fish, but
-// pickSky has no branch that produces it — it was a gate on a value the weather service never emits. Both of
-// those fish also allowed "night", so they were still catchable and nothing looked broken; the aurora half was
-// simply dead. Anything added here must correspond to a real pickSky output or it silently gates a fish out.
-const WEATHER_SKIES = new Set(["storm", "fog", "overcast", "clearday", "sunrise", "sunset", "goldenhour"]);
-
-// Time-of-day half — pure, synchronous, always available even if the weather service is down.
-function clockSkies() {
-    const out = new Set();
-    const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", hour: "numeric", hour12: false }).format(new Date()));
-    if (hour >= 21 || hour < 5) out.add("night");
-    if ((hour >= 19 && hour < 21) || (hour >= 5 && hour < 7)) out.add("dusk");
-    return out;
-}
-
-/**
- * The skies in effect right now. `knownWeather` is an already-resolved sky type (see denSkies) — passing it in
- * keeps this function pure so fishingView can stay a free, synchronous read off the sailing row.
- */
-export function effectiveSkies(knownWeather = null) {
-    const out = clockSkies();
-    const w = String(knownWeather || "");
-    if (WEATHER_SKIES.has(w)) out.add(w);
-    return [...out];
-}
-
-// The live version: asks sky.js for the weather over the shop. Falls back to time-of-day alone if the weather
-// service is unreachable, so a fetch failure narrows the pool rather than breaking a cast.
-export async function denSkies() {
-    const { skyAtTheDen } = await import("@/lib/marketplace/sky.js");
-    const resolved = await skyAtTheDen().catch(() => null);
-    return effectiveSkies(resolved?.skyType || null);
-}
-
-// Which fish could bite right now, given the skies in effect.
-function poolFor({ voyages = 0, skies = [] }) {
-    return FISH.filter((f) => voyages >= f.minVoyages && (!f.sky || f.sky.some((s) => skies.includes(s))));
-}
-
-// Weighted pick, with non-commons tilted up by Angling.
-function rollSpecies(pool, rareTilt = 0) {
-    if (!pool.length) return FISH[0];
-    const weights = pool.map((f) => f.weight * (f.rarity === "common" ? 1 : 1 + rareTilt));
+// ── THE ROLL ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Every species is in the water on every cast. Angling still tilts the odds toward the good stuff, because a
+// stat that does nothing is worse than no stat — but it can only ever bend the curve, never unlock a species.
+function rollSpecies(rareTilt = 0) {
+    const weights = FISH.map((f) => f.odds * (f.rarity === "common" ? 1 : 1 + rareTilt));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
-    for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r <= 0) return pool[i]; }
-    return pool[pool.length - 1];
+    for (let i = 0; i < FISH.length; i++) { r -= weights[i]; if (r <= 0) return FISH[i]; }
+    return FISH[FISH.length - 1];
 }
 
-// Length in cm from the pre-rolled luck and how well the member reeled.
-function sizeFor(species, roll, quality) {
-    const [min, max] = species.cm;
+// Weight in pounds from the pre-rolled luck and how well the member reeled. Distributed on a CURVE, not
+// linearly: t³ means most fish land in the lower half of the range and a near-maximum specimen is genuinely
+// rare, which is what makes a personal best worth chasing. A linear roll made 2000lb sharks routine.
+function weightFor(species, roll, quality) {
+    const [min, max] = species.lb;
     const t = clamp01(SIZE_FROM_ROLL * clamp01(roll) + SIZE_FROM_QUALITY * clamp01(quality));
-    return round1(min + (max - min) * t);
+    const curved = Math.pow(t, 2.2);
+    const lb = min + (max - min) * curved;
+    return lb < 10 ? Math.round(lb * 100) / 100 : round1(lb);
 }
-// Where this fish sits in its species' size range (0..1) — drives payout and the "monster!" callouts.
-const percentileOf = (species, cm) => clamp01((cm - species.cm[0]) / Math.max(0.01, species.cm[1] - species.cm[0]));
+// Where this fish sits in its species' weight range (0..1) — drives payout and the "monster!" callouts.
+// Measured on the same curve the weight came off, so "82% of max" means 82% of the way up the achievable
+// scale rather than 82% of the raw poundage (which for a whale would be almost unreachable).
+const percentileOf = (species, lb) => clamp01(Math.pow(
+    (Number(lb) - species.lb[0]) / Math.max(0.0001, species.lb[1] - species.lb[0]), 1 / 2.2,
+));
 
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
 // fish_log is `{ [speciesId]: { n, best, firstAt } }` on mkt_sailing — a JSONB map rather than a row per catch,
@@ -226,18 +246,11 @@ const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0
 // ── CLIENT VIEW ──────────────────────────────────────────────────────────────────────────────────────────────
 // PURE function off the sailing row — no extra query, so this is free to include in every sailing state load.
 // `status` is the voyage status decorate() already computed; fishing is only offered at sea or docked.
-export function fishingView(row, angling = 0, status = "idle", sky = null) {
+export function fishingView(row, angling = 0, status = "idle") {
     const log = logOf(row);
-    const voyages = Number(row?.voyages_completed) || 0;
     const max = castsPerDay(angling);
     const used = castsUsed(row);
     const hooked = row?.fish_state || null;
-    // Takes the already-resolved list (getSailingState hands down denSkies()), or a bare weather string for
-    // any caller that still has one. Stays synchronous either way so this is free on every sailing load.
-    const skies = Array.isArray(sky) ? sky : effectiveSkies(sky);
-    const pool = poolFor({ voyages, skies });
-    // Species the member has SEEN (their log) plus which of the rest could bite here — enough for a progress
-    // ring and an "unknown waters" teaser, without leaking exactly which mythic is swimming under the boat.
     const caughtIds = Object.keys(log);
     return {
         available: status === "sailing" || status === "arrived",
@@ -249,22 +262,18 @@ export function fishingView(row, angling = 0, status = "idle", sky = null) {
         totalCaught: Number(row?.fish_caught) || 0,
         speciesKnown: caughtIds.length,
         speciesTotal: FISH_COUNT,
-        // The full log, always — this is the actual reward, so it should never be a second round-trip.
+        // The full log, always — this is the actual reward, so it should never be a second round-trip. Every
+        // species shows its real odds now: with nothing gated there's no unlock to spoil, and "1 in 500" is a
+        // better hook than a vague hint about deeper water.
         log: FISH.map((f) => {
             const e = log[f.id];
-            const inRange = voyages >= f.minVoyages && (!f.sky || f.sky.some((s) => skies.includes(s)));
             return {
                 id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
-                cm: f.cm, gold: f.gold,
+                lb: f.lb, gold: f.gold, odds: f.odds,
                 caught: Number(e?.n) || 0,
-                best: e?.best ? round1(Number(e.best)) : null,
-                // Never spoil an unseen species' unlock condition beyond a nudge — "bites at night" is a hint
-                // worth chasing; "requires 34 voyages" is a spreadsheet.
-                hint: e ? null : (f.sky ? `bites in the ${f.sky[0]}` : (f.minVoyages > voyages ? "deeper water" : "out there somewhere")),
-                biting: inRange,
+                best: e?.best ? Number(e.best) : null,
             };
         }),
-        poolSize: pool.length,
     };
 }
 
@@ -280,17 +289,12 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const max = castsPerDay(angling);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
-    // Resolved here, not taken from the caller — this is the roll that decides which species is on the line,
-    // so it must not be something the client can influence.
-    const skies = await denSkies();
-    const pool = poolFor({ voyages: Number(row.voyages_completed) || 0, skies });
-    const species = rollSpecies(pool, anglingEffects(angling).rareTilt);
+    const species = rollSpecies(anglingEffects(angling).rareTilt);
     const state = {
         species: species.id,
-        roll: Math.round(Math.random() * 1000) / 1000,     // the luck half of the final size
+        roll: Math.round(Math.random() * 1000) / 1000,     // the luck half of the final weight
         castAt: Date.now(),
         biteAt: Date.now() + Math.round(BITE_MIN_MS + Math.random() * (BITE_MAX_MS - BITE_MIN_MS)),
-        sky: skies[0] || null,
     };
     // One statement spends the cast AND puts the fish on the line, guarded on fish_state IS NULL so two taps
     // can't both cast. The day roll-over is handled inline: a stale fish_day resets the counter to 1.
@@ -356,7 +360,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
 
     // ── THE CATCH ────────────────────────────────────────────────────────────────────────────────────────────
     const q = clamp01(quality);
-    const cm = sizeFor(species, state.roll, q);
+    const cm = weightFor(species, state.roll, q);   // pounds; the column is still named cm (see migration 287)
     const pct = percentileOf(species, cm);
     // Payout scales from 45% of the species value at the small end to 100% at the top of its range, so a
     // well-reeled fish is worth roughly double a badly-reeled one of the same species — never zero.
@@ -383,28 +387,47 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // Every catch is also a row on the record board — that's the social half of the feature, and it makes the
     // "biggest in the Den" board possible without any extra bookkeeping.
     await db.query(
-        `INSERT INTO mkt_fish_catch (buyer_id, species, cm, quality, sky) VALUES ($1, $2, $3, $4, $5)`,
-        [buyerId, species.id, cm, Math.round(q * 1000) / 1000, state.sky || null]
+        `INSERT INTO mkt_fish_catch (buyer_id, species, lb, quality) VALUES ($1, $2, $3, $4)`,
+        [buyerId, species.id, cm, Math.round(q * 1000) / 1000]
     ).catch(() => {});
 
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
     await awardXp(buyerId, "sail_fish", { points: xp, gold }).catch(() => {});
     await logCoin(buyerId, gold, "fishing", { meta: { species: species.id, cm, quality: q } }).catch(() => {});
 
-    // Sprinkles that feed the forge loop rather than a closed fishing economy.
+    // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────
+    // One weighted roll off the species' rarity table. Every branch is best-effort: a failure to grant the
+    // bonus must never cost the member the fish they just landed.
     const extras = [];
-    const fragChance = FRAGMENT_CHANCE[species.rarity] || 0;
-    if (fragChance && Math.random() < fragChance) {
+    const kind = rollHaul(species.rarity);
+    if (kind === "fragment") {
+        const n = FRAGMENT_COUNT[species.rarity] || 1;
         const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-        await grantFragment(buyerId, 1).catch(() => {});
-        extras.push({ kind: "fragment", label: "Hull Fragment", emoji: "🔷" });
-    }
-    if (species.rarity === "mythic") {
-        await addChests(buyerId, { [CHEST_ON_MYTHIC]: 1 }, { source: "fishing" }).catch(() => {});
-        extras.push({ kind: "chest", label: "Gold Chest", emoji: "🧰" });
-    } else if (personalBest && RARITY_RANK[species.rarity] >= RARITY_RANK.legendary) {
-        await addChests(buyerId, { [CHEST_ON_RECORD_LEGENDARY]: 1 }, { source: "fishing" }).catch(() => {});
-        extras.push({ kind: "chest", label: "Iron Chest", emoji: "🧰" });
+        await grantFragment(buyerId, n).catch(() => {});
+        extras.push({ kind: "fragment", label: n > 1 ? `${n} Hull Shards` : "Hull Shard", emoji: "🔷", n });
+    } else if (kind === "seed") {
+        const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
+        const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
+        if (seed) extras.push({ kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null });
+    } else if (kind === "consumable") {
+        const reach = CONSUMABLE_REACH[species.rarity] ?? 2;
+        const pool = FISH_CONSUMABLES.slice(0, reach + 1);
+        const id = pool[randInt(pool.length)];
+        const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
+        await grantConsumable(buyerId, id, 1).catch(() => {});
+        const def = CONSUMABLES?.[id];
+        extras.push({ kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id });
+    } else if (kind === "gear") {
+        const got = await grantFishingGear(buyerId, species.rarity).catch(() => null);
+        if (got) extras.push({ kind: "gear", label: got.name, emoji: "⚔️", id: got.id, rarity: got.rarity });
+    } else if (kind === "chest") {
+        const tier = CHEST_TIER[species.rarity] || "wooden";
+        await addChests(buyerId, { [tier]: 1 }, { source: "fishing" }).catch(() => {});
+        extras.push({ kind: "chest", label: `${tier[0].toUpperCase()}${tier.slice(1)} Chest`, emoji: "🧰", tier });
+    } else if (kind === "pet") {
+        const { maybeGrantFishingPet } = await import("@/lib/marketplace/pet-drops.js");
+        const pet = await maybeGrantFishingPet(buyerId, species.rarity).catch(() => null);
+        if (pet) extras.push({ kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity });
     }
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
@@ -412,14 +435,14 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
 
     // Is this the biggest one in the whole Den? Checked after the insert, so it includes this catch.
     const denBest = await db.queryOne(
-        `SELECT buyer_id, cm FROM mkt_fish_catch WHERE species = $1 ORDER BY cm DESC, caught_at ASC LIMIT 1`,
+        `SELECT buyer_id, lb FROM mkt_fish_catch WHERE species = $1 ORDER BY lb DESC, caught_at ASC LIMIT 1`,
         [species.id]
     ).catch(() => null);
-    const denRecord = denBest && String(denBest.buyer_id) === String(buyerId) && Number(denBest.cm) === cm;
+    const denRecord = denBest && String(denBest.buyer_id) === String(buyerId) && Number(denBest.lb) === cm;
 
     return {
         ok: true, landed: true,
-        fish: { id: species.id, name: species.name, emoji: species.emoji, rarity: species.rarity, cm, range: species.cm },
+        fish: { id: species.id, name: species.name, emoji: species.emoji, rarity: species.rarity, lb: cm, range: species.lb },
         pct: Math.round(pct * 100),
         gold, xp, extras,
         quality: q,
@@ -449,7 +472,7 @@ export async function checkFishingBadges(buyerId) {
     const mythics = FISH.filter((f) => f.rarity === "mythic").map((f) => f.id);
     if (mythics.some((id) => log[id])) await grantEventBadge(buyerId, "fish_deepwater").catch(() => {});
     // A fish within 2% of its species maximum — a genuinely perfect specimen.
-    const trophy = FISH.some((f) => { const e = log[f.id]; return e && Number(e.best) >= f.cm[1] * 0.98; });
+    const trophy = FISH.some((f) => { const e = log[f.id]; return e && Number(e.best) >= f.lb[1] * 0.98; });
     if (trophy) await grantEventBadge(buyerId, "fish_trophy").catch(() => {});
     // Holding the Den record for any species right now — but only where a record was actually CONTESTED.
     //
@@ -463,7 +486,7 @@ export async function checkFishingBadges(buyerId) {
          ), leaders AS (
              SELECT DISTINCT ON (c.species) c.species, c.buyer_id
                FROM mkt_fish_catch c JOIN contested x ON x.species = c.species
-              ORDER BY c.species, c.cm DESC, c.caught_at ASC
+              ORDER BY c.species, c.lb DESC, c.caught_at ASC
          )
          SELECT 1 FROM leaders WHERE buyer_id = $1 LIMIT 1`,
         [buyerId]
@@ -481,10 +504,10 @@ export async function checkFishingBadges(buyerId) {
 // Rarity breaks ties, so a perfect Kraken still outranks a perfect Sardine.
 export async function denTopCatches(limit = 25) {
     const rows = await db.query(
-        `SELECT c.buyer_id, c.species, c.cm, c.caught_at,
+        `SELECT c.buyer_id, c.species, c.lb, c.caught_at,
                 COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias
            FROM mkt_fish_catch c LEFT JOIN mkt_buyer b ON b.id = c.buyer_id
-          ORDER BY c.cm DESC LIMIT 600`
+          ORDER BY c.lb DESC LIMIT 600`
     ).catch(() => []);
     return (rows || [])
         .map((r) => {
@@ -492,13 +515,13 @@ export async function denTopCatches(limit = 25) {
             if (!f) return null;
             return {
                 species: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
-                cm: round1(Number(r.cm)), max: f.cm[1],
-                pct: Math.round(percentileOf(f, Number(r.cm)) * 100),
+                lb: Number(r.lb), max: f.lb[1],
+                pct: Math.round(percentileOf(f, Number(r.lb)) * 100),
                 who: r.who || null, alias: r.alias || null, at: r.caught_at || null,
             };
         })
         .filter(Boolean)
-        .sort((a, b) => (b.pct - a.pct) || (RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]) || (b.cm - a.cm))
+        .sort((a, b) => (b.pct - a.pct) || (RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity]) || (b.lb - a.lb))
         .slice(0, Math.max(1, Math.min(100, limit)));
 }
 
@@ -506,17 +529,17 @@ export async function denTopCatches(limit = 25) {
 // Biggest of every species anyone in the Den has ever landed. This is the leaderboard the log is chasing.
 export async function denFishRecords() {
     const rows = await db.query(
-        `SELECT DISTINCT ON (c.species) c.species, c.cm, c.caught_at,
+        `SELECT DISTINCT ON (c.species) c.species, c.lb, c.caught_at,
                 COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias
            FROM mkt_fish_catch c LEFT JOIN mkt_buyer b ON b.id = c.buyer_id
-          ORDER BY c.species, c.cm DESC, c.caught_at ASC`
+          ORDER BY c.species, c.lb DESC, c.caught_at ASC`
     ).catch(() => []);
     const byId = new Map((rows || []).map((r) => [r.species, r]));
     return FISH.map((f) => {
         const r = byId.get(f.id);
         return {
-            id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity, max: f.cm[1],
-            record: r ? round1(Number(r.cm)) : null,
+            id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity, max: f.lb[1],
+            record: r ? Number(r.lb) : null,
             who: r?.who || null, alias: r?.alias || null,
             at: r?.caught_at || null,
         };
