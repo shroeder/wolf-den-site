@@ -319,20 +319,29 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [weather, setWeather] = useState({ tod: "day", condition: "clear", isDay: true, located: false });
     useEffect(() => {
         const t0 = setTimeout(() => setWeather((w) => ({ ...w, tod: hourToTod(new Date().getHours()) })), 0);
-        if (typeof navigator === "undefined" || !navigator.geolocation) return () => clearTimeout(t0);
+
+        // Only 3 of ~1000 visitors have ever granted location, so gating the weather call on permission left the
+        // farm permanently sunny for essentially everyone. The Den's own coordinates are the fallback: real
+        // weather for all, and granting location just upgrades it to YOUR weather.
+        const DEN = { lat: 44.4383, lon: -93.5836 };
+        const load = async ({ lat, lon }, located) => {
+            const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}&current=weather_code,is_day&timezone=auto`)
+                .then((x) => (x.ok ? x.json() : null))
+                .catch(() => null);
+            const cur = r?.current;
+            if (!cur) return;
+            const isDay = cur.is_day === 1;
+            setWeather({ tod: hourToTod(new Date().getHours(), isDay), condition: wmoToCondition(cur.weather_code), isDay, located });
+        };
+
+        if (typeof navigator === "undefined" || !navigator.geolocation) { load(DEN, false); return () => clearTimeout(t0); }
         navigator.geolocation.getCurrentPosition(
-            async (pos) => {
+            (pos) => {
                 const { latitude, longitude } = pos.coords || {};
-                if (latitude == null) return;
-                const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(2)}&longitude=${longitude.toFixed(2)}&current=weather_code,is_day&timezone=auto`)
-                    .then((x) => (x.ok ? x.json() : null))
-                    .catch(() => null);
-                const cur = r?.current;
-                if (!cur) return;
-                const isDay = cur.is_day === 1;
-                setWeather({ tod: hourToTod(new Date().getHours(), isDay), condition: wmoToCondition(cur.weather_code), isDay, located: true });
+                if (latitude == null) { load(DEN, false); return; }
+                load({ lat: latitude, lon: longitude }, true);
             },
-            () => {},
+            () => load(DEN, false), // denied or timed out → the weather over the shop
             { timeout: 8000, maximumAge: 1800000 }
         );
     }, []);

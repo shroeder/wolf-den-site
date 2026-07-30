@@ -233,26 +233,34 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
     // from under anyone mid-session. On plain page loads the cached sky is applied before paint (below).
+    // Fetch the sky. WITHOUT coords the server answers with the weather over the shop, which is the whole point:
+    // only 3 of ~1000 visitors have ever granted location, so gating this call on permission meant the
+    // real-weather system reached almost nobody and everyone else got a naive clock guess with no weather in it.
+    // Location is now an upgrade (YOUR storm instead of the Den's), not the price of admission.
+    const fetchAmbiance = useCallback(async (coords, applyLive) => {
+        try {
+            const qs = coords ? `?lat=${coords.latitude}&lon=${coords.longitude}` : "";
+            const r = await fetch(`/api/marketplace/sailing/ambiance${qs}`, { cache: "no-store" });
+            const d = r.ok ? await r.json().catch(() => null) : null;
+            if (!d?.sky) return;
+            try { localStorage.setItem("wolfden-sail-sky", JSON.stringify({ sky: d.sky, at: Date.now() })); } catch { /* ignore */ }
+            try { document.cookie = `wolfden-sail-sky=${d.sky}; path=/; max-age=${45 * 60}; samesite=lax`; } catch { /* ignore */ } // so next refresh's SSR uses the real-weather sky
+            if (applyLive) setSky(d.sky);
+        } catch { /* keep the current sky */ }
+    }, []);
+
     const requestAmbiance = useCallback((applyLive) => {
-        if (typeof navigator === "undefined" || !navigator.geolocation) return;
+        if (typeof navigator === "undefined" || !navigator.geolocation) { fetchAmbiance(null, applyLive); return; }
         navigator.geolocation.getCurrentPosition(
-            async (pos) => {
+            (pos) => {
                 try { localStorage.setItem("wolfden-sail-geo", "1"); } catch { /* ignore */ }
                 setGeoPrompt(false);
-                try {
-                    const r = await fetch(`/api/marketplace/sailing/ambiance?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`, { cache: "no-store" });
-                    const d = r.ok ? await r.json().catch(() => null) : null;
-                    if (d?.sky) {
-                        try { localStorage.setItem("wolfden-sail-sky", JSON.stringify({ sky: d.sky, at: Date.now() })); } catch { /* ignore */ }
-                        try { document.cookie = `wolfden-sail-sky=${d.sky}; path=/; max-age=${45 * 60}; samesite=lax`; } catch { /* ignore */ } // so next refresh's SSR uses the real-weather sky
-                        if (applyLive) setSky(d.sky); // only on an explicit tap — a change they asked for
-                    }
-                } catch { /* keep the current sky */ }
+                fetchAmbiance(pos.coords, applyLive); // only swaps live on an explicit tap — a change they asked for
             },
-            () => { if (applyLive) setGeoPrompt(false); }, // denied
+            () => { if (applyLive) setGeoPrompt(false); fetchAmbiance(null, applyLive); }, // denied → the Den's sky
             { timeout: 8000, maximumAge: 30 * 60 * 1000 },
         );
-    }, []);
+    }, [fetchAmbiance]);
 
     // Decide the sky ONCE, before the browser paints, so it never visibly switches on you: use a fresh cached
     // real-weather sky if we have one, else the local time of day. Then quietly refresh the cache for next load
@@ -269,9 +277,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         try { document.cookie = `wolfden-sail-sky=${chosen}; path=/; max-age=${45 * 60}; samesite=lax`; } catch { /* ignore */ }
         let pref = null;
         try { pref = localStorage.getItem("wolfden-sail-geo"); } catch { /* ignore */ }
-        if (pref === "1") requestAmbiance(false);   // refresh cache for NEXT load — no live swap
-        else if (pref !== "no") setGeoPrompt(true);
-    }, [requestAmbiance]);
+        if (pref === "1") {
+            requestAmbiance(false);   // they opted in — refresh their own sky for NEXT load, no live swap
+        } else {
+            // Everyone else — which is nearly everyone — gets the Den's real weather instead of a clock guess.
+            // Applied live only when there was no fresh cached sky: "don't change it out from under them" was
+            // about not overriding a sky they'd chosen, and on a cold load there is nothing to override.
+            const hadCache = chosen !== `/images/sailing/sky-${t}.png`;
+            fetchAmbiance(null, !hadCache);
+            if (pref !== "no") setGeoPrompt(true);
+        }
+    }, [requestAmbiance, fetchAmbiance]);
 
     const stateRef = useRef(state);
     useEffect(() => { stateRef.current = state; }, [state]);
