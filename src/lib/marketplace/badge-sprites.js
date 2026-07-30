@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { SMALL_ICON_EXTRA, housePrompt } from "@/lib/marketplace/art-style.js";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
 
 // AI-generated badge art (one small sprite per badge slug), stored in mkt_badge_sprite. Mirrors the item
@@ -26,15 +27,12 @@ export async function badgeSpriteMap() {
 // ask for a bold, simple, centered emblem that reads at ~24px — which also keeps them on-brand and cheap.
 function buildBadgePrompt(badge) {
     const theme = [badge.label, badge.description].filter(Boolean).join(" — ");
-    return (
-        `Flat 2D game achievement badge emblem representing: "${theme}". ` +
-        `A single bold centered emblem / crest that fills most of the frame, clean confident outlines, ` +
-        `cel-shaded flat vibrant colors, strong readable silhouette, fantasy trading-card-game / RPG achievement ` +
-        `art style. Dominant accent color ${badge.color || "#c8a24a"}. ` +
-        `Die-cut on a FULLY TRANSPARENT background — nothing behind it: no backdrop, no scene, no glow, no ` +
-        `vignette, no drop shadow, no card, no frame. No text, no letters, no numbers, no logo, no watermark, ` +
-        `no border ring. Must stay clearly legible shrunk to 24 pixels.`
-    );
+    // Asking for a "Flat 2D badge emblem" produced literal flat two-colour vector icons — the odd ones out
+    // against the fully-shaded gear and pets. Same house style as everything else now, just tuned for a subject
+    // that renders tiny (SMALL_ICON_EXTRA), so badges belong to the set instead of looking like clip art.
+    return housePrompt(`A fantasy RPG achievement badge emblem — a single bold heraldic crest representing: "${theme}".`, {
+        extra: `${SMALL_ICON_EXTRA} Dominant accent colour ${badge.color || "#c8a24a"}. No encircling border ring.`,
+    });
 }
 
 // Generate + store a single badge's sprite. Cheap settings (low quality) since it renders tiny. Best-effort:

@@ -1,16 +1,20 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
 import { faceBufferRight, generateImage, storePng, detectFacing } from "@/lib/marketplace/openai-image.js";
 
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
 // them in the boss scene. Same art universe as the member/boss sprites (transparent, full-body).
-const STYLE =
-    "2D video-game creature companion sprite, full body, cute but fierce, facing and looking toward the RIGHT side of the image (a right-facing three-quarter view, turned toward the enemy), bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered, polished RPG game-art style, transparent background, no text, no logo, no watermark, no border.";
+// Pose/framing direction only — the LOOK comes from the shared house style, so pets, gear and decorations all
+// read as one set. Facing right matters mechanically: the sprite fights beside you toward the enemy.
+const POSE =
+    "Full body, cute but fierce, facing and looking toward the RIGHT side of the image — a right-facing " +
+    "three-quarter view, turned toward the enemy.";
 
 export function buildPetSpritePrompt(pet) {
-    return `${pet.spritePrompt} — a loyal battle companion. ${STYLE}`;
+    return housePrompt(`${pet.spritePrompt} — a loyal battle companion.`, { extra: POSE });
 }
 
 // Per-LEVEL evolution flavor (Lv1 = the plain base prompt above). Each tier tells the model to make the SAME
@@ -24,7 +28,10 @@ const LEVEL_EVOLUTION = {
 };
 export function buildPetSpriteLevelPrompt(pet, level) {
     const evo = LEVEL_EVOLUTION[level] || "";
-    return `${pet.spritePrompt} — a loyal battle companion, power level ${level} of 5. ${evo} Keep it recognizably the SAME creature, just more powerful. ${STYLE}`;
+    return housePrompt(
+        `${pet.spritePrompt} — a loyal battle companion, power level ${level} of 5. ${evo} Keep it recognizably the SAME creature, just more powerful.`,
+        { extra: POSE }
+    );
 }
 
 // Map of pet_id -> sprite url for every pet that has one.

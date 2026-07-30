@@ -11,11 +11,11 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // finalized custom is granted into mkt_deco_owned as 'custom:<id>' + its sprite into mkt_deco_sprite, so it
 // flows through the normal place/inspect system. Personal-only, never tradeable.
 const MAX_ATTEMPTS = 4; // 1 initial + 3 correction redraws (each is a single image now, so cheaper than the old 3-up)
-// House art style — matches our pets/heroes/items/boss/backgrounds (bold stylized illustration, cel-shaded flat
-// vibrant colors, polished RPG game-art) so creations look part of the same game — but with NO outline enforced
-// (decorations must be outline-free). Decoration-specific: a single object, isolated, no sticker halo (de-halo
-// also strips any white border at render time).
-const ART = "2D video-game decoration art, a single decorative object, bold stylized illustration, cel-shaded flat vibrant colors, soft clean edges with NO outline — absolutely no black outline, no dark contour lines, no ink outline around the subject — strong readable silhouette, polished RPG game-art style, centered and fully isolated on a transparent background, no white sticker border, no ground shadow, no text, no logo, no watermark, no border";
+// Paid custom art has to look like it belongs to the game, so it uses the SHARED house style like everything
+// else. This previously demanded "absolutely no black outline, no dark contour lines, no ink outline" — the exact
+// opposite of the house look — which is a big part of why generated art drifted apart. The sticker-rim ban still
+// applies and lives in art-style.js; ink contours and white sticker rims are different things.
+const ART_SUBJECT_PREFIX = "A single decorative object for a farm:";
 // Build the final image prompt. We first run the player's raw wording through a refinement pass (the image
 // model takes terse descriptions too literally and misses the point) to get a vivid, concrete subject that
 // captures their intent; on any failure we fall back to their literal words. The ART style suffix is always
@@ -24,7 +24,7 @@ async function buildPrompt(desc, correction) {
     const note = String(correction || "").trim() ? ` Adjustments to apply: ${String(correction).trim().slice(0, 200)}.` : "";
     const refined = await refineDecoPrompt(String(desc || ""), String(correction || "")).catch(() => null);
     const subject = refined || `A ${String(desc || "").slice(0, 300)}.${note}`;
-    return `${subject} ${ART}.`;
+    return housePrompt(`${ART_SUBJECT_PREFIX} ${subject}`);
 }
 
 // Turn a raw OpenAI image error into a short, member-friendly reason (so a refused prompt explains itself

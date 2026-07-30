@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSetting, setSetting } from "@/lib/settings.js";
+import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
 
 // AI-generated loot-chest icons (one closed treasure chest per tier), stored as Blob URLs in settings so
@@ -9,15 +10,13 @@ import { generateImage } from "@/lib/marketplace/openai-image.js";
 
 const SETTING_KEY = "chest_art";
 
-// Shared art direction — kept in the same universe as the hero sprites + boss art (cel-shaded RPG). The
-// negative clauses matter: gpt-image-1 will happily draw a cardboard shipping box if you just say "chest".
-const STYLE =
+// Subject + the shared house style. The negative clauses about boxes matter regardless of style: gpt-image-1
+// will happily draw a cardboard shipping box if you just say "chest".
+const STYLE = housePrompt(
     "A fantasy RPG treasure chest with a CURVED DOMED lid, thick metal corner brackets, a big ornate front lock " +
-    "plate with a keyhole, and reinforcing bands with rivets. Closed lid, three-quarter view from slightly above, " +
-    "centered and filling the frame. 2D video-game loot-chest icon, bold stylized illustration, clean confident " +
-    "outlines, cel-shaded vibrant colors, soft rim lighting, dramatic highlights, strong readable silhouette. " +
-    "It is a treasure chest, NOT a cardboard box, NOT a cube, NOT a crate, NOT a suitcase, no packing tape, no flat " +
-    "flaps. Transparent background, no ground, no shadow, no text, no logo, no watermark, no border.";
+    "plate with a keyhole, and reinforcing bands with rivets. Closed lid, three-quarter view from slightly above.",
+    { extra: "It is a treasure chest, NOT a cardboard box, NOT a cube, NOT a crate, NOT a suitcase, no packing tape, no flat flaps." }
+);
 
 export const CHEST_ART_PROMPTS = {
     wooden:
