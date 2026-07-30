@@ -280,20 +280,40 @@ function rollSpecies(rareTilt = 0) {
 //
 // It is also deliberately INVISIBLE: no live score, no percentage, no meter. You fish; you find out what you
 // caught when it surfaces. Watching a number tick up was what killed the reveal in the first place.
-const SIZE_CURVE = 1.6;          // near-maximum specimens stay genuinely rare
+const SIZE_CURVE = 1.6;          // big specimens stay genuinely rare
 const REEL_FLOOR = 0.35;         // the most a flawless reel can lift the bottom, before the curve
+
+// THERE IS NO MAXIMUM. `lb` is the TYPICAL range for the species, not a ceiling — and roughly one cast in
+// forty pushes past the top of it, occasionally by a lot.
+//
+// A hard cap made the chase self-defeating: land one near the top and the honest read is "that's the biggest
+// this gets, no point trying again". Every record, in fishing and in life, exists to be beaten. So the tail is
+// open: the overshoot itself is rolled, most trophies clear the range by a little, and once in a great while
+// something comes up that nobody has a frame of reference for.
+const TROPHY_CHANCE = 0.025;     // how often a catch escapes the typical range at all
+const TROPHY_MAX = 1.9;          // and the most it can multiply the range's span by
 function weightFor(species, roll, quality) {
     const [min, max] = species.lb;
     const floor = clamp01(quality) * REEL_FLOOR;
     const t = Math.max(clamp01(roll), floor);
-    const lb = min + (max - min) * Math.pow(t, SIZE_CURVE);
+    let scaled = Math.pow(t, SIZE_CURVE);
+    // The overshoot rides on a SEPARATE roll, so it isn't just "the top of the distribution" — a trophy is its
+    // own event and can surprise you off an unremarkable reel.
+    if (Math.random() < TROPHY_CHANCE) {
+        // Skewed hard toward small overshoots; the monsters are the tail of the tail.
+        scaled = 1 + (TROPHY_MAX - 1) * Math.pow(Math.random(), 2.6);
+    }
+    const lb = min + (max - min) * scaled;
     return lb < 10 ? Math.round(lb * 100) / 100 : round1(lb);
 }
-// Where this fish sits in its species' weight range (0..1) — drives payout and the "monster!" callouts.
-// Inverted through the same curve, so "82% of max" means 82% of the way up the ACHIEVABLE scale rather than
-// 82% of the raw poundage (which for a whale would be nearly unreachable).
-const percentileOf = (species, lb) => clamp01(Math.pow(
-    (Number(lb) - species.lb[0]) / Math.max(0.0001, species.lb[1] - species.lb[0]), 1 / SIZE_CURVE,
+// Where this fish sits in its species' TYPICAL range. Used internally to scale the payout and to rank the
+// leaderboard — never shown as a "% of max", because a percentage of a maximum tells you you've nearly
+// finished, which is the opposite of what a record board is for.
+//
+// Not clamped at 1 any more: a trophy that beats the typical range scores above 1.0 and outranks everything
+// inside it, which is exactly right.
+const percentileOf = (species, lb) => Math.max(0, Math.pow(
+    Math.max(0, (Number(lb) - species.lb[0])) / Math.max(0.0001, species.lb[1] - species.lb[0]), 1 / SIZE_CURVE,
 ));
 
 // ── THE LOG ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -464,9 +484,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const q = clamp01(quality);
     const cm = weightFor(species, state.roll, q);   // pounds; the column is still named cm (see migration 287)
     const pct = percentileOf(species, cm);
-    // Payout scales from 45% of the species value at the small end to 100% at the top of its range, so a
-    // well-reeled fish is worth roughly double a badly-reeled one of the same species — never zero.
-    const scale = 0.45 + 0.55 * pct;
+    // Payout scales from 45% of the species value at the small end to full value at the top of its typical
+    // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.
+    const scale = 0.45 + 0.55 * Math.min(1.6, pct);
     const gold = Math.max(1, Math.round(species.gold * scale));
     const xp = Math.max(1, Math.round(species.xp * scale));
 
@@ -516,7 +536,10 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     return {
         ok: true, landed: true,
         fish: { id: species.id, name: species.name, emoji: species.emoji, rarity: species.rarity, lb: cm, range: species.lb },
-        pct: Math.round(pct * 100),
+        // No percentage-of-max is sent any more — nothing displays one. `beatsRange` marks the genuine
+        // freaks (heavier than the species' typical range) and denBest gives the record to beat.
+        beatsRange: cm > species.lb[1],
+        denBest: denBest ? Number(denBest.lb) : null,
         gold, xp, extras,
         quality: q,
         firstEver, personalBest, denRecord,
@@ -544,8 +567,9 @@ export async function checkFishingBadges(buyerId) {
     // Landed one of the four mythics.
     const mythics = FISH.filter((f) => f.rarity === "mythic").map((f) => f.id);
     if (mythics.some((id) => log[id])) await grantEventBadge(buyerId, "fish_deepwater").catch(() => {});
-    // A fish within 2% of its species maximum — a genuinely perfect specimen.
-    const trophy = FISH.some((f) => { const e = log[f.id]; return e && Number(e.best) >= f.lb[1] * 0.98; });
+    // Landed something BIGGER than its species' typical range — a genuine freak of a fish. Was "within 2% of
+    // the maximum", which stopped meaning anything once the range stopped being a ceiling.
+    const trophy = FISH.some((f) => { const e = log[f.id]; return e && Number(e.best) > f.lb[1]; });
     if (trophy) await grantEventBadge(buyerId, "fish_trophy").catch(() => {});
     // Holding the Den record for any species right now — but only where a record was actually CONTESTED.
     //
@@ -565,6 +589,31 @@ export async function checkFishingBadges(buyerId) {
         [buyerId]
     ).catch(() => null);
     if (holds) await grantEventBadge(buyerId, "fish_record_holder").catch(() => {});
+}
+
+// ── SOMEONE ELSE'S LOG ───────────────────────────────────────────────────────────────────────────────────────
+// For the member inspection screen. A collection nobody else can look at is half a collection — the whole
+// point of filling one in is that it can be shown off, and comparing your Marlin against theirs is the reason
+// to keep casting after you've seen every species.
+//
+// Returns only what's been CAUGHT: an empty species list on someone else's profile would hand out the full
+// roster of an unreleased feature, and it reads as a list of their failures rather than their trophies.
+export async function memberFishLog(buyerId) {
+    if (!buyerId) return null;
+    const row = await db.queryOne(
+        `SELECT fish_log, COALESCE(fish_caught, 0) AS n FROM mkt_sailing WHERE buyer_id = $1`, [buyerId],
+    ).catch(() => null);
+    const log = (row?.fish_log && typeof row.fish_log === "object") ? row.fish_log : {};
+    const caught = FISH
+        .filter((f) => log[f.id])
+        .map((f) => ({
+            id: f.id, name: f.name, emoji: f.emoji, rarity: f.rarity,
+            caught: Number(log[f.id]?.n) || 0,
+            best: log[f.id]?.best ? Number(log[f.id].best) : null,
+            beatsRange: Number(log[f.id]?.best || 0) > f.lb[1],
+        }))
+        .sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || (b.best || 0) - (a.best || 0));
+    return { total: Number(row?.n) || 0, known: caught.length, species: FISH_COUNT, caught };
 }
 
 // ── TOP CATCHES ──────────────────────────────────────────────────────────────────────────────────────────────

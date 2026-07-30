@@ -283,9 +283,9 @@ export function FishingLog({ log, known, total, records, onClose }) {
     return (
         <div className="fish-log">
             <div className="fish-log-tabs">
-                <button type="button" className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>📖 My Log</button>
+                <button type="button" className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>📖 My Collection</button>
                 <button type="button" className={tab === "top" ? "on" : ""} onClick={() => setTab("top")}>🏆 Top Catches</button>
-                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🥇 Records</button>
+                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🥇 Species Records</button>
             </div>
             {tab === "log" ? (
                 <>
@@ -315,7 +315,7 @@ export function FishingLog({ log, known, total, records, onClose }) {
                 <>
                     {/* Scored against each species' own maximum, so this isn't just a list of whales — and so a
                         perfect Sardine on your first day can genuinely sit at the top of the Den. */}
-                    <p className="fish-log-progress">Best catches in the Den — how close each came to the biggest that species gets</p>
+                    <p className="fish-log-progress">The heaviest catches anyone in the Den has landed</p>
                     <div className="fish-log-grid">
                         {top.map((r, i) => (
                             <div key={`${r.species}-${r.alias}-${r.lb}-${i}`} className="fish-log-row">
@@ -327,7 +327,7 @@ export function FishingLog({ log, known, total, records, onClose }) {
                                 </span>
                                 <span className="fish-log-best">
                                     <strong>{weightLabel(r.lb)}</strong>
-                                    <em>{r.pct}% of max</em>
+                                    {r.lb > r.max ? <em className="fish-over">🏆 record class</em> : null}
                                 </span>
                             </div>
                         ))}
@@ -552,7 +552,7 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                             <button type="button" className="fish-cta" disabled={casts.left <= 0} onClick={() => { setResult(null); setPhase("idle"); }}>
                                 {casts.left <= 0 ? "That's your last cast today" : "Cast again 🎣"}
                             </button>
-                            <button type="button" className="fish-ghost" onClick={openLog}>📖 Log</button>
+                            <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
                     </div>
                 ) : result ? (
@@ -578,21 +578,21 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{result.fish.name}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.fish.rarity] }}>{RARITY_LABEL[result.fish.rarity]}</div>
                         <div className="fish-size">{weightLabel(result.fish.lb)}</div>
-                        <div className="fish-pct">
-                            <div className="fish-pct-bar"><div className="fish-pct-fill" style={{ width: `${result.pct}%`, background: RARITY_COLOR[result.fish.rarity] }} /></div>
-                            <span>{result.pct}% of the biggest this species gets</span>
-                        </div>
-                        {/* Weight against the two numbers that actually mean something: what YOU'VE landed
-                            before, and what the species can reach. Without these a weight is just a number. */}
+                        {/* No "% of max" and no "species max". There is no maximum any more (weightFor rolls
+                            an open-ended trophy tail), and a percentage-toward-a-ceiling reads as "nearly
+                            done — no point trying again", which is the opposite of what a record board is for.
+                            The comparisons that survive are the two that can always be beaten. */}
+                        {result.beatsRange ? <div className="fish-trophy-flag">🏆 BIGGER THAN ANY ON RECORD FOR ITS KIND</div> : null}
                         <div className="fish-compare">
                             <div className={`fish-compare-cell${result.personalBest ? " is-beat" : ""}`}>
                                 <em>your best</em>
-                                <b>{result.personalBest && result.previousBest ? weightLabel(result.previousBest) : weightLabel(result.previousBest || result.fish.lb)}</b>
+                                <b>{weightLabel(result.personalBest ? result.fish.lb : (result.previousBest || result.fish.lb))}</b>
                                 {result.personalBest ? <span className="fish-compare-tag">BEATEN</span> : null}
                             </div>
-                            <div className="fish-compare-cell">
-                                <em>species max</em>
-                                <b>{weightLabel(result.fish.range?.[1])}</b>
+                            <div className={`fish-compare-cell${result.denRecord ? " is-beat" : ""}`}>
+                                <em>den record</em>
+                                <b>{weightLabel(result.denRecord ? result.fish.lb : (result.denBest || result.fish.lb))}</b>
+                                {result.denRecord ? <span className="fish-compare-tag">YOURS</span> : null}
                             </div>
                         </div>
                         <div className="fish-spoils">
@@ -604,7 +604,7 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                             <button type="button" className="fish-cta" disabled={casts.left <= 0} onClick={() => { setResult(null); setPhase("idle"); }}>
                                 {casts.left <= 0 ? "That's your last cast today" : "Cast again 🎣"}
                             </button>
-                            <button type="button" className="fish-ghost" onClick={openLog}>📖 Log</button>
+                            <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
                     </div>
                 ) : null}

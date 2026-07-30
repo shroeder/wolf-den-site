@@ -12182,6 +12182,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-band-label { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.56rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(190,255,215,0.85); pointer-events: none; }
 .fish-top-rank { flex: 0 0 auto; min-width: 20px; text-align: right; font-size: 0.8rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
 .fish-log-art { flex: 0 0 auto; object-fit: contain; }
+.fish-over { color: #ffd75e !important; font-weight: 900; }
+/* A catch heavier than anything its species is supposed to reach. Rare enough to shout about. */
+.fish-trophy-flag { margin: 8px 0 2px; padding: 7px 14px; border-radius: 999px; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.06em;
+    color: #2a1400; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 0 22px rgba(255,215,94,0.55); animation: twTrophyPop 0.7s cubic-bezier(.2,1.6,.4,1) both; }
 
 /* ── The dedicated fishing screen ────────────────────────────────────────────────────────────────────────── */
 .fishhome { max-width: 620px; margin: 0 auto; padding: 14px 12px 40px; }

@@ -7,6 +7,7 @@ import AvatarStack from "@/components/AvatarStack";
 import CardTab from "@/components/CardTab";
 import FeaturedCollectible from "@/components/FeaturedCollectible";
 import ProfileActions from "@/components/ProfileActions";
+import PublicFishing from "@/components/PublicFishing";
 import PublicGear from "@/components/PublicGear";
 import PublicPets from "@/components/PublicPets";
 import UserBadges from "@/components/UserBadges";
@@ -14,6 +15,8 @@ import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { memberFishLog } from "@/lib/marketplace/fishing.js";
+import { fishingUnlocked } from "@/lib/marketplace/sailing.js";
 import { collectibleById, petActive, petPassive, petSpecialPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { friendStatus } from "@/lib/marketplace/friends.js";
 import { getInventory } from "@/lib/marketplace/inventory.js";
@@ -92,6 +95,9 @@ export default async function UserProfilePage({ params }) {
         getPetSpriteLevelData().catch(() => ({})),
     ]);
     const fmtStat = (s) => String(s || "").replace(/_/g, " ");
+    // Owner-gated: only someone who can fish sees anyone's fishing log, so an unreleased feature doesn't
+    // surface on every member profile in the Den.
+    const fishLog = viewer && fishingUnlocked(viewer.id) ? await memberFishLog(profile.id).catch(() => null) : null;
     const petsData = (pets.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
@@ -192,6 +198,17 @@ export default async function UserProfilePage({ params }) {
                 <p className="muted" style={{ marginTop: 0 }}>Companions {profile.displayLabel} has collected — from leveling, chests, the boss, and the shop.</p>
                 <PublicPets pets={petsData} canTrade={Boolean(viewer && viewer.id !== profile.id)} targetAlias={profile.alias} />
             </section>
+
+            {/* Their fishing collection. Gated on the VIEWER being able to fish at all — fishing is still
+                owner-only, so this must not advertise itself on every profile in the Den. Renders nothing
+                unless they've actually landed something. */}
+            {fishLog?.caught?.length ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>🎣 Fishing Log</h2>
+                    <p className="muted" style={{ marginTop: 0 }}>The biggest of each species {profile.displayLabel} has landed.</p>
+                    <PublicFishing log={fishLog} displayLabel={profile.displayLabel} />
+                </section>
+            ) : null}
         </div>
     );
 }
