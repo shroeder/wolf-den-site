@@ -11286,6 +11286,27 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-xpbar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
 .sail-xpbar > span { display: block; height: 100%; background: linear-gradient(90deg, #4aa3ff, #37f5c0); border-radius: 999px; transition: width 0.4s ease; }
 /* Three compact tiles on one line, instead of three stacked hero CTAs pushing the scene off screen. */
+/* ── SHIP STATIONS ──────────────────────────────────────────────────────────────────────────────────────────
+   Everything below the scene used to be one continuous scroll: boat upgrades, then excavation, then tools,
+   then boat forms. Upgrading meant hunting through a document, and the tools sat at the very bottom of the
+   longest section. Same tab idiom as the farm's Garden/Outside/Inside, so there's nothing new to learn. */
+.sail-stations { display: flex; gap: 6px; padding: 5px; margin: 12px 0 10px; border-radius: 14px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
+.sail-stations button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none;
+    background: transparent; color: #a8b6c8; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.sail-stations button > span { font-size: 16px; }
+.sail-stations button.on { background: linear-gradient(180deg, #7ec8ff, #3f8fd0); color: #06283d;
+    box-shadow: 0 2px 6px rgba(63,143,208,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+@media (hover: hover) { .sail-stations button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0f8; } }
+/* The Rail's at-a-glance numbers. */
+.sail-railstats { display: flex; gap: 8px; }
+.sail-railstats > div { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 10px 6px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; }
+.sail-railstats b { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.sail-railstats b em { font-style: normal; font-size: 0.75rem; color: #8b93a0; }
+.sail-railstats span { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8b93a0; text-align: center; }
+
 .sail-actions { margin-top: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .sail-act { flex: 1 1 0; min-width: 96px; max-width: 168px; display: flex; flex-direction: column; align-items: center; gap: 1px;
     padding: 9px 8px 8px; border-radius: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent;

@@ -200,7 +200,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
-    const [showForms, setShowForms] = useState(false); // the boat-forms gallery is collapsed by default
+    const [showForms, setShowForms] = useState(false);
+    // Which STATION of the ship you're standing at. Everything below the scene used to be one continuous
+    // scroll — boat upgrades, then excavation, then tools, then forms — so upgrading was a hunt through a
+    // document, and the tools sat at the very bottom of the longest section where nobody found them.
+    // Stations give the ship space: each is a short panel about one thing, and the same tab idiom the farm
+    // already uses (Garden / Outside / Inside) so it needs no learning.
+    const [station, setStation] = useState("helm"); // the boat-forms gallery is collapsed by default
     const [toolFx, setToolFx] = useState(null); // { emoji, name, k } — flashes when a dig tool procs
     const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
@@ -951,6 +957,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
+            {/* ── STATIONS ── the ship as a place you move around, not a page you scroll. */}
+            <div className="sail-stations">
+                {[["helm", "⚓", "Helm", "Boat upgrades"], ["dig", "⛏️", "Dig Site", "Tools & excavation"], ["rail", "🎣", "The Rail", "Fishing"]].map(([k, ico, label, sub]) => (
+                    <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub}>
+                        <span aria-hidden="true">{ico}</span>{label}
+                    </button>
+                ))}
+            </div>
+
+            {station === "helm" ? <>
             {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}
             <section className="card" style={{ borderColor: "rgba(96,170,255,0.45)", background: "linear-gradient(180deg, rgba(70,130,220,0.08), transparent 40%)" }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(96,170,255,0.16)", border: "1px solid rgba(96,170,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛵ Sailing</div>
@@ -977,11 +993,33 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
+            </> : null}
+
+            {station === "dig" ? <>
             {/* Excavation — EARTH-themed (amber) so the digging system reads as clearly separate from sailing. */}
             <section className="card" style={{ borderColor: "rgba(214,158,80,0.5)", background: "linear-gradient(180deg, rgba(180,120,50,0.1), transparent 40%)" }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(214,158,80,0.16)", border: "1px solid rgba(214,158,80,0.5)", color: "#e6b878", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛏️ Digging</div>
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Your digging gear — level it with gold. Tools below unlock with <b>🎁 {state.digTools?.chestPoints ?? 0} chests unlocked</b> (earned forging chests — bigger chests count more){state.digTools?.nextUnlock ? <> · next: <b>{state.digTools.nextUnlock.name}</b> at {state.digTools.nextUnlock.unlockPoints}</> : ""}.</p>
+{/* TOOLS FIRST. They were the last thing on the longest section of a long scroll, which is why they read
+                    as an afterthought — they are the most interesting part of digging. */}
+                <div className="sail-tools-head">🧰 Tools <span className="muted">· fire as random procs while you dig — invest to raise the chance</span></div>
+                <div className="sail-tools-list">
+                    {(state.digTools?.tools || []).map((t) => (
+                        <div className={`sail-tool${t.unlocked ? " is-unlocked" : ""}`} key={t.id}>
+                            <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
+                            <div className="sail-tool-body">
+                                <div className="sail-tool-name">{t.name}{t.unlocked ? <span className="muted"> · {(t.procNow * 100).toFixed(1)}% proc</span> : null}</div>
+                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · unlock at 🎁 ${t.unlockPoints} chests unlocked`}</div>
+                            </div>
+                            {t.unlocked ? (
+                                t.maxed ? <button className="pill" disabled>✓ Max</button>
+                                    : state.gold < t.cost ? <CoinCta price={t.cost} have={state.gold} />
+                                        : <button className="btn-ghost sail-tool-buy" disabled={busy} title={`→ ${(t.procNext * 100).toFixed(1)}%`} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}>🪙 {t.cost.toLocaleString()}</button>
+                            ) : null}
+                        </div>
+                    ))}
+                </div>
                 <div className="sail-upgrades is-dig">
                     {digTracks.map((u) => (
                         <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}${upgFlash === `dig:${u.track}` ? " is-bought" : ""}`} key={u.track}>
@@ -1001,25 +1039,34 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         </div>
                     ))}
                 </div>
-                <div className="sail-tools-head">🧰 Tools <span className="muted">· fire as random procs while you dig — invest to raise the chance</span></div>
-                <div className="sail-tools-list">
-                    {(state.digTools?.tools || []).map((t) => (
-                        <div className={`sail-tool${t.unlocked ? " is-unlocked" : ""}`} key={t.id}>
-                            <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
-                            <div className="sail-tool-body">
-                                <div className="sail-tool-name">{t.name}{t.unlocked ? <span className="muted"> · {(t.procNow * 100).toFixed(1)}% proc</span> : null}</div>
-                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · unlock at 🎁 ${t.unlockPoints} chests unlocked`}</div>
-                            </div>
-                            {t.unlocked ? (
-                                t.maxed ? <button className="pill" disabled>✓ Max</button>
-                                    : state.gold < t.cost ? <CoinCta price={t.cost} have={state.gold} />
-                                        : <button className="btn-ghost sail-tool-buy" disabled={busy} title={`→ ${(t.procNext * 100).toFixed(1)}%`} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}>🪙 {t.cost.toLocaleString()}</button>
-                            ) : null}
-                        </div>
-                    ))}
-                </div>
             </section>
 
+            </> : null}
+
+            {/* THE RAIL — fishing's home on the ship. It had none: the only way in was a button that appears
+                mid-voyage, and there was nowhere to put fishing progression at all. */}
+            {station === "rail" && state.fishing ? (
+                <section className="card" style={{ borderColor: "rgba(126,200,255,0.45)", background: "linear-gradient(180deg, rgba(70,170,220,0.08), transparent 40%)" }}>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(126,200,255,0.16)", border: "1px solid rgba(126,200,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>🎣 Fishing</div>
+                    <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>The Rail</h2>
+                    <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Drop a line over the side while you sail. Angling comes from gear and badges — it buys extra casts and tilts what bites.</p>
+                    <div className="sail-railstats">
+                        <div><b>{state.fishing.casts?.left ?? 0}<em>/{state.fishing.casts?.max ?? 0}</em></b><span>casts left</span></div>
+                        <div><b>{state.fishing.speciesKnown ?? 0}<em>/{state.fishing.speciesTotal ?? 0}</em></b><span>species logged</span></div>
+                        <div><b>{state.fishing.angling ?? 0}</b><span>angling</span></div>
+                    </div>
+                    {state.fishing.available ? (
+                        <button className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }} disabled={busy || !state.fishing.casts?.left} onClick={() => setFishOpen(true)}>
+                            🎣 {state.fishing.casts?.left ? "Cast a line" : "Out of casts today"}
+                        </button>
+                    ) : (
+                        <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.82rem" }}>You can only fish once the boat is under way or moored at the island.</p>
+                    )}
+                    <a className="btn-ghost" href="/marketplace/fishing" style={{ display: "block", textAlign: "center", marginTop: 8, textDecoration: "none" }}>📖 Fishing Log &amp; records</a>
+                </section>
+            ) : null}
+
+            {station === "helm" ? <>
             {/* Boat forms — collapsed by default, below the upgrades. 8 milestones, each a new hull + a perk. */}
             <section className="card sail-forms">
                 <button type="button" onClick={() => setShowForms((v) => !v)} aria-expanded={showForms} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}>
@@ -1049,6 +1096,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </>
                 ) : null}
             </section>
+            </> : null}
 
             {/* Win / fail RECAP — you confirm before it returns you to port. */}
             {result ? (
