@@ -70,6 +70,24 @@ export async function checkMerchantBadges(buyerId, { jackpot = false } = {}) {
     if (jackpot) await grantEventBadge(buyerId, "merchant_jackpot").catch(() => {});
 }
 
+// THE HIDDEN GLIMMER — glimmers claimed, plus a completionist badge for owning the whole glint-exclusive set.
+// Called from claimShiny after the atomic claim lands, so the count is always the real one.
+export async function checkGlimmerBadges(buyerId) {
+    if (!buyerId) return;
+    const n = num((await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_shiny WHERE claimed_by = $1`, [buyerId]).catch(() => null))?.n);
+    if (n >= 1) await grantEventBadge(buyerId, "glimmer_spotter").catch(() => {});
+    if (n >= 2) await grantEventBadge(buyerId, "glimmer_keeper").catch(() => {});
+    if (n >= 5) await grantEventBadge(buyerId, "glimmer_hoarder").catch(() => {});
+    // The full set — checked against the live GLINT_DECOS list so adding a glint decoration later automatically
+    // raises the bar rather than leaving the badge trivially earned.
+    const { GLINT_DECOS } = await import("@/lib/marketplace/decorations.js");
+    const have = num((await db.queryOne(
+        `SELECT COUNT(DISTINCT deco_id)::int AS n FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = ANY($2::text[]) AND qty > 0`,
+        [buyerId, GLINT_DECOS]
+    ).catch(() => null))?.n);
+    if (GLINT_DECOS.length && have >= GLINT_DECOS.length) await grantEventBadge(buyerId, "glimmer_complete").catch(() => {});
+}
+
 // DAILY TOWN QUESTS — lifetime claimed count.
 export async function checkTownQuestBadges(buyerId) {
     if (!buyerId) return;

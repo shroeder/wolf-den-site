@@ -6,6 +6,7 @@ import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { checkGlimmerBadges } from "@/lib/marketplace/town-badges.js";
 
 // ── THE HIDDEN SHINY GLINT ───────────────────────────────────────────────────────────────────────────────────
 // A rare sparkle that drifts through the Town background 0-2× a day. It's barely visible (tiny + faint, tucked up
@@ -85,6 +86,7 @@ export async function claimShiny(buyerId, shinyId) {
     await awardXp(buyerId, "shiny_claim", { points: SHINY_XP, gold: SHINY_GOLD }).catch(() => {});
     await addChests(buyerId, { [SHINY_CHEST]: 1 }, { source: "shiny_glint" }).catch(() => {});
     await trackActivity(buyerId, "shiny_claim", { decoId: reward, gold: SHINY_GOLD, xp: SHINY_XP }).catch(() => {});
+    await checkGlimmerBadges(buyerId).catch(() => {});
     const d = decorationById(reward);
     return {
         ok: true,

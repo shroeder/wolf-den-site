@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 
 // ── SHARING A CREATION ───────────────────────────────────────────────────────────────────────────────────────
@@ -100,8 +100,41 @@ async function mintCopy(share, creation) {
     await trackActivity(share.to_buyer_id, "creation_received", { creationId: Number(creation.id), copyId: copy.id }).catch(() => {});
     await syncEarnedBadges(share.from_buyer_id).catch(() => {});
     await syncEarnedBadges(share.to_buyer_id).catch(() => {});
+    await checkShareBadges(share.from_buyer_id, share.to_buyer_id).catch(() => {});
 
     return { ok: true, copyId: copy.id, decoId: newDecoId, name: copy.name };
+}
+
+// ── SHARING BADGES ───────────────────────────────────────────────────────────────────────────────────────────
+// Both sides of a share get recognised, and the pair who traded art in BOTH directions get something neither
+// could earn alone. Counted off accepted shares rather than a counter column, so the numbers can't drift.
+// grantEventBadge is idempotent, so calling this on every mint is safe.
+async function checkShareBadges(giverId, receiverId) {
+    const count = async (sql, params) => Number((await db.queryOne(sql, params).catch(() => null))?.n) || 0;
+
+    const given = await count(
+        `SELECT COUNT(*)::int AS n FROM mkt_creation_share WHERE from_buyer_id = $1 AND status = 'accepted'`, [giverId]);
+    if (given >= 1) await grantEventBadge(giverId, "share_generous").catch(() => {});
+    if (given >= 3) await grantEventBadge(giverId, "share_patron").catch(() => {});
+    if (given >= 10) await grantEventBadge(giverId, "share_legacy").catch(() => {});
+
+    // Received = copies on their farm whose original belongs to somebody else (a copy always has copy_of set).
+    const received = await count(
+        `SELECT COUNT(*)::int AS n FROM mkt_custom_deco c
+           JOIN mkt_custom_deco o ON o.id = c.copy_of
+          WHERE c.buyer_id = $1 AND c.status = 'final' AND o.buyer_id <> $1`, [receiverId]);
+    if (received >= 1) await grantEventBadge(receiverId, "share_collector").catch(() => {});
+    if (received >= 5) await grantEventBadge(receiverId, "share_gallery").catch(() => {});
+
+    // Kindred Spirits — art has flowed BOTH ways between these two. Awarded to both of them at the moment the
+    // return share lands, which is the only point either one has actually completed the exchange.
+    const mutual = await count(
+        `SELECT COUNT(*)::int AS n FROM mkt_creation_share
+          WHERE status = 'accepted' AND from_buyer_id = $2 AND to_buyer_id = $1`, [giverId, receiverId]);
+    if (mutual >= 1) {
+        await grantEventBadge(giverId, "share_mutual").catch(() => {});
+        await grantEventBadge(receiverId, "share_mutual").catch(() => {});
+    }
 }
 
 // ── OWNER OFFERS IT ──────────────────────────────────────────────────────────────────────────────────────────

@@ -312,7 +312,11 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
                         <div className="tw-duel-rewards">
                             {r.xp ? <span className="tw-duel-chip xp">+{r.xp} XP</span> : null}
                             {r.coin ? <span className="tw-duel-chip gold">+{r.coin} 🪙</span> : null}
-                            {(r.loot || []).map((l, i) => <span key={i} className="tw-duel-chip loot">{l.emoji} {l.label}</span>)}
+                            {(r.loot || []).map((l, i) => (
+                                <span key={i} className={`tw-duel-chip loot${l.kind === "gear" ? " scrap" : ""}`}>
+                                    {l.emoji} {l.label}{l.kind === "gear" ? <em> · scrap</em> : null}
+                                </span>
+                            ))}
                             {!r.xp && !r.coin && !(r.loot || []).length ? <span className="muted">No spoils this time.</span> : null}
                         </div>
                         <button type="button" className="tw-levelup-btn" onClick={onClose}>{duel.win ? "Huzzah! 🐺" : "Again! ⚔️"}</button>
@@ -493,7 +497,7 @@ export default function TownClient({ initial }) {
     const shinyBusyRef = useRef(false);
     const [buffCele, setBuffCele] = useState(null); // hangout buff just earned → celebration { pct }
     const buffSeenRef = useRef(false);
-    const [raidHaul, setRaidHaul] = useState({ xp: 0, gold: 0, chests: 0 }); // your running haul this skirmish raid
+    const [raidHaul, setRaidHaul] = useState({ xp: 0, gold: 0, drops: 0 }); // your running haul this skirmish raid (chests + scrap gear)
     const wasRaidingRef = useRef(false);
     const bossKillRef = useRef(false); // set when YOU land the killing blow, so the end-recap defers to bossReward
     const [raidCd, setRaidCd] = useState(false);        // duel cooldown
@@ -736,7 +740,7 @@ export default function TownClient({ initial }) {
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "duel", eventId: ev.id, enemyId, dist }) }).then((x) => x.json()).catch(() => null);
         if (!r?.ok) return; // too_fast / no_event
         if (r.win && typeof r.wins === "number") setRaidKills(r.wins);
-        if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), chests: h.chests + ((r.reward.loot || []).length || 0) }));
+        if (r.win && r.reward) setRaidHaul((h) => ({ xp: h.xp + (r.reward.xp || 0), gold: h.gold + (r.reward.coin || 0), drops: h.drops + ((r.reward.loot || []).length || 0) }));
         setDuel({ enemyId, foeArt: foeArt || null, foeEmoji: r.foeEmoji || ev.emoji, name: ev.name, win: r.win, events: r.events || [], reward: r.reward || { xp: 0, coin: 0, loot: [] }, grade: r.grade || null, gradeLabel: r.gradeLabel || null, capped: Boolean(r.capped), cleared: r.cleared || null });
     }, [state?.event]);
     const closeDuel = useCallback(() => {
@@ -773,10 +777,10 @@ export default function TownClient({ initial }) {
     const wasBossRef = useRef(false);
     useEffect(() => {
         const active = Boolean(state?.event && !state.event.defeated);
-        if (!wasRaidingRef.current && active) { setRaidHaul({ xp: 0, gold: 0, chests: 0 }); setRaidKills(0); } // new raid → reset
+        if (!wasRaidingRef.current && active) { setRaidHaul({ xp: 0, gold: 0, drops: 0 }); setRaidKills(0); } // new raid → reset
         if (active) wasBossRef.current = Boolean(state.event.boss);
         if (wasRaidingRef.current && !active) {
-            if (!bossKillRef.current) setRaidRecap({ kills: raidKills, xp: raidHaul.xp, gold: raidHaul.gold, chests: raidHaul.chests, boss: wasBossRef.current });
+            if (!bossKillRef.current) setRaidRecap({ kills: raidKills, xp: raidHaul.xp, gold: raidHaul.gold, drops: raidHaul.drops, boss: wasBossRef.current });
             bossKillRef.current = false;
         }
         wasRaidingRef.current = active;
@@ -1614,7 +1618,7 @@ export default function TownClient({ initial }) {
                                 <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", margin: "8px 0" }}>
                                     {raidRecap.gold ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#2a1a06", background: "linear-gradient(180deg,#ffe488,#f3b23a)" }}>+{raidRecap.gold.toLocaleString()} 🪙</span> : null}
                                     {raidRecap.xp ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#0a2e1c", background: "linear-gradient(180deg,#8fe39a,#3ec06a)" }}>+{raidRecap.xp.toLocaleString()} ✨ XP</span> : null}
-                                    {raidRecap.chests ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#e0c8ff", background: "rgba(150,90,255,0.2)" }}>🧰 {raidRecap.chests} chest{raidRecap.chests === 1 ? "" : "s"}</span> : null}
+                                    {raidRecap.drops ? <span style={{ padding: "6px 12px", borderRadius: 999, fontWeight: 900, fontSize: 15, color: "#e0c8ff", background: "rgba(150,90,255,0.2)" }}>🎁 {raidRecap.drops} drop{raidRecap.drops === 1 ? "" : "s"}</span> : null}
                                 </div>
                                 <div className="muted" style={{ fontSize: "0.86rem" }}>☠️ {raidRecap.kills} {raidRecap.kills === 1 ? "foe" : "foes"} bested</div>
                             </>
@@ -1867,6 +1871,9 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-duel-chip.xp { color: #0a2e1c; background: linear-gradient(180deg,#8fe39a,#3ec06a); }
 .tw-duel-chip.gold { color: #2a1a06; background: linear-gradient(180deg,#ffe488,#f3b23a); }
 .tw-duel-chip.loot { color: #e0c8ff; background: rgba(150,90,255,0.18); border: 1px solid rgba(184,120,255,0.45); }
+/* Junk gear reads as SCRAP, not treasure — dull steel, so a common drop never masquerades as a real find. */
+.tw-duel-chip.loot.scrap { color: #cfd8e3; background: rgba(150,170,195,0.16); border: 1px solid rgba(170,190,215,0.4); }
+.tw-duel-chip.loot.scrap em { font-style: normal; opacity: 0.65; font-weight: 700; }
 .tw-duel-note { font-size: 0.76rem; font-weight: 800; color: #ffd9a0; }
 .tw-duel-fighting { margin: 12px auto 0; text-align: center; font-weight: 900; font-size: 0.82rem; color: #ffb08a; letter-spacing: 0.03em; animation: twOnlinePulse 1.1s ease-in-out infinite; }
 .tw-openchip { font-size: 0.7rem; font-weight: 800; border-radius: 999px; padding: 2px 9px; color: #e69a9a; background: rgba(224,67,63,0.1); border: 1px solid rgba(224,67,63,0.32); }

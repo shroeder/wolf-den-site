@@ -8,7 +8,7 @@ import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
-import { getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getEquippedStats, getEquippedIds, grantSalvageFodder } from "@/lib/marketplace/inventory.js";
 import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
@@ -66,7 +66,13 @@ const DUEL_THROTTLE_MS = 700;
 const DUEL_WIN_XP = 6;
 const DUEL_WIN_GOLD = 7;
 const DUEL_LOSS_GOLD = 2;       // consolation so a loss is never nothing
-const DUEL_LOOT_CHANCE = 0.03;  // chance a WIN also drops a low-tier chest — chests are meant to be RARE here
+const DUEL_LOOT_CHANCE = 0.06;  // chance a WIN also drops a low-tier chest — still rare, just no longer a novelty
+// ── SALVAGE FODDER ── goblins and bandits are the Den's scrap heap. The Forge consumes gear to make parts, but
+// every other gear source is slow or one-per-lifetime, so smiths run dry of things to melt. A won duel now has a
+// real chance to drop a junk COMMON/RARE piece straight into your bags — worth almost nothing equipped, which is
+// exactly the point: it's fuel. Renewable because salvaging destroys the item, making it droppable again.
+const DUEL_FODDER_CHANCE = 0.14;    // a won duel drops junk gear this often
+const DUEL_FODDER_ELITE_BONUS = 0.16; // + this much when the foe was an elite/chieftain (tougher foe, better scrap)
 // The ceiling that actually binds: total duel spoils ONE fighter can take from ONE raid. Past this, foes still
 // die and still count for damage, badges and quests — there's just no more loot to farm out of a treadmill.
 const DUEL_GOLD_BUDGET = 300;
@@ -655,11 +661,13 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         xp = DUEL_WIN_XP + randInt(0, 6);
         coin = DUEL_WIN_GOLD + randInt(0, 8);
         // Low loot chance on a win.
-        if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
+        if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ kind: "chest", tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
         // Kill the REAL foe on the shared roster (claim → strike), so the whole plaza sees the same board change.
+        let foeKind = null;
         if (enemyId) {
             const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
             if (claim?.ok) {
+                foeKind = claim.kind || null;
                 const st = await strikeEnemy(buyerId, enemyId, claim.hpMax).catch(() => null); // a won duel drops it
                 if (st?.ok && st.waveCleared) {
                     // Wave down. Next wave, or the chieftain, or — after the chieftain — the raid is WON.
@@ -674,6 +682,15 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
                     }
                 }
             }
+        }
+        // SCRAP. A tougher foe was carrying better junk, so elites and the chieftain drop more often. This is
+        // outside the gold/XP ceiling on purpose: the cap exists to stop gold farming, and fodder is the one
+        // reward a smith is SUPPOSED to grind for. It self-limits anyway — you can only be dropped gear you
+        // don't already own, so the supply is exactly "however much you've melted down".
+        const elite = foeKind === "elite" || foeKind === "chieftain";
+        if (Math.random() < DUEL_FODDER_CHANCE + (elite ? DUEL_FODDER_ELITE_BONUS : 0)) {
+            const junk = await grantSalvageFodder(buyerId, { source: "raid_drop" }).catch(() => null);
+            if (junk) loot.push({ kind: "gear", itemId: junk.id, label: junk.name, rarity: junk.rarity, emoji: junk.rarity === "rare" ? "⚙️" : "🔩" });
         }
         // Keep the legacy shared HP bar in step so the raid HUD still reads sensibly.
         const perEnemy = Math.max(1, Math.round((ev.hp_max || 600) / (type.enemies || 6)));

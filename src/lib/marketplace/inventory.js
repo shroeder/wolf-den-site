@@ -198,6 +198,25 @@ export async function grantRandomDrop(buyerId, { source = "boss_drop" } = {}) {
     return res.granted ? pick : null;
 }
 
+// ── SALVAGE FODDER ───────────────────────────────────────────────────────────────────────────────────────────
+// Junk gear, granted on purpose. The Forge eats gear to make parts, but every other source of gear is either
+// slow (chests) or one-per-lifetime, so a smith runs out of things to melt long before they run out of things
+// to enhance. Skirmish foes (goblins/bandits) fill that gap: they drop cheap COMMON/RARE pieces from the chest
+// pool, which is a renewable supply precisely because salvaging destroys the item — melt it and it becomes
+// eligible to drop again. Deliberately capped at rare so this never becomes a shortcut to real gear.
+const FODDER_RARITIES = new Set(["common", "rare"]);
+export async function grantSalvageFodder(buyerId, { source = "raid_drop" } = {}) {
+    if (!buyerId) return null;
+    const pool = ITEMS.filter((i) => i.source === "chest" && FODDER_RARITIES.has(i.rarity) && !i.charged);
+    if (!pool.length) return null;
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+    const candidates = pool.filter((i) => !owned.has(i.id));
+    if (!candidates.length) return null; // owns every scrap already — the caller falls back to gold/chests
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const res = await grantItem(buyerId, pick.id, source);
+    return res.granted ? pick : null;
+}
+
 // Grant a random EARNABLE real-world perk the member doesn't already own (used by play rewards, e.g. a
 // boss win). Only items flagged `earnable` are eligible — the owner still redeems any charge in-store, so
 // real payout stays controlled. Returns the item (with charges) or null if they own them all.

@@ -289,9 +289,15 @@ const BADGE_BONUSES = {
     hype_master: C(2), rival: C(2, 2),
     // ── Level (prestige) → scaling power ──
     night_hunter: C(2), alpha: C(3), ascended: C(4, 3), veteran: C(5, 0, 3), living_legend: C(7, 4, 4),
-    // ── Wealth / spend → power ──
-    big_spender: C(2), whale: C(3), high_roller_badge: C(4), legendary_spend: C(6, 0, 4),
-    gold_hoarder: C(2), gilded: C(3), big_baller: C(5), one_percent: C(10, 0, 6),
+    // ── Wealth / spend → power ──────────────────────────────────────────────────────────────────────────────
+    // TWO different currencies live here and they were priced as if they were the same thing. Gold is FARMABLE
+    // (raids, farm, voyages, dice — a patient member mints 500,000 eventually), while the spend ladder costs real
+    // dollars at the counter. Before this, `whale` — $2,000 of actual money — paid +3 Might, identical to a
+    // hand-assigned `og` badge, while `one_percent` (gold, grindable) paid the biggest bonus in the entire game at
+    // +10/+6. So the game's own numbers said "don't bother spending money, just grind". Now the real-money ladder
+    // sits ABOVE the gold ladder at every rung, and the gold ladder is compressed to match what it actually costs.
+    big_spender: C(3), whale: C(5, 0, 2), high_roller_badge: C(7, 0, 4), legendary_spend: C(10, 3, 6),
+    gold_hoarder: C(2), gilded: C(3), big_baller: C(4, 0, 2), one_percent: C(6, 0, 4),
     // ── Bounties → power ──
     bounty_poster: C(1), bounty_hunter: C(2), bounty_pro: C(3), bounty_legend: C(5, 3),
     // ── Trading → power / crit ──
@@ -307,7 +313,8 @@ const BADGE_BONUSES = {
     // ── Wheel / mystery / credit / meta / lucky drops → power ──
     wheel_regular: C(1), wheel_devotee: C(3), jackpot: C(0, 3),
     mystery_first: C(1), mystery_big_hit: C(0, 4), mystery_20: C(3), mystery_100: C(6, 0, 4),
-    credit_patron: C(1), credit_backer: C(2), credit_benefactor: C(4),
+    // Store credit is real money out of pocket too — sits just under the direct-spend ladder (see Wealth above).
+    credit_patron: C(2), credit_backer: C(4), credit_benefactor: C(6, 0, 3),
     well_rounded: C(3, 2), completionist: C(2), decorated: C(3),
     lucky_find: C(0, 3), treasure_hunter: C(4), boss_relic: C(3), mythic_find: C(0, 0, 6),
     // ── Referrals → power ──
@@ -347,6 +354,18 @@ const BADGE_BONUSES = {
     // ── CREATIONS (art/decorations) → farm gold & growth ──
     creation_first: F({ goldHarvest: 2 }), creation_artisan: F({ goldHarvest: 3 }), creation_gallery: F({ goldHarvest: 5 }),
     creation_curator: F({ growSpeed: 2 }), creation_patron: F({ goldHarvest: 3 }),
+    // ── SHARING CREATIONS → farm power, since that's where the art lives. Giving is the generous side of the
+    // system and each share is spent forever, so the giver ladder pays better than the collector ladder.
+    share_generous: F({ goldHarvest: 3 }), share_patron: F({ goldHarvest: 5, growSpeed: 3 }),
+    share_legacy: F({ goldHarvest: 8, growSpeed: 5, harvestLuck: 4 }),
+    share_collector: F({ harvestLuck: 2 }), share_gallery: F({ harvestLuck: 4, goldHarvest: 3 }),
+    share_mutual: F({ petXp: 4, growSpeed: 2 }),
+    // ── THE HIDDEN GLIMMER → farm power (its rewards are decorations), scaled to how absurdly rare it is: at most
+    // two spawns a day and exactly ONE winner per spawn, den-wide. Five claims is a genuine feat; the full set is
+    // the rarest thing in the game, so Constellation is the strongest farm badge there is.
+    glimmer_spotter: F({ harvestLuck: 3 }), glimmer_keeper: F({ harvestLuck: 5, seedLuck: 3 }),
+    glimmer_hoarder: F({ harvestLuck: 8, seedLuck: 5, goldHarvest: 4 }),
+    glimmer_complete: F({ growSpeed: 10, seedLuck: 8, harvestLuck: 8, goldHarvest: 8, fertPower: 6 }),
 
     // ── FORGING → smithing odds ──
     forge_first: G({ efficient: 1 }), forge_smith: G({ masters_touch: 1 }), forge_master: G({ masters_touch: 3 }),
