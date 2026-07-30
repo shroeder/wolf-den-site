@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { buyRound, claimDailyPint, gambitReroll, gambitResolve, gambitStart, getTavernState, moveTavern } from "@/lib/marketplace/town-tavern.js";
 import { sendTownChat } from "@/lib/marketplace/town.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -13,12 +12,17 @@ function noStore(body, init = {}) {
     return NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init.headers || {}) } });
 }
 
-// GET — tavern state (rumors + dice session + daily pint). Owner-gated during the Town build.
+// GET — tavern state (rumors + dice session + daily pint).
+//
+// The owner gate here was a leftover from the Town's owner-only build phase. Once the Town went public it meant
+// every other member got { owner: false }, so the client threw the state away, their gold rendered as 0 and the
+// pint/round/ante buttons all sat disabled — reported as "the tavern isn't registering my gold". Any member can
+// use the tavern now; only the RAID controls stay owner-only (see the town route).
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/marketplace/tavern", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            if (!buyer || !isOwner(buyer.id)) return noStore({ owner: false });
+            if (!buyer) return noStore({ owner: false });
             return noStore(await getTavernState(buyer.id));
         } catch (error) {
             return internalError(error, { event: "marketplace.tavern.state.failure" });
@@ -26,13 +30,14 @@ export async function GET(request) {
     });
 }
 
-// POST { action } — dice_start(bet) / dice_roll / dice_cash / pint. Owner-gated during the build.
+// POST { action } — gambit_start(bet) / gambit_reroll / gambit_resolve / pint / round / move / chat.
+// Open to any signed-in member; the owner gate was build-phase only (see GET above). Spend limits still apply:
+// 50-2000 gold per ante, 5 antes a day, 400 for a round, one free pint a day.
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/marketplace/tavern", async ({ internalError }) => {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return noStore({ error: "not_signed_in" }, { status: 401 });
-            if (!isOwner(buyer.id)) return noStore({ error: "forbidden" }, { status: 403 });
             const body = await request.json().catch(() => ({}));
             let res;
             if (body?.action === "gambit_start") res = await gambitStart(buyer.id, body?.bet);
