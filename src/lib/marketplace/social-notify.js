@@ -65,6 +65,7 @@ export async function notifyNewDm(recipientId, senderId, threadId, preview, { fi
         });
         // Browser push uses the public label (no real names on a possibly-shared desktop).
         await sendWebPush(recipientId, {
+            kind: "dm",
             title: `💬 ${await publicLabel(senderId)}`,
             body: preview?.trim() ? preview.trim().slice(0, 140) : "Sent you a message",
             // Open the actual DM conversation — NOT the vendor messages page (that mismatch was the bug).
@@ -95,6 +96,7 @@ export async function notifyFriendRequest(addresseeId, requesterId) {
             data: { type: "friend_request" },
         });
         await sendWebPush(addresseeId, {
+            kind: "friend",
             title: "🤝 New friend request",
             body: `${await publicLabel(requesterId)} wants to be friends`,
             url: "/marketplace/friends",
@@ -122,6 +124,7 @@ export async function notifyFriendAccepted(requesterId, accepterId) {
             data: { type: "friend_accept" },
         });
         await sendWebPush(requesterId, {
+            kind: "friend",
             title: "🎉 Friend request accepted",
             body: `${await publicLabel(accepterId)} accepted your friend request`,
             url: "/marketplace/friends",

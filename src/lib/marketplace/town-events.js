@@ -177,7 +177,7 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     let push = null;
     if (!silent) {
         const [web, app] = await Promise.all([
-            broadcastWebPush({ title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
+            broadcastWebPush({ kind: "raid", title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
             broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
         ]);
         push = { web, app };
@@ -319,7 +319,7 @@ async function resolveTownEvent(eventId, outcome) {
         }
         if (!ev.meta?.silent) {
             // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
-            await broadcastWebPush({ title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+            await broadcastWebPush({ kind: "raid", title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
         }
         return;
     }
@@ -331,7 +331,7 @@ async function resolveTownEvent(eventId, outcome) {
     }
     if (!ev.meta?.silent) {
         // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
-        await broadcastWebPush({ title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
+        await broadcastWebPush({ kind: "raid", title: `✅ ${ev.name} over`, body: `The raid's done — ${n} ${n === 1 ? "wolf" : "wolves"} joined the fight. Well fought!`, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
     }
 }
 

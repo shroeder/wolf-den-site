@@ -43,7 +43,8 @@ export async function broadcastAnnouncementEmail({ subject, heading, emoji = "�
     const rows = await db
         .query(
             `SELECT email, COALESCE(NULLIF(first_name,''), NULLIF(display_name,''), NULLIF(alias,'')) AS name
-               FROM mkt_buyer WHERE email IS NOT NULL AND email <> '' AND alias IS NOT NULL`
+               FROM mkt_buyer WHERE email IS NOT NULL AND email <> '' AND alias IS NOT NULL
+                 AND COALESCE((notify_prefs ->> 'email:announce')::boolean, TRUE) IS NOT FALSE`
         )
         .catch(() => []);
     if (!rows.length) return { total: 0, sent: 0 };
@@ -73,6 +74,67 @@ export async function broadcastAnnouncementEmail({ subject, heading, emoji = "�
         }
     }
     return { total: rows.length, sent };
+}
+
+// The win-back recap for members push can't reach. Deliberately short: what's waiting for them, a few lines of
+// Den news, then ONE primary CTA that turns on instant alerts — the goal is to convert them to push so they
+// stop needing this email. Ends with a plain, obvious way to stop these specific emails; burying that is how
+// you earn a spam complaint instead of an unsubscribe.
+export async function sendRecapDigestEmail(email, { name = "", hooks = [], news = [], awayDays = null } = {}) {
+    if (!process.env.RESEND_API_KEY) return false;
+    if (!email) return false;
+    const resend = getResendClient();
+    const site = baseUrl();
+    const settingsUrl = `${site}/marketplace/profile`;
+
+    const li = (rows) => rows
+        .map((r) => `<tr><td style="padding:7px 0;vertical-align:top;width:30px;font-size:19px;">${r.icon}</td><td style="padding:7px 0;line-height:1.5;font-size:15px;">${r.text}</td></tr>`)
+        .join("");
+
+    // The headline promises only what we can actually deliver — a vague "you missed a lot!" is what makes
+    // people unsubscribe. If something is genuinely waiting, lead with that instead.
+    const hasHooks = hooks.length > 0;
+    const heading = hasHooks ? "Something's waiting for you" : "Here's what you missed";
+    const sub = awayDays ? `It's been about ${awayDays} day${awayDays === 1 ? "" : "s"}.` : "";
+
+    const html = `
+        <div style="max-width:520px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;color:#26221c;">
+          <div style="background:linear-gradient(180deg,#2f8f52,#215f39);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center;">
+            <div style="font-size:46px;line-height:1;">🐺</div>
+            <h1 style="margin:10px 0 0;color:#ffffff;font-size:22px;">${heading}</h1>
+            ${sub ? `<p style="margin:6px 0 0;color:#cfe9d8;font-size:13px;">${sub}</p>` : ""}
+          </div>
+          <div style="background:#fbf8f2;border:1px solid #e6ddcb;border-top:none;border-radius:0 0 16px 16px;padding:22px 24px;">
+            <p style="margin:0 0 14px;">${name ? `Hey ${name},` : "Hey there,"}</p>
+            ${hasHooks ? `<table style="width:100%;border-collapse:collapse;margin:0 0 6px;">${li(hooks)}</table>` : ""}
+            ${hasHooks && news.length ? `<p style="margin:16px 0 4px;font-size:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#8a8172;">Around the Den</p>` : ""}
+            ${news.length ? `<table style="width:100%;border-collapse:collapse;">${li(news)}</table>` : ""}
+            <div style="text-align:center;margin:24px 0 8px;">
+              <a href="${site}/marketplace" style="display:inline-block;background:#2f8f52;color:#ffffff;padding:13px 26px;border-radius:10px;font-weight:800;text-decoration:none;font-size:15px;">Jump back in</a>
+            </div>
+            <p style="text-align:center;margin:14px 0 0;font-size:13px;color:#5f594e;line-height:1.5;">
+              Want the good stuff the moment it happens instead of a summary?<br />
+              <a href="${settingsUrl}" style="color:#2f8f52;font-weight:700;">Turn on instant alerts</a>
+            </p>
+            <p style="color:#8a8172;font-size:12px;margin-top:22px;border-top:1px solid #e6ddcb;padding-top:14px;line-height:1.5;">
+              You're getting this because notifications are off, so we only send it occasionally — at most once every couple of weeks, and never when you've been active.
+              <a href="${settingsUrl}" style="color:#8a8172;text-decoration:underline;">Stop these recap emails</a>.
+            </p>
+          </div>
+        </div>`;
+
+    try {
+        await resend.emails.send({
+            from: FROM_ADDRESS,
+            to: email,
+            subject: hasHooks ? "Something's waiting for you at The Wolf Den" : "What you missed at The Wolf Den",
+            html,
+            headers: { "List-Unsubscribe": `<${settingsUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+        });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export async function sendVerificationEmail(email, code) {

@@ -555,7 +555,7 @@ export async function runCropsReadyNudge() {
         const body = plots.length === 1
             ? `Your ${first?.name || "crop"} is ready — harvest it before the plot sits idle.`
             : `${plots.length} crops are ready to harvest on your farm!`;
-        await sendWebPush(buyerId, { title: "🌾 Harvest time!", body, url: "/marketplace/farm", tag: "crops-ready" }).catch(() => {});
+        await sendWebPush(buyerId, { kind: "crops", title: "🌾 Harvest time!", body, url: "/marketplace/farm", tag: "crops-ready" }).catch(() => {});
         sent += 1;
     }
     // Mark every ready-but-unannounced plot as notified so we never re-push it (even for members with no sub).

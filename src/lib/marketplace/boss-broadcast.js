@@ -14,7 +14,7 @@ export async function broadcastBoss(boss) {
         : "A new boss just dropped — join the fight!";
 
     await postDiscordBoss(boss).catch(() => {});
-    await broadcastWebPush({ title, body, url: "/marketplace/boss", tag: "boss", data: { type: "boss" } }).catch(() => {});
+    await broadcastWebPush({ kind: "bossevent", title, body, url: "/marketplace/boss", tag: "boss", data: { type: "boss" } }).catch(() => {});
     await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss" } }).catch(() => {});
 }
 
@@ -30,11 +30,15 @@ export async function broadcastBossDefeated(boss, winner) {
             : `The pack brought down ${boss.name}! See the final stats →`;
 
     await postDiscordDefeated(boss, winnerLabel).catch(() => {});
-    await broadcastWebPush({ title, body, url: `/marketplace/boss/recap/${boss.id}`, tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
+    await broadcastWebPush({ kind: "bossevent", title, body, url: `/marketplace/boss/recap/${boss.id}`, tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
     await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss_defeated" } }).catch(() => {});
 
     // Email every member (winner gets the "come claim" version).
-    const members = await db.query(`SELECT id, email, display_name FROM mkt_buyer WHERE email IS NOT NULL AND email_verified = TRUE`).catch(() => []);
+    const members = await db.query(
+        `SELECT id, email, display_name FROM mkt_buyer
+          WHERE email IS NOT NULL AND email_verified = TRUE
+            AND COALESCE((notify_prefs ->> 'email:bossevent')::boolean, TRUE) IS NOT FALSE`
+    ).catch(() => []);
     for (const m of members) {
         await sendBossDefeatedEmail(m.email, {
             bossId: boss.id,

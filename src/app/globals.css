@@ -6942,6 +6942,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .notif-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms ease; }
 .notif-toggle.is-on .notif-knob { transform: translateX(18px); }
 .notif-toggle:disabled { opacity: 0.7; cursor: default; }
+
+/* ── Granular per-kind × per-channel switch matrix ───────────────────────────────────────────────────────── */
+.notif-prefs { gap: 14px; }
+.notif-group { display: flex; flex-direction: column; gap: 2px; }
+.notif-group-head { display: flex; flex-direction: column; gap: 2px; margin: 4px 2px 6px; }
+.notif-group-title { font-size: 0.68rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; color: #ffd75e; }
+.notif-group-note { font-size: 0.76rem; color: #8b93a0; line-height: 1.35; }
+.notif-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 11px; background: rgba(255,255,255,0.04); border: 1px solid #2a2f37; }
+.notif-row-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
+.notif-row-label { font-weight: 700; font-size: 0.88rem; }
+.notif-row-desc { font-size: 0.75rem; color: #8b93a0; line-height: 1.3; }
+/* Channel switches stay on one line — on a phone the labels are the emoji alone. */
+.notif-row-switches { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.notif-chan { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.notif-chan-label { font-size: 0.78rem; line-height: 1; opacity: 0.85; }
+.notif-switch-btn { background: none; border: none; padding: 0; cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
+.notif-switch-btn .notif-switch { width: 38px; height: 22px; }
+.notif-switch-btn .notif-knob { width: 16px; height: 16px; top: 3px; left: 3px; }
+.notif-switch-btn.is-on .notif-switch { background: linear-gradient(90deg, #c8a24a, #ffd75e); }
+.notif-switch-btn.is-on .notif-knob { transform: translateX(16px); }
+.notif-switch-btn:disabled { opacity: 0.55; cursor: default; }
+.notif-err { color: #e05b6a; font-size: 0.8rem; font-weight: 700; margin: 0 0 4px; }
 @media (max-width: 480px) {
     .social-fab { right: 16px; bottom: 16px; }
 }

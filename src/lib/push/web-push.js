@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { memberAllows } from "@/lib/marketplace/notify-prefs.js";
 import { VAPID_PUBLIC_KEY } from "@/lib/push/vapid.js";
 import { createServerLogger } from "@/lib/server-logger";
 
@@ -44,11 +45,15 @@ async function getWebPush() {
  * @param {string} opts.body
  * @param {string} [opts.url]   path to open on click (e.g. "/marketplace/messages")
  * @param {string} [opts.tag]   collapse key — a newer push with the same tag replaces the old one
+ * @param {string} [opts.kind]  notification kind from NOTIFY_KINDS — when given, the member's per-kind
+ *                              preference is honoured. Omit only for transactional/one-off sends.
  * @param {Record<string, unknown>} [opts.data]
  */
-export async function sendWebPush(buyerId, { title, body, url = "/", tag = null, data = {} }) {
+export async function sendWebPush(buyerId, { title, body, url = "/", tag = null, kind = null, data = {} }) {
     try {
         if (!buyerId) return { sent: 0, skipped: "no_buyer" };
+        // Preference check BEFORE anything else — a muted kind should cost nothing.
+        if (kind && !(await memberAllows(buyerId, "push", kind))) return { sent: 0, skipped: "opted_out" };
         const wp = await getWebPush();
         if (!wp) return { sent: 0, skipped: "not_configured" };
 
@@ -83,11 +88,20 @@ export async function sendWebPush(buyerId, { title, body, url = "/", tag = null,
 }
 
 // Broadcast a web push to EVERY subscribed browser (e.g. a boss release). Best-effort; prunes dead subs.
-export async function broadcastWebPush({ title, body, url = "/", tag = null, data = {} }) {
+// A `kind` filters out members who muted that kind — done in SQL so a muted member is never even contacted.
+export async function broadcastWebPush({ title, body, url = "/", tag = null, kind = null, data = {} }) {
     try {
         const wp = await getWebPush();
         if (!wp) return { sent: 0, skipped: "not_configured" };
-        const rows = await db.query(`SELECT endpoint, p256dh, auth FROM mkt_web_push`).catch(() => []);
+        // An absent prefs key means ON, so COALESCE(...) IS NOT FALSE keeps everyone who hasn't opted out.
+        const rows = kind
+            ? await db.query(
+                `SELECT w.endpoint, w.p256dh, w.auth FROM mkt_web_push w
+                   LEFT JOIN mkt_buyer b ON b.id = w.buyer_id
+                  WHERE COALESCE((b.notify_prefs ->> $1)::boolean, TRUE) IS NOT FALSE`,
+                [`push:${kind}`]
+            ).catch(() => [])
+            : await db.query(`SELECT endpoint, p256dh, auth FROM mkt_web_push`).catch(() => []);
         if (!rows.length) return { sent: 0, skipped: "no_subs" };
         const payload = JSON.stringify({ title, body, url, tag: tag || undefined, data });
         const dead = [];

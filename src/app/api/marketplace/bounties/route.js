@@ -56,6 +56,7 @@ export async function POST(request) {
                 const bt = res.bounty?.title || b?.title || "a new bounty";
                 const rg = Number(res.bounty?.rewardGold ?? b?.rewardGold) || 0;
                 await broadcastWebPush({
+                    kind: "bounty",
                     title: "🎯 New bounty posted!",
                     body: `${who} posted "${bt}"${rg ? ` — ${rg.toLocaleString()} gold` : ""}. Claim it on the bounty board.`,
                     url: "/marketplace/bounties",

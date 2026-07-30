@@ -138,8 +138,8 @@ export default async function ProfileHubPage() {
             <details className="card hub-collapse">
                 <summary><h2>Notifications</h2></summary>
                 <WebPushToggle />
-                <p className="muted" style={{ margin: "6px 0 0" }}>Email me when I miss something while I&apos;m away. (You always get in-app + push.)</p>
-                <NotifyPrefsClient initialDm={profile?.notifyEmailDm !== false} initialFriend={profile?.notifyEmailFriend !== false} />
+                <p className="muted" style={{ margin: "6px 0 10px" }}>Choose exactly what reaches you, and how. Everything is on unless you switch it off.</p>
+                <NotifyPrefsClient />
             </details>
 
             <section className="card">

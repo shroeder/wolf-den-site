@@ -16,7 +16,7 @@ export async function broadcastSailingLaunch({ channels } = {}) {
 
     if (want.discord) { await postDiscordLaunch().then(() => { result.discord = true; }).catch(() => {}); }
     if (want.push) {
-        await broadcastWebPush({ title, body, url: "/marketplace/sailing", tag: "sailing-launch", data: { type: "sailing_launch" } }).catch(() => {});
+        await broadcastWebPush({ kind: "announce", title, body, url: "/marketplace/sailing", tag: "sailing-launch", data: { type: "sailing_launch" } }).catch(() => {});
         await broadcastBuyerPushAll({ title, body, route: "sailing", data: { type: "sailing_launch" } }).catch(() => {});
         result.push = true;
     }

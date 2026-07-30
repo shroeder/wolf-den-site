@@ -8,6 +8,7 @@ import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { awardXp, getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { allowsNotify } from "@/lib/marketplace/notify-prefs.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 
@@ -24,6 +25,7 @@ function memberAvatarUrl(row) {
 async function pushBadgeEarned(buyerId, def) {
     if (!buyerId || !def?.slug) return;
     await sendWebPush(buyerId, {
+        kind: "badge",
         title: `${def.icon || "🏅"} Badge unlocked!`,
         body: def.description ? `${def.label} — ${def.description}` : `You earned ${def.label}`,
         url: "/marketplace/rewards",
@@ -752,8 +754,10 @@ export async function grantRandomDropBadge(buyerId) {
 // Email a member a congrats for a badge, then mark it emailed so the auto-backfill never re-sends it.
 // Best-effort. `def` must carry { slug, label, icon, description }.
 async function sendBadgeCongrats(buyerId, def) {
-    const member = await db.queryOne(`SELECT email, display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const member = await db.queryOne(`SELECT email, display_name, alias, notify_prefs FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!member?.email) return false;
+    // Badges also push, so a member who muted badge email should not get a second ping for the same event.
+    if (!allowsNotify(member.notify_prefs || {}, "email", "badge")) return false;
     const ok = await sendBadgeAwardedEmail(member.email, {
         label: def.label,
         icon: def.icon || "",

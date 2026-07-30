@@ -113,6 +113,19 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
 export async function expireAuctions() {
     const due = await db.query(`UPDATE mkt_auction SET status = 'expired' WHERE status = 'active' AND expires_at < NOW() RETURNING seller_id, item_id`, []).catch(() => []);
     for (const r of due) await grantItem(r.seller_id, r.item_id, "auction_return").catch(() => {});
+    // Tell the seller their listing died. It used to just quietly reappear in their inventory, so unless they
+    // went looking they never learned it hadn't sold — and couldn't decide to relist it cheaper.
+    for (const r of due) {
+        const it = itemById(r.item_id);
+        await sendWebPush(r.seller_id, {
+            kind: "auction",
+            title: "⌛ Listing expired",
+            body: `${it?.name || "Your listing"} didn't sell and is back in your inventory. Relist it any time.`,
+            url: "/marketplace/auction",
+            tag: "auction-expired",
+            data: { type: "auction_expired", itemId: r.item_id },
+        }).catch(() => {});
+    }
 }
 
 // The items a member CAN list right now: owned, not equipped, not already up for auction. With meta for the picker.
@@ -292,6 +305,7 @@ export async function buyAuctionListing(buyerId, listingId) {
         const b = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
         const who = b?.display_name || (b?.alias ? `@${b.alias}` : "a wolf");
         await sendWebPush(claim.seller_id, {
+            kind: "auction",
             title: "💰 Your item sold!",
             body: `${it?.name || "Your listing"} sold to ${who} for ${price.toLocaleString()} gold.`,
             url: "/marketplace/auction",

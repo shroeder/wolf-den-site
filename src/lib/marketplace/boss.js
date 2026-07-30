@@ -249,6 +249,7 @@ export async function runDailyStrikeNudge() {
         .catch(() => []);
     for (const r of rows) {
         await sendWebPush(r.buyer_id, {
+            kind: "boss",
             title: "⚔️ Your daily strike is ready",
             body: `${boss.name} is still standing — land your free hit for XP & raffle tickets.`,
             url: "/marketplace/boss",

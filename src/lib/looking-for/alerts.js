@@ -84,6 +84,7 @@ export async function runLookingForAlerts() {
             if (buyerId) {
                 const more = cards.length > 1 ? ` +${cards.length - 1} more` : "";
                 await sendWebPush(buyerId, {
+                    kind: "stock",
                     title: "🔥 Back in stock",
                     body: `${cards[0].name}${more} on your Looking-For list just came in`,
                     url: "/looking-for",

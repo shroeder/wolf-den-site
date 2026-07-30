@@ -10,6 +10,7 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { sendWebPush } from "@/lib/push/web-push.js";
 
 const nameOf = (r) => r?.display_name || r?.alias || "Member";
 
@@ -186,6 +187,17 @@ export async function sharePet(fromId, petId, toAlias) {
     if (toState?.ownedIds?.includes(petId)) return { ok: false, error: "recipient_has_pet" };
     await db.query(`INSERT INTO mkt_pet_share (pet_id, from_buyer_id, to_buyer_id) VALUES ($1, $2, $3)`, [petId, fromId, to.id]).catch(() => {});
     await trackActivity(fromId, "pet_share_offer", { petId, to: to.id });
+    // Tell them. Without this a gift just sits in the Pets page unseen — offers were going unanswered for
+    // days because the recipient had no way to know one existed.
+    const from = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [fromId]).catch(() => null);
+    await sendWebPush(to.id, {
+        kind: "gift",
+        title: "🎁 Someone sent you a pet!",
+        body: `${nameOf(from) || "A member"} is giving you ${pet.name} — accept it on your Pets page.`,
+        url: "/marketplace/pets",
+        tag: "pet-gift",
+        data: { type: "pet_gift", petId },
+    }).catch(() => {});
     return { ok: true, to: nameOf(to) };
 }
 
@@ -245,6 +257,18 @@ export async function acceptShare(shareId, toId) {
         [toId, petId]
     ).catch(() => {});
     await trackActivity(toId, "pet_share_accept", { petId, from: fromId });
+    // Close the loop for the GIVER — they gave something up and locked their own copy forever, so they should
+    // hear that it landed rather than having to go check.
+    const pet = collectibleById(petId);
+    const taker = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [toId]).catch(() => null);
+    await sendWebPush(fromId, {
+        kind: "gift",
+        title: "🎁 Your pet gift was accepted",
+        body: `${nameOf(taker) || "They"} took your ${pet?.name || "pet"}. Both copies are now locked from trading.`,
+        url: "/marketplace/pets",
+        tag: "pet-gift",
+        data: { type: "pet_gift_accepted", petId },
+    }).catch(() => {});
     return { ok: true, petId };
 }
 

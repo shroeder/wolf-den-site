@@ -273,6 +273,7 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         const from = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [fromId]).catch(() => null);
         const label = from?.display_name || from?.alias || "A member";
         await sendWebPush(toId, {
+            kind: "trade",
             title: "🤝 New trade offer",
             body: `${label} wants to trade with you.`,
             url: "/marketplace/trade",
@@ -323,6 +324,7 @@ export async function respondTrade(userId, offerId, action) {
     if (action === "decline") {
         await db.query(`UPDATE mkt_trade_offer SET status='declined', resolved_at=NOW() WHERE id=$1`, [offerId]);
         await refund(o);
+        await notifyTradeOutcome(o, userId, "declined");
         return { ok: true, status: "declined" };
     }
 
@@ -386,7 +388,25 @@ export async function respondTrade(userId, offerId, action) {
     for (const id of requestedItems) await voidPendingTradesForItem(userId, id);
     await Promise.all([bumpGear(o.from_buyer_id), bumpGear(userId)]);
     await trackActivity(userId, "trade_accept", { offerId, from: o.from_buyer_id, giveItems: offeredItems.length, giveGold: o.offered_gold, givePets: offeredPets.length, getItems: requestedItems.length, getGold: o.requested_gold, getPets: requestedPets.length });
+    await notifyTradeOutcome(o, userId, "accepted");
     return { ok: true, status: "accepted" };
+}
+
+// Tell the PROPOSER how their offer ended. Only the recipient ever saw a notification before, so the person
+// who made the offer (and whose gold sat in escrow) had to keep checking the trade page to find out.
+async function notifyTradeOutcome(offer, responderId, status) {
+    const who = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [responderId]).catch(() => null);
+    const label = who?.display_name || who?.alias || "A member";
+    await sendWebPush(offer.from_buyer_id, {
+        kind: "trade",
+        title: status === "accepted" ? "✅ Trade accepted!" : "❌ Trade declined",
+        body: status === "accepted"
+            ? `${label} accepted your trade — check what landed in your inventory.`
+            : `${label} passed on your trade. Anything you put up has been returned.`,
+        url: "/marketplace/trade",
+        tag: "trade-outcome",
+        data: { type: "trade_outcome", status },
+    }).catch(() => {});
 }
 
 // Proposer cancels their own pending offer (refunds the escrow).

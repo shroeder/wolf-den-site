@@ -31,6 +31,7 @@ async function nudge(threadId, senderSide, preview) {
         // Buyer browser push when a vendor/store opens or replies (vendor name is a public storefront name).
         if (buyerIsRecipient && p.buyer_id) {
             await sendWebPush(p.buyer_id, {
+                kind: "dm",
                 title: `💬 ${p.vendor_name || "The Wolf Den"}`,
                 body: preview.slice(0, 140),
                 url: `/marketplace/messages?thread=${threadId}`,

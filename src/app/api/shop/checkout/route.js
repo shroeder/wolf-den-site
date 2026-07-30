@@ -475,6 +475,7 @@ export async function POST(request) {
                     // can be seen by others nearby).
                     if (buyerId) {
                         await sendWebPush(buyerId, {
+                            kind: "order",
                             title: "🎉 Order confirmed",
                             body: "Thanks for your order! We'll let you know when it's ready.",
                             url: "/shop/orders",

@@ -959,6 +959,7 @@ export async function runSailingArrivals() {
         ).catch(() => null);
         if (!claimed) continue;
         await sendWebPush(r.buyer_id, {
+            kind: "sailing",
             title: "🏝️ Land ho!",
             body: "Your boat reached the island — head ashore and dig for buried treasure.",
             url: "/marketplace/sailing", tag: "sail-arrival", data: { type: "sail_arrival" },
@@ -997,6 +998,7 @@ export async function runSailingIdleReminders() {
         ).catch(() => null);
         if (!claimed) continue;
         await sendWebPush(r.buyer_id, {
+            kind: "sailing",
             title: "⛵ Your boat is docked",
             body: "It's ready to set sail — send it on a voyage to haul back treasure.",
             url: "/marketplace/sailing", tag: "sail-idle", data: { type: "sail_idle" },

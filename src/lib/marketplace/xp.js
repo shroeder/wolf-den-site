@@ -172,6 +172,7 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
             if (newLevel > oldLevel) {
                 const unlocks = unlocksAtLevel(newLevel);
                 await sendWebPush(buyerId, {
+                    kind: "levelup",
                     title: unlocks.length ? "🎁 New reward unlocked!" : "⬆️ Level up!",
                     body: unlocks.length
                         ? `Level ${newLevel} — you unlocked ${unlocks.slice(0, 2).join(" · ")}${unlocks.length > 2 ? ` +${unlocks.length - 2} more` : ""}!`
