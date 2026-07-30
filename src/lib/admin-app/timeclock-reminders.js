@@ -1,18 +1,25 @@
 import "server-only";
 
-import { CLOCK_IN_LEAD_MIN, CLOCK_OUT_LEAD_MIN, ESCALATE_AFTER_MIN, NAG_EVERY_MIN, clockStatus, shiftWindow } from "@/lib/admin-app/timeclock.js";
+import { CLOCK_IN_LEAD_MIN, ESCALATE_AFTER_MIN, NAG_EVERY_MIN, clockStatus, shiftWindow } from "@/lib/admin-app/timeclock.js";
 import { sendAdminPush } from "@/lib/push/send.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
 // ── CLOCK REMINDERS ──────────────────────────────────────────────────────────────────────────────────────────
-// Nudges the employee BEFORE each end of their shift, never after — a reminder that lands once you're already
-// late is just a telling-off. Then it keeps at it while a shift is left open, because an unclosed shift silently
-// wrecks the labour cost in the break-even tracker.
+// ONE RULE: only ever message about a real DISCREPANCY — the clock disagreeing with reality. Never about the
+// schedule, and never while the employee is doing the right thing.
 //
-//   before opening   + not clocked in  → "your shift starts in 15 minutes"
-//   before closing   + clocked in      → "wrap up and clock out"
-//   past closing     + still in        → repeat every 30 min
-//   an hour past     + still in        → also tell the owner
+// Clocking in and out is completely unrestricted (clockIn/clockOut have no store-hours gate at all). Turning up
+// early to set up, staying late to cash up, coming in on a closed day — all fine, all silent. Store hours are
+// only ever used to work out whether the clock currently looks WRONG:
+//
+//   before opening   + not clocked in  → "your shift starts in 15 minutes"   (a heads-up, not a fault)
+//   shop OPEN        + not clocked in  → they're working unpaid              ← discrepancy
+//   past closing     + still clocked in → their hours are overrunning        ← discrepancy, repeats every 30 min
+//   an hour past     + still clocked in → also tell the owner
+//
+// Two nags used to fire when nothing was wrong: a "wrap up and clock out" push mid-shift while correctly
+// clocked in (removed), and the after-close nag firing BEFORE opening because "closed" didn't distinguish the
+// two — which told someone who arrived early that they were working past closing.
 //
 // Every push deep-links to route "timeclock", which opens straight onto the clock screen.
 // State is a single settings row so the cron can run as often as it likes without repeating itself.
@@ -62,13 +69,11 @@ export async function runTimeclockReminders({ dryRun = false } = {}) {
         day.inLate = nowMs;
     }
 
-    // ── CLOCK OUT: before closing, once, only while actually clocked in.
-    if (win.open && status.clockedIn && win.untilClose != null && win.untilClose > 0 && win.untilClose <= CLOCK_OUT_LEAD_MIN) {
-        if (!day.outNudge) {
-            await push("clock_out", "🕒 Time to wrap up", `Closing in ${win.untilClose} min — tap to clock out when you're done.`);
-            day.outNudge = nowMs;
-        }
-    }
+    // ── NO PRE-CLOSE NUDGE. There used to be a "closing in 20 min, tap to clock out" push here, and it fired
+    // while the employee was correctly clocked in and mid-shift — a notification for doing the right thing.
+    // Clocking out is theirs to time: they can stay past close to cash up or leave early, and neither is a
+    // fault. The only clock-out message left is the one that fires when a shift is genuinely still OPEN after
+    // closing, which is a real discrepancy in their hours rather than a schedule they're being held to.
 
     // ── STILL OPEN AFTER CLOSE: keep nudging, then escalate to the owner.
     // `!win.preOpen` is load-bearing. "Closed" covers BOTH before opening and after closing, and this branch

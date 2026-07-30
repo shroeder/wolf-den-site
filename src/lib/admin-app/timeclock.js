@@ -17,7 +17,8 @@ const SQUARE_VERSION = "2025-01-23";
 
 // How far ahead to nudge, and how hard to keep at it once a shift is running long.
 export const CLOCK_IN_LEAD_MIN = 15;    // "your shift starts soon" before opening
-export const CLOCK_OUT_LEAD_MIN = 10;   // "wrap up and clock out" before closing
+// CLOCK_OUT_LEAD_MIN was the "wrap up and clock out" lead time. That nudge is gone — it fired mid-shift
+// while the employee was correctly clocked in. Clocking out is theirs to time.
 export const NAG_EVERY_MIN = 30;        // keep reminding while still clocked in past close
 export const ESCALATE_AFTER_MIN = 60;   // still open this long after close → tell the owner too
 
