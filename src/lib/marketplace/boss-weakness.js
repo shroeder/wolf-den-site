@@ -16,9 +16,14 @@ export const ELEMENT_KEYS = Object.keys(ELEMENTS);
 // Back-compat alias (a couple of callers still import WEAKNESSES).
 export const WEAKNESSES = ELEMENTS;
 
-// Per-hit bonus for each matching equipped piece, and the total cap.
+// Per-hit bonus for each matching equipped piece. UNCAPPED — every match counts, all the way up.
+//
+// It used to stop at +90%, which meant the last four of the ten equip slots were dead weight: once six pieces
+// matched, hunting a seventh changed nothing. That punished exactly the behaviour the system exists to
+// encourage — rebuilding your loadout around this week's element. The ceiling is now the loadout itself:
+// 10 slots × 15% = +150% for a flawless all-matching set, which is genuinely hard to assemble (elements are
+// fixed per item, roughly 1 in 5 pieces is neutral, and the boss's element rotates weekly).
 export const ELEMENT_PER_PIECE = 0.15; // +15% damage per matching piece
-export const ELEMENT_CAP = 0.9; //        up to +90%
 
 // Stable string hash → non-negative int.
 function hashId(s) {
@@ -61,6 +66,6 @@ export function elementMult(equippedIds, bossElement, overrides = null) {
         const els = over && over.length ? over : (itemElement(id) ? [itemElement(id)] : []);
         if (els.includes(bossElement)) matches += 1;
     }
-    const bonus = Math.min(ELEMENT_CAP, ELEMENT_PER_PIECE * matches);
+    const bonus = ELEMENT_PER_PIECE * matches;
     return { mult: 1 + bonus, matches, bonusPct: Math.round(bonus * 100) };
 }
