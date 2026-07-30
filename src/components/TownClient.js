@@ -378,6 +378,14 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
             setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 850);
             setGrade({ key: r.grade, label: r.gradeLabel, dmg: r.damage });
             setTimeout(() => setGrade(null), 1100);
+            // Haptics: the better the swing, the more you feel it. Best-effort — desktop and iOS Safari have
+            // no vibrate, and a missing API must never break the strike.
+            try {
+                const pattern = r.crit ? [22, 40, 22, 40, 55]
+                    : r.grade === "perfect" ? [18, 34, 46]
+                        : r.grade === "great" ? [14, 30] : [10];
+                navigator.vibrate?.(pattern);
+            } catch { /* no haptics here */ }
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
         }
     }, [onStrike]);
@@ -415,10 +423,13 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                 {/* The timing strike. Bands mirror the Forge so the skill transfers; the server grades the
                     swing from the distance we report, so this is presentation only. */}
                 <div className="tw-strike">
-                    <div className="tw-strike-bar" aria-hidden="true">
+                    <div className={`tw-strike-bar${grade ? " is-hit" : ""}`} aria-hidden="true">
                         <span className="tw-strike-band is-good" />
                         <span className="tw-strike-band is-great" />
                         <span className="tw-strike-band is-perfect" />
+                        <span className="tw-strike-zone" style={{ left: "37%" }}>GOOD</span>
+                        <span className="tw-strike-zone" style={{ left: "50%" }}>PERFECT</span>
+                        <span className="tw-strike-zone" style={{ left: "63%" }}>GOOD</span>
                         <span className="tw-strike-marker" style={{ left: `${marker * 100}%` }} />
                     </div>
                     <button
@@ -1785,15 +1796,30 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-boss-leave:hover { background: rgba(255,255,255,0.16); }
 
 /* ── Timing strike: bands mirror the Forge's anvil so the skill carries over ─────────────────────────────── */
-.tw-strike { margin: 8px 10px 2px; }
-.tw-strike-bar { position: relative; height: 22px; border-radius: 11px; overflow: hidden; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); display: flex; }
+/* width:100% is load-bearing — the parent centres its children, so without it this whole block shrink-wrapped
+   to the width of the Strike button and the timing bar rendered as a ~200px sliver on a phone. */
+.tw-strike { width: 100%; margin: 12px 0 2px; }
+.tw-strike-bar { position: relative; width: 100%; height: 54px; border-radius: 14px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(0,0,0,0.62), rgba(0,0,0,0.44)); border: 2px solid rgba(255,255,255,0.18);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.6), 0 2px 14px rgba(0,0,0,0.4); display: flex; }
 .tw-strike-band { position: absolute; top: 0; bottom: 0; }
 /* Widths mirror the server's grade bands: good ±0.16, great ±0.10, perfect ±0.055 of the bar. */
-.tw-strike-band.is-good { left: 34%; width: 32%; background: rgba(215,196,138,0.28); }
-.tw-strike-band.is-great { left: 40%; width: 20%; background: rgba(143,227,154,0.34); }
-.tw-strike-band.is-perfect { left: 44.5%; width: 11%; background: rgba(143,227,255,0.5); }
-.tw-strike-marker { position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.9); border-radius: 2px; }
-.tw-strike-btn { width: 100%; margin-top: 8px; padding: 12px; border: none; border-radius: 12px; font-weight: 900; font-size: 1rem; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 3px 0 #b57f22; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tw-strike-band.is-good { left: 34%; width: 32%; background: linear-gradient(180deg, rgba(215,196,138,0.30), rgba(215,196,138,0.16)); }
+.tw-strike-band.is-great { left: 40%; width: 20%; background: linear-gradient(180deg, rgba(143,227,154,0.42), rgba(143,227,154,0.20)); }
+.tw-strike-band.is-perfect { left: 44.5%; width: 11%; background: linear-gradient(180deg, rgba(143,227,255,0.72), rgba(143,227,255,0.34));
+    box-shadow: 0 0 18px rgba(143,227,255,0.5); animation: twPerfectPulse 1.1s ease-in-out infinite; }
+@keyframes twPerfectPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.45); } }
+/* Names the zones — an unlabelled gradient told you nothing about where the payoff was. */
+.tw-strike-zone { position: absolute; top: 4px; font-size: 0.5rem; font-weight: 900; letter-spacing: 0.09em; color: rgba(255,255,255,0.5); pointer-events: none; transform: translateX(-50%); }
+.tw-strike-marker { position: absolute; top: -3px; bottom: -3px; width: 6px; margin-left: -3px; border-radius: 3px;
+    background: linear-gradient(180deg, #fff, #ffe488); box-shadow: 0 0 16px rgba(255,255,255,0.95), 0 0 34px rgba(255,215,94,0.6); }
+/* A soft trail behind the marker so the sweep reads as motion instead of a jumping tick. */
+.tw-strike-marker::after { content: ""; position: absolute; top: 0; bottom: 0; right: 6px; width: 46px;
+    background: linear-gradient(90deg, rgba(255,228,136,0) 0%, rgba(255,228,136,0.28) 100%); pointer-events: none; }
+.tw-strike-bar.is-hit { animation: twStrikeFlash 0.3s ease-out; }
+@keyframes twStrikeFlash { 0% { filter: brightness(2.4); transform: scale(1.03); } 100% { filter: brightness(1); transform: scale(1); } }
+.tw-strike-btn { width: 100%; margin-top: 10px; padding: 17px; border: none; border-radius: 14px; font-weight: 900; font-size: 1.15rem; letter-spacing: 0.02em; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22, 0 6px 18px rgba(0,0,0,0.4); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.tw-strike-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b57f22; }
 .tw-strike-btn.is-cooling { opacity: 0.55; box-shadow: none; }
 .tw-strike-grade { text-align: center; margin-top: 6px; font-weight: 900; font-size: 0.95rem; animation: twStrikePop 0.35s ease-out; }
 .tw-strike-grade.is-pixel { color: #ffd75e; }
