@@ -1171,7 +1171,12 @@ export default function TownClient({ initial }) {
                     {/* Skirmish raid: tap each foe directly → a 1v1 duel. */}
                     {state?.event && !state.event.defeated && !state.event.boss ? (() => {
                         const ev = state.event;
-                        const url = art[EVENT_ART[ev.kind]]?.url;
+                        // Per-ARCHETYPE art, falling back to the faction's generic sprite. The archetypes have
+                        // always fought differently — a shield-bearer shrugs off sloppy timing, an archer bites
+                        // back — but they all shared one sprite with a CSS tint and a badge emoji, so none of
+                        // that variety was visible. Each now has its own drawing.
+                        const foeUrl = (en) => art[`foe_${en.art || EVENT_ART[ev.kind]}_${en.kind}`]?.url
+                            || art[EVENT_ART[ev.kind]]?.url;
                         return raidEnemies.map((en, i) => (
                             <button
                                 key={en.id} type="button"
@@ -1179,7 +1184,7 @@ export default function TownClient({ initial }) {
                                 // Each foe roams on its OWN clock (per-enemy delay/duration/sway) so they move independently,
                                 // sit low in the foreground, and draw above the buildings (z well over the ~192 building band).
                                 style={{ left: `${en.x}%`, top: `${en.y}%`, zIndex: 240 + Math.round(en.y), animationDelay: `${((i * 0.83) % 2.6).toFixed(2)}s`, animationDuration: `${(3 + (i % 4) * 0.7).toFixed(2)}s`, "--sway": `${9 + (i % 3) * 6}px` }}
-                                onClick={(e) => { e.stopPropagation(); if (!en.dying && en.takeable !== false) startDuel(en.id, url); }}
+                                onClick={(e) => { e.stopPropagation(); if (!en.dying && en.takeable !== false) startDuel(en.id, foeUrl(en)); }}
                                 aria-label={en.takeable === false ? `${en.engagedName} is fighting this one` : `Fight the ${en.label || ev.name}`}
                             >
                                 {/* Who's locked onto this foe — the thing that makes the fight feel shared instead
@@ -1200,10 +1205,10 @@ export default function TownClient({ initial }) {
                                 {en.kind !== "scrapper" ? (
                                     <span className="tw-enemy-tag" style={{ background: en.tint || "#6b7686", color: en.chieftain ? "#fff" : "#16121b" }}>{en.label}</span>
                                 ) : null}
-                                {url ? (
+                                {foeUrl(en) ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
-                                        src={url} alt="" draggable={false}
+                                        src={foeUrl(en)} alt="" draggable={false}
                                         style={{
                                             transform: `scaleX(${en.flip ? -1 : 1}) scale(${en.scale ?? 1})`,
                                             // Tint the sprite toward its archetype colour so a wave reads as mixed

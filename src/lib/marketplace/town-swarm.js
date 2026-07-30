@@ -51,7 +51,46 @@ const KINDS = {
         tint: "#e05b6a", scale: 1.55, badge: "💀", hint: "The Chieftain. Drop it and the raid is won.",
     },
 };
-export const enemyKind = (k) => KINDS[k] || KINDS.scrapper;
+// ── WHO YOU'RE ACTUALLY FIGHTING ─────────────────────────────────────────────────────────────────────────────
+// KINDS above is the MECHANICS — hp, timing difficulty, how hard it bites back. That's shared, because a
+// shield-bearer should play the same whoever's holding the shield.
+//
+// The IDENTITY is per faction, and it wasn't: every archetype was hardcoded "Goblin Scrapper", "Goblin Archer",
+// "Goblin Chieftain" — so a BANDIT RAID spawned a plaza full of goblins. Two different events, one roster.
+const FACTIONS = {
+    goblin_swarm: {
+        art: "goblin",
+        names: {
+            scrapper: { label: "Goblin Scrapper", emoji: "👺", hint: "A plain brawler — nothing fancy." },
+            archer: { label: "Goblin Archer", emoji: "🏹", hint: "Squishy, but it bites back hard — end it fast." },
+            shieldbearer: { label: "Goblin Shield-bearer", emoji: "🛡️", hint: "Armoured — sloppy timing barely dents it." },
+            elite: { label: "Goblin Warchanter", emoji: "✨", hint: "A Warchanter — rare, tough, and worth real loot." },
+            chieftain: { label: "Goblin Chieftain", emoji: "💀", hint: "The Chieftain. Drop it and the raid is won." },
+        },
+    },
+    bandit_raid: {
+        art: "bandit",
+        names: {
+            scrapper: { label: "Bandit Cutpurse", emoji: "🗡️", hint: "A common thug — nothing fancy." },
+            archer: { label: "Bandit Crossbowman", emoji: "🏹", hint: "Squishy, but it bites back hard — end it fast." },
+            shieldbearer: { label: "Bandit Bruiser", emoji: "🛡️", hint: "Armoured — sloppy timing barely dents it." },
+            elite: { label: "Bandit Lieutenant", emoji: "✨", hint: "A Lieutenant — rare, tough, and worth real loot." },
+            chieftain: { label: "Bandit King", emoji: "💀", hint: "The Bandit King. Drop him and the raid is won." },
+        },
+    },
+};
+export const factionOf = (eventKind) => FACTIONS[eventKind] || FACTIONS.goblin_swarm;
+
+/**
+ * Mechanics for an archetype, dressed in a faction's identity. `eventKind` is the TOWN EVENT kind
+ * (bandit_raid / goblin_swarm) — omit it and you get the goblin naming, which is what every caller used to
+ * get whether or not there was a goblin in sight.
+ */
+export const enemyKind = (k, eventKind = null) => {
+    const base = KINDS[k] || KINDS.scrapper;
+    const named = factionOf(eventKind).names[k in KINDS ? k : "scrapper"];
+    return named ? { ...base, ...named, art: factionOf(eventKind).art } : base;
+};
 
 const rand = (a, b) => a + Math.random() * (b - a);
 function pickKind(wave) {
@@ -126,7 +165,7 @@ export async function releaseAbandoned(eventId) {
 }
 
 // The shared board: every foe still standing, plus who's locked onto each one.
-export async function swarmState(eventId, viewerId = null) {
+export async function swarmState(eventId, viewerId = null, eventKind = null) {
     await releaseAbandoned(eventId);
     const rows = await db.query(
         `SELECT e.id, e.wave, e.slot, e.kind, e.hp, e.hp_max, e.x, e.y, e.flip, e.engaged_by,
@@ -146,10 +185,10 @@ export async function swarmState(eventId, viewerId = null) {
         isChieftainWave: wave === CHIEFTAIN_WAVE,
         remaining: alive.length,
         enemies: alive.map((r) => {
-            const def = enemyKind(r.kind);
+            const def = enemyKind(r.kind, eventKind);
             const mine = viewerId && String(r.engaged_by || "") === String(viewerId);
             return {
-                id: Number(r.id), kind: r.kind, label: def.label, emoji: def.emoji,
+                id: Number(r.id), kind: r.kind, label: def.label, emoji: def.emoji, art: def.art || null,
                 tint: def.tint || null, scale: def.scale ?? 1, badge: def.badge || null, hint: def.hint || null,
                 hp: Number(r.hp), hpMax: Number(r.hp_max), hpPct: Math.max(0, Math.round((r.hp / r.hp_max) * 100)),
                 x: Number(r.x), y: Number(r.y), flip: r.flip === true,

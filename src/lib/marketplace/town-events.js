@@ -186,12 +186,12 @@ export async function getActiveTownEvent(buyerId) {
     // before this existed still gets a roster.
     let swarm = null;
     if (!isBoss) {
-        swarm = await swarmState(ev.id, buyerId).catch(() => null);
+        swarm = await swarmState(ev.id, buyerId, ev.kind).catch(() => null);
         if (!swarm || swarm.remaining === 0) {
             const fighters = await liveFighterCount(ev.id).catch(() => 1);
             const nextWave = swarm?.wave ? Math.min(CHIEFTAIN_WAVE, swarm.wave + 1) : 1;
             await spawnWave(ev.id, nextWave, fighters).catch(() => {});
-            swarm = await swarmState(ev.id, buyerId).catch(() => null);
+            swarm = await swarmState(ev.id, buyerId, ev.kind).catch(() => null);
         }
     }
     const enemies = Number(ev.meta?.enemies) || 6;
