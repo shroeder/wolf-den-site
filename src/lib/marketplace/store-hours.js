@@ -31,6 +31,23 @@ function fmtTime(min) {
     return m ? `${h}:${String(m).padStart(2, "0")} ${ap}` : `${h} ${ap}`;
 }
 
+/**
+ * Today's [open, close] in minutes-since-midnight, or null on a day the shop doesn't open.
+ * Exported because "the shop is closed" is two very different situations — before opening and after closing —
+ * and callers that treat them the same get things badly wrong (see the timeclock reminders).
+ */
+export function todayHours(now = new Date()) {
+    const { wd } = centralNow(now);
+    return HOURS[wd] || null;
+}
+
+/** True only in the run-up to TODAY's opening — not on a closed day, and never after close. */
+export function beforeOpeningToday(now = new Date()) {
+    const { wd, minutes } = centralNow(now);
+    const h = HOURS[wd];
+    return Boolean(h) && minutes < h[0];
+}
+
 // { open, closesLabel, nextOpenLabel, minutesSinceOpen, minutesUntilOpen }.
 export function storeStatus(now = new Date()) {
     const { wd, minutes } = centralNow(now);

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { storeStatus, beforeOpeningToday } from "@/lib/marketplace/store-hours.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 
 // ── SQUARE TIME CLOCK ────────────────────────────────────────────────────────────────────────────────────────
@@ -107,9 +107,13 @@ export function shiftWindow(now = new Date()) {
             if (/pm/i.test(m[3])) h += 12;
             closeMin = h * 60 + Number(m[2] || 0);
         }
-        return { open: true, untilOpen: 0, untilClose: closeMin == null ? null : closeMin - (hh * 60 + mm), openedAt, closesLabel: st.closesLabel };
+        return { open: true, preOpen: false, untilOpen: 0, untilClose: closeMin == null ? null : closeMin - (hh * 60 + mm), openedAt, closesLabel: st.closesLabel };
     }
-    return { open: false, untilOpen: st.minutesUntilOpen, untilClose: null, nextOpenLabel: st.nextOpenLabel };
+    // `preOpen` separates the two ways the shop can be closed. Callers that only look at `open` cannot tell
+    // "we haven't opened yet" from "we shut hours ago", and one of them did: an employee who clocked in five
+    // minutes before a 3 PM Thursday open was told they were still on the clock AFTER CLOSING, then nagged
+    // every 30 minutes and reported to the owner an hour later — for arriving early.
+    return { open: false, preOpen: beforeOpeningToday(now), untilOpen: st.minutesUntilOpen, untilClose: null, nextOpenLabel: st.nextOpenLabel };
 }
 
 // ── STATUS / ACTIONS ─────────────────────────────────────────────────────────────────────────────────────────

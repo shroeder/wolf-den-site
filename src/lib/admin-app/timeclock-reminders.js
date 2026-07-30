@@ -71,7 +71,11 @@ export async function runTimeclockReminders({ dryRun = false } = {}) {
     }
 
     // ── STILL OPEN AFTER CLOSE: keep nudging, then escalate to the owner.
-    if (!win.open && status.clockedIn) {
+    // `!win.preOpen` is load-bearing. "Closed" covers BOTH before opening and after closing, and this branch
+    // used to fire on either — so clocking in five minutes before a 3 PM Thursday open produced "you're still
+    // on the clock after closing", a nag every 30 minutes, and a report to the owner an hour later, all for
+    // turning up early to set up. Arriving before open is the correct behaviour; it must never be scolded.
+    if (!win.open && !win.preOpen && status.clockedIn) {
         const since = Number(day.lastNag || 0);
         if (!since || nowMs - since >= NAG_EVERY_MIN * 60000) {
             await push("clock_out_nag", "⏰ Still clocked in", "You're still on the clock after closing — tap to clock out so your hours are right.");
