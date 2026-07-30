@@ -181,6 +181,10 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
             broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
         ]);
         push = { web, app };
+        // Stamp the reach onto the event so the admin Raids screen can show whether anyone was actually told,
+        // instead of leaving it to be inferred from turnout.
+        await db.query(`UPDATE mkt_town_event SET meta = meta || $2::jsonb WHERE id = $1`,
+            [row.id, JSON.stringify({ pushWeb: Number(web?.sent) || 0, pushApp: Number(app?.sent) || 0 })]).catch(() => {});
     }
     return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent), push };
 }

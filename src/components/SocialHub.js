@@ -453,6 +453,14 @@ function relTime(iso) {
     return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// A chat row's hero art (or its initial, when the member has no sprite yet). Shared so the sprite renders
+// identically whether or not it's wrapped in a profile link.
+function heroInner(m) {
+    if (!m.sprite) return <span className="gchat-hero-fallback">{(m.name || "?").slice(0, 1).toUpperCase()}</span>;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={m.sprite} alt="" style={{ transform: m.flip ? "scaleX(-1)" : "none" }} />;
+}
+
 // The Global tab — a first-class town/plaza chat. Same stream as the in-town chat: send here and it shows in
 // the plaza (and vice versa). Every message shows the sender's HERO sprite (not their avatar icon), name, and
 // a pretty timestamp. Polls while open.
@@ -502,14 +510,15 @@ function GlobalChatTab({ open }) {
                 ) : (
                     messages.map((m) => (
                         <div key={m.id} className={`gchat-row${m.mine ? " mine" : ""}`}>
-                            <span className="gchat-hero" aria-hidden="true">
-                                {m.sprite ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={m.sprite} alt="" style={{ transform: m.flip ? "scaleX(-1)" : "none" }} />
-                                ) : (
-                                    <span className="gchat-hero-fallback">{(m.name || "?").slice(0, 1).toUpperCase()}</span>
-                                )}
-                            </span>
+                            {/* The hero sprite is a second, bigger tap target for the same profile the name
+                                links to — tapping someone's hero to size them up is the instinct. */}
+                            {m.alias ? (
+                                <Link href={`/marketplace/u/${m.alias}`} className="gchat-hero is-link" title={`Inspect ${m.name}`} aria-label={`Inspect ${m.name}`}>
+                                    {heroInner(m)}
+                                </Link>
+                            ) : (
+                                <span className="gchat-hero" aria-hidden="true">{heroInner(m)}</span>
+                            )}
                             <span className="gchat-main">
                                 <span className="gchat-top">
                                     {m.alias ? (
