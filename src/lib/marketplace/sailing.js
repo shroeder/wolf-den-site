@@ -1141,6 +1141,11 @@ export async function fishLand(buyerId, { quality = 0, missed = false, sky = nul
         // A landed fish is a sailing daily too — same metric pump the rest of the feature uses.
         await bumpQuestProgress(buyerId, "fish", 1).catch(() => {});
     }
+    // ORDER MATTERS AND IT BITES. The sailing state is spread LAST because the screen needs its fresh values
+    // (gold balance, casts, status) to win — but that means every key the catch shares with it gets
+    // overwritten, and both have `gold`. The catch's `gold` is the payout; the state's is the member's whole
+    // balance. Anything rendering res.gold shows a wallet where a reward should be.
+    // `catchResult` is the untouched result and is what the UI must read. Do not "simplify" it away.
     return { ...res, catchResult: res.landed ? res : null, ...(await getSailingState(buyerId, sky)) };
 }
 

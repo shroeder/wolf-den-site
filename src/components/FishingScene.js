@@ -211,8 +211,19 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
         return () => cancelAnimationFrame(raf);
     }, [onDone, sfx]);
 
-    const down = useCallback((e) => { e.preventDefault(); holdRef.current = true; }, []);
-    const up = useCallback((e) => { e.preventDefault(); holdRef.current = false; }, []);
+    // Capture the pointer on press. The rod is 88px wide and onPointerLeave released the hold, so a thumb
+    // drifting a few pixels sideways mid-reel silently let go — you'd be holding and the line would sink for
+    // no visible reason. With capture the element keeps receiving events until the finger actually lifts.
+    const down = useCallback((e) => {
+        e.preventDefault();
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not supported — leave/up still work */ }
+        holdRef.current = true;
+    }, []);
+    const up = useCallback((e) => {
+        e.preventDefault();
+        try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* already released */ }
+        holdRef.current = false;
+    }, []);
 
     const elapsed = startRef.current ? Math.min(REEL_MS, performance.now() - startRef.current) : 0;
     const left = Math.max(0, 1 - elapsed / REEL_MS);
@@ -235,13 +246,21 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
             </div>
             <div
                 className={`fish-rod${inside ? " is-on" : ""}`}
-                onPointerDown={down} onPointerUp={up} onPointerLeave={up} onPointerCancel={up}
+                onPointerDown={down} onPointerUp={up} onPointerCancel={up}
                 role="presentation"
             >
                 <div className="fish-band" style={{ bottom: `${(band - BAND_H / 2) * 100}%`, height: `${BAND_H * 100}%` }}>
                     <span className="fish-band-label">KEEP IT HERE</span>
                 </div>
-                <div className="fish-catch" style={{ bottom: `${pos * 100}%` }}>🐟</div>
+                {/* YOUR LINE. It was a 1.35rem emoji against a full-width green block, so the thing you
+                    control was the least visible element on the rod and read as scenery — people watched the
+                    band drift and concluded nothing responded to them. Now it's a lit hook on a visible line
+                    running up to the rod tip, so it's obvious what moves when you hold. */}
+                <div className="fish-line" style={{ bottom: `${pos * 100}%` }} aria-hidden="true" />
+                <div className={`fish-catch${holdRef.current && !slack ? " is-pulling" : ""}`} style={{ bottom: `${pos * 100}%` }}>
+                    <span className="fish-catch-hook" aria-hidden="true">🎣</span>
+                    <span className="fish-catch-tag">YOU</span>
+                </div>
                 <div className="fish-rod-hint">
                     {warming ? "get ready…" : slack ? "LINE SLACK — ease off!" : inside ? "REELING" : "hold!"}
                 </div>
@@ -267,7 +286,7 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                 <span className="fish-strain-pct">{Math.round(scoreNow * 100)}%</span>
             </div>
             <div className="fish-timer"><div className="fish-timer-fill" style={{ width: `${left * 100}%` }} /></div>
-            <button type="button" className="fish-hold-btn" onPointerDown={down} onPointerUp={up} onPointerLeave={up}>
+            <button type="button" className="fish-hold-btn" onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
                 HOLD TO REEL
             </button>
         </div>
@@ -434,7 +453,11 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
         const res = await onLand({ quality, sky }).catch(() => null);
         setBusy(false);
         if (res?.ok && res.landed) {
-            setResult(res);
+            // `catchResult`, NOT `res`. fishLand returns the catch spread UNDER the whole sailing state, and
+            // that state carries `gold` = the member's total balance — so `res.gold` is your wallet, not the
+            // payout. A 12-gold Tiger Prawn proudly reported "+1879 🪙". XP looked fine only because the
+            // sailing state has no `xp` key to overwrite. catchResult is the untouched landFish result.
+            setResult(res.catchResult || res);
             setPhase("result");
             sfx.land();
         } else if (res?.ok) {
