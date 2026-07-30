@@ -12053,3 +12053,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .tw-swing-title { font-weight: 900; font-size: 1.02rem; margin-bottom: 12px; }
 .tw-swing-skip { margin-top: 8px; background: none; border: none; color: #8b93a0; font-size: 0.8rem; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .tw-duel-capped { margin: 4px 0 0; font-size: 0.76rem; color: #8b93a0; }
+
+/* ── Skirmish foe archetypes: each fights differently, so each must LOOK different ─────────────────────────── */
+.tw-enemy-badge { position: absolute; top: -16px; right: -6px; width: 19px; height: 19px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; border: 1.5px solid rgba(0,0,0,0.55); pointer-events: none; z-index: 2; }
+.tw-swing-hint { margin: -6px 0 12px; font-size: 0.8rem; color: #b7c0cf; line-height: 1.35; }

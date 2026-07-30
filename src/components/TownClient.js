@@ -219,7 +219,7 @@ function RaidHUD({ ev, kills, onExpire }) {
 // A duel: animate the back-and-forth exchange (two HP bars, damage ticks), then the win/lose + reward.
 // The skirmish timing swing: a marker ping-pongs the banded bar, you tap, and how close to centre you land
 // decides the blow. Identical bands to the golem's strike and the Forge anvil, so the skill transfers.
-function SwingBar({ onSwing, onCancel }) {
+function SwingBar({ foe, onSwing, onCancel }) {
     const [marker, setMarker] = useState(0.5);
     const markerRef = useRef(0.5);
     const firedRef = useRef(false);
@@ -247,7 +247,10 @@ function SwingBar({ onSwing, onCancel }) {
     return (
         <div className="tw-duel" role="presentation" onClick={onCancel}>
             <div className="tw-swing" onClick={(e) => e.stopPropagation()}>
-                <div className="tw-swing-title">⚔️ Time your strike</div>
+                <div className="tw-swing-title" style={foe?.tint ? { color: foe.tint } : undefined}>
+                    ⚔️ {foe?.label || "Time your strike"}
+                </div>
+                {foe?.hint ? <div className="tw-swing-hint">{foe.hint}</div> : null}
                 <div className="tw-strike-bar" aria-hidden="true">
                     <span className="tw-strike-band is-good" />
                     <span className="tw-strike-band is-great" />
@@ -719,7 +722,9 @@ export default function TownClient({ initial }) {
     const [swing, setSwing] = useState(null); // { enemyId, foeArt } while the bar is up
     const startDuel = useCallback((enemyId, foeArt) => {
         const ev = state?.event; if (!ev || raidCdRef.current || duel || swing) return;
-        setSwing({ enemyId, foeArt: foeArt || null });
+        // Carry the archetype through so the swing screen can say what you've picked a fight with.
+        const foe = (ev.swarm?.enemies || []).find((e) => String(e.id) === String(enemyId)) || null;
+        setSwing({ enemyId, foeArt: foeArt || null, label: foe?.label || null, hint: foe?.hint || null, tint: foe?.tint || null });
     }, [state?.event, duel, swing]);
 
     // Resolve the duel with the swing's distance-from-centre; the server grades and clamps it.
@@ -1131,12 +1136,29 @@ export default function TownClient({ initial }) {
                                 ) : <span className="tw-enemy-crossed" aria-hidden="true">⚔️</span>}
                                 {/* Per-foe HP, straight from the server, so everyone sees the same damage. */}
                                 <span className="tw-enemy-hp"><span style={{ width: `${en.hpPct ?? 100}%` }} /></span>
-                                {en.elite ? <span className="tw-enemy-tag is-elite">{en.label}</span> : null}
-                                {en.chieftain ? <span className="tw-enemy-tag is-chief">{en.label}</span> : null}
+                                {/* Archetype identity. A foe that FIGHTS differently has to LOOK different or the
+                                    variety is invisible — so each carries its own tint, size and badge, and the
+                                    non-plain ones name themselves. */}
+                                {en.badge ? (
+                                    <span className="tw-enemy-badge" style={{ background: en.tint || "#6b7686" }}>{en.badge}</span>
+                                ) : null}
+                                {en.kind !== "scrapper" ? (
+                                    <span className="tw-enemy-tag" style={{ background: en.tint || "#6b7686", color: en.chieftain ? "#fff" : "#16121b" }}>{en.label}</span>
+                                ) : null}
                                 {url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={url} alt="" draggable={false} style={{ transform: en.flip ? "scaleX(-1)" : "none", height: en.chieftain ? 118 : en.elite ? 92 : undefined }} />
-                                ) : <span className="tw-enemy-emoji">{en.emoji || ev.emoji}</span>}
+                                    <img
+                                        src={url} alt="" draggable={false}
+                                        style={{
+                                            transform: `scaleX(${en.flip ? -1 : 1}) scale(${en.scale ?? 1})`,
+                                            // Tint the sprite toward its archetype colour so a wave reads as mixed
+                                            // at a glance rather than a row of identical goblins.
+                                            filter: en.tint
+                                                ? `drop-shadow(0 0 7px ${en.tint}) drop-shadow(0 5px 7px rgba(0,0,0,0.55))`
+                                                : undefined,
+                                        }}
+                                    />
+                                ) : <span className="tw-enemy-emoji" style={{ transform: `scale(${en.scale ?? 1})`, display: "inline-block" }}>{en.emoji || ev.emoji}</span>}
                             </button>
                         ));
                     })() : null}
@@ -1457,7 +1479,7 @@ export default function TownClient({ initial }) {
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
             {/* Raid victory recap */}
-            {swing ? <SwingBar onSwing={(d) => resolveSwing(swing.enemyId, swing.foeArt, d)} onCancel={() => setSwing(null)} /> : null}
+            {swing ? <SwingBar foe={swing} onSwing={(d) => resolveSwing(swing.enemyId, swing.foeArt, d)} onCancel={() => setSwing(null)} /> : null}
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
             {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}

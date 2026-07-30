@@ -26,12 +26,30 @@ const ABANDON_AFTER_S = 45;             // no heartbeat for this long = they've 
 
 // Foe archetypes. They differ in what they demand of your gear and timing, so a wave has texture without
 // needing more taps: a shieldbearer punishes sloppy timing, an archer dies fast but bites back.
+// `tint`, `scale` and `badge` are purely for the client: an archetype that fights differently has to LOOK
+// different or the variety is invisible and every foe reads as the same goblin. `hint` is the one-line
+// "what this one does to you", shown when you engage it.
 const KINDS = {
-    scrapper:     { hp: 26, weight: 60, label: "Goblin Scrapper", emoji: "👺", timingMult: 1.0, bite: 1.0 },
-    archer:       { hp: 18, weight: 22, label: "Goblin Archer", emoji: "🏹", timingMult: 1.0, bite: 1.6 },
-    shieldbearer: { hp: 44, weight: 15, label: "Shield-bearer", emoji: "🛡️", timingMult: 0.6, bite: 0.8 },
-    elite:        { hp: 70, weight: 3,  label: "Goblin Warchanter", emoji: "✨", timingMult: 0.8, bite: 1.4, elite: true },
-    chieftain:    { hp: 260, weight: 0, label: "Goblin Chieftain", emoji: "💀", timingMult: 0.7, bite: 2.0, chieftain: true },
+    scrapper: {
+        hp: 26, weight: 60, label: "Goblin Scrapper", emoji: "👺", timingMult: 1.0, bite: 1.0,
+        tint: null, scale: 1, badge: null, hint: "A plain brawler — nothing fancy.",
+    },
+    archer: {
+        hp: 18, weight: 22, label: "Goblin Archer", emoji: "🏹", timingMult: 1.0, bite: 1.6,
+        tint: "#7ad07a", scale: 0.88, badge: "🏹", hint: "Squishy, but it bites back hard — end it fast.",
+    },
+    shieldbearer: {
+        hp: 44, weight: 15, label: "Shield-bearer", emoji: "🛡️", timingMult: 0.6, bite: 0.8,
+        tint: "#54a0e0", scale: 1.14, badge: "🛡️", hint: "Armoured — sloppy timing barely dents it.",
+    },
+    elite: {
+        hp: 70, weight: 3, label: "Goblin Warchanter", emoji: "✨", timingMult: 0.8, bite: 1.4, elite: true,
+        tint: "#b98cff", scale: 1.22, badge: "✨", hint: "A Warchanter — rare, tough, and worth real loot.",
+    },
+    chieftain: {
+        hp: 260, weight: 0, label: "Goblin Chieftain", emoji: "💀", timingMult: 0.7, bite: 2.0, chieftain: true,
+        tint: "#e05b6a", scale: 1.55, badge: "💀", hint: "The Chieftain. Drop it and the raid is won.",
+    },
 };
 export const enemyKind = (k) => KINDS[k] || KINDS.scrapper;
 
@@ -132,6 +150,7 @@ export async function swarmState(eventId, viewerId = null) {
             const mine = viewerId && String(r.engaged_by || "") === String(viewerId);
             return {
                 id: Number(r.id), kind: r.kind, label: def.label, emoji: def.emoji,
+                tint: def.tint || null, scale: def.scale ?? 1, badge: def.badge || null, hint: def.hint || null,
                 hp: Number(r.hp), hpMax: Number(r.hp_max), hpPct: Math.max(0, Math.round((r.hp / r.hp_max) * 100)),
                 x: Number(r.x), y: Number(r.y), flip: r.flip === true,
                 elite: Boolean(def.elite), chieftain: Boolean(def.chieftain),
