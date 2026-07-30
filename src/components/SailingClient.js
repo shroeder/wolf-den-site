@@ -1063,6 +1063,31 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.82rem" }}>You can only fish once the boat is under way or moored at the island.</p>
                     )}
                     <a className="btn-ghost" href="/marketplace/fishing" style={{ display: "block", textAlign: "center", marginTop: 8, textDecoration: "none" }}>📖 Fishing Log &amp; records</a>
+
+                    {/* THE RAIL'S TRACKS — fishing's first real progression. Each buys a different KIND of
+                        fishing (more / rarer / more treasure / safer) so they don't collapse into one obvious
+                        purchase order. Same cost curve and layout as the boat and excavation tracks. */}
+                    <h2 className="sail-upg-h" style={{ margin: "16px 0 2px" }}>🎣 Rig your rod</h2>
+                    <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Gold spent here stays with you — Angling from gear stacks on top.</p>
+                    <div className="sail-upgrades is-boat">
+                        {(state.fishing.tracks || []).map((u) => (
+                            <div className="sail-upg" key={u.id}>
+                                <div className="sail-upg-top">
+                                    <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                    <span className="muted">Lv {u.level}/{u.max}</span>
+                                </div>
+                                <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.max ? Math.min(100, (u.level / u.max) * 100) : 0}%` }} /></div>
+                                <div className="sail-upg-effect">
+                                    <span className="muted">{u.desc}</span>
+                                    <b>{u.kind === "pct" ? `+${Math.round(u.valueNow * 100)}%` : `+${u.valueNow}`}
+                                        {u.maxed ? "" : <> → <span className="sail-upg-next">{u.kind === "pct" ? `+${Math.round(u.valueNext * 100)}%` : `+${u.valueNext}`}</span></>}</b>
+                                </div>
+                                {u.maxed ? <button className="pill" disabled>✓ Max</button>
+                                    : state.gold < u.cost ? <CoinCta price={u.cost} have={state.gold} className="sail-upg-cta" />
+                                        : <button className="btn-ghost sail-upg-cta" disabled={busy} onClick={() => buyUpgrade(`fish:${u.id}`, "upgrade_fishing", { track: u.id })}>🪙 {u.cost.toLocaleString()}</button>}
+                            </div>
+                        ))}
+                    </div>
                 </section>
             ) : null}
 

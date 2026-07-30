@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -55,6 +55,7 @@ export async function POST(request) {
                 case "raid": return noStore(await doRaid(g.buyer.id, body.target));
                 case "upgrade_dig": return noStore(await upgradeDig(g.buyer.id, body.track));
                 case "upgrade_tool": return noStore(await upgradeTool(g.buyer.id, body.tool));
+                case "upgrade_fishing": return noStore(await upgradeFishing(g.buyer.id, body.track));
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
                 case "wave": return noStore(await waveAtSailor(g.buyer.id));
                 case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));

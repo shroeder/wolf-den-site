@@ -242,6 +242,37 @@ async function grantFishingGear(buyerId, fishRarity) {
     return null;
 }
 
+// ── THE RAIL: FISHING UPGRADES ───────────────────────────────────────────────────────────────────────────────
+// Bought with gold at the Rail, on the same cost curve as the boat and excavation tracks. Fishing previously
+// had no progression at all — Angling came only from gear and badges, so there was nothing to work toward.
+//
+// Each track buys a different KIND of fishing rather than just "more of it", so they don't collapse into one
+// obvious purchase order:
+//
+//   line  more casts        — the plainest and most wanted, so it's the most expensive per point of value
+//   lure  rarer species     — stacks with Angling's tilt, and it's the one that fills the log
+//   net   more treasure     — turns fishing toward loot instead of collection
+//   gaff  a better floor    — takes the sting out of a fumbled reel without touching the ceiling
+//
+// Deliberately capped modestly: a fully-invested angler gets 15 casts a day rather than 10, not 40, because
+// casts are the input to every other reward in the feature.
+export const FISH_TRACKS = {
+    line: { max: 5, per: 1, cap: 5, kind: "count", name: "Line", icon: "🎣", desc: "Extra casts each day." },
+    lure: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Lure", icon: "✨", desc: "Better odds of a rarer species." },
+    net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", icon: "🪣", desc: "More casts bring up treasure instead of a fish." },
+    gaff: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Gaff", icon: "🪝", desc: "A clean landing floors the size on a poor reel." },
+};
+export const FISH_TRACK_COL = {
+    line: "fish_line_level", lure: "fish_lure_level", net: "fish_net_level", gaff: "fish_gaff_level",
+};
+export const fishTrackValue = (t, lvl) => Math.min(FISH_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * FISH_TRACKS[t].per);
+// Pull every track's level off the sailing row in one go.
+export function fishTrackLevels(row) {
+    const out = {};
+    for (const t of Object.keys(FISH_TRACKS)) out[t] = Number(row?.[FISH_TRACK_COL[t]]) || 0;
+    return out;
+}
+
 // Angling points → the two things they buy.
 export function anglingEffects(angling = 0) {
     const pts = Math.max(0, Number(angling) || 0);
@@ -251,12 +282,14 @@ export function anglingEffects(angling = 0) {
     };
 }
 
-export const castsPerDay = (angling = 0) => Math.min(CASTS_MAX, CASTS_PER_DAY + anglingEffects(angling).bonusCasts);
+export const castsPerDay = (angling = 0, lineLevel = 0) =>
+    Math.min(CASTS_MAX, CASTS_PER_DAY + anglingEffects(angling).bonusCasts + fishTrackValue("line", lineLevel));
 
 // ── THE ROLL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Every species is in the water on every cast. Angling still tilts the odds toward the good stuff, because a
 // stat that does nothing is worse than no stat — but it can only ever bend the curve, never unlock a species.
 function rollSpecies(rareTilt = 0) {
+    // `rareTilt` already includes the Lure track — see castLine.
     const weights = FISH.map((f) => f.odds * (f.rarity === "common" ? 1 : 1 + rareTilt));
     const total = weights.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -292,9 +325,10 @@ const REEL_FLOOR = 0.35;         // the most a flawless reel can lift the bottom
 // something comes up that nobody has a frame of reference for.
 const TROPHY_CHANCE = 0.025;     // how often a catch escapes the typical range at all
 const TROPHY_MAX = 1.9;          // and the most it can multiply the range's span by
-function weightFor(species, roll, quality) {
+function weightFor(species, roll, quality, gaff = 0) {
     const [min, max] = species.lb;
-    const floor = clamp01(quality) * REEL_FLOOR;
+    // Gaff widens what a good landing is worth at the bottom end — still nothing at all to the ceiling.
+    const floor = clamp01(quality) * (REEL_FLOOR + fishTrackValue("gaff", gaff));
     const t = Math.max(clamp01(roll), floor);
     let scaled = Math.pow(t, SIZE_CURVE);
     // The overshoot rides on a SEPARATE roll, so it isn't just "the top of the distribution" — a trophy is its
@@ -340,7 +374,8 @@ const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0
 // `status` is the voyage status decorate() already computed; fishing is only offered at sea or docked.
 export function fishingView(row, angling = 0, status = "idle") {
     const log = logOf(row);
-    const max = castsPerDay(angling);
+    const lv = fishTrackLevels(row);
+    const max = castsPerDay(angling, lv.line);
     const used = castsUsed(row);
     const hooked = row?.fish_state || null;
     const caughtIds = Object.keys(log);
@@ -351,6 +386,15 @@ export function fishingView(row, angling = 0, status = "idle") {
         // Something is on the line right now (survives a refresh mid-cast — you can always come back and reel).
         hooked: hooked ? { castAt: hooked.castAt, biteAt: hooked.biteAt, graceMs: BITE_GRACE_MS } : null,
         biteWindow: { minMs: BITE_MIN_MS, maxMs: BITE_MAX_MS, graceMs: BITE_GRACE_MS },
+        // The Rail's upgrade tracks, priced and levelled like the boat/dig ones.
+        tracks: Object.keys(FISH_TRACKS).map((t) => {
+            const def = FISH_TRACKS[t], level = lv[t];
+            return {
+                id: t, name: def.name, icon: def.icon, desc: def.desc, kind: def.kind,
+                level, max: def.max, maxed: level >= def.max, cost: 100 * (level + 1) * (level + 1),
+                valueNow: fishTrackValue(t, level), valueNext: fishTrackValue(t, level + 1), cap: def.cap,
+            };
+        }),
         totalCaught: Number(row?.fish_caught) || 0,
         speciesKnown: caughtIds.length,
         speciesTotal: FISH_COUNT,
@@ -378,13 +422,14 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const row = await readFishRow(buyerId);
     if (!row) return { ok: false, error: "no_ship" };
     if (row.fish_state) return { ok: false, error: "already_cast" };
-    const max = castsPerDay(angling);
+    const lv = fishTrackLevels(row);
+    const max = castsPerDay(angling, lv.line);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
     // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
     // learns which it was only when it surfaces.
-    const isTreasure = Math.random() < TREASURE_CHANCE;
-    const species = rollSpecies(anglingEffects(angling).rareTilt);
+    const isTreasure = Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net));
+    const species = rollSpecies(anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure));
     const state = {
         species: species.id,
         treasure: isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
@@ -437,7 +482,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // single claim.
     const taken = await db.queryOne(
         `WITH hooked AS (
-             SELECT buyer_id, fish_state, COALESCE(fish_casts, 0) AS fish_casts, fish_log, voyages_completed
+             SELECT buyer_id, fish_state, COALESCE(fish_casts, 0) AS fish_casts, fish_log, voyages_completed, fish_gaff_level
                FROM mkt_sailing WHERE buyer_id = $1 AND fish_state IS NOT NULL FOR UPDATE
          ), cleared AS (
              UPDATE mkt_sailing s SET fish_state = NULL, updated_at = NOW()
@@ -482,7 +527,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
 
     // ── THE CATCH ────────────────────────────────────────────────────────────────────────────────────────────
     const q = clamp01(quality);
-    const cm = weightFor(species, state.roll, q);   // pounds; the column is still named cm (see migration 287)
+    // Gaff comes off the row we just claimed, so a member who levels it mid-cast still gets the old floor.
+    const gaffLvl = Number(taken.fish_gaff_level) || 0;
+    const cm = weightFor(species, state.roll, q, gaffLvl);   // pounds; column renamed to lb in mig287
     const pct = percentileOf(species, cm);
     // Payout scales from 45% of the species value at the small end to full value at the top of its typical
     // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.

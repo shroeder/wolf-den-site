@@ -21,7 +21,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
-import { fishingView, castLine, landFish, denFishRecords, denTopCatches } from "@/lib/marketplace/fishing.js";
+import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
 // Fishing is still in development — owner-only until the design settles. See fishingUnlocked() below.
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -1847,11 +1847,14 @@ const UPGRADE_COLS = {
     // Digging tracks (separate system):
     dig_stamina: "dig_stamina_level", dig_pierce: "dig_pierce_level", dig_strike: "dig_strike_level",
     dig_efficient: "dig_efficient_level", dig_detonator: "dig_detonator_level",
+    // Fishing tracks (the Rail) — same buy path, same cost curve.
+    ...Object.fromEntries(Object.entries(FISH_TRACK_COL).map(([t, col]) => [`fish_${t}`, col])),
 };
 const UPGRADE_MAX = {
     speed: MAX_SPEED_LEVEL, fortune: MAX_FORTUNE_LEVEL, rarity: MAX_RARITY_LEVEL, luck: MAX_LUCK_LEVEL, raid: MAX_RAID_LEVEL,
     dig_stamina: DIG_TRACKS.stamina.max, dig_pierce: DIG_TRACKS.pierce.max, dig_strike: DIG_TRACKS.strike.max,
     dig_efficient: DIG_TRACKS.efficient.max, dig_detonator: DIG_TRACKS.detonator.max,
+    ...Object.fromEntries(Object.entries(FISH_TRACKS).map(([t, def]) => [`fish_${t}`, def.max])),
 };
 
 async function buyUpgrade(buyerId, kind) {
@@ -1886,3 +1889,7 @@ export const upgradeRarity = (buyerId) => buyUpgrade(buyerId, "rarity");
 export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (waves) lever
 export const upgradeRaid = (buyerId) => buyUpgrade(buyerId, "raid"); // the "Raiding" (raid-dodge) lever
 export const upgradeDig = (buyerId, track) => buyUpgrade(buyerId, `dig_${track}`); // digging tracks
+// Rail tracks — gated like the rest of fishing, so nobody can buy into an unreleased feature.
+export const upgradeFishing = (buyerId, track) => (fishingUnlocked(buyerId)
+    ? buyUpgrade(buyerId, `fish_${track}`)
+    : Promise.resolve({ ok: false, error: "not_available" }));
