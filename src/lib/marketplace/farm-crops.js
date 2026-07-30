@@ -201,12 +201,16 @@ async function loadFarmBuyer(buyerId) {
 // Eight slots, laid out as two staggered rows across the field. Front row fills first, so three plots read as
 // a tidy row rather than a scattering, and the back row is inset half a step for depth. Decorations stay
 // free-placed — those are what make a farm yours; the crop beds want to look like a farm.
-// Spacing is wider than it looks like it needs to be: a bed sprite is a good chunk of the viewport, so 18
-// points apart still had them visibly overlapping and piled toward the left. 24 apart clears them, and the
-// rows are further apart vertically so the back row reads as behind rather than on top.
+// Spacing alone could never fix the overlap: the bed sprite was a FIXED 112px, so four of them across a phone
+// need 448px of a ~390px field no matter where the slots sit. The client now scales the bed to the field width
+// (see ScenePlot) so a row of four always fits — these are the positions that row sits at.
+//
+// `s` is a perspective scale. The back row is drawn smaller because it's further away, which reads as depth AND
+// buys the room to keep it inside the field: a half-step stagger would put the fourth back bed at x 97 and hang
+// it off the right edge. Smaller beds up there sit at 91 and still clear the fence.
 const PLOT_SLOTS = [
-    { x: 12, y: 88 }, { x: 36, y: 88 }, { x: 60, y: 88 }, { x: 84, y: 88 }, // front row
-    { x: 24, y: 71 }, { x: 48, y: 71 }, { x: 72, y: 71 }, { x: 94, y: 71 }, // back row, staggered between
+    { x: 13, y: 89, s: 1 }, { x: 37, y: 89, s: 1 }, { x: 61, y: 89, s: 1 }, { x: 85, y: 89, s: 1 }, // front row
+    { x: 19, y: 70, s: 0.8 }, { x: 43, y: 70, s: 0.8 }, { x: 67, y: 70, s: 0.8 }, { x: 91, y: 70, s: 0.8 }, // back row, inset + smaller
 ];
 function defaultPlotPos(i) {
     return PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1];
@@ -244,13 +248,13 @@ export async function getGarden(buyerId) {
         const tracks = plotTracksFor(plotUp[i] || {}); // this plot's specialization tracks (levels + costs)
         const specLevel = tracks.reduce((s, t) => s + t.level, 0); // total invested (for the plot badge)
         const p = byslot.get(i);
-        if (!p) { gardenPlots.push({ slot: i, empty: true, x: pos.x, y: pos.y, tracks, specLevel }); continue; }
+        if (!p) { gardenPlots.push({ slot: i, empty: true, x: pos.x, y: pos.y, s: pos.s, tracks, specLevel }); continue; }
         const def = seedById(p.seed_id);
         const readyMs = new Date(p.ready_at).getTime();
         const ready = readyMs <= now;
         if (ready) readyCount += 1;
         gardenPlots.push({
-            x: pos.x, y: pos.y, tracks, specLevel,
+            x: pos.x, y: pos.y, s: pos.s, tracks, specLevel,
             slot: i, empty: false, seedId: p.seed_id, name: def?.name || p.seed_id, emoji: def?.emoji || "🌱",
             sprout: def?.sprout || "🌱", sell: def?.sell || 0, xp: def?.xp || 0, loot: LOOT_LABEL[def?.rarity] || null, rarity: def?.rarity || "common",
             plantedAt: new Date(p.planted_at).toISOString(), readyAt: new Date(p.ready_at).toISOString(),

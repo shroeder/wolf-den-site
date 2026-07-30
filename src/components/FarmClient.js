@@ -1525,6 +1525,22 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
     // right-hand side to fix it. A tap still plants / harvests / inspects; decorations remain free-placed.
     const [drag, setDrag] = useState(null); // retained: the render still reads it, always null now
     const gr = useRef({});
+    // The bed sprite used to be a hard-coded 112px. Four of those across a row need 448px, and a phone field is
+    // ~390px — so the front row overlapped itself no matter where the slots were placed. Size the bed off the
+    // MEASURED field instead: a row of four is 4 × 20.5% = 82% of the width, leaving a real gap between beds at
+    // every screen size. The 112 cap keeps them from ballooning on a wide desktop.
+    const [fieldW, setFieldW] = useState(0);
+    useEffect(() => {
+        const el = fieldRef?.current;
+        if (!el) return undefined;
+        const read = () => setFieldW(el.getBoundingClientRect().width || 0);
+        read();
+        if (typeof ResizeObserver === "undefined") { window.addEventListener("resize", read); return () => window.removeEventListener("resize", read); }
+        const ro = new ResizeObserver(read);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [fieldRef]);
+    const bedW = Math.max(58, Math.min(112, (fieldW || 380) * 0.205));
     const suppressClickRef = useRef(false);
     const start = (e, p) => {
         return; // plots are fixed — see the note above
@@ -1560,7 +1576,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
                 const live = drag && drag.slot === p.slot ? drag : p;
                 return (
                     <ScenePlot
-                        key={p.slot} p={p} left={live.x} top={live.y} now={now} busy={busy} bedUrl={garden.bedUrl} bedTiers={garden.bedTiers} cropSprites={garden.cropSprites}
+                        key={p.slot} p={p} left={live.x} top={live.y} bedW={bedW} now={now} busy={busy} bedUrl={garden.bedUrl} bedTiers={garden.bedTiers} cropSprites={garden.cropSprites}
                         totalSeeds={totalSeeds} editing={editing} dragging={drag?.slot === p.slot} suppressClickRef={suppressClickRef}
                         onPointerDown={editing ? (e) => start(e, p) : undefined}
                         onPointerMove={editing ? move : undefined}
@@ -1574,7 +1590,7 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
     );
 }
 
-function ScenePlot({ p, left, top, now, busy, bedUrl, bedTiers, cropSprites, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
+function ScenePlot({ p, left, top, bedW = 112, now, busy, bedUrl, bedTiers, cropSprites, totalSeeds, editing = false, dragging = false, suppressClickRef, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onPlant, onHarvest, onInspect }) {
     const empty = p.empty;
     let progress = 1; let ready = false; let secsLeft = 0;
     if (!empty) {
@@ -1616,7 +1632,12 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, bedTiers, cropSprites, tot
     const title = editing ? `${p.name || "Plot"} — drag to move, tap to ${empty ? "plant" : ready ? "harvest" : "inspect"}`
         : empty ? (canPlant ? "Tap to plant a seed" : "Empty plot — tap to get seeds")
             : ready ? `${p.name} — tap to harvest` : `${p.name} · ${fmtGrow(secsLeft)} left · tap to inspect`;
-    const W = tierBed ? 112 : 78; // the art bed has ~18% transparent padding, so render it a bit larger
+    // Width comes from the measured field (see ScenePlots), times the slot's perspective scale — the back row is
+    // drawn smaller because it's further away. The art bed carries ~18% transparent padding, so the CSS fallback
+    // is rendered a bit narrower to end up the same visual size. Everything inside scales with it.
+    const persp = p.s || 1;
+    const W = Math.round(bedW * persp * (tierBed ? 1 : 0.7));
+    const k = W / 112; // scale factor for the fixed inner sizes the layout was authored at
     return (
         <button type="button" onClick={onClick} title={title}
             onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerCancel}
@@ -1624,26 +1645,26 @@ function ScenePlot({ p, left, top, now, busy, bedUrl, bedTiers, cropSprites, tot
             {/* bed + plant, layered so the plant grows OUT of the soil */}
             <div style={{ position: "relative", width: W, margin: "0 auto" }}>
                 {/* ready ring pulsing behind the crop */}
-                {!empty && ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translate(-50%,50%)", width: 54, height: 54, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", zIndex: 1, animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}
+                {!empty && ready ? <span aria-hidden="true" style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translate(-50%,50%)", width: 54 * k, height: 54 * k, borderRadius: "50%", border: "2px solid rgba(140,240,150,0.7)", zIndex: 1, animation: "farmReadyRing 1.6s ease-out infinite" }} /> : null}
                 {/* the crop — its BASE sits down in the soil (bottom ~46% up the bed), growing taller over time */}
                 {!empty ? (
                     <span style={{ position: "absolute", left: "50%", bottom: "46%", transform: `translateX(-50%) scale(${plantScale})`, transformOrigin: "bottom center", transition: "transform 1.2s linear", zIndex: 2 }}>
                         {plantSprite ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={plantSprite} alt="" draggable={false} style={{ display: "block", width: 50, height: "auto", transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }} />
+                            <img src={plantSprite} alt="" draggable={false} style={{ display: "block", width: 50 * k, height: "auto", transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }} />
                         ) : (
-                            <span style={{ display: "block", fontSize: 42, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{growEmoji}</span>
+                            <span style={{ display: "block", fontSize: 42 * k, lineHeight: 1, transformOrigin: "bottom center", filter: ready ? "drop-shadow(0 0 8px rgba(140,240,150,0.9))" : "drop-shadow(0 3px 3px rgba(0,0,0,0.55))", animation: ready ? "farmBob 2s ease-in-out infinite" : "farmSway 3.4s ease-in-out infinite" }}>{growEmoji}</span>
                         )}
                     </span>
                 ) : (
-                    <span style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translateX(-50%)", fontSize: 24, color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", zIndex: 2, animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
+                    <span style={{ position: "absolute", left: "50%", bottom: "48%", transform: "translateX(-50%)", fontSize: Math.max(15, 24 * k), color: canPlant ? "#ffe27a" : "rgba(255,226,122,0.55)", fontWeight: 900, textShadow: "0 1px 3px rgba(0,0,0,0.85)", zIndex: 2, animation: "farmBob 2.4s ease-in-out infinite" }}>＋</span>
                 )}
                 {/* the raised bed — real AI art if we have it, else the CSS fallback */}
                 {tierBed ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={tierBed} alt="" draggable={false} style={{ display: "block", width: W, height: "auto", filter: `drop-shadow(0 4px 5px rgba(0,0,0,0.45))${bedGlow}`, opacity: canPlant ? 1 : 1 }} />
                 ) : (
-                    <span style={{ position: "relative", display: "block", width: 68, height: 26, margin: "0 auto", borderRadius: "7px / 9px",
+                    <span style={{ position: "relative", display: "block", width: W, height: Math.round(26 * (W / 68)), margin: "0 auto", borderRadius: "7px / 9px",
                         background: p.fertilized
                             ? "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #7a5430 0%, #3a2410 100%)"
                             : "repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 6px, rgba(0,0,0,0) 6px 12px), linear-gradient(180deg, #6b4a26 0%, #33200d 100%)",

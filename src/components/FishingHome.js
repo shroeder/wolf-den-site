@@ -55,9 +55,12 @@ export default function FishingHome({ fishing }) {
                 <span style={{ width: `${pct}%` }} />
             </div>
 
-            {/* Casting still happens at the rail — this screen is the collection, not a second way to fish. */}
-            <a className="fishhome-go" href="/marketplace/sailing">
-                {fishing?.available ? "🎣 Go fish — your line's ready" : "⛵ Set sail to fish"}
+            {/* Casting still happens at the rail — this screen is the collection, not a second way to fish. When
+                there's nothing to cast, the link goes quiet rather than shouting an action you can't take. */}
+            <a className={`fishhome-go${fishing?.available && casts.left > 0 ? "" : " is-quiet"}`} href="/marketplace/sailing">
+                {fishing?.available && casts.left > 0
+                    ? <>🎣 Head to the rail <em>· {casts.left} {casts.left === 1 ? "cast" : "casts"} ready</em></>
+                    : fishing?.available ? <>🎣 Out of casts <em>· more tomorrow</em></> : <>⛵ Set sail to fish</>}
             </a>
 
             <FishingLog log={fishing?.log} known={known} total={total} records={records} onClose={null} />

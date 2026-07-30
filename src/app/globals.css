@@ -12231,7 +12231,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fishhome-stat span { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8b93a0; text-align: center; }
 .fishhome-progress { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.4); overflow: hidden; margin: 10px 0 12px; }
 .fishhome-progress span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.4s ease; }
-.fishhome-go { display: block; text-align: center; text-decoration: none; padding: 13px; border-radius: 13px; font-weight: 900; font-size: 0.98rem; color: #10240f; background: linear-gradient(180deg,#7ed57e,#4bbf6a); box-shadow: 0 3px 0 #2f8a4a; margin-bottom: 6px; }
+/* The go-to-the-rail CTA. Was a full-bleed lime slab with a hard drop shadow — it read as a different site's
+   button next to the gold header, and it dwarfed the boards underneath it, which are what this screen is for.
+   Now it's the page's gold, sized like a button rather than a banner, and it says what you'd get. */
+.fishhome-go { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-decoration: none; padding: 11px 16px; border-radius: 999px; font-weight: 800; font-size: 0.92rem; letter-spacing: 0.01em; color: #2a1a06; background: linear-gradient(180deg,#ffdf86,#e8ab24); border: 1px solid rgba(255,240,200,0.55); box-shadow: 0 2px 10px rgba(232,171,36,0.25); margin: 0 0 14px; transition: filter .15s ease, transform .1s ease; }
+.fishhome-go:hover { filter: brightness(1.06); }
+.fishhome-go:active { transform: translateY(1px); }
+.fishhome-go em { font-style: normal; font-weight: 700; opacity: 0.72; }
+/* No casts left / not at sea — still a link, but it stops competing with the boards for attention. */
+.fishhome-go.is-quiet { color: #d8cfbb; background: rgba(255,255,255,0.05); border-color: #2f3641; box-shadow: none; font-weight: 700; }
 /* The log renders inside the page rather than a modal, so drop the modal's own chrome. */
 .fishhome .fish-log { max-height: none; height: auto; }
 /* Your weight against your previous best and the species ceiling. */
