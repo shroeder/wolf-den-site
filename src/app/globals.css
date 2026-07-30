@@ -12080,17 +12080,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .cshare-person-tag { flex: 0 0 auto; font-size: 0.63rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #7ec8ff; background: rgba(126,200,255,0.14); border-radius: 999px; padding: 2px 7px; }
 .cshare-person-check { flex: 0 0 auto; font-weight: 900; color: #ffd75e; }
 
-/* Sharing sheet — opened from the farm tab row. */
-.cshare-sheet-wrap { position: fixed; inset: 0; z-index: 9996; display: flex; align-items: flex-end; justify-content: center; }
-.cshare-sheet-scrim { position: absolute; inset: 0; border: none; padding: 0; background: rgba(0,0,0,0.62); cursor: pointer; }
-.cshare-sheet { position: relative; width: 100%; max-width: 560px; max-height: 86dvh; display: flex; flex-direction: column; background: #12161c; border: 1px solid #2a2f37; border-bottom: none; border-radius: 18px 18px 0 0; box-shadow: 0 -14px 40px rgba(0,0,0,0.6); animation: cshareSheetUp .22s ease both; }
-@keyframes cshareSheetUp { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.cshare-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 14px 9px; border-bottom: 1px solid #232830; }
-.cshare-sheet-head strong { font-size: 0.98rem; color: #ffd75e; }
-.cshare-sheet-x { background: none; border: none; color: #8b93a0; font-size: 1rem; font-weight: 900; cursor: pointer; padding: 4px 6px; }
-.cshare-sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 14px 16px; }
-.cshare-sheet-body .cshare { margin-top: 0; padding-top: 10px; }
-@media (min-width: 640px) { .cshare-sheet-wrap { align-items: center; } .cshare-sheet { border-radius: 18px; border-bottom: 1px solid #2a2f37; } }
+/* (The sharing sheet lived here. Art is a farm TAB now, so the hub renders inline like every other view.) */
 
 /* ── DM presence + typing ─────────────────────────────────────────────────────────────────────────────────── */
 .mkt-dock-titlewrap { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }

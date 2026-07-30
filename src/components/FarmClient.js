@@ -11,7 +11,7 @@ import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
-import { CreationShareLauncher } from "@/components/CreationShare";
+import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
@@ -565,7 +565,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
     // fold into both `decorations` (inventory) and `placements` (what renders in the scene).
     const [decoEditing, setDecoEditing] = useState(false); // default LOCKED on arrival — tap the 🔒/🔓 toggle to rearrange
-    const [view, setView] = useState("outside"); // farm view: 'garden' | 'outside' | 'inside' (declared early — decoPlaceAt reads it)
+    const [view, setView] = useState("outside"); // farm view: 'garden' | 'outside' | 'inside' | 'art' (declared early — decoPlaceAt reads it)
+    // How many creation gifts/requests are waiting on an answer — badges the Art tab. Its own tiny fetch so the
+    // badge is there before you open the tab; the hub refetches it after every action via onChanged.
+    const [artPending, setArtPending] = useState(0);
+    const loadArtPending = useCallback(async () => {
+        try {
+            const r = await fetch("/api/marketplace/creations/share", { cache: "no-store" });
+            const d = r.ok ? await r.json() : null;
+            setArtPending((d?.incomingGifts?.length || 0) + (d?.incomingRequests?.length || 0));
+        } catch { /* the tab still works, it just won't badge */ }
+    }, []);
+    useEffect(() => { loadArtPending(); }, [loadArtPending]);
     const [decoBusy, setDecoBusy] = useState(false);
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
@@ -854,17 +865,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-rank-bar { height: 6px; border-radius: 999px; background: rgba(0,0,0,0.28); overflow: hidden; margin: 5px 0 3px; }
                 .farm-rank-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3b23a, #ffe488); box-shadow: 0 0 8px rgba(255,214,110,0.6); transition: width .6s cubic-bezier(.3,1.2,.4,1); }
                 .farm-rank-next { font-size: 10.5px; color: #b9a892; }
-                .farm-viewtabs { display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08); }
-                .farm-viewtabs button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none; background: transparent; color: #b7c2ad; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
-                .farm-viewtabs button > span { font-size: 16px; }
+                .farm-viewtabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08); }
+                /* Four tabs on a phone: the label has to survive, so the row gets tighter and the badge stops
+                   taking inline width — it used to push the text sideways and collide with the next tab's icon. */
+                .farm-viewtabs button { position: relative; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 9px 4px; border-radius: 10px; font-weight: 800; font-size: 12px; letter-spacing: -0.01em; cursor: pointer; border: none; background: transparent; color: #b7c2ad; transition: background .15s ease, color .15s ease, box-shadow .15s ease; white-space: nowrap; }
+                .farm-viewtabs button > span[aria-hidden] { font-size: 15px; flex: 0 0 auto; }
                 .farm-viewtabs button.on { background: linear-gradient(180deg, #7ed57e, #4bbf6a); color: #10240f; box-shadow: 0 2px 6px rgba(75,191,106,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
                 @media (hover: hover) { .farm-viewtabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0e0; } }
                 .farm-viewtabs button.has-attn:not(.on) { box-shadow: inset 0 0 0 1px rgba(224,67,63,0.55); }
-                .farm-viewtabs .farm-tab-badge { font-size: 10px; font-weight: 900; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #e0433f; color: #fff; display: inline-grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
-                /* The Art button opens a sheet rather than switching views, so it doesn't take an equal third of
-                   the row and it reads gold instead of green — an action sitting beside the three places. */
-                .farm-viewtabs .farm-artbtn { flex: 0 0 auto; padding: 9px 12px; color: #ffd75e; }
-                @media (hover: hover) { .farm-viewtabs .farm-artbtn:hover { background: rgba(255,215,94,0.12); color: #ffe9a8; } }
+                /* Absolutely positioned so a badge never widens the tab or shoves the label into its neighbour. */
+                .farm-viewtabs .farm-tab-badge { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 900; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #e0433f; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
                 @keyframes farmTabPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
             `}</style>
 
@@ -906,36 +916,45 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             <FarmDirectory current={viewingAlias} />
 
-            {/* Three farm areas: Garden (crops) · Outside (pasture) · Inside (barn). */}
+            {/* Four farm areas: Garden (crops) · Outside (pasture) · Inside (barn) · Art (your creations).
+                Art is a real VIEW now, not a button that opened a sheet on top of the farm — a modal over a
+                tab row reads as an interruption, while the other three swap the panel underneath. Same tab,
+                same behaviour, no exception to learn. */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"]]
-                    .filter(([v]) => farm.mine || v !== "garden") // the Garden is yours alone — hide it on other members' farms
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"]]
+                    .filter(([v]) => farm.mine || (v !== "garden" && v !== "art")) // the Garden and your Art are yours alone
                     .map(([v, ico, label]) => {
                     // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
                     const petAttn = v !== "garden" && farm.mine && liveNudge > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted).length : 0;
-                    const badge = attn || petAttn;
+                    const badge = v === "art" ? artPending : (attn || petAttn);
                     return (
                         <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
                             <span aria-hidden="true">{ico}</span>{label}
-                            {attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span>
-                                : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>{petAttn}</span> : null}
+                            {v === "art" && artPending ? <span className="farm-tab-badge" title={`${artPending} waiting on you`}>{artPending}</span>
+                                : attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span>
+                                    : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>{petAttn}</span> : null}
                         </button>
                     );
                 })}
-                {/* Creation sharing sits with the tabs, not a thousand pixels below the field: gifts waiting on
-                    you and people asking for your art are the whole point, and they were previously invisible
-                    unless you scrolled past the entire farm. Badges when something needs an answer. */}
-                {farm.mine ? <CreationShareLauncher /> : null}
             </div>
 
             {farm.mine && liveNudge > 0 && view !== "garden" ? (
                 <div className="farm-petnudge">🐾 <b>{liveNudge}</b> free {liveNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
             ) : null}
 
+            {/* ART — gifts waiting on you, people asking for your work, and the one-time share picker. */}
+            {view === "art" ? (
+                <section className="card" style={{ marginTop: 10 }}>
+                    <h2 style={{ margin: "0 0 2px", fontSize: "1.1rem" }}>🎨 Your art</h2>
+                    <p className="muted" style={{ margin: "0 0 4px", fontSize: "0.8rem" }}>Pass a creation to another member — each piece can be shared once.</p>
+                    <CreationShareHub onChanged={loadArtPending} />
+                </section>
+            ) : null}
+
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
                 so you can scroll sideways to see the WHOLE painting (it's wider than the viewport). */}
-            <div ref={sceneWrapRef} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
+            <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}

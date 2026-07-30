@@ -201,9 +201,12 @@ async function loadFarmBuyer(buyerId) {
 // Eight slots, laid out as two staggered rows across the field. Front row fills first, so three plots read as
 // a tidy row rather than a scattering, and the back row is inset half a step for depth. Decorations stay
 // free-placed — those are what make a farm yours; the crop beds want to look like a farm.
+// Spacing is wider than it looks like it needs to be: a bed sprite is a good chunk of the viewport, so 18
+// points apart still had them visibly overlapping and piled toward the left. 24 apart clears them, and the
+// rows are further apart vertically so the back row reads as behind rather than on top.
 const PLOT_SLOTS = [
-    { x: 16, y: 86 }, { x: 34, y: 86 }, { x: 52, y: 86 }, { x: 70, y: 86 }, // front row
-    { x: 25, y: 74 }, { x: 43, y: 74 }, { x: 61, y: 74 }, { x: 79, y: 74 }, // back row, staggered
+    { x: 12, y: 88 }, { x: 36, y: 88 }, { x: 60, y: 88 }, { x: 84, y: 88 }, // front row
+    { x: 24, y: 71 }, { x: 48, y: 71 }, { x: 72, y: 71 }, { x: 94, y: 71 }, // back row, staggered between
 ];
 function defaultPlotPos(i) {
     return PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1];

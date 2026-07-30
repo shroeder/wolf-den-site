@@ -233,54 +233,9 @@ export function CreationShareHub({ onChanged }) {
     );
 }
 
-// ── The way in ───────────────────────────────────────────────────────────────────────────────────────────────
-// The hub used to be mounted inline, far below the farm scene — you had to scroll past the whole field, the
-// controls and the seed bag to find out someone had offered you art. It lives behind this button instead: it
-// sits up with the farm tabs, carries a count badge when something is waiting, and opens as a sheet.
-export function CreationShareLauncher() {
-    const [open, setOpen] = useState(false);
-    const [counts, setCounts] = useState(null);
-
-    const refresh = useCallback(async () => {
-        const r = await fetch("/api/marketplace/creations/share", { cache: "no-store" }).catch(() => null);
-        const d = r && r.ok ? await r.json().catch(() => null) : null;
-        setCounts(d ? {
-            waiting: (d.incomingGifts?.length || 0) + (d.incomingRequests?.length || 0),
-            any: Boolean(d.mine?.length || d.incomingGifts?.length || d.incomingRequests?.length || d.outgoing?.length),
-        } : null);
-    }, []);
-    useEffect(() => { refresh(); }, [refresh]);
-
-    // Nothing made, nothing offered, nothing asked — don't put a dead button on the farm.
-    if (!counts?.any) return null;
-    const waiting = counts.waiting;
-
-    return (
-        <>
-            <button
-                type="button" className={`farm-artbtn${waiting ? " has-attn" : ""}`} onClick={() => setOpen(true)}
-                title={waiting ? `${waiting} waiting on you` : "Share your creations"}
-            >
-                <span aria-hidden="true">🎨</span>Art
-                {waiting ? <span className="farm-tab-badge">{waiting}</span> : null}
-            </button>
-            {open ? (
-                <div className="cshare-sheet-wrap" role="dialog" aria-modal="true" aria-label="Creation sharing">
-                    <button type="button" className="cshare-sheet-scrim" aria-label="Close" onClick={() => setOpen(false)} />
-                    <div className="cshare-sheet">
-                        <div className="cshare-sheet-head">
-                            <strong>🎨 Your art</strong>
-                            <button type="button" className="cshare-sheet-x" onClick={() => setOpen(false)} aria-label="Close">✕</button>
-                        </div>
-                        <div className="cshare-sheet-body">
-                            <CreationShareHub onChanged={refresh} />
-                        </div>
-                    </div>
-                </div>
-            ) : null}
-        </>
-    );
-}
+// (CreationShareLauncher lived here — a button that opened the hub as a bottom sheet. Art is a real farm TAB
+// now, so the hub renders inline like the Garden and the barn do; a modal floating over a tab row read as an
+// interruption rather than a place. The sheet styles went with it.)
 
 // ── On someone else's farm ───────────────────────────────────────────────────────────────────────────────────
 // Asks the server whether an ask is possible before rendering anything, so the button never appears just to be
