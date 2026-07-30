@@ -9,7 +9,20 @@
 
 -- 1. Length becomes weight. Both are just a number on the row, so this is a rename, not a conversion —
 --    but the VALUES are not comparable, which is why the existing rows go (see 3).
-ALTER TABLE mkt_fish_catch RENAME COLUMN cm TO lb;
+--
+--    Guarded rather than a bare RENAME. A verification script that believed it was running inside a
+--    transaction had already applied these statements for real — the Neon HTTP driver gives each query its own
+--    connection, so BEGIN/ROLLBACK around separate calls do nothing and every statement auto-commits. The
+--    rename therefore landed without the migration ever being recorded, and every deploy then died retrying
+--    it. Every statement in this file is now safe to run against a database that has already seen it.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'mkt_fish_catch' AND column_name = 'cm')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'mkt_fish_catch' AND column_name = 'lb')
+    THEN
+        ALTER TABLE mkt_fish_catch RENAME COLUMN cm TO lb;
+    END IF;
+END $$;
 
 -- 2. `sky` recorded which weather a catch happened under, for the weather-gated species. Nothing gates on
 --    weather any more and nothing reads the column.

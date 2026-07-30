@@ -124,13 +124,22 @@ const SIZE_FROM_ROLL = 0.38;
 // Balance: ~45% of casts on a common fish return a bonus, almost always a seed or fragments. Gear and chests
 // sit deliberately below the rates the Forge and dig already pay, because fishing is 10 casts a day on top of
 // everything else — it should feed those loops, never replace them.
-const HAUL = {
-    //                       nothing  fragment  seed  consumable  gear  chest  pet
-    common: { nothing: 55, fragment: 22, seed: 18, consumable: 4, gear: 0.8, chest: 0.2, pet: 0 },
-    rare: { nothing: 44, fragment: 24, seed: 18, consumable: 9, gear: 3.5, chest: 1.4, pet: 0.1 },
-    epic: { nothing: 28, fragment: 26, seed: 14, consumable: 16, gear: 10, chest: 5.6, pet: 0.4 },
-    legendary: { nothing: 12, fragment: 24, seed: 8, consumable: 20, gear: 21, chest: 14, pet: 1.0 },
-    mythic: { nothing: 0, fragment: 14, seed: 4, consumable: 20, gear: 30, chest: 28, pet: 4.0 },
+// 80% of casts bring up a FISH. The other 20% bring up TREASURE INSTEAD — you pulled something off the sea
+// floor rather than out of it. Not both: a cast is one or the other, so "what's on the line?" always has a
+// real answer and hauling up a chest is its own moment rather than a footnote under a Sardine.
+export const TREASURE_CHANCE = 0.20;
+
+// What the treasure is, when it isn't a fish. Percentages of that 20%.
+const TREASURE = { fragment: 38, seed: 30, consumable: 20, gear: 8, chest: 3.6, pet: 0.4 };
+
+// Landing a rare FISH still sweetens things — but as a bonus on top, and only for the genuinely rare ones, so
+// a mythic is never a bare fish with no story attached.
+const FISH_BONUS = {
+    common: { nothing: 100 },
+    rare: { nothing: 100 },
+    epic: { nothing: 72, fragment: 20, consumable: 8 },
+    legendary: { nothing: 40, fragment: 28, consumable: 18, gear: 10, chest: 4 },
+    mythic: { nothing: 0, fragment: 22, consumable: 24, gear: 30, chest: 20, pet: 4 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
@@ -146,15 +155,62 @@ const FISH_CONSUMABLES = [
 // How far up that list a rarity can reach (index cap), so the good relics stay attached to the good fish.
 const CONSUMABLE_REACH = { common: 2, rare: 4, epic: 6, legendary: 8, mythic: 9 };
 
-// One weighted pick off the rarity's table.
-function rollHaul(rarity) {
-    const table = HAUL[rarity] || HAUL.common;
-    const entries = Object.entries(table);
+// One weighted pick off any of the tables above.
+function pickWeighted(table) {
+    const entries = Object.entries(table || {});
     const total = entries.reduce((a, [, w]) => a + w, 0);
+    if (!total) return "nothing";
     let r = Math.random() * total;
     for (const [kind, w] of entries) { r -= w; if (r <= 0) return kind; }
     return "nothing";
 }
+const rollTreasure = () => pickWeighted(TREASURE);
+const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.common);
+
+// Grant one haul entry and describe it for the client. Best-effort throughout: failing to hand over a bonus
+// must never cost the member the thing they just landed. `tier` scales the reward and is the fish's rarity for
+// a bonus, or the treasure's own rolled tier when the cast came up treasure instead of a fish.
+async function grantHaul(buyerId, kind, tier = "common") {
+    if (!kind || kind === "nothing") return null;
+    if (kind === "fragment") {
+        const n = FRAGMENT_COUNT[tier] || 1;
+        const { grantFragment } = await import("@/lib/marketplace/sailing.js");
+        await grantFragment(buyerId, n).catch(() => {});
+        return { kind: "fragment", label: n > 1 ? `${n} Hull Shards` : "Hull Shard", emoji: "🔷", n };
+    }
+    if (kind === "seed") {
+        const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
+        const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
+        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null } : null;
+    }
+    if (kind === "consumable") {
+        const pool = FISH_CONSUMABLES.slice(0, (CONSUMABLE_REACH[tier] ?? 2) + 1);
+        const id = pool[randInt(pool.length)];
+        const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
+        await grantConsumable(buyerId, id, 1).catch(() => {});
+        const def = CONSUMABLES?.[id];
+        return { kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id };
+    }
+    if (kind === "gear") {
+        const item = await grantFishingGear(buyerId, tier).catch(() => null);
+        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity } : null;
+    }
+    if (kind === "chest") {
+        const chest = CHEST_TIER[tier] || "wooden";
+        await addChests(buyerId, { [chest]: 1 }, { source: "fishing" }).catch(() => {});
+        return { kind: "chest", label: `${chest[0].toUpperCase()}${chest.slice(1)} Chest`, emoji: "🧰", tier: chest };
+    }
+    if (kind === "pet") {
+        const { maybeGrantFishingPet } = await import("@/lib/marketplace/pet-drops.js");
+        const pet = await maybeGrantFishingPet(buyerId, tier).catch(() => null);
+        return pet ? { kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity } : null;
+    }
+    return null;
+}
+
+// How good a treasure haul is. Rolled independently of the fish table so pulling up a chest doesn't need a
+// mythic on the line — but weighted so most of what the sea gives up is ordinary.
+const TREASURE_TIER = { common: 62, rare: 26, epic: 9, legendary: 2.6, mythic: 0.4 };
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────────────────────────────────────
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));
@@ -289,9 +345,13 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const max = castsPerDay(angling);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
+    // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
+    // learns which it was only when it surfaces.
+    const isTreasure = Math.random() < TREASURE_CHANCE;
     const species = rollSpecies(anglingEffects(angling).rareTilt);
     const state = {
         species: species.id,
+        treasure: isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
         roll: Math.round(Math.random() * 1000) / 1000,     // the luck half of the final weight
         castAt: Date.now(),
         biteAt: Date.now() + Math.round(BITE_MIN_MS + Math.random() * (BITE_MAX_MS - BITE_MIN_MS)),
@@ -358,6 +418,23 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
         return { ok: true, landed: false, refunded: true, message: "It stole your bait and slipped away — cast refunded." };
     }
 
+    // ── TREASURE ─────────────────────────────────────────────────────────────────────────────────────────────
+    // One cast in five pulls up something off the sea floor INSTEAD of a fish. No species, no log entry, no
+    // record — just the thing itself. Reeling well still matters: a clean reel upgrades the tier one step, so
+    // the minigame is never irrelevant.
+    if (state.treasure) {
+        const q0 = clamp01(quality);
+        const tierOrder = RARITY_ORDER;
+        let tier = state.treasure.tier || "common";
+        if (q0 >= 0.75) tier = tierOrder[Math.min(tierOrder.length - 1, tierOrder.indexOf(tier) + 1)];
+        const haul = await grantHaul(buyerId, state.treasure.kind, tier).catch(() => null);
+        // A haul that couldn't be granted (every gear item already owned, say) pays a fragment rather than
+        // handing back an empty net.
+        const prize = haul || await grantHaul(buyerId, "fragment", tier).catch(() => null);
+        await trackActivity(buyerId, "fish_treasure", { kind: prize?.kind || "none", tier, quality: q0 }).catch(() => {});
+        return { ok: true, landed: true, treasure: true, tier, prize, quality: q0 };
+    }
+
     // ── THE CATCH ────────────────────────────────────────────────────────────────────────────────────────────
     const q = clamp01(quality);
     const cm = weightFor(species, state.roll, q);   // pounds; the column is still named cm (see migration 287)
@@ -396,39 +473,10 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     await logCoin(buyerId, gold, "fishing", { meta: { species: species.id, cm, quality: q } }).catch(() => {});
 
     // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────
-    // One weighted roll off the species' rarity table. Every branch is best-effort: a failure to grant the
-    // bonus must never cost the member the fish they just landed.
     const extras = [];
-    const kind = rollHaul(species.rarity);
-    if (kind === "fragment") {
-        const n = FRAGMENT_COUNT[species.rarity] || 1;
-        const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-        await grantFragment(buyerId, n).catch(() => {});
-        extras.push({ kind: "fragment", label: n > 1 ? `${n} Hull Shards` : "Hull Shard", emoji: "🔷", n });
-    } else if (kind === "seed") {
-        const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
-        const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
-        if (seed) extras.push({ kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null });
-    } else if (kind === "consumable") {
-        const reach = CONSUMABLE_REACH[species.rarity] ?? 2;
-        const pool = FISH_CONSUMABLES.slice(0, reach + 1);
-        const id = pool[randInt(pool.length)];
-        const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
-        await grantConsumable(buyerId, id, 1).catch(() => {});
-        const def = CONSUMABLES?.[id];
-        extras.push({ kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id });
-    } else if (kind === "gear") {
-        const got = await grantFishingGear(buyerId, species.rarity).catch(() => null);
-        if (got) extras.push({ kind: "gear", label: got.name, emoji: "⚔️", id: got.id, rarity: got.rarity });
-    } else if (kind === "chest") {
-        const tier = CHEST_TIER[species.rarity] || "wooden";
-        await addChests(buyerId, { [tier]: 1 }, { source: "fishing" }).catch(() => {});
-        extras.push({ kind: "chest", label: `${tier[0].toUpperCase()}${tier.slice(1)} Chest`, emoji: "🧰", tier });
-    } else if (kind === "pet") {
-        const { maybeGrantFishingPet } = await import("@/lib/marketplace/pet-drops.js");
-        const pet = await maybeGrantFishingPet(buyerId, species.rarity).catch(() => null);
-        if (pet) extras.push({ kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity });
-    }
+    const kind = rollFishBonus(species.rarity);
+    const got = await grantHaul(buyerId, kind, species.rarity).catch(() => null);
+    if (got) extras.push(got);
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
     await checkFishingBadges(buyerId).catch(() => {});

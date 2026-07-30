@@ -447,6 +447,21 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                             <button type="button" className="fish-cta" onClick={() => { setPhase("idle"); setResult(null); }}>Try again 🎣</button>
                         </div>
                     </div>
+                ) : result?.treasure ? (
+                    // One cast in five surfaces treasure instead of a fish — its own moment, not a footnote.
+                    <div className="fish-stage fish-result">
+                        <div className="fish-banner is-new">🧭 TREASURE!</div>
+                        <div className="fish-reveal" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</div>
+                        <div className="fish-name" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
+                        <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>
+                        <p className="fish-copy">You hauled it up off the sea floor — no fish this time.</p>
+                        <div className="fish-actions">
+                            <button type="button" className="fish-cta" disabled={casts.left <= 0} onClick={() => { setResult(null); setPhase("idle"); }}>
+                                {casts.left <= 0 ? "That's your last cast today" : "Cast again 🎣"}
+                            </button>
+                            <button type="button" className="fish-ghost" onClick={openLog}>📖 Log</button>
+                        </div>
+                    </div>
                 ) : result ? (
                     <div className="fish-stage fish-result">
                         {result.denRecord ? <div className="fish-banner is-den">🥇 BIGGEST IN THE DEN!</div>
