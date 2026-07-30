@@ -12137,6 +12137,13 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-rod-hint { position: absolute; inset: auto 0 6px 0; text-align: center; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.1em; color: rgba(210,230,250,0.55); pointer-events: none; }
 .fish-strain { flex: 1 1 auto; height: 10px; border-radius: 999px; background: #1a2230; overflow: hidden; }
 .fish-strain-fill { height: 100%; background: linear-gradient(90deg,#3fa8e0,#58d989); transition: width 0.1s linear; }
+/* Line tension — the cost of holding. Goes amber near the redline, flashes red when the line goes slack. */
+.fish-strain.is-tension { background: #241a18; }
+.fish-tension-fill { height: 100%; background: linear-gradient(90deg,#58d989,#ffd75e); transition: width 0.08s linear; }
+.fish-strain.is-tension.is-hot .fish-tension-fill { background: linear-gradient(90deg,#ffb84d,#e0433f); }
+.fish-strain.is-tension.is-slack { animation: fishSlack 0.85s ease-out; }
+.fish-strain.is-tension.is-slack .fish-tension-fill { background: #e0433f; }
+@keyframes fishSlack { 0% { box-shadow: 0 0 0 3px rgba(224,67,63,0.8); } 100% { box-shadow: 0 0 0 0 rgba(224,67,63,0); } }
 /* The size meter, labelled — an unlabelled bar creeping up from zero read as a progress bar you were failing. */
 .fish-strain-row { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
 .fish-strain-label { flex: 0 0 auto; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.08em; color: #8b93a0; }

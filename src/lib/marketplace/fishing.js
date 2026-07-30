@@ -373,7 +373,16 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
 
     return {
         ok: true,
-        cast: { castAt: state.castAt, biteAt: state.biteAt, graceMs: BITE_GRACE_MS },
+        // `fight` is the rarity of what's on the line — and ONLY that. The client uses it to make a monster
+        // pull harder and run more often, so the fight itself telegraphs that something big is down there.
+        // The species is deliberately withheld until it surfaces; that reveal is the whole payoff.
+        // On a treasure cast the fight reads off the treasure's tier, so the weight in your hands never lies.
+        cast: {
+            castAt: state.castAt,
+            biteAt: state.biteAt,
+            graceMs: BITE_GRACE_MS,
+            fight: state.treasure ? (state.treasure.tier || "common") : species.rarity,
+        },
         castsLeft: Math.max(0, max - (Number(cast.fish_casts) || 0)),
     };
 }

@@ -26,6 +26,33 @@ const DAMPING = 0.86;            // velocity bleed so it feels weighty rather th
 const DART_EVERY_MS = 900;       // the fish makes a run for it this often
 const REEL_WARMUP_MS = 700;      // grace before scoring starts — see the note at the scoring site
 
+// ── LINE TENSION ─────────────────────────────────────────────────────────────────────────────────────────────
+// The second axis, and the thing that turns this from motor control into a decision you keep making.
+//
+// Before this, "hold" was free: the optimal play was to hold whenever the fish was below the band and release
+// whenever it was above, forever, with no cost either way. One input, one rule, learned in three casts.
+//
+// Now holding builds TENSION. Let it redline and the line doesn't snap — nothing is punished here, that rule
+// stands — but it goes SLACK for a moment: your pull cuts out and the fish sinks while you recover. So the
+// question stops being "up or down" and becomes "can I afford to keep pulling", which is a different question
+// every second because it depends on how much rope you've already spent.
+//
+// A fish that FIGHTS (see FIGHT below) loads tension faster, so the heavy ones genuinely feel heavy.
+const TENSION_RISE = 0.62;       // per second while holding, × the fish's fight
+const TENSION_FALL = 0.85;       // per second while you're not
+const SLACK_MS = 850;            // how long the line stays useless after a redline
+
+// How hard a thing fights, by how rare it is. The client is told a FIGHT PROFILE, never the species — knowing
+// a Kraken is on the line before it surfaces would give the reveal away — but it can feel the difference,
+// which is the point: a monster should fight like one.
+const FIGHT = {
+    common: { pull: 0.85, dart: 1.0, tension: 0.75 },
+    rare: { pull: 1.0, dart: 1.15, tension: 0.95 },
+    epic: { pull: 1.2, dart: 1.4, tension: 1.2 },
+    legendary: { pull: 1.4, dart: 1.7, tension: 1.45 },
+    mythic: { pull: 1.7, dart: 2.1, tension: 1.75 },
+};
+
 // THE score, in one place. It used to be computed only at the end (as sqrt of time-in-band) while the on-screen
 // strain bar drew the RAW fraction — so the single piece of live feedback disagreed with the result it was
 // supposedly previewing: reel at 0.45 and the bar read 45% while you were actually banking 67%. The curve is
@@ -96,7 +123,8 @@ function useSfx() {
 }
 
 // ── THE REEL STRUGGLE ────────────────────────────────────────────────────────────────────────────────────────
-function ReelStruggle({ onDone, sfx }) {
+function ReelStruggle({ onDone, sfx, fight = "common" }) {
+    const F = FIGHT[fight] || FIGHT.common;
     const [tick, setTick] = useState(0);          // repaint pulse
     const holdRef = useRef(false);
     const posRef = useRef(0.5);                   // the fish, 0 (bottom) .. 1 (top of the rod)
@@ -108,6 +136,9 @@ function ReelStruggle({ onDone, sfx }) {
     const lastDartRef = useRef(0);
     const doneRef = useRef(false);
     const clickRef = useRef(0);
+    const tensionRef = useRef(0);                 // 0..1 — redlines at 1 and goes slack
+    const slackUntilRef = useRef(0);
+    const snapRef = useRef(0);                    // repaint key for the slack flash
 
     useEffect(() => {
         let raf = 0;
@@ -123,12 +154,28 @@ function ReelStruggle({ onDone, sfx }) {
             bandRef.current = 0.5 + Math.sin(t * 1.15) * 0.26 + Math.sin(t * 0.47 + 1.1) * 0.1;
             bandRef.current = Math.max(BAND_H / 2, Math.min(1 - BAND_H / 2, bandRef.current));
 
-            // The fish: gravity down, your reeling up, plus the odd panicked dart.
-            velRef.current += (holdRef.current ? REEL_PULL : 0) * dt;
+            // TENSION. Holding loads the line; letting go bleeds it off. Redline and the line goes slack for
+            // a moment — your pull stops working and the fish sinks — so "keep holding" is a real decision
+            // rather than the obvious answer. Nothing is lost, which keeps the no-punishment rule intact.
+            const slack = ts < slackUntilRef.current;
+            const pulling = holdRef.current && !slack;
+            if (pulling) tensionRef.current += TENSION_RISE * F.tension * dt;
+            else tensionRef.current -= TENSION_FALL * dt;
+            tensionRef.current = Math.max(0, Math.min(1, tensionRef.current));
+            if (tensionRef.current >= 1 && !slack) {
+                slackUntilRef.current = ts + SLACK_MS;
+                tensionRef.current = 0;
+                snapRef.current += 1;
+                sfx.gone();
+                try { navigator.vibrate?.([40, 30, 40]); } catch { /* no haptics here */ }
+            }
+
+            // The fish: gravity down, your reeling up (only while the line has bite), plus panicked runs.
+            velRef.current += (pulling ? REEL_PULL * F.pull : 0) * dt;
             velRef.current -= GRAVITY * dt;
-            if (elapsed - lastDartRef.current > DART_EVERY_MS) {
+            if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
                 lastDartRef.current = elapsed;
-                velRef.current += (Math.random() - 0.62) * 0.9; // biased downward — it wants to go deep
+                velRef.current += (Math.random() - 0.62) * 0.9 * F.dart; // biased downward — it wants to go deep
             }
             velRef.current *= Math.pow(DAMPING, dt * 60);
             posRef.current += velRef.current * dt;
@@ -171,6 +218,8 @@ function ReelStruggle({ onDone, sfx }) {
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
+    const tension = tensionRef.current;
+    const slack = typeof performance !== "undefined" && performance.now() < slackUntilRef.current;
     // Same function the server gets. The bar is a real preview now, not a different number.
     const scoreNow = scoreOf(inRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
@@ -193,8 +242,21 @@ function ReelStruggle({ onDone, sfx }) {
                     <span className="fish-band-label">KEEP IT HERE</span>
                 </div>
                 <div className="fish-catch" style={{ bottom: `${pos * 100}%` }}>🐟</div>
-                <div className="fish-rod-hint">{warming ? "get ready…" : inside ? "REELING" : "hold!"}</div>
+                <div className="fish-rod-hint">
+                    {warming ? "get ready…" : slack ? "LINE SLACK — ease off!" : inside ? "REELING" : "hold!"}
+                </div>
             </div>
+            {/* TENSION — the cost of holding. Turns red as it approaches the redline; going slack flashes it. */}
+            <div className="fish-strain-row">
+                <span className="fish-strain-label">LINE</span>
+                <div className={`fish-strain is-tension${slack ? " is-slack" : ""}${tension > 0.75 ? " is-hot" : ""}`}>
+                    <div className="fish-tension-fill" style={{ width: `${tension * 100}%` }} />
+                </div>
+                <span className="fish-strain-pct" style={{ color: slack ? "#e05b6a" : tension > 0.75 ? "#ffb84d" : "#8b93a0" }}>
+                    {slack ? "SLACK" : `${Math.round(tension * 100)}%`}
+                </span>
+            </div>
+
             {/* Labelled SIZE, because that is literally what it buys: the score decides how big the fish is.
                 An unlabelled bar creeping up from zero read as a progress bar you were failing. */}
             <div className="fish-strain-row">
@@ -301,6 +363,7 @@ export function FishingLog({ log, known, total, records, onClose }) {
 export default function FishingScene({ fishing, sky, records, onCast, onLand, onLoadRecords, onClose }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
+    const [fight, setFight] = useState("common"); // the fight profile of what is on the line (rarity only)
     const [result, setResult] = useState(null);
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState(null);
@@ -340,12 +403,16 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
         // it. Two timers would fire two bite phases and leak a grace timer that could report a miss after the
         // fish was already landed.
         castRef.current = Number(res.cast?.biteAt) || 0;
+        // How hard this one fights. Rarity only — never the species, which stays hidden until it surfaces.
+        setFight(res.cast?.fight || "common");
         setPhase("waiting");
         sfx.plop();
         const wait = Math.max(200, Number(res.cast?.biteAt || 0) - Date.now());
         biteTimer.current = setTimeout(() => {
             setPhase("bite");
             sfx.bite();
+            // The bite is the one moment that demands a reaction — make it felt, not just heard.
+            try { navigator.vibrate?.([0, 45, 35, 45]); } catch { /* no haptics here */ }
             // A long, generous tap window — and missing it costs nothing but the wait.
             graceTimer.current = setTimeout(reportMiss, BITE_HOLD_MS);
         }, wait);
@@ -360,6 +427,10 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
 
     const finishReel = useCallback(async (quality) => {
         setBusy(true);
+        try {
+            const big = ["legendary", "mythic"].includes(fight);
+            navigator.vibrate?.(big ? [30, 50, 30, 50, 90] : [25, 40, 60]);
+        } catch { /* no haptics here */ }
         const res = await onLand({ quality, sky }).catch(() => null);
         setBusy(false);
         if (res?.ok && res.landed) {
@@ -441,7 +512,7 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         <em>something&apos;s on the line</em>
                     </button>
                 ) : phase === "reel" ? (
-                    <ReelStruggle onDone={finishReel} sfx={sfx} />
+                    <ReelStruggle onDone={finishReel} sfx={sfx} fight={fight} />
                 ) : phase === "gone" ? (
                     <div className="fish-stage">
                         <div className="fish-idle-art">💨</div>
