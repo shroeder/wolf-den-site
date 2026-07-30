@@ -253,6 +253,7 @@ export default function PetsClient() {
         const owned = ownedSet.has(p.id);
         const isFeatured = state?.featured === p.id;
         const tradeable = tradeableSet.has(p.id);
+        const giftPending = state?.outgoing?.[p.id] || null; // an offer of THIS pet is already awaiting acceptance
         const passive = petPassive(p);
         const perk = petPerk(p);
         const price = petPrice(p);
@@ -279,11 +280,14 @@ export default function PetsClient() {
                                 <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
                             </div>
                             <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>
+                            {/* The per-level values are a horizontal track now — as five stacked rows it was the
+                                tallest, most repetitive block on the page. */}
+                            <div className="petx-tiers-cap">{statText(passive)} by level</div>
                             <div className="petx-tiers">
                                 {[1, 2, 3, 4, 5].map((n) => (
                                     <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
-                                        <span className="petx-tier-stars">{"★".repeat(n)}</span>
-                                        <span className="petx-tier-val">+{Math.round(lvl.base * petPassiveLevelMult(n))} {statText(passive)}</span>
+                                        <span className="petx-tier-stars">{n}★</span>
+                                        <span className="petx-tier-val">+{Math.round(lvl.base * petPassiveLevelMult(n))}</span>
                                     </div>
                                 ))}
                             </div>
@@ -296,12 +300,19 @@ export default function PetsClient() {
                     ) : null}
 
                     <div className="petx-abilities">
-                        <div className="petx-ability">
-                            <div className="petx-ability-head">🐾 Passive <span className="muted">· always on — every copy you own stacks it</span></div>
+                        <div className="petx-ability petx-passive">
+                            <div className="petx-ability-head">
+                                <span className="petx-tag">🐾 Passive</span>
+                                <span className="petx-ability-note">always on · every copy stacks</span>
+                            </div>
+                            <div className="petx-statline">
+                                <span className="petx-statbig">+{lvl ? lvl.value : passive.value}</span>
+                                <span className="petx-statname">{statText(passive)}</span>
+                                {lvl && !lvl.maxed ? <span className="petx-statnext">→ +{Math.round(passive.value * petPassiveLevelMult(lvl.level + 1))} at Lv {lvl.level + 1}</span> : null}
+                            </div>
                             <div className="petx-ability-body">
-                                <strong>+{lvl ? lvl.value : passive.value} {statText(passive)}</strong>
-                                {lvl && !lvl.maxed ? <span className="muted"> → +{Math.round(passive.value * petPassiveLevelMult(lvl.level + 1))} at Lv {lvl.level + 1}</span> : null}
-                                {" "}— {PET_STAT_META[passive.stat]?.desc || STAT_EFFECT[passive.stat] || ""} <span className="muted">Scales gently (up to ×2) as this pet levels. Stacks with your whole collection.</span>
+                                {PET_STAT_META[passive.stat]?.desc || STAT_EFFECT[passive.stat] || ""}
+                                {" "}<span className="muted">Scales up to ×2 as it levels, and stacks with your whole collection.</span>
                             </div>
                         </div>
                         {(() => {
@@ -311,20 +322,33 @@ export default function PetsClient() {
                             const bits = [];
                             if (sp.secondStat) bits.push(`🌟 Dual affinity — also +${Math.round(sp.secondValue * petPassiveLevelMult(n))} ${PET_STAT_META[sp.secondStat]?.label || sp.secondStat}`);
                             if (sp.aura > 0) bits.push(`✨ Menagerie Aura — +${Math.round(sp.aura * 100)}% to ALL your pets' passives`);
+                            // Legendary tier has aura 0, so a legendary pet whose active stat matches its passive
+                            // stat earns NEITHER bit — render nothing rather than a header over an empty box.
+                            if (!bits.length) return null;
                             return (
                                 <div className="petx-ability petx-special">
-                                    <div className="petx-ability-head">💫 {p.rarity} bonus <span className="muted">· always active while owned</span></div>
+                                    <div className="petx-ability-head">
+                                        <span className="petx-tag">💫 {p.rarity} bonus</span>
+                                        <span className="petx-ability-note">always active while owned</span>
+                                    </div>
                                     <div className="petx-ability-body">{bits.map((b, i) => <div key={i}>{b}</div>)}</div>
                                 </div>
                             );
                         })()}
-                        <div className="petx-ability">
-                            <div className="petx-ability-head">⭐ Active buff <span className="muted">· only while this pet is equipped — grows as it levels</span></div>
-                            <div className="petx-ability-body"><strong>{perk.icon} {perk.name}</strong> — {perk.desc}.</div>
+                        <div className={`petx-ability petx-active${isFeatured ? " is-live" : ""}`}>
+                            <div className="petx-ability-head">
+                                <span className="petx-tag">⭐ Signature</span>
+                                <span className="petx-ability-note">{isFeatured ? "active now · grows as it levels" : "equip to activate · grows as it levels"}</span>
+                            </div>
+                            <div className="petx-perkname">{perk.icon} {perk.name}</div>
+                            <div className="petx-ability-body">{perk.desc}.</div>
                         </div>
                         {petRealWorld(p) ? (
                             <div className="petx-ability petx-realworld">
-                                <div className="petx-ability-head">🎁 Real-world perk</div>
+                                <div className="petx-ability-head">
+                                    <span className="petx-tag">🎁 Real-world perk</span>
+                                    <span className="petx-ability-note">redeem in-store</span>
+                                </div>
                                 <div className="petx-ability-body">
                                     {petRealWorld(p)}
                                     {owned ? (() => {
@@ -350,9 +374,14 @@ export default function PetsClient() {
                                 {isFeatured
                                     ? <button type="button" className="btn-ghost" onClick={() => action(p.id, "unequip")} disabled={busy === p.id}>Unequip</button>
                                     : <button type="button" className="btn-gold" onClick={() => action(p.id, "equip")} disabled={busy === p.id}>{busy === p.id ? "…" : "⭐ Equip"}</button>}
-                                {tradeable
-                                    ? <button type="button" className={`btn-ghost${giveOpen ? " is-active" : ""}`} onClick={() => { setGiveOpen((v) => !v); setModalErr(null); }}>{giveOpen ? "✕ Cancel gift" : "🎁 Give a copy"}</button>
-                                    : <button type="button" className="btn-ghost" disabled title="Already traded once">🔒 Traded</button>}
+                                {/* A pet stays tradeable until the recipient ACCEPTS, so "tradeable" alone can't
+                                    tell you an offer is already out — check the pending gift first or we'd invite
+                                    a second gift that the server rejects with already_pending. */}
+                                {giftPending
+                                    ? <button type="button" className="btn-ghost" disabled title={`Waiting on ${giftPending.to} to accept`}>⏳ Gift pending</button>
+                                    : tradeable
+                                        ? <button type="button" className={`btn-ghost${giveOpen ? " is-active" : ""}`} onClick={() => { setGiveOpen((v) => !v); setModalErr(null); }}>{giveOpen ? "✕ Cancel gift" : "🎁 Give a copy"}</button>
+                                        : <button type="button" className="btn-ghost" disabled title="Already traded once">🔒 Traded</button>}
                             </>
                         ) : p.source === "shop" ? (
                             <button type="button" className="btn-gold" onClick={() => action(p.id, "buy")} disabled={!canBuy || busy === p.id} style={{ width: "100%" }}>
@@ -363,7 +392,13 @@ export default function PetsClient() {
                         )}
                     </div>
 
-                    {owned && tradeable && giveOpen ? (
+                    {giftPending ? (
+                        <div className="petx-status">
+                            <span className="petx-pending">⏳ You&apos;ve offered this pet to <strong>{giftPending.to}</strong> — waiting on them to accept. You can&apos;t offer another copy until they do (or decline).</span>
+                        </div>
+                    ) : null}
+
+                    {owned && tradeable && !giftPending && giveOpen ? (
                         <div className="petx-give">
                             <div className="petx-warn">🔒 Once they accept, <strong>both</strong> your pet and their copy can never be traded again. They receive a <strong>fresh Lv&nbsp;1</strong> copy — your leveled pet stays yours.</div>
                             <label className="petx-label" htmlFor="petx-search">Give to which member?</label>

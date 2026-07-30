@@ -64,16 +64,17 @@ export async function syncPetAchievements(buyerId) {
 // The member's full pet state. With { sync: true } it first grants any due achievement pets (used on page
 // load); action paths skip the sync to stay cheap.
 export async function petsState(buyerId, { sync = false } = {}) {
-    if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], petLevels: {} };
+    if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], outgoing: {}, petLevels: {} };
     if (sync) {
         await syncPetAchievements(buyerId).catch(() => {});
         // Settle the equipped pet's time-trickle so the level shown on the page is current (lazy, no cron).
         await accrueEquippedPetTrickle(buyerId).catch(() => {});
     }
-    const [buyer, rows, incoming, realWorld, petXp] = await Promise.all([
+    const [buyer, rows, incoming, outgoing, realWorld, petXp] = await Promise.all([
         db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref, tradeable FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         incomingShares(buyerId).catch(() => []),
+        outgoingShares(buyerId).catch(() => ({})),
         memberPetPerks(buyerId).catch(() => []),
         getPetXpMap(buyerId).catch(() => ({})),
     ]);
@@ -115,7 +116,7 @@ export async function petsState(buyerId, { sync = false } = {}) {
             petSprites[petId] = perLevel;
         }
     }
-    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, realWorld: realWorldByPet, petLevels, petSprites };
+    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites };
 }
 
 export async function equipPet(buyerId, petId) {
@@ -186,6 +187,23 @@ export async function sharePet(fromId, petId, toAlias) {
     await db.query(`INSERT INTO mkt_pet_share (pet_id, from_buyer_id, to_buyer_id) VALUES ($1, $2, $3)`, [petId, fromId, to.id]).catch(() => {});
     await trackActivity(fromId, "pet_share_offer", { petId, to: to.id });
     return { ok: true, to: nameOf(to) };
+}
+
+// Pet gifts THIS member has already offered that are still waiting on the recipient, keyed by pet id. The
+// pets page needs this so it can say "gift pending" instead of offering a second copy that sharePet would
+// only reject with already_pending — the pet stays tradeable until the recipient accepts, so "is it
+// tradeable" alone can't tell you an offer is already out.
+export async function outgoingShares(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db
+        .query(
+            `SELECT s.pet_id, s.created_at, COALESCE(NULLIF(b.display_name,''), b.alias, 'a member') AS to_name
+               FROM mkt_pet_share s LEFT JOIN mkt_buyer b ON b.id = s.to_buyer_id
+              WHERE s.from_buyer_id = $1 AND s.status = 'pending'`,
+            [buyerId]
+        )
+        .catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.pet_id, { to: r.to_name, at: r.created_at ? new Date(r.created_at).toISOString() : null }]));
 }
 
 // Pending pet gifts waiting for this member to accept.
