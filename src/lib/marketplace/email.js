@@ -85,6 +85,10 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], waiti
     if (!email) return false;
     const resend = getResendClient();
     const site = baseUrl();
+    // Two DIFFERENT destinations on purpose. The conversion CTA goes to the single-purpose opt-in landing (one
+    // button, works on first tap); the opt-out goes to the granular settings. Pointing both at /profile meant
+    // the "turn on alerts" click landed on a long page with notifications collapsed out of sight.
+    const enableUrl = `${site}/marketplace/notifications`;
     const settingsUrl = `${site}/marketplace/profile`;
 
     const li = (rows) => rows
@@ -116,7 +120,7 @@ export async function sendRecapDigestEmail(email, { name = "", hooks = [], waiti
             </div>
             <p style="text-align:center;margin:14px 0 0;font-size:13px;color:#5f594e;line-height:1.5;">
               Want the good stuff the moment it happens instead of a summary?<br />
-              <a href="${settingsUrl}" style="color:#2f8f52;font-weight:700;">Turn on instant alerts</a>
+              <a href="${enableUrl}" style="color:#2f8f52;font-weight:700;">Turn on instant alerts</a>
             </p>
             <p style="color:#8a8172;font-size:12px;margin-top:22px;border-top:1px solid #e6ddcb;padding-top:14px;line-height:1.5;">
               You're getting this because notifications are off, so we only send it occasionally — at most once every couple of weeks, and never when you've been active.

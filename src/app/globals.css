@@ -6964,6 +6964,26 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .notif-switch-btn.is-on .notif-knob { transform: translateX(16px); }
 .notif-switch-btn:disabled { opacity: 0.55; cursor: default; }
 .notif-err { color: #e05b6a; font-size: 0.8rem; font-weight: 700; margin: 0 0 4px; }
+
+/* ── /marketplace/notifications — the single-purpose opt-in landing ──────────────────────────────────────── */
+.enotif { text-align: center; }
+.enotif-hero { padding: 4px 0 2px; }
+.enotif-bell { font-size: 44px; line-height: 1; animation: enotifRing 2.6s ease-in-out infinite; }
+@keyframes enotifRing { 0%, 62%, 100% { transform: rotate(0); } 68% { transform: rotate(13deg); } 74% { transform: rotate(-11deg); } 80% { transform: rotate(7deg); } 86% { transform: rotate(-4deg); } }
+.enotif-title { margin: 8px 0 4px; font-size: 1.32rem; }
+.enotif-sub { margin: 0 auto; max-width: 34ch; color: #b7c0cf; font-size: 0.9rem; line-height: 1.45; }
+.enotif-perks { list-style: none; margin: 16px auto 2px; padding: 0; max-width: 30ch; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.enotif-perks li { display: flex; align-items: flex-start; gap: 9px; font-size: 0.88rem; line-height: 1.35; color: #e7dcc4; }
+.enotif-perks li span { flex: 0 0 auto; font-size: 1.05rem; }
+.enotif-action { margin-top: 18px; }
+.enotif-cta { width: 100%; max-width: 320px; padding: 14px 20px; font-size: 1rem; }
+.enotif-fine { margin: 9px auto 0; max-width: 32ch; font-size: 0.76rem; color: #8b93a0; line-height: 1.4; }
+.enotif-msg { margin: 12px 0 0; font-weight: 700; color: #7ad07a; font-size: 0.88rem; }
+.enotif-note { text-align: left; margin: 4px auto 0; max-width: 40ch; background: rgba(224,168,60,0.1); border: 1px solid rgba(224,168,60,0.32); border-radius: 12px; padding: 12px 14px; }
+.enotif-note strong { display: block; color: #ffd75e; font-size: 0.9rem; margin-bottom: 4px; }
+.enotif-note p { margin: 0; font-size: 0.83rem; line-height: 1.45; color: #cbd2da; }
+.enotif-links { margin: 18px 0 0; font-size: 0.84rem; }
+.enotif-links a { color: #ffd75e; font-weight: 700; }
 @media (max-width: 480px) {
     .social-fab { right: 16px; bottom: 16px; }
 }

@@ -135,7 +135,9 @@ export default async function ProfileHubPage() {
                 <EarnChecklist progress={progress} signedIn />
             </details>
 
-            <details className="card hub-collapse">
+            {/* Open by default: this is the destination for the recap email's opt-out link and the
+                "fine-tune" link, and a collapsed section is why that funnel dead-ended before. */}
+            <details className="card hub-collapse" open>
                 <summary><h2>Notifications</h2></summary>
                 <WebPushToggle />
                 <p className="muted" style={{ margin: "6px 0 10px" }}>Choose exactly what reaches you, and how. Everything is on unless you switch it off.</p>
