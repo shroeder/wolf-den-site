@@ -62,6 +62,7 @@ export async function sendWebPush(buyerId, { title, body, url = "/", tag = null,
 
         const payload = JSON.stringify({ title, body, url, tag: tag || undefined, data });
         const dead = [];
+        const failed = [];
         let sent = 0;
 
         await Promise.all(
@@ -73,14 +74,19 @@ export async function sendWebPush(buyerId, { title, body, url = "/", tag = null,
                 } catch (err) {
                     const code = err?.statusCode;
                     if (code === 404 || code === 410) dead.push(r.endpoint); // subscription is permanently gone
+                    // Anything else (403 VAPID mismatch, 413 too large, 429, 5xx) used to vanish here without a
+                    // trace, which is how a member with a live subscription silently received nothing for days.
+                    // Not pruned — the subscription may be fine and the failure ours — but never again silent.
+                    else failed.push({ code: code || "unknown", host: String(r.endpoint || "").split("/")[2] || "?" });
                 }
             })
         );
 
         if (dead.length) await db.query(`DELETE FROM mkt_web_push WHERE endpoint = ANY($1)`, [dead]).catch(() => {});
         if (sent > 0) await db.query(`UPDATE mkt_web_push SET last_used_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+        if (failed.length) logger.warn("web_push.delivery_failed", { buyerId, kind, attempted: rows.length, sent, failures: failed });
 
-        return { sent, pruned: dead.length };
+        return { sent, pruned: dead.length, failed: failed.length };
     } catch (error) {
         logger.warn("web_push.send_failed", { errorMessage: error instanceof Error ? error.message : "unknown_error" });
         return { sent: 0, error: true };
