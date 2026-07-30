@@ -10,6 +10,21 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // in the sky/rooftops), lingers a few hours, and the FIRST member to spot and tap it claims a source-exclusive
 // decoration. Shared: one winner, then it vanishes for everyone. Pure "were you paying attention?" delight.
 
+// Where a glimmer can appear: the roofline of each town landmark (x matches TOWN_BUILDINGS, y is just above the
+// building so it catches the light on the roof/eaves). Keep these in step with TOWN_BUILDINGS if the street
+// layout changes, or glimmers will start floating beside buildings instead of on them.
+const SHINY_SPOTS = [
+    { x: 4, y: 40, at: "the Tavern roof" },
+    { x: 15, y: 38, at: "the Boss Arena banner" },
+    { x: 26, y: 36, at: "the Forge chimney" },
+    { x: 37, y: 37, at: "the Auction House gable" },
+    { x: 48, y: 39, at: "the General Store awning" },
+    { x: 59, y: 38, at: "the Docks mast" },
+    { x: 70, y: 40, at: "the Farm silo" },
+    { x: 81, y: 37, at: "the Vault gable" },
+    { x: 92, y: 39, at: "the Festival Stage rigging" },
+];
+
 const SHINY_MAX_PER_DAY = 2;
 const SHINY_TTL_HOURS = 3;           // an unclaimed glint fades after a few hours
 const SHINY_SPAWN_CHANCE = 0.02;     // per 15-min cron tick (~1/day avg, capped at 2)
@@ -32,8 +47,12 @@ export async function maybeSpawnShiny() {
     if (live) return { skipped: "already_live" };
     if ((todayRow?.n || 0) >= SHINY_MAX_PER_DAY) return { skipped: "daily_cap" };
     if (Math.random() >= SHINY_SPAWN_CHANCE) return { skipped: "no_roll" };
-    const x = Math.round((6 + Math.random() * 88) * 10) / 10;   // 6%–94% across
-    const y = Math.round((16 + Math.random() * 30) * 10) / 10;  // 16%–46% down (up in the sky/rooftops)
+    // Perch it on an actual LANDMARK rather than a random patch of sky — a glimmer on the Forge roof or the
+    // Vault's gable reads as something hidden in the town you have to go and find. Purely random coordinates
+    // left it floating in empty blue, which looked like a UI artefact instead of a secret.
+    const spot = SHINY_SPOTS[Math.floor(Math.random() * SHINY_SPOTS.length)];
+    const x = Math.round((spot.x + (Math.random() * 4 - 2)) * 10) / 10;  // ±2% jitter so it isn't pixel-identical
+    const y = Math.round((spot.y + (Math.random() * 4 - 2)) * 10) / 10;
     const row = await db.queryOne(
         `INSERT INTO mkt_town_shiny (x, y, expires_at) VALUES ($1, $2, NOW() + ($3 || ' hours')::interval) RETURNING id`,
         [x, y, String(SHINY_TTL_HOURS)]

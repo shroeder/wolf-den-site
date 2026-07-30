@@ -881,11 +881,6 @@ export default function TownClient({ initial }) {
                 {/* Live in-town count — green bubble, top-left (hidden behind the raid HUD during a raid). */}
                 {!raidActive ? <button type="button" className="tw-online-badge" onClick={() => setRoster(true)} title="Members here right now"><span className="tw-online-dot" />{state?.inTownCount ?? 1} in town</button> : null}
                 {/* The hidden shiny glint — barely visible, tucked up in the sky/rooftops. Tap to claim it. */}
-                {!raidActive && state?.shiny ? (
-                    <button type="button" className="tw-shiny" style={{ left: `${state.shiny.x}%`, top: `${state.shiny.y}%` }} onClick={claimShiny} aria-label="A faint glimmer…" title="…is something glinting up there?">
-                        <span className="tw-shiny-core" />
-                    </button>
-                ) : null}
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
@@ -923,6 +918,15 @@ export default function TownClient({ initial }) {
                 ) : null}
                 {/* The wide world that scrolls under a fixed camera */}
                 <div className="tw-world" style={{ width: `${WORLD_W}px`, transform: `translateX(${-cameraPx}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
+                    {/* THE HIDDEN GLIMMER — lives INSIDE the world, so its x/y pin it to a real spot in the town
+                        that you have to walk to and spot. It used to sit outside this container, which meant it
+                        was positioned against the viewport and slid along with the screen: it could never be
+                        "somewhere in the plaza", because it was always wherever you happened to be looking. */}
+                    {!raidActive && state?.shiny ? (
+                        <button type="button" className="tw-shiny" style={{ left: `${state.shiny.x}%`, top: `${state.shiny.y}%` }} onClick={claimShiny} aria-label="A faint glimmer…" title="…is something glinting up there?">
+                            <span className="tw-shiny-core" />
+                        </button>
+                    ) : null}
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
