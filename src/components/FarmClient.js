@@ -1501,12 +1501,15 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
     useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
     const plots = garden.plots || [];
     const totalSeeds = (garden.seedBag || []).reduce((s, x) => s + x.count, 0);
-    // In move mode, plots drag just like decorations: a real drag repositions the plot, a plain click still
-    // plants/harvests/inspects. Positions (p.x / p.y, percent of the field) come from the server.
-    const [drag, setDrag] = useState(null); // { slot, x, y }
+    // Plots are NOT draggable. Their positions are fixed by the server (PLOT_SLOTS in farm-crops.js) — the
+    // old free-drag defaulted every plot into a pile in the left fifth of the field and then couldn't reach the
+    // right-hand side to fix it. A tap still plants / harvests / inspects; decorations remain free-placed.
+    const [drag, setDrag] = useState(null); // retained: the render still reads it, always null now
     const gr = useRef({});
     const suppressClickRef = useRef(false);
     const start = (e, p) => {
+        return; // plots are fixed — see the note above
+        // eslint-disable-next-line no-unreachable
         if (!editing) return;
         suppressClickRef.current = false;
         e.stopPropagation();

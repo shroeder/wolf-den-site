@@ -190,11 +190,23 @@ async function loadFarmBuyer(buyerId) {
     return db.queryOne(`SELECT COALESCE(gold,0) AS gold, COALESCE(farm_upgrades,'{}'::jsonb) AS farm_upgrades, COALESCE(farm_fertilizer,0) AS farm_fertilizer, COALESCE(farm_harvest_luck,0) AS farm_harvest_luck, COALESCE(farm_plot_pos,'{}'::jsonb) AS farm_plot_pos FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
 }
 
-// Default tidy-cluster position for a plot when the buyer hasn't dragged it somewhere custom. Mirrors the
-// layout ScenePlots used before plots became movable, so nothing shifts until the player rearranges.
-function defaultPlotPos(i, n) {
-    const span = Math.min(6 * (n - 1), 20);
-    return { x: n === 1 ? 18 : 15 + (i / (n - 1)) * span, y: 84 + (i % 2) * 6 };
+// ── WHERE THE PLOTS GO ───────────────────────────────────────────────────────────────────────────────────────
+// Fixed, server-set. Plots are NOT draggable any more.
+//
+// They used to default into a cluster spanning x 15→35 — the left fifth of the field — with all eight stacked
+// in two short rows, and the only way out was to drag each one somewhere better. That made a mess by default,
+// put the work of laying out a farm on the player, and the drag itself couldn't reach the right-hand side of
+// the field, so people were stuck with the pile they started with.
+//
+// Eight slots, laid out as two staggered rows across the field. Front row fills first, so three plots read as
+// a tidy row rather than a scattering, and the back row is inset half a step for depth. Decorations stay
+// free-placed — those are what make a farm yours; the crop beds want to look like a farm.
+const PLOT_SLOTS = [
+    { x: 16, y: 86 }, { x: 34, y: 86 }, { x: 52, y: 86 }, { x: 70, y: 86 }, // front row
+    { x: 25, y: 74 }, { x: 43, y: 74 }, { x: 61, y: 74 }, { x: 79, y: 74 }, // back row, staggered
+];
+function defaultPlotPos(i) {
+    return PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1];
 }
 
 // Full garden state for the client: every plot (empty or growing/ready), the seed bag, upgrades + costs,
@@ -217,12 +229,13 @@ export async function getGarden(buyerId) {
     for (const r of (bedRows || [])) if (r.url) { const t = r.art_key === "farm_bed" ? 0 : Number(r.art_key.replace("farm_bed_t", "")); if (Number.isFinite(t)) bedTiers[t] = r.url; }
     const up = buyer?.farm_upgrades || {};
     const n = plotCount(up);
-    const posMap = buyer?.farm_plot_pos || {};
     const byslot = new Map((plots || []).map((p) => [p.slot, p]));
     const now = Date.now();
     const gardenPlots = [];
     let readyCount = 0;
-    const posFor = (i) => { const c = posMap[i] || posMap[String(i)]; const d = defaultPlotPos(i, n); return { x: Number.isFinite(c?.x) ? c.x : d.x, y: Number.isFinite(c?.y) ? c.y : d.y }; };
+    // Server-set only — saved drag positions are deliberately ignored (see PLOT_SLOTS). Anyone who had
+    // dragged plots into a pile gets the tidy layout back on their next load.
+    const posFor = (i) => defaultPlotPos(i);
     for (let i = 0; i < n; i += 1) {
         const pos = posFor(i);
         const tracks = plotTracksFor(plotUp[i] || {}); // this plot's specialization tracks (levels + costs)
@@ -449,17 +462,12 @@ export async function applyRainBoost(buyerId) {
 }
 
 // Drag a plot to a custom spot on the farm (owner arranging their own garden). Stores {x,y} percent for the
-// slot in farm_plot_pos; clamped to stay on-field. Returns the fresh garden so the scene + panel stay in sync.
-export async function movePlot(buyerId, slot, x, y) {
+// Plots are laid out by the server now (PLOT_SLOTS) and cannot be moved. Kept as a no-op rather than deleted
+// so an older client still holding the drag handler gets a clean refusal instead of a 400 — and so the reason
+// is written down at the place someone would look to re-add dragging.
+export async function movePlot(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
-    const s = Number(slot);
-    const buyer = await loadFarmBuyer(buyerId);
-    const n = plotCount(buyer?.farm_upgrades || {});
-    if (!Number.isInteger(s) || s < 0 || s >= n) return { ok: false, error: "bad_slot" };
-    const clamp = (v, lo, hi) => { const num = Number(v); return Math.max(lo, Math.min(hi, Number.isFinite(num) ? num : lo)); };
-    const pos = { x: clamp(x, 3, 97), y: clamp(y, 20, 96) };
-    await db.query(`UPDATE mkt_buyer SET farm_plot_pos = jsonb_set(COALESCE(farm_plot_pos,'{}'::jsonb), $2, $3::jsonb, true) WHERE id = $1`, [buyerId, `{${s}}`, JSON.stringify(pos)]).catch(() => {});
-    return { ok: true, garden: await getGarden(buyerId) };
+    return { ok: false, error: "plots_are_fixed", garden: await getGarden(buyerId) };
 }
 
 // Buy the next level of an upgrade track (gold sink).
