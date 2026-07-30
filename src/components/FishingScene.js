@@ -23,38 +23,38 @@ import { createPortal } from "react-dom";
 // reports one number — quality, 0..1 — exactly like the forge's enhance minigame and the merchant's coin game.
 
 const REEL_MS = 6500;            // how long the struggle lasts
-const BAND_H = 0.26;             // height of the safe band, as a fraction of the rod
-const GRAVITY = 0.62;            // the fish sinking, per second²
-const REEL_PULL = 1.35;          // upward acceleration while you're holding
-const DAMPING = 0.86;            // velocity bleed so it feels weighty rather than twitchy
-const DART_EVERY_MS = 900;       // the fish makes a run for it this often
+const BAND_H = 0.26;             // height of your bar, as a fraction of the tank
 const REEL_WARMUP_MS = 700;      // grace before scoring starts — see the note at the scoring site
+const DART_EVERY_MS = 900;       // the fish makes a run for it this often
 
-// ── LINE TENSION ─────────────────────────────────────────────────────────────────────────────────────────────
-// The second axis, and the thing that turns this from motor control into a decision you keep making.
+// ── YOUR BAR ─────────────────────────────────────────────────────────────────────────────────────────────────
+// These were inherited from the old marker physics and were catastrophically wrong once the bar became the
+// thing you drive. At pull 1.35 / gravity 0.62 / damping 0.86 the bar settled at 0.075 units per second, so
+// crossing the tank took 9.9 SECONDS — in a reel that lasts 6.5. A fish at the far end was not hard to reach,
+// it was unreachable, and holding felt like pressing a button attached to nothing.
 //
-// Before this, "hold" was free: the optimal play was to hold whenever the fish was below the band and release
-// whenever it was above, forever, with no cost either way. One input, one rule, learned in three casts.
-//
-// Now holding builds TENSION. Let it redline and the line doesn't snap — nothing is punished here, that rule
-// stands — but it goes SLACK for a moment: your pull cuts out and the fish sinks while you recover. So the
-// question stops being "up or down" and becomes "can I afford to keep pulling", which is a different question
-// every second because it depends on how much rope you've already spent.
-//
-// A fish that FIGHTS (see FIGHT below) loads tension faster, so the heavy ones genuinely feel heavy.
-const TENSION_RISE = 0.62;       // per second while holding, × the fish's fight
-const TENSION_FALL = 0.85;       // per second while you're not
-const SLACK_MS = 850;            // how long the line stays useless after a redline
+// Now the bar crosses in a bit under a second, and drops in about one and a half. Responsive enough that the
+// chase is a chase; heavy enough that it still coasts and you have to lead the fish rather than snap to it.
+const BAR_PULL = 7.0;            // upward acceleration while you hold
+const BAR_GRAVITY = 2.6;         // and what takes it back down when you let go
+const BAR_DAMPING = 0.92;        // light — the bar should answer the thumb, not wade through treacle
+const FISH_DAMPING = 0.86;       // heavier, so the fish's darts settle instead of pinballing
+
+// LINE TENSION IS GONE. It was meant to make holding a decision, but with a bar this sluggish you had to hold
+// constantly just to make headway — and holding constantly redlined the line in 2.2 seconds. So the mechanic
+// that was supposed to add a choice instead guaranteed a failure you couldn't avoid, on top of a chase you
+// couldn't win. Luke played it and said so. The depth now comes from the fish itself: what it does is visible,
+// which the tension gauge never was.
 
 // How hard a thing fights, by how rare it is. The client is told a FIGHT PROFILE, never the species — knowing
 // a Kraken is on the line before it surfaces would give the reveal away — but it can feel the difference,
 // which is the point: a monster should fight like one.
 const FIGHT = {
-    common: { pull: 0.85, dart: 1.0, tension: 0.75 },
-    rare: { pull: 1.0, dart: 1.15, tension: 0.95 },
-    epic: { pull: 1.2, dart: 1.4, tension: 1.2 },
-    legendary: { pull: 1.4, dart: 1.7, tension: 1.45 },
-    mythic: { pull: 1.7, dart: 2.1, tension: 1.75 },
+    common: { dart: 0.85 },
+    rare: { dart: 1.0 },
+    epic: { dart: 1.25 },
+    legendary: { dart: 1.5 },
+    mythic: { dart: 1.85 },
 };
 
 // THE score, in one place. It used to be computed only at the end (as sqrt of time-in-band) while the on-screen
@@ -141,9 +141,6 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const lastDartRef = useRef(0);
     const doneRef = useRef(false);
     const clickRef = useRef(0);
-    const tensionRef = useRef(0);                 // 0..1 — redlines at 1 and goes slack
-    const slackUntilRef = useRef(0);
-    const snapRef = useRef(0);                    // repaint key for the slack flash
 
     useEffect(() => {
         let raf = 0;
@@ -154,42 +151,24 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
             prev = ts;
             const elapsed = ts - startRef.current;
 
-            // THE FISH swims on its own. It wanders toward a target it keeps re-picking, with panicked darts
-            // on top — nothing you do moves it. A fish that swims reads as a fish; when the player drove this
-            // marker instead, people watched the zone drift past and concluded nothing responded to them.
+            // THE FISH swims on its own. It wanders toward nothing in particular, with panicked runs on top
+            // — nothing you do moves it. Its rarity sets how hard and how often it bolts, so a mythic thrashes
+            // across the tank and a sardine mostly drifts.
             const t = elapsed / 1000;
             if (elapsed - lastDartRef.current > DART_EVERY_MS / F.dart) {
                 lastDartRef.current = elapsed;
-                velRef.current += (Math.random() - 0.5) * 1.5 * F.dart;   // a run, either way
+                velRef.current += (Math.random() - 0.5) * 1.1 * F.dart;
             }
-            // A slow wander underneath the darts, so it drifts with intent instead of jittering in place.
-            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.55 * dt * F.dart;
-            velRef.current *= Math.pow(DAMPING, dt * 60);
+            velRef.current += Math.sin(t * 0.9 + 0.7) * 0.5 * dt * F.dart;
+            velRef.current *= Math.pow(FISH_DAMPING, dt * 60);
             posRef.current += velRef.current * dt;
-            if (posRef.current <= 0.04) { posRef.current = 0.04; velRef.current = Math.abs(velRef.current) * 0.5; }
-            if (posRef.current >= 0.96) { posRef.current = 0.96; velRef.current = -Math.abs(velRef.current) * 0.5; }
+            if (posRef.current <= 0.05) { posRef.current = 0.05; velRef.current = Math.abs(velRef.current) * 0.5; }
+            if (posRef.current >= 0.95) { posRef.current = 0.95; velRef.current = -Math.abs(velRef.current) * 0.5; }
 
-            // TENSION. Holding loads the line; letting go bleeds it off. Redline and the line goes slack for a
-            // moment — your bar stops rising and falls — so "keep holding" is a real decision rather than the
-            // obvious answer. Nothing is lost, which keeps the no-punishment rule intact.
-            const slack = ts < slackUntilRef.current;
-            const pulling = holdRef.current && !slack;
-            if (pulling) tensionRef.current += TENSION_RISE * F.tension * dt;
-            else tensionRef.current -= TENSION_FALL * dt;
-            tensionRef.current = Math.max(0, Math.min(1, tensionRef.current));
-            if (tensionRef.current >= 1 && !slack) {
-                slackUntilRef.current = ts + SLACK_MS;
-                tensionRef.current = 0;
-                snapRef.current += 1;
-                sfx.gone();
-                try { navigator.vibrate?.([40, 30, 40]); } catch { /* no haptics here */ }
-            }
-
-            // THE BAR is yours: hold to raise it, release and it falls. This is the only thing your thumb
-            // touches, and chasing a fish with a capture zone is an idiom players already know.
-            barVelRef.current += (pulling ? REEL_PULL : 0) * dt;
-            barVelRef.current -= GRAVITY * dt;
-            barVelRef.current *= Math.pow(DAMPING, dt * 60);
+            // YOUR BAR: hold to raise, release and it falls. The only thing your thumb touches.
+            barVelRef.current += (holdRef.current ? BAR_PULL : 0) * dt;
+            barVelRef.current -= BAR_GRAVITY * dt;
+            barVelRef.current *= Math.pow(BAR_DAMPING, dt * 60);
             bandRef.current += barVelRef.current * dt;
             const half = BAND_H / 2;
             if (bandRef.current <= half) { bandRef.current = half; barVelRef.current = 0; }
@@ -241,8 +220,6 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
     const left = Math.max(0, 1 - elapsed / REEL_MS);
     const pos = posRef.current, band = bandRef.current;
     const inside = pos >= band - BAND_H / 2 && pos <= band + BAND_H / 2;
-    const tension = tensionRef.current;
-    const slack = typeof performance !== "undefined" && performance.now() < slackUntilRef.current;
     // Same function the server gets. The bar is a real preview now, not a different number.
     const scoreNow = scoreOf(inRef.current, totalRef.current);
     const warming = elapsed < REEL_WARMUP_MS;
@@ -270,20 +247,9 @@ function ReelStruggle({ onDone, sfx, fight = "common" }) {
                     <span className="fish-catch-hook" aria-hidden="true">🐟</span>
                 </div>
                 <div className="fish-rod-hint">
-                    {warming ? "get ready…" : slack ? "LINE SLACK — ease off!" : inside ? "REELING" : "hold!"}
+                    {warming ? "get ready…" : inside ? "CAUGHT!" : "chase it!"}
                 </div>
             </div>
-            {/* TENSION — the cost of holding. Turns red as it approaches the redline; going slack flashes it. */}
-            <div className="fish-strain-row">
-                <span className="fish-strain-label">LINE</span>
-                <div className={`fish-strain is-tension${slack ? " is-slack" : ""}${tension > 0.75 ? " is-hot" : ""}`}>
-                    <div className="fish-tension-fill" style={{ width: `${tension * 100}%` }} />
-                </div>
-                <span className="fish-strain-pct" style={{ color: slack ? "#e05b6a" : tension > 0.75 ? "#ffb84d" : "#8b93a0" }}>
-                    {slack ? "SLACK" : `${Math.round(tension * 100)}%`}
-                </span>
-            </div>
-
             {/* Labelled SIZE, because that is literally what it buys: the score decides how big the fish is.
                 An unlabelled bar creeping up from zero read as a progress bar you were failing. */}
             <div className="fish-strain-row">
