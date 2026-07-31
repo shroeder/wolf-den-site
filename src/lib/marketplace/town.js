@@ -98,6 +98,20 @@ export const GATED_BUILDINGS = [
     { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86, gate: "owner" },
 ];
 
+// Lay the street out evenly for however many buildings the viewer can actually see.
+//
+// The x values on TOWN_BUILDINGS were hand-picked 11% apart, which is ~319px of the 2900px street — comfortably
+// clear of the 244px a building sprite can occupy. Dropping a tenth building in at a hand-picked 86% put it 5%
+// from the Vault and 6% from the Festival Stage, i.e. straight through both of them. Computing the spread means
+// adding a building can never collide with one again, and a viewer who can't see the gated one still gets the
+// original nine-building layout they're used to.
+function spaceOut(list) {
+    if (!list.length) return list;
+    const FIRST = 4, LAST = 92;
+    const step = list.length > 1 ? (LAST - FIRST) / (list.length - 1) : 0;
+    return list.map((b, i) => ({ ...b, x: Math.round((FIRST + step * i) * 10) / 10 }));
+}
+
 // Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.
 export async function getTownArt() {
     const rows = await db.query(`SELECT art_key, url, flip FROM mkt_town_art`).catch(() => []);
@@ -380,8 +394,9 @@ export async function getTownState(buyerId) {
             gold: Number(me?.gold || 0),
         },
         players,
-        // All nine are standing fixtures (no funded unlocks); gated ones are appended per viewer.
-        buildings: [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))],
+        // All nine are standing fixtures (no funded unlocks); gated ones are appended per viewer, and the whole
+        // street is then RE-SPACED to fit however many that is.
+        buildings: spaceOut([...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))]),
         art,
         projects,
         bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, farmGrowPct: bonuses.farmGrowPct || 0, farmYieldPct: bonuses.farmYieldPct || 0 },
