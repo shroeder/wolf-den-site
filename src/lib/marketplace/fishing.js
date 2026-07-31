@@ -6,7 +6,6 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
-import { addToPantry } from "@/lib/marketplace/cooking.js";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -598,6 +597,10 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     ).catch(() => {});
     // YOU KEEP THE FISH. The gold below is still paid — it reads as selling the catch — but the fish itself
     // goes to the pantry so the Kitchen can cook with it, exactly like a harvested crop.
+    //
+    // Lazy import, and it must stay lazy: cooking.js imports FISH from this file, so importing it back
+    // statically is a cycle, and an ESM cycle yields `undefined` at call time instead of failing the build.
+    const { addToPantry } = await import("@/lib/marketplace/cooking.js");
     await addToPantry(buyerId, "fish", species.id, 1).catch(() => {});
 
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.

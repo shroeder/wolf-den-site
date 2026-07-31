@@ -18,7 +18,6 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
-import { addToPantry, learnRecipe } from "@/lib/marketplace/cooking.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -361,6 +360,12 @@ export async function harvestPlot(buyerId, slot) {
     // YOU ALSO KEEP THE CROP. The gold above still reads as selling the surplus and the farm economy is
     // balanced on it — but the produce itself now goes to the pantry, where the Kitchen can cook with it. A
     // doubled harvest doubles the produce too, since it doubled everything else.
+    // IMPORTED LAZILY, and it has to stay that way. cooking.js imports SEEDS and grantSeed from THIS file, so a
+    // static import back the other way is a cycle — and under ESM a cycle resolves to `undefined` at call time
+    // rather than failing at import, which is how it took down the Kitchen page and the town's Kitchen door
+    // instead of failing the build. Same trap as stockade-penalty.js; the fix there was a leaf module, here a
+    // deferred import is the smaller change.
+    const { addToPantry, learnRecipe } = await import("@/lib/marketplace/cooking.js");
     await addToPantry(buyerId, "crop", claimed.seed_id, doubled ? 2 : 1).catch(() => {});
     // Recipes are found, not listed, and the field is one of the places they turn up.
     const recipeFound = Math.random() < HARVEST_RECIPE_CHANCE ? await learnRecipe(buyerId).catch(() => null) : null;
