@@ -7,6 +7,7 @@ import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
 import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
+import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -613,10 +614,14 @@ export default function TownClient({ initial }) {
         });
     }, []);
 
-    // Main town poll. Every viewer hits this on a timer, so it's the steady baseline cost — 2.5s was a large
-    // share of the 17x invocation spike. Avatars interpolate/wander client-side between updates, so 4s looks
-    // the same while cutting the request rate ~40%.
-    useEffect(() => { load(); const t = setInterval(load, 4000); return () => clearInterval(t); }, [load]);
+    // Main town poll — the steady baseline cost, since every viewer runs it. Two things keep it honest:
+    //   1. It only ticks while the tab is VISIBLE. It used to run forever, so a phone with the Town open and the
+    //      screen off asked for the whole plaza every 4s all night. That was the bulk of ~944k invocations per
+    //      billing period. Coming back to the tab refreshes instantly, so nothing feels stale.
+    //   2. 4s while something is actually happening (a raid or boss is live), 8s when the plaza is idle.
+    //      Avatars interpolate and wander client-side between updates, so idle at 8s looks identical.
+    const townPollMs = state?.event ? 4000 : 8000;
+    useVisiblePoll(load, townPollMs);
 
     // Ambient wander for idle players.
     useEffect(() => {
@@ -825,11 +830,7 @@ export default function TownClient({ initial }) {
     }, [state?.event, load]);
     // While the boss modal is open, poll faster so the shared HP bar reflects everyone's hits. 2s per viewer
     // was a big slice of the invocation spike; 4s still feels live because the bar animates between updates.
-    useEffect(() => {
-        if (!bossOpen) return undefined;
-        const t = setInterval(() => load(), 4000);
-        return () => clearInterval(t);
-    }, [bossOpen, load]);
+    useVisiblePoll(load, bossOpen ? 4000 : null, { leading: false });
     // If the boss dies (event clears) while the modal's open, close it.
     useEffect(() => { if (bossOpen && (!state?.event || state.event.defeated || !state.event.boss)) setBossOpen(false); }, [bossOpen, state?.event]);
     // RAID CONCLUSION — the dopamine moment. When a raid ENDS (event goes away), pop a recap so it never just

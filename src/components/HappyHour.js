@@ -25,7 +25,7 @@ export default function HappyHour({ compact = false }) {
     }
     useEffect(() => {
         load();
-        const t = setInterval(load, 20000); // reflect the pool as others donate
+        const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 20000); // reflect the pool as others donate
         return () => clearInterval(t);
     }, []);
     useEffect(() => {

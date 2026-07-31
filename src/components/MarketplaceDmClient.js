@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
+import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 
 const REACTIONS = ["❤️", "👍", "😂", "🔥", "😮", "😢"];
 
@@ -64,11 +65,9 @@ export default function MarketplaceDmClient({ threadId }) {
         if (d?.thread) setThread(d.thread);
     }, [threadId]);
 
-    useEffect(() => {
-        load();
-        const t = setInterval(load, 3000); // snappy polling for live feel (typing, receipts, reactions)
-        return () => clearInterval(t);
-    }, [load]);
+    // 3s keeps typing indicators and read receipts feeling live — but only while the thread is on screen.
+    // Backgrounded, this was the most expensive poll in the app at 1,200 requests an hour per open tab.
+    useVisiblePoll(load, 3000);
 
     // Only auto-scroll when a genuinely NEW message arrives — NOT on typing-indicator changes or 3s polls
     // (those were yanking the view down while you were mid-typing). `nearest` avoids jumping if it's in view.

@@ -1902,7 +1902,9 @@ function MessagesPanel() {
     useEffect(() => {
         if (!openId) return;
         loadConvo(openId);
-        const t = setInterval(() => loadConvo(openId), 3000);
+        // Vendors leave the portal open on a shop machine all day — only poll the open thread while it's
+        // actually on screen.
+        const t = setInterval(() => { if (document.visibilityState === "visible") loadConvo(openId); }, 3000);
         return () => clearInterval(t);
     }, [openId, loadConvo]);
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import SceneMusic from "@/components/SceneMusic";
+import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import CoinCta from "@/components/CoinCta";
 
 // The enterable Tavern — a SCROLLABLE, walkable room like the plaza. Your hero walks the floor (tap to move,
@@ -105,7 +106,9 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (d && d.owner !== false) setSt(d);
     }, []);
-    useEffect(() => { load(); const t = setInterval(load, 2500); return () => clearInterval(t); }, [load]);
+    // The fastest poll in the app (2.5s, so other drinkers move smoothly) — which makes leaving the tavern
+    // open in a background tab the single most expensive thing a member could do. Visible-only now.
+    useVisiblePoll(load, 2500);
 
     const postMove = useCallback((x, y, facing) => {
         fetch("/api/marketplace/tavern", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "move", x, y, facing }) }).catch(() => {});

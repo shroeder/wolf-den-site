@@ -406,7 +406,8 @@ export default function FarmClient({ initial, viewingAlias }) {
             const r = await post({ action: "farm_ping", owner: farm.mine ? undefined : farm.owner?.alias }).catch(() => null);
             if (alive && r?.ok && Array.isArray(r.visitors)) setFarm((f) => ({ ...f, visitors: r.visitors }));
         };
-        const t = setInterval(ping, 15000);
+        // Presence keep-alive — paused while hidden, so a pocketed phone stops claiming to be on the farm.
+        const t = setInterval(() => { if (document.visibilityState === "visible") ping(); }, 15000);
         return () => { alive = false; clearInterval(t); };
     }, [post, farm.mine, farm.owner?.alias]);
 

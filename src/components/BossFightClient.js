@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import AvatarStack from "@/components/AvatarStack";
+import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 import BadgeArt from "@/components/BadgeArt";
 import BossBattleScene, { AURA_COL, BORDER_COL } from "@/components/BossBattleScene";
 import BossFinalBlow from "@/components/BossFinalBlow";
@@ -46,11 +47,8 @@ export default function BossFightClient() {
         setLoaded(true);
     }, []);
 
-    useEffect(() => {
-        load();
-        const t = setInterval(load, 10000);
-        return () => clearInterval(t);
-    }, [load]);
+    // Only while you're looking — a backgrounded boss-fight tab used to refetch every 10s indefinitely.
+    useVisiblePoll(load, 10000);
 
     // Reconcile the interpolated HP to the server's value on each poll / optimistic attack update.
     useEffect(() => {

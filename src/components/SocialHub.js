@@ -54,7 +54,8 @@ function Thread({ thread, onActivity }) {
     useEffect(() => {
         (async () => { await load(); })();
         // 4s, not 15s: the server treats typing as live for 6s, so a 15s poll would nearly always miss it.
-        const iv = setInterval(() => { load(); }, 4000);
+        // Paused while the tab is hidden — nobody is reading a typing indicator they can't see.
+        const iv = setInterval(() => { if (document.visibilityState === "visible") load(); }, 4000);
         return () => clearInterval(iv);
     }, [load]);
 
@@ -195,7 +196,7 @@ export default function SocialHub() {
 
     useEffect(() => {
         refreshUnread();
-        const iv = setInterval(refreshUnread, 30000);
+        const iv = setInterval(() => { if (document.visibilityState === "visible") refreshUnread(); }, 30000);
         return () => clearInterval(iv);
     }, [refreshUnread]);
 
@@ -522,7 +523,7 @@ function GlobalChatTab({ open, onRead }) {
     useEffect(() => {
         if (!open) return undefined;
         load();
-        const iv = setInterval(load, 12000);
+        const iv = setInterval(() => { if (document.visibilityState === "visible") load(); }, 12000);
         return () => clearInterval(iv);
     }, [open, load]);
 

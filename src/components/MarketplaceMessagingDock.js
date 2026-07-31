@@ -34,7 +34,7 @@ function DockThread({ thread, onBack, onActivity }) {
 
     useEffect(() => {
         (async () => { await load(); })();
-        const iv = setInterval(() => { load(); }, 15000);
+        const iv = setInterval(() => { if (document.visibilityState === "visible") load(); }, 15000);
         return () => clearInterval(iv);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [thread.id]);
@@ -170,7 +170,7 @@ export default function MarketplaceMessagingDock() {
             await refreshUnread();
         };
         tick();
-        const iv = setInterval(tick, 30000);
+        const iv = setInterval(() => { if (document.visibilityState === "visible") tick(); }, 30000);
         return () => {
             stop = true;
             clearInterval(iv);
