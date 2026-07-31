@@ -7,6 +7,7 @@ import { requireAdminAppAuth } from "@/lib/admin-app/auth";
 import { hasPermission } from "@/lib/admin-app/permissions";
 import { getDecryptedCredential, resolveOpenAiKey, resolveSquareAccessToken } from "@/lib/admin-app/integrations";
 import { db } from "@/lib/db";
+import { logGeneration, logText } from "@/lib/marketplace/ai-ledger.js";
 import { createServerLogger } from "@/lib/server-logger";
 
 const proxyLogger = createServerLogger({ source: "api", subsystem: "admin-app-proxy" });
@@ -142,6 +143,38 @@ function matchRule(rules, path) {
 // drop Authorization (replaced) and hop-by-hop / host headers.
 const FORWARD_HEADERS = ["content-type", "accept", "idempotency-key", "openai-beta"];
 
+// Record one proxied OpenAI call in the AI ledger. Reads the model/size/quality out of the request the app
+// already sent and the token counts out of the response OpenAI already returned — nothing here is estimated.
+//
+// Every OpenAI call the admin app makes through this proxy is covered by this one function: the entry
+// interpreter, the realized-COGS reader, the chat orchestrator, the catalog resolver. None of them need to
+// know the ledger exists. Attributed to the signed-in staff member, because the admin app is a person holding
+// a phone rather than an unattended job.
+async function logProxiedOpenAi({ path, requestBody, responseBody, status, user }) {
+    let req = null;
+    let res = null;
+    try { req = requestBody ? JSON.parse(requestBody) : null; } catch { req = null; }
+    try { res = responseBody ? JSON.parse(responseBody) : null; } catch { res = null; }
+    const who = user?.name || user?.email || "admin app";
+    const label = `Admin app — ${String(path).replace("/v1/", "")}`;
+    const failed = status >= 400;
+
+    if (String(path).includes("/images/")) {
+        await logGeneration({
+            model: req?.model || "gpt-image-1", size: req?.size, quality: req?.quality,
+            edit: String(path).includes("/edits"), source: "app/openai", label, prompt: req?.prompt,
+            origin: "admin", buyerLabel: who,
+            ok: !failed, error: failed ? String(responseBody).slice(0, 300) : null,
+        });
+        return;
+    }
+    await logText({
+        model: res?.model || req?.model, usage: res?.usage, source: "app/openai", label,
+        origin: "admin", buyerLabel: who,
+        ok: !failed, error: failed ? String(responseBody).slice(0, 300) : null,
+    });
+}
+
 /**
  * @param {Request} request
  * @param {"square"|"openai"|"plaid"} upstreamKey
@@ -245,6 +278,15 @@ export async function handleProxy(request, upstreamKey, context) {
     }
 
     const responseBody = await upstreamResponse.text();
+
+    // Everything the admin app sends to OpenAI comes through here, so this one place covers the whole app —
+    // the entry interpreter, the COGS reader, the chat orchestrator, the catalog resolver — without any of
+    // those services knowing the ledger exists. Attributed to the signed-in staff member, since the app is a
+    // person holding a phone, not an unattended job.
+    if (upstreamKey === "openai") {
+        await logProxiedOpenAi({ path, requestBody: bodyText, responseBody, status: upstreamResponse.status, user: session.user })
+            .catch(() => { /* never let bookkeeping change what the app gets back */ });
+    }
 
     proxyLogger.info("admin_app.proxy.forwarded", {
         upstreamKey,
