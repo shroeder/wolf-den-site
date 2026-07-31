@@ -8,6 +8,7 @@ import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { stockadeMultiplier } from "@/lib/marketplace/stockade-penalty.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -128,11 +129,14 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     const marketMult = 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
     // Town HANGOUT buff — a personal +5% to XP & gold you earn after chilling in the plaza for 3 min (2h timer).
     const hangout = await memberHangoutMult(buyerId).catch(() => 1);
-    const pts = Math.round(base * mult * xpMult * marketMult * hangout);
+    // THE STOCKADE's Mark of Shame: a flat -10% to everything earned while serving. Applied last, on both XP
+    // and gold, so it bites through every buff above it rather than being cancelled out by a good Happy Hour.
+    const shame = await stockadeMultiplier(buyerId).catch(() => 1);
+    const pts = Math.round(base * mult * xpMult * marketMult * hangout * shame);
     // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
     // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
-    const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout;
+    const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout * shame;
     const goldDelta = Math.max(0, Math.round(goldBase * goldMult));
 
     // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it

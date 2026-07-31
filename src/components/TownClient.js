@@ -545,6 +545,35 @@ export default function TownClient({ initial }) {
     const [questBusy, setQuestBusy] = useState(false);
     const [questFlash, setQuestFlash] = useState(null);
     const [smithOpen, setSmithOpen] = useState(false);
+    // THE STOCKADE — a plaza fixture holding whoever was last caught cheating. `stockade` is null when empty,
+    // in which case nothing renders at all: an empty stockade standing in the square is just set dressing that
+    // raises a question nobody can answer.
+    const [stockOpen, setStockOpen] = useState(false);
+    const [stockade, setStockade] = useState(null);
+    const [stockBusy, setStockBusy] = useState(false);
+    const [stockFlash, setStockFlash] = useState(null);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/stockade").then((r) => r.json()).then((d) => { if (!dead) setStockade(d?.occupant ? d : null); }).catch(() => {});
+        return () => { dead = true; };
+    }, []);
+    const stockAct = async (kind) => {
+        if (stockBusy) return;
+        setStockBusy(true);
+        try {
+            const r = await fetch("/api/marketplace/stockade", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) });
+            const d = await r.json();
+            if (d?.ok) {
+                setStockade(d.occupant ? d : null);
+                setStockFlash(kind === "fruit" ? `SPLAT! +${d.xp} XP · +${d.gold} 🪙` : `+${d.xp} XP`);
+                setTimeout(() => setStockFlash(null), 1400);
+            } else if (d?.error === "out_of_turns") {
+                setStockFlash("That's your lot for today.");
+                setTimeout(() => setStockFlash(null), 1600);
+            }
+        } catch { /* a failed tap just does nothing */ }
+        setStockBusy(false);
+    };
     const [raidEnemies, setRaidEnemies] = useState([]); // per-enemy {id,x,y,hp,hpMax,floats:[],dying}
     const [raidKills, setRaidKills] = useState(0);
     const [raidDamage, setRaidDamage] = useState(0);    // your total damage this raid (optimistic)
@@ -1159,6 +1188,20 @@ export default function TownClient({ initial }) {
                         ) : <span className="tw-npc-emoji">⚒️</span>}
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
+                    {/* The Stockade — only stands while someone is actually in it */}
+                    {stockade?.occupant ? (
+                        <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>
+                            <span className="tw-npc-bubble">⛓️ {stockade.occupant.name}</span>
+                            {art.stockade?.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={art.stockade.url} alt="The Stockade" draggable={false} />
+                            ) : <span className="tw-npc-emoji">⛓️</span>}
+                            {stockade.occupant.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={stockade.occupant.spriteUrl} alt="" draggable={false} className="tw-stockade-face" style={{ transform: stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
+                            ) : null}
+                        </button>
+                    ) : null}
                     <button type="button" className="tw-npc-btn" style={{ left: "9%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
                         {crierLines.length ? <span className="tw-npc-bubble">📣 {crierLines[crierMsg % crierLines.length]}</span> : null}
                         {art.crier?.url ? (
@@ -1345,6 +1388,43 @@ export default function TownClient({ initial }) {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* The Stockade — shame / pelt the occupant, three of each a day */}
+            {stockOpen && stockade?.occupant ? (
+                <div className="tw-roster" onClick={() => setStockOpen(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>⛓️ The Stockade</strong><button type="button" onClick={() => setStockOpen(false)} aria-label="Close">✕</button></div>
+                        <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "2px 2px 10px" }}>
+                            {stockade.occupant.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={stockade.occupant.spriteUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, objectFit: "contain", filter: "grayscale(0.5) brightness(0.8)", transform: stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
+                            ) : <span style={{ fontSize: 44 }}>😔</span>}
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 800, fontSize: "1.02rem" }}>{stockade.occupant.name}</div>
+                                <div className="muted" style={{ fontSize: "0.82rem", fontStyle: "italic" }}>{stockade.occupant.reason}</div>
+                                <div className="muted" style={{ fontSize: "0.78rem", marginTop: 3 }}>
+                                    Shamed {stockade.occupant.shameCount}× · Pelted {stockade.occupant.fruitCount}×
+                                </div>
+                            </div>
+                        </div>
+                        {stockFlash ? <div className="tw-merchant-flash">{stockFlash}</div> : null}
+                        {stockade.isOccupant ? (
+                            <p className="muted" style={{ margin: "6px 2px", fontSize: "0.86rem" }}>
+                                You&rsquo;re the one in the stockade. −10% XP, coin and boss damage until you&rsquo;re let out.
+                            </p>
+                        ) : (
+                            <div style={{ display: "grid", gap: 8 }}>
+                                <button type="button" className="tw-btn" disabled={stockBusy || stockade.shame.used >= stockade.shame.max} onClick={() => stockAct("shame")}>
+                                    👉 Shame them &nbsp;<span className="muted">+{stockade.shame.xp} XP · {Math.max(0, stockade.shame.max - stockade.shame.used)} left today</span>
+                                </button>
+                                <button type="button" className="tw-btn" disabled={stockBusy || stockade.fruit.used >= stockade.fruit.max} onClick={() => stockAct("fruit")}>
+                                    🍅 Throw rotten fruit &nbsp;<span className="muted">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} 🪙 · {Math.max(0, stockade.fruit.max - stockade.fruit.used)} left today</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : null}
@@ -2170,6 +2250,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-npc { position: absolute; transform: translate(-50%, -100%); height: 92px; width: auto; z-index: 97; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 /* Interactive plaza NPCs (crier / merchant) — a tappable button with a sprite + a speech bubble. */
 .tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 250; display: flex; flex-direction: column; align-items: center; }
+/* THE STOCKADE — the occupant's own hero sprite is pinned into the frame, desaturated and slightly sunk, so
+   passers-by can see at a glance WHO is in it without opening the panel. */
+.tw-stockade img:first-of-type { height: 92px; }
+.tw-stockade-face { position: absolute; left: 50%; bottom: 6%; width: 34px !important; height: 34px !important; margin-left: -17px; filter: grayscale(0.55) brightness(0.82) drop-shadow(0 2px 3px rgba(0,0,0,0.6)) !important; animation: none !important; pointer-events: none; }
+.tw-stockade .tw-npc-bubble { background: rgba(120,32,32,0.92); border-color: rgba(255,140,140,0.5); }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 .tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
 .tw-npc-btn:hover img, .tw-npc-btn:hover .tw-npc-emoji { filter: drop-shadow(0 0 8px rgba(255,215,110,0.8)); }

@@ -31,6 +31,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { stockadeMultiplier } from "@/lib/marketplace/stockade-penalty.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -1085,7 +1086,10 @@ export async function attackBoss(buyerId) {
         crit: swing.crit, hitIndex: used, bossHpFrac: boss.max_hp ? boss.hp / boss.max_hp : 1,
         bossMaxHp: boss.max_hp || 0, hittersToday: todayHitters, bossWeakness: boss.weakness,
     });
-    const damage = Math.round(swing.damage * buffMult * sig.mult * petMult * wMult * setHit.mult) + (onHit.bonusDamage || 0);
+    // THE STOCKADE's Mark of Shame: -10% boss damage while serving. Applied to the whole swing including the
+    // flat on-hit bonus, so no single source of damage escapes it.
+    const shameMult = await stockadeMultiplier(buyerId).catch(() => 1);
+    const damage = Math.round((swing.damage * buffMult * sig.mult * petMult * wMult * setHit.mult + (onHit.bonusDamage || 0)) * shameMult);
     const crit = swing.crit;
     const ability = pickAbility(crit);
 

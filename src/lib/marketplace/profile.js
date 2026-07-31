@@ -282,6 +282,12 @@ export async function setShowcaseBadges(buyerId, slugs) {
         const heldSet = new Set(held.map((r) => r.badge_slug));
         clean = clean.filter((s) => heldSet.has(s));
     }
+    // A locked badge (the Stockade's Mark of Shame) can't be edited off the card — that's the whole point of it.
+    // Enforced HERE rather than in the UI because the UI isn't the security boundary: this endpoint takes an
+    // arbitrary slug list, so hiding the button would just mean the next request wins.
+    const locked = await db.queryOne(`SELECT locked_badge FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (locked?.locked_badge) clean = [locked.locked_badge, ...clean.filter((s) => s !== locked.locked_badge)].slice(0, MAX_SHOWCASE);
+
     await db.query(`UPDATE mkt_buyer SET showcase_badge_slugs = $2, updated_at = NOW() WHERE id = $1`, [buyerId, clean.length ? clean : null]);
     return getProfile(buyerId);
 }
