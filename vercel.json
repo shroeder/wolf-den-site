@@ -37,7 +37,7 @@
     "crons": [
         {
             "path": "/api/jobs/town-hours",
-            "schedule": "*/15 * * * *"
+            "schedule": "*/30 * * * *"
         },
         {
             "path": "/api/jobs/consignment-nightly-reports",
@@ -61,11 +61,11 @@
         },
         {
             "path": "/api/jobs/avatar-sprites",
-            "schedule": "*/15 * * * *"
+            "schedule": "*/30 * * * *"
         },
         {
             "path": "/api/jobs/leaderboard-badges",
-            "schedule": "*/15 * * * *"
+            "schedule": "17 * * * *"
         },
         {
             "path": "/api/jobs/boss-auto-tick",
@@ -73,7 +73,7 @@
         },
         {
             "path": "/api/jobs/boss-art",
-            "schedule": "*/10 * * * *"
+            "schedule": "7 * * * *"
         },
         {
             "path": "/api/jobs/sailing-arrivals",
@@ -109,7 +109,7 @@
         },
         {
             "path": "/api/jobs/timeclock-reminders",
-            "schedule": "*/5 * * * *"
+            "schedule": "*/10 * * * *"
         }
     ]
 }
