@@ -113,8 +113,21 @@ a {
     text-underline-offset: 2px;
 }
 
-a:visited {
+/* Muting visited links is for PROSE links, not for buttons — but `a:visited` has specificity (0,1,1) and a bare
+   button class like `.btn` only has (0,1,0), so the visited rule quietly won on every button that happens to be
+   a link. Once you'd been to /marketplace/profile, "View your profile" repainted its label in muted secondary
+   ink on a gold background and became unreadable. Two screens had already worked around it one-off
+   (.checkin-cta, .sail-cta) without anyone noticing it was general: .btn, .pill, .nav-link, .fishlaunch-go and
+   .checkin-row were all sitting on the same bug.
+   `:where()` contributes no specificity, so this drops to (0,1,0) and ANY class — including ones not written
+   yet — beats it. Unclassed prose links still grey out as intended. */
+:where(a):visited {
     color: var(--ink-secondary);
+}
+/* Belt and braces on the shared button, so it stays right even if the rule above is ever re-tightened. */
+.btn:link,
+.btn:visited {
+    color: #171008;
 }
 
 .shell {
