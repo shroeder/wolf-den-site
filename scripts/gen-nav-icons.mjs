@@ -76,7 +76,7 @@ async function one(k) {
             const resp = await fetch("https://api.openai.com/v1/images/generations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "high", n: 1 }),
+                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", // "high" is 4x the price and vanishes in the downscale below — see art-style.js, n: 1 }),
             });
             if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
             const b64 = (await resp.json())?.data?.[0]?.b64_json;

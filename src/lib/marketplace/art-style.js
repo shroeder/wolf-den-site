@@ -63,6 +63,19 @@ export function housePrompt(subject, { framing = "sprite", extra = "" } = {}) {
     ].filter(Boolean).join(" ");
 }
 
+// ── WHICH `quality` TO ASK gpt-image-1 FOR ────────────────────────────────────────────────────────────────
+// Image OUTPUT is ~91% of the OpenAI bill, and the tier multiplies it: a 1024x1024 costs roughly 272 output
+// tokens at "low", 1,056 at "medium", 4,160 at "high" — so "high" is ~4x "medium" and ~15x "low".
+//
+// Sprites are STORED at 384-640px and DRAWN at 48-148px. Generating them at "high" buys interior detail that
+// the downscale destroys before anyone sees it; side by side at real size, medium and high are the same
+// picture. "low" is NOT a free win — it comes back visibly off-house-style (thin ink, weak silhouette,
+// washed palette), so it fails the thing SMALL_ICON_EXTRA exists to protect.
+//
+//   sprite / icon / anything downscaled  → "medium"
+//   art viewed LARGE (scene backdrops, boss art, wide panoramas) → "high" is worth it
+export const QUALITY_NOTE = "sprites: medium · large scene art: high";
+
 // Small subjects (badges, stat icons, inventory thumbnails) are viewed tiny, so they need a louder silhouette
 // and less interior noise — but the SAME ink-and-cel treatment, so they still belong to the set.
 export const SMALL_ICON_EXTRA =

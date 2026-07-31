@@ -76,7 +76,9 @@ export async function generateMissingChestArt(limit = 2) {
 export async function generateChestArt(tier) {
     const prompt = CHEST_ART_PROMPTS[tier];
     if (!prompt) throw new Error(`Unknown chest tier: ${tier}`);
-    const url = await generateImage(prompt, { pathPrefix: "marketplace/chest", quality: "high" });
+    // Chests render at 130-260px. "high" costs 4x "medium" and none of that detail survives the
+    // downscale — see the quality note in art-style.js.
+    const url = await generateImage(prompt, { pathPrefix: "marketplace/chest", quality: "medium" });
     const current = await getChestArt();
     current[tier] = url;
     await setSetting(SETTING_KEY, JSON.stringify(current));
