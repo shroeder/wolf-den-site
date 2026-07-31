@@ -65,10 +65,45 @@ function presetLook(kind) {
 
 // Build your "vanilla" avatar (base identity — skin, hair, face, basic clothes). Live preview renders via
 // our own /api/marketplace/avatar route. Save stores the config (the build-your-own avatar is the only path).
+// The illustrated hero SPRITE is drawn free the first time and costs gold to redraw after that — see
+// buyHeroRedraw. Saving the avatar itself is always free.
 export default function AvatarBuilder({ current = null }) {
     const router = useRouter();
     const [config, setConfig] = useState(() => ({ ...DEFAULT_AVATAR, ...(current || {}) }));
     const [busy, setBusy] = useState(false);
+    // What a redraw would cost right now. Fetched once — the price only moves when you buy one.
+    const [quote, setQuote] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        fetch("/api/marketplace/avatar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "redrawQuote" }),
+        })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (alive && d && !d.error) setQuote(d); })
+            .catch(() => { /* the button just stays hidden */ });
+        return () => { alive = false; };
+    }, []);
+
+    const redraw = async () => {
+        if (busy) return;
+        setBusy(true); setErr(null); setMsg(null);
+        try {
+            const r = await fetch("/api/marketplace/avatar", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "redraw" }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (d?.ok) {
+                setMsg("Hero redrawn.");
+                setQuote((q) => (q ? { ...q, cost: d.nextCost ?? q.cost, gold: d.gold ?? q.gold, canAfford: (d.gold ?? 0) >= (d.nextCost ?? 0) } : q));
+                try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
+            } else {
+                setErr(d?.error === "not_enough_gold" ? "Not enough gold for a redraw." : "Couldn't redraw right now.");
+            }
+        } catch { setErr("Couldn't redraw right now."); } finally { setBusy(false); }
+    };
+
     const [msg, setMsg] = useState("");
     const [err, setErr] = useState("");
     // The site header is sticky+opaque, so a preview stuck at top:0 slides behind it and the avatar's head
@@ -166,7 +201,31 @@ export default function AvatarBuilder({ current = null }) {
                 <button type="button" className="btn-gold" onClick={() => save(config, "Avatar saved.")} disabled={busy}>
                     {busy ? "Saving…" : "Save avatar"}
                 </button>
+                {/* Redrawing the hero SPRITE is a separate, paid action. Saving the avatar is free and always
+                    was; what costs gold is having the illustrated hero re-rendered from it. That used to happen
+                    on its own after any gear change, once a day, with nobody deciding it was worth doing. */}
+                {quote && !quote.firstIsFree ? (
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={redraw}
+                        disabled={busy || !quote.canAfford}
+                        title={quote.canAfford ? "Re-render your hero sprite from the current avatar" : "Not enough gold"}
+                    >
+                        {busy ? "Drawing…" : `🎨 Redraw hero · 🪙 ${quote.cost.toLocaleString()}`}
+                    </button>
+                ) : null}
             </div>
+            {quote && !quote.firstIsFree && !quote.canAfford ? (
+                <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
+                    You have 🪙 {quote.gold.toLocaleString()} — a redraw costs {quote.cost.toLocaleString()}.
+                </p>
+            ) : null}
+            {quote?.firstIsFree ? (
+                <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
+                    Your first hero sprite is drawn free once you save.
+                </p>
+            ) : null}
             {msg ? <p className="shop-payment-success" style={{ marginTop: 8 }}>{msg}</p> : null}
             {err ? <p className="shop-payment-error" style={{ marginTop: 8 }}>{err}</p> : null}
         </div>

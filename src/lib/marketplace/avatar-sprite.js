@@ -2,6 +2,7 @@ import "server-only";
 
 
 import { db } from "@/lib/db";
+import { logCoin } from "@/lib/marketplace/coins.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { editImage, detectFacing, storeImage } from "@/lib/marketplace/openai-image.js";
 import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
@@ -90,20 +91,15 @@ export function pendingSpriteIds(limit = null) {
               WHERE avatar_config IS NOT NULL
                 AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
                 -- NEVER draw for an untouched avatar. A member who has not opened the customiser is still on
-                -- the stock config, so a bespoke draw produces the stock character — at ~$0.046 a head, once
-                -- per member. Half the roster (36 of 72) had one drawn for them this way. That is precisely
-                -- what the shared default sprite exists for: they render it until they change something,
-                -- which stamps avatar_updated_at and makes them eligible here for the first time.
+                -- the stock config, so a bespoke draw produces the stock character. That is precisely what the
+                -- shared default sprite exists for: they render it until they change something, which stamps
+                -- avatar_updated_at and makes them eligible here for the first time.
                 AND avatar_updated_at IS NOT NULL
-                AND (
-                    -- Needs a first sprite…
-                    avatar_sprite_url IS NULL
-                    -- …or the avatar / gear changed since the sprite was drawn (regen, off cooldown).
-                    OR (
-                        (avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)
-                        AND (avatar_sprite_at IS NULL OR avatar_sprite_at < NOW() - INTERVAL '${REGEN_COOLDOWN_HOURS} hours')
-                    )
-                )
+                -- FIRST sprite only. Redraws used to queue automatically whenever gear or the avatar changed —
+                -- one free redraw per member per day, forever, with nothing deciding whether the change was
+                -- worth it. A redraw is now a deliberate purchase (see buyHeroRedraw); this job just makes sure
+                -- everyone who has customised has a hero at all.
+                AND avatar_sprite_url IS NULL
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_sprite_attempts ASC, avatar_updated_at DESC NULLS LAST
               ${capped ? "LIMIT $1" : ""}`,
             capped ? [Math.floor(Number(limit))] : []
@@ -309,8 +305,66 @@ export async function runAvatarSpriteJob({ batch = 8 } = {}) {
             `SELECT COUNT(*)::int AS n FROM mkt_buyer
               WHERE avatar_config IS NOT NULL AND avatar_updated_at IS NOT NULL
                 AND avatar_sprite_attempts >= ${MAX_SPRITE_ATTEMPTS}
-                AND (avatar_sprite_url IS NULL OR avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)`
+                AND avatar_sprite_url IS NULL`
         )
         .catch(() => null);
     return { generated, attempted: ids.length, remaining, stuck: stuck?.n || 0, errors };
+}
+
+
+// ── PAY TO REDRAW ────────────────────────────────────────────────────────────────────────────────────────────
+// Your first hero is free; redrawing it costs gold. The price climbs with how many you've bought, so the first
+// couple feel free and someone re-rolling their look daily pays for it. Cheap in gold terms on purpose — this
+// is a brake, not a paywall.
+export const HERO_REDRAW_BASE = 500;
+export const heroRedrawCost = (bought = 0) => HERO_REDRAW_BASE * Math.pow(2, Math.min(4, Math.max(0, bought)));
+
+/** What a redraw would cost this member right now, and whether they can afford it. */
+export async function heroRedrawQuote(buyerId) {
+    if (!buyerId) return null;
+    const r = await db.queryOne(
+        `SELECT COALESCE(hero_redraws, 0) AS bought, COALESCE(gold, 0) AS gold, avatar_sprite_url, avatar_config
+           FROM mkt_buyer WHERE id = $1`,
+        [buyerId],
+    ).catch(() => null);
+    if (!r) return null;
+    const cost = heroRedrawCost(Number(r.bought) || 0);
+    return {
+        cost,
+        gold: Number(r.gold) || 0,
+        canAfford: (Number(r.gold) || 0) >= cost,
+        // No sprite yet means the free first draw is still owed — the cron will handle it.
+        firstIsFree: !r.avatar_sprite_url,
+        hasAvatar: Boolean(r.avatar_config),
+    };
+}
+
+/** Spend gold and redraw this member's hero sprite now. */
+export async function buyHeroRedraw(buyerId) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const quote = await heroRedrawQuote(buyerId);
+    if (!quote) return { ok: false, error: "not_found" };
+    if (!quote.hasAvatar) return { ok: false, error: "no_avatar" };
+    if (quote.firstIsFree) return { ok: false, error: "first_is_free" };
+
+    // Conditional spend: the WHERE clause IS the balance check, so a double-tap can't buy two on one balance.
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2, hero_redraws = COALESCE(hero_redraws, 0) + 1
+          WHERE id = $1 AND COALESCE(gold, 0) >= $2 RETURNING gold, hero_redraws`,
+        [buyerId, quote.cost],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", cost: quote.cost };
+
+    try {
+        const url = await generateBuyerSprite(buyerId);
+        await logCoin(buyerId, -quote.cost, "hero_redraw", { meta: { redraws: paid.hero_redraws } }).catch(() => {});
+        return { ok: true, spriteUrl: url, spent: quote.cost, gold: paid.gold, nextCost: heroRedrawCost(paid.hero_redraws) };
+    } catch (e) {
+        // Refund on a failed draw — they must never pay for art they didn't get.
+        await db.query(
+            `UPDATE mkt_buyer SET gold = gold + $2, hero_redraws = GREATEST(0, COALESCE(hero_redraws, 0) - 1) WHERE id = $1`,
+            [buyerId, quote.cost],
+        ).catch(() => {});
+        return { ok: false, error: "draw_failed", detail: String(e?.message || e) };
+    }
 }

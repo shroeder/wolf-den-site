@@ -620,7 +620,10 @@ export default function TownClient({ initial }) {
     //      billing period. Coming back to the tab refreshes instantly, so nothing feels stale.
     //   2. 4s while something is actually happening (a raid or boss is live), 8s when the plaza is idle.
     //      Avatars interpolate and wander client-side between updates, so idle at 8s looks identical.
-    const townPollMs = state?.event ? 4000 : 8000;
+    // 6s while something is happening, 15s when the plaza is idle. Avatars interpolate and wander client-side
+    // between updates, so a slower tick looks the same — and this is the single highest-volume request in the
+    // app, so the interval is the biggest lever on compute there is.
+    const townPollMs = state?.event ? 6000 : 15000;
     useVisiblePoll(load, townPollMs);
 
     // Ambient wander for idle players.

@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { generateBuyerSprite } from "@/lib/marketplace/avatar-sprite.js";
+import { generateBuyerSprite, buyHeroRedraw, heroRedrawQuote } from "@/lib/marketplace/avatar-sprite.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -48,6 +48,13 @@ export async function POST(request) {
             const buyer = await getAuthenticatedBuyer();
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
             const body = await request.json().catch(() => ({}));
+
+            // Redrawing an EXISTING hero costs gold. The first sprite is still free and still drawn by the
+            // cron — charging for that would be charging to have a face. What's paid for is re-rolling the
+            // look, which used to happen automatically on any gear change, once a day, forever.
+            if (body?.action === "redraw") return noStore(await buyHeroRedraw(buyer.id));
+            if (body?.action === "redrawQuote") return noStore(await heroRedrawQuote(buyer.id));
+
             const config = body?.config ? sanitizeAvatarConfig(body.config) : null;
             const profile = await setAvatarConfig(buyer.id, config);
             // NOTE: we intentionally do NOT generate the sprite here. setAvatarConfig bumps avatar_updated_at,

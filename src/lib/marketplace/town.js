@@ -504,7 +504,10 @@ export async function markGlobalChatSeen(buyerId) {
 
 export async function getGlobalChat(buyerId = null, limit = 40) {
     const n = Math.max(1, Math.min(100, Number(limit) || 40));
-    const rows = await db.query(
+    // The QUERY is identical for everyone — buyerId only decides the `mine` flag, which is computed in JS below.
+    // So the join runs once for the whole plaza instead of once per viewer per poll. This was the last live
+    // piece of the Town poll still doing per-viewer database work for a shared answer.
+    const rows = await shared(`town:chat:${n}`, TTL.LIVE, () => db.query(
         `SELECT c.id, c.body, c.created_at, c.buyer_id,
                 b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip
            FROM mkt_town_chat c
@@ -512,8 +515,8 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
           ORDER BY c.created_at DESC
           LIMIT $1`,
         [n]
-    ).catch(() => []);
-    return rows.reverse().map((r) => ({
+    ).catch(() => []));
+    return rows.slice().reverse().map((r) => ({
         id: String(r.id),
         body: r.body,
         at: r.created_at instanceof Date ? r.created_at.toISOString() : String(r.created_at),
