@@ -1,6 +1,7 @@
 import "server-only";
 
 import { list } from "@vercel/blob";
+import { db } from "@/lib/db";
 
 // OpenAI cost/usage insight — reads the REAL spend from OpenAI's Organization Costs API (admin-key only) and
 // aggregates it into a by-source + by-day breakdown for the admin app's "AI Costs" screen. No estimates.
@@ -197,3 +198,124 @@ const oneTimeArt = {
     count: STATIC_AI_ART.reduce((s, r) => s + r.count, 0),
     est: Math.round(STATIC_AI_ART.reduce((s, r) => s + r.count * r.unit, 0) * 100) / 100,
 };
+
+// ── FULL ACCOUNTING ───────────────────────────────────────────────────────────────────────────────────────
+// "Where did the money go" answered end to end, with nothing inferred and nothing left in a residual bucket.
+//
+// The trick is that OpenAI's COSTS API gives dollars but not how many images, while its USAGE API gives
+// num_model_requests — including for gpt-image-1, which usage/images itself reports nothing for. Putting the
+// two together turns "$111 of image output tokens" into "2,038 generations at an average of 1,365 output
+// tokens each", and average tokens per image identifies the quality tier that day (272 low / 1,056 medium /
+// 4,160 high for a 1024²). That's the difference between a number and an explanation.
+//
+// Cross-referencing against the ledger then shows what ISN'T on disk any more: images billed minus images we
+// can still name is the reroll / refusal / overwritten-art rate.
+const IMG_TIER_TOKENS = { low: 272, medium: 1056, high: 4160 };
+const tierFor = (avg) => (avg > 3000 ? "high" : avg > 700 ? "medium" : avg > 330 ? "low/medium" : "low");
+
+export async function getFullAccounting({ days = 30 } = {}) {
+    const key = adminKey();
+    if (!key) return { ok: false, error: "no_admin_key" };
+    const start = Math.floor(Date.now() / 1000) - days * 86400;
+    const H = { Authorization: `Bearer ${key}` };
+
+    const pull = async (url) => {
+        const out = [];
+        let page = null;
+        for (let i = 0; i < 40; i += 1) {
+            const r = await fetch(url + (page ? `&page=${page}` : ""), { headers: H });
+            if (!r.ok) break;
+            const d = await r.json();
+            out.push(...(d.data || []));
+            if (!d.has_more) break;
+            page = d.next_page;
+        }
+        return out;
+    };
+
+    // Dollars + token quantities, by line item.
+    const items = new Map();
+    for (const b of await pull(`https://api.openai.com/v1/organization/costs?start_time=${start}&bucket_width=1d&group_by=line_item&limit=180`)) {
+        for (const r of (b.results || [])) {
+            const k = r.line_item || "other";
+            const cur = items.get(k) || { usd: 0, qty: 0 };
+            cur.usd += Number(r.amount?.value) || 0;
+            cur.qty += Number(r.quantity) || 0;
+            items.set(k, cur);
+        }
+    }
+    // Request counts + tokens, by model and by day.
+    const models = new Map();
+    const imageDays = new Map();
+    for (const b of await pull(`https://api.openai.com/v1/organization/usage/completions?start_time=${start}&bucket_width=1d&group_by=model&limit=180`)) {
+        const day = new Date(b.start_time * 1000).toISOString().slice(0, 10);
+        for (const r of (b.results || [])) {
+            const m = r.model || "unspecified";
+            const cur = models.get(m) || { requests: 0, tokensIn: 0, tokensOut: 0 };
+            cur.requests += Number(r.num_model_requests) || 0;
+            cur.tokensIn += Number(r.input_tokens) || 0;
+            cur.tokensOut += Number(r.output_tokens) || 0;
+            models.set(m, cur);
+            if (String(m).startsWith("gpt-image-1")) {
+                const d = imageDays.get(day) || { requests: 0, tokensOut: 0 };
+                d.requests += Number(r.num_model_requests) || 0;
+                d.tokensOut += Number(r.output_tokens) || 0;
+                imageDays.set(day, d);
+            }
+        }
+    }
+
+    const isImage = (k) => k.startsWith("gpt-image-1");
+    let imageUsd = 0;
+    let textUsd = 0;
+    for (const [k, v] of items) (isImage(k) ? (imageUsd += v.usd) : (textUsd += v.usd));
+
+    const imageRequests = [...models].filter(([m]) => m.startsWith("gpt-image-1")).reduce((s, [, v]) => s + v.requests, 0);
+    const textRequests = [...models].filter(([m]) => !m.startsWith("gpt-image-1")).reduce((s, [, v]) => s + v.requests, 0);
+
+    // What we can still put a name to.
+    const named = await db.queryOne(
+        `SELECT count(*)::int n FROM mkt_ai_generation WHERE kind = 'image' AND created_at > now() - ($1 || ' days')::interval`,
+        [String(days)],
+    ).catch(() => null);
+    const namedCount = named?.n || 0;
+
+    return {
+        ok: true,
+        days,
+        total: round2(imageUsd + textUsd),
+        images: {
+            usd: round2(imageUsd),
+            requests: imageRequests,
+            avgTokens: imageRequests ? Math.round((items.get("gpt-image-1 image, output")?.qty || 0) / imageRequests) : 0,
+            perImageUsd: imageRequests ? Math.round((imageUsd / imageRequests) * 1000) / 1000 : 0,
+            named: namedCount,
+            // Billed but no longer on disk: rerolls, refusals, and art a later regeneration replaced.
+            unaccounted: Math.max(0, imageRequests - namedCount),
+            tierReference: IMG_TIER_TOKENS,
+        },
+        text: {
+            usd: round2(textUsd),
+            requests: textRequests,
+            byModel: [...models].filter(([m]) => !m.startsWith("gpt-image-1"))
+                .map(([model, v]) => ({
+                    model,
+                    requests: v.requests,
+                    tokensIn: v.tokensIn,
+                    tokensOut: v.tokensOut,
+                    usd: round2([...items].filter(([k]) => k.startsWith(model.split("-20")[0])).reduce((s, [, x]) => s + x.usd, 0)),
+                }))
+                .sort((a, b) => b.usd - a.usd),
+        },
+        daily: [...imageDays].sort().map(([date, v]) => ({
+            date,
+            requests: v.requests,
+            avgTokens: v.requests ? Math.round(v.tokensOut / v.requests) : 0,
+            tier: tierFor(v.requests ? v.tokensOut / v.requests : 0),
+            usd: round2(v.tokensOut * (40 / 1e6)),
+        })),
+        lineItems: [...items].filter(([, v]) => v.usd >= 0.005)
+            .map(([k, v]) => ({ item: k, usd: round2(v.usd), tokens: v.qty }))
+            .sort((a, b) => b.usd - a.usd),
+    };
+}

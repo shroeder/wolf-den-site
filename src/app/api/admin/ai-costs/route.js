@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getAiCosts } from "@/lib/marketplace/openai-usage.js";
+import { getAiCosts, getFullAccounting } from "@/lib/marketplace/openai-usage.js";
 import { listGenerations, listBatch, generationSummary } from "@/lib/marketplace/ai-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -27,6 +27,13 @@ export async function GET(request) {
             const url = new URL(request.url);
             const view = url.searchParams.get("view");
             const days = Math.max(1, Math.min(365, Number(url.searchParams.get("days")) || 30));
+
+            // Where the money actually went, end to end — dollars AND request counts, so image spend reads as
+            // "2,038 generations at $0.056 each" instead of "$111 of output tokens".
+            if (view === "audit") {
+                const data = await getFullAccounting({ days: Math.min(90, days) });
+                return NextResponse.json(data, { status: data.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
+            }
 
             if (view === "batch") {
                 const id = url.searchParams.get("id");

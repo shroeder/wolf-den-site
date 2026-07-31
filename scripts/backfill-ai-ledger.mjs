@@ -53,8 +53,8 @@ const JOBS = [
     ["mkt_town_art", "url", "updated_at", "marketplace/town", "medium", "1024x1024", "admin", "'Town art — ' || COALESCE(art_key,'?')", "art_key", null],
     ["mkt_farm_bg", "url", "created_at", "marketplace/farm-bg", "medium", "1536x1024", "member", "'Farm background'", "NULL", "buyer_id"],
     ["mkt_custom_deco", "chosen_url", "created_at", "marketplace/decorations/custom", "medium", "1024x1024", "creation", "'Creation — ' || COALESCE(name,'?')", "name", "buyer_id"],
-    ["boss_event", "image_url", null, "marketplace/boss", "medium", "1024x1024", "admin", "'Boss — ' || COALESCE(name,'?')", "name", null],
-    ["boss_event", "background_url", null, "marketplace/boss-bg", "medium", "1536x1024", "admin", "'Boss background — ' || COALESCE(name,'?')", "name", null],
+    ["boss_event", "image_url", "started_at", "marketplace/boss", "medium", "1024x1024", "admin", "'Boss — ' || COALESCE(name,'?')", "name", null],
+    ["boss_event", "background_url", "started_at", "marketplace/boss-bg", "medium", "1536x1024", "admin", "'Boss background — ' || COALESCE(name,'?')", "name", null],
     ["mkt_buyer", "avatar_sprite_url", "avatar_sprite_at", "marketplace/sprite", "medium", "1024x1024", "member", "'Hero sprite'", "NULL", "id"],
 ];
 
@@ -96,11 +96,13 @@ for (const [table, col, dateCol, source, quality, size, origin, labelSql, subjec
         await sql.query(
             `INSERT INTO mkt_ai_generation
                 (created_at, model, size, quality, source, label, subject, url, origin, batch_id, batch_label,
-                 buyer_id, buyer_label, ok, cost_usd, cost_basis)
-             VALUES (COALESCE($1, now()), 'gpt-image-1', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, TRUE, $13, 'estimated')
+                 buyer_id, buyer_label, ok, cost_usd, cost_basis, date_known)
+             VALUES (COALESCE($1, now()), 'gpt-image-1', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, TRUE, $13, 'estimated', $14)
              ON CONFLICT (url) DO NOTHING`,
+            // date_known is FALSE when the source table had nothing to tell us. now() is only a placeholder to
+            // keep the column non-null; the app reads date_known, not the timestamp, to decide what to show.
             [r.created_at, size, quality, source, r.label, r.subject, r.url, origin, batchId,
-                `Existing ${source.split("/").pop()} art`, r.buyer_id || null, label, c],
+                `Existing ${source.split("/").pop()} art`, r.buyer_id || null, label, c, r.created_at != null],
         ).catch((e) => {
             // Do NOT swallow. A silent catch here already once reported "backfilled 1345 rows" while inserting
             // nothing, because ON CONFLICT couldn't match a partial index.

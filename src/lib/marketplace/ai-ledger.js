@@ -149,6 +149,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
              COUNT(*)::int AS n,
              SUM(cost_usd) AS cost,
              COUNT(*) FILTER (WHERE NOT ok)::int AS failed,
+             BOOL_AND(date_known) AS date_known,
              MIN(kind) AS kind,
              MIN(origin) AS origin,
              MIN(batch_label) AS batch_label,
@@ -179,6 +180,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
         costUsd: Math.round(num(r.cost) * 100000) / 100000,
         startedAt: r.started_at,
         endedAt: r.ended_at,
+        dateKnown: r.date_known !== false,
         kind: r.kind,
         origin: r.origin,
         batchLabel: r.batch_label,
@@ -198,7 +200,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
 /** Every individual generation inside one batch, oldest first — the order they were drawn. */
 export async function listBatch(batchId, { limit = 500 } = {}) {
     const rows = await db.query(
-        `SELECT id, created_at, label, subject, source, quality, size, url, ok, error, cost_usd, cost_basis,
+        `SELECT id, created_at, date_known, label, subject, source, quality, size, url, ok, error, cost_usd, cost_basis,
                 buyer_label, prompt
          FROM mkt_ai_generation WHERE batch_id = $1 ORDER BY created_at ASC, id ASC LIMIT $2`,
         [batchId, Math.max(1, Math.min(2000, limit))],
@@ -206,7 +208,7 @@ export async function listBatch(batchId, { limit = 500 } = {}) {
     return (rows || []).map((r) => ({
         id: Number(r.id), createdAt: r.created_at, label: r.label, subject: r.subject,
         source: r.source, sourceLabel: sourceLabel(r.source), quality: r.quality, size: r.size,
-        url: r.url, thumbUrl: thumbFor(r.url), ok: r.ok, error: r.error,
+        url: r.url, thumbUrl: thumbFor(r.url), ok: r.ok, error: r.error, dateKnown: r.date_known !== false,
         costUsd: Math.round(num(r.cost_usd) * 100000) / 100000, estimated: r.cost_basis === "estimated",
         buyerLabel: r.buyer_label, prompt: r.prompt,
     }));
