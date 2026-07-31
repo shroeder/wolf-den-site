@@ -37,7 +37,7 @@
     "crons": [
         {
             "path": "/api/jobs/town-hours",
-            "schedule": "*/30 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/consignment-nightly-reports",
@@ -61,27 +61,27 @@
         },
         {
             "path": "/api/jobs/avatar-sprites",
-            "schedule": "*/30 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/leaderboard-badges",
-            "schedule": "17 * * * *"
+            "schedule": "0 * * * *"
         },
         {
             "path": "/api/jobs/boss-auto-tick",
-            "schedule": "*/10 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/boss-art",
-            "schedule": "7 * * * *"
+            "schedule": "0 * * * *"
         },
         {
             "path": "/api/jobs/sailing-arrivals",
-            "schedule": "*/15 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/inventory-feed",
-            "schedule": "*/15 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/marketplace-missions",
@@ -93,7 +93,7 @@
         },
         {
             "path": "/api/jobs/marketplace-square-sync",
-            "schedule": "15 * * * *"
+            "schedule": "0 * * * *"
         },
         {
             "path": "/api/jobs/daily-strike-nudge",
@@ -101,7 +101,7 @@
         },
         {
             "path": "/api/jobs/crops-ready",
-            "schedule": "*/20 * * * *"
+            "schedule": "0,30 * * * *"
         },
         {
             "path": "/api/jobs/recap-digest",
@@ -109,7 +109,7 @@
         },
         {
             "path": "/api/jobs/timeclock-reminders",
-            "schedule": "*/10 * * * *"
+            "schedule": "0,30 * * * *"
         }
     ]
 }
