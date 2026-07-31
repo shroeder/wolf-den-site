@@ -179,7 +179,11 @@ export async function detectFacing(bufferOrUrl) {
         if (answer.includes("right") && !answer.includes("left")) return "right";
         return "unknown";
     };
-    const votes = await Promise.all([askOnce(), askOnce(), askOnce()]);
+    // ONE call, not three. The majority vote existed to stabilise a coin-flip, but measuring it against 452
+    // already-labelled sprites showed the extra two calls weren't buying correctness — the labels are wrong on
+    // clearly directional creatures and meaningless on symmetrical ones. Paying triple for that isn't a
+    // trade-off, it's just triple. Left as a manual admin tool; nothing calls it on a schedule any more.
+    const votes = [await askOnce()];
     const left = votes.filter((v) => v === "left").length;
     const right = votes.filter((v) => v === "right").length;
     if (left > right) return "left";

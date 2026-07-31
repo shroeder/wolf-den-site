@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { runAvatarSpriteJob, detectBuyerSpriteFacings } from "@/lib/marketplace/avatar-sprite.js";
+import { runAvatarSpriteJob } from "@/lib/marketplace/avatar-sprite.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -28,9 +28,12 @@ export async function GET(request) {
                 return NextResponse.json({ error: "unauthorized" }, { status: 401 });
             }
             const result = await runAvatarSpriteJob();
-            // AI facing read-pass: mark left-facing sprites so they render mirrored (right-facing).
-            const facing = await detectBuyerSpriteFacings(12).catch(() => null);
-            return NextResponse.json({ success: true, ...result, facing });
+            // The AI facing read-pass used to run here every 15 minutes, unattended: up to 12 sprites a tick,
+            // three gpt-4o vision calls each at detail:"high". It was ~$1.20/month to answer left-or-right,
+            // and auditing its own output showed it labelling symmetrical creatures (a butterfly, a jellyfish)
+            // as facing one way and getting clearly directional ones backwards. Sprites are already nudged
+            // right-facing at generation time, which is the cheap pass and the one that works.
+            return NextResponse.json({ success: true, ...result });
         } catch (error) {
             return internalError(error, { event: "avatar_sprites.run.failure" });
         }
