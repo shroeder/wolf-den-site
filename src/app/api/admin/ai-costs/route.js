@@ -52,15 +52,27 @@ export async function GET(request) {
                 const [summary, entries, real, daily, realDaily] = await Promise.all([
                     generationSummary({ days }),
                     listGenerations({ days, limit, origin }),
-                    getAiCosts({ days: Math.min(90, days) }).catch(() => ({ ok: false })),
+                    getFullAccounting({ days: Math.min(90, days) }).catch(() => ({ ok: false })),
                     dailyTotals({ days }),
                     realDailyCost({ days }).catch(() => ({})),
                 ]);
                 const openaiTotal = real?.ok ? Number(real.total || 0) : null;
+                // Split the difference into what it's actually made of, so "unaccounted" is never a mystery
+                // bucket. It reconciles to the cent:
+                //   images billed - images we can still name = draws that no longer exist (rerolls, refusals,
+                //                                             and art a later pass overwrote)
+                //   text / vision                            = never reconstructable; no artefact is left behind
+                const imgUsd = Number(real?.images?.usd) || 0;
+                const txtUsd = Number(real?.text?.usd) || 0;
+                const imgReq = Number(real?.images?.requests) || 0;
+                const imgNamed = Number(real?.images?.named) || 0;
                 const reconcile = openaiTotal == null ? null : {
                     openaiTotal: Math.round(openaiTotal * 100) / 100,
                     ledgerTotal: summary.costUsd,
                     unattributed: Math.round(Math.max(0, openaiTotal - summary.costUsd) * 100) / 100,
+                    lostDrawsUsd: imgUsd ? Math.round(Math.max(0, imgUsd - summary.costUsd) * 100) / 100 : null,
+                    lostDraws: Math.max(0, imgReq - imgNamed),
+                    textUsd: txtUsd ? Math.round(txtUsd * 100) / 100 : null,
                     // Capped at 90 by the costs API, so say so rather than silently comparing unlike windows.
                     windowDays: Math.min(90, days),
                     windowMatches: days <= 90,
