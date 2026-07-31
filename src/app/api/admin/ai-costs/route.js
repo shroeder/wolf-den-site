@@ -37,11 +37,26 @@ export async function GET(request) {
             if (view === "history") {
                 const origin = url.searchParams.get("origin") || null;
                 const limit = Math.max(1, Math.min(500, Number(url.searchParams.get("limit")) || 200));
-                const [summary, entries] = await Promise.all([
+                // Pull OpenAI's own total for the SAME window and hand back both, plus the difference.
+                // The ledger only knows what it was there to see: art generated before it existed was
+                // reconstructed from what survived, and a sprite that was drawn five times and overwritten
+                // four leaves exactly one row. Showing the ledger total alone would quietly understate the
+                // bill, which is the opposite of the point. Name the gap instead of hiding it.
+                const [summary, entries, real] = await Promise.all([
                     generationSummary({ days }),
                     listGenerations({ days, limit, origin }),
+                    getAiCosts({ days: Math.min(90, days) }).catch(() => ({ ok: false })),
                 ]);
-                return NextResponse.json({ ok: true, days, summary, entries }, { headers: { "Cache-Control": "no-store" } });
+                const openaiTotal = real?.ok ? Number(real.total || 0) : null;
+                const reconcile = openaiTotal == null ? null : {
+                    openaiTotal: Math.round(openaiTotal * 100) / 100,
+                    ledgerTotal: summary.costUsd,
+                    unattributed: Math.round(Math.max(0, openaiTotal - summary.costUsd) * 100) / 100,
+                    // Capped at 90 by the costs API, so say so rather than silently comparing unlike windows.
+                    windowDays: Math.min(90, days),
+                    windowMatches: days <= 90,
+                };
+                return NextResponse.json({ ok: true, days, summary, entries, reconcile }, { headers: { "Cache-Control": "no-store" } });
             }
 
             const data = await getAiCosts({ days: Math.min(90, days) });

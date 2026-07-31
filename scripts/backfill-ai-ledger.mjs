@@ -20,7 +20,7 @@
  *   node scripts/backfill-ai-ledger.mjs           # dry run
  *   node scripts/backfill-ai-ledger.mjs --apply
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
 const APPLY = process.argv.includes("--apply");
@@ -101,6 +101,44 @@ for (const [table, col, dateCol, source, quality, size, origin, labelSql, subjec
             if (!failures.length) console.log(`  ! insert failed: ${e.message}`);
             failures.push(e.message);
         });
+    }
+}
+
+// ── Art generated straight to DISK ────────────────────────────────────────────────────────────────────────
+// The gen-*.mjs scripts write into public/images/ and never touch the database, so the table walk above cannot
+// see them at all — 145 files, and among the most expensive art we own, because every one of those scripts
+// asked for "high" at the time it ran. Priced per directory from the script that produced it.
+const DISK = [
+    ["public/images/sailing", "1536x1024", "high", "gen-sailing-art", "Sailing art"],
+    ["public/images/fish", "1024x1024", "high", "gen-fish-sprites", "Fish sprite"],
+    ["public/images/nav", "1024x1024", "high", "gen-nav-icons", "Nav icon"],
+    ["public/images/spin", "1024x1024", "high", "gen-spin-art", "Spin art"],
+];
+const IMG_RE = /\.(png|webp|jpg)$/i;
+for (const [dir, size, quality, script, label] of DISK) {
+    let files;
+    try {
+        files = readdirSync(dir, { recursive: true, withFileTypes: true })
+            .filter((f) => f.isFile() && IMG_RE.test(f.name))
+            .map((f) => f.name);
+    } catch { continue; }
+    if (!files.length) continue;
+    const c = cost(size, quality);
+    console.log(`  ${dir.padEnd(34)} ${String(files.length).padStart(4)} × $${c.toFixed(3)} = $${(files.length * c).toFixed(2)}  [${quality}]`);
+    planned += files.length;
+    plannedCost += files.length * c;
+    if (!APPLY) continue;
+    for (const name of files) {
+        const subject = name.replace(IMG_RE, "");
+        // Keyed on a file: URL so a re-run stays idempotent the same way the blob-backed rows are.
+        await sql.query(
+            `INSERT INTO mkt_ai_generation
+                (model, size, quality, source, label, subject, url, origin, batch_id, batch_label, ok, cost_usd, cost_basis)
+             VALUES ('gpt-image-1',$1,$2,$3,$4,$5,$6,'batch',$7,$8,TRUE,$9,'estimated')
+             ON CONFLICT (url) DO NOTHING`,
+            [size, quality, `script/${script}`, `${label} — ${subject}`, subject,
+                `file:${dir}/${name}`, `backfill:${script}`, script, c],
+        ).catch((e) => { failures.push(e.message); });
     }
 }
 
