@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAccountLinkedVendorId, getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { listDmThreads } from "@/lib/marketplace/dm.js";
-import { listThreadsForBuyer, listThreadsForVendor } from "@/lib/marketplace/messaging.js";
+import { listThreadsForBuyer } from "@/lib/marketplace/messaging.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -20,10 +20,11 @@ export async function GET() {
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
 
             const vendorId = await getAccountLinkedVendorId(buyer.id);
-            const [dms, buyerThreads, vendorThreads] = await Promise.all([
+            // Only threads the member is a PARTY to as a buyer. Shop-inbound threads live in the vendor
+            // portal — see the note below.
+            const [dms, buyerThreads] = await Promise.all([
                 listDmThreads(buyer.id),
                 listThreadsForBuyer(buyer.id),
-                vendorId ? listThreadsForVendor(vendorId) : Promise.resolve([]),
             ]);
 
             const items = [
@@ -49,16 +50,12 @@ export async function GET() {
                     href: `/marketplace/dm/${t.id}`,
                     tag: "Shop",
                 })),
-                ...vendorThreads.map((t) => ({
-                    kind: "vendor",
-                    id: t.id,
-                    name: t.counterpartName,
-                    preview: t.lastPreview,
-                    at: t.lastMessageAt,
-                    unread: t.unread,
-                    href: "/marketplace/portal?tab=messages",
-                    tag: "Your shop",
-                })),
+                // Threads where YOU are the vendor are deliberately NOT here. They were, tagged "Your shop", but
+                // their href pointed at the portal's messages TAB rather than the conversation — so tapping one
+                // navigated away and showed nothing readable, which is a worse outcome than not listing it.
+                // They belong in the vendor portal, which is built for them (product context, quote flow,
+                // dealer tools) and already pushes a notification when one arrives. Listing them twice, with
+                // the copy in Social being the broken one, helped nobody.
             ].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
 
             return noStore({ items, isVendor: Boolean(vendorId) });
