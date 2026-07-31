@@ -114,6 +114,10 @@
         {
             "path": "/api/jobs/reminders",
             "schedule": "5 * * * *"
+        },
+        {
+            "path": "/api/jobs/cash-refunds",
+            "schedule": "20 */4 * * *"
         }
     ]
 }
