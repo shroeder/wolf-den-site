@@ -11,6 +11,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { housePrompt, SMALL_ICON_EXTRA } from "../src/lib/marketplace/art-style.js";
+import { startBatch } from "./lib/ai-log.mjs";
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
@@ -57,6 +58,8 @@ const want = process.argv.slice(2);
 const todo = Object.keys(FISH).filter((k) => (want.length ? want.includes(k) : !fs.existsSync(path.join(OUT, `${k}.png`))));
 if (!todo.length) { console.log("nothing to do"); process.exit(0); }
 console.log(`generating ${todo.length} fish sprites`);
+// Group this whole run under one entry in the AI Costs history instead of N loose rows.
+const batch = startBatch("gen-fish-sprites");
 
 async function one(k) {
     const prompt = housePrompt(FISH[k], { extra: `${POSE} ${SMALL_ICON_EXTRA}` });
@@ -65,7 +68,8 @@ async function one(k) {
             const resp = await fetch("https://api.openai.com/v1/images/generations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", // "high" is 4x the price and vanishes in the downscale below — see art-style.js, n: 1 }),
+                // medium, not high: "high" is ~4x the price and the extra detail dies in the downscale (see art-style.js).
+                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", n: 1 }),
             });
             if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
             const b64 = (await resp.json())?.data?.[0]?.b64_json;
@@ -73,9 +77,12 @@ async function one(k) {
             const file = path.join(OUT, `${k}.png`);
             fs.writeFileSync(file, await shrink(Buffer.from(b64, "base64")));
             console.log(`✓ ${k} (${Math.round(fs.statSync(file).size / 1024)}kb)`);
+            await batch.log({ subject: k, label: `Fish — ${k.replace(/^fish_/, "")}`, source: "marketplace/fish", quality: "medium", url: `file:${file}`, bytes: fs.statSync(file).size });
             return true;
         } catch (e) {
             console.log(`… ${k} attempt ${attempt}: ${e.message}`);
+            // Failed attempts are billed too, and they're the ones worth seeing in the history.
+            await batch.log({ subject: k, label: `Fish — ${k.replace(/^fish_/, "")} (attempt ${attempt})`, source: "marketplace/fish", quality: "medium", ok: false, error: e.message, url: null });
             if (attempt === 3) { console.log(`✗ ${k} GAVE UP`); return false; }
             await new Promise((r) => setTimeout(r, 4000 * attempt));
         }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { put } from "@vercel/blob";
+import { logGeneration } from "@/lib/marketplace/ai-ledger.js";
 import sharp from "sharp";
 
 // AI art generation via OpenAI's image model (gpt-image-1), stored to Vercel Blob. Reuses the same
@@ -208,7 +209,10 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai", opts = {})
     return storeImage(buffer, pathPrefix, opts);
 }
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null, deHalo = false } = {}) {
+// `meta` is the provenance the AI Costs history is built on — origin (batch/creation/member/cron/admin), the
+// batch it belongs to, and WHO caused it when a member did. Callers that pass nothing still get a costed row;
+// they just show up as "unknown", which is a gap worth seeing rather than a silent omission.
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -219,11 +223,17 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
+        // A refusal still costs input tokens and is the thing you most want to see in the history, so it is
+        // logged before the throw rather than disappearing into the caller's catch.
+        await logGeneration({ size, quality, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
         throw new Error(`OpenAI image ${resp.status}: ${text.slice(0, 300)}`);
     }
     const data = await resp.json().catch(() => null);
     const b64 = data?.data?.[0]?.b64_json;
-    if (!b64) throw new Error("OpenAI returned no image");
+    if (!b64) {
+        await logGeneration({ size, quality, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
+        throw new Error("OpenAI returned no image");
+    }
 
     let buffer = Buffer.from(b64, "base64");
     // Enforce a consistent right-facing orientation (e.g. pets/companions that fight toward the boss).
@@ -234,11 +244,13 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     // Downscale + WebP on the way out. `resizeTo` (callers that already asked for a smaller sprite, e.g.
     // badges at ~24px) still wins; everything else lands on the SPRITE_MAX_PX cap instead of shipping the raw
     // 1024px PNG. Transparency is preserved either way.
-    return storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SPRITE_MAX_PX });
+    const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SPRITE_MAX_PX });
+    await logGeneration({ size, quality, source: pathPrefix, prompt, url, ...meta });
+    return url;
 }
 
 // Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
-export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg" } = {}) {
+export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -256,7 +268,9 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     if (!b64) throw new Error("OpenAI returned no image");
     const buffer = Buffer.from(b64, "base64");
     // A backdrop is painted across the whole scene, so it keeps its resolution — only the encoding changes.
-    return storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
+    const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
+    await logGeneration({ size: "1536x1024", quality: "medium", source: pathPrefix, prompt, url, ...meta });
+    return url;
 }
 
 // TRUE wide scene via OUTPAINTING — generate a base tile, then extend it RIGHT step-by-step by feeding the real

@@ -54,7 +54,8 @@ for (const job of JOBS) {
     try {
         const resp = await fetch("https://api.openai.com/v1/images/generations", {
             method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: "gpt-image-1", prompt: job.prompt, size: job.size, background: "transparent", quality: "medium", // "high" is 4x the price and vanishes in the downscale below — see art-style.js, n: 1 }),
+            // medium, not high: "high" is ~4x the price and the extra detail dies in the downscale (see art-style.js).
+            body: JSON.stringify({ model: "gpt-image-1", prompt: job.prompt, size: job.size, background: "transparent", quality: "medium", n: 1 }),
         });
         if (!resp.ok) { console.error(`✗ ${job.out}: ${resp.status} ${(await resp.text()).slice(0, 160)}`); continue; }
         const b64 = (await resp.json())?.data?.[0]?.b64_json;

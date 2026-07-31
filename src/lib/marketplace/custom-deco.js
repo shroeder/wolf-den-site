@@ -47,11 +47,18 @@ function classifyGenError(err) {
     return { reason, raw };
 }
 
+// The member behind a creation, snapshotted by handle so the cost history still reads correctly after a rename.
+async function creationActor(buyerId) {
+    const b = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const label = b?.alias ? `@${b.alias}` : (b?.display_name || null);
+    return { buyerId, buyerLabel: label };
+}
+
 // Draw a single option (the whole flow is one-at-a-time now). Returns { urls:[{url,attempt}], error } — on any
 // failure/refusal `urls` is empty and `error` carries a member-friendly reason + the raw OpenAI text (for admins).
-async function genOne(prompt, attempt) {
+async function genOne(prompt, attempt, meta = {}) {
     try {
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true });
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
         if (url) return { urls: [{ url, attempt }], error: null };
         return { urls: [], error: classifyGenError(new Error("OpenAI returned no image")) };
     } catch (e) {
@@ -100,7 +107,11 @@ export async function startCustomDeco(buyerId, name, prompt) {
     if (!free) await logCreationLedger(buyerId, -1, { source: "spend_deco", actorId: buyerId, actorLabel: "self", balanceAfter: paid.custom_deco_credits, meta: { name: nm } });
     const row = await db.queryOne(`INSERT INTO mkt_custom_deco (buyer_id, name, prompt) VALUES ($1, $2, $3) RETURNING id`, [buyerId, nm, desc]).catch(() => null);
     if (!row) { if (!free) { await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); await logCreationLedger(buyerId, 1, { source: "refund_deco", actorId: "system", actorLabel: "system", meta: { reason: "db_error" } }); } return { ok: false, error: "db" }; }
-    const gen = await genOne(await buildPrompt(desc), 1);
+    // Creation tokens are the one place a MEMBER spends our OpenAI money, so every draw is attributed to them
+    // by name — that's the "who" the AI Costs history exists to answer. Attempts 2-4 are free to the member but
+    // are NOT free to us, so each redraw is logged the same way.
+    const who = await creationActor(buyerId);
+    const gen = await genOne(await buildPrompt(desc), 1, { origin: "creation", subject: nm, label: `Creation — ${nm}`, ...who });
     if (!gen.urls.length) {
         if (!free) {
             await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); // refund
@@ -123,7 +134,10 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const row = await db.queryOne(`SELECT * FROM mkt_custom_deco WHERE id = $1 AND buyer_id = $2 AND status = 'drafting'`, [Number(id), buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_found" };
     if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "no_attempts", draft: mapDraft(row) };
-    const gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1);
+    const who = await creationActor(buyerId);
+    const gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1, {
+        origin: "creation", subject: row.name, label: `Creation redraw ${row.attempts + 1} — ${row.name}`, ...who,
+    });
     if (!gen.urls.length) {
         await db.query(`UPDATE mkt_custom_deco SET last_error = $2, updated_at = NOW() WHERE id = $1`, [Number(id), gen.error?.raw || null]).catch(() => {});
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null, draft: mapDraft(row) };
