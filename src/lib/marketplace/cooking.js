@@ -49,34 +49,110 @@ export const TIERS = [
 ];
 export const tierMeta = (t) => TIERS[Math.max(0, Math.min(TIERS.length - 1, (Number(t) || 1) - 1))];
 
-// ── RECIPES ──────────────────────────────────────────────────────────────────────────────────────────────────
-// `need` is { crop|fish ref → qty }. Kept deliberately readable: a recipe should look like food, not a formula.
-const R = (id, name, emoji, tier, need, flavor) => ({ id, name, emoji, tier, need, flavor });
+// ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
+// The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
+// isn't "own three rare things", it's a chain you had to build. They live in the same pantry as everything else
+// (kind 'prep'), which means one inventory, one screen and one set of rules rather than a parallel system.
+export const PREPS = {
+    p_flour:     { name: "Stoneground Flour", rarity: "common" },
+    p_dough:     { name: "Risen Dough",       rarity: "common" },
+    p_butter:    { name: "Churned Butter",    rarity: "common" },
+    p_stock:     { name: "Fish Stock",        rarity: "common" },
+    p_jam:       { name: "Berry Jam",         rarity: "rare" },
+    p_syrup:     { name: "Golden Syrup",      rarity: "rare" },
+    p_puree:     { name: "Pumpkin Puree",     rarity: "rare" },
+    p_wine:      { name: "Dark Wine",         rarity: "rare" },
+    p_smoked:    { name: "Smoked Fillet",     rarity: "epic" },
+    p_roe:       { name: "Cured Roe",         rarity: "epic" },
+    p_essence:   { name: "Star Essence",      rarity: "legendary" },
+    p_leviathan: { name: "Leviathan Marrow",  rarity: "legendary" },
+};
+export const prepMeta = (id) => PREPS[id] || null;
+
+// ── RECIPES ──────────────────────────────────────────────────────────────────────────────────────────────
+// `need` is { ref → qty } over crops, fish and preps alike. A recipe is either a PREP (output goes back to the
+// pantry as an ingredient) or a DISH (output is a consumable rolled from the tier's pool).
+const R = (id, name, tier, need, flavor) => ({ id, name, tier, need, flavor, kind: "dish" });
+const P = (id, name, tier, need, out, flavor) => ({ id, name, tier, need, out, flavor, kind: "prep" });
+
 export const RECIPES = [
-    // T1 — everyday stuff you can make from the common rows.
-    R("r_porridge",   "Morning Porridge",   "🥣", 1, { wheat: 2 },                          "What the pack eats before a long day."),
-    R("r_roast_roots","Roasted Roots",      "🥕", 1, { carrot: 2, potato: 1 },              "Sweet, charred at the edges."),
-    R("r_mash",       "Buttered Mash",      "🥔", 1, { potato: 3 },                         "Comfort, in a bowl."),
-    R("r_flatbread",  "Camp Flatbread",     "🫓", 1, { wheat: 3 },                          "Cooked on a stone by the fire."),
-    // T2 — a rare crop, or the sea.
-    R("r_fish_stew",  "Fisherman's Stew",   "🍲", 2, { fish_sardine: 2, potato: 1 },        "Everything that didn't sell, in one pot."),
-    R("r_berry_tart", "Berry Tart",         "🥧", 2, { strawberry: 2, wheat: 2 },           "Worth burning your mouth for."),
-    R("r_corn_chowder","Corn Chowder",      "🥘", 2, { corn: 2, potato: 2 },                "Thick enough to stand a spoon in."),
-    R("r_grilled_perch","Grilled Perch",    "🐟", 2, { fish_perch: 2, wheat: 1 },           "Salt, fire, nothing else."),
-    // T3 — proper cooking.
-    R("r_harvest_pie","Harvest Pie",        "🥧", 3, { pumpkin: 2, wheat: 2, carrot: 1 },   "The whole field, baked."),
-    R("r_crab_boil",  "Crab Boil",          "🦀", 3, { fish_crab: 3, corn: 1, potato: 1 },  "Eaten with your hands, at a long table."),
-    R("r_grape_glaze","Glazed Roast",       "🍇", 3, { grape: 3, potato: 2 },               "Sticky, dark and slightly boozy."),
-    R("r_squid_ink",  "Squid Ink Supper",   "🦑", 3, { fish_squid: 2, wheat: 2 },           "Black as a moonless tide."),
-    // T4 — a feast dish. Needs something rare AND something from the water.
-    R("r_lobster",    "Buttered Lobster",   "🦞", 4, { fish_lobster: 2, wheat: 2, grape: 1 }, "The reason people row out in bad weather."),
-    R("r_gold_pie",   "Golden Apple Pie",   "🍎", 4, { goldenapple: 2, wheat: 3 },          "They say it's good for the heart."),
-    R("r_surf_turf",  "Surf and Turf",      "🍖", 4, { fish_octopus: 1, pumpkin: 2, corn: 2 }, "Two whole days of work on one plate."),
-    // T5 — the ones you save for.
-    R("r_starfruit",  "Starfruit Ambrosia", "🌟", 5, { starfruit: 2, goldenapple: 1, grape: 2 }, "Sweet enough that pets forget themselves."),
-    R("r_leviathan",  "Leviathan Roast",    "🐋", 5, { fish_manta: 1, starfruit: 1, pumpkin: 2 }, "It took four of you to carry it in."),
-    R("r_stormpot",   "Storm Pot",          "⚡", 5, { fish_stormpike: 1, fish_swordfish: 1, corn: 3 }, "It crackles. Nobody is sure why."),
+    // ═══ PREP · turn raw stuff into cooking ingredients ═══
+    P("k_flour",   "Mill the Wheat",     1, { wheat: 3 },                        "p_flour",     "Slow work, and the whole room smells of it."),
+    P("k_dough",   "Prove the Dough",    1, { p_flour: 2 },                      "p_dough",     "Leave it by the fire and wait."),
+    P("k_butter",  "Churn the Butter",   1, { corn: 2, wheat: 1 },               "p_butter",    "Your arm aches long before it turns."),
+    P("k_stock",   "Simmer a Stock",     1, { fish_sardine: 2, carrot: 1 },      "p_stock",     "The bones give up everything eventually."),
+    P("k_jam",     "Set the Jam",        2, { strawberry: 4 },                   "p_jam",       "Skim the foam or it goes cloudy."),
+    P("k_syrup",   "Reduce the Syrup",   2, { goldenapple: 2, corn: 1 },         "p_syrup",     "Thick, amber, and dangerously hot."),
+    P("k_puree",   "Roast the Pumpkin",  2, { pumpkin: 3 },                      "p_puree",     "Blackened skin, sweet middle."),
+    P("k_wine",    "Press the Grapes",   2, { grape: 5 },                        "p_wine",      "Six months in the dark, and worth it."),
+    P("k_smoked",  "Smoke the Fillet",   3, { fish_tuna: 1, wheat: 2 },          "p_smoked",    "Two days over green wood."),
+    P("k_roe",     "Cure the Roe",       3, { fish_snapper: 2, fish_perch: 2 },  "p_roe",       "Salt, patience, a cold cellar."),
+    P("k_essence", "Distil the Star",    4, { starfruit: 3 },                    "p_essence",   "It hums faintly against the glass."),
+    P("k_marrow",  "Render the Marrow",  4, { fish_whale: 1, fish_kraken: 1 },   "p_leviathan", "Nobody agrees on how it should be done."),
+
+    // ═══ TIER 1 · Simple ═══
+    R("r_porridge",    "Morning Porridge",   1, { wheat: 2 },                     "What the pack eats before a long day."),
+    R("r_mash",        "Buttered Mash",      1, { potato: 3, p_butter: 1 },       "Comfort, in a bowl."),
+    R("r_flatbread",   "Camp Flatbread",     1, { p_dough: 1 },                   "Cooked on a stone by the fire."),
+    R("r_roast_roots", "Roasted Roots",      1, { carrot: 2, potato: 1 },         "Sweet, charred at the edges."),
+    R("r_carrot_soup", "Carrot Soup",        1, { carrot: 3, p_stock: 1 },        "Orange enough to feel medicinal."),
+    R("r_corn_bread",  "Skillet Cornbread",  1, { corn: 2, p_flour: 1 },          "Crisp bottom, soft middle."),
+    R("r_boiled_crab", "Boiled Rock Crab",   1, { fish_crab: 2 },                 "Ten minutes, no ceremony."),
+    R("r_sardines",    "Salt Sardines",      1, { fish_sardine: 3 },              "Eaten standing up, off the dock."),
+    R("r_potato_cake", "Potato Cakes",       1, { potato: 2, p_flour: 1 },        "Fried in whatever's left in the pan."),
+    R("r_perch_fry",   "Pan-Fried Perch",    1, { fish_perch: 2, p_butter: 1 },   "Salt, fire, nothing else."),
+
+    // ═══ TIER 2 · Hearty ═══
+    R("r_fish_stew",   "Fisherman's Stew",   2, { p_stock: 1, potato: 2, fish_mackerel: 1 }, "Everything that didn't sell, in one pot."),
+    R("r_berry_tart",  "Berry Tart",         2, { p_jam: 1, p_dough: 1 },         "Worth burning your mouth for."),
+    R("r_corn_chowder","Corn Chowder",       2, { corn: 3, potato: 2, p_stock: 1 }, "Thick enough to stand a spoon in."),
+    R("r_squid_ink",   "Squid Ink Supper",   2, { fish_squid: 2, p_dough: 1 },    "Black as a moonless tide."),
+    R("r_shrimp_pot",  "Prawn Pot",          2, { fish_shrimp: 3, p_butter: 1 },  "Gone in about four minutes."),
+    R("r_puffer",      "Careful Pufferfish", 2, { fish_pufferfish: 2, carrot: 1 }, "Prepared by someone who knows. Hopefully."),
+    R("r_snapper_bake","Baked Snapper",      2, { fish_snapper: 2, p_butter: 1 }, "Whole, with the skin left crisp."),
+    R("r_harvest_hash","Harvest Hash",       2, { potato: 2, corn: 2, carrot: 2 }, "Whatever came out of the ground that day."),
+    R("r_jam_roll",    "Jam Roly-Poly",      2, { p_jam: 1, p_flour: 2 },         "Heavy, sweet, and entirely unreasonable."),
+    R("r_moon_broth",  "Moonfish Broth",     2, { fish_moonfish: 1, p_stock: 1 }, "Pale, and faintly luminous."),
+    R("r_pumpkin_soup","Pumpkin Soup",       2, { p_puree: 1, p_butter: 1 },      "The bowl everyone comes back for."),
+    R("r_octo_grill",  "Grilled Octopus",    2, { fish_octopus: 1, p_wine: 1 },   "Charred tentacle, lemon, done."),
+
+    // ═══ TIER 3 · Fine ═══
+    R("r_harvest_pie", "Harvest Pie",        3, { p_puree: 1, p_dough: 1, carrot: 2 }, "The whole field, baked."),
+    R("r_crab_boil",   "Crab Boil",          3, { fish_crab: 4, corn: 2, potato: 2 }, "Eaten with your hands, at a long table."),
+    R("r_grape_glaze", "Glazed Roast",       3, { p_wine: 1, potato: 3 },         "Sticky, dark and slightly boozy."),
+    R("r_lobster_roll","Lobster Roll",       3, { fish_lobster: 1, p_dough: 1, p_butter: 1 }, "Cold claw, warm bun, too much butter."),
+    R("r_smoked_plate","Smokehouse Plate",   3, { p_smoked: 1, p_dough: 1 },      "Best eaten leaning against something."),
+    R("r_stormpike",   "Storm Pike Skewers", 3, { fish_stormpike: 1, corn: 2 },   "It sparks when the fat hits the fire."),
+    R("r_angler_stew", "Anglerfish Stew",    3, { fish_anglerfish: 1, p_stock: 1, potato: 2 }, "Ugly thing. Extraordinary broth."),
+    R("r_sword_steak", "Swordfish Steak",    3, { fish_swordfish: 1, p_butter: 1, carrot: 1 }, "Cut thick, cooked pink."),
+    R("r_wine_braise", "Wine-Braised Roots", 3, { p_wine: 1, carrot: 3, potato: 2 }, "Four hours, barely any attention."),
+    R("r_syrup_cake",  "Golden Syrup Cake",  3, { p_syrup: 1, p_flour: 2, p_butter: 1 }, "Sticks to the roof of your mouth."),
+    R("r_tuna_loin",   "Seared Bluefin",     3, { fish_tuna: 1, p_roe: 1 },       "Thirty seconds a side and not a moment more."),
+    R("r_manta_wing",  "Manta Wing",         3, { fish_manta: 1, p_butter: 1 },   "Enormous, and gone by morning."),
+
+    // ═══ TIER 4 · Exquisite ═══
+    R("r_lobster",     "Buttered Lobster",   4, { fish_lobster: 2, p_butter: 2, p_wine: 1 }, "The reason people row out in bad weather."),
+    R("r_gold_pie",    "Golden Apple Pie",   4, { goldenapple: 2, p_dough: 1, p_syrup: 1 },  "They say it's good for the heart."),
+    R("r_surf_turf",   "Surf and Turf",      4, { fish_octopus: 1, p_puree: 1, corn: 3 },    "Two whole days of work on one plate."),
+    R("r_caviar",      "Cured Roe Service",  4, { p_roe: 2, p_dough: 1 },                    "Served on ice, in silence."),
+    R("r_shark_steak", "Great White Steak",  4, { fish_shark: 1, p_wine: 1, p_butter: 1 },   "You are, briefly, top of the food chain."),
+    R("r_dolphin",     "Ghost Dolphin Feast",4, { fish_dolphin: 1, p_syrup: 1, corn: 2 },    "Nobody's quite sure it was really there."),
+    R("r_marlin_grill","Black Marlin Grill", 4, { fish_marlin: 1, p_smoked: 1, potato: 3 },  "It fought for an hour. It lost."),
+    R("r_coelacanth",  "Coelacanth Confit",  4, { fish_coelacanth: 1, p_butter: 2 },         "Older than the town. Cooked anyway."),
+    R("r_royal_roast", "Royal Roast",        4, { p_wine: 2, p_puree: 1, goldenapple: 1 },   "For nights that deserve it."),
+    R("r_long_board",  "The Long Board",     4, { p_smoked: 2, p_jam: 1, p_dough: 2 },       "Put it in the middle and let people at it."),
+
+    // ═══ TIER 5 · Legendary ═══
+    R("r_starfruit",   "Starfruit Ambrosia", 5, { p_essence: 1, goldenapple: 2, p_syrup: 1 }, "Sweet enough that pets forget themselves."),
+    R("r_leviathan",   "Leviathan Roast",    5, { p_leviathan: 1, p_puree: 2, p_wine: 1 },    "It took four of you to carry it in."),
+    R("r_stormpot",    "Storm Pot",          5, { fish_stormpike: 2, fish_swordfish: 1, p_stock: 2 }, "It crackles. Nobody is sure why."),
+    R("r_kraken",      "Kraken Feast",       5, { fish_kraken: 1, p_wine: 2, p_butter: 2 },   "Served to the whole table, or not at all."),
+    R("r_whale",       "Sunlit Whale Course",5, { fish_whale: 1, p_essence: 1, p_smoked: 1 }, "A dish people will still mention next winter."),
+    R("r_fallen_star", "Fallen Star Plate",  5, { fish_starfish: 1, p_essence: 2 },           "It is still warm. It should not be."),
+    R("r_grand_feast", "The Grand Feast",    5, { p_leviathan: 1, p_essence: 1, p_roe: 1, p_wine: 2 }, "Everything you have, all at once."),
+    R("r_wolfs_table", "The Wolf's Table",   5, { p_smoked: 2, p_roe: 1, p_syrup: 1, goldenapple: 2 }, "The one the whole den turns up for."),
 ];
+
 export const recipeById = (id) => RECIPES.find((r) => r.id === id) || null;
 
 // Where a recipe can drop from. Weighted by tier so the good ones stay rare.
@@ -94,14 +170,33 @@ export function rollRecipe(known = []) {
 }
 
 // ── INGREDIENTS ──────────────────────────────────────────────────────────────────────────────────────────────
+// Everything resolves to a SPRITE, never an emoji. Raw ingredients reuse art the game already owns — crops from
+// mkt_town_art (`crop_<id>_ripe`), fish from the PNGs on disk — and only the prepped ingredients and the dishes
+// needed drawing. The emoji is carried purely as a last-resort fallback if a sprite row is ever missing.
 const cropMeta = (ref) => SEEDS[ref] || null;
 const fishMeta = (ref) => FISH.find((f) => f.id === ref) || null;
-export function ingredientMeta(ref) {
+export function ingredientMeta(ref, sprites = {}) {
+    const pr = PREPS[ref];
+    if (pr) return { ref, kind: "prep", name: pr.name, emoji: "🧂", rarity: pr.rarity, sprite: sprites[ref] || null };
     const c = cropMeta(ref);
-    if (c) return { ref, kind: "crop", name: c.name, emoji: c.emoji, rarity: c.rarity };
+    if (c) return { ref, kind: "crop", name: c.name, emoji: c.emoji, rarity: c.rarity, sprite: sprites[`crop:${ref}`] || null };
     const f = fishMeta(ref);
-    if (f) return { ref, kind: "fish", name: f.name, emoji: f.emoji, rarity: f.rarity };
-    return { ref, kind: "crop", name: ref, emoji: "❔", rarity: "common" };
+    if (f) return { ref, kind: "fish", name: f.name, emoji: f.emoji, rarity: f.rarity, sprite: `/images/fish/${f.id}.png` };
+    return { ref, kind: "crop", name: ref, emoji: "\u2753", rarity: "common", sprite: null };
+}
+
+/** Every sprite the Kitchen needs, in one read: cooking art keyed by ref, plus the crop art from the town. */
+async function cookingSprites() {
+    const [own, crops] = await Promise.all([
+        db.query(`SELECT ref, url FROM mkt_cooking_sprite`).catch(() => []),
+        db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'crop_%_ripe'`).catch(() => []),
+    ]);
+    const map = Object.fromEntries(own.map((r) => [r.ref, r.url]));
+    for (const c of crops) {
+        const id = String(c.art_key).replace(/^crop_/, "").replace(/_ripe$/, "");
+        map[`crop:${id}`] = c.url;
+    }
+    return map;
 }
 
 /** Add to the pantry. Called by the farm on harvest and by fishing on a landing. Best-effort, never throws. */
@@ -134,12 +229,16 @@ export async function learnRecipe(buyerId, recipeId = null) {
 // Cooking badges are granted at the moment they're earned rather than through the auto-rule sweep, which is
 // how fishing does it: the counters live on mkt_kitchen and mkt_recipe_known, not in getMemberMetrics, and
 // duplicating them there just to drive a rule would be two sources of truth for the same number.
-async function cookingBadges(buyerId) {
+async function cookingBadges(buyerId, ctx = {}) {
     const row = await db.queryOne(
         `SELECT (SELECT COALESCE(cooks_total,0) FROM mkt_kitchen WHERE buyer_id = $1)::int AS cooks,
                 (SELECT COALESCE(best_dish_tier,0) FROM mkt_kitchen WHERE buyer_id = $1)::int AS best,
                 (SELECT COUNT(*) FROM mkt_recipe_known WHERE buyer_id = $1)::int AS recipes,
-                (SELECT COALESCE(SUM(qty),0) FROM mkt_pantry WHERE buyer_id = $1)::int AS stock`,
+                (SELECT COALESCE(SUM(qty),0) FROM mkt_pantry WHERE buyer_id = $1)::int AS stock,
+                (SELECT COALESCE(preps_total,0) FROM mkt_kitchen WHERE buyer_id = $1)::int AS preps,
+                (SELECT COALESCE(tiers_cooked,0) FROM mkt_kitchen WHERE buyer_id = $1)::int AS tiers,
+                (SELECT COALESCE(best_quality,0) FROM mkt_kitchen WHERE buyer_id = $1) AS bestq,
+                (SELECT COALESCE(best_chain,0) FROM mkt_kitchen WHERE buyer_id = $1)::int AS bestchain`,
         [buyerId]
     ).catch(() => null);
     if (!row) return;
@@ -152,6 +251,14 @@ async function cookingBadges(buyerId) {
     if (row.recipes >= RECIPES.length) await g("cook_librarian");
     if (row.best >= 5) await g("cook_legendary");
     if (row.stock >= 100) await g("cook_forager");
+    if (row.cooks >= 1000) await g("cook_thousand");
+    if (row.preps >= 50) await g("cook_prep");
+    // 0b11111 = one dish cooked at every tier.
+    if ((row.tiers & 31) === 31) await g("cook_every_tier");
+    if (Number(row.bestq) >= 0.92) await g("cook_perfect");
+    if (row.bestchain >= 10) await g("cook_chain");
+    if (ctx.recipeId === "r_grand_feast") await g("cook_grand");
+    if (ctx.recipeId === "r_wolfs_table") await g("cook_wolfs");
 }
 
 const today = () => db.queryOne(`SELECT (NOW() AT TIME ZONE 'America/Chicago')::date::text AS d`).then((r) => r?.d);
@@ -167,11 +274,12 @@ async function kitchenRow(buyerId) {
 /** Everything the Kitchen screen needs, in one call. */
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
-    const [row, pantryRows, knownRows, goldRow] = await Promise.all([
+    const [row, pantryRows, knownRows, goldRow, sprites] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        cookingSprites(),
     ]);
     const have = new Map(pantryRows.map((r) => [r.ref, Number(r.qty)]));
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
@@ -181,14 +289,22 @@ export async function getKitchenState(buyerId) {
     const recipes = RECIPES.map((r) => {
         const known = cookedMap.has(r.id);
         const need = Object.entries(r.need).map(([ref, qty]) => {
-            const m = ingredientMeta(ref);
+            const m = ingredientMeta(ref, sprites);
             const held = have.get(ref) || 0;
             return { ...m, qty, held, enough: held >= qty };
         });
+        const outMeta = r.kind === "prep" ? ingredientMeta(r.out, sprites) : null;
         return {
-            id: r.id, name: r.name, emoji: r.emoji, tier: r.tier, flavor: r.flavor,
+            id: r.id, name: r.name, tier: r.tier, flavor: r.flavor, kind: r.kind,
+            sprite: sprites[r.id] || null,
             tierName: tierMeta(r.tier).name, tierColor: tierMeta(r.tier).color,
             known, timesCooked: cookedMap.get(r.id) || 0,
+            // A prep says exactly what it makes; a dish says which pool it rolls from. Either way there is no
+            // guessing about what pressing the button gets you.
+            makes: outMeta ? { ref: outMeta.ref, name: outMeta.name, sprite: outMeta.sprite } : null,
+            pool: r.kind === "dish" ? tierMeta(r.tier).pool.map((id) => ({
+                id, name: CONSUMABLES[id]?.name || id, desc: CONSUMABLES[id]?.desc || "",
+            })) : null,
             need: known ? need : null,              // an unknown recipe shows as a locked silhouette
             canCook: known && need.every((n) => n.enough),
         };
@@ -201,9 +317,12 @@ export async function getKitchenState(buyerId) {
         cookXp: Number(row?.cook_xp) || 0,
         cooksTotal: Number(row?.cooks_total) || 0,
         bestTier: Number(row?.best_dish_tier) || 0,
+        bestQuality: Number(row?.best_quality) || 0,
+        bestChain: Number(row?.best_chain) || 0,
+        prepsTotal: Number(row?.preps_total) || 0,
         cooks: { used: usedToday, max: maxCooks, left: Math.max(0, maxCooks - usedToday) },
         pantry: pantryRows
-            .map((r) => ({ ...ingredientMeta(r.ref), qty: Number(r.qty) }))
+            .map((r) => ({ ...ingredientMeta(r.ref, sprites), qty: Number(r.qty) }))
             .sort((a, b) => a.kind.localeCompare(b.kind) || b.qty - a.qty),
         pantryTotal: pantryRows.reduce((s, r) => s + Number(r.qty), 0),
         recipes,
@@ -228,7 +347,7 @@ export async function getKitchenState(buyerId) {
  * can't cook twice off one set of ingredients. The daily counter is claimed the same way, before anything is
  * granted, for the same reason.
  */
-export async function cookRecipe(buyerId, recipeId) {
+export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 } = {}) {
     if (!COOK_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const rec = recipeById(recipeId);
     if (!rec) return { ok: false, error: "unknown_recipe" };
@@ -272,29 +391,65 @@ export async function cookRecipe(buyerId, recipeId) {
         }
     }
 
-    // Heat can push the dish a tier above the recipe.
-    const bumped = Math.random() < trackValue("heat", row?.heat_level);
-    const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
-    const pool = tierMeta(tier).pool;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const portions = 1 + (Math.random() < trackValue("season", row?.season_level) ? 1 : 0);
-    await grantConsumable(buyerId, pick, portions).catch(() => {});
+    // ── OUTCOME ──────────────────────────────────────────────────────────────────────────────────────────
+    // `quality` is the timing run, 0..1, exactly like the forge's temper. It is clamped and treated as
+    // UNTRUSTED — it arrives from the client, so it can only ever improve the odds within fixed bounds, never
+    // hand out a tier directly. A cook with no minigame result (an old client, a scripted call) is treated as
+    // an average run rather than a failure.
+    const conSprites = Object.fromEntries(
+        (await db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).catch(() => [])).map((r) => [r.consumable_id, r.url])
+    );
+    const q = quality == null ? 0.5 : Math.max(0, Math.min(1, Number(quality) || 0));
+    const chainN = Math.max(0, Math.min(50, Math.floor(Number(chain) || 0)));
 
-    const xp = 8 * tier;
+    // Heat is the upgrade track; a strong run adds to it. A perfect run is worth about as much as three levels.
+    const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36;
+    const bumped = Math.random() < bumpChance;
+    const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
+
+    let made = null;
+    let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 ? 1 : 0);
+
+    const spriteMap = await cookingSprites();
+    if (rec.kind === "prep") {
+        // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
+        await addToPantry(buyerId, "prep", rec.out, portions);
+        const m = PREPS[rec.out];
+        made = { kind: "prep", id: rec.out, name: m?.name || rec.out, desc: "A prepped ingredient other recipes call for.", sprite: spriteMap[rec.out] || null };
+    } else {
+        const pool = tierMeta(tier).pool;
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        await grantConsumable(buyerId, pick, portions).catch(() => {});
+        const c = CONSUMABLES[pick] || {};
+        // A cooked dish IS a consumable, so it shows the consumable's own sprite — the same picture the stash
+        // will show it with, rather than a second drawing of the same thing.
+        made = { kind: "dish", id: pick, name: c.name || pick, desc: c.desc || "", sprite: conSprites[pick] || spriteMap[rec.id] || null };
+    }
+
+    const xp = Math.round(8 * tier * (0.7 + q * 0.6));
     await db.query(
-        `UPDATE mkt_kitchen SET cook_xp = cook_xp + $2, cooks_total = cooks_total + 1,
-                                best_dish_tier = GREATEST(best_dish_tier, $3), updated_at = NOW()
-          WHERE buyer_id = $1`, [buyerId, xp, tier]).catch(() => {});
+        `UPDATE mkt_kitchen
+            SET cook_xp = cook_xp + $2,
+                cooks_total = cooks_total + 1,
+                preps_total = preps_total + $5,
+                best_dish_tier = GREATEST(best_dish_tier, $3),
+                best_quality = GREATEST(best_quality, $4),
+                best_chain = GREATEST(best_chain, $6),
+                tiers_cooked = tiers_cooked | $7,
+                updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId, xp, tier, q, rec.kind === "prep" ? 1 : 0, chainN, 1 << (tier - 1)]
+    ).catch(() => {});
     await db.query(`UPDATE mkt_recipe_known SET times_cooked = times_cooked + 1 WHERE buyer_id = $1 AND recipe_id = $2`, [buyerId, recipeId]).catch(() => {});
     await awardXp(buyerId, "cooking", { points: xp, gold: 0, meta: { recipe: rec.id, tier } }).catch(() => {});
-    await trackActivity(buyerId, "cooked", { recipe: rec.id, tier, dish: pick, portions, bumped, freeCook }).catch(() => {});
-    await cookingBadges(buyerId).catch(() => {});
+    await trackActivity(buyerId, "cooked", { recipe: rec.id, tier, made: made.id, portions, bumped, freeCook, quality: q, chain: chainN }).catch(() => {});
+    await cookingBadges(buyerId, { recipeId, quality: q, chain: chainN }).catch(() => {});
 
-    const c = CONSUMABLES[pick] || {};
     return {
         ok: true,
-        dish: { id: pick, name: c.name || pick, emoji: c.emoji || "🍽️", desc: c.desc || "", tier, tierName: tierMeta(tier).name, tierColor: tierMeta(tier).color },
-        portions, bumped, freeCook, xp,
+        made: { ...made, tier, tierName: tierMeta(tier).name, tierColor: tierMeta(tier).color },
+        portions, bumped, freeCook, xp, quality: q, chain: chainN,
+        grade: q >= 0.92 ? "flawless" : q >= 0.72 ? "perfect" : q >= 0.45 ? "good" : "rough",
         ...(await getKitchenState(buyerId)),
     };
 }

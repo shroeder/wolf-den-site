@@ -1,0 +1,80 @@
+// Sprites for every dish, every prep recipe and every prepped ingredient in the Kitchen.
+//
+// These render at badge size or smaller, so they're generated at `low` — the detail a higher tier buys is
+// thrown away by the downscale long before anyone sees it, and there are 76 of them. Raw ingredients are NOT
+// generated here on purpose: crops already have `crop_<id>_ripe` in mkt_town_art and fish already have PNGs in
+// public/images/fish, and paying twice for a picture we own is just waste.
+//
+// Usage: node scripts/gen-cooking-sprites.mjs [ref1 ref2 …]   (no args = everything still missing art)
+import fs from "node:fs";
+import { neon } from "@neondatabase/serverless";
+import { put } from "@vercel/blob";
+import sharp from "sharp";
+
+function pick(text, key) {
+    for (const line of text.split(/\r?\n/)) {
+        const i = line.indexOf("=");
+        if (i > 0 && line.slice(0, i).trim() === key) return line.slice(i + 1).trim().replace(/^["']|["']$/g, "");
+    }
+    return null;
+}
+const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
+const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8");
+const OPENAI_KEY = pick(props, "OPENAI_API_KEY");
+const DB_URL = pick(env, "DATABASE_URL");
+const BLOB_TOKEN = pick(env, "BLOB_READ_WRITE_TOKEN");
+if (!OPENAI_KEY?.startsWith("sk-")) throw new Error("bad OPENAI_API_KEY");
+const sql = neon(DB_URL);
+
+// Parsed straight out of cooking.js so this can never drift from the catalogue it's drawing.
+const src = fs.readFileSync("src/lib/marketplace/cooking.js", "utf8");
+const RECIPES = [...src.matchAll(/^\s+([RP])\("([a-z_0-9]+)",\s*"([^"]+)",\s*(\d)/gm)]
+    .map((m) => ({ ref: m[2], name: m[3], tier: Number(m[4]), kind: m[1] === "P" ? "prep" : "dish" }));
+const PREPS = [...src.matchAll(/^\s+(p_[a-z]+):\s*\{ name: "([^"]+)"/gm)].map((m) => ({ ref: m[1], name: m[2], kind: "ingredient" }));
+const ALL = [...RECIPES, ...PREPS];
+
+function promptFor(item) {
+    if (item.kind === "ingredient") {
+        return `A single prepared cooking INGREDIENT for a fantasy cooking game: ${item.name}. Shown on its own as one clear object — a sack, jar, crock, bottle, block or bundle as suits it. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, warm rustic fantasy kitchen palette, strong readable silhouette, centered, fills most of the frame, viewed straight on. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no table, no glow, no vignette, no drop shadow, no plate under it. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
+    }
+    if (item.kind === "prep") {
+        return `A fantasy cooking-game icon for a PREPARATION step called "${item.name}": the tools and raw materials of that task arranged as one compact object group. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, warm rustic fantasy kitchen palette, strong readable silhouette, centered, fills most of the frame. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no table, no glow, no drop shadow. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
+    }
+    return `A finished plated DISH for a fantasy cooking game: "${item.name}". Appetising, served on a simple rustic plate, bowl, board or pot as suits the dish, seen from a three-quarter angle. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, warm rustic fantasy kitchen palette, strong readable silhouette, centered, fills most of the frame. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no tablecloth, no glow, no vignette, no drop shadow. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
+}
+
+const argv = process.argv.slice(2);
+const done = new Set((await sql`SELECT ref FROM mkt_cooking_sprite`).map((r) => r.ref));
+const todo = (argv.length ? ALL.filter((x) => argv.includes(x.ref)) : ALL.filter((x) => !done.has(x.ref)));
+console.log(`catalogue: ${RECIPES.length} recipes + ${PREPS.length} prepped ingredients`);
+console.log(`generating ${todo.length} sprite(s)…`);
+
+let ok = 0, failed = 0;
+for (const item of todo) {
+    const prompt = promptFor(item);
+    try {
+        const res = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
+        });
+        const j = await res.json();
+        if (!res.ok) { console.log(`  ✗ ${item.ref}: ${JSON.stringify(j).slice(0, 120)}`); failed += 1; continue; }
+        const buf = Buffer.from(j.data[0].b64_json, "base64");
+        // 192px: these are drawn at ~40-64 CSS px, so this still covers a 3x screen with room to spare.
+        const webp = await sharp(buf).resize({ width: 192, withoutEnlargement: true }).webp({ quality: 88, effort: 5 }).toBuffer();
+        const { url } = await put(`marketplace/cooking/${item.ref}-${Date.now()}.webp`, webp, { access: "public", token: BLOB_TOKEN, contentType: "image/webp" });
+        await sql`INSERT INTO mkt_cooking_sprite (ref, url, prompt, updated_at) VALUES (${item.ref}, ${url}, ${prompt}, NOW())
+                  ON CONFLICT (ref) DO UPDATE SET url = EXCLUDED.url, prompt = EXCLUDED.prompt, updated_at = NOW()`;
+        const u = j.usage || {};
+        await sql`INSERT INTO mkt_ai_generation (url, subject, source, size, quality, prompt, ok, tokens_in, tokens_out, origin, label, model, bytes)
+                  VALUES (${url}, ${item.ref}, 'marketplace/cooking', '1024x1024', 'low', ${prompt.slice(0, 900)}, true,
+                          ${u.input_tokens || null}, ${u.output_tokens || null}, 'admin', ${'Cooking — ' + item.name}, 'gpt-image-1', ${webp.length})`.catch(() => {});
+        ok += 1;
+        console.log(`  ✓ ${item.ref.padEnd(16)} ${item.name}  (${(webp.length / 1024).toFixed(0)} KB)`);
+    } catch (e) {
+        failed += 1;
+        console.log(`  ✗ ${item.ref}: ${String(e?.message || e).slice(0, 120)}`);
+    }
+}
+console.log(`Done. ${ok} generated, ${failed} failed. ~$${(ok * 0.011).toFixed(2)}`);

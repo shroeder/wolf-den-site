@@ -79,18 +79,27 @@ const LINKS = [
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 // Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction"];
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
+    // The Kitchen is owner-gated. The nav asks the server rather than deciding locally, because "am I the owner"
+    // isn't something the client knows and shouldn't be something it guesses.
+    const [kitchen, setKitchen] = useState(false);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/cooking").then((r) => r.json()).then((d) => { if (!dead) setKitchen(Boolean(d?.unlocked)); }).catch(() => {});
+        return () => { dead = true; };
+    }, []);
     // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
-        ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : [])];
+        ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
+        ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);

@@ -27,7 +27,7 @@ export async function POST(request) {
             if (!buyer?.id) return noStore({ error: "unauthorized" }, { status: 401 });
             const b = await request.json().catch(() => ({}));
             switch (String(b?.action || "")) {
-                case "cook": return noStore(await cookRecipe(buyer.id, String(b.recipe || "")));
+                case "cook": return noStore(await cookRecipe(buyer.id, String(b.recipe || ""), { quality: b.quality, chain: b.chain }));
                 case "upgrade": return noStore(await upgradeKitchen(buyer.id, String(b.track || "")));
                 // Owner-only test tools — the gate is inside, not here.
                 case "dev_stock": return noStore(await devStock(buyer.id, String(b.what || "all")));
