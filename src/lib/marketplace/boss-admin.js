@@ -127,14 +127,22 @@ export async function generateBossArt(bossId, prompt) {
 export async function ensureBossArt(bossId) {
     const boss = await db.queryOne(`SELECT id, name, description, image_url, background_url FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
     if (!boss) return { skipped: "not_found" };
-    const did = { portrait: false, background: false };
+    // Failures used to vanish into `.catch(() => {})`, so a boss that never got art reported the same clean
+    // result as one that didn't need any. The live boss "Molgrath the Devourer" sat with no portrait and no
+    // background through repeated cron runs and nothing anywhere said why. Errors are returned now.
+    const did = { portrait: false, background: false, errors: [] };
     if (!boss.image_url) {
         const prompt = `${boss.name || "a fearsome boss"}. ${boss.description || "a monstrous fantasy boss creature"}`;
-        await generateBossArt(bossId, prompt).then(() => { did.portrait = true; }).catch(() => {});
+        await generateBossArt(bossId, prompt)
+            .then(() => { did.portrait = true; })
+            .catch((e) => { did.errors.push(`portrait: ${e?.message || e}`); });
     }
     if (!boss.background_url) {
-        await generateBossBackground(bossId).then(() => { did.background = true; }).catch(() => {});
+        await generateBossBackground(bossId)
+            .then(() => { did.background = true; })
+            .catch((e) => { did.errors.push(`background: ${e?.message || e}`); });
     }
+    if (!did.errors.length) delete did.errors;
     return did;
 }
 

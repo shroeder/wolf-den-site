@@ -900,23 +900,65 @@ async function sizeNextBossHp(prevBoss) {
     return Math.max(100000, Math.round(hp / 1000) * 1000);
 }
 
+
+// Roll the next boss as a DRAFT. Split out of activateNextBoss so it can also be called EARLY — see
+// prepareNextBoss below — rather than only at the moment the old one dies.
+async function createDraftBoss(prevBoss) {
+    const hp = await sizeNextBossHp(prevBoss); // scaled off the last boss's real kill pace → ~10-day fight
+    const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
+    const div = Math.max(100, Math.round(hp / 7000));
+    const rewardIds = pickRewardItems(3, "epic"); // 3 gear drops, capped at epic (never legendary+)
+    return db
+        .queryOne(
+            `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness, reward_item_ids, chase_item_id)
+             VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5, $6::jsonb, $7) RETURNING id`,
+            [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness(), JSON.stringify(rewardIds), rewardIds[0] || null]
+        )
+        .catch(() => null);
+}
+
+// How low the live boss has to get before we start drawing its successor.
+const PREPARE_NEXT_AT_PCT = 0.05;
+
+/**
+ * When the live boss is nearly dead, make sure its successor already EXISTS and already has art.
+ *
+ * Without this, a boss dies, the next one is rolled procedurally in the same tick and goes live immediately
+ * with no portrait and no background — then waits up to an hour for the art cron. Members meet the new boss as
+ * a blank. Drawing it while the current fight is still finishing means the successor arrives fully illustrated.
+ *
+ * Idempotent by design: the cron calls this hourly, and once a draft exists with both pieces of art every
+ * subsequent call is a couple of cheap reads. Two images at the low tier is about $0.03, once per ~10-day boss.
+ */
+export async function prepareNextBoss() {
+    const live = await db
+        .queryOne(`SELECT id, name, hp, max_hp FROM boss_event WHERE status = 'live' AND defeated_at IS NULL LIMIT 1`)
+        .catch(() => null);
+    if (!live) return { skipped: "no_live_boss" };
+    const pct = Number(live.max_hp) > 0 ? Number(live.hp) / Number(live.max_hp) : 1;
+    if (pct > PREPARE_NEXT_AT_PCT) return { skipped: "boss_still_healthy", pct: Math.round(pct * 1000) / 10 };
+
+    let next = await db
+        .queryOne(`SELECT id, name, image_url, background_url FROM boss_event WHERE status = 'draft' ORDER BY started_at ASC LIMIT 1`)
+        .catch(() => null);
+    if (!next) {
+        const created = await createDraftBoss(live);
+        if (!created) return { error: "could_not_draft" };
+        next = await db.queryOne(`SELECT id, name, image_url, background_url FROM boss_event WHERE id = $1`, [created.id]).catch(() => null);
+    }
+    if (!next) return { error: "could_not_draft" };
+    if (next.image_url && next.background_url) return { ready: next.name, skipped: "already_drawn" };
+
+    const { ensureBossArt } = await import("@/lib/marketplace/boss-admin.js");
+    const did = await ensureBossArt(next.id);
+    return { preparing: next.name, livePct: Math.round(pct * 1000) / 10, ...did };
+}
+
 async function activateNextBoss(prevBoss) {
     const live = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'live' AND defeated_at IS NULL LIMIT 1`).catch(() => null);
     if (live) return; // something is already live — nothing to do
     let next = await db.queryOne(`SELECT id FROM boss_event WHERE status = 'draft' ORDER BY started_at ASC LIMIT 1`).catch(() => null);
-    if (!next) {
-        const hp = await sizeNextBossHp(prevBoss); // scaled off the last boss's real kill pace → ~10-day fight
-        const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
-        const div = Math.max(100, Math.round(hp / 7000));
-        const rewardIds = pickRewardItems(3, "epic"); // 3 gear drops, capped at epic (never legendary+)
-        next = await db
-            .queryOne(
-                `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness, reward_item_ids, chase_item_id)
-                 VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5, $6::jsonb, $7) RETURNING id`,
-                [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness(), JSON.stringify(rewardIds), rewardIds[0] || null]
-            )
-            .catch(() => null);
-    }
+    if (!next) next = await createDraftBoss(prevBoss);
     if (!next) return;
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [next.id]).catch(() => {});
     const boss = await db
