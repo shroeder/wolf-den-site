@@ -865,10 +865,24 @@ async function finalizeBossKill(bossId) {
 }
 
 // Cool procedural names for auto-generated bosses (when no admin-authored draft is waiting).
-const PROC_BOSS_NAMES = [
-    "Grumvok the Ravenous", "Aztheku, Void-Maw", "Skornfang the Unbound", "Verathis, Ashen Wyrm",
-    "Molgrath the Devourer", "Nyxaal, Shadow-Tyrant", "Kaelvorn the Cinderborn", "Threxil, Bone Sovereign",
-    " Vok Ruaghul the Endless", "Sythmara, Storm-Render", "Gholzuk the Ironjaw", "Emberoth, the Waking Ruin",
+// Each name carries the CREATURE it actually is. Auto-spawned bosses used to be stored with one shared filler
+// line — "A new terror rises to challenge the pack" — which is also what got handed to the art model, so every
+// procedural boss was drawn from a name and nothing else. That's how the storm boss came back as a purple mass
+// with no face: the model had no anatomy to draw, so it drew weather. A concrete body, head and silhouette per
+// name costs nothing and is the difference between a creature and a smudge.
+const PROC_BOSSES = [
+    { name: "Grumvok the Ravenous", desc: "a hulking four-armed ogre-brute with tusked jaws, a distended gut and small furious eyes sunk under a heavy stone brow" },
+    { name: "Aztheku, Void-Maw", desc: "a floating eldritch horror whose body is a ring of dark tentacles around one enormous fanged maw, with several glowing eyes clustered above the mouth" },
+    { name: "Skornfang the Unbound", desc: "a lean snarling wolf-demon straining against snapped iron chains, long fangs bared, bright burning eyes and a shredded mane" },
+    { name: "Verathis, Ashen Wyrm", desc: "a long serpentine dragon-wyrm of cracked grey ash and cooling embers, narrow horned skull, slitted molten eyes and tattered wings" },
+    { name: "Molgrath the Devourer", desc: "an immense bloated toad-beast with a cavernous fanged mouth, warty armored hide and heavy-lidded yellow eyes" },
+    { name: "Nyxaal, Shadow-Tyrant", desc: "a tall armored tyrant wreathed in living shadow, horned helm framing a gaunt pale face with two piercing violet eyes" },
+    { name: "Kaelvorn the Cinderborn", desc: "a broad molten-rock golem veined with fire, a craggy horned head and two blazing orange eyes set deep in the stone" },
+    { name: "Threxil, Bone Sovereign", desc: "a towering crowned skeletal sovereign in tattered royal robes, bare fanged skull with cold blue soul-flames burning in both eye sockets" },
+    { name: "Vok Ruaghul the Endless", desc: "a many-headed hydra-serpent of coiling green scale, each long neck ending in a horned head with bright reptilian eyes" },
+    { name: "Sythmara, Storm-Render", desc: "a sleek winged storm-drake of deep violet scale crackling with blue lightning, a sharp horned draconic head with two fierce glowing white eyes and bared fangs" },
+    { name: "Gholzuk the Ironjaw", desc: "a squat armored beast plated in riveted iron, an oversized steel-fanged lower jaw and two narrow red eyes behind a battered faceplate" },
+    { name: "Emberoth, the Waking Ruin", desc: "a colossal moss-covered stone titan rousing from ruin, cracked temple-carved body glowing with inner embers and two hollow burning eyes" },
 ];
 
 // Auto-rotate the weekly boss after a kill so play never stalls. Prefer a prepared DRAFT (admin-authored,
@@ -938,14 +952,15 @@ async function sizeNextBossHp(prevBoss) {
 // prepareNextBoss below — rather than only at the moment the old one dies.
 async function createDraftBoss(prevBoss) {
     const hp = await sizeNextBossHp(prevBoss); // scaled off the last boss's real kill pace → ~10-day fight
-    const name = PROC_BOSS_NAMES[Math.floor(Math.random() * PROC_BOSS_NAMES.length)].trim();
+    const pick = PROC_BOSSES[Math.floor(Math.random() * PROC_BOSSES.length)];
+    const name = pick.name.trim();
     const div = Math.max(100, Math.round(hp / 7000));
     const rewardIds = pickRewardItems(3, "epic"); // 3 gear drops, capped at epic (never legendary+)
     return db
         .queryOne(
             `INSERT INTO boss_event (name, icon, tier, max_hp, hp, status, description, ticket_divisor, weakness, reward_item_ids, chase_item_id)
              VALUES ($1, 'dragon', 1, $2, $2, 'draft', $3, $4, $5, $6::jsonb, $7) RETURNING id`,
-            [name, hp, "A new terror rises to challenge the pack.", div, pickWeakness(), JSON.stringify(rewardIds), rewardIds[0] || null]
+            [name, hp, pick.desc, div, pickWeakness(), JSON.stringify(rewardIds), rewardIds[0] || null]
         )
         .catch(() => null);
 }
