@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
 import CoinCta from "@/components/CoinCta";
@@ -63,6 +63,7 @@ export default function AuctionClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [flash, setFlash] = useState(null);
     const [sellPick, setSellPick] = useState(null); // item being listed { itemId,... }
+    const priceRef = useRef(null); // focused the moment an item is picked, so the keyboard opens on the field
     const [price, setPrice] = useState("");
     const [days, setDays] = useState(3);
     const [detail, setDetail] = useState(null); // listing being inspected in the full-detail modal (browse OR mine)
@@ -196,14 +197,14 @@ export default function AuctionClient({ initial }) {
             ) : null}
 
             {tab === "sell" ? (
-                <section className="card">
+                <section className={`card${sellPick ? " ah-sell-padded" : ""}`}>
                     <h3 style={{ marginTop: 0 }}>📤 List an item</h3>
                     {(state?.sellable || []).length === 0 ? (
                         <p className="muted" style={{ margin: 0 }}>No unequipped gear to list right now. Unequip a piece (or win some) and it&apos;ll show up here.</p>
                     ) : (
                         <div className="ah-grid">
                             {(state?.sellable || []).map((it) => (
-                                <button key={it.itemId} type="button" className={`ah-card ah-sellcard${sellPick?.itemId === it.itemId ? " is-picked" : ""}`} style={{ "--rc": RARITY_TXT[it.rarity] || "#9aa7b5" }} onClick={() => { setSellPick(it); setPrice(""); }}>
+                                <button key={it.itemId} type="button" className={`ah-card ah-sellcard${sellPick?.itemId === it.itemId ? " is-picked" : ""}`} style={{ "--rc": RARITY_TXT[it.rarity] || "#9aa7b5" }} onClick={() => { setSellPick(it); setPrice(""); setTimeout(() => priceRef.current?.focus(), 60); }}>
                                     <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} />{it.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{it.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</div>
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
@@ -219,7 +220,7 @@ export default function AuctionClient({ initial }) {
                     {sellPick ? (
                         <div className="ah-listform">
                             <div className="ah-listform-title">List <b style={{ color: RARITY_TXT[sellPick.rarity] || "#fff" }}>{sellPick.name}</b></div>
-                            <label className="ah-field"><span>Price (🪙)</span><input type="number" min={10} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 2500" /></label>
+                            <label className="ah-field"><span>Price (🪙)</span><input ref={priceRef} type="number" inputMode="numeric" min={10} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="e.g. 2500" /></label>
                             <div className="ah-field"><span>Duration</span>
                                 <div className="ah-days">{durations.map((d) => <button key={d} type="button" className={days === d ? "is-on" : ""} onClick={() => setDays(d)}>{d}d</button>)}</div>
                             </div>
@@ -383,7 +384,21 @@ const AH_CSS = `
 .ah-buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }
 .ah-buy:disabled { opacity: .55; cursor: default; background: rgba(255,255,255,0.08); color: #cbb9e0; box-shadow: none; }
 .ah-buy.is-mine { background: rgba(120,200,255,0.12); color: #bfe3ff; }
-.ah-listform { margin-top: 14px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,215,110,0.35); display: flex; flex-direction: column; gap: 10px; }
+/* THE PRICE FORM IS A BOTTOM SHEET, not the bottom of the page.
+   It used to render after the whole grid of sellable gear, so picking an item near the top left the form
+   somewhere below the fold with nothing to say it had appeared — you had to scroll the entire inventory to
+   find out where to type a price. Now it slides up over the content the moment an item is picked, which is
+   also where a thumb already is. */
+.ah-listform { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; margin: 0;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 18px 18px 0 0; background: linear-gradient(180deg, #241c33, #1a1426);
+    border: 1px solid rgba(255,215,110,0.4); border-bottom: none;
+    box-shadow: 0 -10px 34px rgba(0,0,0,0.62);
+    display: flex; flex-direction: column; gap: 10px;
+    animation: ahSheetUp .22s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes ahSheetUp { from { transform: translateY(102%); } to { transform: translateY(0); } }
+/* Keep the last row of gear reachable above the sheet. */
+.ah-sell-padded { padding-bottom: 300px; }
 .ah-listform-title { font-weight: 800; font-size: 1rem; }
 .ah-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; font-weight: 700; color: #cbb9e0; }
 .ah-field input { padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 1rem; font-weight: 800; }

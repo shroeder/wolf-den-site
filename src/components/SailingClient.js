@@ -916,22 +916,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <b>Fish</b><em>{state.fishing.casts?.left ? `${state.fishing.casts.left} casts left` : "none left today"}</em>
                             </button>
                         )}
-                        {/* Out of casts → buy one. Only appears once the free allowance is gone; the price
-                            doubles each time within the day, so the first is an easy yes and the fifth isn't. */}
-                        {liveStatus !== "digging" && state.fishing?.recharge?.available && (
-                            <button
-                                className="sail-act is-recharge"
-                                disabled={busy || (state.gold || 0) < state.fishing.recharge.cost}
-                                onClick={() => act("fish_recharge")}
-                            >
-                                <span className="sail-act-ico" aria-hidden="true">🎣</span>
-                                <b>Buy a cast</b>
-                                <em>
-                                    🪙 {state.fishing.recharge.cost.toLocaleString()}
-                                    {(state.gold || 0) < state.fishing.recharge.cost ? " · not enough" : ""}
-                                </em>
-                            </button>
-                        )}
+                        {/* The "buy a cast" control used to live here, a whole screen away from the fishing
+                            scene where you actually run out. It's now the SAME button you cast with — see
+                            FishingScene — so the offer appears exactly where the need does. */}
                         {liveStatus === "digging" && (
                             <button className="sail-act" disabled>
                                 <span className="sail-act-ico" aria-hidden="true">⛏️</span>
@@ -1351,8 +1338,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     fishing={state.fishing}
                     sky={skyType || null}
                     records={fishRecords}
+                    gold={state.gold || 0}
                     onCast={fishCast}
                     onLand={fishLand}
+                    onRecharge={() => act("fish_recharge")}
                     onLoadRecords={loadFishRecords}
                     onClose={() => setFishOpen(false)}
                 />

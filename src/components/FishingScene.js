@@ -357,7 +357,7 @@ export function FishingLog({ log, known, total, records, onClose }) {
 // ── THE SCENE ────────────────────────────────────────────────────────────────────────────────────────────────
 // `fishing` is the server's fishing view. `onCast`/`onLand` post to the sailing endpoint and resolve with the
 // server's reply; the parent owns the state refresh.
-export default function FishingScene({ fishing, sky, records, onCast, onLand, onLoadRecords, onClose }) {
+export default function FishingScene({ fishing, sky, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
     const [fight, setFight] = useState("common"); // the fight profile of what is on the line (rarity only)
@@ -383,6 +383,16 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
         sfx.gone();
         await onLand({ quality: 0, missed: true, sky }).catch(() => {});
     }, [clearTimers, onLand, sfx, sky]);
+
+    // The recharge offer, if the day's free casts are spent and another can still be bought.
+    const rc = fishing?.recharge || {};
+    const buyable = Boolean(rc.available);
+    const canAfford = Number(gold || 0) >= Number(rc.cost || 0);
+    const buyCast = useCallback(async () => {
+        if (busy || !canAfford) return;
+        setBusy(true);
+        try { await onRecharge?.(); } finally { setBusy(false); }
+    }, [busy, canAfford, onRecharge]);
 
     const cast = useCallback(async () => {
         if (busy) return;
@@ -497,9 +507,19 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         </p>
                         {err ? <p className="fish-err">{err}</p> : null}
                         <div className="fish-actions">
-                            <button type="button" className="fish-cta" disabled={busy || casts.left <= 0} onClick={cast}>
-                                {casts.left <= 0 ? "Out of casts today" : busy ? "Casting…" : "Cast the line 🎣"}
-                            </button>
+                            {/* ONE button. Running out of casts doesn't hand you a dead control and hide the
+                                way forward somewhere else on another screen — the same button you've been
+                                tapping simply changes what it offers, the way the raid and tailwind buttons do.
+                                Only when there's genuinely nothing left to offer does it disable. */}
+                            {casts.left > 0 || !buyable ? (
+                                <button type="button" className="fish-cta" disabled={busy || casts.left <= 0} onClick={cast}>
+                                    {casts.left <= 0 ? "Out of casts today" : busy ? "Casting…" : "Cast the line 🎣"}
+                                </button>
+                            ) : (
+                                <button type="button" className="fish-cta is-buy" disabled={busy || !canAfford} onClick={buyCast}>
+                                    {busy ? "…" : <>Buy another cast 🎣 <span className="fish-cta-cost">🪙 {rc.cost.toLocaleString()}{canAfford ? "" : " · not enough"}</span></>}
+                                </button>
+                            )}
                             <button type="button" className="fish-ghost" onClick={openLog}>
                                 📖 Log · {fishing?.speciesKnown || 0}/{fishing?.speciesTotal || 0}
                             </button>
@@ -560,8 +580,20 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>
                         <p className="fish-copy">You hauled it up off the sea floor — no fish this time.</p>
                         <div className="fish-actions">
-                            <button type="button" className="fish-cta" disabled={casts.left <= 0} onClick={() => { setResult(null); setPhase("idle"); }}>
-                                {casts.left <= 0 ? "That's your last cast today" : "Cast again 🎣"}
+                            <button
+                                type="button"
+                                className={`fish-cta${casts.left <= 0 && buyable ? " is-buy" : ""}`}
+                                disabled={busy || (casts.left <= 0 && !(buyable && canAfford))}
+                                onClick={async () => {
+                                    // Out of casts: buy one right here rather than sending them back to find a
+                                    // different button. Either way we land on idle, ready to cast.
+                                    if (casts.left <= 0 && buyable) await buyCast();
+                                    setResult(null); setPhase("idle");
+                                }}
+                            >
+                                {casts.left > 0 ? "Cast again 🎣"
+                                    : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
+                                    : "That's your last cast today"}
                             </button>
                             <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
@@ -612,8 +644,20 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                             {(result.extras || []).map((e, i) => <span key={i} className="fish-chip extra">{e.emoji} {e.label}</span>)}
                         </div>
                         <div className="fish-actions">
-                            <button type="button" className="fish-cta" disabled={casts.left <= 0} onClick={() => { setResult(null); setPhase("idle"); }}>
-                                {casts.left <= 0 ? "That's your last cast today" : "Cast again 🎣"}
+                            <button
+                                type="button"
+                                className={`fish-cta${casts.left <= 0 && buyable ? " is-buy" : ""}`}
+                                disabled={busy || (casts.left <= 0 && !(buyable && canAfford))}
+                                onClick={async () => {
+                                    // Out of casts: buy one right here rather than sending them back to find a
+                                    // different button. Either way we land on idle, ready to cast.
+                                    if (casts.left <= 0 && buyable) await buyCast();
+                                    setResult(null); setPhase("idle");
+                                }}
+                            >
+                                {casts.left > 0 ? "Cast again 🎣"
+                                    : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
+                                    : "That's your last cast today"}
                             </button>
                             <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
