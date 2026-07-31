@@ -51,15 +51,17 @@ export async function setCashInput(key, amount, by = "owner") {
  * would let one overpayment quietly fund another consignor's payout.
  */
 async function consignorPayable() {
+    // A 100% payout rate means the shop keeps nothing, which is not a commercial arrangement — it's the owner's
+    // own test account, deliberately pointed at a real consignor's Square category so the payout maths can be
+    // exercised against live sales. Left in, it bills that category's whole revenue a second time (it was
+    // inflating this figure by $670 of Pedro's sales). Excluded here; the real consignor still counts.
     const rows = await db.query(
-        `SELECT id, display_name, square_category_id FROM consignors WHERE active ORDER BY display_name`
+        `SELECT id, display_name, square_category_id FROM consignors WHERE active AND payout_rate < 1.0 ORDER BY display_name`
     ).catch(() => []);
     if (!rows.length) return { total: 0, detail: [], overpaid: 0 };
 
-    // Two active consignors pointing at ONE Square category means the same sales are counted twice — each
-    // summary independently resolves that category and bills it at its own rate. Seen live: a 100%-rate
-    // account sharing another consignor's category, inflating the liability by roughly that category's whole
-    // revenue. It can't be resolved from here (which one is right is a business decision), so it's surfaced.
+    // Two REAL consignors on one category would still double-count, and which is right is a business decision
+    // rather than something to resolve here — so it's surfaced on the line instead of silently adjusted.
     const byCategory = new Map();
     for (const c of rows) {
         if (!c.square_category_id) continue;

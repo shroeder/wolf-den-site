@@ -88,11 +88,27 @@ export default function GameNav() {
     // The Kitchen is owner-gated. The nav asks the server rather than deciding locally, because "am I the owner"
     // isn't something the client knows and shouldn't be something it guesses.
     const [kitchen, setKitchen] = useState(false);
+    // Every failure mode here looks identical to "you're not the owner" — a dropped request, a cached reply from
+    // before you signed in, a blip in the route — and the Kitchen just isn't in the menu, with nothing to see.
+    // So: never cached, and one retry before believing a negative.
     useEffect(() => {
         let dead = false;
-        fetch("/api/marketplace/cooking").then((r) => r.json()).then((d) => { if (!dead) setKitchen(Boolean(d?.unlocked)); }).catch(() => {});
+        const ask = async (attempt = 0) => {
+            try {
+                const r = await fetch("/api/marketplace/cooking", { cache: "no-store", credentials: "same-origin" });
+                const d = await r.json();
+                if (dead) return;
+                if (d?.unlocked) { setKitchen(true); return; }
+                // A negative on the first go is retried once — the common cause is the session cookie not being
+                // live yet on a fresh sign-in, and a wrong "no" here is invisible rather than noisy.
+                if (attempt === 0) setTimeout(() => { if (!dead) ask(1); }, 1200);
+            } catch {
+                if (!dead && attempt === 0) setTimeout(() => { if (!dead) ask(1); }, 1200);
+            }
+        };
+        ask();
         return () => { dead = true; };
-    }, []);
+    }, [pathname]);
     // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
