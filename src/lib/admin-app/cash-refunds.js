@@ -53,13 +53,28 @@ export async function syncCashRefunds({ lookbackDays = 30, dryRun = false } = {}
             && Number(r?.amount_money?.amount || 0) > 0
     );
 
+    // ── DON'T DOUBLE-COUNT WHAT A PHYSICAL COUNT ALREADY SWALLOWED ──────────────────────────────────────────
+    //
+    // A cash count sets the ledger to what's actually in the drawer, so every unrecorded movement up to that
+    // date is ALREADY baked into the balance. Importing a refund from before the last count would subtract it a
+    // second time and push the ledger below the till — turning one bug into the opposite bug.
+    //
+    // This is not just about today's backfill. Counts happen regularly, so the rule has to hold forever: the
+    // most recent count is the settled line, and this sync only ever works forward of it.
+    const lastCount = await db.queryOne(
+        `SELECT MAX(occurred_on) AS d FROM cash_ledger WHERE source = 'reconcile'`
+    ).catch(() => null);
+    const settledThrough = lastCount?.d ? String(lastCount.d).slice(0, 10) : null;
+
     let added = 0;
+    let skippedSettled = 0;
     const inserted = [];
     for (const r of refunds) {
         const entryId = `square-refund-${r.id}`;
         const amount = -(Number(r.amount_money.amount) / 100); // NEGATIVE — this is cash leaving the drawer
         const day = localDay(r.created_at);
         const desc = `Square cash refund (${String(r.id).slice(-6)})`;
+        if (settledThrough && day <= settledThrough) { skippedSettled += 1; continue; }
         if (dryRun) {
             const exists = await db.queryOne(`SELECT 1 AS x FROM cash_ledger WHERE entry_id = $1`, [entryId]).catch(() => null);
             if (!exists) { added += 1; inserted.push({ day, amount, entryId }); }
@@ -77,5 +92,5 @@ export async function syncCashRefunds({ lookbackDays = 30, dryRun = false } = {}
         ).catch(() => null);
         if (row) { added += 1; inserted.push({ day, amount, entryId }); }
     }
-    return { ok: true, scanned: refunds.length, added, inserted };
+    return { ok: true, scanned: refunds.length, added, skippedSettled, settledThrough, inserted };
 }
