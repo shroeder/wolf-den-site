@@ -211,25 +211,39 @@ async function hangoutBuffState(buyerId, inTownSecs) {
 
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
-    const heartbeat = await markTownSeen(buyerId); // stamp presence + measure how long they've been here
-    const hangout = await hangoutBuffState(buyerId, heartbeat?.inTownSecs || 0);
-    const me = buyerId
-        ? await db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
-                (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = mkt_buyer.id::text AND pl.pet_id = mkt_buyer.featured_collectible) AS featured_pet_xp,
-                COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
-        : null;
-    const myPos = buyerId ? await db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : null;
 
-    // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline members never show.
-    const recent = await db.query(
-        `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
-                (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
-                MAX(v.last_seen) AS seen
-           FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
-          WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
-          GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
-        [buyerId || "00000000-0000-0000-0000-000000000000", ONLINE_WINDOW]
-    ).catch(() => []);
+    // This is the highest-volume request in the app — every viewer runs it on a timer — and it used to open
+    // with FIVE round-trips one after another. The `neon()` HTTP driver gives each query its own HTTPS request,
+    // so sequential queries don't just add up, they add up in wall time while a gigabyte of memory sits idle.
+    // That's the gap between 46ms of CPU and 221ms of held memory per request.
+    //
+    // Only two orderings are real:
+    //   markTownSeen WRITES mkt_town_presence, and myPos READS it   -> myPos must follow it
+    //   hangoutBuffState needs heartbeat.inTownSecs                 -> must follow it
+    // `me` (mkt_buyer) and `recent` (mkt_visitor, and it excludes this member anyway) share nothing with it.
+    // So five stages collapse to two, with identical results.
+    const [heartbeat, me, recent] = await Promise.all([
+        markTownSeen(buyerId), // stamp presence + measure how long they've been here
+        buyerId
+            ? db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
+                    (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = mkt_buyer.id::text AND pl.pet_id = mkt_buyer.featured_collectible) AS featured_pet_xp,
+                    COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
+            : Promise.resolve(null),
+        // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline never shows.
+        db.query(
+            `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
+                    (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
+                    MAX(v.last_seen) AS seen
+               FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
+              WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
+              GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
+            [buyerId || "00000000-0000-0000-0000-000000000000", ONLINE_WINDOW]
+        ).catch(() => []),
+    ]);
+    const [hangout, myPos] = await Promise.all([
+        hangoutBuffState(buyerId, heartbeat?.inTownSecs || 0),
+        buyerId ? db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : Promise.resolve(null),
+    ]);
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
