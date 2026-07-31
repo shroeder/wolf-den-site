@@ -37,3 +37,25 @@ export function denWebhook() {
 export function restocksWebhook() {
     return process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL || null;
 }
+
+/**
+ * PRIVATE ops channel — marketplace leads and sell offers.
+ *
+ * These are not game messages and they are not shopping messages: they carry a real customer's NAME, EMAIL
+ * ADDRESS and what they said. They were going to the new-arrivals webhook, which is a public feed members
+ * subscribe to, and sending them to the den channel instead would only trade one public room for another.
+ *
+ * There is deliberately NO fallback to a public webhook. If this isn't configured the message is dropped and
+ * logged, because silently posting a customer's email address to 74 people is worse than not posting at all.
+ */
+export function opsWebhook() {
+    const url = process.env.DISCORD_OPS_WEBHOOK_URL || null;
+    if (!url) {
+        log.warn({
+            event: "discord.ops_webhook.missing",
+            step: "webhook_not_configured",
+            detail: "Set DISCORD_OPS_WEBHOOK_URL to a PRIVATE admin channel. Lead/offer notifications contain customer email addresses and are being dropped rather than posted publicly.",
+        });
+    }
+    return url;
+}

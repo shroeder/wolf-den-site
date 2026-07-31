@@ -2,7 +2,7 @@ import "server-only";
 
 import { createServerLogger } from "@/lib/server-logger";
 import { SITE_URL } from "@/lib/site";
-import { denWebhook } from "@/lib/marketplace/discord-channels.js";
+import { opsWebhook } from "@/lib/marketplace/discord-channels.js";
 
 // Owner-facing nudge: when a buyer messages a vendor, also ping Discord so the lead is seen fast — an
 // email alone is easy to miss, and at one vendor the first impressions set the tone. Best-effort and
@@ -14,11 +14,10 @@ function baseUrl() {
     return process.env.NEXT_PUBLIC_BASE_URL || SITE_URL;
 }
 
-// Uses a dedicated marketplace webhook if configured, else falls back to the new-arrivals webhook so
-// it works out of the box on the channel that already exists. Silent no-op if neither is set.
+// Goes to the PRIVATE ops channel, never a public one - the embed below carries the buyer's email address and
+// their message. No-op (and logged) if no ops webhook is configured.
 export async function notifyNewLead({ vendorName, buyerName, buyerEmail, itemTitle, price, message, productUrl }) {
-    const webhookUrl =
-        denWebhook();
+    const webhookUrl = opsWebhook();
 
     if (!webhookUrl) {
         return;
@@ -60,8 +59,7 @@ export async function notifyNewLead({ vendorName, buyerName, buyerEmail, itemTit
 
 // A walk-in seller posted cards looking for vendor offers. Best-effort Discord ping.
 export async function notifyNewSellOffer({ name, email, items, askingPrice }) {
-    const webhookUrl =
-        denWebhook();
+    const webhookUrl = opsWebhook();
 
     if (!webhookUrl) {
         return;
