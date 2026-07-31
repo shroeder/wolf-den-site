@@ -20,7 +20,11 @@
  *   node scripts/backfill-ai-ledger.mjs           # dry run
  *   node scripts/backfill-ai-ledger.mjs --apply
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+
+// A generated file's mtime is when it was written, which is when it was drawn. Stamping all 145 of them with
+// now() put every piece of disk art on today's date and destroyed the ordering the history exists to show.
+const fileTime = (p) => { try { return statSync(p).mtime; } catch { return null; } };
 import { neon } from "@neondatabase/serverless";
 
 const APPLY = process.argv.includes("--apply");
@@ -51,7 +55,7 @@ const JOBS = [
     ["mkt_custom_deco", "chosen_url", "created_at", "marketplace/decorations/custom", "medium", "1024x1024", "creation", "'Creation — ' || COALESCE(name,'?')", "name", "buyer_id"],
     ["boss_event", "image_url", null, "marketplace/boss", "medium", "1024x1024", "admin", "'Boss — ' || COALESCE(name,'?')", "name", null],
     ["boss_event", "background_url", null, "marketplace/boss-bg", "medium", "1536x1024", "admin", "'Boss background — ' || COALESCE(name,'?')", "name", null],
-    ["mkt_buyer", "avatar_sprite_url", null, "marketplace/sprite", "medium", "1024x1024", "member", "'Hero sprite'", "NULL", "id"],
+    ["mkt_buyer", "avatar_sprite_url", "avatar_sprite_at", "marketplace/sprite", "medium", "1024x1024", "member", "'Hero sprite'", "NULL", "id"],
 ];
 
 let planned = 0;
@@ -78,9 +82,11 @@ for (const [table, col, dateCol, source, quality, size, origin, labelSql, subjec
     plannedCost += rows.length * c;
     if (!APPLY) continue;
 
-    // One batch id per source, so reconstructed art groups as "the pet sprite set" rather than 372 loose rows
-    // pretending to be individual events we witnessed.
-    const batchId = `backfill:${table}.${col}`;
+    // Reconstructed rows carry NO batch id. Grouping them by source read as "one pet-sprite batch", which was
+    // a lie about the timeline: those 465 sprites were drawn across eleven days, not in one run. Each row is
+    // its own event, in its own real order. Only genuinely simultaneous runs — a live gen-*.mjs invocation
+    // recorded by ai-trace — group.
+    const batchId = null;
     for (const r of rows) {
         let label = r.buyer_id;
         if (label) {
@@ -118,9 +124,17 @@ const IMG_RE = /\.(png|webp|jpg)$/i;
 for (const [dir, size, quality, script, label] of DISK) {
     let files;
     try {
+        // Keep the SUBDIRECTORY. A recursive readdir hands back the bare filename, so spin/prizes/x.png was
+        // being recorded as spin/x.png — a path that doesn't exist, which then failed the mtime lookup and
+        // stamped 26 files with today's date instead of when they were drawn.
         files = readdirSync(dir, { recursive: true, withFileTypes: true })
             .filter((f) => f.isFile() && IMG_RE.test(f.name))
-            .map((f) => f.name);
+            .map((f) => {
+                const parent = String(f.parentPath || f.path || dir).split("\\").join("/");
+                const at = parent.indexOf(dir);
+                const rel = (at >= 0 ? parent.slice(at + dir.length) : "").replace(/^\/+/, "");
+                return rel ? `${rel}/${f.name}` : f.name;
+            });
     } catch { continue; }
     if (!files.length) continue;
     const c = cost(size, quality);
@@ -133,11 +147,11 @@ for (const [dir, size, quality, script, label] of DISK) {
         // Keyed on a file: URL so a re-run stays idempotent the same way the blob-backed rows are.
         await sql.query(
             `INSERT INTO mkt_ai_generation
-                (model, size, quality, source, label, subject, url, origin, batch_id, batch_label, ok, cost_usd, cost_basis)
-             VALUES ('gpt-image-1',$1,$2,$3,$4,$5,$6,'batch',$7,$8,TRUE,$9,'estimated')
+                (model, size, quality, source, label, subject, url, origin, batch_label, ok, cost_usd, cost_basis, created_at)
+             VALUES ('gpt-image-1',$1,$2,$3,$4,$5,$6,'batch',$7,TRUE,$8,'estimated',COALESCE($9, now()))
              ON CONFLICT (url) DO NOTHING`,
             [size, quality, `script/${script}`, `${label} — ${subject}`, subject,
-                `file:${dir}/${name}`, `backfill:${script}`, script, c],
+                `file:${dir}/${name}`, script, c, fileTime(`${dir}/${name}`)],
         ).catch((e) => { failures.push(e.message); });
     }
 }

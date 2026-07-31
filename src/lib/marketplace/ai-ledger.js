@@ -117,6 +117,16 @@ export async function logGeneration({
     } catch { /* bookkeeping must never break art generation */ }
 }
 
+
+// Disk art is stored as `file:public/images/...` because it never went to blob. The same bytes are served by
+// the site, so turn it into something the admin app can actually display rather than showing a dead path.
+const thumbFor = (u) => {
+    if (!u) return null;
+    if (u.startsWith("file:public/")) return `https://www.wolfdengamingmn.com/${u.replace("file:public/", "")}`;
+    if (u.startsWith("file:")) return null;
+    return u;
+};
+
 // ── Reading it back ───────────────────────────────────────────────────────────────────────────────────────
 
 const num = (v) => (v == null ? 0 : Number(v));
@@ -180,6 +190,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
         buyerId: r.buyer_id,
         buyerLabel: r.buyer_label,
         url: r.n === 1 ? r.url : null,
+        thumbUrl: r.n === 1 ? thumbFor(r.url) : null,
         estimated: Boolean(r.estimated),
     }));
 }
@@ -195,7 +206,7 @@ export async function listBatch(batchId, { limit = 500 } = {}) {
     return (rows || []).map((r) => ({
         id: Number(r.id), createdAt: r.created_at, label: r.label, subject: r.subject,
         source: r.source, sourceLabel: sourceLabel(r.source), quality: r.quality, size: r.size,
-        url: r.url, ok: r.ok, error: r.error,
+        url: r.url, thumbUrl: thumbFor(r.url), ok: r.ok, error: r.error,
         costUsd: Math.round(num(r.cost_usd) * 100000) / 100000, estimated: r.cost_basis === "estimated",
         buyerLabel: r.buyer_label, prompt: r.prompt,
     }));
