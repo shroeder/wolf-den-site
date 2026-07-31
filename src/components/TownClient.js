@@ -1192,14 +1192,15 @@ export default function TownClient({ initial }) {
                     {stockade?.occupant ? (
                         <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>
                             <span className="tw-npc-bubble">⛓️ {stockade.occupant.name}</span>
-                            {art.stockade?.url ? (
+                            {stockade.occupant.artUrl ? (
+                                // The combined picture: them drawn INTO the boards, one image.
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={stockade.occupant.artUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
+                            ) : art.stockade?.url ? (
+                                // Fallback while the combined draw is pending or if it failed: the empty prop.
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={art.stockade.url} alt="The Stockade" draggable={false} />
                             ) : <span className="tw-npc-emoji">⛓️</span>}
-                            {stockade.occupant.spriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={stockade.occupant.spriteUrl} alt="" draggable={false} className="tw-stockade-face" style={{ transform: stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
-                            ) : null}
                         </button>
                     ) : null}
                     <button type="button" className="tw-npc-btn" style={{ left: "9%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setBoardOpen(true); }} aria-label="Town Crier">
@@ -1398,9 +1399,9 @@ export default function TownClient({ initial }) {
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
                         <div className="tw-roster-head"><strong>⛓️ The Stockade</strong><button type="button" onClick={() => setStockOpen(false)} aria-label="Close">✕</button></div>
                         <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "2px 2px 10px" }}>
-                            {stockade.occupant.spriteUrl ? (
+                            {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img src={stockade.occupant.spriteUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, objectFit: "contain", filter: "grayscale(0.5) brightness(0.8)", transform: stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
+                                <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt="" width={96} height={96} style={{ width: 96, height: 96, objectFit: "contain", transform: !stockade.occupant.artUrl && stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
                             ) : <span style={{ fontSize: 44 }}>😔</span>}
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.02rem" }}>{stockade.occupant.name}</div>
@@ -2250,10 +2251,9 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-npc { position: absolute; transform: translate(-50%, -100%); height: 92px; width: auto; z-index: 97; pointer-events: none; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 /* Interactive plaza NPCs (crier / merchant) — a tappable button with a sprite + a speech bubble. */
 .tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 250; display: flex; flex-direction: column; align-items: center; }
-/* THE STOCKADE — the occupant's own hero sprite is pinned into the frame, desaturated and slightly sunk, so
-   passers-by can see at a glance WHO is in it without opening the panel. */
+/* THE STOCKADE — the occupant is DRAWN INTO the boards as one image (see renderOccupantArt), so there is no
+   sprite to position here; it just stands a little taller than the NPCs. */
 .tw-stockade img:first-of-type { height: 92px; }
-.tw-stockade-face { position: absolute; left: 50%; bottom: 6%; width: 34px !important; height: 34px !important; margin-left: -17px; filter: grayscale(0.55) brightness(0.82) drop-shadow(0 2px 3px rgba(0,0,0,0.6)) !important; animation: none !important; pointer-events: none; }
 .tw-stockade .tw-npc-bubble { background: rgba(120,32,32,0.92); border-color: rgba(255,140,140,0.5); }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }
 .tw-npc-emoji { font-size: 50px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }

@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { STOCKADE_PENALTY, stockadeMultiplier } from "@/lib/marketplace/stockade-penalty.js";
+import { editImage } from "@/lib/marketplace/openai-image.js";
+import sharp from "sharp";
 
 export { STOCKADE_PENALTY, stockadeMultiplier };
 
@@ -31,7 +33,7 @@ const today = () => db.queryOne(`SELECT (NOW() AT TIME ZONE 'America/Chicago')::
 export async function getOccupant() {
     return db
         .queryOne(
-            `SELECT s.buyer_id, s.reason, s.placed_at, s.shame_count, s.fruit_count,
+            `SELECT s.buyer_id, s.reason, s.placed_at, s.shame_count, s.fruit_count, s.occupant_art_url,
                     b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip
                FROM mkt_stockade s
                JOIN mkt_buyer b ON b.id = s.buyer_id
@@ -39,6 +41,39 @@ export async function getOccupant() {
               LIMIT 1`
         )
         .catch(() => null);
+}
+
+/**
+ * Draw the occupant INTO the stockade as one image, starting from their own hero sprite.
+ *
+ * Compositing a hero sprite over an empty stockade doesn't read as "locked in" — the arms don't go through the
+ * holes, nothing is foreshortened and the lighting doesn't match, so it lands as a face pasted on a fence. An
+ * edit pass on their actual sprite keeps it recognisably THEM while letting the model bend the pose around the
+ * prop, which is the whole point of the picture.
+ *
+ * Cached on the row: it costs an image call and only changes when the occupant does. Best-effort — a failure
+ * leaves occupant_art_url null and the town falls back to the plain fixture rather than showing nothing.
+ */
+export async function renderOccupantArt(buyerId) {
+    const row = await db.queryOne(`SELECT avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!row?.avatar_sprite_url) return { ok: false, error: "no_hero_sprite" };
+    try {
+        const src = await fetch(row.avatar_sprite_url).then((r) => r.arrayBuffer());
+        // sharp normalises whatever the sprite is stored as (WebP) into the PNG the edits endpoint wants.
+        const png = await sharp(Buffer.from(src)).png().toBuffer();
+        const prompt =
+            "Redraw this exact character locked into a medieval wooden pillory stockade, keeping their face, hair, skin tone, outfit and colours EXACTLY as they are. Two thick weathered oak planks clamp shut across them: their HEAD is through the large centre hole and BOTH WRISTS are through the two smaller side holes, palms open, arms stretched out to the sides and bent forward at the elbow so they are genuinely trapped in the boards. Hunched forward slightly, standing, glum embarrassed expression. A few splattered rotten tomatoes and cabbage leaves on the boards and on the ground at their feet. Bold stylized 2D video-game illustration, dark ink contour lines, cel-shaded flat vibrant colors, warm torchlit fantasy town palette, polished RPG game-art style, strong readable silhouette, full body, viewed from the front, transparent background, no text, no logo, no watermark, no border, no white outline, no sticker rim, no drop shadow.";
+        const url = await editImage(png, prompt, {
+            size: "1024x1024",
+            pathPrefix: "marketplace/town",
+            quality: "medium", // one image per occupant, standing in the plaza for as long as they're in it
+            meta: { origin: "admin", subject: "stockade-occupant", label: "Stockade occupant" },
+        });
+        await db.query(`UPDATE mkt_stockade SET occupant_art_url = $2, occupant_art_at = NOW() WHERE buyer_id = $1`, [buyerId, url]).catch(() => {});
+        return { ok: true, url };
+    } catch (e) {
+        return { ok: false, error: String(e?.message || e).slice(0, 200) };
+    }
 }
 
 /** Full state for the town UI: who's in, and how many swings the viewer has left today. */
@@ -62,6 +97,9 @@ export async function getStockadeState(viewerId) {
             name: occupant.display_name || occupant.alias,
             spriteUrl: occupant.avatar_sprite_url || null,
             spriteFlip: occupant.avatar_sprite_flip === true,
+            // The combined stockade+occupant picture. Null until it's drawn (or if the draw failed), in which
+            // case the town falls back to the empty fixture.
+            artUrl: occupant.occupant_art_url || null,
             reason: occupant.reason,
             placedAt: occupant.placed_at,
             shameCount: Number(occupant.shame_count) || 0,
@@ -145,7 +183,10 @@ export async function placeInStockade(buyerId, { reason, byId = null } = {}) {
           WHERE id = $1`,
         [buyerId, MARK_BADGE]
     ).catch(() => {});
-    return { ok: true };
+    // Draw them into the boards. Awaited rather than fired off: on Vercel an un-awaited promise dies the moment
+    // the handler returns, and this is the one image the whole feature is about.
+    const art = await renderOccupantArt(buyerId).catch(() => ({ ok: false }));
+    return { ok: true, art: art.ok ? art.url : null, artError: art.ok ? null : art.error || "draw_failed" };
 }
 
 /** Let them out: clears the lock, the badge and the debuff. The row stays as a record of what happened. */

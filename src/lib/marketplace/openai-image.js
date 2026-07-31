@@ -408,7 +408,7 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
 
 // Image-to-image: transform a reference PNG with a prompt (gpt-image-1 edits). Used to redraw a member's
 // avatar as a full-body sprite so it actually matches their avatar. Returns the stored Blob URL.
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", meta = {} } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -417,20 +417,20 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     form.append("image", new Blob([imageBuffer], { type: "image/png" }), "avatar.png");
     form.append("prompt", prompt);
     form.append("size", size);
-    form.append("quality", "low");
+    form.append("quality", quality);
     form.append("background", "transparent");
     form.append("n", "1");
 
     const resp = await fetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
-        await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
+        await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
         throw new Error(`OpenAI edit ${resp.status}: ${text.slice(0, 300)}`);
     }
     const data = await resp.json().catch(() => null);
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) {
-        await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
+        await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
         throw new Error("OpenAI returned no image");
     }
 
@@ -438,6 +438,6 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
     // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
     // draw of the same size — estimateImageCost() adds that when edit is true.
-    await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, url, ...meta });
     return url;
 }
