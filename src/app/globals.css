@@ -11647,11 +11647,23 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-tool-buy { flex: none; margin-left: auto; }
 .sail-tool .coin-cta { flex: none; margin-left: auto; }
 /* A dig tool procced — a quick flourish above the grid. */
-.dig-toolfx { text-align: center; font-weight: 800; font-size: 0.86rem; color: #ffd08a; margin: 0 0 8px;
-    background: rgba(255,140,60,0.14); border: 1px solid rgba(255,150,60,0.45); border-radius: 999px; padding: 5px 12px;
+/* FLOATS over the board instead of sitting in the flow. As a block element it appeared between the
+   instructions and the grid, so every tool proc shoved the whole board down and back — mid-dig, right as
+   you're aiming at a tile. It now overlays, and nothing moves. */
+.dig-toolfx { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 6;
+    pointer-events: none; white-space: nowrap;
+    text-align: center; font-weight: 800; font-size: 0.95rem; color: #ffd08a;
+    background: rgba(24,12,4,0.88); border: 1px solid rgba(255,150,60,0.55); border-radius: 999px; padding: 7px 16px;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.55);
     animation: digToolFx 1.5s ease-out both; }
 .dig-toolfx b { color: #ffb86b; }
-@keyframes digToolFx { 0% { opacity: 0; transform: scale(0.85); } 12% { opacity: 1; transform: scale(1.05); } 25% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes digToolFx {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+    12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+    25% { transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -76%) scale(1); }
+}
 
 /* ===== Sailing: fragment art, the hold card, and the dig recap ===== */
 .frag-icon { display: inline-block; vertical-align: -0.15em; flex: 0 0 auto; }

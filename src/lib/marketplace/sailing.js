@@ -512,12 +512,17 @@ const DIG_MAX_TIER = 6;
 function digTier(voyages = 0) { return Math.min(DIG_MAX_TIER, 1 + Math.floor(Math.max(0, voyages) / DIG_TIER_EVERY)); }
 // Grid = big enough to hide the fixed 3-wide chest with room; bigger at higher tiers = the same chest hides
 // better = harder. (Kept modest so tiles stay tappable on mobile.)
-function digSize(tier) { return Math.min(7, 4 + tier); } // t1=5 … t3=7 (capped)
-function digDepthMax(tier) { return tier >= 4 ? 4 : 3; }                          // deeper dirt at high tiers
+// The board kept growing only to tier 3 (capped at 7) while DIG_MAX_SIZE said 8 — so tiers 4-6 were the same
+// board as tier 3. Let it reach 8.
+function digSize(tier) { return Math.min(DIG_MAX_SIZE, 4 + tier); } // t1=5 … t4+=8
+function digDepthMax(tier) { return tier >= 5 ? 5 : tier >= 3 ? 4 : 3; } // deeper dirt as you go
 // Scan charges (the detector) — deliberately FEW ("a couple"), so a scan is a precious "feel it out" moment,
 // not a solve-the-grid tool. Scales with board difficulty (tier), NOT Luck. Tune freely.
 function digSenseBudget(tier) {
-    return 3 + Math.floor(Math.max(0, tier - 1) / 2); // t1-2: 3 scans, t3-4: 4, t5-6: 5
+    // Scans used to INCREASE with tier (3 → 4 → 5), which inverted the whole curve: the board stopped growing
+    // at tier 3 while the detector kept getting better, so tiles-per-scan fell from 12.3 to 9.8 and the dig got
+    // EASIER the further you progressed. Difficulty is meant to climb. Fewer scans on bigger boards.
+    return Math.max(2, 4 - Math.floor(Math.max(0, tier - 1) / 2)); // t1-2: 4, t3-4: 3, t5-6: 2
 }
 // A scan's HEAT for a tile: how CLOSE the nearest treasure is (Chebyshev distance) → 3 hot / 2 warm / 1 cool
 // / 0 cold. Feeling-based, not a neighbour-count — "am I close?" reads instantly.
