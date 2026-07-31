@@ -90,7 +90,10 @@ export async function grantCustomCredit(buyerId, n = 1, ctx = {}) {
     const amount = Math.max(1, Number(n) || 1);
     await db.query(`UPDATE mkt_buyer SET custom_deco_credits = COALESCE(custom_deco_credits, 0) + $2 WHERE id = $1`, [buyerId, amount]).catch(() => {});
     const b = await db.queryOne(`SELECT COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    await logCreationLedger(buyerId, amount, { source: ctx.source || "admin_grant", actorId: ctx.actorId ?? null, actorLabel: ctx.actorLabel ?? null, balanceAfter: b?.c ?? null, meta: ctx.meta || {} });
+    // Default to "unknown", NOT "admin_grant". A caller that forgets to say where tokens came from should
+    // produce an obviously-unattributed row, not a false claim that an admin gifted them — GIFT_SOURCES treats
+    // admin_grant as a gift, so the old default put paid purchases straight into the gift audit feed.
+    await logCreationLedger(buyerId, amount, { source: ctx.source || "unknown", actorId: ctx.actorId ?? null, actorLabel: ctx.actorLabel ?? null, balanceAfter: b?.c ?? null, meta: ctx.meta || {} });
     return { ok: true, credits: b?.c || 0 };
 }
 

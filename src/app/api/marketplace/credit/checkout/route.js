@@ -127,7 +127,18 @@ export async function POST(request) {
                 syncEarnedBadges(buyer.id).catch(() => {});
                 // 1 custom-decoration creation credit per full $5 loaded (design-your-own-decoration perk).
                 const creations = Math.floor(amountCents / 500);
-                if (creations > 0) grantCustomCredit(buyer.id, creations).catch(() => {});
+                if (creations > 0) {
+                    // Label it. Passing no context made grantCustomCredit fall back to source "admin_grant",
+                    // so tokens a member PAID for appeared in the gift audit feed as an admin handout — which
+                    // is exactly how a member buying $25 of store credit came to look like he was comping
+                    // himself creations.
+                    grantCustomCredit(buyer.id, creations, {
+                        source: "purchase_credit",
+                        actorId: buyer.id,
+                        actorLabel: "self (store credit)",
+                        meta: { amountCents },
+                    }).catch(() => {});
+                }
             }
 
             return noStore({
