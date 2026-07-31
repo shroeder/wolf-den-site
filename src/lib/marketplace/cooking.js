@@ -10,6 +10,11 @@ import { SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { FISH } from "@/lib/marketplace/fishing.js";
 import { COOK_ODDS_KEYS, collectibleById, petCookPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+import { addChests } from "@/lib/marketplace/chests.js";
+import { addParts } from "@/lib/marketplace/crafting.js";
+import { grantSeed } from "@/lib/marketplace/farm-crops.js";
+import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
 // same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
@@ -62,18 +67,117 @@ export const TRACK_COL = { heat: "heat_level", season: "season_level", batch: "b
 export const trackValue = (t, lvl) => Math.min(COOK_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * COOK_TRACKS[t].per);
 export const trackCost = (lvl) => 400 * (Number(lvl) + 1) * (Number(lvl) + 1);
 
-// ── DISH TIERS ───────────────────────────────────────────────────────────────────────────────────────────────
-// Each tier is a POOL of existing consumables. Cooking rolls one at random. Reusing the consumable catalogue
-// rather than inventing a parallel one means every dish already works everywhere — the stash, the use flow,
-// the pet-feeding, the boss buffs — on day one.
+// ── WHAT A DISH IS WORTH ─────────────────────────────────────────────────────────────────────────────────────
+// Every dish pays GOLD, always. Cooking spends real ingredients and one of five daily slots, so it has to be
+// worth doing even when the rolled reward isn't the one you wanted — and a system that pays nothing you can
+// spend is a strange thing to put in a game with an economy.
+//
+// On top of that it rolls ONE reward from the tier's table. The first pass drew that table entirely from the
+// consumables that already existed, which meant it leaned on the oldest systems (boss potions, pet treats) and
+// completely ignored the Forge, chests, seeds and sailing. It also handed out an instant pet level and a
+// 2,000 XP scroll, which are both far too strong to be a random drop off a mid-tier dish.
+//
+// R() is weight-first so the shape of a tier is readable down the column.
+const R_ = (weight, reward) => ({ weight, ...reward });
+
 export const TIERS = [
-    { tier: 1, name: "Simple",    color: "#cfd8e3", pool: ["treat_bone", "farm_pet_whistle", "farm_kindness_token", "scroll_wisdom", "farm_growth_tonic"] },
-    { tier: 2, name: "Hearty",    color: "#7ec8ff", pool: ["treat_snack", "pot_adrenaline", "stone_storm", "sail_tailwind_charm", "sail_prospectors_charm"] },
-    { tier: 3, name: "Fine",      color: "#c9a2ff", pool: ["treat_toy", "pot_secondwind", "stone_ember", "farm_harvest_charm", "sail_raiding_horn", "spin_lucky_coin"] },
-    { tier: 4, name: "Exquisite", color: "#ffd75e", pool: ["treat_feast", "pot_berserker", "scroll_ancient", "farm_fertilizer_crate", "sail_treasure_map", "spin_golden_ticket"] },
-    { tier: 5, name: "Legendary", color: "#ff9ec4", pool: ["treat_golden", "treat_kibble", "pot_fury", "treat_ambrosia", "sail_kraken_bait", "farm_fertilizer_haul"] },
+    {
+        tier: 1, name: "Simple", color: "#cfd8e3", gold: [120, 220],
+        rewards: [
+            R_(26, { kind: "parts", partTier: 1, min: 2, max: 4 }),
+            R_(20, { kind: "seed", pool: ["wheat", "carrot", "potato"], min: 2, max: 3 }),
+            R_(16, { kind: "consumable", id: "treat_bone" }),
+            R_(14, { kind: "consumable", id: "farm_pet_whistle" }),
+            R_(12, { kind: "gold", min: 220, max: 400 }),           // a bonus purse on top of the base
+            R_(8, { kind: "consumable", id: "farm_growth_tonic" }),
+            R_(4, { kind: "chest", chestTier: "wooden" }),
+        ],
+    },
+    {
+        tier: 2, name: "Hearty", color: "#7ec8ff", gold: [320, 560],
+        rewards: [
+            R_(24, { kind: "parts", partTier: 2, min: 2, max: 4 }),
+            R_(18, { kind: "chest", chestTier: "wooden" }),
+            R_(15, { kind: "consumable", id: "treat_snack" }),
+            R_(13, { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 }),
+            R_(12, { kind: "gold", min: 600, max: 950 }),
+            R_(10, { kind: "consumable", id: "sail_tailwind_charm" }),
+            R_(8, { kind: "consumable", id: "scroll_wisdom" }),      // 500 XP — a sensible scroll, not 2,000
+        ],
+    },
+    {
+        tier: 3, name: "Fine", color: "#c9a2ff", gold: [750, 1200],
+        rewards: [
+            R_(22, { kind: "parts", partTier: 3, min: 2, max: 4 }),
+            R_(18, { kind: "chest", chestTier: "iron" }),
+            R_(14, { kind: "consumable", id: "treat_toy" }),
+            R_(13, { kind: "gold", min: 1400, max: 2200 }),
+            R_(11, { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 2, max: 3 }),
+            R_(10, { kind: "consumable", id: "farm_harvest_charm" }),
+            R_(7, { kind: "spin", n: 2 }),
+            R_(5, { kind: "consumable", id: "sail_prospectors_charm" }),
+        ],
+    },
+    {
+        tier: 4, name: "Exquisite", color: "#ffd75e", gold: [1700, 2600],
+        rewards: [
+            R_(20, { kind: "parts", partTier: 4, min: 2, max: 3 }),
+            R_(18, { kind: "chest", chestTier: "gold" }),
+            R_(14, { kind: "gold", min: 3200, max: 4800 }),
+            R_(12, { kind: "consumable", id: "treat_feast" }),
+            R_(10, { kind: "seed", pool: ["starfruit"], min: 2, max: 3 }),
+            R_(9, { kind: "consumable", id: "farm_fertilizer_crate" }),
+            R_(8, { kind: "consumable", id: "sail_treasure_map" }),
+            R_(6, { kind: "spin", n: 5 }),
+            R_(3, { kind: "parts", partTier: 5, min: 1, max: 2 }),
+        ],
+    },
+    {
+        // Tier 5 has to justify a chain of legendary ingredients. The old top tier's best outcome was a pet
+        // treat; this one can hand over a Creation token — the only reward in the game that costs real money
+        // to buy — a mythic chest, or a stack of the Forge's top-tier part.
+        tier: 5, name: "Legendary", color: "#ff9ec4", gold: [4000, 6000],
+        rewards: [
+            R_(20, { kind: "parts", partTier: 5, min: 2, max: 4 }),
+            R_(17, { kind: "chest", chestTier: "gold" }),
+            R_(15, { kind: "gold", min: 7500, max: 12000 }),
+            R_(12, { kind: "chest", chestTier: "mythic" }),
+            R_(10, { kind: "consumable", id: "treat_golden" }),
+            R_(9, { kind: "spin", n: 8 }),
+            R_(7, { kind: "consumable", id: "farm_fertilizer_haul" }),
+            R_(6, { kind: "creation", n: 1 }),
+            R_(4, { kind: "chest", chestTier: "ascendant" }),
+        ],
+    },
 ];
 export const tierMeta = (t) => TIERS[Math.max(0, Math.min(TIERS.length - 1, (Number(t) || 1) - 1))];
+
+const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+/** Pick one reward from a tier's weighted table. */
+function rollReward(tier) {
+    const table = tierMeta(tier).rewards;
+    const total = table.reduce((n, r) => n + r.weight, 0);
+    let n = Math.random() * total;
+    for (const r of table) { n -= r.weight; if (n <= 0) return r; }
+    return table[table.length - 1];
+}
+
+/** Human-readable label for a reward entry — used by the recipe card so nothing is a guess. */
+export function rewardLabel(r) {
+    switch (r.kind) {
+        case "gold": return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "A bonus purse on top of the dish's own payout." };
+        case "parts": return { name: `${PART_NAME[r.partTier]} ×${r.min}–${r.max}`, desc: "Forge parts for salvaging and enhancing gear." };
+        case "chest": return { name: `${CHEST_NAME[r.chestTier]}`, desc: "Opens for gear at that chest's rarity odds." };
+        case "seed": return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.join(", ")}.` };
+        case "spin": return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin." };
+        case "creation": return { name: "A Creation token", desc: "Design your own custom decoration with AI art." };
+        case "consumable": return { name: CONSUMABLES[r.id]?.name || r.id, desc: CONSUMABLES[r.id]?.desc || "" };
+        default: return { name: "Something", desc: "" };
+    }
+}
+const PART_NAME = { 1: "Cinder Scrap", 2: "Iron Filings", 3: "Tempered Steel", 4: "Mythril Dust", 5: "Emberheart Shard" };
+const CHEST_NAME = { wooden: "Wooden Chest", iron: "Iron Chest", gold: "Gold Chest", mythic: "Mythic Chest", ascendant: "Ascendant Chest" };
 
 // ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
 // The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
@@ -357,9 +461,14 @@ export async function getKitchenState(buyerId) {
             // A prep says exactly what it makes; a dish says which pool it rolls from. Either way there is no
             // guessing about what pressing the button gets you.
             makes: outMeta ? { ref: outMeta.ref, name: outMeta.name, sprite: outMeta.sprite } : null,
-            pool: r.kind === "dish" ? tierMeta(r.tier).pool.map((id) => ({
-                id, name: CONSUMABLES[id]?.name || id, desc: CONSUMABLES[id]?.desc || "",
-            })) : null,
+            // What a dish can actually pay, with the gold floor stated separately — the roll is a bonus ON TOP
+            // of a guaranteed purse, and hiding that made cooking look like a lottery with a lot of blanks.
+            payout: r.kind === "dish" ? {
+                gold: tierMeta(r.tier).gold,
+                pool: tierMeta(r.tier).rewards
+                    .map((x) => ({ ...rewardLabel(x), weight: x.weight }))
+                    .sort((a, b) => b.weight - a.weight),
+            } : null,
             need,   // shown whether known or not — what a recipe wants is the useful half of the hint
             canCook: known && need.every((n) => n.enough),
         };
@@ -476,6 +585,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
 
     let made = null;
+    let goldPaid = 0;
     let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) ? 1 : 0);
 
     const spriteMap = await cookingSprites();
@@ -489,13 +599,43 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         const m = PREPS[rec.out];
         made = { kind: "prep", id: rec.out, name: m?.name || rec.out, desc: "A prepped ingredient other recipes call for.", sprite: spriteMap[rec.out] || null };
     } else {
-        const pool = tierMeta(tier).pool;
-        const pick = pool[Math.floor(Math.random() * pool.length)];
-        await grantConsumable(buyerId, pick, portions).catch(() => {});
-        const c = CONSUMABLES[pick] || {};
-        // A cooked dish IS a consumable, so it shows the consumable's own sprite — the same picture the stash
-        // will show it with, rather than a second drawing of the same thing.
-        made = { kind: "dish", id: pick, name: c.name || pick, desc: c.desc || "", sprite: conSprites[pick] || spriteMap[rec.id] || null };
+        // GUARANTEED GOLD first. Cooking burns real ingredients and one of five daily slots; it has to pay
+        // something spendable every single time, not just when the roll is kind.
+        const meta = tierMeta(tier);
+        const baseGold = rint(meta.gold[0], meta.gold[1]) * portions;
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, baseGold]).catch(() => null);
+        await logCoin(buyerId, baseGold, "cooking", { balanceAfter: paid?.gold, meta: { recipe: rec.id, tier } }).catch(() => {});
+        goldPaid = baseGold;
+
+        // …then ONE roll from the tier's table, which now spans the Forge, chests, the farm, sailing, the
+        // wheel and Creations rather than only the consumables that happened to exist first.
+        const r = rollReward(tier);
+        const lbl = rewardLabel(r);
+        let extraSprite = null;
+        switch (r.kind) {
+            case "gold": {
+                const bonus = rint(r.min, r.max);
+                const p2 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, bonus]).catch(() => null);
+                await logCoin(buyerId, bonus, "cooking", { balanceAfter: p2?.gold, meta: { recipe: rec.id, bonus: true } }).catch(() => {});
+                goldPaid += bonus;
+                break;
+            }
+            case "parts": await addParts(buyerId, r.partTier, rint(r.min, r.max)).catch(() => {}); break;
+            case "chest": await addChests(buyerId, { [r.chestTier]: 1 }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
+            case "seed": {
+                const id = r.pool[Math.floor(Math.random() * r.pool.length)];
+                for (let i = 0; i < rint(r.min, r.max); i += 1) await grantSeed(buyerId, id).catch(() => {});
+                break;
+            }
+            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, r.n]).catch(() => {}); break;
+            case "creation": await grantCustomCredit(buyerId, r.n, { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
+            case "consumable":
+                await grantConsumable(buyerId, r.id, 1).catch(() => {});
+                extraSprite = conSprites[r.id] || null;
+                break;
+            default: break;
+        }
+        made = { kind: "dish", id: rec.id, name: rec.name, desc: `${lbl.name} — ${lbl.desc}`, reward: { ...lbl, kind: r.kind }, sprite: spriteMap[rec.id] || extraSprite || null };
     }
 
     const xp = Math.round(8 * tier * (0.7 + q * 0.6));
@@ -520,7 +660,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     return {
         ok: true,
         made: { ...made, tier, tierName: tierMeta(tier).name, tierColor: tierMeta(tier).color },
-        portions, bumped, freeCook, xp, quality: q, chain: chainN,
+        portions, bumped, freeCook, xp, quality: q, chain: chainN, goldPaid,
         grade: q >= 0.92 ? "flawless" : q >= 0.72 ? "perfect" : q >= 0.45 ? "good" : "rough",
         ...(await getKitchenState(buyerId)),
     };

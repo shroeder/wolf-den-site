@@ -183,7 +183,7 @@ async function logCraft(buyerId, action, { itemId = null, tier = null, score = n
         .query(`INSERT INTO mkt_craft_event (buyer_id, action, item_id, tier, score, grade, meta) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`, [buyerId, action, itemId, tier, score, grade, meta ? JSON.stringify(meta) : null])
         .catch(() => {});
 }
-async function addParts(buyerId, tier, n) {
+export async function addParts(buyerId, tier, n) {
     if (n <= 0) return;
     await db
         .query(`INSERT INTO mkt_salvage_part (buyer_id, tier, count) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET count = mkt_salvage_part.count + $3`, [buyerId, tier, n])

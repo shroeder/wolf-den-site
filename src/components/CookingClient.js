@@ -253,9 +253,18 @@ export default function CookingClient({ initial }) {
                                             </div>
                                         ) : (
                                             <div className="ck-pool">
-                                                <p className="ck-pool-intro">One of these, at random — a good timing run can push it a tier higher:</p>
-                                                {(r.pool || []).map((c) => (
-                                                    <div key={c.id} className="ck-pool-row">
+                                                {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
+                                                    only the roll made cooking look like a lottery with a lot of blanks. */}
+                                                <div className="ck-payout">
+                                                    <span className="ck-payout-ico" aria-hidden="true">🪙</span>
+                                                    <span>
+                                                        <b>{r.payout?.gold?.[0]?.toLocaleString()}–{r.payout?.gold?.[1]?.toLocaleString()} gold</b>
+                                                        every time you cook it
+                                                    </span>
+                                                </div>
+                                                <p className="ck-pool-intro">…plus ONE of these, at random. A good timing run can push the whole dish a tier higher:</p>
+                                                {(r.payout?.pool || []).map((c, i) => (
+                                                    <div key={i} className="ck-pool-row">
                                                         <b>{c.name}</b><span>{c.desc}</span>
                                                     </div>
                                                 ))}
@@ -318,7 +327,12 @@ export default function CookingClient({ initial }) {
                         <div className="ck-reveal-tier">{result.made.tierName} · {result.grade}</div>
                         <div className="ck-reveal-art"><Art sprite={result.made.sprite} emoji="🍽️" size={110} alt={result.made.name} /></div>
                         <div className="ck-reveal-name">{result.made.name}{result.portions > 1 ? ` ×${result.portions}` : ""}</div>
-                        <p className="ck-reveal-desc">{result.made.desc}</p>
+                        {result.made.reward ? (
+                            <div className="ck-reveal-got">
+                                <div className="ck-reveal-gold">🪙 {(result.goldPaid || 0).toLocaleString()} gold</div>
+                                <div className="ck-reveal-prize"><b>{result.made.reward.name}</b><span>{result.made.reward.desc}</span></div>
+                            </div>
+                        ) : <p className="ck-reveal-desc">{result.made.desc}</p>}
                         <div className="ck-reveal-tags">
                             {result.bumped ? <span className="ck-tag heat">The heat caught it — a tier better</span> : null}
                             {result.portions > 1 ? <span className="ck-tag season">Second helping — ×{result.portions}</span> : null}
@@ -474,6 +488,16 @@ const CK_CSS = `
 .ck-makes { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #cfd6dd; margin-bottom: 12px; }
 .ck-pool { margin-bottom: 12px; }
 .ck-pool-intro { margin: 0 0 6px; font-size: 0.78rem; color: #98a2ae; }
+.ck-payout { display: flex; align-items: center; gap: 9px; padding: 8px 11px; border-radius: 10px; margin-bottom: 9px;
+    background: rgba(255,215,94,0.09); border: 1px solid rgba(255,215,94,0.28); font-size: 0.8rem; color: #cfd6dd; }
+.ck-payout-ico { font-size: 1.05rem; }
+.ck-payout b { color: #ffd75e; }
+.ck-reveal-got { margin-top: 10px; }
+.ck-reveal-gold { font-size: 1.05rem; font-weight: 900; color: #ffd75e; margin-bottom: 8px; }
+.ck-reveal-prize { display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; border-radius: 11px;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.ck-reveal-prize b { font-size: 0.95rem; }
+.ck-reveal-prize span { font-size: 0.76rem; color: #98a2ae; line-height: 1.35; }
 .ck-pool-row { display: flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,0.035); margin-bottom: 4px; }
 .ck-pool-row b { font-size: 0.8rem; }
 .ck-pool-row span { font-size: 0.73rem; color: #8b93a0; line-height: 1.3; }
