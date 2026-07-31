@@ -332,7 +332,20 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         await db.query(`UPDATE mkt_buyer SET free_spin_day = NULL WHERE id = $1`, [buyerId]).catch(() => {});
         applied = "free daily spin refreshed — spin again!";
     } else if (e.type === "xp") {
-        await awardXp(buyerId, "consumable", { points: e.amount, meta: { consumable: id } }).catch(() => {});
+        // gold: 0 — XP ONLY. awardXp defaults gold to track XP 1:1, so an XP scroll paid GOLD back on top of
+        // the XP, and with the town/market/hangout multipliers it paid back more than the scroll cost:
+        //
+        //     Ancient Codex — costs 5,000 gold, grants 2,000 XP, refunded ~8,000 gold. Net +3,000 a use.
+        //     Tome of Wisdom — costs 1,500, grants 500 XP, refunded ~2,000. Net +500 a use.
+        //
+        // Both were an unbounded money printer at roughly one use per second. One member reached 9.5M XP and
+        // 3.5M gold this way — 270x the next player — which is not a clever exploit so much as us paying people
+        // to press a button.
+        //
+        // This is exactly the case the `gold` parameter already exists for: trades pass gold: 0 "so we don't
+        // hand out spendable currency for a payout we already paid the customer for". A scroll is the same
+        // shape — they PAID gold for it; handing gold back is refunding the purchase and then some.
+        await awardXp(buyerId, "consumable", { points: e.amount, gold: 0, meta: { consumable: id } }).catch(() => {});
         applied = `+${e.amount.toLocaleString()} XP`;
     } else if (e.type === "strikes") {
         // Expire at the next STORE-LOCAL (America/Chicago) midnight — the same boundary the boss swing counter
