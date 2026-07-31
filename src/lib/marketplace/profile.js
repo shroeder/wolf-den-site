@@ -136,9 +136,9 @@ function mapProfile(row, badges = []) {
         // Equipped cosmetic profile frame id ('none' when unset) — the inset textured card border.
         frame: row.equipped_frame || "none",
         // Badges shown ON the card: the member's showcase (up to 3), or their top few by default.
-        displayBadges: pickShowcaseBadges(badges, row.showcase_badge_slugs || null),
+        displayBadges: pickShowcaseBadges(badges, row.showcase_badge_slugs || null, row.locked_badge || null),
         // The "folder tab" = the top-ranked of the showcased badges (silent; no explicit primary).
-        featuredBadge: pickShowcaseBadges(badges, row.showcase_badge_slugs || null)[0] || null,
+        featuredBadge: pickShowcaseBadges(badges, row.showcase_badge_slugs || null, row.locked_badge || null)[0] || null,
         // The RAW stored showcase (for the picker). Empty = default (top few).
         showcaseSlugs: row.showcase_badge_slugs || [],
         // The collectible the member features on their card / public profile (id, or null). Level only ever
@@ -158,7 +158,7 @@ function mapProfile(row, badges = []) {
 export async function getProfile(buyerId) {
     if (!buyerId) return null;
     const row = await db.queryOne(
-        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible, game_interests, fnm_cta_dismissed_at, notify_email_dm, notify_email_friend
+        `SELECT id, email, phone, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, discord_user_id, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, locked_badge, featured_collectible, game_interests, fnm_cta_dismissed_at, notify_email_dm, notify_email_friend
            FROM mkt_buyer WHERE id = $1`,
         [buyerId]
     );
@@ -384,7 +384,7 @@ export async function getPublicProfileByAlias(alias) {
     const a = normalizeAlias(alias);
     if (!a) return null;
     const row = await db.queryOne(
-        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, featured_collectible
+        `SELECT id, display_name, first_name, last_name, alias, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_background, equipped_frame, showcase_badge_slugs, locked_badge, featured_collectible
            FROM mkt_buyer WHERE alias_normalized = $1`,
         [a]
     );

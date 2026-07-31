@@ -398,7 +398,7 @@ export async function getBossState(buyerId = null) {
     const members = await db
         .query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_url, b.avatar_config, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
-                    COALESCE(b.xp, 0) AS xp, b.equipped_border, b.equipped_frame, b.equipped_background, b.avatar_cosmetics, b.showcase_badge_slugs,
+                    COALESCE(b.xp, 0) AS xp, b.equipped_border, b.equipped_frame, b.equipped_background, b.avatar_cosmetics, b.showcase_badge_slugs, b.locked_badge,
                     (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
                     COALESCE(SUM(h.damage), 0)::int AS dmg
                FROM mkt_buyer b
@@ -438,7 +438,7 @@ export async function getBossState(buyerId = null) {
                 : null;
             const cos = sanitizeCosmetics(m.avatar_cosmetics);
             const badges = fighterBadges.get(m.id) || [];
-            const displayBadges = pickShowcaseBadges(badges, m.showcase_badge_slugs || null);
+            const displayBadges = pickShowcaseBadges(badges, m.showcase_badge_slugs || null, m.locked_badge || null);
             return {
                 id: m.id,
                 name: m.display_name || m.alias || "Member",

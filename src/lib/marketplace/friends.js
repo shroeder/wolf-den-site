@@ -29,11 +29,12 @@ function mapUser(row) {
         border: row.equipped_border || "none",
         frame: row.equipped_frame || "none",
         showcaseSlugs: row.showcase_badge_slugs || null,
+        lockedBadge: row.locked_badge || null,
         featuredCollectibleId: row.featured_collectible || null,
     };
 }
 
-const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_frame, showcase_badge_slugs, featured_collectible";
+const USER_COLS = "id, alias, display_name, avatar_url, avatar_config, avatar_cosmetics, xp, equipped_border, equipped_frame, showcase_badge_slugs, locked_badge, featured_collectible";
 
 // Batch-attach each user's badges (for hero cards). One query for the whole set, not per-user.
 async function attachBadges(users) {
@@ -58,7 +59,7 @@ async function attachBadges(users) {
         if (!u) return u;
         const badges = byId.get(u.id) || [];
         // Cap what shows on the card to the member's showcase (or their top few), tab = the top of those.
-        const displayBadges = pickShowcaseBadges(badges, u.showcaseSlugs);
+        const displayBadges = pickShowcaseBadges(badges, u.showcaseSlugs, u.lockedBadge || null);
         return { ...u, badges, displayBadges, featuredBadge: displayBadges[0] || null };
     });
 }
