@@ -1398,34 +1398,38 @@ export default function TownClient({ initial }) {
                 <div className="tw-roster" onClick={() => setStockOpen(false)} role="presentation">
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
                         <div className="tw-roster-head"><strong>⛓️ The Stockade</strong><button type="button" onClick={() => setStockOpen(false)} aria-label="Close">✕</button></div>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "2px 2px 10px" }}>
-                            {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt="" width={96} height={96} style={{ width: 96, height: 96, objectFit: "contain", transform: !stockade.occupant.artUrl && stockade.occupant.spriteFlip ? "scaleX(-1)" : "none" }} />
-                            ) : <span style={{ fontSize: 44 }}>😔</span>}
-                            <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 800, fontSize: "1.02rem" }}>{stockade.occupant.name}</div>
-                                <div className="muted" style={{ fontSize: "0.82rem", fontStyle: "italic" }}>{stockade.occupant.reason}</div>
-                                <div className="muted" style={{ fontSize: "0.78rem", marginTop: 3 }}>
-                                    Shamed {stockade.occupant.shameCount}× · Pelted {stockade.occupant.fruitCount}×
-                                </div>
-                            </div>
-                        </div>
+                        <p className="tw-stock-reason">&ldquo;{stockade.occupant.reason}&rdquo;</p>
                         {stockFlash ? <div className="tw-merchant-flash">{stockFlash}</div> : null}
+
                         {stockade.isOccupant ? (
-                            <p className="muted" style={{ margin: "6px 2px", fontSize: "0.86rem" }}>
+                            <p className="tw-stock-self">
                                 You&rsquo;re the one in the stockade. −10% XP, coin and boss damage until you&rsquo;re let out.
                             </p>
                         ) : (
-                            <div style={{ display: "grid", gap: 8 }}>
-                                <button type="button" className="tw-btn" disabled={stockBusy || stockade.shame.used >= stockade.shame.max} onClick={() => stockAct("shame")}>
-                                    👉 Shame them &nbsp;<span className="muted">+{stockade.shame.xp} XP · {Math.max(0, stockade.shame.max - stockade.shame.used)} left today</span>
+                            <div className="tw-stock-actions">
+                                <button type="button" className="tw-stock-btn is-shame" disabled={stockBusy || stockade.shame.used >= stockade.shame.max} onClick={() => stockAct("shame")}>
+                                    <span className="tw-stock-ico" aria-hidden="true">👉</span>
+                                    <span className="tw-stock-lbl">Shame them</span>
+                                    <span className="tw-stock-meta">+{stockade.shame.xp} XP</span>
+                                    <span className="tw-stock-left">{Math.max(0, stockade.shame.max - stockade.shame.used)}/{stockade.shame.max}</span>
                                 </button>
-                                <button type="button" className="tw-btn" disabled={stockBusy || stockade.fruit.used >= stockade.fruit.max} onClick={() => stockAct("fruit")}>
-                                    🍅 Throw rotten fruit &nbsp;<span className="muted">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} 🪙 · {Math.max(0, stockade.fruit.max - stockade.fruit.used)} left today</span>
+                                <button type="button" className="tw-stock-btn is-fruit" disabled={stockBusy || stockade.fruit.used >= stockade.fruit.max} onClick={() => stockAct("fruit")}>
+                                    <span className="tw-stock-ico" aria-hidden="true">🍅</span>
+                                    <span className="tw-stock-lbl">Throw rotten fruit</span>
+                                    <span className="tw-stock-meta">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} 🪙</span>
+                                    <span className="tw-stock-left">{Math.max(0, stockade.fruit.max - stockade.fruit.used)}/{stockade.fruit.max}</span>
                                 </button>
                             </div>
                         )}
+
+                        <div className="tw-stock-stage">
+                            {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
+                            ) : <span style={{ fontSize: 64 }}>😔</span>}
+                            <div className="tw-stock-name">{stockade.occupant.name}</div>
+                            <div className="tw-stock-tally">Shamed {stockade.occupant.shameCount}× · Pelted {stockade.occupant.fruitCount}×</div>
+                        </div>
                     </div>
                 </div>
             ) : null}
@@ -2253,6 +2257,25 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-npc-btn { position: absolute; transform: translate(-50%, -100%); background: none; border: none; padding: 0; cursor: pointer; z-index: 250; display: flex; flex-direction: column; align-items: center; }
 /* THE STOCKADE — the occupant is DRAWN INTO the boards as one image (see renderOccupantArt), so there is no
    sprite to position here; it just stands a little taller than the NPCs. */
+/* Panel: the ACTIONS sit above the occupant so they're the first thing your thumb reaches and can never end up
+   under the floating chat button, and the portrait below them is the payoff rather than a thumbnail. */
+.tw-stock-reason { margin: 2px 2px 10px; font-size: 0.88rem; font-style: italic; color: #c9b6b6; line-height: 1.35; }
+.tw-stock-self { margin: 6px 2px 12px; font-size: 0.88rem; color: #e2b4b4; }
+.tw-stock-actions { display: grid; gap: 9px; margin-bottom: 14px; }
+.tw-stock-btn { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border-radius: 14px; cursor: pointer; text-align: left; font: inherit; border: 1px solid rgba(255,255,255,0.16); background: linear-gradient(180deg, rgba(58,40,40,0.96), rgba(38,26,26,0.96)); color: #f2e6e6; box-shadow: 0 3px 12px rgba(0,0,0,0.45); transition: transform .06s ease, filter .12s ease; }
+.tw-stock-btn:hover:not(:disabled) { filter: brightness(1.14); }
+.tw-stock-btn:active:not(:disabled) { transform: translateY(1px) scale(0.995); }
+.tw-stock-btn:disabled { opacity: 0.42; cursor: default; }
+.tw-stock-btn.is-shame { border-color: rgba(255,205,120,0.42); background: linear-gradient(180deg, rgba(74,58,30,0.96), rgba(44,34,18,0.96)); }
+.tw-stock-btn.is-fruit { border-color: rgba(255,120,110,0.45); background: linear-gradient(180deg, rgba(84,34,30,0.96), rgba(50,20,18,0.96)); }
+.tw-stock-ico { font-size: 22px; line-height: 1; grid-row: span 2; }
+.tw-stock-lbl { font-weight: 800; font-size: 0.98rem; letter-spacing: 0.1px; }
+.tw-stock-meta { grid-column: 2; font-size: 0.76rem; color: #c3b2a6; margin-top: 1px; }
+.tw-stock-left { grid-row: span 2; font-weight: 800; font-size: 0.8rem; color: #ffd75e; background: rgba(0,0,0,0.32); border-radius: 999px; padding: 4px 9px; }
+.tw-stock-stage { display: grid; justify-items: center; gap: 4px; padding: 12px 0 6px; border-top: 1px solid rgba(255,255,255,0.09); }
+.tw-stock-stage img { width: 172px; height: 172px; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)); }
+.tw-stock-name { font-weight: 800; font-size: 1.06rem; }
+.tw-stock-tally { font-size: 0.78rem; color: #9aa0a6; }
 .tw-stockade img:first-of-type { height: 92px; }
 .tw-stockade .tw-npc-bubble { background: rgba(120,32,32,0.92); border-color: rgba(255,140,140,0.5); }
 .tw-npc-btn img { height: 86px; width: auto; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.55)); }

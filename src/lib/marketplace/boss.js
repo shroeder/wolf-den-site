@@ -648,13 +648,21 @@ export async function getPendingBossCelebration(buyerId) {
     if (!buyerId) return { pending: false };
     const row = await db
         .queryOne(
+            // Pick the LATEST defeat they fought in FIRST, then check whether it's been acknowledged.
+            //
+            // Filtering out the acked boss BEFORE the ORDER BY made the recap unclosable whenever two bosses
+            // died inside the 3-day window: boss_celebrated_id holds one id, so acking Molgrath left Grumvok
+            // pending, acking Grumvok left Molgrath pending, and it ping-ponged forever. Only the most recent
+            // defeat can be pending now, so acknowledging it actually ends it.
             `SELECT be.id, be.name, be.winner_buyer_id, be.winner_tickets, be.prize_name, be.ticket_divisor
-               FROM boss_event be
+               FROM (
+                    SELECT e.* FROM boss_event e
+                     WHERE e.defeated_at IS NOT NULL AND e.defeated_at > NOW() - interval '3 days'
+                       AND EXISTS (SELECT 1 FROM boss_hit h WHERE h.boss_id = e.id AND h.buyer_id = $1)
+                     ORDER BY e.defeated_at DESC LIMIT 1
+               ) be
                JOIN mkt_buyer mb ON mb.id = $1
-              WHERE be.defeated_at IS NOT NULL AND be.defeated_at > NOW() - interval '3 days'
-                AND (mb.boss_celebrated_id IS DISTINCT FROM be.id)
-                AND EXISTS (SELECT 1 FROM boss_hit h WHERE h.boss_id = be.id AND h.buyer_id = $1)
-              ORDER BY be.defeated_at DESC LIMIT 1`,
+              WHERE mb.boss_celebrated_id IS DISTINCT FROM be.id`,
             [buyerId]
         )
         .catch(() => null);
