@@ -62,6 +62,24 @@ export async function getImageSpendByFeature() {
     }
 }
 
+
+// ── Cache for the OpenAI reads ────────────────────────────────────────────────────────────────────────────
+// Each of getAiCosts / getFullAccounting / realDailyCost walks OpenAI's paginated cost API, up to 40 requests
+// apiece. Opening the AI Costs screen fires several of them, so one refresh could mean ~80 outbound calls —
+// each one costing function time and origin transfer on our side. Costs only update daily, so a few minutes of
+// staleness is free. This showed up as a real jump in Fluid CPU and Fast Origin Transfer while the screen was
+// being refreshed repeatedly during development.
+const _cache = new Map();
+const TTL_MS = 5 * 60 * 1000;
+async function cached(key, fn) {
+    const hit = _cache.get(key);
+    if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+    const value = await fn();
+    // Don't cache a failure — a missing key or a transient 500 would stick for five minutes.
+    if (value && value.ok !== false) _cache.set(key, { at: Date.now(), value });
+    return value;
+}
+
 function adminKey() {
     return process.env.OPEN_AI_ADMIN_KEY || process.env.OPENAI_ADMIN_KEY || null;
 }
@@ -90,6 +108,9 @@ const round2 = (n) => Math.round(n * 100) / 100;
 // { total, total7d, totalToday, byModel:[{label,feature,cost,pct}], daily:[{date,cost}] }. Returns ok:false with a
 // reason when the admin key is missing or OpenAI rejects the call.
 export async function getAiCosts({ days = 30 } = {}) {
+    return cached(`costs:${days}`, () => _getAiCosts({ days }));
+}
+async function _getAiCosts({ days = 30 } = {}) {
     const key = adminKey();
     if (!key) return { ok: false, error: "no_admin_key" };
     const start = Math.floor(Date.now() / 1000) - days * 86400;
@@ -214,6 +235,9 @@ const IMG_TIER_TOKENS = { low: 272, medium: 1056, high: 4160 };
 const tierFor = (avg) => (avg > 3000 ? "high" : avg > 700 ? "medium" : avg > 330 ? "low/medium" : "low");
 
 export async function getFullAccounting({ days = 30 } = {}) {
+    return cached(`full:${days}`, () => _getFullAccounting({ days }));
+}
+async function _getFullAccounting({ days = 30 } = {}) {
     const key = adminKey();
     if (!key) return { ok: false, error: "no_admin_key" };
     const start = Math.floor(Date.now() / 1000) - days * 86400;
@@ -329,6 +353,9 @@ export async function getFullAccounting({ days = 30 } = {}) {
  * the ledger sits underneath it explaining as much of it as it can account for.
  */
 export async function realDailyCost({ days = 30 } = {}) {
+    return cached(`daily:${days}`, () => _realDailyCost({ days }));
+}
+async function _realDailyCost({ days = 30 } = {}) {
     const key = adminKey();
     if (!key) return {};
     const start = Math.floor(Date.now() / 1000) - Math.min(90, days) * 86400;
