@@ -7,7 +7,7 @@ import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -1401,7 +1401,7 @@ export async function doRaid(buyerId, targetId = null) {
         let defGear = null;
         if (Math.random() < DEFENSE_GEAR_CHANCE) {
             const rarity = weightedPickW(DEFENSE_GEAR_WEIGHTS);
-            const pool = ITEMS.filter((it) => it.rarity === rarity);
+            const pool = randomDropPool((it) => it.rarity === rarity);
             const gearDef = pool.length ? pool[randInt(pool.length)] : null;
             if (gearDef) { await grantItem(target.id, gearDef.id, "raid_defense").catch(() => {}); defGear = gearDef.id; }
         }

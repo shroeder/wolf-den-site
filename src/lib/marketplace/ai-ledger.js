@@ -138,6 +138,23 @@ const num = (v) => (v == null ? 0 : Number(v));
  * actually wanted to see. Each batch comes back as one entry carrying its count, total cost and time span,
  * with `batchId` so the screen can expand it via listBatch().
  */
+/** Per-day totals for the history headers: what each day actually cost, and how many events it holds. */
+export async function dailyTotals({ days = 30 } = {}) {
+    const rows = await db.query(
+        `SELECT to_char(created_at, 'YYYY-MM-DD') AS day, count(*)::int n, sum(cost_usd) cost,
+                bool_and(cost_basis = 'estimated') AS estimated
+         FROM mkt_ai_generation
+         WHERE created_at > now() - $1::interval AND date_known
+         GROUP BY 1 ORDER BY 1 DESC`,
+        [`${Math.max(1, Math.min(365, days))} days`],
+    ).catch(() => []);
+    return (rows || []).map((r) => ({
+        day: r.day, count: r.n,
+        costUsd: Math.round(num(r.cost) * 100) / 100,
+        estimated: Boolean(r.estimated),
+    }));
+}
+
 export async function listGenerations({ days = 30, limit = 200, origin = null } = {}) {
     const since = `${Math.max(1, Math.min(365, days))} days`;
     const rows = await db.query(
@@ -181,6 +198,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
         startedAt: r.started_at,
         endedAt: r.ended_at,
         dateKnown: r.date_known !== false,
+        day: r.date_known === false ? null : String(r.ended_at).slice(0, 10),
         kind: r.kind,
         origin: r.origin,
         batchLabel: r.batch_label,

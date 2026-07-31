@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { getAiCosts, getFullAccounting } from "@/lib/marketplace/openai-usage.js";
-import { listGenerations, listBatch, generationSummary } from "@/lib/marketplace/ai-ledger.js";
+import { listGenerations, listBatch, generationSummary, dailyTotals } from "@/lib/marketplace/ai-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -49,10 +49,11 @@ export async function GET(request) {
                 // reconstructed from what survived, and a sprite that was drawn five times and overwritten
                 // four leaves exactly one row. Showing the ledger total alone would quietly understate the
                 // bill, which is the opposite of the point. Name the gap instead of hiding it.
-                const [summary, entries, real] = await Promise.all([
+                const [summary, entries, real, daily] = await Promise.all([
                     generationSummary({ days }),
                     listGenerations({ days, limit, origin }),
                     getAiCosts({ days: Math.min(90, days) }).catch(() => ({ ok: false })),
+                    dailyTotals({ days }),
                 ]);
                 const openaiTotal = real?.ok ? Number(real.total || 0) : null;
                 const reconcile = openaiTotal == null ? null : {
@@ -63,7 +64,7 @@ export async function GET(request) {
                     windowDays: Math.min(90, days),
                     windowMatches: days <= 90,
                 };
-                return NextResponse.json({ ok: true, days, summary, entries, reconcile }, { headers: { "Cache-Control": "no-store" } });
+                return NextResponse.json({ ok: true, days, summary, entries, reconcile, daily }, { headers: { "Cache-Control": "no-store" } });
             }
 
             const data = await getAiCosts({ days: Math.min(90, days) });

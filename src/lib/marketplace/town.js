@@ -11,6 +11,7 @@ import { getActiveTownEvent, lastRaidRecap } from "@/lib/marketplace/town-events
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject, wellClaimedToday } from "@/lib/marketplace/town-projects.js";
@@ -232,7 +233,7 @@ export async function getTownState(buyerId) {
 
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
-    const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog] = await Promise.all([
+    const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog, defaultSprite] = await Promise.all([
         getTownArt(),
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
@@ -244,6 +245,7 @@ export async function getTownState(buyerId) {
         getChestArt().catch(() => ({})),
         townEventsLive().catch(() => false),
         getGlobalChat(buyerId, 30).catch(() => []),
+        getDefaultSpriteUrl().catch(() => null),
     ]);
     // The itemised wrap-up for a raid that just ended, for anyone who took part — served from the DB so it
     // survives a refresh and reaches everyone, not just whoever landed the killing blow.
@@ -307,7 +309,10 @@ export async function getTownState(buyerId) {
             id: r.id,
             name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
             alias: r.alias || null,
-            sprite: r.avatar_sprite_url || null,
+            // Fall back to the SHARED default sprite, the way the boss fight already does. Members who have
+            // never opened the customiser no longer get a bespoke draw (see pendingSpriteIds), so without this
+            // they'd walk the plaza with no hero at all.
+            sprite: r.avatar_sprite_url || defaultSprite || null,
             flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             pet: pet?.url || null,
             petFlip: pet ? pet.flip === true : false,

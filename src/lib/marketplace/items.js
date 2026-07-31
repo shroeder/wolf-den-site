@@ -29,6 +29,21 @@ export const EQUIP_SLOTS = [
 // Ascendant tier and above are BOUND to their owner — they can't be traded or auctioned (the top-tier chase
 // gear stays personally earned, never bought or laundered through the market).
 export const TRADE_LOCKED_RARITIES = new Set(["ascendant", "eternal", "celestial", "primordial"]);
+
+// ── Items that cost REAL MONEY when they're redeemed ──────────────────────────────────────────────────────
+// `admin` and `elite` gear carries charges that cash out at the counter: $50 store credit, a free $25 pack,
+// 25% off an order over $300, free grading, a box-break slot. They are meant to be AWARDED — an elite reward,
+// an owner grant — never handed out by a random roll.
+//
+// They were reachable by one. Fishing, the farm harvest and the sailing dig all built their pool with a bare
+// `ITEMS.filter(i => i.rarity === rarity)`, which has no idea what an item is worth outside the game, so a
+// lucky cast could pay out a real pack. Boss drops and chests already guarded against this
+// (`i.source !== "admin"`, or scoping to `source === "chest"`), so the rule existed — it just wasn't shared.
+export const isRealMoneyItem = (i) => i?.source === "admin" || i?.source === "elite" || Boolean(i?.chargeReward);
+
+/** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
+export const randomDropPool = (predicate) =>
+    ITEMS.filter((i) => !isRealMoneyItem(i) && (typeof predicate === "function" ? predicate(i) : true));
 export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
 
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.

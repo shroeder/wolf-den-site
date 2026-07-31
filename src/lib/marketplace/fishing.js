@@ -227,13 +227,13 @@ const GEAR_RARITY = {
     legendary: ["legendary", "epic"], mythic: ["mythic", "legendary"],
 };
 async function grantFishingGear(buyerId, fishRarity) {
-    const [{ ITEMS }, { grantItem }] = await Promise.all([
+    const [{ randomDropPool }, { grantItem }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/inventory.js"),
     ]);
     const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
     for (const rarity of GEAR_RARITY[fishRarity] || ["common"]) {
-        const pool = (ITEMS || []).filter((i) => i.rarity === rarity && !owned.has(i.id));
+        const pool = randomDropPool((i) => i.rarity === rarity && !owned.has(i.id));
         if (!pool.length) continue;
         const item = pool[randInt(pool.length)];
         await grantItem(buyerId, item.id, "fishing").catch(() => {});

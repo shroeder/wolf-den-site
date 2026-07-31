@@ -10,7 +10,7 @@ import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { ITEMS } from "@/lib/marketplace/items.js";
+import { ITEMS, randomDropPool } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { getGarden, farmPetCapBonus, dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
@@ -189,7 +189,7 @@ export async function claimPig(buyerId) {
     let item = null;
     if (Math.random() < PIG_ITEM_CHANCE) {
         const rarity = weightedPick(PIG_RARITY_WEIGHTS);
-        const pool = ITEMS.filter((it) => it.rarity === rarity);
+        const pool = randomDropPool((it) => it.rarity === rarity);
         const def = pool.length ? pool[randInt(pool.length)] : null;
         if (def) {
             const g = await grantItem(buyerId, def.id, "loot_pig").catch(() => null);

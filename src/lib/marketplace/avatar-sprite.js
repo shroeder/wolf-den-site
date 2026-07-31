@@ -89,8 +89,14 @@ export function pendingSpriteIds(limit = null) {
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
                 AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
+                -- NEVER draw for an untouched avatar. A member who has not opened the customiser is still on
+                -- the stock config, so a bespoke draw produces the stock character — at ~$0.046 a head, once
+                -- per member. Half the roster (36 of 72) had one drawn for them this way. That is precisely
+                -- what the shared default sprite exists for: they render it until they change something,
+                -- which stamps avatar_updated_at and makes them eligible here for the first time.
+                AND avatar_updated_at IS NOT NULL
                 AND (
-                    -- Needs a first sprite (regardless of whether avatar_updated_at was ever stamped)…
+                    -- Needs a first sprite…
                     avatar_sprite_url IS NULL
                     -- …or the avatar / gear changed since the sprite was drawn (regen, off cooldown).
                     OR (
