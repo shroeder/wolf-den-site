@@ -648,7 +648,7 @@ export default function TownClient({ initial }) {
     }, []);
 
     // Lock the page scroll while any Town overlay is open, so the background can't scroll underneath it.
-    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || Boolean(gambleReveal);
+    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal);
     // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
     // button was walking the hero + scrolling the street behind the panel). Read via a ref so the [] -deps
     // pointer callbacks always see the live value.
@@ -753,14 +753,22 @@ export default function TownClient({ initial }) {
     const onPointerDown = useCallback((e) => {
         if (modalOpenRef.current) return; // an overlay is up — don't let the street react behind it
         cancelAnimationFrame(momentumRef.current); // stop any glide
-        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0 };
-        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
+        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0, captured: false, id: e.pointerId };
+        // NOTE: capture is deliberately NOT taken here — see onPointerMove. Capturing on pointerdown retargets
+        // the pointerup to the scene, and a MOUSE click is dispatched to the common ancestor of down and up, so
+        // every button in Town stopped receiving click on desktop. Touch pointers are implicitly captured to
+        // their own target already, which is why phones were unaffected and this hid for so long.
     }, []);
     const onPointerMove = useCallback((e) => {
         const d = drag.current; if (!d.down) return;
         const dx = e.clientX - d.lastX;
         // Treat as a horizontal pan as soon as it's mostly-horizontal (low threshold = less friction to start).
-        if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) { d.moved = true; setDragging(true); }
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) {
+            d.moved = true; setDragging(true);
+            // Only NOW take the pointer — once this is a pan there is no click to preserve, and capture is what
+            // keeps the drag tracking when the cursor leaves the scene mid-flick.
+            try { e.currentTarget.setPointerCapture(e.pointerId); d.captured = true; } catch { /* ok */ }
+        }
         if (d.moved) {
             const t = e.timeStamp || 0;
             const dt = Math.max(1, t - d.lastT);
@@ -771,6 +779,7 @@ export default function TownClient({ initial }) {
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
+        if (d.captured) { try { e.currentTarget.releasePointerCapture(d.id); } catch { /* ok */ } d.captured = false; }
         if (d.moved) {
             // Flick momentum: keep gliding (with the camera transition OFF the whole time, so it tracks the
             // finger 1:1 like a native scroll instead of easing every frame) until it decays out.
