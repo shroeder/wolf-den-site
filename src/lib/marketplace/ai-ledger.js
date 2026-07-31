@@ -143,6 +143,7 @@ const num = (v) => (v == null ? 0 : Number(v));
 export async function dailyTotals({ days = 30 } = {}) {
     const rows = await db.query(
         `SELECT to_char(created_at, 'YYYY-MM-DD') AS day, count(*)::int n, sum(cost_usd) cost,
+                count(*) FILTER (WHERE NOT ok)::int AS failed,
                 bool_and(cost_basis = 'estimated') AS estimated
          FROM mkt_ai_generation
          WHERE created_at > now() - $1::interval AND date_known
@@ -150,7 +151,7 @@ export async function dailyTotals({ days = 30 } = {}) {
         [`${Math.max(1, Math.min(365, days))} days`],
     ).catch(() => []);
     return (rows || []).map((r) => ({
-        day: r.day, count: r.n,
+        day: r.day, count: r.n, failed: r.failed,
         costUsd: Math.round(num(r.cost) * 100) / 100,
         estimated: Boolean(r.estimated),
     }));
@@ -164,9 +165,11 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
              batch_id,
              MIN(created_at) AS started_at,
              MAX(created_at) AS ended_at,
+             to_char(MAX(created_at), 'YYYY-MM-DD') AS day,
              COUNT(*)::int AS n,
              SUM(cost_usd) AS cost,
              COUNT(*) FILTER (WHERE NOT ok)::int AS failed,
+             BOOL_AND(ok) AS all_ok,
              BOOL_AND(date_known) AS date_known,
              MIN(kind) AS kind,
              MIN(origin) AS origin,
@@ -195,11 +198,12 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
         isBatch: Boolean(r.batch_id) && r.n > 1,
         count: r.n,
         failed: r.failed,
+        ok: r.all_ok !== false,
         costUsd: Math.round(num(r.cost) * 100000) / 100000,
         startedAt: r.started_at,
         endedAt: r.ended_at,
         dateKnown: r.date_known !== false,
-        day: r.date_known === false ? null : String(r.ended_at).slice(0, 10),
+        day: r.date_known === false ? null : r.day,
         kind: r.kind,
         origin: r.origin,
         batchLabel: r.batch_label,
