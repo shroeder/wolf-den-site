@@ -287,10 +287,36 @@ async function cookingBadges(buyerId, ctx = {}) {
     if (ctx.recipeId === "r_wolfs_table") await g("cook_wolfs");
 }
 
+// The three you start with. An empty recipe book is a dead screen — you can't cook, so you can't learn what
+// cooking IS, so there's no reason to come back. These are all wheat/root basics you'll have ingredients for.
+export const STARTER_RECIPES = ["k_flour", "r_porridge", "r_roast_roots"];
+
+// WHERE a recipe is found. Derived rather than hand-tagged so it can't drift from the ingredients: a dish built
+// out of fish is found at sea, a dish built out of crops is found in the field, and the top tiers come out of
+// the same chests everything else rare does. Shown on the locked card so "undiscovered" is a lead, not a wall.
+export function recipeSource(rec) {
+    if (!rec) return { key: "farm", label: "Found while working the farm" };
+    const refs = Object.keys(rec.need || {});
+    const fishy = refs.some((r) => r.startsWith("fish_"));
+    if (rec.tier >= 5) return { key: "chest", label: "Gold & mythic chests, and the Gold Merchant" };
+    if (rec.tier === 4) return { key: "chest", label: "Iron & gold chests, island digs and raids" };
+    if (fishy) return { key: "sea", label: "Found while fishing and on voyages" };
+    return { key: "farm", label: "Found while working the farm" };
+}
+
 const today = () => db.queryOne(`SELECT (NOW() AT TIME ZONE 'America/Chicago')::date::text AS d`).then((r) => r?.d);
 
 async function kitchenRow(buyerId) {
-    await db.query(`INSERT INTO mkt_kitchen (buyer_id) VALUES ($1) ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
+    const created = await db.queryOne(
+        `INSERT INTO mkt_kitchen (buyer_id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING buyer_id`, [buyerId]
+    ).catch(() => null);
+    // First time through, hand over the basics. Done here rather than in a migration so it also covers anyone
+    // who reaches the Kitchen later, and ON CONFLICT DO NOTHING means it can never re-grant.
+    if (created) {
+        for (const id of STARTER_RECIPES) {
+            await db.query(`INSERT INTO mkt_recipe_known (buyer_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, id]).catch(() => {});
+        }
+    }
     return db.queryOne(
         `SELECT *, (cook_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS cooked_today FROM mkt_kitchen WHERE buyer_id = $1`,
         [buyerId]
@@ -326,13 +352,15 @@ export async function getKitchenState(buyerId) {
             sprite: sprites[r.id] || null,
             tierName: tierMeta(r.tier).name, tierColor: tierMeta(r.tier).color,
             known, timesCooked: cookedMap.get(r.id) || 0,
+            // Shown on a LOCKED card too: what it is, what it's for, and where to go looking.
+            source: recipeSource(r),
             // A prep says exactly what it makes; a dish says which pool it rolls from. Either way there is no
             // guessing about what pressing the button gets you.
             makes: outMeta ? { ref: outMeta.ref, name: outMeta.name, sprite: outMeta.sprite } : null,
             pool: r.kind === "dish" ? tierMeta(r.tier).pool.map((id) => ({
                 id, name: CONSUMABLES[id]?.name || id, desc: CONSUMABLES[id]?.desc || "",
             })) : null,
-            need: known ? need : null,              // an unknown recipe shows as a locked silhouette
+            need,   // shown whether known or not — what a recipe wants is the useful half of the hint
             canCook: known && need.every((n) => n.enough),
         };
     }).sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name));
