@@ -33,6 +33,9 @@ export default function CookingClient({ initial }) {
     const [result, setResult] = useState(null);
     const [flash, setFlash] = useState(null);
     const [open, setOpen] = useState(null);
+    // Where you came FROM. Tapping a missing prepped ingredient jumps to the recipe that makes it; this is the
+    // breadcrumb back, so chasing a chain three deep doesn't strand you.
+    const [trail, setTrail] = useState([]);
     const [tab, setTab] = useState("all");
     const [devOpen, setDevOpen] = useState(false);
     // The kettle gives itself a shake every few seconds. Randomised so it never falls into a metronome — a
@@ -83,6 +86,28 @@ export default function CookingClient({ initial }) {
 
     const s = state || {};
     const cooksLeft = s.cooks?.left ?? 0;
+    const byId = useMemo(() => Object.fromEntries((s.recipes || []).map((r) => [r.id, r])), [s.recipes]);
+
+    // Jump to the recipe that makes an ingredient, remembering where we were.
+    const jumpTo = (recipeId, fromId) => {
+        if (!byId[recipeId]) return;
+        setTrail((t) => [...t, fromId]);
+        setOpen(recipeId);
+        setTab("all"); // the target may not be in the current filter, and a jump that lands on nothing is worse
+        setTimeout(() => {
+            document.getElementById(`ck-r-${recipeId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 40);
+    };
+    const goBack = () => {
+        setTrail((t) => {
+            const prev = t[t.length - 1];
+            if (prev) {
+                setOpen(prev);
+                setTimeout(() => document.getElementById(`ck-r-${prev}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 40);
+            }
+            return t.slice(0, -1);
+        });
+    };
 
     const shown = useMemo(() => {
         const all = s.recipes || [];
@@ -200,7 +225,7 @@ export default function CookingClient({ initial }) {
                     {shown.map((r) => {
                         const isOpen = open === r.id;
                         return (
-                            <div key={r.id} className={`ck-recipe${r.known ? "" : " is-locked"}${isOpen ? " is-open" : ""}`} style={{ "--rt": TIER_RING[r.tier] }}>
+                            <div key={r.id} id={`ck-r-${r.id}`} className={`ck-recipe${r.known ? "" : " is-locked"}${isOpen ? " is-open" : ""}`} style={{ "--rt": TIER_RING[r.tier] }}>
                                 {/* A locked recipe is now tappable too. "Undiscovered recipe" told you nothing
                                     and gave you nowhere to go; the sprite, what it makes and WHERE IT DROPS
                                     turn the same row into something to chase. */}
@@ -220,6 +245,11 @@ export default function CookingClient({ initial }) {
                                 </button>
                                 {isOpen ? (
                                     <div className="ck-recipe-body">
+                                        {trail.length && isOpen ? (
+                                            <button type="button" className="ck-crumb" onClick={goBack}>
+                                                ← Back to {byId[trail[trail.length - 1]]?.name || "where you were"}
+                                            </button>
+                                        ) : null}
                                         <p className="ck-recipe-flavor">&ldquo;{r.flavor}&rdquo;</p>
 
                                         {!r.known ? (
@@ -236,13 +266,35 @@ export default function CookingClient({ initial }) {
 
                                         <div className="ck-block-label">Needs</div>
                                         <div className="ck-need">
-                                            {(r.need || []).map((n) => (
-                                                <span key={n.ref} className={`ck-need-item${!r.known ? "" : n.enough ? "" : " is-short"}`}>
-                                                    <Art sprite={n.sprite} emoji={n.emoji} size={22} alt={n.name} />
-                                                    <span>{n.name}</span>
-                                                    <b>{r.known ? `${n.held}/${n.qty}` : `×${n.qty}`}</b>
-                                                </span>
-                                            ))}
+                                            {(r.need || []).map((n) => {
+                                                const short = r.known && !n.enough;
+                                                // Short of a PREPPED ingredient? Tap it and go make it. Short of a
+                                                // raw one? Tap it and go get it. Hunting the list for whatever
+                                                // produces "Risen Dough" was the worst part of using this screen.
+                                                const canJump = short && n.madeBy;
+                                                const canGather = short && !n.madeBy && n.gather;
+                                                const body = (
+                                                    <>
+                                                        <Art sprite={n.sprite} emoji={n.emoji} size={22} alt={n.name} />
+                                                        <span>{n.name}</span>
+                                                        <b>{r.known ? `${n.held}/${n.qty}` : `×${n.qty}`}</b>
+                                                        {canJump ? <em className="ck-need-go">make →</em> : null}
+                                                        {canGather ? <em className="ck-need-go">get →</em> : null}
+                                                    </>
+                                                );
+                                                if (canJump) {
+                                                    return (
+                                                        <button type="button" key={n.ref} className="ck-need-item is-short is-link"
+                                                            title={`${n.madeBy.name} makes this`} onClick={() => jumpTo(n.madeBy.id, r.id)}>
+                                                            {body}
+                                                        </button>
+                                                    );
+                                                }
+                                                if (canGather) {
+                                                    return <Link key={n.ref} href={n.gather.href} className="ck-need-item is-short is-link" title={n.gather.label}>{body}</Link>;
+                                                }
+                                                return <span key={n.ref} className={`ck-need-item${short ? " is-short" : ""}`}>{body}</span>;
+                                            })}
                                         </div>
 
                                         <div className="ck-block-label">Makes</div>
@@ -255,14 +307,7 @@ export default function CookingClient({ initial }) {
                                             <div className="ck-pool">
                                                 {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
                                                     only the roll made cooking look like a lottery with a lot of blanks. */}
-                                                <div className="ck-payout">
-                                                    <span className="ck-payout-ico" aria-hidden="true">🪙</span>
-                                                    <span>
-                                                        <b>{r.payout?.gold?.[0]?.toLocaleString()}–{r.payout?.gold?.[1]?.toLocaleString()} gold</b>
-                                                        every time you cook it
-                                                    </span>
-                                                </div>
-                                                <p className="ck-pool-intro">…plus ONE of these, at random. A good timing run can push the whole dish a tier higher:</p>
+                                                <p className="ck-pool-intro">ONE of these, at random — likeliest first. A good timing run can push the whole dish a tier higher:</p>
                                                 {(r.payout?.pool || []).map((c, i) => (
                                                     <div key={i} className="ck-pool-row">
                                                         <b>{c.name}</b><span>{c.desc}</span>
@@ -485,6 +530,14 @@ const CK_CSS = `
 .ck-need-item b { color: #4ad07f; }
 .ck-need-item.is-short { border-color: rgba(224,91,106,0.45); }
 .ck-need-item.is-short b { color: #e0685c; }
+/* A shortfall you can act on looks like a control, not a label. */
+.ck-need-item.is-link { cursor: pointer; text-decoration: none; color: inherit; font: inherit;
+    border-color: rgba(255,180,90,0.5); background: rgba(255,180,90,0.08); }
+.ck-need-item.is-link:hover { background: rgba(255,180,90,0.16); }
+.ck-need-go { font-style: normal; font-size: 0.68rem; font-weight: 900; color: #ffb86b; margin-left: 2px; }
+.ck-crumb { display: inline-flex; align-items: center; margin: 0 0 8px; padding: 5px 11px; border-radius: 9px;
+    font-size: 0.76rem; font-weight: 800; cursor: pointer; color: #8fb8ff;
+    background: rgba(143,184,255,0.1); border: 1px solid rgba(143,184,255,0.3); }
 .ck-makes { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: #cfd6dd; margin-bottom: 12px; }
 .ck-pool { margin-bottom: 12px; }
 .ck-pool-intro { margin: 0 0 6px; font-size: 0.78rem; color: #98a2ae; }
