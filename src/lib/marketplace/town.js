@@ -11,6 +11,7 @@ import { getActiveTownEvent, lastRaidRecap } from "@/lib/marketplace/town-events
 import { CHEST_TIERS, addChests } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
@@ -222,44 +223,52 @@ export async function getTownState(buyerId) {
     //   hangoutBuffState needs heartbeat.inTownSecs                 -> must follow it
     // `me` (mkt_buyer) and `recent` (mkt_visitor, and it excludes this member anyway) share nothing with it.
     // So five stages collapse to two, with identical results.
-    const [heartbeat, me, recent] = await Promise.all([
+    const [heartbeat, me, rosterAll] = await Promise.all([
         markTownSeen(buyerId), // stamp presence + measure how long they've been here
         buyerId
             ? db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
                     (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = mkt_buyer.id::text AND pl.pet_id = mkt_buyer.featured_collectible) AS featured_pet_xp,
                     COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null)
             : Promise.resolve(null),
-        // Members who are ONLINE NOW (active within ONLINE_WINDOW), excluding me, capped. Offline never shows.
-        db.query(
+        // Who is ONLINE NOW. This was per-viewer only because it excluded the caller — so every viewer ran the
+        // same scan to get the same answer minus themselves. Fetch it ONCE for everyone and drop the caller
+        // below; a 2.5s TTL is well inside the 4-8s poll, so nobody sees a staler plaza than before.
+        shared("town:online", TTL.LIVE, () => db.query(
             `SELECT b.id, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.featured_collectible,
                     (SELECT xp FROM mkt_pet_level pl WHERE pl.buyer_id = b.id::text AND pl.pet_id = b.featured_collectible) AS featured_pet_xp,
                     MAX(v.last_seen) AS seen
                FROM mkt_visitor v JOIN mkt_buyer b ON b.id = v.buyer_id
-              WHERE v.buyer_id IS NOT NULL AND v.buyer_id <> $1 AND v.last_seen > NOW() - $2::interval
-              GROUP BY b.id ORDER BY seen DESC LIMIT 40`,
-            [buyerId || "00000000-0000-0000-0000-000000000000", ONLINE_WINDOW]
-        ).catch(() => []),
+              WHERE v.buyer_id IS NOT NULL AND v.last_seen > NOW() - $1::interval
+              GROUP BY b.id ORDER BY seen DESC LIMIT 41`,
+            [ONLINE_WINDOW]
+        ).catch(() => [])),
     ]);
     const [hangout, myPos] = await Promise.all([
         hangoutBuffState(buyerId, heartbeat?.inTownSecs || 0),
         buyerId ? db.queryOne(`SELECT x, y, facing FROM mkt_town_presence WHERE buyer_id = $1`, [buyerId]).catch(() => null) : Promise.resolve(null),
     ]);
 
+    // The cached roster includes everyone; drop the caller here (it fetched 41 so the cap still lands at 40).
+    const recent = rosterAll.filter((r) => String(r.id) !== String(buyerId || "")).slice(0, 40);
     const ids = recent.map((r) => r.id);
     const chatIds = buyerId ? [...ids, buyerId] : ids; // include me so my own bubble persists across polls
+    // EIGHT of these twelve are byte-identical for every viewer, and this handler runs on a timer for everyone
+    // in town. Uncached, fifteen concurrent viewers ran the same queries fifteen times every four seconds; at
+    // 300 members that would be sixty. They go through the shared cache — the per-viewer four (friends, event,
+    // quests, chat) do not. See shared-cache.js for why each TTL is what it is.
     const [art, petSprites, petSpriteLevels, friends, projects, bonuses, event, quests, chestArt, eventsLive, chatLog, defaultSprite] = await Promise.all([
-        getTownArt(),
-        getPetSpriteData().catch(() => ({})),
-        getPetSpriteLevelData().catch(() => ({})),
+        shared("town:art", TTL.ART, () => getTownArt()),
+        shared("town:petSprites", TTL.ART, () => getPetSpriteData().catch(() => ({}))),
+        shared("town:petSpriteLevels", TTL.ART, () => getPetSpriteLevelData().catch(() => ({}))),
         buyerId ? listFriends(buyerId).catch(() => []) : Promise.resolve([]),
-        getTownProjects().catch(() => []),
-        getTownBonuses(Date.now()).catch(() => ({})),
+        shared("town:projects", TTL.SLOW, () => getTownProjects().catch(() => [])),
+        shared("town:bonuses", TTL.SLOW, () => getTownBonuses(Date.now()).catch(() => ({}))),
         getActiveTownEvent(buyerId).catch(() => null),
         buyerId ? getTownQuests(buyerId).catch(() => []) : Promise.resolve([]),
-        getChestArt().catch(() => ({})),
-        townEventsLive().catch(() => false),
+        shared("town:chestArt", TTL.ART, () => getChestArt().catch(() => ({}))),
+        shared("town:eventsLive", TTL.SLOW, () => townEventsLive().catch(() => false)),
         getGlobalChat(buyerId, 30).catch(() => []),
-        getDefaultSpriteUrl().catch(() => null),
+        shared("town:defaultSprite", TTL.ART, () => getDefaultSpriteUrl().catch(() => null)),
     ]);
     // The itemised wrap-up for a raid that just ended, for anyone who took part — served from the DB so it
     // survives a refresh and reaches everyone, not just whoever landed the killing blow.
