@@ -106,12 +106,12 @@ export async function GET(request, { params }) {
         try {
             const { id } = await params;
             const row = await db.queryOne(
-                `SELECT id, display_name, alias, first_name, last_name, email, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(store_credit_cents,0) AS store_credit_cents, created_at, last_seen_at, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = $1`,
+                `SELECT id, display_name, alias, first_name, last_name, email, phone, COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(store_credit_cents,0) AS store_credit_cents, created_at, last_seen_at, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible, notify_prefs, discord_user_id FROM mkt_buyer WHERE id = $1`,
                 [id]
             ).catch(() => null);
             if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, purchaseXpRows, creditEvents, chestGrants] = await Promise.all([
+            const [metrics, inv, badges, redemptions, historyRows, petPerks, pets, petSprites, coins, coinBd, tradeRows, buckets, purchaseXpRows, creditEvents, chestGrants, reach, geo] = await Promise.all([
                 getMemberMetrics(id).catch(() => ({})),
                 getInventory(id).catch(() => null),
                 getUserBadges(id).catch(() => []),
@@ -161,6 +161,28 @@ export async function GET(request, { params }) {
                 ).catch(() => []),
                 // Chest-grant history — every loot chest this member received, and WHERE it came from.
                 chestGrantHistory(id, { limit: 150 }).catch(() => []),
+                // CAN WE ACTUALLY REACH THIS PERSON? Three independent channels, and knowing a member has
+                // pushes DISABLED matters as much as knowing they're on: it's the difference between "they
+                // ignored the raid alert" and "they never got it".
+                db.queryOne(
+                    `SELECT
+                        (SELECT COUNT(*)::int FROM mkt_web_push   WHERE buyer_id = $1) AS web_push,
+                        (SELECT COUNT(*)::int FROM mkt_push_token WHERE buyer_id = $1) AS app_push,
+                        (SELECT MAX(last_used_at) FROM mkt_web_push WHERE buyer_id = $1) AS web_push_last`,
+                    [id]
+                ).catch(() => null),
+                // Where they are. Two very different things, shown as such: precise geolocation is OPT-IN (they
+                // tapped allow on the browser prompt) and accurate to metres; IP geo is always there and is a
+                // guess. Newest visitor row wins.
+                db.queryOne(
+                    `SELECT city, region, country, timezone, geo_lat, geo_lng, geo_accuracy, geo_at,
+                            device, browser, os, last_seen
+                       FROM mkt_visitor
+                      WHERE buyer_id = $1
+                      ORDER BY (geo_lat IS NOT NULL) DESC, last_seen DESC NULLS LAST
+                      LIMIT 1`,
+                    [id]
+                ).catch(() => null),
             ]);
             // Hero-card visuals + a featured-pet + pets summary.
             const featuredPet = row.featured_collectible ? collectibleById(row.featured_collectible) : null;
@@ -291,6 +313,40 @@ export async function GET(request, { params }) {
                     petSpriteFlip,
                     profileUrl: row.alias ? `/marketplace/u/${row.alias}` : null,
                 },
+                // ── Can we reach them, and where are they? ────────────────────────────────────────────────
+                // A member with zero subscriptions never SAW the announcement — worth knowing before assuming
+                // they ignored it. notify_prefs stores explicit opt-OUTs ("channel:kind": false) and an absent
+                // key means ON, so `mutedCount` counts deliberate switch-offs, not defaults.
+                reach: (() => {
+                    let prefs = row.notify_prefs;
+                    if (typeof prefs === "string") { try { prefs = JSON.parse(prefs); } catch { prefs = null; } }
+                    const entries = Object.entries(prefs || {});
+                    const muted = entries.filter(([, v]) => v === false).map(([k]) => k);
+                    const webPush = Number(reach?.web_push || 0);
+                    const appPush = Number(reach?.app_push || 0);
+                    return {
+                        webPush, appPush,
+                        pushEnabled: webPush + appPush > 0 && muted.length < entries.length,
+                        webPushLastUsed: iso(reach?.web_push_last),
+                        mutedCount: muted.length,
+                        allMuted: entries.length > 0 && muted.length === entries.length,
+                        muted: muted.slice(0, 24),
+                        discordLinked: Boolean(row.discord_user_id),
+                        email: row.email || null,
+                        phone: row.phone || null,
+                    };
+                })(),
+                location: geo ? {
+                    // Opt-in browser geolocation: they tapped "allow". Accurate to metres.
+                    precise: geo.geo_lat != null && geo.geo_lng != null
+                        ? { lat: Number(geo.geo_lat), lng: Number(geo.geo_lng), accuracyM: geo.geo_accuracy != null ? Number(geo.geo_accuracy) : null, at: iso(geo.geo_at) }
+                        : null,
+                    // IP-derived. Always present, always a guess — never show it as if they shared it.
+                    city: geo.city || null, region: geo.region || null, country: geo.country || null,
+                    timezone: geo.timezone || null,
+                    device: [geo.device, geo.browser, geo.os].filter(Boolean).join(" · ") || null,
+                    lastSeen: iso(geo.last_seen),
+                } : null,
                 boss: { damage: metrics.bossDamage || 0, hits: metrics.bossHits || 0, fought: metrics.bossesFought || 0, won: metrics.bossesWon || 0 },
                 activity: { spend: metrics.spend || 0, events: metrics.events || 0, activeDays: metrics.activeDays || 0, friends: metrics.friends || 0, messages: metrics.messages || 0, tenureDays: metrics.tenureDays || 0, eliteItems: metrics.eliteItems || 0 },
                 gear,
