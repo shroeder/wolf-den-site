@@ -20,18 +20,37 @@ import { SEED_PACKS } from "@/lib/marketplace/seed-packs";
 // A pet's OWNED (just-by-having-it) passive bonus, split into { icon, name, desc } so the modal can lay it out
 // as a clean labeled row instead of a run-on sentence. Earner stats explain the real income; combat stats show
 // the buff. GOLD_PER_POINT / TICKETS rates come from pet-perks.js so the numbers never drift.
-const ownedBonusParts = (p) => {
-    if (p.stat === "gold_find") return { icon: "💰", name: `+${Math.max(1, Math.round(p.value * GOLD_PER_POINT))} gold / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
-    if (p.stat === "xp_gain") return { icon: "✨", name: `+${p.value} XP / hr`, desc: "Passive income — grows as it levels · every pet you own stacks" };
-    if (p.stat === "fortune") return { icon: "🍀", name: `+${p.value * TICKETS_PER_FORTUNE_PER_DAY} tickets / day`, desc: "Boss-raffle tickets, banked all week · every pet you own stacks" };
-    // Farm passives (seedLuck/growSpeed/petXp) help the FARM; combat passives buff the boss. Use each stat's OWN
-    // description so a "Seed Luck" bonus reads like seed luck — not the old hardcoded "boss damage" for everything.
+// Small numbers need a decimal or the growth is invisible: a common pet's passive is base 1 and levels at
+// x1.25, so Math.round showed 1%, 1%, 2%, 2%, 2% — five levels rendering as two distinct values.
+const fmtVal = (v) => (v >= 10 ? String(Math.round(v)) : String(Math.round(v * 10) / 10));
+
+// A pet's OWNED (just-by-having-it) passive, at its CURRENT level, with what the next level brings.
+//
+// This used to be handed petPassive(def) — the BASE value by rarity — so a Lv 5 pet showed exactly the same
+// number as a Lv 1 one. The scaling was real (petPassiveLevelMult) and completely invisible, which is why a
+// levelled Barn Cat still read "+1% Pet Bond". It now shows the levelled value and what Lv+1 is worth, and
+// says in plain terms what the stat actually does rather than naming it.
+const ownedBonusParts = (p, level = 1, maxed = false) => {
+    const mult = 1 + (Math.max(1, level) - 1) * 0.25;
+    const nextMult = 1 + Math.max(1, level) * 0.25;
+    const v = p.value * mult;
+    const nv = p.value * nextMult;
+    const growth = maxed ? "Max level." : `Lv ${level + 1} → ${fmtVal(nv)}${["seedLuck", "growSpeed", "petXp"].includes(p.stat) ? "%" : ""}.`;
+
+    if (p.stat === "gold_find") return { icon: "💰", name: `+${Math.max(1, Math.round(v * GOLD_PER_POINT))} gold / hr`, desc: `Passive income, paid whether you play or not. ${growth} Every pet you own stacks.` };
+    if (p.stat === "xp_gain") return { icon: "✨", name: `+${fmtVal(v)} XP / hr`, desc: `Passive income, paid whether you play or not. ${growth} Every pet you own stacks.` };
+    if (p.stat === "fortune") return { icon: "🍀", name: `+${fmtVal(v * TICKETS_PER_FORTUNE_PER_DAY)} tickets / day`, desc: `Boss-raffle tickets, banked all week. ${growth} Every pet you own stacks.` };
+
     const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨", desc: "Stacks across your whole menagerie" };
     const isFarm = ["seedLuck", "growSpeed", "petXp"].includes(p.stat);
-    const suffix = isFarm ? "%" : "";
-    // Farm passives apply only while this pet is your equipped farm companion; combat passives stack across your
-    // whole menagerie. Say which so the player isn't misled.
-    return { icon: m.icon, name: `+${p.value}${suffix} ${m.label}`, desc: `${m.desc} ${isFarm ? "Active while this pet is equipped." : "Stacks across every pet you own."}` };
+    // Say what the number DOES, not just what it's called. "+2% Pet Bond" tells you nothing on its own.
+    const plain = {
+        petXp: `Every pet you tend earns ${fmtVal(v)}% more XP, so your whole menagerie levels faster.`,
+        seedLuck: `${fmtVal(v)}% better odds of finding a seed from harvests, petting and the other games.`,
+        growSpeed: `Crops finish ${fmtVal(v)}% sooner.`,
+    }[p.stat] || m.desc;
+    const scope = isFarm ? "Active while this pet is equipped." : "Stacks across every pet you own.";
+    return { icon: m.icon, name: `+${fmtVal(v)}${isFarm ? "%" : ""} ${m.label}`, desc: `${plain} ${growth} ${scope}` };
 };
 
 // One effect row in the pet modal: an icon tile + a tiny label, the effect name, and a muted one-line detail.
@@ -2507,7 +2526,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                     {(perk || passive) ? (
                         <div style={{ display: "grid", gap: 8, marginBottom: 10 }}>
                             {perk ? <FxRow label="Equipped power" icon={perk.icon} name={perk.name} desc={perk.desc} accent={ring} /> : null}
-                            {passive ? (() => { const ob = ownedBonusParts(passive); return <FxRow label="Owned bonus" icon={ob.icon} name={ob.name} desc={ob.desc} accent="#9aa0a6" />; })() : null}
+                            {passive ? (() => { const ob = ownedBonusParts(passive, pet.level || 1, pet.maxed); return <FxRow label="Owned bonus" icon={ob.icon} name={ob.name} desc={ob.desc} accent="#9aa0a6" />; })() : null}
                         </div>
                     ) : null}
 
