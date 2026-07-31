@@ -111,21 +111,29 @@ export async function getWageCents(teamMemberId) {
     return best != null ? { cents: best, source: "square" } : { cents: null, source: null };
 }
 
-// Sum a team member's clocked hours per day over [fromISO, toISO). Returns { ok, byDay: {YYYY-MM-DD: hours},
-// totalHours }. byDay keys are Chicago-local dates (the shop's timezone) so they line up with sales days.
-export async function employeeHoursByDay(teamMemberId, fromISO, toISO) {
-    if (!teamMemberId) return { ok: true, byDay: {}, totalHours: 0 };
+// Sum clocked hours per day over [fromISO, toISO) for one or more team members. Returns { ok, byDay:
+// {YYYY-MM-DD: hours}, totalHours }. byDay keys are Chicago-local dates (the shop's timezone) so they line up
+// with sales days.
+//
+// `ok: false` when NOBODY is passed, not `ok: true` with an empty result. Those are different facts — "the
+// employee worked zero hours" and "we never asked about any employee" cannot look identical to the caller, or
+// the tracker reports $0 labor as if it had measured it. That is exactly what went wrong: no employee was ever
+// pinned in the config, so break-even quietly billed overhead only.
+export async function employeeHoursByDay(teamMemberIds, fromISO, toISO) {
+    const ids = (Array.isArray(teamMemberIds) ? teamMemberIds : [teamMemberIds]).filter(Boolean);
+    if (!ids.length) return { ok: false, reason: "no_team_members", byDay: {}, totalHours: 0 };
     const byDay = {};
+    const byMemberDay = {}; // memberId -> { date: hours } — each person is priced at THEIR own wage
     let cursor = null;
     let totalHours = 0;
     let pages = 0;
     do {
         const body = {
-            query: { filter: { team_member_ids: [teamMemberId], start: { start_at: fromISO, end_at: toISO } } },
+            query: { filter: { team_member_ids: ids, start: { start_at: fromISO, end_at: toISO } } },
             limit: 200, ...(cursor ? { cursor } : {}),
         };
         const r = await squareCall("/v2/labor/shifts/search", { method: "POST", body: JSON.stringify(body) }).catch(() => null);
-        if (!r?.ok) return { ok: false, status: r?.status || 0, byDay: {}, totalHours: 0 };
+        if (!r?.ok) return { ok: false, reason: "square_error", status: r?.status || 0, byDay: {}, byMemberDay: {}, totalHours: 0 };
         for (const s of r.json?.shifts || []) {
             const start = s?.start_at ? new Date(s.start_at) : null;
             const end = s?.end_at ? new Date(s.end_at) : null;
@@ -137,12 +145,14 @@ export async function employeeHoursByDay(teamMemberId, fromISO, toISO) {
             hrs = Math.max(0, hrs);
             const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(start);
             byDay[day] = (byDay[day] || 0) + hrs;
+            const mid = s?.team_member_id || "unknown";
+            (byMemberDay[mid] ||= {})[day] = (byMemberDay[mid][day] || 0) + hrs;
             totalHours += hrs;
         }
         cursor = r.json?.cursor || null;
         pages += 1;
     } while (cursor && pages < 25);
-    return { ok: true, byDay, totalHours };
+    return { ok: true, byDay, byMemberDay, totalHours };
 }
 
 // ── Break-even summary over a date range ──────────────────────────────────────────────────────────────────
@@ -158,26 +168,57 @@ export async function breakevenSummary({ from, to }) {
     const fromISO = fromDate.toISOString();
     const toISO = new Date(toDate.getTime() + 1000).toISOString();
 
-    const wage = await getWageCents(config.employeeTeamMemberId);
-    const wageCents = wage.cents ?? config.defaultWageCents;
-    const wageSource = wage.cents != null ? "square" : "default";
-    const hours = await employeeHoursByDay(config.employeeTeamMemberId, fromISO, toISO);
+    // WHO counts as labor. If an employee is pinned in config, just them. If nobody is pinned — which was the
+    // case in production, and is why break-even had been reporting overhead only — fall back to every ACTIVE
+    // non-owner team member. That is the real wage bill, and it means the tracker is right by default instead
+    // of silently zero until somebody remembers to configure it. The owner is excluded: Luke doesn't draw an
+    // hourly wage, and counting his hours would turn working the counter into a loss.
+    let tracked = [];
+    let scope = "pinned";
+    if (config.employeeTeamMemberId) {
+        tracked = [{ id: config.employeeTeamMemberId, name: config.employeeName || null }];
+    } else {
+        const team = await listTeamMembers();
+        tracked = (team.members || []).filter((m) => !m.isOwner).map((m) => ({ id: m.id, name: m.name }));
+        scope = team.ok ? "all_employees" : "unavailable";
+    }
+
+    // Each person is priced at THEIR own Square wage. defaultWageCents is only a fallback, and when it's used
+    // we say so (wageSource) rather than passing a guess off as a measurement.
+    const wages = await Promise.all(tracked.map(async (m) => {
+        const w = await getWageCents(m.id);
+        return { ...m, wageCents: w.cents ?? config.defaultWageCents, wageSource: w.cents != null ? "square" : "default" };
+    }));
+    const hours = await employeeHoursByDay(wages.map((m) => m.id), fromISO, toISO);
     const burdenMult = 1 + Math.max(0, config.burdenPct) / 100;
 
     const days = [];
     let totalOverhead = 0;
     let totalLabor = 0;
     let totalHours = 0;
+    const perMember = wages.map((m) => ({ ...m, hours: 0, cents: 0 }));
     for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + 864e5)) {
         const key = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-        const hrs = hours.byDay?.[key] || 0;
-        const laborCents = Math.round(hrs * wageCents * burdenMult);
+        let laborCents = 0;
+        let hrs = 0;
+        for (const m of perMember) {
+            const mh = hours.byMemberDay?.[m.id]?.[key] || 0;
+            if (!mh) continue;
+            const c = Math.round(mh * m.wageCents * burdenMult);
+            laborCents += c; hrs += mh;
+            m.hours += mh; m.cents += c;
+        }
         const overheadCents = Math.round(dailyOverheadCents);
         days.push({ date: key, overheadCents, hours: Math.round(hrs * 100) / 100, laborCents, costCents: overheadCents + laborCents });
         totalOverhead += overheadCents;
         totalLabor += laborCents;
         totalHours += hrs;
     }
+    // A single blended figure for the summary line when more than one person is tracked.
+    const wageCents = perMember.length === 1 ? perMember[0].wageCents
+        : (totalHours > 0 ? Math.round(totalLabor / burdenMult / totalHours) : config.defaultWageCents);
+    const wageSource = perMember.length === 1 ? perMember[0].wageSource
+        : (perMember.some((m) => m.wageSource === "square") ? "square" : "default");
 
     return {
         range: { from: days[0]?.date || null, to: days[days.length - 1]?.date || null, dayCount: days.length },
@@ -185,6 +226,15 @@ export async function breakevenSummary({ from, to }) {
         labor: {
             employeeTeamMemberId: config.employeeTeamMemberId, employeeName: config.employeeName,
             wageCents, wageSource, burdenPct: config.burdenPct, hoursAvailable: hours.ok,
+            // What labor actually covers, so the screen can never again imply it's included when it isn't.
+            //   pinned         — one configured employee
+            //   all_employees  — nobody pinned, so every active non-owner
+            //   unavailable    — Square wouldn't tell us; labor is MISSING, not zero
+            scope, unavailableReason: hours.ok ? null : (hours.reason || "unknown"),
+            members: perMember.map((m) => ({
+                id: m.id, name: m.name, wageCents: m.wageCents, wageSource: m.wageSource,
+                hours: Math.round(m.hours * 100) / 100, totalCents: m.cents,
+            })),
             totalHours: Math.round(totalHours * 100) / 100, totalCents: totalLabor,
         },
         config,
