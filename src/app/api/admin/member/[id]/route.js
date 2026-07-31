@@ -324,12 +324,16 @@ export async function GET(request, { params }) {
                     const muted = entries.filter(([, v]) => v === false).map(([k]) => k);
                     const webPush = Number(reach?.web_push || 0);
                     const appPush = Number(reach?.app_push || 0);
+                    // An EMPTY notify_prefs means nothing has been opted out, i.e. every channel is on. Testing
+                    // `muted < entries.length` read 0 < 0 as false and reported members with live subscriptions
+                    // and zero opt-outs as unreachable — the exact opposite of the truth.
+                    const allMuted = entries.length > 0 && muted.length === entries.length;
                     return {
                         webPush, appPush,
-                        pushEnabled: webPush + appPush > 0 && muted.length < entries.length,
+                        pushEnabled: webPush + appPush > 0 && !allMuted,
                         webPushLastUsed: iso(reach?.web_push_last),
                         mutedCount: muted.length,
-                        allMuted: entries.length > 0 && muted.length === entries.length,
+                        allMuted,
                         muted: muted.slice(0, 24),
                         discordLinked: Boolean(row.discord_user_id),
                         email: row.email || null,
