@@ -1,7 +1,7 @@
 import "server-only";
 
 import { put } from "@vercel/blob";
-import { logGeneration } from "@/lib/marketplace/ai-ledger.js";
+import { logGeneration, logText, estimateImageCost } from "@/lib/marketplace/ai-ledger.js";
 import sharp from "sharp";
 
 // AI art generation via OpenAI's image model (gpt-image-1), stored to Vercel Blob. Reuses the same
@@ -35,6 +35,8 @@ async function orientFacingRight(buffer, key) {
         });
         if (!resp.ok) return { buffer, flipped: false };
         const data = await resp.json().catch(() => null);
+        // Runs on every faceRight sprite, so it's small per call and never small in aggregate.
+        await logText({ model: "gpt-4o-mini", usage: data?.usage, source: "vision/facing", label: "Facing check", origin: "auto" });
         const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
         if (answer.includes("left") && !answer.includes("right")) {
             return { buffer: await sharp(buffer).flop().png().toBuffer(), flipped: true };
@@ -84,6 +86,7 @@ export async function refineDecoPrompt(description, correction = "") {
         });
         if (!resp.ok) return null;
         const data = await resp.json().catch(() => null);
+        await logText({ model: "gpt-4o-mini", usage: data?.usage, source: "text/deco-prompt", label: "Creation prompt refine", origin: "creation" });
         let out = (data?.choices?.[0]?.message?.content || "").trim();
         out = out
             .replace(/^["']|["']$/g, "")
@@ -121,6 +124,7 @@ export async function describeDecoFromName(name) {
         });
         if (!resp.ok) return null;
         const data = await resp.json().catch(() => null);
+        await logText({ model: "gpt-4o-mini", usage: data?.usage, source: "text/deco-name", label: "Creation name → description", origin: "creation" });
         const out = (data?.choices?.[0]?.message?.content || "")
             .trim()
             .replace(/^["']|["']$/g, "")
@@ -167,6 +171,9 @@ export async function detectFacing(bufferOrUrl) {
         });
         if (!resp.ok) throw new Error(`Facing detection request failed (${resp.status}).`);
         const data = await resp.json().catch(() => null);
+        // gpt-4o at detail:"high", THREE times per sprite for the majority vote — the most expensive text call
+        // in the app by a wide margin, and it was completely invisible before this.
+        await logText({ model: "gpt-4o", usage: data?.usage, source: "vision/facing-vote", label: "Facing vote (1 of 3)", origin: "auto" });
         const answer = (data?.choices?.[0]?.message?.content || "").toLowerCase();
         if (answer.includes("left") && !answer.includes("right")) return "left";
         if (answer.includes("right") && !answer.includes("left")) return "right";
@@ -276,7 +283,7 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
 // TRUE wide scene via OUTPAINTING — generate a base tile, then extend it RIGHT step-by-step by feeding the real
 // right-edge pixels back with a fill-mask so the model paints a genuine continuation (no seams, no repeat — not a
 // "clever tile"). Sequential, so keep `steps` modest under a serverless time budget. Returns the stored Blob URL.
-export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pathPrefix = "marketplace/boss-bg", steps = 3, quality = "medium" } = {}) {
+export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pathPrefix = "marketplace/boss-bg", steps = 3, quality = "medium", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
     const W = 1536, H = 1024, SEED = 800, NEW = W - SEED;
@@ -319,6 +326,14 @@ export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pat
     // Outpainted panoramas are several tiles wide on purpose — no width cap here, or the scrolling scene the
     // outpainting exists to build would be squeezed back down to one screen.
     const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`, out, { access: "public", contentType: "image/webp", cacheControlMaxAge: 31536000 });
+    // This is the priciest call in the app: one base draw plus `steps` edit passes, each billing a reference
+    // image back in. Logged as a single row carrying the whole run's cost, not one row per invisible step.
+    await logGeneration({
+        size: `${W}x${H}`, quality, edit: true, source: pathPrefix, prompt: basePrompt, url: blob.url,
+        label: `Outpainted panorama (${steps + 1} passes)`,
+        costUsd: estimateImageCost({ size: `${W}x${H}`, quality }) + steps * (estimateImageCost({ size: `${W}x${H}`, quality, edit: true })),
+        ...meta,
+    });
     return blob.url;
 }
 
@@ -367,7 +382,7 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
 
 // Image-to-image: transform a reference PNG with a prompt (gpt-image-1 edits). Used to redraw a member's
 // avatar as a full-body sprite so it actually matches their avatar. Returns the stored Blob URL.
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai" } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -383,12 +398,20 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     const resp = await fetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
+        await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
         throw new Error(`OpenAI edit ${resp.status}: ${text.slice(0, 300)}`);
     }
     const data = await resp.json().catch(() => null);
     const b64 = data?.data?.[0]?.b64_json;
-    if (!b64) throw new Error("OpenAI returned no image");
+    if (!b64) {
+        await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
+        throw new Error("OpenAI returned no image");
+    }
 
     const buffer = Buffer.from(b64, "base64");
-    return storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
+    const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
+    // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
+    // draw of the same size — estimateImageCost() adds that when edit is true.
+    await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, url, ...meta });
+    return url;
 }

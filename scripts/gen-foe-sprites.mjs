@@ -15,6 +15,7 @@ import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
 
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8");

@@ -40,7 +40,7 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const key = body?.variant || body?.tod;
             const variant = VARIANT[key] ? key : "day";
-            const url = await generateSceneImage(buildPrompt(variant), { pathPrefix: "marketplace/farm-bg" });
+            const url = await generateSceneImage(buildPrompt(variant), { pathPrefix: "marketplace/farm-bg", meta: { origin: "admin", subject: String(variant), label: "Farm background (admin)" } });
             return NextResponse.json({ ok: Boolean(url), variant, url }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.farm_bg.failure" });

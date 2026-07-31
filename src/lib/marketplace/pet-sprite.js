@@ -74,7 +74,7 @@ export async function detectPetSpriteFacings(limit = 6) {
 export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true });
+    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet sprite — ${pet?.name || pet?.id || "?"}` } });
     // Freshly generated art is already right-facing, so stamp it oriented — the repair sweep skips it.
     await db.query(
         `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at, oriented_at) VALUES ($1, $2, NOW(), NOW())
@@ -197,7 +197,7 @@ export async function generatePetSpriteLevel(petId, level) {
     if (!PET_SPRITE_LEVELS.includes(lv)) throw new Error("Level must be 2–5");
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true });
+    const url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet level art — ${pet?.name || pet?.id || "?"} lv${lv}` } });
     await db.query(
         `INSERT INTO mkt_pet_sprite_level (pet_id, level, url, updated_at) VALUES ($1, $2, $3, NOW())
          ON CONFLICT (pet_id, level) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,

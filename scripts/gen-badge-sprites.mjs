@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 // ── secrets: OpenAI key from the Android local.properties; DB + blob token from accounting_app/.env ──
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");

@@ -56,7 +56,15 @@ export async function startFarmBg(buyerId, prompt) {
     if (!paid) return { ok: false, error: "no_credits" };
     if (!free) await logCreationLedger(buyerId, -FARM_BG_COST, { source: "spend_farm_bg", actorId: buyerId, actorLabel: "self", balanceAfter: paid.custom_deco_credits, meta: {} });
     let url = null;
-    try { url = await generateSceneImage(buildBgPrompt(desc), { pathPrefix: "marketplace/farm-bg" }); } catch { url = null; }
+        // Paid for with Creation credits, so it belongs with the creations — named, not anonymous.
+    const who = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const buyerLabel = who?.alias ? `@${who.alias}` : (who?.display_name || null);
+    try {
+        url = await generateSceneImage(buildBgPrompt(desc), {
+            pathPrefix: "marketplace/farm-bg",
+            meta: { origin: "creation", buyerId, buyerLabel, label: "Farm background" },
+        });
+    } catch { url = null; }
     if (!url) {
         if (!free) {
             await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + $2 WHERE id = $1`, [buyerId, FARM_BG_COST]).catch(() => {}); // refund

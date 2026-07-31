@@ -25,6 +25,45 @@ export function estimateImageCost({ size = "1024x1024", quality = "medium", edit
     return Math.round((tokens * PER_TOKEN + (edit ? EDIT_INPUT_USD : 0)) * 100000) / 100000;
 }
 
+// Text/vision pricing, $ per 1M tokens {in, out}. Priced from the token counts OpenAI returns on every
+// response, so these are measured, not guessed.
+const TEXT_PRICES = {
+    "gpt-4o-mini": { in: 0.15, out: 0.60 },
+    "gpt-4o": { in: 2.50, out: 10.00 },
+    "gpt-4.1-mini": { in: 0.40, out: 1.60 },
+    "gpt-4.1": { in: 2.00, out: 8.00 },
+};
+const textPrice = (model) => {
+    const m = String(model || "");
+    for (const k of Object.keys(TEXT_PRICES)) if (m.startsWith(k)) return TEXT_PRICES[k];
+    return TEXT_PRICES["gpt-4o-mini"];
+};
+export function estimateTextCost({ model, tokensIn = 0, tokensOut = 0 } = {}) {
+    const p = textPrice(model);
+    return Math.round(((tokensIn / 1e6) * p.in + (tokensOut / 1e6) * p.out) * 1e6) / 1e6;
+}
+
+/**
+ * Record a text/vision call. Same ledger, kind='text'. Never throws.
+ * `usage` is OpenAI's own usage object off the response — pass it straight through.
+ */
+export async function logText({ model, usage, label, source, origin = "unknown", buyerId, buyerLabel, subject, ok = true, error } = {}) {
+    try {
+        const tokensIn = Number(usage?.prompt_tokens ?? usage?.input_tokens ?? 0) || 0;
+        const tokensOut = Number(usage?.completion_tokens ?? usage?.output_tokens ?? 0) || 0;
+        const cost = estimateTextCost({ model, tokensIn, tokensOut });
+        await db.query(
+            `INSERT INTO mkt_ai_generation
+                (kind, model, source, label, subject, origin, buyer_id, buyer_label, ok, error,
+                 tokens_in, tokens_out, cost_usd, cost_basis)
+             VALUES ('text',$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'measured')`,
+            [model || "unknown", source || null, label || null, subject || null, origin,
+                buyerId || null, buyerLabel || null, Boolean(ok), error ? String(error).slice(0, 600) : null,
+                tokensIn, tokensOut, cost],
+        );
+    } catch { /* bookkeeping must never break the caller */ }
+}
+
 // Human label for a blob path prefix, so the history reads as features rather than folder names.
 export const SOURCE_LABELS = {
     "marketplace/sprite": "Hero sprite",
@@ -100,6 +139,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
              COUNT(*)::int AS n,
              SUM(cost_usd) AS cost,
              COUNT(*) FILTER (WHERE NOT ok)::int AS failed,
+             MIN(kind) AS kind,
              MIN(origin) AS origin,
              MIN(batch_label) AS batch_label,
              MIN(source) AS source,
@@ -129,6 +169,7 @@ export async function listGenerations({ days = 30, limit = 200, origin = null } 
         costUsd: Math.round(num(r.cost) * 100000) / 100000,
         startedAt: r.started_at,
         endedAt: r.ended_at,
+        kind: r.kind,
         origin: r.origin,
         batchLabel: r.batch_label,
         source: r.source,
@@ -166,7 +207,9 @@ export async function generationSummary({ days = 30 } = {}) {
     const [totals, byOrigin, bySource, byMember] = await Promise.all([
         db.query(
             `SELECT COUNT(*)::int n, SUM(cost_usd) cost, COUNT(*) FILTER (WHERE NOT ok)::int failed,
-                    SUM(cost_usd) FILTER (WHERE cost_basis = 'estimated') est_cost
+                    SUM(cost_usd) FILTER (WHERE cost_basis = 'estimated') est_cost,
+                    COUNT(*) FILTER (WHERE kind = 'text')::int text_n,
+                    SUM(cost_usd) FILTER (WHERE kind = 'text') text_cost
              FROM mkt_ai_generation WHERE created_at > now() - $1::interval`, [since]).catch(() => []),
         db.query(
             `SELECT origin, COUNT(*)::int n, SUM(cost_usd) cost FROM mkt_ai_generation
@@ -187,6 +230,8 @@ export async function generationSummary({ days = 30 } = {}) {
         failed: t.failed || 0,
         costUsd: Math.round(num(t.cost) * 100) / 100,
         estimatedCostUsd: Math.round(num(t.est_cost) * 100) / 100,
+        textCount: t.text_n || 0,
+        textCostUsd: Math.round(num(t.text_cost) * 100) / 100,
         byOrigin: (byOrigin || []).map((r) => ({ origin: r.origin, count: r.n, costUsd: Math.round(num(r.cost) * 100) / 100 })),
         bySource: (bySource || []).map((r) => ({ source: r.source, label: sourceLabel(r.source), count: r.n, costUsd: Math.round(num(r.cost) * 100) / 100 })),
         byMember: (byMember || []).map((r) => ({ buyerId: r.buyer_id, label: r.buyer_label || "(unknown)", count: r.n, costUsd: Math.round(num(r.cost) * 100) / 100 })),

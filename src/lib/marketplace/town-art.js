@@ -169,8 +169,8 @@ export async function generateTownArt(key) {
     let url;
     if (key === "background") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 3 });
     else if (key === "tavern_interior") url = await generateWideSceneImage(prompt, { pathPrefix: "marketplace/town", panels: 2 }); // WIDE scrollable tavern room
-    else if (key === "sky" || key === "cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town" }); // opaque scene layers
-    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true }); // transparent building sprite
+    else if (key === "sky" || key === "cobble") url = await generateSceneImage(prompt, { pathPrefix: "marketplace/town", meta: { origin: "admin", subject: key, label: `Town scene — ${key}` } }); // opaque scene layers
+    else url = await generateImage(prompt, { size: "1024x1024", pathPrefix: "marketplace/town", deHalo: true, meta: { origin: "admin", subject: key, label: `Town art — ${key}` } }); // transparent building sprite
     await db.query(
         `INSERT INTO mkt_town_art (art_key, url, updated_at) VALUES ($1, $2, NOW())
          ON CONFLICT (art_key) DO UPDATE SET url = $2, updated_at = NOW()`,

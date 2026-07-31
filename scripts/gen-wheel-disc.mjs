@@ -3,6 +3,7 @@
 // center to keep the hand-painted feel. Overwrites public/images/spin/wheel-disc.png.
 // Run: node scripts/gen-wheel-disc.mjs   (regenerate the AI medallion first via gen-spin-art.mjs wheel-disc)
 import sharp from "sharp";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 const S = 1024, cx = S / 2, cy = S / 2, Rout = S * 0.475, Rin = S * 0.135;
 const cols = ["#2f8f7a", "#b0402f", "#2a6db0", "#6b4f9a", "#3a8f5a", "#c77d2f"]; // jewel palette

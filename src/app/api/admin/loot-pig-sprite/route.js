@@ -22,7 +22,7 @@ export async function POST(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            const url = await generateImage(PIG_PROMPT, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/farm", resizeTo: 256, faceRight: true });
+            const url = await generateImage(PIG_PROMPT, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/farm", resizeTo: 256, faceRight: true, meta: { origin: "admin", label: "Loot pig sprite" } });
             return NextResponse.json({ ok: Boolean(url), url }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "admin.loot_pig_sprite.failure" });

@@ -14,6 +14,7 @@ import path from "node:path";
 import sharp from "sharp";
 
 import { housePrompt, SMALL_ICON_EXTRA } from "../src/lib/marketplace/art-style.js";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
 // gpt-image-1 returns a 1024² transparent PNG — around 1.8MB each. These are drawn at 18px in the strip and
 // 28px in the grid, so shipping the raw output would have put ~43MB of art in the repo to render thumbnails.

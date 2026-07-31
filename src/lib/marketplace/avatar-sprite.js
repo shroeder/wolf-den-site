@@ -230,7 +230,12 @@ export async function generateBuyerSprite(buyerId) {
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
     const prompt = buildSpritePrompt(row.avatar_config, gear);
     const png = await renderAvatarPng(row.avatar_config, 1024);
-    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
+    // Redrawn whenever a member changes gear, so this fires far more often than once per member.
+    const who = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const url = await editImage(png, prompt, {
+        size: "1024x1024", pathPrefix: "marketplace/sprite",
+        meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
+    });
     // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
@@ -257,7 +262,7 @@ export async function setDefaultSpriteFromImage(base64) {
 export async function generateDefaultSprite() {
     const prompt = buildSpritePrompt(DEFAULT_AVATAR);
     const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
-    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite" });
+    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite", meta: { origin: "admin", label: "Default hero sprite" } });
     await setSetting(DEFAULT_SPRITE_KEY, url);
     return url;
 }

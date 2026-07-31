@@ -34,7 +34,7 @@ export async function POST(request) {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
         if (authError) return authError;
         try {
-            const url = await generateSceneImage(PROMPT, { pathPrefix: "marketplace/equip-bg" });
+            const url = await generateSceneImage(PROMPT, { pathPrefix: "marketplace/equip-bg", meta: { origin: "admin", label: "Equip backdrop" } });
             await setSetting("equip_backdrop_url", url);
             return noStore({ ok: true, url });
         } catch (error) {

@@ -1,6 +1,7 @@
 // One-off: generate the buried treasure-chest sprite that gets uncovered tile-by-tile in the dig game.
 // Front view, ~3:2 so it slices cleanly across a 3-wide × 2-tall chest footprint. Transparent PNG.
 import fs from "node:fs";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 if (!key) throw new Error("no key");

@@ -2,6 +2,7 @@
 // 20-wedge disc, a small mini-wheel disc, 16 prize sprites, and 6 wheel-exclusive gear sprites. Static assets
 // under public/images/spin/. Run: node scripts/gen-spin-art.mjs   (add slugs to regen only some)
 import fs from "node:fs";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 if (!key) throw new Error("no OPENAI_API_KEY");

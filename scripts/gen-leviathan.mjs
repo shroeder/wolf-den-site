@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import sharp from "sharp";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
 const prompt =
