@@ -148,14 +148,22 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
     const onPointerDown = useCallback((e) => {
         if (overlayRef.current) return; // a panel is open — don't start a room drag behind it
         cancelAnimationFrame(momentumRef.current);
-        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0 };
-        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ok */ }
+        drag.current = { down: true, moved: false, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp || 0, vx: 0, captured: false, id: e.pointerId };
+        // Capture is taken in onPointerMove, NOT here. Capturing on pointerdown retargets the pointerup to the
+        // scene, and a MOUSE click goes to the common ancestor of down and up -- so every NPC and button in the
+        // room stopped receiving click on desktop. Touch pointers are implicitly captured to their own target,
+        // which is why phones never showed it. Same bug as Town had.
     }, []);
     const onPointerMove = useCallback((e) => {
         if (overlayRef.current) return;
         const d = drag.current; if (!d.down) return;
         const dx = e.clientX - d.lastX;
-        if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) { d.moved = true; setDragging(true); }
+        if (!d.moved && Math.abs(e.clientX - d.startX) > 4 && Math.abs(e.clientX - d.startX) > Math.abs(e.clientY - d.startY) * 0.8) {
+            d.moved = true; setDragging(true);
+            // Now that it's a pan there is no click left to protect, and capture keeps the drag tracking when
+            // the cursor leaves the scene mid-flick.
+            try { e.currentTarget.setPointerCapture(e.pointerId); d.captured = true; } catch { /* ok */ }
+        }
         if (d.moved) {
             const t = e.timeStamp || 0; const dt = Math.max(1, t - d.lastT);
             d.vx = dx / dt; d.lastX = e.clientX; d.lastT = t;
@@ -164,6 +172,7 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
     }, [followCam, maxScroll]);
     const onPointerUp = useCallback((e) => {
         const d = drag.current; d.down = false;
+        if (d.captured) { try { e.currentTarget.releasePointerCapture(d.id); } catch { /* ok */ } d.captured = false; }
         if (overlayRef.current) { setDragging(false); return; } // panel open → ignore
         if (d.moved) {
             let v = d.vx * 16;
