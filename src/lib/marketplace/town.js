@@ -91,6 +91,13 @@ export const TOWN_BUILDINGS = [
     { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 92 },
 ];
 
+// Buildings that only some members can see. The Kitchen is owner-gated while the design settles, and the town
+// is the one place a new feature has to appear or nobody will find it — so the gate lives here rather than the
+// building being quietly absent from the list.
+export const GATED_BUILDINGS = [
+    { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86, gate: "owner" },
+];
+
 // Shared generated art (background + building sprites), keyed. Empty until generated via the admin tool.
 export async function getTownArt() {
     const rows = await db.query(`SELECT art_key, url, flip FROM mkt_town_art`).catch(() => []);
@@ -373,7 +380,8 @@ export async function getTownState(buyerId) {
             gold: Number(me?.gold || 0),
         },
         players,
-        buildings: TOWN_BUILDINGS, // all nine are standing fixtures now (no funded unlocks)
+        // All nine are standing fixtures (no funded unlocks); gated ones are appended per viewer.
+        buildings: [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))],
         art,
         projects,
         bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, farmGrowPct: bonuses.farmGrowPct || 0, farmYieldPct: bonuses.farmYieldPct || 0 },

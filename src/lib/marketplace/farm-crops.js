@@ -18,6 +18,11 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
+import { addToPantry, learnRecipe } from "@/lib/marketplace/cooking.js";
+
+// How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
+// only one of several sources (chests, digs, raids, the merchant).
+const HARVEST_RECIPE_CHANCE = 0.04;
 
 // ===== Farming =====
 // Plant a seed in a plot → it grows over real time → harvest it to SELL for gold (+ a small chance at a loot
@@ -353,6 +358,12 @@ export async function harvestPlot(buyerId, slot) {
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
+    // YOU ALSO KEEP THE CROP. The gold above still reads as selling the surplus and the farm economy is
+    // balanced on it — but the produce itself now goes to the pantry, where the Kitchen can cook with it. A
+    // doubled harvest doubles the produce too, since it doubled everything else.
+    await addToPantry(buyerId, "crop", claimed.seed_id, doubled ? 2 : 1).catch(() => {});
+    // Recipes are found, not listed, and the field is one of the places they turn up.
+    const recipeFound = Math.random() < HARVEST_RECIPE_CHANCE ? await learnRecipe(buyerId).catch(() => null) : null;
     // Harvest is a huge XP minter, so the PLAYER only banks a fraction of the crop's XP (tuned down). The full
     // crop XP still feeds the PET below — the farm stays a pet-XP engine, it just doesn't flood player levels.
     const harvestPlayerXp = Math.round(xp * HARVEST_PLAYER_XP_MULT);
@@ -415,7 +426,7 @@ export async function harvestPlot(buyerId, slot) {
     // fights it with a timing meter, then calls encounter_resolve for bonus loot. Server parks the pending fight.
     const encounter = await maybeStartEncounter(buyerId, { rarity, wardChance: pEff.raidChance, seedId: claimed.seed_id }).catch(() => null);
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, encounter, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, recipeFound: recipeFound ? { id: recipeFound.id, name: recipeFound.name, emoji: recipeFound.emoji, tier: recipeFound.tier } : null, newPet, encounter, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
