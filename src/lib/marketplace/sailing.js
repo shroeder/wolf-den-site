@@ -726,7 +726,10 @@ function boardView(board) {
 }
 
 // --- state ---------------------------------------------------------------------------------------------
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null) {
+// `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
+// mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
+// erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -825,11 +828,12 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
         windRecharge: { cost: windRechargeCost(row?.wind_recharges || 0) },
         dig: status === "digging" ? boardView(dig) : null,
-        // Fishing — offered while at sea or docked. fishingView is PURE off this same row, so the log, the daily
+        // Fishing — offered at sea AND docked. fishingView is PURE off this same row, so the log, the daily
         // cast count and anything currently on the line all come along for free with no extra query.
-        // Owner-only while the design settles. A null here removes the whole surface: SailingClient guards every
-        // fishing affordance on `state.fishing`, so members see no rail button, no scene, no trace of it.
-        fishing: fishingUnlocked(row?.buyer_id) ? fishingView(row, angling, status) : null,
+        // A null here removes the whole surface: SailingClient guards every fishing affordance on
+        // `state.fishing`, so members see no rail button, no scene, no trace of it — which is exactly what
+        // happened to the 36 members who had no sailing row when this read `row?.buyer_id`.
+        fishing: fishingUnlocked(buyerId || row?.buyer_id) ? fishingView(row, angling, status) : null,
     };
 }
 
@@ -947,7 +951,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {

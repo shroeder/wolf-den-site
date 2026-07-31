@@ -392,7 +392,8 @@ const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0
 
 // ── CLIENT VIEW ──────────────────────────────────────────────────────────────────────────────────────────────
 // PURE function off the sailing row — no extra query, so this is free to include in every sailing state load.
-// `status` is the voyage status decorate() already computed; fishing is only offered at sea or docked.
+// `status` is the voyage status decorate() already computed. Fishing is offered at sea AND docked — the only
+// state that blocks it is `digging`, when you're ashore on the island with a shovel rather than on the boat.
 export function fishingView(row, angling = 0, status = "idle") {
     const log = logOf(row);
     const lv = fishTrackLevels(row);
@@ -402,7 +403,10 @@ export function fishingView(row, angling = 0, status = "idle") {
     const hooked = row?.fish_state || null;
     const caughtIds = Object.keys(log);
     return {
-        available: status === "sailing" || status === "arrived",
+        // Docked counts. This used to require being at sea, which silently hid the whole feature from anyone
+        // who hadn't sent their boat out — they'd open Sailing, see no fishing anywhere, and have no way to
+        // know why. The client's own error copy already said "at sea or docked"; only the gate disagreed.
+        available: status !== "digging",
         casts: { used, max, left: Math.max(0, max - used), bought },
         // Offered only once the day's casts are gone — buying while you still have some would just be a worse
         // way to spend gold, and reads as a trap.
@@ -448,7 +452,7 @@ export function fishingView(row, angling = 0, status = "idle") {
 // because the surprise of what surfaces is most of the fun.
 export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    if (status !== "sailing" && status !== "arrived") return { ok: false, error: "not_at_sea" };
+    if (status === "digging") return { ok: false, error: "not_at_sea" }; // ashore with a shovel, not on the boat
     const row = await readFishRow(buyerId);
     if (!row) return { ok: false, error: "no_ship" };
     if (row.fish_state) return { ok: false, error: "already_cast" };

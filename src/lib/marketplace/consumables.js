@@ -361,5 +361,10 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         await db.query(`INSERT INTO mkt_user_boost (buyer_id, kind, magnitude, expires_at) VALUES ($1, 'damage', $2, NOW() + ($3 || ' hours')::interval)`, [buyerId, e.mult, String(e.hours)]).catch(() => {});
         applied = `${e.mult}× boss damage for ${e.hours}h`;
     }
+    // Every other branch above tracks its use; this one never did, so spin tokens, XP scrolls, strike potions
+    // and damage potions were all invisible to telemetry. That's how 1,213 XP-scroll uses in 90 minutes left no
+    // trace on the admin screens — the only record was the coin ledger, and you had to already suspect
+    // something to go looking there. An action that moves currency should always be visible as an action.
+    await trackActivity(buyerId, "use_consumable", { id, name: c.name }).catch(() => {});
     return { ok: true, remaining: dec.count, name: c.name, emoji: c.emoji, applied };
 }

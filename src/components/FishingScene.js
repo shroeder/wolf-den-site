@@ -392,7 +392,7 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
         if (!res?.ok) {
             setErr(res?.error === "out_of_casts" ? "You're out of casts for today — they refill tomorrow."
                 : res?.error === "already_cast" ? "Your line is already in the water."
-                : res?.error === "not_at_sea" ? "You can only fish while you're at sea or docked."
+                : res?.error === "not_at_sea" ? "You can't fish while you're ashore digging."
                 : "The line wouldn't go out. Try again.");
             return;
         }
