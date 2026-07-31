@@ -94,6 +94,10 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 const BOSS_TARGET_DAYS = 10;
 // A little headroom so the next boss isn't undersized by the pack leveling/growing between fights.
 const BOSS_PACK_GROWTH = 1.1;
+// How many "typical members" the single strongest account is allowed to count as when projecting pack power.
+// High enough that a genuinely well-geared veteran still counts for more than average, low enough that one
+// runaway account can't size the boss on its own.
+const OUTLIER_CAP = 8;
 
 // Passive per-member hourly auto-damage. Now uses the FULL offensive kit (like the manual strike): Might +
 // Ferocity both add power, and crit gives an expected-value uplift — so ALL combat gear matters for the ~90%
@@ -164,7 +168,7 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
         getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map()),
         getPackPetBonuses().catch(() => new Map()),
     ]);
-    const daily = members.reduce((sum, m) => {
+    const perMember = members.map((m) => {
         const g = gearStats.get(m.id) || {};
         const pb = petBonuses.get(m.id) || { stats: {}, proc: {} };
         const ps = pb.stats || {};
@@ -176,8 +180,20 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
             extra_strike: (g.extra_strike || 0) + (ps.extra_strike || 0) + (pb.proc?.extraStrikeChance || 0), // chance folds in as expected value for the projection
         };
         const manualMult = manualStatMultiplier(combined) * procMultiplier(pb.proc, 1 + combined.extra_strike);
-        return sum + memberDailyDamage(lvl(m.xp), manualMult, autoStats(g, ps));
-    }, 0);
+        return memberDailyDamage(lvl(m.xp), manualMult, autoStats(g, ps));
+    });
+    // One account must never define the pack's power. This summed every member flat, so a single member at
+    // level 437 wearing ten enhanced legendaries sized a boss at 73,155,000 against a pack that really does
+    // ~1,900,000 a day — a 38-day fight inside a 10-day window, i.e. unkillable. That member got there through
+    // a gold exploit, but an admin grant or a whale would do the same thing honestly.
+    //
+    // Cap each member's contribution at a multiple of the MEDIAN. The median is what a typical member brings and
+    // no single account can move it, so a genuinely geared pack still scales the boss up while one outlier can
+    // only ever count as OUTLIER_CAP members' worth.
+    const sorted = perMember.slice().sort((a, b) => a - b);
+    const median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+    const ceiling = median > 0 ? median * OUTLIER_CAP : Infinity;
+    const daily = perMember.reduce((sum, d) => sum + Math.min(d, ceiling), 0);
     // Size off the LARGER of observed real damage (buffs & all, +10% growth headroom) and the theoretical
     // projection — so a buffed-up pack can't one-shot the boss, but a first-ever boss still gets a real size.
     const observed = await observedDailyDamage();
@@ -909,6 +925,11 @@ async function sizeNextBossHp(prevBoss) {
     if (projected) hp = Math.max(hp, projected);
     if (!hp) hp = prevBoss?.max_hp || 500000;
     hp = Math.max(hp, (prevBoss?.max_hp || 0) * 1.05); // a new boss is never weaker than the last
+    // ...and never wildly stronger, either. That floor is a RATCHET: whatever number comes out here becomes the
+    // permanent minimum for every boss after it. A single bad projection therefore poisons the curve forever,
+    // which is exactly what happened when one exploited account sized a boss at 3.5x the pack's real pace.
+    // Bounding a single step to 2x means a bad reading costs one boss cycle instead of every future one.
+    if (prevBoss?.max_hp) hp = Math.min(hp, Number(prevBoss.max_hp) * 2);
     return Math.max(100000, Math.round(hp / 1000) * 1000);
 }
 
