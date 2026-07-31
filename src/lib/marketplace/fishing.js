@@ -177,7 +177,7 @@ async function grantHaul(buyerId, kind, tier = "common") {
         // since day one — they're pieces you forge into a treasure chest — and inventing a third name for the
         // same object left people asking what a Hull Shard even was. It also collided with the Forge's salvage
         // tiers (Cinder Scrap … Emberheart Shard), which are a completely unrelated currency.
-        return { kind: "fragment", label: n > 1 ? `${n} Chest Fragments` : "Chest Fragment", emoji: "🔷", n };
+        return { kind: "fragment", label: n > 1 ? `${n} Chest Fragments` : "Chest Fragment", emoji: "🔷", n, spriteUrl: await haulSprite("fragment") };
     }
     if (kind === "seed") {
         const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
@@ -287,11 +287,13 @@ export const castsPerDay = (angling = 0, lineLevel = 0) =>
 
 // ── BUYING MORE CASTS ────────────────────────────────────────────────────────────────────────────────────────
 // Once the day's allowance is spent you can buy another cast with gold. The price DOUBLES each time within the
-// day (1,000 → 2,000 → 4,000 …), which is what keeps this from being a way to farm the treasure table flat:
+// day (100 → 200 → 400 …), which is what keeps this from being a way to farm the treasure table flat:
 // the first is an easy yes, the fourth is a real decision, and a big balance buys sharply less than it looks.
 // Resets with the daily allowance, off the same fish_day, so "today" has exactly one definition.
-export const RECHARGE_BASE = 1000;
-export const RECHARGE_MAX_PER_DAY = 6; // 1k+2k+4k+8k+16k+32k = 63,000 gold to max out a day
+// Base is deliberately low: the first extra cast should be an easy yes at any balance — the doubling is what
+// does the limiting, not the entry price.
+export const RECHARGE_BASE = 100;
+export const RECHARGE_MAX_PER_DAY = 6; // 100+200+400+800+1600+3200 = 6,300 gold to max out a day
 export const rechargeCost = (bought = 0) => RECHARGE_BASE * (2 ** Math.max(0, bought));
 const rechargesToday = (row) => (row?.fish_is_today ? Number(row.fish_recharges) || 0 : 0);
 

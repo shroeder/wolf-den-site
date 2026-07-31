@@ -12293,6 +12293,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    way whether it's a marlin, a chest or a piece of gear. */
 img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: contain; margin: 0 auto;
     filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
+.fish-reveal-wrap { position: relative; display: inline-block; z-index: 3; }
+/* A stacked haul says how many — "3 Chest Fragments" reads better with a 3 on the art. */
+.fish-reveal-count { position: absolute; right: -6px; bottom: 2px; font-size: 1.05rem; font-weight: 900;
+    color: #0d1117; background: linear-gradient(180deg,#ffe9a8,#f0b429); border-radius: 999px;
+    padding: 2px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
 @keyframes fishRevealArt { 0% { transform: scale(0.35) rotate(-14deg); opacity: 0; } 60% { transform: scale(1.14) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
 /* Rays — a slow conic sweep behind the art. */
 .fish-rays { z-index: 1; width: 240px; height: 240px; border-radius: 50%; opacity: 0.5;

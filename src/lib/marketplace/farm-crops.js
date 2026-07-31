@@ -208,9 +208,12 @@ async function loadFarmBuyer(buyerId) {
 // `s` is a perspective scale. The back row is drawn smaller because it's further away, which reads as depth AND
 // buys the room to keep it inside the field: a half-step stagger would put the fourth back bed at x 97 and hang
 // it off the right edge. Smaller beds up there sit at 91 and still clear the fence.
+// Spread across a field that is now ~1.9x the viewport wide (see FarmClient: the Garden scrolls horizontally
+// like Outside/Inside instead of being squeezed onto one screen). 24 points apart on a 190% field is roughly
+// 45% of a phone screen between beds — they read as a laid-out plot rather than a row of crates.
 const PLOT_SLOTS = [
-    { x: 13, y: 89, s: 1 }, { x: 37, y: 89, s: 1 }, { x: 61, y: 89, s: 1 }, { x: 85, y: 89, s: 1 }, // front row
-    { x: 19, y: 70, s: 0.8 }, { x: 43, y: 70, s: 0.8 }, { x: 67, y: 70, s: 0.8 }, { x: 91, y: 70, s: 0.8 }, // back row, inset + smaller
+    { x: 10, y: 89, s: 1 }, { x: 34, y: 89, s: 1 }, { x: 58, y: 89, s: 1 }, { x: 82, y: 89, s: 1 }, // front row
+    { x: 22, y: 69, s: 0.8 }, { x: 46, y: 69, s: 0.8 }, { x: 70, y: 69, s: 0.8 }, { x: 92, y: 69, s: 0.8 }, // back row, inset + smaller
 ];
 function defaultPlotPos(i) {
     return PLOT_SLOTS[i] || PLOT_SLOTS[PLOT_SLOTS.length - 1];

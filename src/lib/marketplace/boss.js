@@ -864,10 +864,22 @@ const PROC_BOSS_NAMES = [
 // come out weaker than the last one. Returns a rounded HP.
 // Auto-pick N reward items for a procedurally-generated boss, capped so it never drops too-rare gear.
 const REWARD_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
-function pickRewardItems(n = 3, capRarity = "epic") {
+// A boss is a ten-day fight for the whole pack. Its drops had only a CAP, no floor, so the roll could hand out
+// three commons — a week and a half of everyone's effort paying out in grey. There is now a floor as well:
+// rare (blue) at minimum, epic at most. `floorRarity` is a parameter rather than a constant so raising the bar
+// later is a one-word change, and it degrades safely — if a floor ever leaves the pool empty it widens rather
+// than returning nothing.
+function pickRewardItems(n = 3, capRarity = "epic", floorRarity = "rare") {
     const cap = REWARD_RARITY_RANK[capRarity] ?? 2;
-    // Real stat gear only, at/below the cap, and never the charged real-world-perk items (source 'admin').
-    const pool = ITEMS.filter((i) => i.stats && i.source !== "admin" && (REWARD_RARITY_RANK[i.rarity] ?? 9) <= cap);
+    let floor = REWARD_RARITY_RANK[floorRarity] ?? 1;
+    // Real stat gear only, within the band, and never the charged real-world-perk items (source 'admin').
+    const inBand = (f) => ITEMS.filter((i) => {
+        const r = REWARD_RARITY_RANK[i.rarity] ?? 9;
+        return i.stats && i.source !== "admin" && r <= cap && r >= f;
+    });
+    let pool = inBand(floor);
+    // Widen downward only if the band can't fill the slots — better a mixed set than a short one.
+    while (pool.length < n && floor > 0) { floor -= 1; pool = inBand(floor); }
     const out = [];
     const bag = pool.slice();
     while (out.length < n && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0].id);

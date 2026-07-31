@@ -547,8 +547,11 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                                 land here as a bare emoji while a fish got its illustrated sprite — so half the reward
                                 table looked like a placeholder. Fragments keep the emoji: they're a currency, not a thing. */}
                             {result.prize?.spriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="fish-reveal-art" src={result.prize.spriteUrl} alt={result.prize.label || ""} />
+                                <span className="fish-reveal-wrap">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img className="fish-reveal-art" src={result.prize.spriteUrl} alt={result.prize.label || ""} />
+                                    {result.prize.n > 1 ? <span className="fish-reveal-count">×{result.prize.n}</span> : null}
+                                </span>
                             ) : (
                                 <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</span>
                             )}

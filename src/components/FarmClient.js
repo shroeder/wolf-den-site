@@ -833,7 +833,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-scroll { scrollbar-width: thin; }
                 /* Illustrated backdrop tiled with the mirror trick: [A A' A A'] — every other copy flipped, so
                    each junction's edges match and there's no seam even with non-tiling art (same as the sailing sky). */
-                .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; }
+                .farm-bg-strip { position: absolute; inset: 0; z-index: 0; display: flex; width: max-content; min-width: 100%; }
                 .farm-bg-strip img { height: 100%; width: auto; display: block; flex: 0 0 auto; margin-right: -1px; pointer-events: none; user-select: none; }
                 .farm-bg-strip img:nth-child(even) { transform: scaleX(-1); }
                 /* IN-FLOW mirror strip — sets the field's scrollable width (3 copies, every other flipped → seamless). */
@@ -962,7 +962,12 @@ export default function FarmClient({ initial, viewingAlias }) {
                         style={{
                             // The field is as wide as the painting so you can scroll/pan sideways to see all of it —
                             // in both windowed AND fullscreen (fullscreen just makes the scene taller).
-                            position: "relative", width: "max-content", minWidth: "100%", height: sceneHeight,
+                            // The Garden is now a WIDE scrolling field like Outside/Inside. It used to be pinned
+                            // to the viewport, so eight beds shared one phone screen and had to be shrunk to
+                            // fit — small and crowded, with the whole horizontal scroll going unused. At 190%
+                            // the beds get roughly double the size and real space between them.
+                            position: "relative", width: "max-content",
+                            minWidth: view === "garden" ? "190%" : "100%", height: sceneHeight,
                             background: fieldBackground(visTod, wx.condition),
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
@@ -1514,7 +1519,9 @@ function ScenePlots({ garden, busy, editing = false, fieldRef, onMovePlot, onPla
         ro.observe(el);
         return () => ro.disconnect();
     }, [fieldRef]);
-    const bedW = Math.max(58, Math.min(112, (fieldW || 380) * 0.205));
+    // Sized off the MEASURED field. The field is ~1.9x the viewport in the Garden now, so the multiplier
+    // comes down and the cap goes up: beds land near double their old on-screen size with room between them.
+    const bedW = Math.max(72, Math.min(190, (fieldW || 380) * 0.108));
     const suppressClickRef = useRef(false);
     const start = (e, p) => {
         return; // plots are fixed — see the note above

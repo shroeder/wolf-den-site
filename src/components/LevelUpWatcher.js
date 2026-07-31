@@ -77,13 +77,17 @@ export default function LevelUpWatcher() {
         // guards with activeRef, so the repeats are harmless once one fires.
         const xpTimers = [];
         const onXp = () => { [400, 1200, 2600, 4500].forEach((ms) => xpTimers.push(setTimeout(check, ms))); };
-        // Safety net so leveling from ANY source still celebrates within ~30s even if it didn't emit the event.
-        const poll = setInterval(() => { if (document.visibilityState === "visible") check(); }, 30000);
+        // No standing poll. The client already knows when this happens: every XP-earning action dispatches
+        // `wolfden-xp-updated`, and the retries above cover a slow write. A 30-second timer asking "did I level
+        // up?" was one request per member per 30s, forever, to catch an event we cause ourselves.
+        //
+        // The two cases the event can't cover are both covered without a timer: levelling from a passive source
+        // while away is caught by the mount check plus the visibility handler on return, and a genuinely
+        // background level-up still sends a web push from the server at the moment of crossing.
         document.addEventListener("visibilitychange", onVisible);
         window.addEventListener("wolfden-xp-updated", onXp);
         return () => {
             alive = false;
-            clearInterval(poll);
             xpTimers.forEach(clearTimeout);
             document.removeEventListener("visibilitychange", onVisible);
             window.removeEventListener("wolfden-xp-updated", onXp);

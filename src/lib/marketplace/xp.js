@@ -171,6 +171,14 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
             const oldLevel = levelForXp(newXp - pts).level;
             if (newLevel > oldLevel) {
                 const unlocks = unlocksAtLevel(newLevel);
+                // Don't push someone who is looking at the screen. They earned this two seconds ago by tapping
+                // something, and the celebration modal is already on its way — a phone notification for it is
+                // noise, and it costs a push send. Only notify if they've gone quiet.
+                const active = await db.queryOne(
+                    `SELECT 1 FROM mkt_visitor WHERE buyer_id = $1 AND last_seen > NOW() - INTERVAL '90 seconds' LIMIT 1`,
+                    [buyerId],
+                ).catch(() => null);
+                if (active) return row;
                 await sendWebPush(buyerId, {
                     kind: "levelup",
                     title: unlocks.length ? "🎁 New reward unlocked!" : "⬆️ Level up!",
