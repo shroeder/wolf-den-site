@@ -307,10 +307,17 @@ export default function CookingClient({ initial }) {
                                             <div className="ck-pool">
                                                 {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
                                                     only the roll made cooking look like a lottery with a lot of blanks. */}
-                                                <p className="ck-pool-intro">ONE of these, at random — likeliest first. A good timing run can push the whole dish a tier higher:</p>
+                                                <p className="ck-pool-intro">
+                                                    ONE of these, at random — likeliest first. A run of <b>{s.bump?.flawlessAt ?? 92}%+</b> bumps
+                                                    the whole dish to the next tier&rsquo;s table; below that it&rsquo;s a chance.
+                                                </p>
                                                 {(r.payout?.pool || []).map((c, i) => (
-                                                    <div key={i} className="ck-pool-row">
-                                                        <b>{c.name}</b><span>{c.desc}</span>
+                                                    <div key={i} className={`ck-pool-row is-${c.rarity || "common"}`}>
+                                                        <span className="ck-pool-art"><Art sprite={c.sprite} emoji={c.emoji} size={30} alt={c.name} /></span>
+                                                        <span className="ck-pool-copy">
+                                                            <b>{c.name}</b>
+                                                            <span>{c.desc}</span>
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -375,7 +382,10 @@ export default function CookingClient({ initial }) {
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
                                 <div className="ck-reveal-gold">🪙 {(result.goldPaid || 0).toLocaleString()} gold</div>
-                                <div className="ck-reveal-prize"><b>{result.made.reward.name}</b><span>{result.made.reward.desc}</span></div>
+                                <div className={`ck-reveal-prize is-${result.made.reward.rarity || "common"}`}>
+                                    <Art sprite={result.made.reward.sprite} emoji={result.made.reward.emoji} size={44} alt={result.made.reward.name} />
+                                    <span><b>{result.made.reward.name}</b><span>{result.made.reward.desc}</span></span>
+                                </div>
                             </div>
                         ) : <p className="ck-reveal-desc">{result.made.desc}</p>}
                         <div className="ck-reveal-tags">
@@ -547,13 +557,27 @@ const CK_CSS = `
 .ck-payout b { color: #ffd75e; }
 .ck-reveal-got { margin-top: 10px; }
 .ck-reveal-gold { font-size: 1.05rem; font-weight: 900; color: #ffd75e; margin-bottom: 8px; }
-.ck-reveal-prize { display: flex; flex-direction: column; gap: 2px; padding: 9px 11px; border-radius: 11px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
-.ck-reveal-prize b { font-size: 0.95rem; }
-.ck-reveal-prize span { font-size: 0.76rem; color: #98a2ae; line-height: 1.35; }
-.ck-pool-row { display: flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,0.035); margin-bottom: 4px; }
-.ck-pool-row b { font-size: 0.8rem; }
-.ck-pool-row span { font-size: 0.73rem; color: #8b93a0; line-height: 1.3; }
+.ck-reveal-prize { display: flex; align-items: center; gap: 11px; text-align: left; padding: 10px 12px; border-radius: 12px;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--rr, rgba(255,255,255,0.12)); }
+.ck-reveal-prize.is-rare { --rr: #7ec8ff; } .ck-reveal-prize.is-epic { --rr: #c9a2ff; }
+.ck-reveal-prize.is-legendary { --rr: #ffd75e; } .ck-reveal-prize.is-mythic { --rr: #ff9ec4; }
+.ck-reveal-prize > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ck-reveal-prize b { font-size: 0.95rem; color: var(--rr, #f2ead9); }
+.ck-reveal-prize span span { font-size: 0.76rem; color: #98a2ae; line-height: 1.35; }
+/* Every outcome is an item, so every outcome gets its picture and its rarity — a legendary drop should LOOK
+   different from a handful of scrap before you've read a word of it. */
+.ck-pool-row { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 10px; margin-bottom: 5px;
+    background: rgba(255,255,255,0.035); border-left: 3px solid var(--rr, #8b93a0); }
+.ck-pool-row.is-common { --rr: #cfd8e3; }
+.ck-pool-row.is-rare { --rr: #7ec8ff; background: rgba(126,200,255,0.06); }
+.ck-pool-row.is-epic { --rr: #c9a2ff; background: rgba(201,162,255,0.07); }
+.ck-pool-row.is-legendary { --rr: #ffd75e; background: rgba(255,215,94,0.08); }
+.ck-pool-row.is-mythic { --rr: #ff9ec4; background: rgba(255,158,196,0.09); box-shadow: inset 0 0 18px rgba(255,158,196,0.09); }
+.ck-pool-art { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; }
+.ck-pool-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ck-pool-copy b { font-size: 0.81rem; color: var(--rr); }
+.ck-pool-copy > span { font-size: 0.72rem; color: #8b93a0; line-height: 1.3; }
+.ck-pool-intro b { color: #ffd75e; }
 .ck-cook { width: 100%; }
 .sail-upg-maxed { margin-top: auto; text-align: center; font-size: 0.74rem; font-weight: 900; color: #4ad07f; padding: 7px 0; }
 

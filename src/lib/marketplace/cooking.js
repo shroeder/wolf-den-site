@@ -11,10 +11,13 @@ import { FISH } from "@/lib/marketplace/fishing.js";
 import { COOK_ODDS_KEYS, collectibleById, petCookPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
+import { PART_TIERS } from "@/lib/marketplace/crafting.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
 // same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
@@ -162,21 +165,57 @@ function rollReward(tier) {
     return table[table.length - 1];
 }
 
-/** Human-readable label for a reward entry — used by the recipe card so nothing is a guess. */
-export function rewardLabel(r) {
+// Everything a dish can pay is an ITEM, so everything gets a picture and a rarity. Parts and chests already
+// carry their own art elsewhere in the game and are reused here rather than redrawn; consumables use their
+// stash sprite, so a reward looks the same on the recipe card as it will in your bag.
+const PART_META = {
+    1: { name: "Cinder Scrap", rarity: "common" },
+    2: { name: "Iron Filings", rarity: "rare" },
+    3: { name: "Tempered Steel", rarity: "epic" },
+    4: { name: "Mythril Dust", rarity: "legendary" },
+    5: { name: "Emberheart Shard", rarity: "mythic" },
+};
+const CHEST_META = {
+    wooden: { name: "Wooden Chest", rarity: "common" },
+    iron: { name: "Iron Chest", rarity: "rare" },
+    gold: { name: "Gold Chest", rarity: "epic" },
+    mythic: { name: "Mythic Chest", rarity: "legendary" },
+    ascendant: { name: "Ascendant Chest", rarity: "mythic" },
+};
+
+/**
+ * Human-readable label + art + rarity for a reward entry, so the recipe card can show what you'd actually get.
+ * `art` bundles the sprite maps the caller already loaded — none of this triggers its own query.
+ */
+export function rewardLabel(r, art = {}) {
+    const { consumables = {}, parts = {}, chests = {}, crops = {} } = art;
     switch (r.kind) {
-        case "gold": return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse." };
-        case "parts": return { name: `${PART_NAME[r.partTier]} ×${r.min}–${r.max}`, desc: "Forge parts for salvaging and enhancing gear." };
-        case "chest": return { name: `${CHEST_NAME[r.chestTier]}`, desc: "Opens for gear at that chest's rarity odds." };
-        case "seed": return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.join(", ")}.` };
-        case "spin": return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin." };
-        case "creation": return { name: "A Creation token", desc: "Design your own custom decoration with AI art." };
-        case "consumable": return { name: CONSUMABLES[r.id]?.name || r.id, desc: CONSUMABLES[r.id]?.desc || "" };
-        default: return { name: "Something", desc: "" };
+        case "gold":
+            return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse.", rarity: "common", emoji: "🪙" };
+        case "parts": {
+            const m = PART_META[r.partTier];
+            return { name: `${m.name} ×${r.min}–${r.max}`, desc: "Forge parts — salvage fodder for enhancing your gear.", rarity: m.rarity, sprite: parts[r.partTier] || null, emoji: "⚙️" };
+        }
+        case "chest": {
+            const m = CHEST_META[r.chestTier];
+            return { name: m.name, desc: "Opens for gear at that chest's rarity odds.", rarity: m.rarity, sprite: chests[r.chestTier] || null, emoji: "🧰" };
+        }
+        case "seed": {
+            const first = r.pool[0];
+            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, emoji: "🌱" };
+        }
+        case "spin":
+            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", emoji: "🎡" };
+        case "creation":
+            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", emoji: "🎨" };
+        case "consumable": {
+            const c = CONSUMABLES[r.id] || {};
+            return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, emoji: c.emoji || "🧪" };
+        }
+        default:
+            return { name: "Something", desc: "", rarity: "common" };
     }
 }
-const PART_NAME = { 1: "Cinder Scrap", 2: "Iron Filings", 3: "Tempered Steel", 4: "Mythril Dust", 5: "Emberheart Shard" };
-const CHEST_NAME = { wooden: "Wooden Chest", iron: "Iron Chest", gold: "Gold Chest", mythic: "Mythic Chest", ascendant: "Ascendant Chest" };
 
 // ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
 // The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
@@ -434,14 +473,23 @@ async function kitchenRow(buyerId) {
 /** Everything the Kitchen screen needs, in one call. */
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
-    const [row, pantryRows, knownRows, goldRow, sprites, art] = await Promise.all([
+    const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         cookingSprites(),
         db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'kitchen'`).catch(() => null),
+        db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).catch(() => []),
+        getChestArt().catch(() => ({})),
     ]);
+    // One bundle of art for every reward kind, built once per request rather than per recipe row.
+    const rewardArt = {
+        consumables: Object.fromEntries(conRows.map((r) => [r.consumable_id, r.url])),
+        parts: Object.fromEntries(PART_TIERS.map((t) => [t.tier, t.sprite])),
+        chests: Object.fromEntries(Object.entries(chestArt || {}).map(([k, v]) => [k, typeof v === "string" ? v : v?.url || null])),
+        crops: sprites,
+    };
     const have = new Map(pantryRows.map((r) => [r.ref, Number(r.qty)]));
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
     const usedToday = row?.cooked_today ? Number(row.cooks_today) || 0 : 0;
@@ -477,7 +525,7 @@ export async function getKitchenState(buyerId) {
             // of a guaranteed purse, and hiding that made cooking look like a lottery with a lot of blanks.
             payout: r.kind === "dish" ? {
                 pool: tierMeta(r.tier).rewards
-                    .map((x) => ({ ...rewardLabel(x), weight: x.weight }))
+                    .map((x) => ({ ...rewardLabel(x, rewardArt), weight: x.weight }))
                     .sort((a, b) => b.weight - a.weight),
             } : null,
             need,   // shown whether known or not — what a recipe wants is the useful half of the hint
@@ -521,6 +569,11 @@ export async function getKitchenState(buyerId) {
                 valueNow: trackValue(id, level), valueNext: trackValue(id, level + 1), cap: def.cap,
             };
         }),
+        // The tier rule, surfaced so it never has to be guessed at from play.
+        bump: {
+            chance: Math.min(0.95, trackValue("heat", row?.heat_level) + 0.18),
+            flawlessAt: 92,
+        },
         isOwner: isOwner(buyerId),
     };
 }
@@ -590,9 +643,18 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     const q = quality == null ? 0.5 : Math.max(0, Math.min(1, Number(quality) || 0));
     const chainN = Math.max(0, Math.min(50, Math.floor(Number(chain) || 0)));
 
-    // Heat is the upgrade track; a strong run adds to it. A perfect run is worth about as much as three levels.
+    // HOW YOU REACH A HIGHER TIER — the rule, in one place, because it wasn't obvious from playing:
+    //
+    //   · The RECIPE sets the floor. A tier-2 recipe pays from the tier-2 table no matter how well you cook it.
+    //   · A good run buys a CHANCE at one tier higher, stacked with the Heat track and the Hearth Cat.
+    //   · A FLAWLESS run (92%+) guarantees it.
+    //
+    // So the ceiling is the recipe you have the ingredients for, +1 — never "five taps for the best table". The
+    // guarantee at the top is the point of the minigame having a skill ceiling at all: without it a perfect run
+    // was a coin flip, which makes practising feel pointless.
+    const FLAWLESS = 0.92;
     const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0);
-    const bumped = Math.random() < bumpChance;
+    const bumped = q >= FLAWLESS || Math.random() < bumpChance;
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
 
     let made = null;
@@ -614,7 +676,12 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
         const r = rollReward(tier);
-        const lbl = rewardLabel(r);
+        const lbl = rewardLabel(r, {
+            consumables: conSprites,
+            parts: Object.fromEntries(PART_TIERS.map((t) => [t.tier, t.sprite])),
+            chests: await getChestArt().then((a) => Object.fromEntries(Object.entries(a || {}).map(([k, v]) => [k, typeof v === "string" ? v : v?.url || null]))).catch(() => ({})),
+            crops: spriteMap,
+        });
         let extraSprite = null;
         switch (r.kind) {
             case "gold": {
@@ -640,7 +707,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 break;
             default: break;
         }
-        made = { kind: "dish", id: rec.id, name: rec.name, desc: `${lbl.name} — ${lbl.desc}`, reward: { ...lbl, kind: r.kind }, sprite: spriteMap[rec.id] || extraSprite || null };
+        made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind }, sprite: spriteMap[rec.id] || null };
     }
 
     const xp = Math.round(8 * tier * (0.7 + q * 0.6));
@@ -661,6 +728,10 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     await awardXp(buyerId, "cooking", { points: xp, gold: 0, meta: { recipe: rec.id, tier } }).catch(() => {});
     await trackActivity(buyerId, "cooked", { recipe: rec.id, tier, made: made.id, portions, bumped, freeCook, quality: q, chain: chainN }).catch(() => {});
     await cookingBadges(buyerId, { recipeId, quality: q, chain: chainN }).catch(() => {});
+    // Daily bounties. A prep counts for the prep task, a dish for the dish task, and a run graded "perfect" or
+    // better counts for the skill one — so the three tasks can't all be cleared by the same three taps.
+    await bumpQuestProgress(buyerId, rec.kind === "prep" ? "cook_prep" : "cook_dish", 1).catch(() => {});
+    if (q >= 0.72) await bumpQuestProgress(buyerId, "cook_clean", 1).catch(() => {});
 
     return {
         ok: true,
