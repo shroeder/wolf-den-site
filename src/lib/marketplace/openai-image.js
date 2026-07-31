@@ -358,7 +358,7 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
         const resp = await fetch(IMAGES_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-            body: JSON.stringify({ model: "gpt-image-1", prompt: p, size: `${W}x${H}`, background: "opaque", quality: "medium", n: 1 }),
+            body: JSON.stringify({ model: "gpt-image-1", prompt: p, size: `${W}x${H}`, background: "opaque", quality: "low", n: 1 }),
         });
         if (!resp.ok) { const t = await resp.text().catch(() => ""); throw new Error(`OpenAI wide-scene ${resp.status}: ${t.slice(0, 200)}`); }
         const b64 = (await resp.json().catch(() => null))?.data?.[0]?.b64_json;
