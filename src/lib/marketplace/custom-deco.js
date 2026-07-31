@@ -58,7 +58,11 @@ async function creationActor(buyerId) {
 // failure/refusal `urls` is empty and `error` carries a member-friendly reason + the raw OpenAI text (for admins).
 async function genOne(prompt, attempt, meta = {}) {
     try {
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
+        // A Creation is the one image a member actually PAID for. It's downscaled to a 320px tile like every
+        // other decoration, so the size rule would call it `low` — but "cheapest tier that survives the resize"
+        // is the right call for art we hand out and the wrong one for art someone spent a token on. ~19 a
+        // month, so buying the better draw costs well under a dollar and it's the thing they judge us on.
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
         if (url) return { urls: [{ url, attempt }], error: null };
         return { urls: [], error: classifyGenError(new Error("OpenAI returned no image")) };
     } catch (e) {

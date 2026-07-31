@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { broadcastAnnouncementEmail } from "@/lib/marketplace/email.js";
 import { withRequestLogging } from "@/lib/server-logger";
+import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function POST(request) {
                 return NextResponse.json({ ok: true, ...res });
             }
 
-            const webhook = process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+            const webhook = denWebhook();
             if (!webhook) return NextResponse.json({ error: "no_webhook_configured" }, { status: 400 });
             const embed = {
                 title: String(b.title || "").slice(0, 256) || undefined,

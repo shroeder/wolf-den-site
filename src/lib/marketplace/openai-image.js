@@ -223,9 +223,24 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai", opts = {})
 // `meta` is the provenance the AI Costs history is built on — origin (batch/creation/member/cron/admin), the
 // batch it belongs to, and WHO caused it when a member did. Callers that pass nothing still get a costed row;
 // they just show up as "unknown", which is a gap worth seeing rather than a silent omission.
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
+// How good the image needs to be is a function of HOW BIG IT ENDS UP, not of what it costs. A flat `low`
+// default saved money on 127 decorations a month that get downscaled to 320px — where the extra detail is
+// thrown away by the resize regardless — and spent the same nothing on the 6 boss portraits a month that fill
+// half a phone screen and stay there for ten days. That's the wrong trade in both directions.
+//
+// So: anything downscaled to a tile stays `low` (you cannot see the difference), and anything rendered large
+// gets `medium`. Measured against the last 30 days of real volume this is about +$6/month, and essentially all
+// of it lands on the boss splash, the backgrounds, the town buildings and members' own hero sprites.
+// An explicit `quality` still wins — this only decides what happens when the caller doesn't care.
+const TILE_PX = 320;
+function qualityForOutput(resizeTo) {
+    return resizeTo && resizeTo <= TILE_PX ? "low" : "medium";
+}
+
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = null, faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
+    quality = quality || qualityForOutput(resizeTo);
 
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
@@ -261,14 +276,16 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
 }
 
 // Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
-export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", meta = {} } = {}) {
+export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", quality = "medium", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
+    // A scene keeps its full resolution and is painted across the entire card - it is the single largest image
+    // the game renders, so it is the last place to be saving a hundredth of a cent. Four of these a month.
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "low", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality, n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -280,7 +297,7 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     const buffer = Buffer.from(b64, "base64");
     // A backdrop is painted across the whole scene, so it keeps its resolution — only the encoding changes.
     const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
-    await logGeneration({ size: "1536x1024", quality: "low", source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ size: "1536x1024", quality, source: pathPrefix, prompt, url, ...meta });
     return url;
 }
 

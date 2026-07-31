@@ -5,6 +5,7 @@ import { sendBossDefeatedEmail } from "@/lib/marketplace/email.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { SITE_URL } from "@/lib/site";
+import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
 // Announce a released boss through every venue: Discord, browser push, and phone-app push. Best-effort.
 export async function broadcastBoss(boss) {
@@ -53,7 +54,7 @@ export async function broadcastBossDefeated(boss, winner) {
 }
 
 async function postDiscordDefeated(boss, winnerLabel) {
-    const webhook = process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+    const webhook = denWebhook();
     if (!webhook) return;
     const embed = {
         title: `☠️ ${boss.name} defeated!`,
@@ -72,7 +73,7 @@ async function postDiscordDefeated(boss, winnerLabel) {
 }
 
 async function postDiscordBoss(boss) {
-    const webhook = process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+    const webhook = denWebhook();
     if (!webhook) return;
     const embed = {
         title: `⚔️ New Boss: ${boss.name}`,

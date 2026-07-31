@@ -5,6 +5,7 @@ import { sendSailingLaunchEmail } from "@/lib/marketplace/email.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { SITE_URL } from "@/lib/site";
+import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
 // One-time SAILING LAUNCH announcement across every player channel: Discord, browser push, phone-app push, and
 // an email to every verified member. Best-effort per channel. Fired by the admin "Announce Sailing" action.
@@ -31,7 +32,7 @@ export async function broadcastSailingLaunch({ channels } = {}) {
 }
 
 async function postDiscordLaunch() {
-    const webhook = process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+    const webhook = denWebhook();
     if (!webhook) return;
     const embed = {
         title: "⚓ Sailing is here!",

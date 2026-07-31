@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServerLogger } from "@/lib/server-logger";
 import { SITE_URL } from "@/lib/site";
+import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
 // Owner-facing nudge: when a buyer messages a vendor, also ping Discord so the lead is seen fast — an
 // email alone is easy to miss, and at one vendor the first impressions set the tone. Best-effort and
@@ -17,7 +18,7 @@ function baseUrl() {
 // it works out of the box on the channel that already exists. Silent no-op if neither is set.
 export async function notifyNewLead({ vendorName, buyerName, buyerEmail, itemTitle, price, message, productUrl }) {
     const webhookUrl =
-        process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+        denWebhook();
 
     if (!webhookUrl) {
         return;
@@ -60,7 +61,7 @@ export async function notifyNewLead({ vendorName, buyerName, buyerEmail, itemTit
 // A walk-in seller posted cards looking for vendor offers. Best-effort Discord ping.
 export async function notifyNewSellOffer({ name, email, items, askingPrice }) {
     const webhookUrl =
-        process.env.DISCORD_MARKETPLACE_WEBHOOK_URL || process.env.DISCORD_NEW_ARRIVALS_WEBHOOK_URL;
+        denWebhook();
 
     if (!webhookUrl) {
         return;
