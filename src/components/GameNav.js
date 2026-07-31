@@ -189,6 +189,9 @@ export default function GameNav() {
             { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
             { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties", sub: "Post & claim" },
             ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
+            // The Kitchen is owner-gated. It has to be in the MENU as well as the scroll bar — the bar runs off
+            // the side of the screen and a new entry appended to the end of it is, in practice, invisible.
+            ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
