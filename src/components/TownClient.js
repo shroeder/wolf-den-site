@@ -557,8 +557,44 @@ export default function TownClient({ initial }) {
         fetch("/api/marketplace/stockade").then((r) => r.json()).then((d) => { if (!dead) setStockade(d?.occupant ? d : null); }).catch(() => {});
         return () => { dead = true; };
     }, []);
+    // Projectiles + the splats they leave. Fired OPTIMISTICALLY on tap, before the request resolves: a lobbed
+    // tomato is the feedback, and waiting ~300ms for the server to agree makes the button feel broken. If the
+    // request then fails we've shown a tomato for nothing, which costs nothing.
+    const [flying, setFlying] = useState([]);
+    const [splats, setSplats] = useState([]);
+    const [hitFx, setHitFx] = useState(null); // "fruit" | "shame" — drives the recoil on the portrait
+    const fxId = useRef(0);
+    const lob = (kind) => {
+        const id = ++fxId.current;
+        if (kind === "fruit") {
+            const n = 1 + Math.floor(Math.random() * 2); // one or two, so repeat taps don't look identical
+            // PIXELS, not percentages. `translate()` resolves a % against the ELEMENT's own box, so a 30px
+            // tomato offset by "-34%" travels about ten pixels and the lob looks like a twitch.
+            const shots = Array.from({ length: n }, (_, i) => ({
+                id: id * 10 + i,
+                from: -120 + Math.random() * 240, // thrown from somewhere along the bottom edge
+                to: -34 + Math.random() * 68,     // lands somewhere on him
+                spin: Math.random() < 0.5 ? -520 : 520,
+                delay: i * 90,
+            }));
+            setFlying((f) => [...f, ...shots]);
+            shots.forEach((sh) => {
+                setTimeout(() => {
+                    setFlying((f) => f.filter((x) => x.id !== sh.id));
+                    setSplats((sp) => [...sp, { id: sh.id, x: sh.to, y: -30 + Math.random() * 70 }]);
+                    setHitFx("fruit");
+                    setTimeout(() => setHitFx(null), 380);
+                    setTimeout(() => setSplats((sp) => sp.filter((x) => x.id !== sh.id)), 2600);
+                }, 520 + sh.delay);
+            });
+        } else {
+            setHitFx("shame");
+            setTimeout(() => setHitFx(null), 620);
+        }
+    };
     const stockAct = async (kind) => {
         if (stockBusy) return;
+        if ((kind === "fruit" ? stockade?.fruit : stockade?.shame)?.used < (kind === "fruit" ? stockade?.fruit : stockade?.shame)?.max) lob(kind);
         setStockBusy(true);
         try {
             const r = await fetch("/api/marketplace/stockade", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) });
@@ -1423,10 +1459,23 @@ export default function TownClient({ initial }) {
                         )}
 
                         <div className="tw-stock-stage">
-                            {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
-                            ) : <span style={{ fontSize: 64 }}>😔</span>}
+                            <div className={`tw-stock-figure${hitFx ? ` is-${hitFx}` : ""}`}>
+                                {stockade.occupant.artUrl || stockade.occupant.spriteUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={stockade.occupant.artUrl || stockade.occupant.spriteUrl} alt={`${stockade.occupant.name} in the stockade`} draggable={false} />
+                                ) : <span style={{ fontSize: 64 }}>😔</span>}
+                                {splats.map((sp) => (
+                                    <span key={sp.id} className="tw-splat" style={{ left: `calc(50% + ${sp.x}px)`, top: `calc(50% + ${sp.y}px)` }} aria-hidden="true">🍅</span>
+                                ))}
+                                {flying.map((f) => (
+                                    <span key={f.id} className="tw-fruit-fly" style={{ "--from": `${f.from}px`, "--to": `${f.to}px`, "--spin": `${f.spin}deg`, animationDelay: `${f.delay}ms` }} aria-hidden="true">🍅</span>
+                                ))}
+                                {/* The charge sheet, nailed up beside him. */}
+                                <div className="tw-stock-sign">
+                                    <div className="tw-stock-sign-title">EXPLOITATION<br />&amp; ABUSE</div>
+                                    <div className="tw-stock-sign-body">attempted to ruin the game for the wolf pack</div>
+                                </div>
+                            </div>
                             <div className="tw-stock-name">{stockade.occupant.name}</div>
                             <div className="tw-stock-tally">Shamed {stockade.occupant.shameCount}× · Pelted {stockade.occupant.fruitCount}×</div>
                         </div>
@@ -2273,7 +2322,53 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-stock-meta { grid-column: 2; font-size: 0.76rem; color: #c3b2a6; margin-top: 1px; }
 .tw-stock-left { grid-row: span 2; font-weight: 800; font-size: 0.8rem; color: #ffd75e; background: rgba(0,0,0,0.32); border-radius: 999px; padding: 4px 9px; }
 .tw-stock-stage { display: grid; justify-items: center; gap: 4px; padding: 12px 0 6px; border-top: 1px solid rgba(255,255,255,0.09); }
-.tw-stock-stage img { width: 172px; height: 172px; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)); }
+.tw-stock-figure { position: relative; display: grid; place-items: center; width: 100%; padding: 4px 0 2px; }
+.tw-stock-figure img { width: 172px; height: 172px; object-fit: contain; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)); }
+/* Recoil. The fruit hit is a sharp jolt; the shame is a slower, more embarrassed wobble. */
+.tw-stock-figure.is-fruit img { animation: stockJolt .38s cubic-bezier(.36,.07,.19,.97) both; }
+.tw-stock-figure.is-shame img { animation: stockWobble .62s ease-in-out both; }
+@keyframes stockJolt {
+    0% { transform: translate(0,0) rotate(0); }
+    18% { transform: translate(-7px,3px) rotate(-4deg); }
+    38% { transform: translate(5px,1px) rotate(3deg); }
+    62% { transform: translate(-3px,2px) rotate(-2deg); }
+    100% { transform: translate(0,0) rotate(0); }
+}
+@keyframes stockWobble {
+    0%,100% { transform: rotate(0); }
+    25% { transform: rotate(-3.5deg); }
+    60% { transform: rotate(3deg); }
+    85% { transform: rotate(-1.5deg); }
+}
+/* The lob: rises, arcs over, drops onto him, spinning the whole way. Two animations on one element — the
+   wrapper's translate carries it across and the emoji's own transform does the arc — so the path curves
+   instead of travelling in a straight line. */
+.tw-fruit-fly { position: absolute; left: 50%; bottom: 2%; margin-left: -15px; font-size: 30px; pointer-events: none; z-index: 4;
+    animation: fruitFly .58s cubic-bezier(.3,.05,.6,1) forwards; will-change: transform, opacity; }
+@keyframes fruitFly {
+    0%   { transform: translate(var(--from), 34px) scale(.65) rotate(0deg); opacity: 0; }
+    12%  { opacity: 1; }
+    50%  { transform: translate(calc((var(--from) + var(--to)) / 2), -96px) scale(1.15) rotate(calc(var(--spin) / 2)); opacity: 1; }
+    100% { transform: translate(var(--to), -10px) scale(.9) rotate(var(--spin)); opacity: 1; }
+}
+/* What it leaves behind: squashed, stuck to him, then fading. */
+.tw-splat { position: absolute; font-size: 26px; pointer-events: none; z-index: 3; transform: translate(-50%,-50%) scaleY(.52) scaleX(1.28) rotate(8deg);
+    filter: saturate(1.25) brightness(.82) drop-shadow(0 1px 1px rgba(0,0,0,.5)); animation: splatIn 2.6s ease-out forwards; }
+@keyframes splatIn {
+    0%   { opacity: 0; transform: translate(-50%,-50%) scaleY(.9) scaleX(.9) rotate(8deg); }
+    10%  { opacity: 1; transform: translate(-50%,-50%) scaleY(.44) scaleX(1.42) rotate(8deg); }
+    72%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%,-40%) scaleY(.5) scaleX(1.3) rotate(8deg); }
+}
+/* The charge sheet, nailed up beside him on its own little post. */
+.tw-stock-sign { position: absolute; right: 2%; bottom: 4%; width: 118px; padding: 9px 8px 10px; text-align: center;
+    background: linear-gradient(176deg, #b9834a, #8d5f31 62%, #7a5029);
+    border: 2px solid #4a2f18; border-radius: 4px; transform: rotate(-4deg);
+    box-shadow: 0 4px 10px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,224,180,.35); z-index: 5; }
+.tw-stock-sign::after { content: ""; position: absolute; left: 50%; top: 100%; width: 9px; height: 26px; margin-left: -4px;
+    background: linear-gradient(90deg, #6f4826, #8d5f31 40%, #5c3a1d); border: 2px solid #4a2f18; border-top: none; border-radius: 0 0 2px 2px; }
+.tw-stock-sign-title { font-weight: 900; font-size: 0.72rem; line-height: 1.08; letter-spacing: .4px; color: #3a1f0e; text-shadow: 0 1px 0 rgba(255,220,170,.35); }
+.tw-stock-sign-body { margin-top: 5px; font-size: 0.6rem; line-height: 1.2; font-style: italic; color: #4a2c15; }
 .tw-stock-name { font-weight: 800; font-size: 1.06rem; }
 .tw-stock-tally { font-size: 0.78rem; color: #9aa0a6; }
 .tw-stockade img:first-of-type { height: 92px; }
