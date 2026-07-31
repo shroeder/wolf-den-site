@@ -32,6 +32,11 @@ export default async function InventoryPage() {
     return (
         <div className="stack reveal">
             <ViewPing event="view_inventory" />
+            {/* Consumables FIRST. They sat below the whole equipment screen — a long scroll on a phone — so
+                members were sitting on potions, treats and relics without knowing it. An item you own and never
+                use is worse than one you don't have: it cost something to hand out and it does nothing. */}
+            <ConsumablesClient />
+
             <EquipmentClient
                 avatarUrl={profile?.avatarUrl}
                 spriteUrl={spriteRow?.avatar_sprite_url || null}
@@ -40,9 +45,6 @@ export default async function InventoryPage() {
                 level={profile?.level?.level || 1}
                 backdropUrl={backdropUrl || null}
             />
-
-            {/* Your consumables — potions, scrolls, pet treats & relics. Tap one to use it (self-serve). */}
-            <ConsumablesClient />
         </div>
     );
 }

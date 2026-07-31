@@ -94,6 +94,7 @@ export default function GameNav() {
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
+    const [consumables, setConsumables] = useState(0); // unused potions/treats/relics — the Gear badge counts these too
     const [spins, setSpins] = useState(0);
     const [bossStrikes, setBossStrikes] = useState(0);
     const [questsReady, setQuestsReady] = useState(0);
@@ -112,6 +113,7 @@ export default function GameNav() {
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
+            fetch("/api/marketplace/consumables", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setConsumables((d?.stash || []).reduce((s2, c) => s2 + (c.count || 0), 0)); }).catch(() => {});
         };
         loadChests();
         const onRefresh = () => loadChests();
@@ -142,7 +144,13 @@ export default function GameNav() {
 
     const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
     const badgeInfo = (href) => {
-        if (href === "/marketplace/inventory" && chests > 0) return { badge: chests, title: `${plural(chests, "chest")} to open` };
+        // Gear counts chests AND unused consumables: both are "you own something you haven't spent".
+        if (href === "/marketplace/inventory" && (chests + consumables) > 0) {
+            const bits = [];
+            if (chests > 0) bits.push(plural(chests, "chest") + " to open");
+            if (consumables > 0) bits.push(plural(consumables, "item") + " to use");
+            return { badge: chests + consumables, title: bits.join(" · ") };
+        }
         if (href === "/marketplace/boss" && bossStrikes > 0) return { badge: bossStrikes, title: `${plural(bossStrikes, "strike")} ready` };
         if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };

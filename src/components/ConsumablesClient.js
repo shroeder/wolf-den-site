@@ -18,7 +18,6 @@ export default function ConsumablesClient() {
     const [busy, setBusy] = useState("");
     const [msg, setMsg] = useState(null);
     const [picking, setPicking] = useState(null); // a stash item awaiting a charged-gear target
-    const [petCele, setPetCele] = useState(null); // { petId, petName, level, rarity, maxed } — level-up dopamine
     useScrollLock(Boolean(picking) || Boolean(petCele)); // lock bg scroll behind the target-picker / level-up modals
     const [open, setOpen] = useState(false); // collapsed by default so it doesn't push the page down
     const [mounted, setMounted] = useState(false);
@@ -43,7 +42,7 @@ export default function ConsumablesClient() {
             if (res.ok && data.ok) {
                 if (data.petLevelUp) {
                     // Big celebration instead of a tiny text line.
-                    setPetCele(data.petLevelUp);
+                    dispatchPetLevelUp(data.petLevelUp);
                     setMsg(null);
                 } else if (body.action === "use") {
                     setMsg({ ok: true, text: `${data.emoji || "✨"} ${data.applied}` });
@@ -173,32 +172,14 @@ export default function ConsumablesClient() {
             </div>
             <p className="muted" style={{ fontSize: "0.8rem", marginBottom: 0 }}>⚗️ Rare relics can&apos;t be bought — they only drop from the rarest chests.</p>
             </>)}
-            {mounted && petCele ? createPortal((
-                <div className="petfeed-cele" onClick={() => setPetCele(null)}>
-                    <div className="petfeed-flash" />
-                    <div className={`petfeed-card rar-${petCele.rarity}`} onClick={(e) => e.stopPropagation()}>
-                        <div className="petfeed-burst" aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>
-                        <span className="petfeed-art">
-                            <span className="petfeed-rays" aria-hidden="true" />
-                            <span className="petfeed-reveal">
-                                {petCele.spriteUrl
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    ? <img src={petCele.spriteUrl} alt={petCele.petName} style={petCele.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
-                                    : <PetArt id={petCele.petId} />}
-                            </span>
-                        </span>
-                        <div className="petfeed-tag">⬆️ Level up!</div>
-                        <div className="petfeed-title">{petCele.petName} reached Lv {petCele.level}</div>
-                        <div className="petfeed-stars">
-                            {Array.from({ length: 5 }, (_, i) => (
-                                <span key={i} className={`petfeed-star${i === petCele.level - 1 ? " is-new" : ""}`} style={{ opacity: i < petCele.level ? 1 : 0.3 }}>★</span>
-                            ))}
-                        </div>
-                        {petCele.maxed ? <div className="petfeed-max">MAX LEVEL! 🏆</div> : null}
-                        <button type="button" className="button gold" onClick={() => setPetCele(null)}>Awesome!</button>
-                    </div>
-                </div>
-            ), document.body) : null}
         </section>
     );
+}
+
+// Hand a pet level-up to the ONE global celebration modal (<PetLevelUp>, mounted in the layout) rather than
+// rendering a second card here. Feeding a treat used to pop a local celebration AND trip the global watcher,
+// so a single level-up produced two modals back to back.
+export function dispatchPetLevelUp(info) {
+    if (!info?.petId) return;
+    try { window.dispatchEvent(new CustomEvent("wolfden-pet-levelup", { detail: info })); } catch { /* SSR */ }
 }

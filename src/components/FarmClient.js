@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { dispatchPetLevelUp } from "@/components/ConsumablesClient";
 import { useRouter } from "next/navigation";
 
 import CoinCta from "@/components/CoinCta";
@@ -255,7 +256,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     const [upgradePlot, setUpgradePlot] = useState(null); // slot whose specialization tracks are open
     const [inspectSlot, setInspectSlot] = useState(null); // a growing plot being inspected (crop details + fertilize)
     const [inspectDeco, setInspectDeco] = useState(null); // a placed decoration being inspected (details + pick up)
-    const [petCele, setPetCele] = useState(null); // pet just leveled up (from feeding) → juicy celebration modal
     const [harvestToast, setHarvestToast] = useState(null); // harvest / rain reward modal
     const [encounter, setEncounter] = useState(null); // a creature raided a harvest → timing-meter fight
     const [recap, setRecap] = useState(null); // once-a-day "your pets earned X while you were away" recap
@@ -479,7 +479,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         }));
         setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
         if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : r.forOther ? `+${r.playerXp} XP · +${r.goldGained}g 💛` : `+${r.petXpGain || ""} XP`, "#ffe27a");
-        if (r.petLevelUp) setPetCele(r.petLevelUp); // the juicy level-up celebration, same as the shop's
+        if (r.petLevelUp) dispatchPetLevelUp(r.petLevelUp); // handed to the ONE global celebration modal
     }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets]);
 
     // ── Garden actions ── every response returns the fresh garden so the in-scene plots + the controls panel
@@ -1205,33 +1205,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 />
             ) : null}
 
-            {/* Pet level-up celebration — same juicy modal the shop shows, now fired when a pet levels on the farm */}
-            {petCele && typeof document !== "undefined" ? createPortal((
-                <div className="petfeed-cele" onClick={() => setPetCele(null)}>
-                    <div className="petfeed-flash" />
-                    <div className={`petfeed-card rar-${petCele.rarity}`} onClick={(e) => e.stopPropagation()}>
-                        <div className="petfeed-burst" aria-hidden="true">{Array.from({ length: 18 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>
-                        <span className="petfeed-art">
-                            <span className="petfeed-rays" aria-hidden="true" />
-                            <span className="petfeed-reveal">
-                                {petCele.spriteUrl
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    ? <img src={petCele.spriteUrl} alt={petCele.petName} style={petCele.spriteFlip ? { transform: "scaleX(-1)" } : undefined} />
-                                    : <PetArt id={petCele.petId} />}
-                            </span>
-                        </span>
-                        <div className="petfeed-tag">⬆️ Level up!</div>
-                        <div className="petfeed-title">{petCele.petName} reached Lv {petCele.level}</div>
-                        <div className="petfeed-stars">
-                            {Array.from({ length: 5 }, (_, i) => (
-                                <span key={i} className={`petfeed-star${i === petCele.level - 1 ? " is-new" : ""}`} style={{ opacity: i < petCele.level ? 1 : 0.3 }}>★</span>
-                            ))}
-                        </div>
-                        {petCele.maxed ? <div className="petfeed-max">MAX LEVEL! 🏆</div> : null}
-                        <button type="button" className="button gold" onClick={() => setPetCele(null)}>Awesome!</button>
-                    </div>
-                </div>
-            ), document.body) : null}
 
             {customOpen && farm.mine && farm.decorations ? (
                 <CustomDecoCreator

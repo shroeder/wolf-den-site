@@ -85,6 +85,39 @@ export default function PetLevelUp() {
         }
     }, []);
 
+    // A DIRECT hand-off from whatever caused the level-up (feeding a treat, working the farm). Those screens
+    // used to pop their own celebration, so a single level-up produced two modals back to back. They now fire
+    // this event and the one modal below handles it — immediately, with no wait for the poll.
+    useEffect(() => {
+        const onDirect = (e) => {
+            const d = e?.detail;
+            if (!d?.petId) return;
+            const pet = collectibleById(d.petId);
+            if (!pet) return;
+            setQueue((q) => {
+                // The poller may also spot this level a moment later; don't celebrate the same one twice.
+                const key = `${d.petId}:${d.level}`;
+                if (q.some((x) => x.key.startsWith(key))) return q;
+                return [...q, {
+                    key: `${key}:${Date.now()}`,
+                    pet, from: Math.max(0, Number(d.level) - 1), to: Number(d.level),
+                    oldArt: d.oldArt || null,
+                    newArt: d.spriteUrl ? { url: d.spriteUrl, flip: d.spriteFlip } : null,
+                    value: d.value, stat: d.stat,
+                }];
+            });
+            // Keep the poller's baseline in step, or it will re-detect this level and queue it again.
+            try {
+                const seen = JSON.parse(localStorage.getItem(SEEN_KEY) || "{}");
+                seen[d.petId] = Number(d.level);
+                localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+            } catch { /* ignore */ }
+            chime();
+        };
+        window.addEventListener("wolfden-pet-levelup", onDirect);
+        return () => window.removeEventListener("wolfden-pet-levelup", onDirect);
+    }, []);
+
     // Check on mount (catches trickle level-ups), whenever an action awards XP (pets earn a 12% share, so this
     // is the moment a pet may tick over a level), on tab focus, and a slow safety poll.
     useEffect(() => {
@@ -153,7 +186,7 @@ export default function PetLevelUp() {
                 {current.value ? (
                     <p className="plu-sub">Passive now <b>+{current.value} {statIcon} {statLabel}</b>{maxed ? " — MAX level! 🏆" : ""}</p>
                 ) : null}
-                <button type="button" className="plu-btn" onClick={dismiss}>{queue.length > 1 ? "Next →" : "Awesome!"}</button>
+                <div className="plu-hint" aria-hidden="true">{queue.length > 1 ? `tap for the next one · ${queue.length - 1} more` : "tap anywhere to close"}</div>
             </div>
         </div>,
         document.body
@@ -225,6 +258,8 @@ const PLU_CSS = `
 .plu-sub { margin: 9px 4px 0; font-size: 0.9rem; color: #d7ccec; opacity: 0; animation: pluRise .5s ease 2.35s both; }
 .plu-sub b { color: #fff; }
 @keyframes pluRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.plu-hint { margin-top: 16px; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.03em; text-transform: lowercase;
+    color: rgba(255,255,255,0.42); animation: pluFade .4s ease 2.4s both; }
 .plu-btn { margin-top: 16px; width: 100%; padding: 13px 16px; border-radius: 13px; border: none; font-weight: 900; font-size: 1rem; cursor: pointer;
     color: #24123a; background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 90%, #fff), var(--acc));
     box-shadow: 0 4px 0 color-mix(in srgb, var(--acc) 55%, #000), 0 10px 24px color-mix(in srgb, var(--acc) 35%, transparent);
