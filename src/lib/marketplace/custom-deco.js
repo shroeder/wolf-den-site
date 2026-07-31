@@ -6,6 +6,12 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
+// Placed decorations render at 66px BASE, but the scale slider goes to 2.5x - so a maxed-out decoration
+// wants ~165 CSS px, which is ~495 device pixels on a 3x phone. Storing 320 meant those were being
+// upscaled 1.5x and going soft, which is a RESOLUTION problem and was never fixable by paying OpenAI for
+// a better draw. 512 covers max scale on a 3x screen. Costs ~20 KB a sprite, no extra API spend.
+const DECO_PX = 512;
+
 // Player-made decorations: describe → the art pipeline draws ONE image → if you don't love it, add a short
 // correction note and it redraws (the original description is preserved, your note nudges it) → pick one. Each
 // finalized custom is granted into mkt_deco_owned as 'custom:<id>' + its sprite into mkt_deco_sprite, so it
@@ -58,11 +64,11 @@ async function creationActor(buyerId) {
 // failure/refusal `urls` is empty and `error` carries a member-friendly reason + the raw OpenAI text (for admins).
 async function genOne(prompt, attempt, meta = {}) {
     try {
-        // A Creation is the one image a member actually PAID for. It's downscaled to a 320px tile like every
-        // other decoration, so the size rule would call it `low` — but "cheapest tier that survives the resize"
-        // is the right call for art we hand out and the wrong one for art someone spent a token on. ~19 a
-        // month, so buying the better draw costs well under a dollar and it's the thing they judge us on.
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
+        // A Creation is the one image a member actually PAID for. Like every decoration it is downscaled to a tile,
+        // so the size rule would call it `low` — but "cheapest tier that survives the resize" is the right call
+        // for art we hand out and the wrong one for art someone spent a token on. ~19 a month, so buying the
+        // better draw costs well under a dollar and it is the thing they judge us on.
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: DECO_PX, deHalo: true, meta });
         if (url) return { urls: [{ url, attempt }], error: null };
         return { urls: [], error: classifyGenError(new Error("OpenAI returned no image")) };
     } catch (e) {

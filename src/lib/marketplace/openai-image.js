@@ -232,6 +232,11 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai", opts = {})
 // gets `medium`. Measured against the last 30 days of real volume this is about +$6/month, and essentially all
 // of it lands on the boss splash, the backgrounds, the town buildings and members' own hero sprites.
 // An explicit `quality` still wins — this only decides what happens when the caller doesn't care.
+// NOTE the knock-on: raising a sprite's resizeTo past this line also promotes it to `medium`. Decorations went
+// to 512 (they can be scaled 2.5x on the farm, so 320 was being upscaled) and therefore crossed it — about
+// +$4/month for the ~127 drawn each month. That's intentional, not an accident of the threshold: the farm is
+// the most-decorated surface in the game. Anything genuinely tile-sized — badges at 160, the loot pig at 256 —
+// still sits below and still draws cheap.
 const TILE_PX = 320;
 function qualityForOutput(resizeTo) {
     return resizeTo && resizeTo <= TILE_PX ? "low" : "medium";

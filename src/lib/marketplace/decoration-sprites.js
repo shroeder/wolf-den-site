@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 import { generateImage } from "@/lib/marketplace/openai-image.js";
 import { decorationById, DECORATIONS } from "@/lib/marketplace/decorations.js";
 
+// Placed decorations render at 66px BASE, but the scale slider goes to 2.5x - so a maxed-out decoration
+// wants ~165 CSS px, which is ~495 device pixels on a 3x phone. Storing 320 meant those were being
+// upscaled 1.5x and going soft, which is a RESOLUTION problem and was never fixable by paying OpenAI for
+// a better draw. 512 covers max scale on a 3x screen. Costs ~20 KB a sprite, no extra API spend.
+const DECO_PX = 512;
+
 // AI-generated decoration art (one die-cut sprite per catalog decoration), stored in mkt_deco_sprite. Sprites
 // are STATIC, so the { deco_id → url } map is cached in memory for a few minutes; any failure returns whatever
 // we last had (renderers fall back to the decoration emoji — art is purely additive).
@@ -29,7 +35,7 @@ export async function generateDecorationSprite(decoId) {
     const def = decorationById(decoId);
     if (!def) return null;
     try {
-        const url = await generateImage(def.prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/decorations", resizeTo: 320, deHalo: true, meta: { origin: "cron", subject: def?.id || null, label: `Decoration — ${def?.name || def?.id || "?"}` } });
+        const url = await generateImage(def.prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/decorations", resizeTo: DECO_PX, deHalo: true, meta: { origin: "cron", subject: def?.id || null, label: `Decoration — ${def?.name || def?.id || "?"}` } });
         if (!url) return null;
         await db.query(
             `INSERT INTO mkt_deco_sprite (deco_id, url, updated_at) VALUES ($1, $2, NOW())
