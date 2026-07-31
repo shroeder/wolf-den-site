@@ -208,6 +208,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // already uses (Garden / Outside / Inside) so it needs no learning.
     const [station, setStation] = useState("helm"); // the boat-forms gallery is collapsed by default
     const [toolFx, setToolFx] = useState(null); // { emoji, name, k } — flashes when a dig tool procs
+    const [procFx, setProcFx] = useState(null); // { emoji, left, top, k } — the burst on the triggering tile
     const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse
     const [celebrate, setCelebrate] = useState(null); // "arrive" while the Land-ho banner shows
     const [chunk, setChunk] = useState(null); // { r, c, k } — the tile currently spraying rock chunks
@@ -306,6 +307,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const windMsgTimer = useRef(null); // clears the tailwind feedback toast
     const halfwayRef = useRef(null);   // departedAt we've already done the one-shot midpoint refetch for
     const lastProcRef = useRef(null);  // last dig-tool that procced, to flash each new proc once
+    const lastTapRef = useRef(null);   // the tile just tapped, so a proc bursts THERE and not in the abstract
 
     // Flash a flourish when a dig TOOL procs (board reports the last one that fired).
     useEffect(() => {
@@ -315,6 +317,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         const tool = (state.digTools?.tools || []).find((x) => x.id === id);
         const k = (chunkId.current += 1);
         setToolFx({ emoji: tool?.emoji || "☄️", name: tool?.name || "Tool", k });
+        // Burst on the tile that caused it. Percentages of the grid, so it lands correctly at any board size.
+        const at = lastTapRef.current;
+        if (at && state.dig?.rows && state.dig?.cols) {
+            setProcFx({
+                k,
+                emoji: tool?.emoji || "☄️",
+                left: ((at.c + 0.5) / state.dig.cols) * 100,
+                top: ((at.r + 0.5) / state.dig.rows) * 100,
+            });
+            setTimeout(() => setProcFx((f) => (f?.k === k ? null : f)), 900);
+        }
         const timer = setTimeout(() => setToolFx((f) => (f?.k === k ? null : f)), 1500);
         return () => clearTimeout(timer);
     }, [state.dig?.toolProc, state.digTools]);
@@ -468,7 +481,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 windMsgTimer.current = setTimeout(() => setWindMsg(null), 2800);
             }
             if (d && !d.error) {
-                setState(d);
+                // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it
+                // onto what we already have. Replacing wholesale would drop the fleet, the art maps and the
+                // upgrade views and make the screen flicker on every tap.
+                if (d.partial) setState((prev) => ({ ...prev, ...d }));
+                else setState(d);
                 if (!String(action).startsWith("upgrade_")) setBountyTick((t) => t + 1); // any real voyage action can progress a bounty
 
                 const leveled = d.level > prevLevel;
@@ -508,6 +525,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         const k = (chunkId.current += 1);
         setChunk({ r, c, k });
         setTimeout(() => setChunk((cur) => (cur?.k === k ? null : cur)), 520);
+        lastTapRef.current = { r, c };
         act("dig", { r, c });
     }, [act]);
 
@@ -634,6 +652,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             ? <>🔍 <b>Tap to scan</b> ({dig.senses} left) — feel how close the chest is (🔥 HOT → 🧊 COLD).</>
                             : <>⛏️ <b>Tap to dig it out.</b> Follow the heat — dig the HOT tiles to uncover the chest.</>}</div>
                         {toolFx ? <div className="dig-toolfx" key={toolFx.k}>{toolFx.emoji} <b>{toolFx.name}</b> triggered!</div> : null}
+                        <div className="dig-gridwrap">
+                        {procFx ? (
+                            <div className="dig-procfx" key={procFx.k} style={{ left: `${procFx.left}%`, top: `${procFx.top}%` }} aria-hidden="true">
+                                <span className="ring" />
+                                <span className="ring two" />
+                                <span className="ico">{procFx.emoji}</span>
+                                {[[-30, -26], [28, -30], [-34, 16], [32, 20], [0, -42], [-6, 34]].map(([sx, sy], i) => (
+                                    <span key={i} className="spark" style={{ "--sx": `${sx}px`, "--sy": `${sy}px`, animationDelay: `${i * 22}ms` }} />
+                                ))}
+                            </div>
+                        ) : null}
                         <div className="dig-grid" style={{ gridTemplateColumns: `repeat(${dig.cols}, 1fr)` }}>
                             {dig.tiles.flatMap((row, r) => row.map((t, c) => {
                                 const bottomed = t.depth <= 0;
@@ -661,6 +690,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     </button>
                                 );
                             }))}
+                        </div>
                         </div>
                         <p className="dig-tip">A <b>buried treasure chest</b> is down here. <b>🔍 Scan</b> to feel how close it is — 🔥 <b>HOT</b> = right nearby, 🧊 <b>COLD</b> = far — then <b>⛏️ dig</b> to uncover it. <b>Grab any items 🧪 you dig up</b> along the way too, before your digs run out.</p>
                         {dig.status === "active" && dig.chestDone && dig.itemsLeft > 0 ? (

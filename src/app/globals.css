@@ -11647,22 +11647,53 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-tool-buy { flex: none; margin-left: auto; }
 .sail-tool .coin-cta { flex: none; margin-left: auto; }
 /* A dig tool procced — a quick flourish above the grid. */
-/* FLOATS over the board instead of sitting in the flow. As a block element it appeared between the
-   instructions and the grid, so every tool proc shoved the whole board down and back — mid-dig, right as
-   you're aiming at a tile. It now overlays, and nothing moves. */
-.dig-toolfx { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 6;
+/* A tool proc is an EVENT, so it gets an event's worth of animation instead of a line of text parked over the
+   board. Three pieces: a shockwave ring that expands out of the tile you just dug, the tool's own icon kicking
+   up and spinning, and the label — which now sits ABOVE the grid rather than at 46% (dead centre), because the
+   one thing you're looking at when a tool fires is the tile you're about to hit next. */
+.dig-toolfx { position: absolute; left: 50%; top: 8px; transform: translate(-50%, 0); z-index: 7;
     pointer-events: none; white-space: nowrap;
     text-align: center; font-weight: 800; font-size: 0.95rem; color: #ffd08a;
-    background: rgba(24,12,4,0.88); border: 1px solid rgba(255,150,60,0.55); border-radius: 999px; padding: 7px 16px;
-    box-shadow: 0 6px 22px rgba(0,0,0,0.55);
+    background: rgba(24,12,4,0.92); border: 1px solid rgba(255,150,60,0.6); border-radius: 999px; padding: 7px 16px;
+    box-shadow: 0 6px 22px rgba(0,0,0,0.6);
     animation: digToolFx 1.5s ease-out both; }
 .dig-toolfx b { color: #ffb86b; }
 @keyframes digToolFx {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
-    12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
-    25% { transform: translate(-50%, -50%) scale(1); }
-    80% { opacity: 1; transform: translate(-50%, -60%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -76%) scale(1); }
+    0%   { opacity: 0; transform: translate(-50%, 14px) scale(0.82); }
+    14%  { opacity: 1; transform: translate(-50%, -4px) scale(1.08); }
+    28%  { transform: translate(-50%, 0) scale(1); }
+    78%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -14px) scale(0.97); }
+}
+
+/* The grid needs its own positioning context: the burst's coordinates are a percentage of the BOARD, and
+   .dig-wrap also contains the stamina bar and the instruction line, so measuring against it puts the burst
+   well above the tile that caused it. */
+.dig-gridwrap { position: relative; }
+
+/* The burst, anchored on the tile that triggered it. */
+.dig-procfx { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%);
+    display: grid; place-items: center; }
+.dig-procfx .ring { position: absolute; width: 26px; height: 26px; border-radius: 50%;
+    border: 3px solid rgba(255,186,92,0.95); animation: digProcRing .62s cubic-bezier(.2,.7,.35,1) forwards; }
+.dig-procfx .ring.two { animation-delay: .1s; border-color: rgba(255,232,160,0.75); }
+.dig-procfx .ico { position: relative; font-size: 30px; filter: drop-shadow(0 3px 5px rgba(0,0,0,.6));
+    animation: digProcIco .78s cubic-bezier(.2,.7,.35,1) forwards; }
+.dig-procfx .spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #ffd08a;
+    box-shadow: 0 0 6px rgba(255,190,100,.9); animation: digProcSpark .66s ease-out forwards; }
+@keyframes digProcRing {
+    0%   { opacity: .95; transform: scale(.35); }
+    100% { opacity: 0; transform: scale(3.4); }
+}
+@keyframes digProcIco {
+    0%   { opacity: 0; transform: translateY(6px) scale(.5) rotate(-24deg); }
+    22%  { opacity: 1; transform: translateY(-16px) scale(1.28) rotate(10deg); }
+    55%  { transform: translateY(-22px) scale(1.05) rotate(-4deg); }
+    100% { opacity: 0; transform: translateY(-40px) scale(.95) rotate(0deg); }
+}
+@keyframes digProcSpark {
+    0%   { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(.3); }
 }
 
 /* ===== Sailing: fragment art, the hold card, and the dig recap ===== */

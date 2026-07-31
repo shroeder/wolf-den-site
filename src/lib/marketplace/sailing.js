@@ -1850,7 +1850,17 @@ async function finishDig(buyerId, board) {
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});
-    return { ok: true, ...(await getSailingState(buyerId)) };
+    // A mid-dig tap returns ONLY the board.
+    //
+    // This used to end in `...(await getSailingState(buyerId))`, so every single tile tap re-ran the whole
+    // sailing screen: resolveDueEncounter, rollMerchant, the 24-row fleet JOIN, the pet-sprite map, the chest
+    // art map, sea affinity and raid extras — roughly eight queries and two art maps, none of which can change
+    // while you're stood on an island with a shovel. That round-trip is why digging felt sluggish; the board
+    // itself is one UPDATE.
+    //
+    // `partial` tells the client to MERGE rather than replace, since everything else it already has is still
+    // valid. finishDig still returns the full state — that's when rewards, level and forged chests land.
+    return { ok: true, partial: true, status: "digging", dig: boardView(board) };
 }
 
 export async function digAt(buyerId, r, c) {
