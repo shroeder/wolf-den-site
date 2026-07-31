@@ -308,18 +308,25 @@ export default function CookingClient({ initial }) {
                                                 {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
                                                     only the roll made cooking look like a lottery with a lot of blanks. */}
                                                 <p className="ck-pool-intro">
-                                                    ONE of these, at random — likeliest first. A run of <b>{s.bump?.flawlessAt ?? 92}%+</b> bumps
-                                                    the whole dish to the next tier&rsquo;s table; below that it&rsquo;s a chance.
+                                                    <b>How well you cook decides which one you get.</b> Bottom rung for a rough
+                                                    run, top rung for a flawless one — and a run of {s.bump?.flawlessAt ?? 92}%+
+                                                    also bumps you onto the next tier&rsquo;s ladder entirely.
                                                 </p>
-                                                {(r.payout?.pool || []).map((c, i) => (
-                                                    <div key={i} className={`ck-pool-row is-${c.rarity || "common"}`}>
-                                                        <span className="ck-pool-art"><Art sprite={c.sprite} emoji={c.emoji} size={30} alt={c.name} /></span>
-                                                        <span className="ck-pool-copy">
-                                                            <b>{c.name}</b>
-                                                            <span>{c.desc}</span>
-                                                        </span>
-                                                    </div>
-                                                ))}
+                                                {/* Rendered TOP-RUNG FIRST so the best outcome is what you see, and numbered so
+                                                    the ladder reads as a ladder. The old list was sorted by likelihood, which
+                                                    looked identical and meant something completely different. */}
+                                                <div className="ck-ladder">
+                                                    {[...(r.payout?.pool || [])].reverse().map((c) => (
+                                                        <div key={c.rung} className={`ck-pool-row is-${c.rarity || "common"}`}>
+                                                            <span className="ck-rung">{c.rung}</span>
+                                                            <span className="ck-pool-art"><Art sprite={c.sprite} emoji={c.emoji} size={30} alt={c.name} /></span>
+                                                            <span className="ck-pool-copy">
+                                                                <b>{c.name}</b>
+                                                                <span>{c.desc}</span>
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
 
@@ -382,6 +389,9 @@ export default function CookingClient({ initial }) {
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
                                 <div className="ck-reveal-gold">🪙 {(result.goldPaid || 0).toLocaleString()} gold</div>
+                                {result.made.reward.rungs ? (
+                                    <div className="ck-reveal-rung">Rung {result.made.reward.rung} of {result.made.reward.rungs}</div>
+                                ) : null}
                                 <div className={`ck-reveal-prize is-${result.made.reward.rarity || "common"}`}>
                                     <Art sprite={result.made.reward.sprite} emoji={result.made.reward.emoji} size={44} alt={result.made.reward.name} />
                                     <span><b>{result.made.reward.name}</b><span>{result.made.reward.desc}</span></span>
@@ -578,6 +588,14 @@ const CK_CSS = `
 .ck-pool-copy b { font-size: 0.81rem; color: var(--rr); }
 .ck-pool-copy > span { font-size: 0.72rem; color: #8b93a0; line-height: 1.3; }
 .ck-pool-intro b { color: #ffd75e; }
+/* The ladder. A spine down the left makes the ordering the first thing you read. */
+.ck-ladder { position: relative; padding-left: 4px; }
+.ck-ladder::before { content: ""; position: absolute; left: 15px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px;
+    background: linear-gradient(180deg, #ff9ec4, #ffd75e 30%, #c9a2ff 60%, rgba(255,255,255,0.12)); opacity: .5; }
+.ck-rung { position: relative; z-index: 1; flex: 0 0 auto; display: grid; place-items: center; width: 22px; height: 22px;
+    border-radius: 50%; font-size: 0.66rem; font-weight: 900; color: #17121f; background: var(--rr, #8b93a0);
+    box-shadow: 0 0 0 3px rgba(23,18,31,0.9); }
+.ck-reveal-rung { font-size: 0.68rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #7a828c; margin-bottom: 6px; }
 .ck-cook { width: 100%; }
 .sail-upg-maxed { margin-top: auto; text-align: center; font-size: 0.74rem; font-weight: 900; color: #4ad07f; padding: 7px 0; }
 

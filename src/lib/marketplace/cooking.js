@@ -71,84 +71,79 @@ export const trackValue = (t, lvl) => Math.min(COOK_TRACKS[t].cap, Math.max(0, N
 export const trackCost = (lvl) => 400 * (Number(lvl) + 1) * (Number(lvl) + 1);
 
 // ── WHAT A DISH IS WORTH ─────────────────────────────────────────────────────────────────────────────────────
-// A dish rolls ONE reward from its tier's table. Gold is IN that table, not a guaranteed purse on top: paying
-// out every single time made cooking a money faucet on a five-a-day timer, and the whole point of a tier table
-// is that what you get is the interesting part. The gold entries are deliberately modest — enough to be a fine
-// result, never the reason you cooked. The first pass drew that table entirely from the
-// consumables that already existed, which meant it leaned on the oldest systems (boss potions, pet treats) and
-// completely ignored the Forge, chests, seeds and sailing. It also handed out an instant pet level and a
-// 2,000 XP scroll, which are both far too strong to be a random drop off a mid-tier dish.
+// EXECUTION PICKS THE RUNG. Each tier is an ordered LADDER of rewards, worst at the bottom, best at the top,
+// and how well you cook decides how high up it you land. Cook badly and you get the bottom rung; cook flawlessly
+// and you get the top one.
 //
-// R() is weight-first so the shape of a tier is readable down the column.
-const R_ = (weight, reward) => ({ weight, ...reward });
-
+// The first version was a weighted lottery — the same list, but which entry you got was random and your timing
+// only bought a small chance at the NEXT TIER's table. Displayed as a sorted list it read exactly like a ladder,
+// so it taught players a rule the code didn't implement: you'd cook a perfect run, get the cheapest thing on the
+// list, and have no way to understand why. A lottery you can't influence also makes the minigame pointless.
+//
+// So: the ladder is the reward, timing is the climb, and the tier bump on a flawless run moves you to the NEXT
+// ladder entirely. Order matters in these arrays — index 0 is the consolation, the last entry is the prize.
 export const TIERS = [
     {
         tier: 1, name: "Simple", color: "#cfd8e3",
         rewards: [
-            R_(26, { kind: "parts", partTier: 1, min: 2, max: 4 }),
-            R_(20, { kind: "seed", pool: ["wheat", "carrot", "potato"], min: 2, max: 3 }),
-            R_(16, { kind: "consumable", id: "treat_bone" }),
-            R_(14, { kind: "consumable", id: "farm_pet_whistle" }),
-            R_(12, { kind: "gold", min: 90, max: 160 }),
-            R_(8, { kind: "consumable", id: "farm_growth_tonic" }),
-            R_(4, { kind: "chest", chestTier: "wooden" }),
+            { kind: "seed", pool: ["wheat", "carrot", "potato"], min: 2, max: 3 },
+            { kind: "gold", min: 90, max: 160 },
+            { kind: "parts", partTier: 1, min: 2, max: 4 },
+            { kind: "consumable", id: "farm_pet_whistle" },
+            { kind: "consumable", id: "treat_bone" },
+            { kind: "consumable", id: "farm_growth_tonic" },
+            { kind: "chest", chestTier: "wooden" },
         ],
     },
     {
         tier: 2, name: "Hearty", color: "#7ec8ff",
         rewards: [
-            R_(24, { kind: "parts", partTier: 2, min: 2, max: 4 }),
-            R_(18, { kind: "chest", chestTier: "wooden" }),
-            R_(15, { kind: "consumable", id: "treat_snack" }),
-            R_(13, { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 }),
-            R_(12, { kind: "gold", min: 220, max: 380 }),
-            R_(10, { kind: "consumable", id: "sail_tailwind_charm" }),
-            R_(8, { kind: "consumable", id: "scroll_wisdom" }),      // 500 XP — a sensible scroll, not 2,000
+            { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 },
+            { kind: "gold", min: 220, max: 380 },
+            { kind: "parts", partTier: 2, min: 2, max: 4 },
+            { kind: "consumable", id: "scroll_wisdom" },
+            { kind: "consumable", id: "treat_snack" },
+            { kind: "consumable", id: "sail_tailwind_charm" },
+            { kind: "chest", chestTier: "iron" },
         ],
     },
     {
         tier: 3, name: "Fine", color: "#c9a2ff",
         rewards: [
-            R_(22, { kind: "parts", partTier: 3, min: 2, max: 4 }),
-            R_(18, { kind: "chest", chestTier: "iron" }),
-            R_(14, { kind: "consumable", id: "treat_toy" }),
-            R_(13, { kind: "gold", min: 500, max: 850 }),
-            R_(11, { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 2, max: 3 }),
-            R_(10, { kind: "consumable", id: "farm_harvest_charm" }),
-            R_(7, { kind: "spin", n: 2 }),
-            R_(5, { kind: "consumable", id: "sail_prospectors_charm" }),
+            { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 2, max: 3 },
+            { kind: "gold", min: 500, max: 850 },
+            { kind: "parts", partTier: 3, min: 2, max: 4 },
+            { kind: "consumable", id: "treat_toy" },
+            { kind: "consumable", id: "farm_harvest_charm" },
+            { kind: "spin", n: 2 },
+            { kind: "chest", chestTier: "gold" },
         ],
     },
     {
         tier: 4, name: "Exquisite", color: "#ffd75e",
         rewards: [
-            R_(20, { kind: "parts", partTier: 4, min: 2, max: 3 }),
-            R_(18, { kind: "chest", chestTier: "gold" }),
-            R_(14, { kind: "gold", min: 1100, max: 1800 }),
-            R_(12, { kind: "consumable", id: "treat_feast" }),
-            R_(10, { kind: "seed", pool: ["starfruit"], min: 2, max: 3 }),
-            R_(9, { kind: "consumable", id: "farm_fertilizer_crate" }),
-            R_(8, { kind: "consumable", id: "sail_treasure_map" }),
-            R_(6, { kind: "spin", n: 5 }),
-            R_(3, { kind: "parts", partTier: 5, min: 1, max: 2 }),
+            { kind: "seed", pool: ["starfruit"], min: 2, max: 3 },
+            { kind: "gold", min: 1100, max: 1800 },
+            { kind: "parts", partTier: 4, min: 2, max: 3 },
+            { kind: "consumable", id: "treat_feast" },
+            { kind: "consumable", id: "farm_fertilizer_crate" },
+            { kind: "consumable", id: "sail_treasure_map" },
+            { kind: "spin", n: 5 },
+            { kind: "chest", chestTier: "mythic" },
         ],
     },
     {
-        // Tier 5 has to justify a chain of legendary ingredients. The old top tier's best outcome was a pet
-        // treat; this one can hand over a Creation token — the only reward in the game that costs real money
-        // to buy — a mythic chest, or a stack of the Forge's top-tier part.
+        // The top ladder. Its last two rungs are the reason to build a legendary ingredient chain at all.
         tier: 5, name: "Legendary", color: "#ff9ec4",
         rewards: [
-            R_(20, { kind: "parts", partTier: 5, min: 2, max: 4 }),
-            R_(17, { kind: "chest", chestTier: "gold" }),
-            R_(15, { kind: "gold", min: 2400, max: 3800 }),
-            R_(12, { kind: "chest", chestTier: "mythic" }),
-            R_(10, { kind: "consumable", id: "treat_golden" }),
-            R_(9, { kind: "spin", n: 8 }),
-            R_(7, { kind: "consumable", id: "farm_fertilizer_haul" }),
-            R_(6, { kind: "creation", n: 1 }),
-            R_(4, { kind: "chest", chestTier: "ascendant" }),
+            { kind: "gold", min: 2400, max: 3800 },
+            { kind: "parts", partTier: 5, min: 2, max: 4 },
+            { kind: "consumable", id: "farm_fertilizer_haul" },
+            { kind: "consumable", id: "treat_golden" },
+            { kind: "spin", n: 8 },
+            { kind: "chest", chestTier: "mythic" },
+            { kind: "creation", n: 1 },
+            { kind: "chest", chestTier: "ascendant" },
         ],
     },
 ];
@@ -156,67 +151,19 @@ export const tierMeta = (t) => TIERS[Math.max(0, Math.min(TIERS.length - 1, (Num
 
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
-/** Pick one reward from a tier's weighted table. */
-function rollReward(tier) {
-    const table = tierMeta(tier).rewards;
-    const total = table.reduce((n, r) => n + r.weight, 0);
-    let n = Math.random() * total;
-    for (const r of table) { n -= r.weight; if (n <= 0) return r; }
-    return table[table.length - 1];
-}
-
-// Everything a dish can pay is an ITEM, so everything gets a picture and a rarity. Parts and chests already
-// carry their own art elsewhere in the game and are reused here rather than redrawn; consumables use their
-// stash sprite, so a reward looks the same on the recipe card as it will in your bag.
-const PART_META = {
-    1: { name: "Cinder Scrap", rarity: "common" },
-    2: { name: "Iron Filings", rarity: "rare" },
-    3: { name: "Tempered Steel", rarity: "epic" },
-    4: { name: "Mythril Dust", rarity: "legendary" },
-    5: { name: "Emberheart Shard", rarity: "mythic" },
-};
-const CHEST_META = {
-    wooden: { name: "Wooden Chest", rarity: "common" },
-    iron: { name: "Iron Chest", rarity: "rare" },
-    gold: { name: "Gold Chest", rarity: "epic" },
-    mythic: { name: "Mythic Chest", rarity: "legendary" },
-    ascendant: { name: "Ascendant Chest", rarity: "mythic" },
-};
-
 /**
- * Human-readable label + art + rarity for a reward entry, so the recipe card can show what you'd actually get.
- * `art` bundles the sprite maps the caller already loaded — none of this triggers its own query.
+ * Which rung a run lands on, 0..n-1.
+ *
+ * Mostly deterministic — a 70% run reliably lands around 70% up the ladder, which is what makes the list
+ * readable as a promise. `lift` (the Heat track + the Hearth Cat) nudges it up, and there's a single-rung
+ * wobble so two identical runs aren't identical, but a good cook is never dumped on the bottom rung by luck.
  */
-export function rewardLabel(r, art = {}) {
-    const { consumables = {}, parts = {}, chests = {}, crops = {} } = art;
-    switch (r.kind) {
-        case "gold":
-            return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse.", rarity: "common", emoji: "🪙" };
-        case "parts": {
-            const m = PART_META[r.partTier];
-            return { name: `${m.name} ×${r.min}–${r.max}`, desc: "Forge parts — salvage fodder for enhancing your gear.", rarity: m.rarity, sprite: parts[r.partTier] || null, emoji: "⚙️" };
-        }
-        case "chest": {
-            const m = CHEST_META[r.chestTier];
-            return { name: m.name, desc: "Opens for gear at that chest's rarity odds.", rarity: m.rarity, sprite: chests[r.chestTier] || null, emoji: "🧰" };
-        }
-        case "seed": {
-            const first = r.pool[0];
-            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, emoji: "🌱" };
-        }
-        case "spin":
-            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", emoji: "🎡" };
-        case "creation":
-            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", emoji: "🎨" };
-        case "consumable": {
-            const c = CONSUMABLES[r.id] || {};
-            return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, emoji: c.emoji || "🧪" };
-        }
-        default:
-            return { name: "Something", desc: "", rarity: "common" };
-    }
+export function rungFor(quality, n, lift = 0) {
+    const q = Math.max(0, Math.min(1, Number(quality) || 0));
+    const base = q * (n - 1) + lift * (n - 1);
+    const wobble = Math.random() < 0.25 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+    return Math.max(0, Math.min(n - 1, Math.round(base) + wobble));
 }
-
 // ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
 // The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
 // isn't "own three rare things", it's a chain you had to build. They live in the same pantry as everything else
@@ -524,9 +471,9 @@ export async function getKitchenState(buyerId) {
             // What a dish can actually pay, with the gold floor stated separately — the roll is a bonus ON TOP
             // of a guaranteed purse, and hiding that made cooking look like a lottery with a lot of blanks.
             payout: r.kind === "dish" ? {
-                pool: tierMeta(r.tier).rewards
-                    .map((x) => ({ ...rewardLabel(x, rewardArt), weight: x.weight }))
-                    .sort((a, b) => b.weight - a.weight),
+                // In LADDER order — bottom rung first. Sorting by anything else would go straight back to
+                // implying a lottery.
+                pool: tierMeta(r.tier).rewards.map((x, i) => ({ ...rewardLabel(x, rewardArt), rung: i + 1 })),
             } : null,
             need,   // shown whether known or not — what a recipe wants is the useful half of the hint
             canCook: known && need.every((n) => n.enough),
@@ -675,7 +622,9 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // ONE roll from the tier's table, which spans the Forge, chests, the farm, sailing, the wheel and
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
-        const r = rollReward(tier);
+        const ladder = tierMeta(tier).rewards;
+        const rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        const r = ladder[rung];
         const lbl = rewardLabel(r, {
             consumables: conSprites,
             parts: Object.fromEntries(PART_TIERS.map((t) => [t.tier, t.sprite])),
@@ -707,7 +656,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 break;
             default: break;
         }
-        made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind }, sprite: spriteMap[rec.id] || null };
+        made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind, rung: rung + 1, rungs: ladder.length }, sprite: spriteMap[rec.id] || null };
     }
 
     const xp = Math.round(8 * tier * (0.7 + q * 0.6));
