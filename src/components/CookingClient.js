@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import CookingMinigame from "@/components/CookingMinigame";
 
@@ -35,6 +35,21 @@ export default function CookingClient({ initial }) {
     const [open, setOpen] = useState(null);
     const [tab, setTab] = useState("all");
     const [devOpen, setDevOpen] = useState(false);
+    // The kettle gives itself a shake every few seconds. Randomised so it never falls into a metronome — a
+    // predictable twitch reads as a broken loop, an unpredictable one reads as something alive.
+    const [shaking, setShaking] = useState(false);
+    useEffect(() => {
+        let timer;
+        const schedule = () => {
+            timer = setTimeout(() => {
+                setShaking(true);
+                setTimeout(() => setShaking(false), 620);
+                schedule();
+            }, 4200 + Math.random() * 5200);
+        };
+        schedule();
+        return () => clearTimeout(timer);
+    }, []);
 
     const post = useCallback(async (body) => {
         setBusy(true);
@@ -90,6 +105,30 @@ export default function CookingClient({ initial }) {
                     </div>
                     <Link href="/marketplace/town" className="ck-back" aria-label="Back to Town">←</Link>
                 </div>
+
+                {/* THE KETTLE. Upgrading anything eventually changes the pot you're looking at, which is a far
+                    better reward than a number moving in a list. It bubbles constantly and gives itself a shake
+                    every few seconds so the screen is never completely still. */}
+                {s.kettle?.sprite ? (
+                    <div className="ck-kettle-wrap">
+                        <div className={`ck-kettle${shaking ? " is-shaking" : ""}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={s.kettle.sprite} alt={`Your kitchen, stage ${s.kettle.stage} of 5`} className="ck-kettle-img" />
+                            <span className="ck-bub b1" aria-hidden="true" />
+                            <span className="ck-bub b2" aria-hidden="true" />
+                            <span className="ck-bub b3" aria-hidden="true" />
+                            <span className="ck-bub b4" aria-hidden="true" />
+                        </div>
+                        <div className="ck-kettle-meta">
+                            <span className="ck-kettle-stage">Stage {s.kettle.stage}<i>/5</i></span>
+                            <span className="ck-kettle-hint">
+                                {s.kettle.nextAt
+                                    ? `${s.kettle.nextAt - s.kettle.total} more upgrade${s.kettle.nextAt - s.kettle.total === 1 ? "" : "s"} to the next pot`
+                                    : "The finest pot in the den"}
+                            </span>
+                        </div>
+                    </div>
+                ) : null}
 
                 {/* The one number that decides whether you can act right now gets its own bar. */}
                 <div className="ck-cooks">
@@ -305,7 +344,7 @@ const CK_CSS = `
 .ck-hero { position: relative; overflow: hidden; }
 .ck-hero::before { content: ""; position: absolute; right: -14px; top: 50%; transform: translateY(-50%);
     width: 190px; height: 190px; background-image: var(--ck-art); background-size: contain;
-    background-repeat: no-repeat; background-position: center; opacity: 0.13; pointer-events: none; }
+    background-repeat: no-repeat; background-position: center; opacity: 0.08; pointer-events: none; }
 .ck-hero > * { position: relative; }
 .ck-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ck-title { margin: 0; font-size: 1.55rem; line-height: 1.1; }
@@ -314,6 +353,45 @@ const CK_CSS = `
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #cfd6dd;
     text-decoration: none; font-size: 1rem; font-weight: 800; }
 .ck-back:hover { background: rgba(255,255,255,0.11); }
+
+/* THE KETTLE ────────────────────────────────────────────────────────────────────────────────────────────── */
+.ck-kettle-wrap { display: flex; flex-direction: column; align-items: center; margin: 10px 0 2px; }
+.ck-kettle { position: relative; width: 128px; height: 128px; display: grid; place-items: center;
+    animation: ckSimmer 3.4s ease-in-out infinite; transform-origin: 50% 92%; }
+.ck-kettle-img { width: 128px; height: 128px; object-fit: contain;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)) drop-shadow(0 0 22px rgba(255,150,60,0.28)); }
+/* A quick rattle, fired on a random timer from the component. */
+.ck-kettle.is-shaking { animation: ckRattle .62s cubic-bezier(.36,.07,.19,.97); }
+@keyframes ckSimmer {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-2px) scale(1.012); }
+}
+@keyframes ckRattle {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    12% { transform: translate(-3px, 1px) rotate(-1.6deg); }
+    28% { transform: translate(3px, -1px) rotate(1.4deg); }
+    45% { transform: translate(-2px, 1px) rotate(-1deg); }
+    62% { transform: translate(2px, 0) rotate(.7deg); }
+    80% { transform: translate(-1px, 0) rotate(-.3deg); }
+}
+/* Bubbles rise out of the pot and pop. Four, each on its own offset, so the rhythm never repeats visibly. */
+.ck-bub { position: absolute; left: 50%; bottom: 46%; width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.9), rgba(255,196,120,0.55) 55%, rgba(255,150,60,0.15));
+    box-shadow: 0 0 8px rgba(255,180,90,0.5); pointer-events: none; opacity: 0; }
+.ck-bub.b1 { animation: ckBubble 2.6s ease-in infinite;         margin-left: -14px; }
+.ck-bub.b2 { animation: ckBubble 3.1s ease-in .7s infinite;     margin-left: 2px; width: 7px; height: 7px; }
+.ck-bub.b3 { animation: ckBubble 2.2s ease-in 1.4s infinite;    margin-left: 12px; width: 6px; height: 6px; }
+.ck-bub.b4 { animation: ckBubble 3.6s ease-in 2.1s infinite;    margin-left: -4px; width: 11px; height: 11px; }
+@keyframes ckBubble {
+    0%   { opacity: 0; transform: translateY(0) scale(.5); }
+    18%  { opacity: .95; transform: translateY(-10px) scale(1); }
+    70%  { opacity: .8; transform: translateY(-34px) scale(1.05); }
+    100% { opacity: 0; transform: translateY(-50px) scale(.4); }
+}
+.ck-kettle-meta { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 2px; }
+.ck-kettle-stage { font-size: 0.78rem; font-weight: 900; color: #ffd75e; }
+.ck-kettle-stage i { font-style: normal; color: #7a828c; font-size: 0.68rem; }
+.ck-kettle-hint { font-size: 0.68rem; color: #7a828c; }
 
 /* The actionable number, as a bar of pips — glanceable without reading. */
 .ck-cooks { margin-top: 14px; }

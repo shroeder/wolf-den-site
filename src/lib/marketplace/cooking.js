@@ -368,6 +368,15 @@ export async function getKitchenState(buyerId) {
     return {
         unlocked: true,
         art: art?.url || null,
+        // THE KETTLE. Its stage is your TOTAL upgrade levels across all four tracks (0-20), so every purchase
+        // moves you toward a visibly better pot instead of only a number in a list. Five stages, back-loaded so
+        // the last one is genuinely earned.
+        kettle: (() => {
+            const total = Object.values(TRACK_COL).reduce((n, col) => n + (Number(row?.[col]) || 0), 0);
+            const stage = total >= 16 ? 5 : total >= 11 ? 4 : total >= 6 ? 3 : total >= 2 ? 2 : 1;
+            const next = [2, 6, 11, 16][stage - 1] ?? null;
+            return { stage, total, max: 20, sprite: sprites[`kettle_${stage}`] || null, nextAt: stage < 5 ? next : null };
+        })(),
         gold: Number(goldRow?.gold) || 0,
         level: Math.floor(Math.sqrt((Number(row?.cook_xp) || 0) / 40)) + 1,
         cookXp: Number(row?.cook_xp) || 0,
