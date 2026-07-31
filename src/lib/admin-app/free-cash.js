@@ -52,9 +52,22 @@ export async function setCashInput(key, amount, by = "owner") {
  */
 async function consignorPayable() {
     const rows = await db.query(
-        `SELECT id, display_name FROM consignors WHERE active ORDER BY display_name`
+        `SELECT id, display_name, square_category_id FROM consignors WHERE active ORDER BY display_name`
     ).catch(() => []);
     if (!rows.length) return { total: 0, detail: [], overpaid: 0 };
+
+    // Two active consignors pointing at ONE Square category means the same sales are counted twice — each
+    // summary independently resolves that category and bills it at its own rate. Seen live: a 100%-rate
+    // account sharing another consignor's category, inflating the liability by roughly that category's whole
+    // revenue. It can't be resolved from here (which one is right is a business decision), so it's surfaced.
+    const byCategory = new Map();
+    for (const c of rows) {
+        if (!c.square_category_id) continue;
+        byCategory.set(c.square_category_id, [...(byCategory.get(c.square_category_id) || []), c.display_name]);
+    }
+    const ambiguous = [...byCategory.entries()]
+        .filter(([, names]) => names.length > 1)
+        .map(([categoryId, names]) => ({ categoryId, names }));
 
     const { getConsignorSummary } = await import("@/lib/consignment/portal-data.js");
     const detail = [];
@@ -71,7 +84,7 @@ async function consignorPayable() {
         if (bal > 0) { total += bal; detail.push({ name: rows[i].display_name, owed: bal }); }
         else if (bal < 0) overpaid += -bal;
     });
-    return { total: money(total), detail, overpaid: money(overpaid), failed: detail.some((d) => d.error) };
+    return { total: money(total), detail, overpaid: money(overpaid), failed: detail.some((d) => d.error), ambiguous };
 }
 
 /** Store credit members are holding — spendable by them at any time, so not spendable by the shop. */
@@ -117,9 +130,12 @@ export async function cashPosition() {
     const owe = [
         {
             label: "Owed to consignors", amount: consignors.total, source: "computed",
-            note: consignors.failed ? "One or more consignors couldn't be checked — treat as a floor"
-                : `${consignors.detail.filter((d) => !d.error).length} with a balance`,
+            note: consignors.ambiguous?.length
+                ? `OVERSTATED — ${consignors.ambiguous.map((a) => a.names.join(" & ")).join("; ")} share one Square category, so those sales are counted twice`
+                : consignors.failed ? "One or more consignors couldn't be checked — treat as a floor"
+                    : `${consignors.detail.filter((d) => !d.error).length} with a balance`,
             detail: consignors.detail,
+            warn: Boolean(consignors.ambiguous?.length),
         },
         { label: "Store credit outstanding", amount: credit, source: "computed", note: "Members can spend this any time" },
         {
