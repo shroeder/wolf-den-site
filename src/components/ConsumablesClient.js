@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import CoinCta from "@/components/CoinCta";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
-import PetArt from "@/components/PetArt";
 import useScrollLock from "@/lib/useScrollLock";
 
 const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic", farm: "Farm Supply", sail: "Voyage Gear" };
@@ -18,7 +17,9 @@ export default function ConsumablesClient() {
     const [busy, setBusy] = useState("");
     const [msg, setMsg] = useState(null);
     const [picking, setPicking] = useState(null); // a stash item awaiting a charged-gear target
-    useScrollLock(Boolean(picking) || Boolean(petCele)); // lock bg scroll behind the target-picker / level-up modals
+    // Only the target-picker locks scroll now — the level-up modal moved out to the global <PetLevelUp>,
+    // and this still referenced its deleted state, which threw a ReferenceError on every render.
+    useScrollLock(Boolean(picking));
     const [open, setOpen] = useState(false); // collapsed by default so it doesn't push the page down
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
