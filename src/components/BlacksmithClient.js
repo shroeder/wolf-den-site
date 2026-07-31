@@ -423,7 +423,7 @@ export default function BlacksmithClient({ initial }) {
 
             {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHandChance={forge.steadyHandChance || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
-            {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
+            {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} equipped={(forge.enhance || []).find((e) => e.slot === salvaging.slot) || null} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
 
             {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
 
@@ -540,7 +540,61 @@ const enhanceErr = (e, need) => (e === "not_enough" ? `Not enough parts — need
 
 // ── Salvage preview → confirm → loot reveal ─────────────────────────────────────────────────────────────────
 // Shows what you MIGHT get (yield range + perk odds) before committing, then reveals what you DID get with juice.
-function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
+// How a stat reads on screen. Kept in step with STAT_META server-side; anything unknown falls back to its key
+// rather than being dropped, so a new stat shows up as ugly instead of invisible.
+const STAT_UI = {
+    might: { label: "Might", suffix: "" }, fortune: { label: "Fortune", suffix: "" },
+    ferocity: { label: "Ferocity", suffix: "" }, crit_chance: { label: "Crit chance", suffix: "%" },
+    crit_power: { label: "Crit power", suffix: "%" }, extra_strike: { label: "Extra strike", suffix: "%" },
+    xp: { label: "XP", suffix: "%" }, gold: { label: "Gold", suffix: "%" },
+    tickets: { label: "Tickets", suffix: "%" }, pet_bond: { label: "Pet bond", suffix: "%" },
+    grow_speed: { label: "Grow speed", suffix: "%" }, seed_luck: { label: "Seed luck", suffix: "%" },
+};
+const statName = (k) => STAT_UI[k]?.label || k.replace(/_/g, " ");
+const statSuffix = (k) => STAT_UI[k]?.suffix || "";
+
+// Side-by-side of the piece you're about to melt and whatever is in that slot right now.
+//
+// The modal used to show the parts yield and nothing else, which is the one number that DOESN'T help you
+// decide — you're weighing gear against gear, not gear against dust. Every stat either item touches gets a row,
+// so a stat the equipped piece has and this one doesn't still shows as a loss rather than silently missing.
+function StatCompare({ item, equipped }) {
+    const mine = item?.statMap || {};
+    const theirs = equipped?.statMap || {};
+    const keys = [...new Set([...Object.keys(mine), ...Object.keys(theirs)])];
+    if (!keys.length) return null;
+    return (
+        <div className="forge-sv-cmp">
+            <div className="forge-sv-cmp-head">
+                <span />
+                <span className="forge-sv-cmp-col">This piece</span>
+                <span className="forge-sv-cmp-col">{equipped ? "Equipped" : "Slot empty"}</span>
+            </div>
+            {keys.map((k) => {
+                const a = Number(mine[k] || 0);
+                const b = Number(theirs[k] || 0);
+                const d = a - b;
+                return (
+                    <div key={k} className="forge-sv-cmp-row">
+                        <span className="forge-sv-cmp-stat">{statName(k)}</span>
+                        <span className="forge-sv-cmp-val">{a ? `+${a}${statSuffix(k)}` : "—"}</span>
+                        <span className="forge-sv-cmp-val">
+                            {b ? `+${b}${statSuffix(k)}` : "—"}
+                            {d !== 0 ? <b className={d > 0 ? "up" : "down"}>{d > 0 ? `+${d}` : d}</b> : null}
+                        </span>
+                    </div>
+                );
+            })}
+            {equipped ? (
+                <p className="forge-sv-cmp-note">Green means this piece beats what you have on. You cannot salvage an equipped item, so nothing you&apos;re wearing is at risk.</p>
+            ) : (
+                <p className="forge-sv-cmp-note">You have nothing equipped in this slot — wearing this would be a straight upgrade.</p>
+            )}
+        </div>
+    );
+}
+
+function SalvageModal({ item, parts, odds = {}, equipped = null, onConfirm, onClose }) {
     const [phase, setPhase] = useState("confirm"); // confirm | working | result
     const [result, setResult] = useState(null);
     const tier = parts[item.salvageTier - 1] || {};
@@ -569,6 +623,7 @@ function SalvageModal({ item, parts, odds = {}, onConfirm, onClose }) {
                             <button type="button" className="forge-mg-x" onClick={onClose} aria-label="Cancel">×</button>
                         </div>
                         {item.level > 0 ? <div className="forge-sv-warn">This is enhanced (+{item.level}) — salvaging destroys the item &amp; its forge bonus, but melts down ~40% of the parts you forged in.</div> : null}
+                        <StatCompare item={item} equipped={equipped} />
                         <div className="forge-sv-yield">
                             <span className="forge-sv-yield-label">You&apos;ll get</span>
                             <div className="forge-sv-yield-main">
@@ -1057,6 +1112,17 @@ const FORGE_CSS = `
 /* ── salvage preview / reveal modal ── */
 .forge-sv { width: 100%; max-width: 400px; border-radius: 18px; padding: 16px; background: linear-gradient(180deg, #2a180c, #140b06); border: 2px solid color-mix(in srgb, var(--rc) 70%, #ff9a3c); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 30px color-mix(in srgb, var(--rc) 30%, transparent); animation: forgePopC .3s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-sv-warn { margin: 12px 0 0; font-size: 11px; color: #ffc98a; background: rgba(255,150,60,0.12); border: 1px solid rgba(255,150,60,0.35); border-radius: 9px; padding: 7px 9px; }
+.forge-sv-cmp { margin: 12px 0 0; padding: 10px 11px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); }
+.forge-sv-cmp-head, .forge-sv-cmp-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; }
+.forge-sv-cmp-head { padding-bottom: 6px; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.forge-sv-cmp-col { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #b9a892; min-width: 74px; text-align: right; }
+.forge-sv-cmp-row { padding: 3px 0; }
+.forge-sv-cmp-stat { font-size: 12px; font-weight: 700; color: #d9cdbb; }
+.forge-sv-cmp-val { font-size: 12.5px; font-weight: 800; color: #f2ead9; min-width: 74px; text-align: right; }
+.forge-sv-cmp-val b { margin-left: 6px; font-size: 11px; font-weight: 900; }
+.forge-sv-cmp-val b.up { color: #4ad07f; }
+.forge-sv-cmp-val b.down { color: #e0685c; }
+.forge-sv-cmp-note { margin: 7px 0 0; font-size: 10.5px; line-height: 1.35; color: #9aa0a6; }
 .forge-sv-yield { margin: 12px 0 0; padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.07); text-align: center; }
 .forge-sv-yield-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #b9a892; }
 .forge-sv-yield-main { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; font-size: 14px; color: #efe2d2; }

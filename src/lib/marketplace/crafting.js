@@ -419,6 +419,13 @@ export async function getForgeState(buyerId) {
     const equippedIds = new Set(Object.values(bySlot));
     const enhById = new Map();
     for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade, util: r.util });
+    // Effective totals = the item's base stats plus whatever the forge added. Local rather than imported: this is
+    // three lines and auction.js keeps its own copy for the same reason.
+    const mergeStats = (base = {}, bonus = {}) => {
+        const out = { ...(base || {}) };
+        for (const [k, v] of Object.entries(bonus || {})) out[k] = (out[k] || 0) + Number(v || 0);
+        return out;
+    };
     const dress = (id) => {
         const it = itemById(id);
         if (!it) return null;
@@ -426,6 +433,10 @@ export async function getForgeState(buyerId) {
         return {
             id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, flavor: it.flavor || null, sprite: spriteMap[id] || null,
             stats: describeStats(it.stats), salvageTier: rarityTier(it.rarity),
+            // RAW effective totals (base + any forge bonus), keyed by stat, so the client can diff this piece
+            // against whatever is in the same slot. The `stats` string above is already rendered and can't be
+            // subtracted from anything — deciding whether to melt a piece down means seeing the actual delta.
+            statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
             util: describeUtil(enh?.util),
         };

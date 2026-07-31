@@ -6966,7 +6966,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .notif-toggle-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .notif-toggle-label { font-weight: 700; }
 .notif-toggle-sub { font-size: 0.8rem; }
-.notif-switch { flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, 0.15); position: relative; transition: background 150ms ease; }
+/* display:block is load-bearing. This is a <span>, so it defaults to display:inline — and width/height are
+   IGNORED on inline boxes. Inside .notif-toggle it happened to work because flex children get blockified, but
+   inside .notif-switch-btn (a plain button) the track collapsed to zero width while the knob, being absolutely
+   positioned, carried on painting: a row of white circles floating off the edge of the card with no switch
+   under them. */
+.notif-switch { display: block; flex: 0 0 auto; width: 44px; height: 26px; border-radius: 999px; background: rgba(255, 255, 255, 0.15); position: relative; transition: background 150ms ease; }
 .notif-toggle.is-on .notif-switch { background: linear-gradient(90deg, #c8a24a, #ffd75e); }
 .notif-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms ease; }
 .notif-toggle.is-on .notif-knob { transform: translateX(18px); }
@@ -6987,7 +6992,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .notif-chan { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .notif-chan-label { font-size: 0.78rem; line-height: 1; opacity: 0.85; }
 .notif-switch-btn { background: none; border: none; padding: 0; cursor: pointer; line-height: 0; -webkit-tap-highlight-color: transparent; }
-.notif-switch-btn .notif-switch { width: 38px; height: 22px; }
+.notif-switch-btn .notif-switch { width: 38px; height: 22px; background: rgba(255,255,255,0.13); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); }
 .notif-switch-btn .notif-knob { width: 16px; height: 16px; top: 3px; left: 3px; }
 .notif-switch-btn.is-on .notif-switch { background: linear-gradient(90deg, #c8a24a, #ffd75e); }
 .notif-switch-btn.is-on .notif-knob { transform: translateX(16px); }
