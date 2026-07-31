@@ -10,7 +10,7 @@ import { SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { FISH } from "@/lib/marketplace/fishing.js";
 import { COOK_ODDS_KEYS, collectibleById, petCookPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { PART_TIERS } from "@/lib/marketplace/crafting.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
@@ -150,6 +150,54 @@ export const TIERS = [
 export const tierMeta = (t) => TIERS[Math.max(0, Math.min(TIERS.length - 1, (Number(t) || 1) - 1))];
 
 const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+// Neither forge parts nor chests carry a `rarity` of their own — parts have a tier number and chests a name —
+// but the reward list colours every entry by rarity, so the ladder reads at a glance. These map each onto the
+// shared rarity scale.
+const PART_RARITY = ["common", "common", "rare", "epic", "legendary"];
+const CHEST_RARITY = {
+    wooden: "common", iron: "rare", gold: "epic", mythic: "legendary",
+    ascendant: "mythic", eternal: "ascendant", celestial: "eternal", primordial: "eternal",
+};
+
+/**
+ * One rung of a reward ladder, described for display: name, blurb, rarity colour, and a sprite where one exists.
+ *
+ * Used both to render the whole ladder on a recipe card and to describe the single rung a finished cook landed
+ * on, so the promise and the payoff are worded by the same code and can't drift apart.
+ *
+ * `art` carries the sprite maps (consumables/parts/chests/crops), passed in rather than looked up here because
+ * the caller already builds them once per request instead of once per reward.
+ */
+export function rewardLabel(r, art = {}) {
+    const { consumables = {}, parts = {}, chests = {}, crops = {} } = art;
+    switch (r.kind) {
+        case "gold":
+            return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse.", rarity: "common", emoji: "🪙" };
+        case "parts": {
+            const m = PART_TIERS.find((p) => p.tier === r.partTier) || PART_TIERS[0];
+            return { name: `${m.name} ×${r.min}–${r.max}`, desc: "Forge parts — salvage fodder for enhancing your gear.", rarity: PART_RARITY[m.tier - 1] || "common", sprite: parts[r.partTier] || null, emoji: "⚙️" };
+        }
+        case "chest": {
+            const m = CHEST_TIERS[r.chestTier] || {};
+            return { name: m.label || "Chest", desc: "Opens for gear at that chest's rarity odds.", rarity: CHEST_RARITY[r.chestTier] || "common", sprite: chests[r.chestTier] || null, emoji: m.emoji || "🧰" };
+        }
+        case "seed": {
+            const first = r.pool[0];
+            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, emoji: "🌱" };
+        }
+        case "spin":
+            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", emoji: "🎡" };
+        case "creation":
+            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", emoji: "🎨" };
+        case "consumable": {
+            const c = CONSUMABLES[r.id] || {};
+            return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, emoji: c.emoji || "🧪" };
+        }
+        default:
+            return { name: "Something", desc: "", rarity: "common" };
+    }
+}
 
 /**
  * Which rung a run lands on, 0..n-1.
