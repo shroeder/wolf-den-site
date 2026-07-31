@@ -1,10 +1,9 @@
 import "server-only";
 
-import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { getSetting, setSetting } from "@/lib/settings.js";
-import { editImage, detectFacing } from "@/lib/marketplace/openai-image.js";
+import { editImage, detectFacing, storeImage } from "@/lib/marketplace/openai-image.js";
 import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
@@ -211,7 +210,8 @@ export async function setBuyerSprite(buyerId, base64) {
     const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
     const buffer = Buffer.from(clean, "base64");
     if (!buffer.length) throw new Error("Empty image");
-    const blob = await put(`marketplace/sprite/${buyerId}-${Date.now()}.png`, buffer, { access: "public", contentType: "image/png" });
+    const url = await storeImage(buffer, "marketplace/sprite");
+    const blob = { url };
     // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
@@ -247,7 +247,8 @@ export async function setDefaultSpriteFromImage(base64) {
     const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
     const buffer = Buffer.from(clean, "base64");
     if (!buffer.length) throw new Error("Empty image");
-    const blob = await put(`marketplace/sprite/default-${Date.now()}.png`, buffer, { access: "public", contentType: "image/png" });
+    const url = await storeImage(buffer, "marketplace/sprite");
+    const blob = { url };
     await setSetting(DEFAULT_SPRITE_KEY, blob.url);
     return blob.url;
 }

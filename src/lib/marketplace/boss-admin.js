@@ -1,13 +1,12 @@
 import "server-only";
 
-import { put } from "@vercel/blob";
 
 import { db } from "@/lib/db";
 import { broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { pickWeakness } from "@/lib/marketplace/boss-weakness.js";
 import { projectBossHp } from "@/lib/marketplace/boss.js";
 import { itemById } from "@/lib/marketplace/items.js";
-import { generateImage, generateSceneImage } from "@/lib/marketplace/openai-image.js";
+import { generateImage, generateSceneImage, storeImage } from "@/lib/marketplace/openai-image.js";
 
 // Store a finished PNG (base64, generated directly on the phone) as the boss art — fast, no OpenAI wait.
 export async function setBossArt(bossId, base64) {
@@ -16,7 +15,9 @@ export async function setBossArt(bossId, base64) {
     const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
     const buffer = Buffer.from(clean, "base64");
     if (!buffer.length) throw new Error("Empty image");
-    const blob = await put(`marketplace/boss/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
+    // The battle scene draws the boss up to ~310px tall and the final-blow scene larger still, so it gets a
+    // roomier cap than an inventory sprite.
+    const blob = { url: await storeImage(buffer, "marketplace/boss", { maxWidth: 1280 }) };
     await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, blob.url]);
     return blob.url;
 }
@@ -194,7 +195,7 @@ export async function setBossBackground(bossId, base64) {
     const clean = String(base64 || "").replace(/^data:image\/\w+;base64,/, "").trim();
     const buffer = Buffer.from(clean, "base64");
     if (!buffer.length) throw new Error("Empty image");
-    const blob = await put(`marketplace/boss-bg/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
+    const blob = { url: await storeImage(buffer, "marketplace/boss-bg", { maxWidth: 1600 }) };
     await db.query(`UPDATE boss_event SET background_url = $2 WHERE id = $1`, [bossId, blob.url]);
     return blob.url;
 }

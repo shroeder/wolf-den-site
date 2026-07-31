@@ -179,11 +179,33 @@ export async function detectFacing(bufferOrUrl) {
     return "unknown"; // genuine tie/ambiguous — settle as no-flip; staff can override manually.
 }
 
-// Public: store a PNG buffer to Blob and return its URL (same convention as generateImage).
-export async function storePng(buffer, pathPrefix = "marketplace/ai") {
-    const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
-    const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
+// Store an image buffer to Blob and return its URL.
+//
+// gpt-image-1 hands back a 1024x1024 PNG, ~1.5-2.4 MB. Sprites are drawn at 48-148 CSS px, so shipping the raw
+// return value meant ~2 GB of art was being downloaded by phones to paint thumbnails — the largest single line
+// on the Vercel bill and the reason the Town and Farm were slow on mobile. Everything now goes out as WebP,
+// capped at SPRITE_MAX_PX, which is ~3x the biggest size any sprite renders at (more pixels than a 3x-DPR phone
+// can show) and lands each file at 20-90 KB. Pass maxWidth explicitly for backdrops, which are painted
+// full-width and genuinely need the resolution.
+const SPRITE_MAX_PX = 640;
+// Backdrops are painted across the full width of a scrolling scene, so they keep real resolution.
+const SCENE_MAX_PX = 1600;
+
+export async function storeImage(buffer, pathPrefix, { maxWidth = SPRITE_MAX_PX, quality = 88 } = {}) {
+    const sharp = (await import("sharp")).default;
+    const out = await sharp(buffer)
+        .resize({ width: maxWidth, height: maxWidth, fit: "inside", withoutEnlargement: true })
+        .webp({ quality, effort: 5 })
+        .toBuffer();
+    const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`;
+    const blob = await put(path, out, { access: "public", contentType: "image/webp", cacheControlMaxAge: 31536000 });
     return blob.url;
+}
+
+// Public: store a buffer to Blob and return its URL (same convention as generateImage). Name kept for its
+// callers; the stored file is WebP now, not PNG.
+export async function storePng(buffer, pathPrefix = "marketplace/ai", opts = {}) {
+    return storeImage(buffer, pathPrefix, opts);
 }
 
 export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null, deHalo = false } = {}) {
@@ -209,15 +231,10 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     // Future-proof the die-cut white halo: safely peel it off die-cut sprite generations (no-ops when there's
     // no halo, keeps the original if a pale subject would go ragged). Callers opt in; never used on scenes.
     if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
-    // Optionally downscale before storing (e.g. badges render at ~24px — no need to ship a 1024px, ~1.5MB PNG).
-    // Preserves transparency; sharp is loaded lazily so callers that don't resize don't pull it in.
-    if (resizeTo) {
-        const sharp = (await import("sharp")).default;
-        buffer = await sharp(buffer).resize(resizeTo, resizeTo, { fit: "inside", withoutEnlargement: true }).png({ compressionLevel: 9 }).toBuffer();
-    }
-    const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
-    const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
-    return blob.url;
+    // Downscale + WebP on the way out. `resizeTo` (callers that already asked for a smaller sprite, e.g.
+    // badges at ~24px) still wins; everything else lands on the SPRITE_MAX_PX cap instead of shipping the raw
+    // 1024px PNG. Transparency is preserved either way.
+    return storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SPRITE_MAX_PX });
 }
 
 // Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
@@ -238,8 +255,8 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) throw new Error("OpenAI returned no image");
     const buffer = Buffer.from(b64, "base64");
-    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, buffer, { access: "public", contentType: "image/png" });
-    return blob.url;
+    // A backdrop is painted across the whole scene, so it keeps its resolution — only the encoding changes.
+    return storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
 }
 
 // TRUE wide scene via OUTPAINTING — generate a base tile, then extend it RIGHT step-by-step by feeding the real
@@ -284,8 +301,10 @@ export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pat
     let buf = await genBase();
     let width = W;
     for (let i = 0; i < Math.max(1, Math.min(6, steps)); i += 1) { const r = await extend(buf, width); buf = r.buf; width = r.width; }
-    const out = await sharp(buf).flatten({ background: { r: 20, g: 24, b: 16 } }).png({ compressionLevel: 9 }).toBuffer();
-    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, out, { access: "public", contentType: "image/png" });
+    const out = await sharp(buf).flatten({ background: { r: 20, g: 24, b: 16 } }).webp({ quality: 86, effort: 5 }).toBuffer();
+    // Outpainted panoramas are several tiles wide on purpose — no width cap here, or the scrolling scene the
+    // outpainting exists to build would be squeezed back down to one screen.
+    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`, out, { access: "public", contentType: "image/webp", cacheControlMaxAge: 31536000 });
     return blob.url;
 }
 
@@ -326,8 +345,9 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
         layers.push({ input: faded, left, top: 0 });
     }
     const out = await sharp({ create: { width: finalW, height: H, channels: 4, background: { r: 18, g: 22, b: 14, alpha: 1 } } })
-        .composite(layers).png({ compressionLevel: 9 }).toBuffer();
-    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`, out, { access: "public", contentType: "image/png" });
+        .composite(layers).webp({ quality: 86, effort: 5 }).toBuffer();
+    // Stitched panorama — genuinely finalW wide, so no cap here either.
+    const blob = await put(`${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.webp`, out, { access: "public", contentType: "image/webp", cacheControlMaxAge: 31536000 });
     return blob.url;
 }
 
@@ -356,7 +376,5 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     if (!b64) throw new Error("OpenAI returned no image");
 
     const buffer = Buffer.from(b64, "base64");
-    const path = `${pathPrefix}/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
-    const blob = await put(path, buffer, { access: "public", contentType: "image/png" });
-    return blob.url;
+    return storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
 }
