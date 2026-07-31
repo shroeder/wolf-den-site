@@ -448,21 +448,30 @@ export async function maybeSpawnRandomEvent() {
 // Throttled per member; clearing a wave sends reinforcements — or wins the raid once the minimum time has passed.
 export async function attackTownEvent(buyerId, eventId, move = "normal") {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const ev = await db.queryOne(`SELECT id, hp, hp_max, started_at, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    // This runs on EVERY strike — with a 2.6s cooldown and a full raid that's hundreds a minute — and it used
+    // to make five round-trips in a row. The first three are independent: the event row, this member's hit row,
+    // and the damage calculation (computeRaidHit is read-only, so computing it before the throttle check is
+    // free — a throttled strike just discards a number it would have waited for anyway).
+    const [ev, prior, hit] = await Promise.all([
+        db.queryOne(`SELECT id, hp, hp_max, started_at, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null),
+        db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null),
+        computeRaidHit(buyerId),
+    ]);
     if (!ev) return { ok: false, error: "no_event" };
-    const prior = await db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
     if (prior?.last_hit_at && Date.now() - new Date(prior.last_hit_at).getTime() < HIT_THROTTLE_MS) {
         return { ok: false, error: "too_fast", hp: ev.hp };
     }
-    const hit = await computeRaidHit(buyerId);
     const dmg = hit.damage;
-    const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
-    const mine = await db.queryOne(
-        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
-         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()
-         RETURNING damage, hits`,
-        [eventId, buyerId, dmg]
-    ).catch(() => null);
+    // Both writes need dmg but not each other — different tables, no ordering between them.
+    const [updated, mine] = await Promise.all([
+        db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null),
+        db.queryOne(
+            `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, last_hit_at) VALUES ($1, $2, $3, 1, NOW())
+             ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, last_hit_at = NOW()
+             RETURNING damage, hits`,
+            [eventId, buyerId, dmg]
+        ).catch(() => null),
+    ]);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     let hp = updated?.hp ?? ev.hp;
     const defeated = false; // raids run their full duration now — a cleared wave just refills

@@ -12289,6 +12289,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fish-reveal.rarity-mythic { --rc: #ff9ec4; }
 .fish-reveal.is-pop > * { grid-area: 1 / 1; }
 .fish-reveal-art { position: relative; z-index: 3; animation: fishRevealArt 0.62s cubic-bezier(.2,1.7,.4,1) both; }
+/* When the haul has real art it renders as an <img>; match the emoji's presence so the reveal lands the same
+   way whether it's a marlin, a chest or a piece of gear. */
+img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: contain; margin: 0 auto;
+    filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
 @keyframes fishRevealArt { 0% { transform: scale(0.35) rotate(-14deg); opacity: 0; } 60% { transform: scale(1.14) rotate(4deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
 /* Rays — a slow conic sweep behind the art. */
 .fish-rays { z-index: 1; width: 240px; height: 240px; border-radius: 50%; opacity: 0.5;

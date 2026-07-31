@@ -543,7 +543,15 @@ export default function FishingScene({ fishing, sky, records, onCast, onLand, on
                                     ))}
                                 </span>
                             ) : null}
-                            <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</span>
+                            {/* The real art when we have it. This is the payoff moment of the feature, and a treasure haul used to
+                                land here as a bare emoji while a fish got its illustrated sprite — so half the reward
+                                table looked like a placeholder. Fragments keep the emoji: they're a currency, not a thing. */}
+                            {result.prize?.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="fish-reveal-art" src={result.prize.spriteUrl} alt={result.prize.label || ""} />
+                            ) : (
+                                <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</span>
+                            )}
                         </div>
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>

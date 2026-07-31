@@ -182,7 +182,7 @@ async function grantHaul(buyerId, kind, tier = "common") {
     if (kind === "seed") {
         const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
         const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
-        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null } : null;
+        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, spriteUrl: await haulSprite("seed", seed.id) } : null;
     }
     if (kind === "consumable") {
         const pool = FISH_CONSUMABLES.slice(0, (CONSUMABLE_REACH[tier] ?? 2) + 1);
@@ -190,21 +190,21 @@ async function grantHaul(buyerId, kind, tier = "common") {
         const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
         await grantConsumable(buyerId, id, 1).catch(() => {});
         const def = CONSUMABLES?.[id];
-        return { kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id };
+        return { kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id, spriteUrl: await haulSprite("consumable", id) };
     }
     if (kind === "gear") {
         const item = await grantFishingGear(buyerId, tier).catch(() => null);
-        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity } : null;
+        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity, spriteUrl: await haulSprite("gear", item.id) } : null;
     }
     if (kind === "chest") {
         const chest = CHEST_TIER[tier] || "wooden";
         await addChests(buyerId, { [chest]: 1 }, { source: "fishing" }).catch(() => {});
-        return { kind: "chest", label: `${chest[0].toUpperCase()}${chest.slice(1)} Chest`, emoji: "🧰", tier: chest };
+        return { kind: "chest", label: `${chest[0].toUpperCase()}${chest.slice(1)} Chest`, emoji: "🧰", tier: chest, spriteUrl: await haulSprite("chest", null, chest) };
     }
     if (kind === "pet") {
         const { maybeGrantFishingPet } = await import("@/lib/marketplace/pet-drops.js");
         const pet = await maybeGrantFishingPet(buyerId, tier).catch(() => null);
-        return pet ? { kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity } : null;
+        return pet ? { kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity, spriteUrl: await haulSprite("pet", pet.id) } : null;
     }
     return null;
 }
