@@ -34,6 +34,7 @@ export default function CookingClient({ initial }) {
     const [flash, setFlash] = useState(null);
     const [open, setOpen] = useState(null);
     const [tab, setTab] = useState("all");
+    const [devOpen, setDevOpen] = useState(false);
 
     const post = useCallback(async (body) => {
         setBusy(true);
@@ -78,34 +79,57 @@ export default function CookingClient({ initial }) {
 
     return (
         <div className="stack reveal ck">
-            <section className="card ck-head">
-                <div className="ck-head-row">
-                    <div>
+            {/* HERO. The old header was a title, a three-line paragraph and a run-on stat line that wrapped
+                mid-sentence — a wall of text where every other screen in the game leads with a picture. The
+                kitchen's own building art is the banner, the blurb is one line, and the numbers are tiles. */}
+            <section className="card ck-hero" style={s.art ? { "--ck-art": `url(${s.art})` } : undefined}>
+                <div className="ck-hero-top">
+                    <div className="ck-hero-id">
                         <h1 className="ck-title">The Kitchen</h1>
-                        <p className="muted ck-sub">Everything you farm and everything you land ends up in here. Prep it, cook it, and time it well.</p>
+                        <p className="ck-sub">Cook what you farm and what you land.</p>
                     </div>
-                    <Link href="/marketplace/town" className="btn-ghost ck-back">← Town</Link>
+                    <Link href="/marketplace/town" className="ck-back" aria-label="Back to Town">←</Link>
                 </div>
-                <div className="ck-stats">
-                    <span><b>Lv {s.level}</b> cook</span>
-                    <span><b>{s.cooksTotal}</b> cooked</span>
-                    <span><b>{s.known}</b>/{s.recipeTotal} recipes</span>
-                    <span><b>{cooksLeft}</b>/{s.cooks?.max} left today</span>
-                    <span>Best run <b>{pctText(s.bestQuality)}</b></span>
-                    <span>🪙 {(s.gold || 0).toLocaleString()}</span>
+
+                {/* The one number that decides whether you can act right now gets its own bar. */}
+                <div className="ck-cooks">
+                    <div className="ck-cooks-row">
+                        <span className="ck-cooks-label">Cooks left today</span>
+                        <span className="ck-cooks-count"><b>{cooksLeft}</b> / {s.cooks?.max ?? 0}</span>
+                    </div>
+                    <div className="ck-cooks-bar">
+                        {Array.from({ length: s.cooks?.max ?? 0 }, (_, i) => (
+                            <span key={i} className={`ck-pip${i < cooksLeft ? " is-on" : ""}`} />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="ck-kpis">
+                    <div className="ck-kpi"><b>Lv {s.level}</b><span>cook</span></div>
+                    <div className="ck-kpi"><b>{(s.cooksTotal || 0).toLocaleString()}</b><span>cooked</span></div>
+                    <div className="ck-kpi"><b>{s.known}<i>/{s.recipeTotal}</i></b><span>recipes</span></div>
+                    <div className="ck-kpi"><b>{pctText(s.bestQuality)}</b><span>best run</span></div>
+                    <div className="ck-kpi is-gold"><b>{(s.gold || 0).toLocaleString()}</b><span>gold</span></div>
                 </div>
                 {flash ? <div className="ck-flash">{flash}</div> : null}
             </section>
 
+            {/* Collapsed by default. It's a dev tool, and expanded it was eating the entire first screen
+                above the pantry and the recipes — the things the page is actually for. */}
             {s.isOwner ? (
                 <section className="card ck-dev">
-                    <div className="ck-dev-title">Test kitchen <span className="muted">· owner only</span></div>
-                    <div className="ck-dev-btns">
-                        <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "all" })}>Stock everything</button>
-                        <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "recipes" })}>All recipes</button>
-                        <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "ingredients" })}>Fill pantry</button>
-                        <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_reset" })}>Wipe kitchen</button>
-                    </div>
+                    <button type="button" className="ck-dev-toggle" onClick={() => setDevOpen((v) => !v)} aria-expanded={devOpen}>
+                        <span>Test kitchen <span className="muted">· owner only</span></span>
+                        <span className="ck-dev-caret">{devOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {devOpen ? (
+                        <div className="ck-dev-btns">
+                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "all" })}>Stock everything</button>
+                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "recipes" })}>All recipes</button>
+                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "ingredients" })}>Fill pantry</button>
+                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_reset" })}>Wipe kitchen</button>
+                        </div>
+                    ) : null}
                 </section>
             ) : null}
 
@@ -244,17 +268,48 @@ export default function CookingClient({ initial }) {
 
 const CK_CSS = `
 .ck { --ck-line: rgba(255,255,255,0.09); }
-.ck-head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.ck-title { margin: 0 0 4px; font-size: 1.5rem; }
-.ck-sub { margin: 0; font-size: 0.86rem; line-height: 1.4; max-width: 52ch; }
-.ck-back { flex: 0 0 auto; }
-.ck-stats { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 0.82rem; color: #b9c2cc; }
-.ck-stats b { color: #ffd75e; }
+/* HERO — the building art sits behind the title, faded and pushed right, so the header has an identity
+   without costing legibility. */
+.ck-hero { position: relative; overflow: hidden; }
+.ck-hero::before { content: ""; position: absolute; right: -14px; top: 50%; transform: translateY(-50%);
+    width: 190px; height: 190px; background-image: var(--ck-art); background-size: contain;
+    background-repeat: no-repeat; background-position: center; opacity: 0.13; pointer-events: none; }
+.ck-hero > * { position: relative; }
+.ck-hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ck-title { margin: 0; font-size: 1.55rem; line-height: 1.1; }
+.ck-sub { margin: 3px 0 0; font-size: 0.85rem; color: #98a2ae; }
+.ck-back { flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #cfd6dd;
+    text-decoration: none; font-size: 1rem; font-weight: 800; }
+.ck-back:hover { background: rgba(255,255,255,0.11); }
+
+/* The actionable number, as a bar of pips — glanceable without reading. */
+.ck-cooks { margin-top: 14px; }
+.ck-cooks-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.ck-cooks-label { font-size: 0.7rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #7a828c; }
+.ck-cooks-count { font-size: 0.84rem; color: #98a2ae; }
+.ck-cooks-count b { color: #ffd75e; font-size: 1.02rem; }
+.ck-cooks-bar { display: flex; gap: 4px; }
+.ck-pip { flex: 1 1 0; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.09); }
+.ck-pip.is-on { background: linear-gradient(90deg, #f0c46a, #ffd75e); box-shadow: 0 0 8px rgba(255,215,94,0.45); }
+
+/* KPI tiles instead of a run-on sentence that wrapped mid-stat. */
+.ck-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; }
+.ck-kpi { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border-radius: 10px;
+    background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.07); text-align: center; }
+.ck-kpi b { font-size: 0.94rem; font-weight: 900; color: #f2ead9; line-height: 1.1; }
+.ck-kpi b i { font-style: normal; font-size: 0.74rem; color: #7a828c; font-weight: 700; }
+.ck-kpi span { font-size: 0.62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #7a828c; }
+.ck-kpi.is-gold b { color: #ffd75e; }
+@media (max-width: 420px) { .ck-kpis { grid-template-columns: repeat(3, 1fr); } }
 .ck-flash { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: rgba(224,91,106,0.14); border: 1px solid rgba(224,91,106,0.4); color: #ffb4bc; font-size: 0.84rem; font-weight: 700; }
 .ck-sec { font-weight: 800; font-size: 0.98rem; margin-bottom: 10px; }
 .ck-empty { margin: 0; font-size: 0.85rem; }
 .ck-dev { border-color: rgba(201,162,255,0.45) !important; }
-.ck-dev-title { font-weight: 800; font-size: 0.9rem; margin-bottom: 8px; color: #c9a2ff; }
+.ck-dev-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0;
+    background: none; border: none; cursor: pointer; font: inherit; font-weight: 800; font-size: 0.9rem; color: #c9a2ff; }
+.ck-dev-caret { font-size: 0.7rem; opacity: .7; }
+.ck-dev-btns { margin-top: 10px; }
 .ck-dev-btns { display: flex; flex-wrap: wrap; gap: 7px; }
 
 .ck-pantry { display: flex; flex-wrap: wrap; gap: 7px; }

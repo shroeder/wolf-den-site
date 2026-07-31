@@ -300,12 +300,13 @@ async function kitchenRow(buyerId) {
 /** Everything the Kitchen screen needs, in one call. */
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
-    const [row, pantryRows, knownRows, goldRow, sprites] = await Promise.all([
+    const [row, pantryRows, knownRows, goldRow, sprites, art] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         cookingSprites(),
+        db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'kitchen'`).catch(() => null),
     ]);
     const have = new Map(pantryRows.map((r) => [r.ref, Number(r.qty)]));
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
@@ -338,6 +339,7 @@ export async function getKitchenState(buyerId) {
 
     return {
         unlocked: true,
+        art: art?.url || null,
         gold: Number(goldRow?.gold) || 0,
         level: Math.floor(Math.sqrt((Number(row?.cook_xp) || 0) / 40)) + 1,
         cookXp: Number(row?.cook_xp) || 0,
