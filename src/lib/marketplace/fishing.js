@@ -285,6 +285,19 @@ export function anglingEffects(angling = 0) {
 export const castsPerDay = (angling = 0, lineLevel = 0) =>
     Math.min(CASTS_MAX, CASTS_PER_DAY + anglingEffects(angling).bonusCasts + fishTrackValue("line", lineLevel));
 
+// ── BUYING MORE CASTS ────────────────────────────────────────────────────────────────────────────────────────
+// Once the day's allowance is spent you can buy another cast with gold. The price DOUBLES each time within the
+// day (1,000 → 2,000 → 4,000 …), which is what keeps this from being a way to farm the treasure table flat:
+// the first is an easy yes, the fourth is a real decision, and a big balance buys sharply less than it looks.
+// Resets with the daily allowance, off the same fish_day, so "today" has exactly one definition.
+export const RECHARGE_BASE = 1000;
+export const RECHARGE_MAX_PER_DAY = 6; // 1k+2k+4k+8k+16k+32k = 63,000 gold to max out a day
+export const rechargeCost = (bought = 0) => RECHARGE_BASE * (2 ** Math.max(0, bought));
+const rechargesToday = (row) => (row?.fish_is_today ? Number(row.fish_recharges) || 0 : 0);
+
+// Total casts available today = the earned allowance plus anything bought.
+const castsAvailable = (row, angling, lineLevel) => castsPerDay(angling, lineLevel) + rechargesToday(row);
+
 // ── THE ROLL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Every species is in the water on every cast. Angling still tilts the odds toward the good stuff, because a
 // stat that does nothing is worse than no stat — but it can only ever bend the curve, never unlock a species.
@@ -364,6 +377,7 @@ async function readFishRow(buyerId) {
         `SELECT buyer_id, voyages_completed, fish_state, fish_log, fish_caught,
                 fish_line_level, fish_lure_level, fish_net_level, fish_gaff_level,
                 COALESCE(fish_casts, 0) AS fish_casts,
+                COALESCE(fish_recharges, 0) AS fish_recharges,
                 (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
@@ -380,13 +394,22 @@ const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0
 export function fishingView(row, angling = 0, status = "idle") {
     const log = logOf(row);
     const lv = fishTrackLevels(row);
-    const max = castsPerDay(angling, lv.line);
+    const max = castsAvailable(row, angling, lv.line);
     const used = castsUsed(row);
+    const bought = rechargesToday(row);
     const hooked = row?.fish_state || null;
     const caughtIds = Object.keys(log);
     return {
         available: status === "sailing" || status === "arrived",
-        casts: { used, max, left: Math.max(0, max - used) },
+        casts: { used, max, left: Math.max(0, max - used), bought },
+        // Offered only once the day's casts are gone — buying while you still have some would just be a worse
+        // way to spend gold, and reads as a trap.
+        recharge: {
+            available: used >= max && bought < RECHARGE_MAX_PER_DAY,
+            cost: rechargeCost(bought),
+            bought,
+            maxPerDay: RECHARGE_MAX_PER_DAY,
+        },
         angling,
         // Something is on the line right now (survives a refresh mid-cast — you can always come back and reel).
         hooked: hooked ? { castAt: hooked.castAt, biteAt: hooked.biteAt, graceMs: BITE_GRACE_MS } : null,
@@ -428,7 +451,9 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     if (!row) return { ok: false, error: "no_ship" };
     if (row.fish_state) return { ok: false, error: "already_cast" };
     const lv = fishTrackLevels(row);
-    const max = castsPerDay(angling, lv.line);
+    // castsAvailable, NOT castsPerDay — a member who has paid for an extra cast must actually get it. This is
+    // the same trap that once let the view promise "2/13 left" while the mutator refused at 11.
+    const max = castsAvailable(row, angling, lv.line);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
     // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
@@ -718,4 +743,45 @@ export async function denFishRecords() {
             at: r?.caught_at || null,
         };
     });
+}
+
+
+// ── BUY AN EXTRA CAST ────────────────────────────────────────────────────────────────────────────────────────
+// Spends gold for one more cast today. Deliberately only offered once the free allowance is gone, and the
+// counter resets with the day so tomorrow starts at 1,000 again.
+export async function buyRecharge(buyerId) {
+    if (!buyerId) return { ok: false, error: "bad_request" };
+    // Angling ADDS casts, so it has to be the real value here — treating it as 0 would understate the cap and
+    // offer a paid recharge to someone who still has free casts left.
+    const { equippedSeaAffinity } = await import("@/lib/marketplace/sailing.js");
+    const [row, sea] = await Promise.all([readFishRow(buyerId), equippedSeaAffinity(buyerId).catch(() => ({}))]);
+    const angling = Number(sea?.angling) || 0;
+    if (!row) return { ok: false, error: "no_ship" };
+    const lv = fishTrackLevels(row);
+    const used = castsUsed(row);
+    const max = castsAvailable(row, angling, lv.line);
+    if (used < max) return { ok: false, error: "still_have_casts" };
+    const bought = rechargesToday(row);
+    if (bought >= RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed" };
+
+    const cost = rechargeCost(bought);
+    // Conditional spend: the WHERE clause is the balance check, so two taps can't both succeed on one balance.
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND COALESCE(gold, 0) >= $2 RETURNING gold`,
+        [buyerId, cost],
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", cost };
+
+    // Stamp fish_day alongside, so a recharge bought before the first cast of a new day still counts as today's.
+    await db.query(
+        `UPDATE mkt_sailing
+            SET fish_recharges = CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                                      THEN COALESCE(fish_recharges, 0) + 1 ELSE 1 END,
+                fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+          WHERE buyer_id = $1`,
+        [buyerId],
+    ).catch(() => {});
+    await logCoin(buyerId, -cost, "fishing_recharge", { meta: { bought: bought + 1 } }).catch(() => {});
+    await trackActivity(buyerId, "fish_recharge", { cost, bought: bought + 1 }).catch(() => {});
+    return { ok: true, cost, gold: paid.gold, bought: bought + 1, nextCost: rechargeCost(bought + 1) };
 }

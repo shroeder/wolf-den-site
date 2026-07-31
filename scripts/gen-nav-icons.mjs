@@ -78,7 +78,7 @@ async function one(k) {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
                 // medium, not high: "high" is ~4x the price and the extra detail dies in the downscale (see art-style.js).
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", n: 1 }),
+                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
             });
             if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
             const b64 = (await resp.json())?.data?.[0]?.b64_json;

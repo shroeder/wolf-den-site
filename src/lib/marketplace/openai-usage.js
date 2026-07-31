@@ -319,3 +319,33 @@ export async function getFullAccounting({ days = 30 } = {}) {
             .sort((a, b) => b.usd - a.usd),
     };
 }
+
+
+/**
+ * What OpenAI charged PER DAY — the real number, including every reroll, refusal and overwritten draw.
+ *
+ * The ledger can only name art that still exists, so its daily totals run low: a sprite drawn five times and
+ * replaced four leaves one row. For a COST screen that's the wrong denominator. This is the true spend per day;
+ * the ledger sits underneath it explaining as much of it as it can account for.
+ */
+export async function realDailyCost({ days = 30 } = {}) {
+    const key = adminKey();
+    if (!key) return {};
+    const start = Math.floor(Date.now() / 1000) - Math.min(90, days) * 86400;
+    const out = {};
+    let page = null;
+    for (let i = 0; i < 40; i += 1) {
+        const r = await fetch(`${COSTS_URL}?start_time=${start}&bucket_width=1d&limit=180${page ? `&page=${page}` : ""}`, {
+            headers: { Authorization: `Bearer ${key}` },
+        });
+        if (!r.ok) break;
+        const d = await r.json();
+        for (const b of (d.data || [])) {
+            const day = new Date(b.start_time * 1000).toISOString().slice(0, 10);
+            for (const x of (b.results || [])) out[day] = round2((out[day] || 0) + (Number(x.amount?.value) || 0));
+        }
+        if (!d.has_more) break;
+        page = d.next_page;
+    }
+    return out;
+}

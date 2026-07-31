@@ -1,0 +1,11 @@
+-- Buy extra casts once the day's allowance is gone.
+--
+-- Fishing hands out a fixed number of casts a day and then stops, which is the correct default — it's what
+-- keeps the reward table from being farmable. But a member who wants to keep playing has nowhere to put their
+-- gold, and gold is the thing the rest of the game keeps handing them.
+--
+-- fish_recharges counts how many EXTRA casts have been bought today. Price doubles each time (1,000 → 2,000 →
+-- 4,000 …), so the first one is an easy yes, the fourth is a real decision, and nobody can grind the treasure
+-- table flat with a big balance. It resets with the daily allowance — same fish_day the casts use, so there's
+-- one definition of "today" and it can't drift from the one castLine already enforces.
+ALTER TABLE mkt_sailing ADD COLUMN IF NOT EXISTS fish_recharges INTEGER NOT NULL DEFAULT 0;

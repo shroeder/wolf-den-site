@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -66,6 +66,7 @@ export async function POST(request) {
                 case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky }));
                 case "fish_land": return noStore(await fishLand(g.buyer.id, { quality: body.quality, missed: body.missed, sky: body.sky }));
                 case "fish_records": return noStore({ ok: true, ...(await fishRecords(g.buyer.id)) });
+                case "fish_recharge": return noStore(await fishRecharge(g.buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

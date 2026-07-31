@@ -19,7 +19,7 @@ const TOKENS = {
 const PER_TOKEN = 40 / 1_000_000;
 const EDIT_INPUT_USD = 0.004; // reference image fed back in on an edit/outpaint pass
 
-export function estimateImageCost({ size = "1024x1024", quality = "medium", edit = false } = {}) {
+export function estimateImageCost({ size = "1024x1024", quality = "low", edit = false } = {}) {
     const row = TOKENS[size] || TOKENS["1024x1024"];
     const tokens = row[quality] ?? row.medium;
     return Math.round((tokens * PER_TOKEN + (edit ? EDIT_INPUT_USD : 0)) * 100000) / 100000;
@@ -138,7 +138,8 @@ const num = (v) => (v == null ? 0 : Number(v));
  * actually wanted to see. Each batch comes back as one entry carrying its count, total cost and time span,
  * with `batchId` so the screen can expand it via listBatch().
  */
-/** Per-day totals for the history headers: what each day actually cost, and how many events it holds. */
+/** Per-day totals for the history headers. `costUsd` is what the LEDGER can name; the API pairs it with what
+ *  OpenAI actually charged that day, because the question is what we spent, not what survived. */
 export async function dailyTotals({ days = 30 } = {}) {
     const rows = await db.query(
         `SELECT to_char(created_at, 'YYYY-MM-DD') AS day, count(*)::int n, sum(cost_usd) cost,

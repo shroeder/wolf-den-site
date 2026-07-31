@@ -11,7 +11,7 @@ const prompt = `A single classic wooden TREASURE CHEST, front 3/4 view, cel-shad
 const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "transparent", quality: "high", n: 1 }),
+    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "transparent", quality: "low", n: 1 }),
 });
 if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
 const b64 = (await resp.json())?.data?.[0]?.b64_json;

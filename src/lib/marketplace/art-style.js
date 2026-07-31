@@ -72,9 +72,14 @@ export function housePrompt(subject, { framing = "sprite", extra = "" } = {}) {
 // picture. "low" is NOT a free win — it comes back visibly off-house-style (thin ink, weak silhouette,
 // washed palette), so it fails the thing SMALL_ICON_EXTRA exists to protect.
 //
-//   sprite / icon / anything downscaled  → "medium"
-//   art viewed LARGE (scene backdrops, boss art, wide panoramas) → "high" is worth it
-export const QUALITY_NOTE = "sprites: medium · large scene art: high";
+// DEFAULT IS "low", EVERYWHERE. Luke's call, 2026-07-31: image generation is ~91% of the OpenAI bill and low
+// is ~15x cheaper than high, ~4x cheaper than medium. Pass a higher tier ONLY when specifically asked for.
+//
+// Worth knowing what that trades away: in a side-by-side at 1024px, low came back visibly off-house-style —
+// thinner ink contours, weaker silhouette, a washed palette — which is the thing SMALL_ICON_EXTRA exists to
+// protect. At the size sprites are actually DRAWN (48-148px) that gap closes a lot, and the saving is large
+// and immediate. If a particular set comes out looking wrong, that set is the one to raise, not the default.
+export const QUALITY_NOTE = "default: low · raise per-set only on request";
 
 // Small subjects (badges, stat icons, inventory thumbnails) are viewed tiny, so they need a louder silhouette
 // and less interior noise — but the SAME ink-and-cel treatment, so they still belong to the set.

@@ -13,7 +13,7 @@ const prompt = `A vibrant hand-drawn cartoon game background, cel-shaded with bo
 const resp = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "high", n: 1 }),
+    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "low", n: 1 }),
 });
 if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
 const data = await resp.json();

@@ -197,7 +197,7 @@ async function merchantFindBonus(buyerId) {
 // ── SEA AFFINITY ── equipped GEAR + PET grant sailing-only effect POINTS (broadside/ironclad/plunder/bounty/dredge/trove/tailwind).
 // Aggregated here and converted to real effects by seaEffects(). Never touches boss power. Pet points scale by
 // the equipped pet's level (1..5 → ~0.36x..1.0x), mirroring the elephant's merchant-find bonus.
-async function equippedSeaAffinity(buyerId) {
+export async function equippedSeaAffinity(buyerId) {
     // Must list EVERY real SEA_META effect key — the merges below use `for (k in sea)`, so any key missing here
     // is silently dropped. (This previously seeded only plunder/dredge/bulwark/tailwind, so broadside, ironclad,
     // bounty and trove were always 0 for BOTH gear and pets — Turtle/Marlin/Anglerfish etc. did nothing. The
@@ -1195,6 +1195,12 @@ export async function fishLand(buyerId, { quality = 0, missed = false, sky = nul
 // advertise an unreleased feature (and its whole species list) to anyone who asks.
 //   records → biggest ever landed, per species
 //   top     → the leaderboard: best catches in the Den, scored against each species' own maximum
+/** Buy one more cast for today. Thin pass-through so the route keeps a single fishing entry point. */
+export const fishRecharge = async (buyerId) => {
+    const { buyRecharge } = await import("@/lib/marketplace/fishing.js");
+    return buyRecharge(buyerId);
+};
+
 export const fishRecords = async (buyerId) => {
     if (!fishingUnlocked(buyerId)) return { records: [], top: [] };
     const [records, top] = await Promise.all([denFishRecords(), denTopCatches(25)]);

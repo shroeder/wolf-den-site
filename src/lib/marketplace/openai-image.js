@@ -223,7 +223,7 @@ export async function storePng(buffer, pathPrefix = "marketplace/ai", opts = {})
 // `meta` is the provenance the AI Costs history is built on — origin (batch/creation/member/cron/admin), the
 // batch it belongs to, and WHO caused it when a member did. Callers that pass nothing still get a costed row;
 // they just show up as "unknown", which is a gap worth seeing rather than a silent omission.
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "medium", faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -268,7 +268,7 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     const resp = await fetch(IMAGES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "medium", n: 1 }),
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", background: "opaque", quality: "low", n: 1 }),
     });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
@@ -280,14 +280,14 @@ export async function generateSceneImage(prompt, { pathPrefix = "marketplace/bos
     const buffer = Buffer.from(b64, "base64");
     // A backdrop is painted across the whole scene, so it keeps its resolution — only the encoding changes.
     const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
-    await logGeneration({ size: "1536x1024", quality: "medium", source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ size: "1536x1024", quality: "low", source: pathPrefix, prompt, url, ...meta });
     return url;
 }
 
 // TRUE wide scene via OUTPAINTING — generate a base tile, then extend it RIGHT step-by-step by feeding the real
 // right-edge pixels back with a fill-mask so the model paints a genuine continuation (no seams, no repeat — not a
 // "clever tile"). Sequential, so keep `steps` modest under a serverless time budget. Returns the stored Blob URL.
-export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pathPrefix = "marketplace/boss-bg", steps = 3, quality = "medium", meta = {} } = {}) {
+export async function generateOutpaintedSceneImage(basePrompt, contPrompt, { pathPrefix = "marketplace/boss-bg", steps = 3, quality = "low", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
     const W = 1536, H = 1024, SEED = 800, NEW = W - SEED;
@@ -395,20 +395,20 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     form.append("image", new Blob([imageBuffer], { type: "image/png" }), "avatar.png");
     form.append("prompt", prompt);
     form.append("size", size);
-    form.append("quality", "medium");
+    form.append("quality", "low");
     form.append("background", "transparent");
     form.append("n", "1");
 
     const resp = await fetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
     if (!resp.ok) {
         const text = await resp.text().catch(() => "");
-        await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
+        await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, ok: false, error: text.slice(0, 300), ...meta });
         throw new Error(`OpenAI edit ${resp.status}: ${text.slice(0, 300)}`);
     }
     const data = await resp.json().catch(() => null);
     const b64 = data?.data?.[0]?.b64_json;
     if (!b64) {
-        await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
+        await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, ok: false, error: "no image returned", ...meta });
         throw new Error("OpenAI returned no image");
     }
 
@@ -416,6 +416,6 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
     // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
     // draw of the same size — estimateImageCost() adds that when edit is true.
-    await logGeneration({ size, quality: "medium", edit: true, source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ size, quality: "low", edit: true, source: pathPrefix, prompt, url, ...meta });
     return url;
 }

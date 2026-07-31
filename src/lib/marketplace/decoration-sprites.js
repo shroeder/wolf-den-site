@@ -29,7 +29,7 @@ export async function generateDecorationSprite(decoId) {
     const def = decorationById(decoId);
     if (!def) return null;
     try {
-        const url = await generateImage(def.prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations", resizeTo: 320, deHalo: true, meta: { origin: "cron", subject: def?.id || null, label: `Decoration — ${def?.name || def?.id || "?"}` } });
+        const url = await generateImage(def.prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/decorations", resizeTo: 320, deHalo: true, meta: { origin: "cron", subject: def?.id || null, label: `Decoration — ${def?.name || def?.id || "?"}` } });
         if (!url) return null;
         await db.query(
             `INSERT INTO mkt_deco_sprite (deco_id, url, updated_at) VALUES ($1, $2, NOW())

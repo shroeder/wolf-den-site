@@ -792,18 +792,21 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
                             {/* Primary action docked to the bottom of the animation window so it reads as part of the scene.
                                 Suppressed when the Gold Merchant is here — his own card carries the "dig" button. */}
-                            {liveStatus === "arrived" && !state.merchant && (
-                                <div className="sail-cta-dock">
-                                    <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
-                                        <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Dig for treasure"}
-                                    </button>
-                                </div>
-                            )}
-
                             {celebrate === "arrive" ? (<><div className="sail-landho">🏝️ LAND HO!</div><Confetti /></>) : null}
                             {celebrate === "depart" ? (<><div className="sail-bonvoyage">⚓ BON VOYAGE!</div><Confetti /></>) : null}
                             {gusting ? <WindGust key={gustNonce} /> : null}
                         </div>
+                        {/* BELOW the scene, not on top of it. It used to be absolutely positioned inside the
+                            animation window "so it reads as part of the scene", but at full CTA size it covered
+                            the ship — the thing the window exists to show. Suppressed when the Gold Merchant is
+                            here; his own card carries the dig button. */}
+                        {liveStatus === "arrived" && !state.merchant && (
+                            <div className="sail-cta-dock">
+                                <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
+                                    <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Dig for treasure"}
+                                </button>
+                            </div>
+                        )}
                         {/* Gold Merchant island event — the interstitial before the dig when he rolls in. */}
                         {liveStatus === "arrived" && state.merchant ? (
                             <MerchantScene
@@ -881,6 +884,22 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             <button className="sail-act is-fish" disabled={busy || !state.fishing.casts?.left} onClick={() => setFishOpen(true)}>
                                 <span className="sail-act-ico" aria-hidden="true">🎣</span>
                                 <b>Fish</b><em>{state.fishing.casts?.left ? `${state.fishing.casts.left} casts left` : "none left today"}</em>
+                            </button>
+                        )}
+                        {/* Out of casts → buy one. Only appears once the free allowance is gone; the price
+                            doubles each time within the day, so the first is an easy yes and the fifth isn't. */}
+                        {liveStatus !== "digging" && state.fishing?.recharge?.available && (
+                            <button
+                                className="sail-act is-recharge"
+                                disabled={busy || (state.gold || 0) < state.fishing.recharge.cost}
+                                onClick={() => act("fish_recharge")}
+                            >
+                                <span className="sail-act-ico" aria-hidden="true">🎣</span>
+                                <b>Buy a cast</b>
+                                <em>
+                                    🪙 {state.fishing.recharge.cost.toLocaleString()}
+                                    {(state.gold || 0) < state.fishing.recharge.cost ? " · not enough" : ""}
+                                </em>
                             </button>
                         )}
                         {liveStatus === "digging" && (

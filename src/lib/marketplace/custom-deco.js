@@ -58,7 +58,7 @@ async function creationActor(buyerId) {
 // failure/refusal `urls` is empty and `error` carries a member-friendly reason + the raw OpenAI text (for admins).
 async function genOne(prompt, attempt, meta = {}) {
     try {
-        const url = await generateImage(prompt, { size: "1024x1024", quality: "medium", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
+        const url = await generateImage(prompt, { size: "1024x1024", quality: "low", pathPrefix: "marketplace/decorations/custom", resizeTo: 320, deHalo: true, meta });
         if (url) return { urls: [{ url, attempt }], error: null };
         return { urls: [], error: classifyGenError(new Error("OpenAI returned no image")) };
     } catch (e) {

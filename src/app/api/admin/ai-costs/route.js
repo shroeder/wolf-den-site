@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { getAiCosts, getFullAccounting } from "@/lib/marketplace/openai-usage.js";
+import { getAiCosts, getFullAccounting, realDailyCost } from "@/lib/marketplace/openai-usage.js";
 import { listGenerations, listBatch, generationSummary, dailyTotals } from "@/lib/marketplace/ai-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -49,11 +49,12 @@ export async function GET(request) {
                 // reconstructed from what survived, and a sprite that was drawn five times and overwritten
                 // four leaves exactly one row. Showing the ledger total alone would quietly understate the
                 // bill, which is the opposite of the point. Name the gap instead of hiding it.
-                const [summary, entries, real, daily] = await Promise.all([
+                const [summary, entries, real, daily, realDaily] = await Promise.all([
                     generationSummary({ days }),
                     listGenerations({ days, limit, origin }),
                     getAiCosts({ days: Math.min(90, days) }).catch(() => ({ ok: false })),
                     dailyTotals({ days }),
+                    realDailyCost({ days }).catch(() => ({})),
                 ]);
                 const openaiTotal = real?.ok ? Number(real.total || 0) : null;
                 const reconcile = openaiTotal == null ? null : {
@@ -64,7 +65,10 @@ export async function GET(request) {
                     windowDays: Math.min(90, days),
                     windowMatches: days <= 90,
                 };
-                return NextResponse.json({ ok: true, days, summary, entries, reconcile, daily }, { headers: { "Cache-Control": "no-store" } });
+                // Each day header shows what OpenAI CHARGED (realCostUsd) with what the ledger can name
+                // beneath it. Showing only what we kept answers the wrong question on a cost screen.
+                const dailyMerged = (daily || []).map((d) => ({ ...d, realCostUsd: realDaily?.[d.day] ?? null }));
+                return NextResponse.json({ ok: true, days, summary, entries, reconcile, daily: dailyMerged }, { headers: { "Cache-Control": "no-store" } });
             }
 
             const data = await getAiCosts({ days: Math.min(90, days) });
