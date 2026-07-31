@@ -49,8 +49,14 @@ const todo = (argv.length ? ALL.filter((x) => argv.includes(x.ref)) : ALL.filter
 console.log(`catalogue: ${RECIPES.length} recipes + ${PREPS.length} prepped ingredients`);
 console.log(`generating ${todo.length} sprite(s)…`);
 
+// CONCURRENCY. The first version of this was a plain sequential loop: fire one image, wait ~15 seconds, fire
+// the next. For 76 sprites that's twenty minutes of waiting on a round trip rather than doing any work, and the
+// image API is perfectly happy to take several at once. A small fixed pool keeps it well inside rate limits
+// while cutting the wall-clock by roughly the pool size.
+const POOL = 5;
 let ok = 0, failed = 0;
-for (const item of todo) {
+
+async function makeOne(item) {
     const prompt = promptFor(item);
     try {
         const res = await fetch("https://api.openai.com/v1/images/generations", {
@@ -59,9 +65,8 @@ for (const item of todo) {
             body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
         });
         const j = await res.json();
-        if (!res.ok) { console.log(`  ✗ ${item.ref}: ${JSON.stringify(j).slice(0, 120)}`); failed += 1; continue; }
+        if (!res.ok) { console.log(`  x ${item.ref}: ${JSON.stringify(j).slice(0, 120)}`); failed += 1; return; }
         const buf = Buffer.from(j.data[0].b64_json, "base64");
-        // 192px: these are drawn at ~40-64 CSS px, so this still covers a 3x screen with room to spare.
         const webp = await sharp(buf).resize({ width: 192, withoutEnlargement: true }).webp({ quality: 88, effort: 5 }).toBuffer();
         const { url } = await put(`marketplace/cooking/${item.ref}-${Date.now()}.webp`, webp, { access: "public", token: BLOB_TOKEN, contentType: "image/webp" });
         await sql`INSERT INTO mkt_cooking_sprite (ref, url, prompt, updated_at) VALUES (${item.ref}, ${url}, ${prompt}, NOW())
@@ -69,12 +74,20 @@ for (const item of todo) {
         const u = j.usage || {};
         await sql`INSERT INTO mkt_ai_generation (url, subject, source, size, quality, prompt, ok, tokens_in, tokens_out, origin, label, model, bytes)
                   VALUES (${url}, ${item.ref}, 'marketplace/cooking', '1024x1024', 'low', ${prompt.slice(0, 900)}, true,
-                          ${u.input_tokens || null}, ${u.output_tokens || null}, 'admin', ${'Cooking — ' + item.name}, 'gpt-image-1', ${webp.length})`.catch(() => {});
+                          ${u.input_tokens || null}, ${u.output_tokens || null}, 'admin', ${'Cooking - ' + item.name}, 'gpt-image-1', ${webp.length})`.catch(() => {});
         ok += 1;
-        console.log(`  ✓ ${item.ref.padEnd(16)} ${item.name}  (${(webp.length / 1024).toFixed(0)} KB)`);
+        console.log(`  ok ${String(ok + failed).padStart(3)}/${todo.length}  ${item.ref.padEnd(16)} ${item.name}`);
     } catch (e) {
         failed += 1;
-        console.log(`  ✗ ${item.ref}: ${String(e?.message || e).slice(0, 120)}`);
+        console.log(`  x ${item.ref}: ${String(e?.message || e).slice(0, 120)}`);
     }
 }
+
+// A queue drained by POOL workers: each worker takes the next index until there are none left, so a slow image
+// never blocks the others and the pool stays full to the last item.
+let cursor = 0;
+await Promise.all(Array.from({ length: Math.min(POOL, todo.length) }, async () => {
+    while (cursor < todo.length) await makeOne(todo[cursor++]);
+}));
+
 console.log(`Done. ${ok} generated, ${failed} failed. ~$${(ok * 0.011).toFixed(2)}`);

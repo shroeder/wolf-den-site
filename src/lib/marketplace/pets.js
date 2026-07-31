@@ -37,6 +37,14 @@ const ACHIEVEMENT_PET_RULES = {
     anvil_golem: (m) => (m.forgeCombines || 0) >= 100,     // combine parts 100 times
     molten_salamander: (m) => (m.maxForgeLevel || 0) >= 8, // enhance a piece to +8
     forgeheart_wyrm: (m) => (m.maxForgeLevel || 0) >= 15,  // enhance a piece to +15 (Master rank)
+    // KITCHEN pets — earned by cooking (metrics from mkt_kitchen). Deliberately a ladder rather than five
+    // variations on "cook a lot": one for showing up, one for the prep chain, one for volume, one for breadth
+    // (every tier, which needs the rare ingredients), and one that wants volume AND a flawless timing run.
+    pantry_mouse: (m) => (m.cooksTotal || 0) >= 10,
+    copper_kettle: (m) => (m.prepsTotal || 0) >= 25,
+    hearth_cat: (m) => (m.cooksTotal || 0) >= 100,
+    spice_moth: (m) => ((m.cookTiers || 0) & 31) === 31,
+    gourmand_dragon: (m) => (m.cooksTotal || 0) >= 500 && Number(m.cookBestQuality || 0) >= 0.92,
 };
 
 // Grant any achievement pets the member has newly qualified for. Best-effort; returns newly-granted ids.

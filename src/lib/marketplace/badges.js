@@ -158,6 +158,11 @@ export async function getMemberMetrics(buyerId) {
         [buyerId]
     ).catch(() => null);
     const forgeLevelRow = await db.queryOne(`SELECT COALESCE(MAX(level), 0)::int AS n FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // The Kitchen's counters, for the cooking pet unlocks. Nulls all the way through if they've never cooked.
+    const kitchenRow = await db.queryOne(
+        `SELECT cooks_total, preps_total, tiers_cooked, best_quality FROM mkt_kitchen WHERE buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
 
     // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
     // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
@@ -249,6 +254,11 @@ export async function getMemberMetrics(buyerId) {
         creditPurchased: Math.round(Number(creditRow?.c || 0) / 100), // lifetime $ of store credit bought
         forgeEnhances: forgeRow?.enhances || 0,
         forgeSalvages: forgeRow?.salvages || 0,
+        // Kitchen metrics, for the cooking pet unlocks (see pets.js ACHIEVEMENTS).
+        cooksTotal: kitchenRow?.cooks_total || 0,
+        prepsTotal: kitchenRow?.preps_total || 0,
+        cookTiers: kitchenRow?.tiers_cooked || 0,
+        cookBestQuality: kitchenRow?.best_quality || 0,
         forgeCombines: forgeRow?.combines || 0,
         maxForgeLevel: forgeLevelRow?.n || 0,
         auctionSales: auctionRow?.sales || 0,

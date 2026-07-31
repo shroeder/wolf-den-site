@@ -8,6 +8,32 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { FISH } from "@/lib/marketplace/fishing.js";
+import { COOK_ODDS_KEYS, collectibleById, petCookPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
+
+// What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
+// same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
+async function petCookBonus(buyerId) {
+    const [owned, xpRows] = await Promise.all([
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+        db.query(`SELECT pet_id, xp FROM mkt_pet_level WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+    ]);
+    const xp = Object.fromEntries(xpRows.map((r) => [r.pet_id, r.xp]));
+    const out = {};
+    for (const row of owned) {
+        const pet = collectibleById(row.ref);
+        const cp = petCookPassive(pet);
+        if (!cp) continue;
+        const scaled = cp.value * petPassiveLevelMult(petLevelForXp(xp[row.ref] || 0, pet?.rarity));
+        if (cp.stat === "kitchen_master") {
+            // The Gourmand Dragon lifts every key at once, at half weight each.
+            for (const k of COOK_ODDS_KEYS) out[k] = (out[k] || 0) + scaled * 0.5;
+        } else out[cp.stat] = (out[cp.stat] || 0) + scaled;
+    }
+    // Stored as points; the cook maths wants fractions.
+    for (const k of Object.keys(out)) out[k] = out[k] / 100;
+    return out;
+}
 
 // ═══ THE KITCHEN ═════════════════════════════════════════════════════════════════════════════════════════════
 //
@@ -372,7 +398,10 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
 
     // The Larder can spare the ingredients entirely — rolled once for the whole dish, not per line, so a cook
     // either costs you everything it should or nothing at all.
-    const freeCook = Math.random() < trackValue("larder", row?.larder_level);
+    // Read once, up here, because the Larder roll below needs it too — and `a < b + c || 0` parses as
+    // `(a < b + c) || 0`, so writing it inline both double-queried and silently discarded the pet's help.
+    const petBonus = await petCookBonus(buyerId).catch(() => ({}));
+    const freeCook = Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0);
     if (!freeCook) {
         const taken = [];
         for (const [ref, qty] of Object.entries(rec.need)) {
@@ -403,16 +432,20 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     const chainN = Math.max(0, Math.min(50, Math.floor(Number(chain) || 0)));
 
     // Heat is the upgrade track; a strong run adds to it. A perfect run is worth about as much as three levels.
-    const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36;
+    const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0);
     const bumped = Math.random() < bumpChance;
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
 
     let made = null;
-    let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 ? 1 : 0);
+    let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) ? 1 : 0);
 
     const spriteMap = await cookingSprites();
     if (rec.kind === "prep") {
         // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
+        // Prep Cook (Copper Kettle) is its own roll on top of the portion roll — prepping is the grind, so the
+        // pet that helps with it should be felt on the prep chain specifically.
+        const prepBonus = Math.random() < (petBonus.prep_cook || 0) ? 1 : 0;
+        portions += prepBonus;
         await addToPantry(buyerId, "prep", rec.out, portions);
         const m = PREPS[rec.out];
         made = { kind: "prep", id: rec.out, name: m?.name || rec.out, desc: "A prepped ingredient other recipes call for.", sprite: spriteMap[rec.out] || null };

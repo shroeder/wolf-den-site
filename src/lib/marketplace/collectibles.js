@@ -17,6 +17,7 @@ import {
     GiPig, GiRooster, GiScarecrow, GiMouse, GiGoose,
     // Forge pets
     GiSmallFire, GiHound, GiRockGolem, GiSalamander, GiFireBreath,
+    GiRat, GiTeapot,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -34,6 +35,12 @@ export const FARM_PASSIVE_STATS = new Set(["seedLuck", "growSpeed", "petXp"]);
 // once (expanded in crafting.js's petForgeBonus). Kept out of the real-keys set used by the odds math.
 export const FORGE_ODDS_KEYS = ["efficient", "keen_eye", "masters_touch", "steady_hand"];
 export const FORGE_PASSIVE_STATS = new Set([...FORGE_ODDS_KEYS, "forgemaster"]);
+
+// COOKING passive stats — the same idea again for The Kitchen. An owned cooking pet improves what comes out of
+// the pot (cooking.js), never boss power, so these keys are invisible to the combat aggregator. Four real keys
+// plus "kitchen_master", a unique legendary that lifts all four at once.
+export const COOK_ODDS_KEYS = ["hot_hands", "generous", "thrifty", "prep_cook"];
+export const COOK_PASSIVE_STATS = new Set([...COOK_ODDS_KEYS, "kitchen_master"]);
 export const PET_PASSIVE_STAT = {
     // Level
     bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
@@ -51,6 +58,8 @@ export const PET_PASSIVE_STAT = {
     // Forge (earned by using The Forge) — FORGE passives that improve your smithing odds (crafting.js), fitting
     // how each is earned: salvagers → part yield, enhancers → enhance odds.
     ember_whelp: "efficient", cinder_hound: "steady_hand", anvil_golem: "keen_eye", molten_salamander: "masters_touch", forgeheart_wyrm: "forgemaster",
+    // Kitchen (earned by cooking) — COOKING passives that improve what comes out of the pot.
+    pantry_mouse: "thrifty", copper_kettle: "prep_cook", hearth_cat: "hot_hands", spice_moth: "generous", gourmand_dragon: "kitchen_master",
     // Chest
     tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
@@ -86,6 +95,11 @@ export const PET_STAT_META = {
     petXp: { label: "Pet Bond", icon: "🐾", desc: "Your pets earn more XP when you tend them on the farm." },
     // FORGE passives (forge pets) — these improve your smithing odds at The Forge, not the boss.
     efficient: { label: "Efficient Salvage", icon: "🛠️", desc: "Better odds of DOUBLE parts when you salvage at the Forge." },
+    hot_hands: { label: "Hot Hands", icon: "🔥", desc: "Better odds a dish comes out a whole tier better." },
+    generous: { label: "Generous Portions", icon: "🥢", desc: "Better odds of a second helping when you cook." },
+    thrifty: { label: "Thrifty Pantry", icon: "🧺", desc: "Better odds a cook uses none of its ingredients." },
+    prep_cook: { label: "Prep Cook", icon: "🔪", desc: "Prep recipes yield an extra ingredient more often." },
+    kitchen_master: { label: "Kitchen Master", icon: "👑", desc: "Lifts EVERY kitchen passive at once." },
     keen_eye: { label: "Keen Eye", icon: "👁️", desc: "Better odds of a BONUS higher-tier part when you salvage." },
     masters_touch: { label: "Master's Touch", icon: "✨", desc: "Better odds an enhancement rolls DOUBLE the gains." },
     steady_hand: { label: "Steady Hand", icon: "🖐️", desc: "Better odds a slip won't break your combo while enhancing." },
@@ -223,7 +237,14 @@ export const COLLECTIBLES = [
     { id: "lantern_jelly", name: "Lantern Jelly", Icon: GiJellyfish, color: "#c9a2ff", rarity: "epic", source: "fishing", fishTier: 1, activeStat: "gold_find", hint: "Rose out of the dark still glowing", spritePrompt: "a translucent violet jellyfish glowing softly from within, long trailing luminous tendrils" },
     { id: "deep_angler", name: "Deep Angler", Icon: GiAnglerFish, color: "#ffd75e", rarity: "legendary", source: "fishing", fishTier: 2, eliteOnly: true, activeStat: "crit_chance", hint: "Followed something bigger up from the deep", spritePrompt: "a small deep-sea anglerfish companion with an oversized toothy grin and a bright glowing lure bobbing above its head" },
     { id: "tidecaller", name: "Tidecaller", Icon: GiWhaleTail, color: "#37f5c0", rarity: "mythic", source: "fishing", fishTier: 3, eliteOnly: true, activeStat: "might", hint: "The sea sent something back with you", spritePrompt: "a small serene whale calf wreathed in swirling turquoise water and glowing runes, trailing sea-foam" },
-];
+
+    // ===== KITCHEN pets — earned by cooking. Each carries a COOKING passive (see COOK_ODDS_KEYS), so they
+    // improve what comes out of the pot rather than boss power, exactly like the Forge set improves smithing.
+    { id: "pantry_mouse", name: "Pantry Mouse", Icon: GiRat, color: "#cfd8e3", rarity: "rare", source: "achievement", activeStat: "thrifty", achievement: "Cook 10 dishes", spritePrompt: "a tiny round grey field mouse in a little cook's apron clutching a single wheat grain, whiskers twitching, bright curious eyes" },
+    { id: "copper_kettle", name: "Copper Kettle", Icon: GiTeapot, color: "#e8a33d", rarity: "epic", source: "achievement", activeStat: "prep_cook", achievement: "Prep 25 ingredients", spritePrompt: "a small living copper kettle creature with stubby legs and a cheerful spout face, steam curling from its lid, polished dented copper" },
+    { id: "hearth_cat", name: "Hearth Cat", Icon: GiCat, color: "#ff8a3c", rarity: "epic", source: "achievement", activeStat: "hot_hands", achievement: "Cook 100 dishes", spritePrompt: "a plump ginger cat curled up asleep, its fur glowing faintly like banked embers, warm orange light coming off its belly" },
+    { id: "spice_moth", name: "Spice Moth", Icon: GiButterfly, color: "#c9a2ff", rarity: "legendary", source: "achievement", activeStat: "generous", achievement: "Cook a dish of every tier", spritePrompt: "a large velvety moth with wings patterned like ground spices in saffron, paprika and violet, trailing a fine shimmer of powder" },
+    { id: "gourmand_dragon", name: "Gourmand Dragon", Icon: GiDragonHead, color: "#ffd75e", rarity: "mythic", source: "achievement", activeStat: "kitchen_master", achievement: "Cook 500 dishes AND a flawless timing run", spritePrompt: "a small round gold dragon with an enormous well-fed belly, a napkin tucked under its chin, holding a tiny silver fork, extremely pleased with itself" },];
 
 const BY_ID = Object.fromEntries(COLLECTIBLES.map((c) => [c.id, c]));
 
@@ -257,6 +278,15 @@ export function petForgePassive(pet) {
     if (!pet) return null;
     const stat = PET_PASSIVE_STAT[pet.id];
     if (!FORGE_PASSIVE_STATS.has(stat)) return null;
+    return { stat, value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
+}
+
+// The Kitchen's equivalent. Same shape, different key set, so cooking pets are invisible to the forge maths and
+// forge pets are invisible to cooking's.
+export function petCookPassive(pet) {
+    if (!pet) return null;
+    const stat = PET_PASSIVE_STAT[pet.id];
+    if (!COOK_PASSIVE_STATS.has(stat)) return null;
     return { stat, value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };
 }
 
