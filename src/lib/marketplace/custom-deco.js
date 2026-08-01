@@ -86,6 +86,14 @@ export async function suggestDecoDescription(name) {
 
 export async function getCustomState(buyerId) {
     if (!buyerId) return { credits: 0, draft: null };
+    // A draft with ZERO attempts and ZERO options has nothing to show, redraw or accept — the member sees a
+    // panel whose every button fails. Retire it and hand the credit back rather than offering a dead resume.
+    await db.query(
+        `UPDATE mkt_custom_deco SET status = 'failed', last_error = COALESCE(last_error, 'generation never ran')
+          WHERE buyer_id = $1 AND status = 'drafting' AND attempts = 0
+            AND jsonb_array_length(COALESCE(options, '[]'::jsonb)) = 0`,
+        [buyerId]
+    ).catch(() => {});
     const [b, draftRow] = await Promise.all([
         db.queryOne(`SELECT COALESCE(custom_deco_credits, 0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT * FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'drafting' ORDER BY id DESC LIMIT 1`, [buyerId]).catch(() => null),
@@ -123,8 +131,18 @@ export async function startCustomDeco(buyerId, name, prompt) {
     // Creation tokens are the one place a MEMBER spends our OpenAI money, so every draw is attributed to them
     // by name — that's the "who" the AI Costs history exists to answer. Attempts 2-4 are free to the member but
     // are NOT free to us, so each redraw is logged the same way.
-    const who = await creationActor(buyerId);
-    const gen = await genOne(await buildPrompt(desc), 1, { origin: "creation", subject: nm, label: `Creation — ${nm}`, ...who });
+    // EVERYTHING after the charge is guarded. genOne has its own try/catch, but buildPrompt, creationActor and
+    // housePrompt sit OUTSIDE it — so a throw in any of them escaped this function with the credit already
+    // spent, no refund, and the row left at status='drafting', attempts=0. That is exactly the state seven
+    // drafts across three members were found in: a paid token gone, a draft the UI offers to resume, and
+    // nothing to resume it with.
+    let gen;
+    try {
+        const who = await creationActor(buyerId);
+        gen = await genOne(await buildPrompt(desc), 1, { origin: "creation", subject: nm, label: `Creation — ${nm}`, ...who });
+    } catch (e) {
+        gen = { urls: [], error: classifyGenError(e) };
+    }
     if (!gen.urls.length) {
         if (!free) {
             await db.query(`UPDATE mkt_buyer SET custom_deco_credits = custom_deco_credits + 1 WHERE id = $1`, [buyerId]).catch(() => {}); // refund
@@ -147,10 +165,17 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const row = await db.queryOne(`SELECT * FROM mkt_custom_deco WHERE id = $1 AND buyer_id = $2 AND status = 'drafting'`, [Number(id), buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_found" };
     if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "no_attempts", draft: mapDraft(row) };
-    const who = await creationActor(buyerId);
-    const gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1, {
-        origin: "creation", subject: row.name, label: `Creation redraw ${row.attempts + 1} — ${row.name}`, ...who,
-    });
+    // Same guard as startCustomDeco: buildPrompt and creationActor sit outside genOne's own try, so a throw
+    // there left the draft jammed with no error recorded and no way forward.
+    let gen;
+    try {
+        const who = await creationActor(buyerId);
+        gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1, {
+            origin: "creation", subject: row.name, label: `Creation redraw ${row.attempts + 1} — ${row.name}`, ...who,
+        });
+    } catch (e) {
+        gen = { urls: [], error: classifyGenError(e) };
+    }
     if (!gen.urls.length) {
         await db.query(`UPDATE mkt_custom_deco SET last_error = $2, updated_at = NOW() WHERE id = $1`, [Number(id), gen.error?.raw || null]).catch(() => {});
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null, draft: mapDraft(row) };
