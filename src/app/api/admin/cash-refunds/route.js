@@ -30,7 +30,10 @@ export async function GET(request) {
             const from = url.searchParams.get("from");
             const to = url.searchParams.get("to");
             const rows = await db.query(
-                `SELECT id, occurred_on, description, amount
+                // ::text in SQL, NOT String(date).slice(0,10) in JS — the driver hands back a Date for a DATE
+                // column and String() on it yields "Fri Jul 31", which the report would then splice into a
+                // timestamp and mis-file the refund's day.
+                `SELECT id, occurred_on::text AS occurred_on, description, amount
                    FROM cash_ledger
                   WHERE source = 'refund'
                     AND ($1::date IS NULL OR occurred_on >= $1::date)
