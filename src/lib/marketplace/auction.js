@@ -104,6 +104,11 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
         sellerAlias: row.alias || null,
         listedAt: row.listed_at,
         expiresAt: row.expires_at,
+        // Browse only ever queries ACTIVE rows, so this was left off — but the detail modal is SHARED with the
+        // Listings tab and gates the whole owner footer on `status === "active"`. Opening your own listing from
+        // Browse therefore showed neither the price nor a Cancel button, because the buy footer is skipped for
+        // your own item and the owner footer never rendered.
+        status: "active",
         mine: viewerId && row.seller_id === viewerId,
         owned: ownedSet.has(row.item_id), // viewer already owns this item (can't buy a duplicate)
     };

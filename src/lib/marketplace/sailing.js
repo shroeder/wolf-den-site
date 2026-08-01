@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
-import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
+import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
@@ -184,6 +184,39 @@ const MERCHANT_STOCK = [
     { id: "pot_secondwind", base: 3200, off: 0.35 },
     { id: "stone_ember", base: 3500, off: 0.35 },
 ];
+
+// ── LEVEL-CORRECT PET ART FOR A SET OF MEMBERS ───────────────────────────────────────────────────────────────
+// Everywhere a pet appears on a boat -- the captain's, the fleet on the horizon, both sides of a raid, the
+// defence log -- it used getPetSpriteData() alone, which only holds the Lv1 BASE sprite. So a fully evolved pet
+// still sailed in its starter form for every member on screen. The farm and the boss scene already show the
+// sprite for the pet's CURRENT level; this brings sailing in line.
+//
+// Takes [{ buyerId, petId }] and returns buyerId -> { url, flip }, with one query for all the levels rather
+// than one per member.
+async function petArtByBuyer(pairs) {
+    const wanted = (pairs || []).filter((p) => p?.buyerId && p?.petId);
+    if (!wanted.length) return {};
+    const [base, levels, xpRows] = await Promise.all([
+        getPetSpriteData().catch(() => ({})),
+        getPetSpriteLevelData().catch(() => ({})),
+        // Two plain arrays rather than a record[] of interpolated pairs -- the pair form would have to build
+        // SQL literals out of ids. This over-fetches a little (any listed member x any listed pet) and the
+        // exact pair is matched in JS below.
+        db.query(
+            `SELECT buyer_id, pet_id, xp FROM mkt_pet_level
+              WHERE buyer_id = ANY($1::text[]) AND pet_id = ANY($2::text[])`,
+            [[...new Set(wanted.map((w) => String(w.buyerId)))], [...new Set(wanted.map((w) => String(w.petId)))]]
+        ).catch(() => []),
+    ]);
+    const xpFor = new Map((xpRows || []).map((r) => [`${r.buyer_id}|${r.pet_id}`, Number(r.xp) || 0]));
+    const out = {};
+    for (const w of wanted) {
+        const lvl = petLevelForXp(xpFor.get(`${w.buyerId}|${w.petId}`) || 0, collectibleById(w.petId)?.rarity);
+        const art = pickPetSpriteForLevel(base[w.petId], levels[w.petId], lvl);
+        if (art?.url) out[w.buyerId] = { url: art.url, flip: art.flip === true };
+    }
+    return out;
+}
 
 // The equipped elephant pet's merchant-find bonus (0 if it isn't equipped).
 async function merchantFindBonus(buyerId) {
@@ -909,14 +942,14 @@ export async function getSailingState(buyerId, skyKey = null) {
     void skyKey;
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, petMap, chestArt, sea, raidExtras] = await Promise.all([
+    const [row, goldRow, others, chestArt, sea, raidExtras] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
         // has at least the starter hull; if they've bought boat upgrades we show that form. Ordered by recent
         // activity so you see LIVE players, not always the same top-XP account.
         db.query(
-            `SELECT b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
+            `SELECT b.id, b.alias, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
                     COALESCE(s.speed_level, 0) AS speed_level, COALESCE(s.luck_level, 0) AS luck_level,
                     COALESCE(s.rarity_level, 0) AS rarity_level, COALESCE(s.find_level, 0) AS find_level,
                     COALESCE(s.raid_level, 0) AS raid_level
@@ -928,14 +961,14 @@ export async function getSailingState(buyerId, skyKey = null) {
               LIMIT 24`,
             [buyerId]
         ).catch(() => []),
-        getPetSpriteData().catch(() => ({})),
         getChestArt().catch(() => ({})),
         equippedSeaAffinity(buyerId),
         equippedRaidExtras(buyerId),
     ]);
     const seaEff = seaEffects(sea);
+    const fleetPetArt = await petArtByBuyer((others || []).map((o) => ({ buyerId: o.id, petId: o.featured_collectible })));
     const fleet = (others || []).map((o) => {
-        const pet = o.featured_collectible ? petMap[o.featured_collectible] : null;
+        const pet = fleetPetArt[o.id] || null;
         return {
             art: boatArt(boatLevelFromUpgrades(o.speed_level, o.luck_level, o.rarity_level, o.find_level, o.raid_level)),
             name: o.alias,
@@ -1350,9 +1383,8 @@ export async function doRaid(buyerId, targetId = null) {
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
 
     // Presentation + combat inputs for BOTH fighters (their hero sprite, pet, and equipped gear stats).
-    const [me, petMap, myStats, foeStats, mySea] = await Promise.all([
+    const [me, myStats, foeStats, mySea] = await Promise.all([
         db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        getPetSpriteData().catch(() => ({})),
         getEquippedStats(buyerId).catch(() => ({})),
         getEquippedStats(target.id).catch(() => ({})),
         equippedSeaAffinity(buyerId),
@@ -1435,7 +1467,11 @@ export async function doRaid(buyerId, targetId = null) {
     await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
     if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
 
-    const petView = (id) => { const p = id ? petMap[id] : null; return p?.url ? { url: p.url, flip: p.flip === true } : null; };
+    const raidPetArt = await petArtByBuyer([
+        { buyerId, petId: me?.featured_collectible },
+        { buyerId: target.id, petId: target.featured_collectible },
+    ]);
+    const petView = (id) => raidPetArt[id] || null;
     const result = {
         outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
         battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
@@ -1443,13 +1479,13 @@ export async function doRaid(buyerId, targetId = null) {
             name: me?.display_name || me?.alias || "You", level: myLevel, tier: boatTier(myLevel), boat: boatArt(myLevel),
             rider: me?.avatar_sprite_url || me?.avatar_url || null,
             riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
-            pet: petView(me?.featured_collectible), stats: compactStats(myStats), canStun: perks.raidStun,
+            pet: petView(buyerId), stats: compactStats(myStats), canStun: perks.raidStun,
         },
         foe: {
             name: target.display_name || target.alias, level: foeLevel, tier: boatTier(foeLevel), boat: boatArt(foeLevel),
             rider: target.avatar_sprite_url || target.avatar_url || null,
             riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
-            pet: petView(target.featured_collectible), stats: compactStats(foeStats),
+            pet: petView(target.id), stats: compactStats(foeStats),
         },
         // Back-compat shim for any older client build still reading .target.
         target: { name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel) },
@@ -1473,14 +1509,12 @@ export async function getUnseenRaidDefenses(buyerId) {
         .catch(() => []);
     if (!rows.length) return { defenses: [], totalGold: 0, totalWins: 0 };
     const ids = rows.map((r) => r.attacker_id);
-    const [buyers, petMap] = await Promise.all([
-        db.query(`SELECT id, display_name, alias, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []),
-        getPetSpriteData().catch(() => ({})),
-    ]);
+    const buyers = await db.query(`SELECT id, display_name, alias, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []);
     const byId = new Map((buyers || []).map((b) => [b.id, b]));
+    const defencePetArt = await petArtByBuyer((buyers || []).map((b) => ({ buyerId: b.id, petId: b.featured_collectible })));
     const defenses = rows.map((r) => {
         const b = byId.get(r.attacker_id) || {};
-        const pet = b.featured_collectible ? petMap[b.featured_collectible] : null;
+        const pet = defencePetArt[b.id] || null;
         const gear = (r.gears || []).map((id) => { const d = itemById(id); return d ? { name: d.name, rarity: d.rarity } : null; }).filter(Boolean);
         return {
             attacker: {

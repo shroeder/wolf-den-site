@@ -7,6 +7,8 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
+import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { getSailingState } from "@/lib/marketplace/sailing.js";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +43,15 @@ export default async function SailingPage() {
         spriteFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
         avatarUrl: avatarImageUrl(me?.avatar_config, me?.avatar_cosmetics) || me?.avatar_url || DEFAULT_AVATAR_URL,
     };
+    // Show the sprite for the pet's CURRENT level, like the farm and the boss scene do. This was pinned to 1,
+    // so a fully evolved pet still rode the boat in its Lv1 form -- for the captain AND, further down, for every
+    // other member on the horizon.
     const petId = me?.featured_collectible || null;
-    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], 1) : null;
+    const petXpRow = petId
+        ? await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyer.id, petId]).catch(() => null)
+        : null;
+    const petLvl = petId ? petLevelForXp(petXpRow?.xp || 0, collectibleById(petId)?.rarity) : 1;
+    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl) : null;
     const pet = petArt?.url ? { url: petArt.url, flip: petArt.flip || false } : null;
 
     return <SailingClient initial={state} hero={hero} pet={pet} captain={me?.display_name || me?.alias || "Captain"} />;
