@@ -43,12 +43,23 @@ function normalize(input) {
     const date = Number(input.date);
     const amount = Number(input.amount);
     if (!Number.isFinite(date) || !Number.isFinite(amount)) throw new Error("date and amount must be numbers.");
+    // Kotlin's JSONObject.optString returns the four-character STRING "null" when the JSON value is null, and
+    // String("null" || "") keeps it. 82 bank-synced entries reached the books with description="null" — not
+    // empty, not SQL NULL, so every `IS NULL` check reported the data as clean while the ledger showed the
+    // word "null" where a payee should be. One of them was a $704 sales-tax payment, which meant Where the
+    // Money Is could not see it and reported the tax owed $704 too high.
+    //
+    // Normalised here rather than in the app so any client — the phone, an import, a future one — is covered.
+    const clean = (v) => {
+        const t = v == null ? "" : String(v).trim();
+        return t === "null" || t === "undefined" ? "" : t;
+    };
     return {
         entryId,
         date,
         type: String(input.type || ""),
         category: String(input.category || ""),
-        description: String(input.description || ""),
+        description: clean(input.description),
         amount,
         paymentMethod: input.paymentMethod != null ? String(input.paymentMethod) : null,
         accountType: input.accountType != null ? String(input.accountType) : null,
