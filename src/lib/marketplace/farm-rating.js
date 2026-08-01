@@ -137,6 +137,17 @@ export async function rateFarm(raterId, ownerId, tier) {
         return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
     }
 
+    // Green Thumb: a companion turns the courtesy of rating someone's farm into a seed for you. Rating is
+    // already daily-capped, so this can't be farmed beyond that ceiling.
+    let seedFound = null;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const gt = await getPetSystemPerk(raterId, "green_thumb");
+        if (gt > 0 && Math.random() < gt / 100) {
+            const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
+            seedFound = await dropSeedFrom(raterId, "green_thumb").catch(() => null);
+        }
+    } catch { /* a seed is a bonus; never fail the rating */ }
     await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
     await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
     await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t }).catch(() => {});
@@ -148,7 +159,7 @@ export async function rateFarm(raterId, ownerId, tier) {
     await syncEarnedBadges(ownerId).catch(() => {}); // Well-Liked / Adored — the OWNER just received a rating
 
     const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: meta.raterXp, ...summary, charge };
+    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: meta.raterXp, seedFound, ...summary, charge };
 }
 
 // "N people rated your farm" welcome-back recap. Returns every unseen (new or revised) rating on your farm, plus

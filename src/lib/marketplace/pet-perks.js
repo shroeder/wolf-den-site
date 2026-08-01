@@ -60,6 +60,15 @@ export const PERK_META = {
     town_haggle:  { icon: "🧳", kind: "town" },
     town_rally:   { icon: "🏘️", kind: "town" },
     chest_luck:   { icon: "🧰", kind: "econ" },
+    // ── The eight designed in review ─────────────────────────────────────────────────────────────────────
+    green_thumb:  { icon: "🌿", kind: "farm" },
+    pack_visit:   { icon: "🐕", kind: "farm" },
+    truffle_hog:  { icon: "🐖", kind: "farm" },
+    night_angler: { icon: "🌙", kind: "sea" },
+    second_wind:  { icon: "💨", kind: "sea" },
+    storm_sense:  { icon: "⛈️", kind: "sea" },
+    following_sea:{ icon: "🌊", kind: "sea" },
+    beachcomber:  { icon: "🏖️", kind: "sea" },
     recipe_nose:  { icon: "📜", kind: "kitchen" },
 };
 
@@ -136,10 +145,10 @@ export const PET_PERKS = {
     elephant_spear: { name: "Merchant's Nose", key: "gold_find", note: "Unique: while equipped, boosts your chance to find the Gold Merchant at sea (+1% per pet level, up to +5%)." },
     // Farm/pastoral pets — a farm passive (in collectibles PET_PASSIVE_STAT) PLUS a combat active so they still
     // fight. Actives are ordinary combat keys (nothing farm-specific here).
-    honeybee: { name: "Pollen Flurry", key: "chain_strike" }, barn_cat: { name: "Mouser", key: "crit_chance" },
-    piglet: { name: "Truffle Snout", key: "gold_find" }, hen: { name: "Golden Egg", key: "gold_find" },
-    spring_lamb: { name: "Lamb Leap", key: "first_hit" }, scarecrow_crow: { name: "Startle", key: "first_blood" },
-    field_mouse: { name: "Scurry", key: "extra_strike" }, golden_goose: { name: "Windfall", key: "fortune" },
+    honeybee: { name: "Following Wind", key: "following_sea" }, barn_cat: { name: "Night Prowler", key: "night_angler" },
+    piglet: { name: "Truffle Snout", key: "truffle_hog" }, hen: { name: "Broody Hen", key: "green_thumb" },
+    spring_lamb: { name: "Spring Lamb", key: "pack_visit" }, scarecrow_crow: { name: "Storm Caller", key: "storm_sense" },
+    field_mouse: { name: "Quick Whiskers", key: "second_wind" }, golden_goose: { name: "Beachcomber", key: "beachcomber" },
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.
@@ -173,6 +182,14 @@ export const SYSTEM_PERK_CAP = {
     town_haggle: 30,    // merchant discount
     town_rally: 40,     // town-raid damage
     chest_luck: 20,     // rarity promotion
+    green_thumb: 40,    // a seed from rating; rating is already daily-capped
+    pack_visit: 50,     // share of the XP, never more than half
+    truffle_hog: 100,   // +100% = the 2x ceiling agreed in review
+    night_angler: 30,   // only applies outside store hours
+    second_wind: 1,     // binary — one free recharge, not a scaling percentage
+    storm_sense: 25,    // only applies in real rain
+    following_sea: 25,  // agreed cap: a 4h voyage lands at 3h, not 2h26
+    beachcomber: 20,    // /10 in the description -> +2 finds at cap
 };
 
 export function petPerkValue(rarity, key) {
@@ -239,6 +256,19 @@ function perkDesc(key, v, level = 1) {
         case "town_rally": return `+${v}% damage on town raids — the plaza skirmishes, not the weekly boss`;
         case "chest_luck": return `+${v}% chance any chest you open rolls on the NEXT rarity up`;
         case "recipe_nose": return `+${v}% chance anything that can drop a recipe does`;
+        // ── The eight designed in review. Each states the number AND what it buys you. ────────────────────
+        case "green_thumb": return `${v}% chance rating a friend's farm drops you a seed too`;
+        case "pack_visit": return `Petting or feeding on someone else's farm also gives YOUR equipped pet ${v}% of that XP`;
+        // The pig is a ONCE-PER-DAY claim, not a spawn timer — so "1.5x as often" would be meaningless. At
+        // 100 (the cap) it comes back every day; below that it's a chance. That IS the agreed 2x.
+        case "truffle_hog": return v >= 100
+            ? `The Loot Pig comes back for a SECOND visit every day`
+            : `${v}% chance the Loot Pig comes back for a second visit the same day`;
+        case "night_angler": return `+${v}% gold and XP from any cast made while the shop is closed`;
+        case "second_wind": return `Your first cast recharge each day is FREE (normally ${100} gold)`;
+        case "storm_sense": return `While it's actually raining over the shop, fish run +${v}% bigger and rarer`;
+        case "following_sea": return `Your voyages finish ${v}% sooner — a 4h trip lands about ${Math.round(4 * v / 100 * 60)} min early`;
+        case "beachcomber": { const n = Math.max(1, Math.round(v / 10)); return `+${n} extra buried find${n === 1 ? "" : "s"} scattered through every dig`; }
         default: return "";
     }
 }
@@ -296,6 +326,8 @@ export const SYSTEM_PERK_KEYS = new Set([
     "kitchen_heat", "kitchen_larder", "kitchen_portion", "kitchen_prep", "recipe_nose",
     "forge_spark", "forge_salvage",
     "town_haggle", "town_rally", "chest_luck",
+    "green_thumb", "pack_visit", "truffle_hog",
+    "night_angler", "second_wind", "storm_sense", "following_sea", "beachcomber",
 ]);
 
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}) {

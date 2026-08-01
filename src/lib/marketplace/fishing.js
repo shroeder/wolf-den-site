@@ -184,8 +184,45 @@ async function seaPetPerks(buyerId) {
             getPetSystemPerk(buyerId, "angling"),
             getPetSystemPerk(buyerId, "reelStrength"),
         ]);
-        return { bite: bite + angling, size: size + reel, dredge };
-    } catch { return { bite: 0, size: 0, dredge: 0 }; }
+        // Storm Sense only pays when it's genuinely raining over the shop; Night Angler only outside opening
+        // hours. Both are checked here so a cast pays the same way whichever perk is doing the work.
+        const [storm, night] = await Promise.all([
+            getPetSystemPerk(buyerId, "storm_sense"),
+            getPetSystemPerk(buyerId, "night_angler"),
+        ]);
+        const stormOn = storm > 0 && await denIsRaining();
+        const nightOn = night > 0 && !shopIsOpen();
+        return {
+            bite: bite + angling + (stormOn ? storm : 0),
+            size: size + reel + (stormOn ? storm : 0),
+            dredge,
+            payoutBonus: nightOn ? night / 100 : 0,
+        };
+    } catch { return { bite: 0, size: 0, dredge: 0, payoutBonus: 0 }; }
+}
+
+// ── REAL-WORLD CONDITIONS FOR THE ANGLING PERKS ──────────────────────────────────────────────────────────────
+// Night Fishing and Storm Sense both key off the world outside. Resolved against the SHOP's coordinates, not
+// the member's — gating on a member's own weather needs a location grant most people never give, and two
+// members fishing "together" seeing different weather reads as a bug.
+const DEN_LAT = 44.4383, DEN_LON = -93.5836;
+// Thu/Fri 15:00-21:00, Sat 10:00-21:00, Sun 10:00-15:00, closed Mon-Wed (matches the site's opening hours).
+const STORE_HOURS = { 0: [10, 15], 4: [15, 21], 5: [15, 21], 6: [10, 21] };
+function shopIsOpen(now = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", hour12: false }).formatToParts(now);
+    const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.find((p) => p.type === "weekday")?.value || "");
+    const hr = Number(parts.find((p) => p.type === "hour")?.value ?? 12);
+    const span = STORE_HOURS[wd];
+    return Boolean(span && hr >= span[0] && hr < span[1]);
+}
+// Rain/drizzle/showers/thunder in the WMO code table open-meteo returns.
+const RAINY = (code) => (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || (code >= 95 && code <= 99);
+async function denIsRaining() {
+    try {
+        const { skyAt } = await import("@/lib/marketplace/sky.js");
+        const sky = await skyAt({ lat: DEN_LAT, lon: DEN_LON });
+        return sky ? RAINY(sky.weatherCode) : false;
+    } catch { return false; }
 }
 
 const rollTreasure = () => pickWeighted(TREASURE);
@@ -643,8 +680,11 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // Payout scales from 45% of the species value at the small end to full value at the top of its typical
     // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.
     const scale = 0.45 + 0.55 * Math.min(1.6, pct);
-    const gold = Math.max(1, Math.round(species.gold * scale));
-    const xp = Math.max(1, Math.round(species.xp * scale));
+    // Night Angler pays more for a cast made while the shop is shut — see seaPetPerks. Folded in at the
+    // declaration so every downstream consumer (the haul, the log, the coin ledger) sees the same figure.
+    const nightMult = 1 + (seaPets.payoutBonus || 0);
+    const gold = Math.max(1, Math.round(species.gold * scale * nightMult));
+    const xp = Math.max(1, Math.round(species.xp * scale * nightMult));
 
     const log = (taken.fish_log && typeof taken.fish_log === "object") ? taken.fish_log : {};
     const prev = log[species.id] || null;
@@ -855,7 +895,15 @@ export async function buyRecharge(buyerId) {
     const bought = rechargesToday(row);
     if (bought >= RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed" };
 
-    const cost = rechargeCost(bought);
+    // Second Wind: a companion makes the FIRST recharge of the day free. Only the first — the cost doubles
+    // each time, so waiving a later one would be worth thousands rather than a hundred.
+    let cost = rechargeCost(bought);
+    if (bought === 0) {
+        try {
+            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+            if (await getPetSystemPerk(buyerId, "second_wind") > 0) cost = 0;
+        } catch { /* no companion, normal price */ }
+    }
     // Conditional spend: the WHERE clause is the balance check, so two taps can't both succeed on one balance.
     const paid = await db.queryOne(
         `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND COALESCE(gold, 0) >= $2 RETURNING gold`,

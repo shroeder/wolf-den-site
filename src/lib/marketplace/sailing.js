@@ -588,11 +588,11 @@ const DIG_ITEM_POOL = [
     "pot_adrenaline", "stone_storm", "scroll_wisdom", "treat_bone", "treat_snack", "treat_toy",
     "spin_lucky_coin", "treat_wild", "pot_secondwind", "treat_feast",
 ];
-const digItemCount = (tier) => Math.min(5, 2 + Math.floor(tier / 2)); // 2 (t1) … 5 (t6)
+const digItemCount = (tier, bonus = 0) => Math.min(5 + bonus, 2 + Math.floor(tier / 2) + bonus); // 2 (t1) … 5 (t6), +Beachcomber
 // One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
 const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
-function newBoard(row, petStamina = 0) {
+function newBoard(row, petStamina = 0, petFinds = 0) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
@@ -622,7 +622,7 @@ function newBoard(row, petStamina = 0) {
     const free = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!chestSet.has(`${r},${c}`)) free.push([r, c]);
     for (let i = free.length - 1; i > 0; i--) { const j = randInt(i + 1); [free[i], free[j]] = [free[j], free[i]]; }
-    const items = free.slice(0, digItemCount(tier)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
+    const items = free.slice(0, digItemCount(tier, petFinds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     // petStamina comes from the caller: every owned seafaring pet adds a dig, capped at +4 across the whole
@@ -998,7 +998,13 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const state = decorate(row);
     if (state.status !== "idle") return { ok: false, error: "busy", ...(await getSailingState(buyerId)) };
     const opt = VOYAGE_OPTIONS.find((o) => o.id === optionId) || VOYAGE_OPTIONS[1];
-    const voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
+    let voyageSpeed = seaEffects(await equippedSeaAffinity(buyerId)).voyageSpeed; // Tailwind shortens the trip
+    // Following Sea: a companion shortens it further, capped at 25% so a 4h voyage lands at 3h. Added to
+    // Tailwind rather than multiplied — MIN_VOYAGE_MS below is the real floor either way.
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        voyageSpeed += (await getPetSystemPerk(buyerId, "following_sea")) / 100;
+    } catch { /* no companion, no speed-up */ }
     const ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
     // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark (Kraken Bait guarantees one).
     const forcedEnc = row?.force_encounter === true;
@@ -1780,7 +1786,13 @@ export async function beginDig(buyerId) {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
         petStamina = Math.round(await getPetSystemPerk(buyerId, "seafaring"));
     } catch { /* no pets, no bonus */ }
-    const board = newBoard(row, petStamina);
+    let petFinds = 0;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        // /10 to match the description: 20 at cap -> +2 finds.
+        petFinds = Math.max(0, Math.round((await getPetSystemPerk(buyerId, "beachcomber")) / 10));
+    } catch { /* no companion, no extra finds */ }
+    const board = newBoard(row, petStamina, petFinds);
     // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
     const eff = seaEffects(await equippedSeaAffinity(buyerId));
     if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;

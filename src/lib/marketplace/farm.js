@@ -182,7 +182,23 @@ async function farmMineBits(buyerId, mine = true) {
 export async function claimPig(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     const claim = await db.queryOne(`UPDATE mkt_buyer SET pig_day = ${DAY} WHERE id = $1 AND pig_day IS DISTINCT FROM ${DAY} RETURNING id`, [buyerId]).catch(() => null);
-    if (!claim) return { ok: false, error: "already_claimed" };
+    if (!claim) {
+        // Truffle Hog: a companion can bring the pig back for ONE more visit the same day. Tracked on its own
+        // column so it can't be re-rolled by retrying the request — the second claim is spent the same way the
+        // first is, atomically.
+        let second = null;
+        try {
+            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+            const th = await getPetSystemPerk(buyerId, "truffle_hog");
+            if (th > 0 && Math.random() < th / 100) {
+                second = await db.queryOne(
+                    `UPDATE mkt_buyer SET pig_second_day = ${DAY} WHERE id = $1 AND pig_second_day IS DISTINCT FROM ${DAY} RETURNING id`,
+                    [buyerId]
+                ).catch(() => null);
+            }
+        } catch { /* no companion, no second visit */ }
+        if (!second) return { ok: false, error: "already_claimed" };
+    }
     const gold = PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
@@ -438,6 +454,17 @@ export async function petPet(petterId, petId, ownerId = null) {
         newXp = r?.xp || 0;
         // Log it so the owner sees who petted which of their pets (and the XP it earned) on their next visit.
         await db.query(`INSERT INTO mkt_pet_visit (owner_id, petter_id, pet_id, xp) VALUES ($1, $2, $3, $4)`, [petOwner, petterId, petId, petXpAmt]).catch(() => {});
+        // Pack Visit: a share of that XP also goes to the VISITOR's own equipped pet. Only on someone else's
+        // farm — on your own it would just be a flat multiplier on petting yourself.
+        try {
+            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+            const share = await getPetSystemPerk(petterId, "pack_visit");
+            if (share > 0) {
+                const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [petterId]).catch(() => null);
+                const mine = me?.featured_collectible;
+                if (mine) await addPetXp(petterId, mine, Math.max(1, Math.round(petXpAmt * share / 100))).catch(() => {});
+            }
+        } catch { /* a share is a bonus; never fail the visit */ }
     }
 
     // Reward the petter: your own pet pays a bit more (the bond); a friend's pet a small thank-you.
