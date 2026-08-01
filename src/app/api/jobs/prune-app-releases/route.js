@@ -24,8 +24,9 @@ const KEEP = 3;
 
 export async function GET(request) {
     return withRequestLogging(request, "GET /api/jobs/prune-app-releases", async ({ logger, internalError }) => {
-        const token = process.env.BLOB_READ_WRITE_TOKEN;
-        if (!token) return NextResponse.json({ ok: false, error: "no_blob_token" }, { status: 500 });
+        // No explicit token: every other server-side blob call here (openai-image, logo) calls put() bare and
+        // lets the SDK resolve ambient Vercel credentials. Reading process.env directly found nothing and made
+        // this a no-op — the one failure mode a cleanup job must not have, since nothing would ever notice.
         try {
             const doomed = await db.query(
                 `WITH ranked AS (
@@ -44,7 +45,7 @@ export async function GET(request) {
             const failures = [];
             for (const r of doomed) {
                 try {
-                    if (r.apk_url) await del(r.apk_url, { token });
+                    if (r.apk_url) await del(r.apk_url);
                     blobsGone += 1;
                     freed += Number(r.size_bytes || 0);
                 } catch (e) {
