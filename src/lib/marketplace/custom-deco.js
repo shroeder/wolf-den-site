@@ -91,10 +91,17 @@ export async function getCustomState(buyerId) {
     if (!buyerId) return { credits: 0, draft: null };
     // A draft with ZERO attempts and ZERO options has nothing to show, redraw or accept — the member sees a
     // panel whose every button fails. Retire it and hand the credit back rather than offering a dead resume.
+    //
+    // THE AGE GUARD IS LOAD-BEARING. startCustomDeco inserts the row first and only then generates, which takes
+    // about a minute — so a brand-new draft legitimately looks like 0 attempts / 0 options for that whole window.
+    // Without the guard, a state poll landing mid-generation retired a draft that was working perfectly: the art
+    // then finished and wrote into an already-dead row, leaving the member staring at a finished image whose
+    // every button returned not_found. Only sweep drafts old enough that generation cannot still be in flight.
     await db.query(
         `UPDATE mkt_custom_deco SET status = 'failed', last_error = COALESCE(last_error, 'generation never ran')
           WHERE buyer_id = $1 AND status = 'drafting' AND attempts = 0
-            AND jsonb_array_length(COALESCE(options, '[]'::jsonb)) = 0`,
+            AND jsonb_array_length(COALESCE(options, '[]'::jsonb)) = 0
+            AND created_at < NOW() - INTERVAL '15 minutes'`,
         [buyerId]
     ).catch(() => {});
     const [b, draftRow] = await Promise.all([
@@ -156,7 +163,14 @@ export async function startCustomDeco(buyerId, name, prompt) {
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null };
     }
     const opts = gen.urls;
-    await db.query(`UPDATE mkt_custom_deco SET attempts = 1, options = $2::jsonb, updated_at = NOW() WHERE id = $1`, [row.id, JSON.stringify(opts)]).catch(() => {});
+    // Art landed, so this row IS live — say so explicitly rather than assuming nothing touched it while we drew.
+    // The response below hands the member a draft marked 'drafting'; if the stored row disagrees, every button
+    // they press looks up `status = 'drafting'` and returns not_found against art they can see on screen.
+    await db.query(
+        `UPDATE mkt_custom_deco SET attempts = 1, options = $2::jsonb, status = 'drafting', last_error = NULL, updated_at = NOW()
+          WHERE id = $1 AND status <> 'final'`,
+        [row.id, JSON.stringify(opts)]
+    ).catch(() => {});
     const credits = free ? (await db.queryOne(`SELECT COALESCE(custom_deco_credits,0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null))?.c ?? 0 : paid.custom_deco_credits;
     return { ok: true, draft: { id: Number(row.id), name: nm, prompt: desc, attempts: 1, maxAttempts: MAX_ATTEMPTS, options: opts, status: "drafting" }, credits, free };
 }
@@ -187,7 +201,12 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const note = String(correction || "").trim().slice(0, 200) || null;
     const opts = gen.urls.map((o) => ({ ...o, note }));
     const merged = [...(row.options || []), ...opts];
-    await db.query(`UPDATE mkt_custom_deco SET attempts = attempts + 1, options = $2::jsonb, updated_at = NOW() WHERE id = $1`, [Number(id), JSON.stringify(merged)]).catch(() => {});
+    // Same reasoning as startCustomDeco: a successful redraw asserts the row is live.
+    await db.query(
+        `UPDATE mkt_custom_deco SET attempts = attempts + 1, options = $2::jsonb, status = 'drafting', last_error = NULL, updated_at = NOW()
+          WHERE id = $1 AND status <> 'final'`,
+        [Number(id), JSON.stringify(merged)]
+    ).catch(() => {});
     return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting" } };
 }
 
