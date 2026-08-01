@@ -773,16 +773,20 @@ export async function buyBadge(buyerId, slug) {
     return { ok: true, gold: row.gold };
 }
 
-// Grant a random un-owned DROP-ONLY badge (used by loot-chest opens + boss kills). Returns it or null.
+// Grant a random un-owned DROP-ONLY badge. BOSS KILLS ONLY — to the top damage dealer. Returns it or null.
 //
-// `drop_only` is the ONLY gate here, so anything flagged with it becomes chest loot. Nine ACHIEVEMENT badges
+// Chests used to call this too, and that was the mistake: a badge for opening a box says nothing about you.
+// Topping the damage board on a boss the whole Den fought does, which is why this caller stayed.
+//
+// `drop_only` is the ONLY gate here, so anything flagged with it lands in this pool. Nine ACHIEVEMENT badges
 // had been flagged — "Forged a single item all the way to +10", "Landed a PIXEL-PERFECT hammer strike",
 // "Maxed out every one of the Forge's smithing perks" — and chests were handing them out to members who had
 // never touched the Forge. A badge that describes something you DID means nothing if a chest can grant it.
 //
 // The pool is now only badges whose description IS "you found this": boss_relic, lucky_find, mythic_find,
 // treasure_hunter. Before flagging a badge drop_only, read its description: if it names an action, it belongs
-// to the event that performs that action (grantEventBadge), not to a loot table.
+// to the event that performs that action (grantEventBadge), not to a loot table. The Mark of Shame was also in
+// here and is not any more — it is reserved, and admin_only alone did not keep it out of the pool.
 export async function grantRandomDropBadge(buyerId) {
     if (!buyerId) return null;
     const rows = await db.query(`SELECT slug, label, icon, description FROM mkt_badge WHERE drop_only = TRUE`).catch(() => []);
