@@ -45,6 +45,16 @@ export const QUEST_TEMPLATES = [
     { key: "place_deco", label: "Place a decoration on your farm", metric: "place_deco", target: 1, gold: 120, area: "/marketplace/farm", cta: "Decorate your farm", gate: "farm" },
     { key: "arrange_deco", label: "Move or resize a decoration", metric: "arrange_deco", target: 1, gold: 90, area: "/marketplace/farm", cta: "Decorate your farm", gate: "farm" },
     { key: "rate_friend", label: "Rate a friend's farm", metric: "farm_rate", target: 1, gold: 110, area: "/marketplace/farm", cta: "Visit a friend's farm", gate: "farm" },
+    // ── Kitchen ──────────────────────────────────────────────────────────────────────────────────────────
+    // The daily pool was boss- and chest-heavy: the same handful of fights every day regardless of what the
+    // member actually plays. These send you to the systems that shipped after the pool was written.
+    { key: "cook_a_dish", label: "Cook a dish", metric: "cook_dish", target: 1, gold: 130, area: "/marketplace/cooking", cta: "Get cooking" },
+    { key: "cook_three", label: "Cook 3 dishes", metric: "cook_dish", target: 3, gold: 240, chest: "wooden", area: "/marketplace/cooking", cta: "Get cooking" },
+    { key: "cook_a_prep", label: "Prep an ingredient", metric: "cook_prep", target: 1, gold: 110, area: "/marketplace/cooking", cta: "Get cooking" },
+    { key: "cook_clean_run", label: "Cook a dish with a clean run", metric: "cook_clean", target: 1, gold: 200, area: "/marketplace/cooking", cta: "Get cooking" },
+    // ── Fishing ──────────────────────────────────────────────────────────────────────────────────────────
+    { key: "fish_one", label: "Land a fish", metric: "fish", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Cast a line" },
+    { key: "fish_five", label: "Land 5 fish", metric: "fish", target: 5, gold: 220, chest: "wooden", area: "/marketplace/sailing", cta: "Cast a line" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

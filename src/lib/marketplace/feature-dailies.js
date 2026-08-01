@@ -27,13 +27,12 @@ export const FEATURE_DAILIES = {
         // unreleased; the `ownerOnly` filter below is kept for the next feature that needs it.)
         { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
     ],
-    // The Kitchen. ownerOnly while cooking is gated — the same filter sailing used before fishing launched, so
-    // opening the feature up is one flag rather than a hunt. One task for volume, one for the PREP chain (the
-    // part people skip), and one for skill rather than repetition.
+    // The Kitchen — PUBLIC as of launch. One task for volume, one for the PREP chain (the part people skip),
+    // and one for skill rather than repetition, so the card can't be cleared by grinding alone.
     cooking: [
-        { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold", ownerOnly: true },
-        { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold", ownerOnly: true },
-        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest", ownerOnly: true },
+        { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
+        { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
+        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
     ],
 };
 
