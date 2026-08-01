@@ -31,6 +31,9 @@ export default function CookingMinigame({ recipe, onDone }) {
     const [pop, setPop] = useState(null);
     const [sparks, setSparks] = useState([]);
     const [done, setDone] = useState(false);
+    const [shake, setShake] = useState(0);   // grade-scaled kick on the whole dialog
+    const [flash, setFlash] = useState(null); // full-card colour wash on a big hit
+    const audio = useRef(null);
 
     const markerRef = useRef(0);
     const markerEl = useRef(null); // the DOM node — moved directly, never through React
@@ -65,6 +68,29 @@ export default function CookingMinigame({ recipe, onDone }) {
         return () => cancelAnimationFrame(raf.current);
     }, [step, done]);
 
+    // A short blip whose pitch climbs with the chain. Built on the fly so there's no asset to load and nothing
+    // to go stale; wrapped so a browser that blocks audio can never break the tap.
+    const blip = useCallback((score, chainN) => {
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            if (!audio.current) audio.current = new Ctx();
+            const ac = audio.current;
+            if (ac.state === "suspended") ac.resume();
+            const osc = ac.createOscillator();
+            const gain = ac.createGain();
+            osc.type = score >= 3 ? "triangle" : "sine";
+            const base = score === 0 ? 150 : 380 + score * 90;
+            osc.frequency.setValueAtTime(base + Math.min(6, chainN) * 55, ac.currentTime);
+            if (score >= 2) osc.frequency.exponentialRampToValueAtTime(base * 1.7, ac.currentTime + 0.11);
+            gain.gain.setValueAtTime(0.0001, ac.currentTime);
+            gain.gain.exponentialRampToValueAtTime(score >= 3 ? 0.16 : 0.09, ac.currentTime + 0.012);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.2);
+            osc.connect(gain); gain.connect(ac.destination);
+            osc.start(); osc.stop(ac.currentTime + 0.22);
+        } catch { /* audio is a bonus, never a requirement */ }
+    }, []);
+
     const tap = useCallback(() => {
         if (done || finished.current) return;
         const now = typeof performance !== "undefined" ? performance.now() : Date.now();
@@ -81,10 +107,16 @@ export default function CookingMinigame({ recipe, onDone }) {
         bestChainRef.current = Math.max(bestChainRef.current, chainRef.current);
         setChain(chainRef.current);
         setPop({ label: g.label, color: g.color, k: now, chain: chainRef.current });
-        setSparks(Array.from({ length: g.score >= 3 ? 18 : g.score >= 2 ? 11 : 5 }, (_, i) => ({
-            id: now + i, a: Math.random() * 360, d: 30 + Math.random() * 70, c: g.color,
+        // More, faster, further the better the hit — a flawless tap should look obviously different from a good
+        // one at a glance, not just read differently.
+        setSparks(Array.from({ length: g.score >= 4 ? 30 : g.score >= 3 ? 22 : g.score >= 2 ? 13 : 5 }, (_, i) => ({
+            id: now + i, a: Math.random() * 360, d: 34 + Math.random() * (g.score >= 3 ? 120 : 70), c: g.color,
         })));
-        setTimeout(() => setSparks([]), 600);
+        setTimeout(() => setSparks([]), 700);
+        blip(g.score, chainRef.current);
+        setShake(g.score);
+        setTimeout(() => setShake(0), 260);
+        if (g.score >= 3) { setFlash({ c: g.color, k: now }); setTimeout(() => setFlash(null), 320); }
 
         const next = step + 1;
         if (next >= STEPS.length) {
@@ -97,7 +129,7 @@ export default function CookingMinigame({ recipe, onDone }) {
             t0.current = 0;
             setStep(next);
         }
-    }, [done, step, onDone]);
+    }, [done, step, onDone, blip]);
 
     useEffect(() => {
         const h = (e) => { if ((e.key === " " || e.key === "Enter") && !done) { e.preventDefault(); tap(); } };
@@ -109,7 +141,8 @@ export default function CookingMinigame({ recipe, onDone }) {
 
     return (
         <div className="ckmg-scrim" role="dialog" aria-label={`Cooking ${recipe.name}`}>
-            <div className="ckmg" style={{ "--rt": recipe.tierColor }}>
+            <div className={`ckmg${shake ? ` is-shake-${shake}` : ""}`} style={{ "--rt": recipe.tierColor }}>
+                {flash ? <span key={flash.k} className="ckmg-flash" style={{ "--fc": flash.c }} aria-hidden="true" /> : null}
                 <div className="ckmg-head">
                     {recipe.sprite ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -150,7 +183,7 @@ export default function CookingMinigame({ recipe, onDone }) {
 
                 <div className="ckmg-meta">
                     <span>Step <b>{Math.min(step + 1, STEPS.length)}</b>/{STEPS.length}</span>
-                    <span>Chain <b>×{chain}</b></span>
+                    <span className={chain >= 3 ? "ckmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
                     <span>Quality <b>{Math.round(quality * 100)}%</b></span>
                 </div>
                 <p className="ckmg-hint">Hit the button when the marker is dead centre. A clean run cooks a better dish — and can push it a whole tier.</p>
@@ -204,4 +237,27 @@ const MG_CSS = `
    feels laggy even when the timing was captured correctly. */
 .ckmg-tap:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 6px 14px rgba(240,193,75,0.22); }
 .ckmg-tap:disabled { opacity: 0.55; cursor: default; transform: none; }
+
+/* ── JUICE ──────────────────────────────────────────────────────────────────────────────────────────────
+   Impact scales with the grade so a flawless tap LOOKS different from a good one before you read a word. */
+.ckmg { position: relative; overflow: hidden; }
+.ckmg.is-shake-1 { animation: ckmgShake 0.16s ease-out; }
+.ckmg.is-shake-2 { animation: ckmgShake 0.2s ease-out; --amp: 4px; }
+.ckmg.is-shake-3 { animation: ckmgShake 0.24s ease-out; --amp: 7px; }
+.ckmg.is-shake-4 { animation: ckmgShake 0.28s ease-out; --amp: 11px; }
+@keyframes ckmgShake {
+    0% { transform: translate(0,0) }
+    20% { transform: translate(calc(var(--amp,2px) * -1), calc(var(--amp,2px) * 0.4)) rotate(-0.5deg) }
+    45% { transform: translate(var(--amp,2px), calc(var(--amp,2px) * -0.3)) rotate(0.4deg) }
+    70% { transform: translate(calc(var(--amp,2px) * -0.5), 0) rotate(-0.2deg) }
+    100% { transform: translate(0,0) }
+}
+/* A wash of the grade's colour across the whole card on Perfect or better. */
+.ckmg-flash { position: absolute; inset: 0; pointer-events: none; z-index: 3; border-radius: 20px;
+    background: radial-gradient(circle at 50% 45%, var(--fc), transparent 62%); animation: ckmgFlash 0.32s ease-out forwards; }
+@keyframes ckmgFlash { 0% { opacity: 0.5 } 100% { opacity: 0 } }
+/* The chain is the thing worth protecting, so it starts pulsing once it's worth something. */
+.ckmg-chain-hot { animation: ckmgChain 0.9s ease-in-out infinite; }
+.ckmg-chain-hot b { color: #ffd75e; text-shadow: 0 0 10px rgba(255,215,94,0.7); }
+@keyframes ckmgChain { 0%,100% { transform: scale(1) } 50% { transform: scale(1.13) } }
 `;

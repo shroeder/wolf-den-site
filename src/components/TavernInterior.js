@@ -15,12 +15,36 @@ const GREET = [
     "Ahh, a familiar face! Pull up a stool — what'll it be?",
     "Welcome back to the Wolf's Den! Fire's warm, ale's cold.",
     "*wipes down the bar* Evenin', friend. What can I do you for?",
+    "Well look what the wolf dragged in. Sit, sit — you look parched.",
+    "*thunks down a mug* You've the look of someone with a story. Out with it.",
+    "Mind the step there — third one's been loose since the spring raids.",
+    "Long road, was it? Everything's warmer on this side of the door.",
+    "You're just in time. Another hour and I'd have started drinking the profits.",
+    "*squints* You've grown. Or I've shrunk. One of the two.",
+    "Ale, stew, or gossip? I stock all three, and only one of 'em's free.",
 ];
 const LORE = [
     "This old tavern's been the heart of the Den since before your time — warm fire, cold ale, good company.",
     "Every wolf in the pack passes through here eventually. Stick around, you'll see.",
     "The owner keeps it lively — raids, feasts, dice... never a dull night in the Den.",
     "Mind the bard in the corner. He's terrible, but he's ours.",
+    "See that scorch mark on the ceiling? Nobody's owned up to it. Been six seasons now.",
+    "The fire's never gone out. Not once. I'd know — it's my job to see it doesn't.",
+    "Folk come for the ale and stay for the company. Or they come for the company and stay for the ale. Same coin, either side.",
+    "There's a barrel down cellar older than most of the pack. Saving it for a night worth opening it.",
+    "I've poured for wolves who went out and never came back, and for wolves who came back with a boat full of gold. You never can tell which is which at the door.",
+    "The dice on that table are honest. The folk holding them, I make no promises about.",
+    "Every scratch in this bar top is a story. Most of 'em end with somebody apologising.",
+    "Cook out back does a crab that'll make you weep. Don't tell her I said so, she's insufferable enough.",
+    "We've weathered raids, a flood, and one very determined goat. Tavern's still standing.",
+    "Best seat's by the fire, but nobody'll fight you for it. That's the Den for you.",
+    // ── The Hudson business ──────────────────────────────────────────────────────────────────────────────
+    // The stockade is public and permanent, so the tavern talks about it — this is how the pack processes it.
+    "You'll have seen the lad in the stockade out there. Hudson. Found a crack in the world and squeezed through it 'til it split.",
+    "*sets down the rag* Hudson. Aye. Weren't the taking that soured folk — it were that he kept at it after he knew.",
+    "They stripped every coin of it back off him. Every scrap. Cleanest bit of justice I've seen in this town.",
+    "Funny thing about cheating a whole pack — you don't beat them, you just stop being one of them. Hudson learned that the slow way.",
+    "Throw fruit at him if it pleases you, most do. But he'll be marked long after the fruit's washed off — that's the part that lasts.",
 ];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

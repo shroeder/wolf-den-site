@@ -111,7 +111,7 @@ export const TIERS = [
         tier: 3, name: "Fine", color: "#c9a2ff",
         rewards: [
             { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 2, max: 3 },
-            { kind: "gold", min: 500, max: 850 },
+            { kind: "gold", min: 240, max: 400 },
             { kind: "parts", partTier: 3, min: 2, max: 4 },
             { kind: "consumable", id: "treat_toy" },
             { kind: "consumable", id: "farm_harvest_charm" },
@@ -123,7 +123,7 @@ export const TIERS = [
         tier: 4, name: "Exquisite", color: "#ffd75e",
         rewards: [
             { kind: "seed", pool: ["starfruit"], min: 2, max: 3 },
-            { kind: "gold", min: 1100, max: 1800 },
+            { kind: "gold", min: 420, max: 680 },
             { kind: "parts", partTier: 4, min: 2, max: 3 },
             { kind: "consumable", id: "treat_feast" },
             { kind: "consumable", id: "farm_fertilizer_crate" },
@@ -136,7 +136,7 @@ export const TIERS = [
         // The top ladder. Its last two rungs are the reason to build a legendary ingredient chain at all.
         tier: 5, name: "Legendary", color: "#ff9ec4",
         rewards: [
-            { kind: "gold", min: 2400, max: 3800 },
+            { kind: "gold", min: 700, max: 1100 },
             { kind: "parts", partTier: 5, min: 2, max: 4 },
             { kind: "consumable", id: "farm_fertilizer_haul" },
             { kind: "consumable", id: "treat_golden" },
@@ -689,17 +689,20 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 goldPaid += bonusN;
                 break;
             }
-            case "parts": await addParts(buyerId, r.partTier, rint(r.min, r.max)).catch(() => {}); break;
-            case "chest": await addChests(buyerId, { [r.chestTier]: 1 }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
+            // `portions` is the Seasoning track's second helping. It used to be applied ONLY to gold, so
+            // "the same dish, twice" quietly meant "the same dish once" for six of the seven reward kinds —
+            // the track read as broken to anyone who bought it and then won a chest.
+            case "parts": await addParts(buyerId, r.partTier, rint(r.min, r.max) * portions).catch(() => {}); break;
+            case "chest": await addChests(buyerId, { [r.chestTier]: portions }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
             case "seed": {
                 const id = r.pool[Math.floor(Math.random() * r.pool.length)];
-                for (let i = 0; i < rint(r.min, r.max); i += 1) await grantSeed(buyerId, id).catch(() => {});
+                for (let i = 0; i < rint(r.min, r.max) * portions; i += 1) await grantSeed(buyerId, id).catch(() => {});
                 break;
             }
-            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, r.n]).catch(() => {}); break;
-            case "creation": await grantCustomCredit(buyerId, r.n, { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
+            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, r.n * portions]).catch(() => {}); break;
+            case "creation": await grantCustomCredit(buyerId, r.n * portions, { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
             case "consumable":
-                await grantConsumable(buyerId, r.id, 1).catch(() => {});
+                await grantConsumable(buyerId, r.id, portions).catch(() => {});
                 extraSprite = conSprites[r.id] || null;
                 break;
             default: break;

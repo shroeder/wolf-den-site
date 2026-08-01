@@ -20,7 +20,6 @@ const QUEST_POOL = {
     ] },
     social: { emoji: "💬", variants: [
         { label: "Good Neighbor", desc: "Send 5 chats or emotes in town", target: 5, gold: 80 },
-        { label: "Chatterbox", desc: "Send 12 chats or emotes in town", target: 12, gold: 150 },
     ] },
     civic: { emoji: "🏗️", variants: [
         { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100 },
@@ -36,9 +35,37 @@ const QUEST_POOL = {
     merchant: { emoji: "🧳", variants: [
         { label: "Window Shopping", desc: "Buy a chest from the Traveling Merchant", target: 1, gold: 90 },
     ] },
+    harvest: { emoji: "🌾", variants: [
+        { label: "Bring in the Sheaves", desc: "Harvest 5 crops on your farm", target: 5, gold: 110 },
+        { label: "Full Barn", desc: "Harvest 12 crops on your farm", target: 12, gold: 220 },
+    ] },
+    angler: { emoji: "🎣", variants: [
+        { label: "Something for the Pot", desc: "Land 3 fish", target: 3, gold: 100 },
+        { label: "Full Creel", desc: "Land 8 fish", target: 8, gold: 210 },
+    ] },
+    voyage: { emoji: "⛵", variants: [
+        { label: "Weigh Anchor", desc: "Dig 6 times at sea", target: 6, gold: 120 },
+        { label: "Deep Water", desc: "Dig 15 times at sea", target: 15, gold: 250 },
+    ] },
+    slayer: { emoji: "⚔️", variants: [
+        { label: "Blood on the Blade", desc: "Strike the weekly boss 3 times", target: 3, gold: 130 },
+        { label: "Boss Hunter", desc: "Strike the weekly boss 8 times", target: 8, gold: 260 },
+    ] },
+    smith: { emoji: "🔨", variants: [
+        { label: "Sparks Fly", desc: "Salvage or enhance 2 items at the Forge", target: 2, gold: 120 },
+    ] },
+    cook: { emoji: "🍳", variants: [
+        { label: "Something on the Stove", desc: "Cook 2 dishes", target: 2, gold: 120 },
+    ] },
+    beastfriend: { emoji: "🐾", variants: [
+        { label: "Good Company", desc: "Feed or pet your pets 3 times", target: 3, gold: 100 },
+    ] },
+    hoarder: { emoji: "🧰", variants: [
+        { label: "Crack Them Open", desc: "Open 3 chests", target: 3, gold: 110 },
+    ] },
 };
 const ACTIVITY_KEYS = Object.keys(QUEST_POOL);
-const DAILY_COUNT = 4; // how many quests the Quartermaster features each day (of the pool above)
+const DAILY_COUNT = 5; // how many quests the Quartermaster features each day (of the pool above)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
 // FNV-1a hash → a stable 32-bit number for a string. Used to seed the daily rotation deterministically.

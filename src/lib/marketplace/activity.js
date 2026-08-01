@@ -31,6 +31,22 @@ function splitContext(ctx) {
 
 // Log an event. buyerId OR anonId identifies who; path is set for page views; ctx carries device/geo (see
 // request-context.js + the client beacon). Best-effort, non-blocking.
+// ── ACTIVITY → TOWN BOUNTY ───────────────────────────────────────────────────────────────────────────────────
+// The Quartermaster's bounties used to be town-only, so he was a reason to stand in the plaza. Mapping ordinary
+// activity events onto his quest keys lets him send you anywhere in the game without a single feature module
+// having to know he exists — anything that already logs an activity can carry a bounty.
+const ACTIVITY_QUEST_KEYS = {
+    harvest_crop: "harvest",
+    fish_caught: "angler",
+    sail_dig: "voyage",
+    boss_attack: "slayer",
+    craft_salvage: "smith",
+    craft_enhance: "smith",
+    cooked: "cook",
+    feed_pet: "beastfriend",
+    open_chest: "hoarder",
+};
+
 export async function trackActivity(buyerId, event, meta = null, { path = null, anonId = null, ctx = null } = {}) {
     if (!event || (!buyerId && !anonId)) return;
     const { c, context, hasContext } = splitContext(ctx);
@@ -47,6 +63,16 @@ export async function trackActivity(buyerId, event, meta = null, { path = null, 
             ]
         )
         .catch(() => {});
+
+    // Deferred import on purpose: town-quests pulls in coins + town-badges, and a static edge from this module
+    // — which nearly everything imports — is exactly the shape of cycle that has taken features down here
+    // before. Fire-and-forget; a bounty tick must never be able to fail the action that earned it.
+    const questKey = ACTIVITY_QUEST_KEYS[String(event)];
+    if (questKey && buyerId) {
+        import("@/lib/marketplace/town-quests.js")
+            .then((m) => m.bumpTownQuest(buyerId, questKey, 1))
+            .catch(() => {});
+    }
 }
 
 // Roll up one row per visitor (keyed by anon_id — every browser has one, member or not). first_seen,
