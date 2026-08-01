@@ -43,7 +43,12 @@ const ACTIVITY_QUEST_KEYS = {
     craft_salvage: "smith",
     craft_enhance: "smith",
     cooked: "cook",
+    // The bounty reads "Feed OR PET your pets", but only feeding was mapped — petting fires pet_farm (your own)
+    // or pet_other (a friend's), and neither was listened for. So a member could pet all day and watch the
+    // bounty sit at 0/3, which is exactly what was reported.
     feed_pet: "beastfriend",
+    pet_farm: "beastfriend",
+    pet_other: "beastfriend",
     open_chest: "hoarder",
 };
 
