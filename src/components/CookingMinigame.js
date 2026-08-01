@@ -25,15 +25,15 @@ const GRADES = [
 ];
 const gradeFor = (dist) => GRADES.find((g) => dist <= g.max) || GRADES[GRADES.length - 1];
 
-export default function CookingMinigame({ recipe, onDone, onCancel }) {
+export default function CookingMinigame({ recipe, onDone }) {
     const [step, setStep] = useState(0);
-    const [marker, setMarker] = useState(0);
     const [chain, setChain] = useState(0);
     const [pop, setPop] = useState(null);
     const [sparks, setSparks] = useState([]);
     const [done, setDone] = useState(false);
 
     const markerRef = useRef(0);
+    const markerEl = useRef(null); // the DOM node — moved directly, never through React
     const raf = useRef(0);
     const t0 = useRef(0);
     const scoreRef = useRef(0);
@@ -43,6 +43,12 @@ export default function CookingMinigame({ recipe, onDone, onCancel }) {
     const lastTap = useRef(0);
     const finished = useRef(false);
 
+    // The marker is positioned by writing to the DOM node directly rather than by setting state.
+    //
+    // It used to call setMarker() on EVERY frame, which re-rendered the whole dialog sixty times a second. The
+    // grading was always read from markerRef (correct), but the marker you could SEE lagged behind it — so a tap
+    // that looked dead centre scored as if it were late, and the game felt delayed rather than hard. Writing
+    // style.left keeps the picture and the maths on the same frame.
     useEffect(() => {
         if (done) return undefined;
         const period = Math.max(0.6, BASE_PERIOD - step * SPEEDUP);
@@ -51,7 +57,8 @@ export default function CookingMinigame({ recipe, onDone, onCancel }) {
             const phase = (((ts - t0.current) / 1000) % period) / period;
             const pos = phase < 0.5 ? phase * 2 : 2 - phase * 2; // triangle, 0→1→0
             markerRef.current = pos;
-            setMarker(pos);
+            const el = markerEl.current;
+            if (el) el.style.left = `${pos * 100}%`;
             raf.current = requestAnimationFrame(loop);
         };
         raf.current = requestAnimationFrame(loop);
@@ -120,11 +127,11 @@ export default function CookingMinigame({ recipe, onDone, onCancel }) {
                     ))}
                 </div>
 
-                <button type="button" className="ckmg-bar" onClick={tap} disabled={done} aria-label="Time it">
+                <div className="ckmg-bar" aria-hidden="true">
                     <span className="ckmg-zone ckmg-zone-good" />
                     <span className="ckmg-zone ckmg-zone-great" />
                     <span className="ckmg-zone ckmg-zone-perfect" />
-                    <span className="ckmg-marker" style={{ left: `${marker * 100}%` }} />
+                    <span ref={markerEl} className="ckmg-marker" />
                     {sparks.map((sp) => (
                         <span key={sp.id} className="ckmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />
                     ))}
@@ -133,6 +140,12 @@ export default function CookingMinigame({ recipe, onDone, onCancel }) {
                             {pop.label}{pop.chain > 1 ? <b> ×{pop.chain}</b> : null}
                         </span>
                     ) : null}
+                </div>
+
+                {/* The tap target is its own button under the bar. Tapping the bar itself meant a thumb covering
+                    the exact thing being timed, on the one screen where you need to see it. */}
+                <button type="button" className="ckmg-tap" onPointerDown={tap} disabled={done} aria-label="Time it">
+                    {done ? "Plating…" : "TAP"}
                 </button>
 
                 <div className="ckmg-meta">
@@ -140,8 +153,7 @@ export default function CookingMinigame({ recipe, onDone, onCancel }) {
                     <span>Chain <b>×{chain}</b></span>
                     <span>Quality <b>{Math.round(quality * 100)}%</b></span>
                 </div>
-                <p className="ckmg-hint">Tap when the marker is dead centre. A clean run cooks a better dish — and can push it a whole tier.</p>
-                {!done ? <button type="button" className="ckmg-cancel" onClick={onCancel}>Back out</button> : null}
+                <p className="ckmg-hint">Hit the button when the marker is dead centre. A clean run cooks a better dish — and can push it a whole tier.</p>
             </div>
             <style>{MG_CSS}</style>
         </div>
@@ -163,9 +175,8 @@ const MG_CSS = `
     background: rgba(255,255,255,0.05); color: #7a828c; text-transform: uppercase; letter-spacing: .04em; }
 .ckmg-step.is-done { background: rgba(74,208,127,0.16); color: #6fe0a0; }
 .ckmg-step.is-now { background: var(--rt); color: #17121f; }
-.ckmg-bar { position: relative; display: block; width: 100%; height: 62px; border-radius: 14px; cursor: pointer; overflow: hidden;
-    background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.14); padding: 0; }
-.ckmg-bar:disabled { cursor: default; }
+.ckmg-bar { position: relative; display: block; width: 100%; height: 62px; border-radius: 14px; overflow: hidden;
+    background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.14); padding: 0; pointer-events: none; }
 .ckmg-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 4px; }
 .ckmg-zone-good { width: 72%; background: rgba(154,160,166,0.14); }
 .ckmg-zone-great { width: 44%; background: rgba(126,200,255,0.18); }
@@ -183,6 +194,14 @@ const MG_CSS = `
 .ckmg-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 11px; font-size: 0.78rem; color: #b9c2cc; }
 .ckmg-meta b { color: #ffd75e; }
 .ckmg-hint { margin: 9px 0 0; font-size: 0.76rem; color: #8b93a0; line-height: 1.35; text-align: center; }
-.ckmg-cancel { display: block; margin: 12px auto 0; padding: 7px 16px; border-radius: 9px; font-size: 0.78rem; font-weight: 700;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #b9c2cc; cursor: pointer; }
+/* Big, thumb-sized, and directly under the bar — this is the only control in the dialog. */
+.ckmg-tap { display: block; width: 100%; margin-top: 10px; padding: 18px 16px; border-radius: 14px; cursor: pointer;
+    font-size: 1.1rem; font-weight: 900; letter-spacing: 0.1em; color: #17121f;
+    background: linear-gradient(180deg, #ffe9a8, #f0c14b); border: 0;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.35), 0 10px 24px rgba(240,193,75,0.28);
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; }
+/* Presses on the DOWN edge, matching onPointerDown — a button that sinks after the tap has already registered
+   feels laggy even when the timing was captured correctly. */
+.ckmg-tap:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 6px 14px rgba(240,193,75,0.22); }
+.ckmg-tap:disabled { opacity: 0.55; cursor: default; transform: none; }
 `;

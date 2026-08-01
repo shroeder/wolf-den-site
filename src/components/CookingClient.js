@@ -378,7 +378,7 @@ export default function CookingClient({ initial }) {
                 </div>
             </section>
 
-            {playing ? <CookingMinigame recipe={playing} onDone={finishCook} onCancel={() => setPlaying(null)} /> : null}
+            {playing ? <CookingMinigame recipe={playing} onDone={finishCook} /> : null}
 
             {result ? (
                 <div className="ck-scrim" role="dialog" onClick={() => setResult(null)}>
@@ -388,7 +388,6 @@ export default function CookingClient({ initial }) {
                         <div className="ck-reveal-name">{result.made.name}{result.portions > 1 ? ` ×${result.portions}` : ""}</div>
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
-                                <div className="ck-reveal-gold">🪙 {(result.goldPaid || 0).toLocaleString()} gold</div>
                                 {result.made.reward.rungs ? (
                                     <div className="ck-reveal-rung">Rung {result.made.reward.rung} of {result.made.reward.rungs}</div>
                                 ) : null}
@@ -566,7 +565,6 @@ const CK_CSS = `
 .ck-payout-ico { font-size: 1.05rem; }
 .ck-payout b { color: #ffd75e; }
 .ck-reveal-got { margin-top: 10px; }
-.ck-reveal-gold { font-size: 1.05rem; font-weight: 900; color: #ffd75e; margin-bottom: 8px; }
 .ck-reveal-prize { display: flex; align-items: center; gap: 11px; text-align: left; padding: 10px 12px; border-radius: 12px;
     background: rgba(255,255,255,0.05); border: 1px solid var(--rr, rgba(255,255,255,0.12)); }
 .ck-reveal-prize.is-rare { --rr: #7ec8ff; } .ck-reveal-prize.is-epic { --rr: #c9a2ff; }
