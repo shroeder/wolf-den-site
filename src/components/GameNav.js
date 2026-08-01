@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import FishingLaunch from "@/components/FishingLaunch";
+import AnnouncementModal from "@/components/AnnouncementModal";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
@@ -256,6 +257,9 @@ export default function GameNav() {
     return (
         <>
             {signedIn ? <ForgeAnnounce /> : null}
+            {/* Mounted on the NAV, not on a page, so a launch card reaches people wherever they resume — most
+                sessions do not start on the home screen. */}
+            {signedIn ? <AnnouncementModal /> : null}
             {signedIn ? <FishingLaunch /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">

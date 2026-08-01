@@ -95,7 +95,7 @@ export const TOWN_BUILDINGS = [
 // is the one place a new feature has to appear or nobody will find it — so the gate lives here rather than the
 // building being quietly absent from the list.
 export const GATED_BUILDINGS = [
-    { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86, gate: "owner" },
+    { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86 },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.

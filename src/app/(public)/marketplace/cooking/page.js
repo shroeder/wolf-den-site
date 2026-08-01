@@ -15,8 +15,8 @@ export default async function CookingPage() {
     if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/cooking");
 
     const state = await getKitchenState(buyer.id);
-    // Owner-gated while the design settles — same single gate the whole feature reads (COOK_UNLOCKED), so
-    // there's one place to open it up rather than a hunt through the routes and the town.
+    // The one gate the whole feature reads (COOK_UNLOCKED). Now open to every signed-in member; a signed-out
+    // visitor is bounced to the town rather than shown an empty kitchen.
     if (!state?.unlocked) redirect("/marketplace/town");
 
     return <CookingClient initial={state} />;

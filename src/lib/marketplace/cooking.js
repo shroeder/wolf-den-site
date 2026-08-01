@@ -55,9 +55,10 @@ async function petCookBonus(buyerId) {
 // The upgrade tracks are the same shape as the boat and the rail: four of them, five levels each, priced on a
 // square curve, each doing one legible thing.
 
-// STILL OWNER-GATED. Briefly opened and closed again — the recipe economy isn't settled, so nobody sees it yet.
-// Flipping this one line is the whole launch; the feature-daily flags below are the only other switch.
-export const COOK_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
+// OPEN TO EVERYONE. The recipe economy was re-measured and retuned (RECIPE_SOURCES below: ~1.9 recipes per
+// member per week, a full book in ~33 weeks, no single source above a quarter of drops), which was the thing
+// holding the launch. Any signed-in member can cook.
+export const COOK_UNLOCKED = (buyerId) => Boolean(buyerId);
 
 export const MAX_TRACK = 5;
 export const COOKS_PER_DAY = 5;

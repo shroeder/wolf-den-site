@@ -23,7 +23,8 @@ import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/market
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem, rollCheerProcs } from "@/lib/marketplace/signatures.js";
 import { grantFragment } from "@/lib/marketplace/sailing.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
+import { syncEarnedBadges, getBadgePassives } from "@/lib/marketplace/badges.js";
+import { grantBossTrophy } from "@/lib/marketplace/boss-trophy.js";
 import { broadcastBossDefeated, broadcastBoss } from "@/lib/marketplace/boss-broadcast.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { maybeGrantBossPet } from "@/lib/marketplace/pet-drops.js";
@@ -841,8 +842,16 @@ async function finalizeBossKill(bossId) {
         itemWinners.get(winner.id).push(item.name);
         if (drawPool.length) drawPool = drawPool.filter((p) => p.id !== winner.id);
     }
-    // Drop-only badge is still the #1 dealer's skill recognition.
-    const top1Badge = top1 ? await grantRandomDropBadge(top1.id).catch(() => null) : null;
+    // No badge here any more. Badges are earned by their own rule, granted for the event that matches them,
+    // or given by an admin — never rolled. The #1 dealer gets a TROPHY instead: a stone statue of the exact
+    // boss they topped, granted as a farm decoration, which is a record of THAT kill rather than a token.
+    const top1Badge = null;
+    const trophy = top1
+        ? await grantBossTrophy({
+            bossId, bossName: boss.name, imageUrl: boss.image_url || null,
+            winnerId: top1.id, damage: top1.dmg,
+        }).catch(() => null)
+        : null;
 
     // LOOT CHESTS — a CONSOLATION for the rest of the pack. Anyone who already won something (the raffle
     // prize, a boss pet, or a reward item) is EXCLUDED, and tiers are capped at Iron so a chest never

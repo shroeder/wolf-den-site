@@ -5,10 +5,13 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { DECORATIONS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
+import { trophyMap } from "@/lib/marketplace/boss-trophy.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
 import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
 
 const isCustom = (id) => String(id).startsWith("custom:");
+// Boss trophies are decorations too — `trophy:<bossEventId>`, granted to whoever topped the damage board.
+const isTrophy = (id) => String(id).startsWith("trophy:");
 const CUSTOM_COLOR = "#c9a2ff";
 
 const hexToRgb = (hex) => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || ""); return m ? `${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)}` : null; };
@@ -112,10 +115,24 @@ export async function decoState(buyerId) {
         listFinalCustomDecos(buyerId),
     ]);
     const customState = await getCustomState(buyerId).catch(() => ({ credits: 0, draft: null }));
+    // Trophy rows for anything the member owns or has placed, so a statue can name and draw itself.
+    const trophies = await trophyMap([
+        ...(ownedRows || []).map((r) => r.deco_id),
+        ...(placeRows || []).map((p) => p.deco_id),
+    ]).catch(() => new Map());
     const placedCount = {};
     for (const p of placeRows || []) placedCount[p.deco_id] = (placedCount[p.deco_id] || 0) + 1;
     // Build owned entries — catalog decorations AND player-made customs (custom:<id>).
     const ownedEntry = (decoId, placed) => {
+        const tr = trophies.get(decoId);
+        if (tr) {
+            return {
+                id: decoId, name: `${tr.boss_name} — Trophy`, emoji: "🏆", rarity: "trophy", rarityColor: "#ffd75e",
+                spriteUrl: sprites[decoId] || tr.url || null, owned: true, placed, buff: null,
+                buffText: `Top damage on ${tr.boss_name}${tr.damage ? ` — ${Number(tr.damage).toLocaleString()} damage` : ""}`,
+                custom: true, trophy: true,
+            };
+        }
         const cm = customMap.get(decoId);
         if (cm) return { id: decoId, name: cm.name, emoji: "🎨", rarity: "custom", rarityColor: CUSTOM_COLOR, spriteUrl: sprites[decoId] || cm.url || null, owned: true, placed, buff: null, buffText: null, custom: true };
         const def = decorationById(decoId);
