@@ -71,7 +71,7 @@ export const PET_PERKS = {
     serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Graze", key: "farm_speed" }, bat: { name: "Echolocate", key: "crit_chance" },
     scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Shallows Sense", key: "angler_bite" },
     eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Pouncing Roar", key: "first_hit" }, gorilla: { name: "Plaza Bruiser", key: "town_rally" },
-    croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "execute" },
+    croc: { name: "River Plunder", key: "sea_plunder" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "execute" },
     unicorn: { name: "Wish Granted", key: "fortune" }, dragon_whelp: { name: "Ember Burst", key: "erupt" }, pegasus: { name: "Tailwind", key: "xp_gain" },
     baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Leviathan Wake", key: "angler_size" }, chameleon: { name: "Prismatic Hex", key: "crit_power" },
     elder_dragon: { name: "Cataclysm", key: "execute" },
@@ -109,6 +109,36 @@ export const PET_PERKS = {
 };
 
 // The scaled value for a perk mechanic at a rarity. Proc perks return an object.
+// ── CAPS ──────────────────────────────────────────────────────────────────────────────────────────────────
+// PET_ACTIVE_BY_RARITY runs 3 (common) to 30 (eternal), and the Lv5 active multiplier is x3 — so an eternal
+// pet at Lv5 lands on NINETY before any consumer sees it. Uncapped that reads as "90% chance an enhance costs
+// no parts", "90% chance a cook consumes nothing", "90% of chests promote a rarity". Each of those breaks the
+// system it points at.
+//
+// Two of the fifteen happened to be capped because a Math.min got written at the call site. That's not a
+// policy, it's luck, and it's the wrong place for it — a cap belongs where the value is produced, once, where
+// you can read them all together and see the shape.
+//
+// Numbers chosen so a maxed top-rarity companion is clearly the best in its niche without removing the system:
+// a 30% double-harvest is a great pet, a 90% one means you stop noticing harvests.
+export const SYSTEM_PERK_CAP = {
+    farm_yield: 30,     // double-harvest chance
+    farm_speed: 25,     // crop grow-time reduction
+    farm_seed: 25,      // bonus seed on harvest
+    angler_bite: 25,    // tilt toward rarer fish
+    angler_size: 20,    // measured length
+    sea_dredge: 20,     // treasure instead of a fish
+    sea_plunder: 35,    // raid + sea-merchant gold
+    kitchen_heat: 25,   // tier bump
+    kitchen_larder: 25, // free ingredients
+    recipe_nose: 40,    // multiplies drop odds that are already small
+    forge_spark: 20,    // free enhance — the most abusable, so the tightest
+    forge_salvage: 30,  // double parts
+    town_haggle: 30,    // merchant discount
+    town_rally: 40,     // town-raid damage
+    chest_luck: 20,     // rarity promotion
+};
+
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
@@ -118,6 +148,17 @@ export function petPerkValue(rarity, key) {
     if (key === "onslaught") return ONSLAUGHT_BY_RARITY[rarity] || 0.3;
     if (key === "first_blood") return FIRSTBLOOD_BY_RARITY[rarity] || 0.3;
     return PET_ACTIVE_BY_RARITY[rarity] || 3;
+}
+
+/**
+ * The value a consumer should actually use — capped, and after the pet's level multiplier.
+ *
+ * Consumers must go through combinePetBonuses/getPetSystemPerk rather than reading raw values, so the cap can
+ * never be skipped by a call site that forgot about it.
+ */
+export function capSystemPerk(key, value) {
+    const cap = SYSTEM_PERK_CAP[key];
+    return cap == null ? value : Math.min(cap, value);
 }
 
 function perkDesc(key, v, level = 1) {
@@ -167,7 +208,9 @@ function perkDesc(key, v, level = 1) {
 // The full equipped perk for a pet: name + mechanic + scaled value + human description.
 export function petPerk(pet) {
     const def = PET_PERKS[pet.id] || { name: "Companion", key: pet.activeStat || "fortune" };
-    const value = petPerkValue(pet.rarity, def.key);
+    // Capped here as well as in combinePetBonuses: a card that advertises 90% while the game pays 30% is a
+    // worse bug than the uncapped value, because it looks deliberate.
+    const value = capSystemPerk(def.key, petPerkValue(pet.rarity, def.key));
     const meta = PERK_META[def.key] || { icon: "🐾" };
     const desc = perkDesc(def.key, value, pet.level || 1) + (def.note ? `. ${def.note}` : "");
     return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
@@ -245,7 +288,7 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             const eqLevel = Math.max(1, Number(levelByPet[equippedPet.id]) || 1);
             proc.extraStrikeChance = Math.min(1, 0.2 + 0.2 * (eqLevel - 1));
         }
-        else if (SYSTEM_PERK_KEYS.has(def.key)) system[def.key] = v * aMult;
+        else if (SYSTEM_PERK_KEYS.has(def.key)) system[def.key] = capSystemPerk(def.key, v * aMult);
         else add(def.key, v * aMult);
     }
     return { stats, economy, proc, system };

@@ -1414,7 +1414,14 @@ export async function doRaid(buyerId, targetId = null) {
 
     let goldDelta = 0, itemWon = null;
     if (sim.win) {
-        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + Dread Corsair double
+        // A plundering companion adds to the Bounty affinity rather than replacing it — the pet card says
+        // "+N% gold from raids and the sea merchant" and this is the raid half of that promise.
+        let plunder = 0;
+        try {
+            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+            plunder = await getPetSystemPerk(buyerId, "sea_plunder");
+        } catch { /* no companion, no plunder */ }
+        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + companion + Dread Corsair double
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
         if (Math.random() < Math.min(0.05, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 5%)
             // Copy one of THEIR items — but never a BOUND piece (ascendant+ can't be copied/traded).

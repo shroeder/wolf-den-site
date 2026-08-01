@@ -320,7 +320,16 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Town Greenhouse (community project) speeds growth for EVERY member's farm, on top of all personal buffs.
     const townB = await getTownBonuses(Date.now()).catch(() => ({}));
     const townGrow = Math.max(0.4, 1 - (townB?.farmGrowPct || 0) / 100);
-    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow * townGrow);
+    // A farm companion's speed perk shortens the grow time — applied at PLANT, because ready_at is fixed when
+    // the seed goes in. Swapping pets mid-crop therefore doesn't retroactively change a growing plant, which is
+    // both easier to reason about and what the pet card implies ("your crops finish sooner").
+    let petGrow = 1;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const sp = await getPetSystemPerk(buyerId, "farm_speed");
+        if (sp > 0) petGrow = 1 - Math.min(0.25, sp / 100);
+    } catch { /* no companion, no speed-up */ }
+    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow * townGrow * petGrow);
     const row = await db.queryOne(
         `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
          VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)
