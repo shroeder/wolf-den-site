@@ -5,6 +5,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import CookingMinigame from "@/components/CookingMinigame";
 
+// ── Permanent credit: the Kitchen was aannw's idea — cook the things you grow and catch instead of just
+// selling them. Her actual AI hero sprite is enshrined beside the kettle as a small medallion; tapping it
+// tells the story. Hard-coded to the sprite blob on purpose, exactly like the Forge's tribute to Alstier1: a
+// fixed dedication should not change or break if the account or its avatar later does.
+const FOUNDER = {
+    name: "aannw",
+    sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/art/mkt_buyer/1785396661309-480247-bgglm4dqeqalWevOldEeiNBuNtjiOy.webp",
+};
+
 // ── THE KITCHEN ──────────────────────────────────────────────────────────────────────────────────────────────
 // Pantry, recipes, upgrades. Everything shows a SPRITE — raw ingredients reuse the crop and fish art the game
 // already owns, dishes and prepped ingredients have their own. The emoji field is carried only as a fallback if
@@ -28,6 +37,7 @@ function Art({ sprite, emoji, size = 34, alt = "" }) {
 
 export default function CookingClient({ initial }) {
     const [state, setState] = useState(initial);
+    const [showFounder, setShowFounder] = useState(false); // the aannw credit medallion
     const [busy, setBusy] = useState(false);
     const [playing, setPlaying] = useState(null);   // the recipe whose minigame is up
     const [result, setResult] = useState(null);
@@ -128,8 +138,26 @@ export default function CookingClient({ initial }) {
                         <h1 className="ck-title">The Kitchen</h1>
                         <p className="ck-sub">Cook what you farm and what you land.</p>
                     </div>
+                    {/* Founder's medallion — aannw's hero sprite, permanently enshrined for dreaming up the Kitchen. */}
+                    <button type="button" className="ck-founder" onClick={() => setShowFounder(true)} title={`Cooked up by ${FOUNDER.name}`} aria-label={`About the Kitchen — an idea by ${FOUNDER.name}`}>
+                        {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span aria-hidden="true">🍳</span>}
+                    </button>
                     <Link href="/marketplace/town" className="ck-back" aria-label="Back to Town">←</Link>
                 </div>
+
+                {showFounder ? (
+                    <div className="ck-founder-scrim" role="dialog" aria-modal="true" onClick={() => setShowFounder(false)}>
+                        <div className="ck-founder-card" onClick={(e) => e.stopPropagation()}>
+                            <div className="ck-founder-hero">
+                                {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span style={{ fontSize: 44 }} aria-hidden="true">🍳</span>}
+                            </div>
+                            <div className="ck-founder-kicker">🍳 Founder&apos;s Tribute</div>
+                            <h3 className="ck-founder-name">{FOUNDER.name}</h3>
+                            <p className="ck-founder-body">The Kitchen was <b>{FOUNDER.name}&apos;s</b> idea. She asked why everything you grow and everything you land just gets sold — and said there should be somewhere to actually cook it. So here it is. Her hero is enshrined beside the kettle as thanks. Every dish in the Den traces back to her.</p>
+                            <button type="button" className="ck-founder-close" onClick={() => setShowFounder(false)}>Back to the kettle</button>
+                        </div>
+                    </div>
+                ) : null}
 
                 {/* THE KETTLE. Upgrading anything eventually changes the pot you're looking at, which is a far
                     better reward than a number moving in a list. It bubbles constantly and gives itself a shake
@@ -431,6 +459,30 @@ const CK_CSS = `
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #cfd6dd;
     text-decoration: none; font-size: 1rem; font-weight: 800; }
 .ck-back:hover { background: rgba(255,255,255,0.11); }
+/* ── Founder's medallion (aannw) — a small hero circle beside the back arrow, mirroring the Forge's tribute
+   to Alstier1 but in the kitchen's warm copper rather than the hearth's ember orange. ── */
+.ck-founder { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; padding: 0; cursor: pointer; overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, #2a1c12, #0d0805); border: 2px solid rgba(224,158,80,0.4);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.6);
+    display: grid; place-items: center; transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s, border-color .18s; }
+.ck-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+.ck-founder span { font-size: 19px; }
+.ck-founder:hover, .ck-founder:focus-visible { transform: scale(1.12) rotate(-3deg); border-color: rgba(255,200,120,0.75); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 16px rgba(230,170,90,0.5); outline: none; }
+.ck-founder-scrim { position: fixed; inset: 0; z-index: 240; display: grid; place-items: center; padding: 20px; background: rgba(8,5,3,0.72); backdrop-filter: blur(3px); animation: ckFounderFade .2s ease both; }
+.ck-founder-card { position: relative; max-width: 340px; width: 100%; text-align: center; padding: 22px 22px 18px; border-radius: 18px;
+    background: linear-gradient(180deg, #2c1e12, #170f08); border: 1px solid rgba(224,158,80,0.45); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(224,150,70,0.26);
+    animation: ckFounderPop .32s cubic-bezier(.2,1.4,.35,1) both; }
+.ck-founder-hero { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 28%, #261a10, #0c0704); border: 3px solid rgba(230,175,95,0.45); box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 14px rgba(0,0,0,0.6); }
+.ck-founder-hero img { width: 108%; height: 108%; object-fit: contain; object-position: center 6%; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+.ck-founder-kicker { font-size: 10.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #e9b981; }
+.ck-founder-name { margin: 3px 0 8px; font-size: 1.35rem; font-weight: 900; color: #ffe4bd; text-shadow: 0 2px 8px rgba(224,140,50,0.45); }
+.ck-founder-body { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #eddcc6; }
+.ck-founder-body b { color: #ffd39a; }
+.ck-founder-close { width: 100%; padding: 10px; border-radius: 11px; border: none; cursor: pointer; font-weight: 900; font-size: 13px; color: #2a1a05; background: linear-gradient(180deg, #ffd89a, #e8a24a); box-shadow: 0 3px 0 #a86a24; }
+.ck-founder-close:active { transform: translateY(2px); box-shadow: 0 1px 0 #a86a24; }
+@keyframes ckFounderFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ckFounderPop { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
 /* THE KETTLE ────────────────────────────────────────────────────────────────────────────────────────────── */
 .ck-kettle-wrap { display: flex; flex-direction: column; align-items: center; margin: 10px 0 2px; }
