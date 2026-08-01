@@ -118,6 +118,10 @@
         {
             "path": "/api/jobs/cash-refunds",
             "schedule": "20 */4 * * *"
+        },
+        {
+            "path": "/api/jobs/prune-app-releases",
+            "schedule": "20 8 * * *"
         }
     ]
 }
