@@ -97,8 +97,14 @@ export const PET_STAT_META = {
     gold_find: { label: "Gold Find", icon: "💰", desc: "More gold from everything you earn (boss, spins, sales)." },
     // FARM passives (pastoral pets) — these help your FARM, not the boss. Equip the pet to apply its farm bonus.
     seedLuck: { label: "Seed Luck", icon: "🍀", desc: "Better chance to find and keep seeds while you farm." },
-    growSpeed: { label: "Grow Speed", icon: "🌱", desc: "Your crops grow faster while this pet is equipped." },
+    growSpeed: { label: "Grow Speed", icon: "🌱", desc: "Your crops grow faster." },
     petXp: { label: "Pet Bond", icon: "🐾", desc: "Your pets earn more XP when you tend them on the farm." },
+    // FISHING + SAILING passives. These were added without a PET_STAT_META entry, so the pet card fell back to
+    // rendering the raw key with a generic blurb — "+2 angling · Stacks across your whole menagerie", which is
+    // exactly the unreadable shape the explicit-description standard exists to prevent.
+    angling: { label: "Angling", icon: "🎣", desc: "Better odds a cast hooks a rarer fish." },
+    reelStrength: { label: "Reel Strength", icon: "💪", desc: "Every fish you land comes in bigger." },
+    seafaring: { label: "Seafaring", icon: "⚓", desc: "Extra digs on every voyage." },
     // FORGE passives (forge pets) — these improve your smithing odds at The Forge, not the boss.
     efficient: { label: "Efficient Salvage", icon: "🛠️", desc: "Better odds of DOUBLE parts when you salvage at the Forge." },
     hot_hands: { label: "Hot Hands", icon: "🔥", desc: "Better odds a dish comes out a whole tier better." },

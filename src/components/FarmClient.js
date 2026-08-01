@@ -42,14 +42,19 @@ const ownedBonusParts = (p, level = 1, maxed = false) => {
     if (p.stat === "fortune") return { icon: "🍀", name: `+${fmtVal(v * TICKETS_PER_FORTUNE_PER_DAY)} tickets / day`, desc: `Boss-raffle tickets, banked all week. ${growth} Every pet you own stacks.` };
 
     const m = PET_STAT_META[p.stat] || { label: p.stat, icon: "✨", desc: "Stacks across your whole menagerie" };
-    const isFarm = ["seedLuck", "growSpeed", "petXp"].includes(p.stat);
+    const isFarm = ["seedLuck", "growSpeed", "petXp", "angling", "reelStrength"].includes(p.stat); // percentage stats — seafaring is a COUNT, so it takes no % suffix
     // Say what the number DOES, not just what it's called. "+2% Pet Bond" tells you nothing on its own.
     const plain = {
         petXp: `Every pet you tend earns ${fmtVal(v)}% more XP, so your whole menagerie levels faster.`,
         seedLuck: `${fmtVal(v)}% better odds of finding a seed from harvests, petting and the other games.`,
         growSpeed: `Crops finish ${fmtVal(v)}% sooner.`,
+        angling: `${fmtVal(v)}% better odds a cast hooks a rarer fish than it should have.`,
+        reelStrength: `Every fish you land measures ${fmtVal(v)}% longer.`,
+        seafaring: `+${fmtVal(v)} extra digs on every voyage.`,
     }[p.stat] || m.desc;
-    const scope = isFarm ? "Active while this pet is equipped." : "Stacks across every pet you own.";
+    // The farm stats used to be read ONLY from the equipped pet, so this said "while equipped". They stack
+    // across the whole menagerie now, and the line was quietly telling members the opposite.
+    const scope = "Stacks across every pet you own.";
     return { icon: m.icon, name: `+${fmtVal(v)}${isFarm ? "%" : ""} ${m.label}`, desc: `${plain} ${growth} ${scope}` };
 };
 
