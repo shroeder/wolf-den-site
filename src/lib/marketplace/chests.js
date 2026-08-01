@@ -166,10 +166,19 @@ export async function openChest(buyerId, tier) {
     // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
     // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
     try { const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js"); await dropSeedFrom(buyerId, ["wooden", "iron", "gold"].includes(tier) ? `chest_${tier}` : "chest_gold"); } catch { /* best-effort */ }
+    // Chests drop recipes, banded by tier: a wooden chest can never produce a Legendary one however many you
+    // open, and the top band is reachable only from mythic and above. Deferred import — chests.js is pulled in
+    // by cooking.js, and a static edge back would be a cycle.
+    let recipeFound = null;
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        const band = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : tier === "gold" ? "chest_gold" : "chest_high";
+        recipeFound = await tryRecipeDrop(buyerId, band);
+    } catch { /* best-effort */ }
 
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
-    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
+    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop, recipe: recipeFound || undefined };
 
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.
@@ -178,7 +187,7 @@ export async function openChest(buyerId, tier) {
         const cid = Math.random() < 0.12 ? "forge_enchant_scroll" : "forge_power_scroll";
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc }, recipe: recipeFound || undefined };
     }
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
@@ -187,7 +196,7 @@ export async function openChest(buyerId, tier) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc }, recipe: recipeFound || undefined };
     }
 
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -204,10 +213,10 @@ export async function openChest(buyerId, tier) {
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         await grantItem(buyerId, item.id, isEliteRarity ? "elite" : "chest");
-        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
+        return { ok: true, remaining: dec.count, recipe: recipeFound || undefined, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
     const gold = DUST[rarity] || 25;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
-    return { ok: true, remaining: dec.count, gold, rarity };
+    return { ok: true, remaining: dec.count, gold, rarity, recipe: recipeFound || undefined };
 }

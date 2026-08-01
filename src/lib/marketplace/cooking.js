@@ -112,7 +112,7 @@ export const TIERS = [
     {
         tier: 3, name: "Fine", color: "#c9a2ff",
         rewards: [
-            { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 2, max: 3 },
+            { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 1, max: 2 },
             { kind: "gold", min: 240, max: 400 },
             { kind: "parts", partTier: 3, min: 2, max: 4 },
             { kind: "consumable", id: "treat_toy" },
@@ -124,7 +124,10 @@ export const TIERS = [
     {
         tier: 4, name: "Exquisite", color: "#ffd75e",
         rewards: [
-            { kind: "seed", pool: ["starfruit"], min: 2, max: 3 },
+            // ONE, and only as the consolation rung. Seeds sit at index 0 of every ladder, so this is what a BAD
+            // cook pays out — handing over 2-3 mythic seeds for a fumbled run undercut the farm's whole
+            // rarity curve, which is the one place starfruit is supposed to be hard to come by.
+            { kind: "seed", pool: ["starfruit"], min: 1, max: 1 },
             { kind: "gold", min: 420, max: 680 },
             { kind: "parts", partTier: 4, min: 2, max: 3 },
             { kind: "consumable", id: "treat_feast" },
@@ -323,15 +326,58 @@ export const recipeById = (id) => RECIPES.find((r) => r.id === id) || null;
 // Where a recipe can drop from. Weighted by tier so the good ones stay rare.
 const DROP_WEIGHT = { 1: 40, 2: 28, 3: 18, 4: 10, 5: 4 };
 
-/** Roll a recipe the member doesn't know yet. Returns the recipe, or null when they know them all. */
-export function rollRecipe(known = []) {
+// ── WHERE RECIPES COME FROM ──────────────────────────────────────────────────────────────────────────────────
+//
+// They used to come from exactly ONE place: a 4% roll on a farm harvest. Everything else in the game — chests,
+// digs, the boss, raids, the sea, the forge — dropped nothing, which made the whole recipe book a farming
+// reward and left the top tiers reachable by grinding one screen.
+//
+// Each source now declares the BAND it can drop from. A wooden chest can't cough up a Legendary recipe no
+// matter how many you open; the top tiers only come out of things you can't farm on demand — a boss kill, an
+// ascendant chest, a deep dig, a raid win. That's what makes owning one mean something.
+export const RECIPE_SOURCES = {
+    harvest:      { min: 1, max: 2, chance: 0.040 }, // the field: the common stuff, often
+    fish:         { min: 1, max: 2, chance: 0.030 }, // the same, at sea
+    chest_wooden: { min: 1, max: 2, chance: 0.060 },
+    chest_iron:   { min: 2, max: 3, chance: 0.080 },
+    chest_gold:   { min: 2, max: 3, chance: 0.110 },
+    chest_high:   { min: 3, max: 5, chance: 0.180 }, // mythic and above
+    dig:          { min: 2, max: 3, chance: 0.035 },
+    dig_deep:     { min: 3, max: 4, chance: 0.090 }, // a tool proc, not an ordinary dig
+    raid_win:     { min: 3, max: 4, chance: 0.070 },
+    boss_kill:    { min: 4, max: 5, chance: 0.350 }, // weekly, shared, and the main route to the top tiers
+    forge:        { min: 2, max: 4, chance: 0.030 },
+    town_merchant:{ min: 3, max: 4, chance: 0.120 },
+};
+
+/**
+ * Roll a recipe the member doesn't know yet, optionally restricted to a tier band.
+ *
+ * Falls back to the full pool when the band is exhausted — once you know every Legendary recipe a boss kill
+ * should still give you something rather than silently nothing.
+ */
+export function rollRecipe(known = [], { min = 1, max = 5 } = {}) {
     const have = new Set(known);
-    const pool = RECIPES.filter((r) => !have.has(r.id));
-    if (!pool.length) return null;
+    const all = RECIPES.filter((r) => !have.has(r.id));
+    if (!all.length) return null;
+    const banded = all.filter((r) => r.tier >= min && r.tier <= max);
+    const pool = banded.length ? banded : all;
     const total = pool.reduce((s, r) => s + (DROP_WEIGHT[r.tier] || 1), 0);
     let n = Math.random() * total;
     for (const r of pool) { n -= DROP_WEIGHT[r.tier] || 1; if (n <= 0) return r; }
     return pool[pool.length - 1];
+}
+
+/**
+ * Try to drop a recipe from a named source. Rolls the source's own chance, then its tier band.
+ *
+ * One call for every system, so adding a drop point is a line rather than a copy of the odds.
+ */
+export async function tryRecipeDrop(buyerId, source) {
+    const def = RECIPE_SOURCES[source];
+    if (!buyerId || !def) return null;
+    if (Math.random() >= def.chance) return null;
+    return learnRecipe(buyerId, null, { min: def.min, max: def.max });
 }
 
 // ── INGREDIENTS ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -375,11 +421,11 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
 }
 
 /** Teach a recipe. Returns the recipe when it was NEW to them, else null — so callers can announce it. */
-export async function learnRecipe(buyerId, recipeId = null) {
+export async function learnRecipe(buyerId, recipeId = null, band = undefined) {
     if (!buyerId) return null;
     const knownRows = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const known = knownRows.map((r) => r.recipe_id);
-    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known);
+    const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, band);
     if (!rec || known.includes(rec.id)) return null;
     const ins = await db.queryOne(
         `INSERT INTO mkt_recipe_known (buyer_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING recipe_id`,

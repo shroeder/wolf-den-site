@@ -600,8 +600,11 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     //
     // Lazy import, and it must stay lazy: cooking.js imports FISH from this file, so importing it back
     // statically is a cycle, and an ESM cycle yields `undefined` at call time instead of failing the build.
-    const { addToPantry } = await import("@/lib/marketplace/cooking.js");
+    const { addToPantry, tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
     await addToPantry(buyerId, "fish", species.id, 1).catch(() => {});
+    // The sea drops recipes too. It carried the pantry hook but never a recipe roll, so every recipe in the
+    // game came from one 4% chance on a farm harvest.
+    const recipeFound = await tryRecipeDrop(buyerId, "fish").catch(() => null);
 
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
     await awardXp(buyerId, "sail_fish", { points: xp, gold }).catch(() => {});
@@ -612,6 +615,8 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const kind = rollFishBonus(species.rarity);
     const got = await grantHaul(buyerId, kind, species.rarity).catch(() => null);
     if (got) extras.push(got);
+    // Surfaced in the same haul strip as everything else — a recipe you were never told about is no reward.
+    if (recipeFound) extras.push({ kind: "recipe", label: `📜 Recipe learned — ${recipeFound.name}`, recipe: recipeFound.id });
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
     await checkFishingBadges(buyerId).catch(() => {});

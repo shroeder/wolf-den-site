@@ -365,10 +365,12 @@ export async function harvestPlot(buyerId, slot) {
     // rather than failing at import, which is how it took down the Kitchen page and the town's Kitchen door
     // instead of failing the build. Same trap as stockade-penalty.js; the fix there was a leaf module, here a
     // deferred import is the smaller change.
-    const { addToPantry, learnRecipe } = await import("@/lib/marketplace/cooking.js");
+    const { addToPantry, tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
     await addToPantry(buyerId, "crop", claimed.seed_id, doubled ? 2 : 1).catch(() => {});
     // Recipes are found, not listed, and the field is one of the places they turn up.
-    const recipeFound = Math.random() < HARVEST_RECIPE_CHANCE ? await learnRecipe(buyerId).catch(() => null) : null;
+    // The field only ever yields the everyday recipes now — the top tiers come from things you cannot
+    // farm on demand. See RECIPE_SOURCES.
+    const recipeFound = await tryRecipeDrop(buyerId, "harvest").catch(() => null);
     // Harvest is a huge XP minter, so the PLAYER only banks a fraction of the crop's XP (tuned down). The full
     // crop XP still feeds the PET below — the farm stays a pet-XP engine, it just doesn't flood player levels.
     const harvestPlayerXp = Math.round(xp * HARVEST_PLAYER_XP_MULT);
