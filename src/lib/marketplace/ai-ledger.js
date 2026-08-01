@@ -95,6 +95,8 @@ export const sourceLabel = (s) => SOURCE_LABELS[s] || SOURCE_LABELS[String(s || 
  *   cron     — a scheduled backfill job drew it unattended
  *   admin    — someone hit a Generate button in the admin app
  */
+// EVERY attempt is a row, kept or thrown away. The bill doesn't care whether we liked the sprite, and a ledger
+// that only counts the ones we shipped shows roughly half the real spend — which is exactly what it was doing.
 export async function logGeneration({
     model = "gpt-image-1", size, quality, edit = false,
     source, label, subject, prompt, url, bytes,
@@ -108,7 +110,7 @@ export async function logGeneration({
                 (model, size, quality, edit, source, label, subject, prompt, url, bytes,
                  origin, batch_id, batch_label, buyer_id, buyer_label, ok, error, cost_usd, cost_basis)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-             ON CONFLICT (url) DO NOTHING`,
+             ON CONFLICT (url) WHERE url IS NOT NULL DO NOTHING`,
             [model, size || null, quality || null, Boolean(edit), source || null, label || null, subject || null,
                 (prompt || "").slice(0, 4000) || null, url || null, bytes ?? null,
                 origin, batchId || null, batchLabel || null, buyerId || null, buyerLabel || null,

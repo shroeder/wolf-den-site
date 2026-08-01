@@ -83,7 +83,10 @@ const DUEL_FODDER_ELITE_BONUS = 0.16; // + this much when the foe was an elite/c
 // The ceiling that actually binds: total duel spoils ONE fighter can take from ONE raid. Past this, foes still
 // die and still count for damage, badges and quests — there's just no more loot to farm out of a treadmill.
 const DUEL_GOLD_BUDGET = 600;
-const DUEL_XP_BUDGET = 700;
+// Was 700/day. Duels were the single biggest XP source in the game (567 of them in a week) and they're
+// grindable on one screen, so the daily ceiling comes down rather than the per-duel payout — a member who
+// duels a lot still gets the fun, just not the levels.
+const DUEL_XP_BUDGET = 450;
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep

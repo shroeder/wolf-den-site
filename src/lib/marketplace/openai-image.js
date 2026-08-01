@@ -281,7 +281,9 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
 }
 
 // Opaque landscape scene (no transparency) — used for boss battle backgrounds. Returns the Blob URL.
-export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", quality = "medium", meta = {} } = {}) {
+// Scenes are full-screen backdrops generated a handful of times a year. Cost control here saves pennies and
+// costs the one thing you actually look at, so the default is HIGH and callers have to opt down deliberately.
+export async function generateSceneImage(prompt, { pathPrefix = "marketplace/boss-bg", quality = "high", meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -418,6 +420,11 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     form.append("prompt", prompt);
     form.append("size", size);
     form.append("quality", quality);
+    // The edits endpoint does NOT inherit the source image's alpha. Without this every edited sprite comes back
+    // on an opaque plate — which is what happened to the first evolved-pet run, where Lv4 and Lv5 arrived with
+    // full painted backdrops while Lv1-3 were clean cutouts.
+    form.append("background", "transparent");
+    form.append("output_format", "png");
     form.append("background", "transparent");
     form.append("n", "1");
 

@@ -4,6 +4,7 @@
 // screen rather than only a number in a list. That's the whole point — an upgrade you can see beats an upgrade
 // you have to read.
 import fs from "node:fs";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
 import sharp from "sharp";

@@ -7,6 +7,7 @@
 //
 // Usage: node scripts/gen-cooking-sprites.mjs [ref1 ref2 …]   (no args = everything still missing art)
 import fs from "node:fs";
+import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 import { neon } from "@neondatabase/serverless";
 import { put } from "@vercel/blob";
 import sharp from "sharp";

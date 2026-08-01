@@ -62,10 +62,10 @@ async function record(row) {
             `INSERT INTO mkt_ai_generation
                 (kind, model, size, quality, source, label, subject, prompt, origin, batch_id, batch_label,
                  ok, error, tokens_in, tokens_out, cost_usd, cost_basis)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'batch',$9,$10,$11,$12,$13,$14,$15,'measured')`,
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'batch',$9,$10,$11,$12,$13,$14,$15,$16)`,
             [row.kind, row.model, row.size || null, row.quality || null, row.source, row.label || null,
                 row.subject || null, (row.prompt || "").slice(0, 4000) || null, batchId, scriptName,
-                row.ok, row.error || null, row.tokensIn ?? null, row.tokensOut ?? null, row.cost],
+                row.ok, row.error || null, row.tokensIn ?? null, row.tokensOut ?? null, row.cost, row.basis || 'measured'],
         );
     } catch { /* bookkeeping must never break a generator */ }
 }
@@ -90,8 +90,14 @@ globalThis.fetch = async function tracedFetch(input, init) {
                 size: body?.size, quality: body?.quality, source: `script/${scriptName}`,
                 label: `${scriptName} (failed)`, prompt: body?.prompt,
                 ok: false, error: text.slice(0, 300),
-                // A refusal still bills input; recording it as free would understate the run.
-                cost: 0,
+                // A refusal still BILLS. Recording it as free was the lie: the ledger showed a clean run and
+                // the invoice showed the attempts. An image refusal is charged input-only, which is roughly a
+                // low-quality render of the same size — that's the honest floor, and it is marked `estimated`
+                // rather than dressed up as measured.
+                cost: isImage
+                    ? Math.round(((IMG_TOKENS[body?.size || "1024x1024"] || IMG_TOKENS["1024x1024"]).low) * (40 / 1e6) * 1e5) / 1e5
+                    : 0,
+                basis: "estimated",
             });
             return res;
         }

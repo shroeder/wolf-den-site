@@ -110,7 +110,10 @@ export function upgradeEffect(key, level) {
     const max = FARM_UPGRADES[key]?.max || 0;
     return { label: labels[key] || FARM_UPGRADES[key]?.name || key, now: at(Math.min(max, level)), next: at(Math.min(max, level + 1)) };
 }
-const HARVEST_PLAYER_XP_MULT = 0.4; // player banks 40% of a crop's XP (the full value still feeds your pet)
+// Player banks a fraction of a crop's XP; the FULL value still feeds the pet, so the farm stays a pet-XP
+// engine. Trimmed 0.4 -> 0.28: 954 harvests a week made this the fourth-biggest XP source in the game, and
+// the farm is meant to level your companion, not you.
+const HARVEST_PLAYER_XP_MULT = 0.28;
 const FERTILIZER_PRICE = 350; // gold per fertilizer
 const FERTILIZER_CUT = 0.4; // fertilizer removes 40% of the REMAINING grow time
 const RAIN_CUT = 0.3; // logging in during rain removes 30% of remaining time (once per plot per 6h)

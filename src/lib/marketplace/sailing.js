@@ -111,7 +111,9 @@ const windRechargeCost = (n = 0) => WIND_RECHARGE_COST * Math.pow(2, Math.max(0,
 // ── Waves ── greet a passing member a few times a day for a little XP/coins + a small travel cut.
 const WAVES_PER_DAY = 3;               // base daily waves; LUCK adds more (see wavesPerDay)
 const WAVE_LUCK_PER = 4;               // Luck: +1 wave every this many Luck levels (max Luck 20 → +5 waves)
-const WAVE_XP = 25;
+// Waving at a passing sailor is a courtesy, not an accomplishment — 261 waves a week at 25 XP was quietly a
+// top-eight XP source for an action with no cost and no risk.
+const WAVE_XP = 12;
 const WAVE_COINS = 10;
 const WAVE_SHAVE_MS = 2 * 60 * 1000; // 2 minutes off the remaining voyage
 // Luck (find_level) is now a WAVES stat: more greetings per day, not a digging aid.

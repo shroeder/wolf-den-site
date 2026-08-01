@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { COLLECTIBLES, collectibleById } from "@/lib/marketplace/collectibles.js";
-import { faceBufferRight, generateImage, storePng, detectFacing } from "@/lib/marketplace/openai-image.js";
+import { faceBufferRight, generateImage, editImage, storePng, detectFacing } from "@/lib/marketplace/openai-image.js";
 
 // Each pet gets ONE shared 2D battle sprite (not per-member) so the member's active pet can fight beside
 // them in the boss scene. Same art universe as the member/boss sprites (transparent, full-body).
@@ -17,21 +17,63 @@ export function buildPetSpritePrompt(pet) {
     return housePrompt(`${pet.spritePrompt} — a loyal battle companion.`, { extra: POSE });
 }
 
-// Per-LEVEL evolution flavor (Lv1 = the plain base prompt above). Each tier tells the model to make the SAME
-// creature look progressively more powerful/awesome, so a member watches their pet visibly evolve 1→5.
+// Per-LEVEL evolution (Lv1 = the plain base prompt above). Each tier makes the SAME creature read as more
+// powerful, so a member watches their companion visibly evolve 1→5.
+//
+// ── WHY THESE WERE REWRITTEN ─────────────────────────────────────────────────────────────────────────────
+// The Lv1 sprite was consistently the strongest and most on-style, Lv2 often came back WEAKER than the base,
+// and the creature's identity drifted from there. Three causes, all in the prompt:
+//
+//   1. Every level was generated INDEPENDENTLY from the same text description. Five independent readings of
+//      "a fluffy grey wolf pup" produce five different wolf pups, not one wolf pup at five ages. Nothing
+//      carried the actual look forward. Fixed structurally below by anchoring levels to the Lv1 IMAGE.
+//   2. Lv2's instruction was "a faint magical aura and a more confident stance" — so weak it gave the model
+//      nothing to hold on to, and a vague instruction is an invitation to reinterpret the whole subject.
+//      Every rung now names a CONCRETE, additive change.
+//   3. The escalation was entirely VFX — aura, runes, energy, swirling. By Lv4 the creature was buried in
+//      effects. The escalation now grows the CREATURE first and treats effects as trim.
+const IDENTITY = "CRITICAL: it must remain unmistakably the same individual creature — identical species, "
+    + "identical colour palette, identical markings, identical silhouette and proportions. This is the same "
+    + "character at a later stage, NOT a different creature of the same type. Do not restyle it.";
+
 export const PET_SPRITE_LEVELS = [2, 3, 4, 5];
 const LEVEL_EVOLUTION = {
-    2: "It has grown a little stronger — a faint magical aura and a more confident, battle-ready stance.",
-    3: "It is battle-hardened and clearly more powerful — glowing energy, subtle magical runes or markings, a fiercer posture.",
-    4: "It has reached an EPIC evolved form — radiant energy swirling around it, dramatic elemental effects, a larger imposing heroic silhouette.",
-    5: "It has reached its ULTIMATE LEGENDARY form — a blazing powerful aura, crackling energy, maximum intensity, awe-inspiring and majestic.",
+    2: "It has visibly matured: slightly larger and sturdier, fur/scales/feathers fuller and better groomed, "
+       + "posture squared and alert, eyes sharper and more determined. No magical effects yet — this rung is "
+       + "about the creature itself looking healthier and stronger, and it must NOT look softer or younger "
+       + "than the base form.",
+    3: "It is battle-hardened: noticeably bigger and more muscular, a few honest marks of experience (a nicked "
+       + "ear, a scar, weathered plating), stance widened and braced. A faint warm glow at the eyes only.",
+    4: "It has reached an EPIC evolved form: substantially larger and more imposing, with ONE dramatic new "
+       + "physical feature that suits this species (heavier horns, a longer mane, spreading wings, armoured "
+       + "plates). Any aura must hug the creature's own outline — no background, no scenery, no filled "
+       + "backdrop. The background stays fully transparent.",
+    5: "It has reached its ULTIMATE LEGENDARY form: the largest and most majestic version of itself, its "
+       + "signature feature fully realised, bearing regal and awe-inspiring. Any glow or energy must CLING "
+       + "TIGHTLY to the creature's own silhouette — absolutely no background, no scenery, no filled backdrop, "
+       + "no glowing plate behind it. The background stays fully transparent.",
 };
 export function buildPetSpriteLevelPrompt(pet, level) {
     const evo = LEVEL_EVOLUTION[level] || "";
+    // The creature's own description is restated FIRST and the identity clause comes last, so the thing the
+    // model reads going in and the thing it reads last are both "this exact creature" rather than the effects.
     return housePrompt(
-        `${pet.spritePrompt} — a loyal battle companion, power level ${level} of 5. ${evo} Keep it recognizably the SAME creature, just more powerful.`,
+        `${pet.spritePrompt} — a loyal battle companion at power level ${level} of 5. ${evo} ${IDENTITY}`,
         { extra: POSE }
     );
+}
+
+/**
+ * The level prompt used when we can anchor on the Lv1 sprite as a reference image.
+ *
+ * This is the structural fix for identity drift: an edit carries the actual pixels of the base form forward,
+ * so "the same creature, later" stops being something the model has to infer from a sentence.
+ */
+export function buildPetSpriteLevelEditPrompt(pet, level) {
+    const evo = LEVEL_EVOLUTION[level] || "";
+    return `Evolve THIS EXACT creature to power level ${level} of 5. ${evo} ${IDENTITY} `
+        + `Keep the same art style, the same transparent background, and the same right-facing three-quarter `
+        + `full-body pose as the reference image.`;
 }
 
 // Map of pet_id -> sprite url for every pet that has one.
@@ -74,7 +116,7 @@ export async function detectPetSpriteFacings(limit = 6) {
 export async function generatePetSprite(petId) {
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet sprite — ${pet?.name || pet?.id || "?"}` } });
+    const url = await generateImage(buildPetSpritePrompt(pet), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet sprite — ${pet?.name || pet?.id || "?"}` } });
     // Freshly generated art is already right-facing, so stamp it oriented — the repair sweep skips it.
     await db.query(
         `INSERT INTO mkt_pet_sprite (pet_id, url, updated_at, oriented_at) VALUES ($1, $2, NOW(), NOW())
@@ -197,7 +239,28 @@ export async function generatePetSpriteLevel(petId, level) {
     if (!PET_SPRITE_LEVELS.includes(lv)) throw new Error("Level must be 2–5");
     const pet = COLLECTIBLES.find((p) => p.id === petId);
     if (!pet) throw new Error("Unknown pet");
-    const url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", faceRight: true, deHalo: true, meta: { origin: "cron", subject: pet?.id || null, label: `Pet level art — ${pet?.name || pet?.id || "?"} lv${lv}` } });
+    // ── ANCHOR ON THE Lv1 ART ────────────────────────────────────────────────────────────────────────────
+    // Levels used to be generated from the text description alone, independently of each other and of the base
+    // sprite — five separate readings of "a fluffy grey wolf pup", not one wolf pup at five ages. That is why
+    // Lv1 looked iconic and everything after it drifted.
+    //
+    // Editing FROM the Lv1 image carries the actual pixels forward, so identity is a fact rather than something
+    // the model has to infer from a sentence. If the base can't be fetched we fall back to the text prompt,
+    // which is the old behaviour — degraded, but never a failed generation.
+    const meta = { origin: "cron", subject: pet?.id || null, label: `Pet level art — ${pet?.name || pet?.id || "?"} lv${lv}` };
+    const baseRow = await db.queryOne(`SELECT url FROM mkt_pet_sprite WHERE pet_id = $1`, [petId]).catch(() => null);
+    let url = null;
+    if (baseRow?.url) {
+        try {
+            const buf = Buffer.from(await (await fetch(baseRow.url)).arrayBuffer());
+            url = await editImage(buf, buildPetSpriteLevelEditPrompt(pet, lv), {
+                size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", meta: { ...meta, label: `${meta.label} (from Lv1)` },
+            });
+        } catch { url = null; }
+    }
+    if (!url) {
+        url = await generateImage(buildPetSpriteLevelPrompt(pet, lv), { size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true, meta });
+    }
     await db.query(
         `INSERT INTO mkt_pet_sprite_level (pet_id, level, url, updated_at) VALUES ($1, $2, $3, NOW())
          ON CONFLICT (pet_id, level) DO UPDATE SET url = $3, updated_at = NOW(), flip = FALSE, facing_checked_at = NULL`,

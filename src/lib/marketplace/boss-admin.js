@@ -120,7 +120,7 @@ export async function generateBossArt(bossId, prompt) {
     // back at you, so the head, the eyes and an unobstructed face are stated as hard requirements and the
     // elemental effects are explicitly pushed off the face and onto the body.
     const full = `${String(prompt || "a fearsome dragon").slice(0, 500)}. The creature is facing to the LEFT — its body and head turned toward the left side of the frame, toward its attackers. CLEARLY VISIBLE HEAD AND FACE with TWO distinct expressive EYES, menacing readable facial features, face fully unobscured — any smoke, lightning, fire, magic or energy effects trail off the BODY and never cover the head or eyes. 2D video-game boss art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, dramatic dynamic action pose, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border.`;
-    const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss", meta: { origin: "admin", label: "Boss sprite" } });
+    const url = await generateImage(full, { size: "1024x1024", pathPrefix: "marketplace/boss", quality: "high", meta: { origin: "admin", label: "Boss sprite" } });
     await db.query(`UPDATE boss_event SET image_url = $2 WHERE id = $1`, [bossId, url]);
     return url;
 }
