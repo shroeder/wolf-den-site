@@ -186,7 +186,7 @@ function perkDesc(key, v, level = 1) {
         // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────
         // Every one states the exact number and exactly what it changes. "+2 seed luck" tells a member nothing;
         // "1 harvest in 12 comes up double" tells them whether they want it.
-        case "farm_yield": return `${Math.max(2, Math.round(100 / v))} in 100 harvests come up DOUBLE while equipped (+${v}% double-harvest chance)`;
+        case "farm_yield": return `About 1 harvest in ${Math.max(2, Math.round(100 / v))} comes up DOUBLE while equipped (+${v}% double-harvest chance)`;
         case "farm_speed": return `Your crops finish ${v}% sooner while equipped — a 12h crop lands about ${Math.round(12 * v / 100 * 60)} min early`;
         case "farm_seed": return `+${v}% chance a harvest also drops a SEED while equipped`;
         case "angler_bite": return `+${v}% chance a cast hooks a rarer fish than it should have`;
