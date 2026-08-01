@@ -47,7 +47,7 @@ export const TOWN_EVENT_TYPES = {
     // HP is tuned so 5-10 people bring it down in roughly 5-10 minutes. See RAID_TUNING below for the maths;
     // change HP and the tuning note together or the fight silently drifts out of that window again.
     treasure_golem: {
-        name: "Treasure Golem", emoji: "💎", boss: true, siege: true, hp: 260000, testHp: 26000, rewardGold: 4000, durationMin: 20,
+        name: "Treasure Golem", emoji: "💎", boss: true, siege: true, hp: 520000, testHp: 52000, rewardGold: 4000, durationMin: 20,
         pushTitle: "💎 A Treasure Golem BOSS lumbered into Town!", pushBody: "It's MASSIVE — the whole pack has to rally and bring it down together. Rush the plaza!",
     },
 };
@@ -93,7 +93,16 @@ const DUEL_GOLD_BUDGET = 600;
 const DUEL_XP_BUDGET = 280;
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
-const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep
+// The FLOOR for a swing, not the cadence. The client now earns its cooldown: a pixel-perfect hit re-arms in
+// ~1.0s and a glancing one in ~2.4s (STRIKE_COOLDOWN_MS below), so a flat 2600 server throttle would have
+// rejected every good swing as "too_fast". Sits just under the fastest client cooldown to leave room for
+// latency, and still stops a scripted client hammering the endpoint.
+const BOSS_STRIKE_THROTTLE_MS = 900;
+
+// How long until you can swing again, BY GRADE. Timing already decided how hard you hit; making it decide how
+// OFTEN you hit is what turns the bar from a damage roll into a rhythm you can get better at. Shared with the
+// client (sent back on every strike) so the button and the server can never disagree about when you re-arm.
+export const STRIKE_COOLDOWN_MS = { pixel: 1000, perfect: 1250, great: 1550, good: 1900, miss: 2400 };
 
 // ── COMBO CHAINS + STRIKE PROCS ──────────────────────────────────────────────────────────────────────────────
 // The timing bar is one axis: how close to centre. That's fine, but it means every swing is an island — the
@@ -666,6 +675,8 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     return {
         ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
         grade: grade.key, gradeLabel: grade.label, mult: grade.mult,
+        // The server owns the cooldown too, so the button can never re-arm before the throttle would accept it.
+        cooldownMs: STRIKE_COOLDOWN_MS[grade.key] ?? STRIKE_COOLDOWN_MS.miss,
         combo, comboMult: Math.round(comboMult * 100) / 100, comboBroken: !kept && priorCombo >= 3,
         strikeProc: proc ? { key: proc.key, label: proc.label, tell: proc.tell, mult: proc.mult } : null,
         hp, hpMax: ev.hp_max, hpPct: ev.hp_max ? Math.max(0, Math.round((hp / ev.hp_max) * 100)) : 0,

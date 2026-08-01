@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isPrimaryOwner } from "@/lib/marketplace/owner.js";
-import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
+import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, getTownTodo, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
 import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike, endTownEvent } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { claimWishingWell } from "@/lib/marketplace/town-projects.js";
@@ -18,6 +18,12 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return NextResponse.json({ signedIn: false, owner: false }, { headers: { "Cache-Control": "no-store" } });
+            // ?todo=1 — the nav pill's four counts only. The nav asks on every page for every member, and the
+            // full town state renders rosters, art, projects and chat; running all of that for a badge would
+            // cost more than the screen the badge points at.
+            if (new URL(request.url).searchParams.get("todo")) {
+                return NextResponse.json({ todo: await getTownTodo(buyer.id) }, { headers: { "Cache-Control": "no-store" } });
+            }
             return NextResponse.json(await getTownState(buyer.id), { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.town.state.failure" });

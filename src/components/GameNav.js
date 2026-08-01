@@ -120,6 +120,7 @@ export default function GameNav() {
 
     const [chests, setChests] = useState(0);
     const [consumables, setConsumables] = useState(0); // unused potions/treats/relics — the Gear badge counts these too
+    const [townTodo, setTownTodo] = useState(null); // { total, quests, well, tavern, event } from the town
     const [spins, setSpins] = useState(0);
     const [bossStrikes, setBossStrikes] = useState(0);
     const [questsReady, setQuestsReady] = useState(0);
@@ -139,6 +140,10 @@ export default function GameNav() {
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
             fetch("/api/marketplace/consumables", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setConsumables((d?.stash || []).reduce((s2, c) => s2 + (c.count || 0), 0)); }).catch(() => {});
+            // Town is the one hub whose tasks are invisible from outside it — the pint, a claimable bounty and
+            // the wish all sit behind a door you have to walk through. `todo=1` returns the counts alone rather
+            // than the whole plaza, so the pill costs a small query and not a full town render.
+            fetch("/api/marketplace/town?todo=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.todo) setTownTodo(d.todo); }).catch(() => {});
         };
         loadChests();
         const onRefresh = () => loadChests();
@@ -187,6 +192,17 @@ export default function GameNav() {
         if (href === "/marketplace/sailing") {
             if (castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left — your line's out` };
             if ((featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
+        }
+        if (href === "/marketplace/town" && (townTodo?.total || 0) > 0) {
+            return {
+                badge: townTodo.total,
+                title: [
+                    townTodo.event ? "a fight is on in the plaza" : null,
+                    townTodo.quests ? `${plural(townTodo.quests, "bounty")} to claim` : null,
+                    townTodo.tavern ? "your pint is waiting" : null,
+                    townTodo.well ? "you haven't wished today" : null,
+                ].filter(Boolean).join(" · "),
+            };
         }
         if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };

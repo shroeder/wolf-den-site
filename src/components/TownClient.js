@@ -333,9 +333,18 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
 // BOSS RAID battle — the whole pack rallies on ONE shared boss (like the weekly boss fight). Your hero AUTO-
 // attacks while you're here (engaging = being at the fight); everyone who's actively fighting shows as their real
 // hero sprite lunging at the boss. Shared HP bar drains for the pack; killing it ends the raid.
-// One swing per this long, matched EXACTLY to the server's BOSS_STRIKE_THROTTLE_MS. The marker's full
-// ping-pong is half of it each way, so the bar is back at the edge the instant the button re-arms.
-const STRIKE_CD_MS = 2600;
+// Cooldown is now EARNED, not fixed. These mirror STRIKE_COOLDOWN_MS in town-events.js — the server sends the
+// real value back on every strike, so this table is only the optimistic guess used before the reply lands.
+// Timing already decided how hard you hit; letting it decide how OFTEN you hit is what makes the bar a rhythm
+// you can get better at instead of a damage roll you wait out.
+const STRIKE_CD_BY_GRADE = { pixel: 1000, perfect: 1250, great: 1550, good: 1900, miss: 2400 };
+const STRIKE_CD_MS = 2400; // worst case, and the pre-first-swing default
+
+// A FULL ping-pong of the marker. The forge sweeps in 850–1700ms; this used to take 2600, which is why the
+// same bands that feel tight at the anvil felt generous here — the bar was simply crawling. It also speeds up
+// as the golem weakens, so the fight gets louder as it goes rather than becoming a formality.
+const SWEEP_FULL_MS = 1150;   // at full health
+const SWEEP_MIN_MS = 700;     // at death's door
 
 function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     const [floats, setFloats] = useState([]); // { id, dmg, crit }
@@ -360,16 +369,28 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     // 300ms of dead air where the marker kept sweeping and the button did nothing, and the two drifted out of
     // phase, meaning the bar sat somewhere different every time it came back. That mismatch is what read as
     // "the timing is off". Now the button re-arms at the exact moment the marker returns to the left edge.
-    const SWEEP_MS = STRIKE_CD_MS / 2;
     const markerElRef = useRef(null);
     const cdElRef = useRef(null);
+    // Read inside the animation loop so the tempo tracks the HP bar continuously — no re-render, no restart of
+    // the sweep, and therefore no jump in the marker's position when the golem crosses a threshold.
+    const hpPctRef = useRef(ev.hpPct ?? 100);
+    const cdMsRef = useRef(STRIKE_CD_MS);
+    // Mirrored into a ref via an effect rather than assigned during render, so the animation loop can read the
+    // current HP every frame without the sweep restarting each time the bar moves.
+    useEffect(() => { hpPctRef.current = localPct; }, [localPct]);
 
     useEffect(() => {
         let raf = 0;
-        const t0 = performance.now();
+        let last = performance.now();
+        let phase = 0; // 0..2, own accumulator so a changing period never teleports the marker
         const loop = (t) => {
+            const dt = t - last;
+            last = t;
+            // Faster as it weakens: full health sweeps in SWEEP_FULL_MS, a sliver in SWEEP_MIN_MS.
+            const k = Math.max(0, Math.min(1, hpPctRef.current / 100));
+            const full = SWEEP_MIN_MS + (SWEEP_FULL_MS - SWEEP_MIN_MS) * k;
+            phase = (phase + (dt / (full / 2))) % 2;
             // Ping-pong 0→1→0 so both edges are reachable and the centre is hit twice a sweep.
-            const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
             const pos = phase <= 1 ? phase : 2 - phase;
             markerRef.current = pos;
             // Written straight to the DOM rather than through setState. A state update per animation frame
@@ -379,23 +400,47 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
             // Cooldown sweep on the button, same frame, so "when can I swing again" is visible rather than felt.
             if (cdElRef.current) {
                 const left = Math.max(0, cdUntilRef.current - Date.now());
-                cdElRef.current.style.transform = `scaleX(${left / STRIKE_CD_MS})`;
+                cdElRef.current.style.transform = `scaleX(${left / (cdMsRef.current || STRIKE_CD_MS)})`;
             }
             raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
         return () => cancelAnimationFrame(raf);
-    }, [SWEEP_MS]);
+    }, []);
 
     const strike = useCallback(async () => {
         if (cdRef.current || swingRef.current) return;
         swingRef.current = true;
         cdRef.current = true;
-        cdUntilRef.current = Date.now() + STRIKE_CD_MS;
-        setTimeout(() => { cdRef.current = false; setCooling(false); }, STRIKE_CD_MS); // matches server throttle
-        setCooling(true);
+        // The marker position is sampled and the swing is JUDGED LOCALLY before anything is awaited, so what you
+        // feel is what the bar showed when your finger landed. It used to wait on the round trip before any
+        // haptic or grade appeared, which read as input lag on a game that is entirely about timing.
         const dist = Math.abs(markerRef.current - 0.5);
+        const localKey = dist <= 0.022 ? "pixel" : dist <= 0.055 ? "perfect" : dist <= 0.10 ? "great" : dist <= 0.16 ? "good" : "miss";
+        const guessCd = STRIKE_CD_BY_GRADE[localKey] ?? STRIKE_CD_MS;
+        cdMsRef.current = guessCd;
+        cdUntilRef.current = Date.now() + guessCd;
+        let cdTimer = setTimeout(() => { cdRef.current = false; setCooling(false); }, guessCd);
+        setCooling(true);
+        // Haptics fire NOW, off the local grade, strongest at the top. PIXEL PERFECT previously fell through
+        // every branch of this chain and landed on the single weakest buzz — the best hit in the game felt like
+        // the worst one.
+        try {
+            const pattern = localKey === "pixel" ? [30, 30, 30, 30, 60, 40, 110]
+                : localKey === "perfect" ? [22, 34, 26, 34, 70]
+                    : localKey === "great" ? [16, 30, 40]
+                        : localKey === "good" ? [12, 26] : [8];
+            navigator.vibrate?.(pattern);
+        } catch { /* no haptics here */ }
         const r = await onStrike(dist);
+        // The server is the authority on both grade and cooldown; reconcile once its answer lands.
+        if (typeof r?.cooldownMs === "number" && r.cooldownMs !== guessCd) {
+            clearTimeout(cdTimer);
+            const remain = Math.max(0, r.cooldownMs - (guessCd - Math.max(0, cdUntilRef.current - Date.now())));
+            cdMsRef.current = r.cooldownMs;
+            cdUntilRef.current = Date.now() + remain;
+            cdTimer = setTimeout(() => { cdRef.current = false; setCooling(false); }, remain);
+        }
         swingRef.current = false;
         if (r?.ok) {
             const id = (fidRef.current += 1);
@@ -408,15 +453,11 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                 setProcFx({ ...r.strikeProc, k: Date.now() });
                 setTimeout(() => setProcFx((p) => (p && p.k === r.strikeProc.k ? null : p)), 1600);
             }
-            // Haptics: the better the swing, the more you feel it. Best-effort — desktop and iOS Safari have
-            // no vibrate, and a missing API must never break the strike.
-            try {
-                const pattern = r.strikeProc ? [30, 40, 30, 40, 30, 40, 80]
-                    : r.crit ? [22, 40, 22, 40, 55]
-                    : r.grade === "perfect" ? [18, 34, 46]
-                        : r.grade === "great" ? [14, 30] : [10];
-                navigator.vibrate?.(pattern);
-            } catch { /* no haptics here */ }
+            // The grade buzz already fired locally the instant you tapped. Only a PROC gets a second one — it is
+            // the one thing the client cannot know in advance, and it deserves its own flourish.
+            if (r.strikeProc) {
+                try { navigator.vibrate?.([30, 40, 30, 40, 30, 40, 90]); } catch { /* no haptics here */ }
+            }
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
         }
     }, [onStrike]);
@@ -470,7 +511,9 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                     <button
                         type="button"
                         className={`tw-strike-btn${cooling ? " is-cooling" : ""}`}
-                        onClick={strike}
+                        // pointerdown, not click: a click waits for the finger to LIFT, which on a timing game
+                        // means the bar has already moved past what you were aiming at.
+                        onPointerDown={(e) => { e.preventDefault(); strike(); }}
                     >
                         <span className="tw-strike-cd" ref={cdElRef} aria-hidden="true" />
                         <span className="tw-strike-btn-label">⚔️ Strike</span>
@@ -989,6 +1032,9 @@ export default function TownClient({ initial }) {
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
     const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
+    // Per-building counts of what's waiting, computed server-side so the pill in the nav and the pins on the
+    // buildings can never disagree about how much there is to do.
+    const todo = state?.todo || { total: 0, byBuilding: {} };
     const canWish = Boolean(well && !well.claimedToday);
     const raidActive = Boolean(state?.event && !state.event.defeated); // during a raid: hide NPCs + lock the buildings
     const marketDay = Boolean(state?.store?.open) && !raidActive; // physical shop open → the plaza celebrates "Market Day"
@@ -1212,6 +1258,13 @@ export default function TownClient({ initial }) {
                         return (
                             <Link key={b.id} href={raidActive ? "#" : b.href} className={`tw-building${bart ? " has-art" : ""}${raidActive ? " is-locked" : ""}${shopOpen ? " is-openshop" : ""}`} style={{ left: `${b.x}%`, top: `${GROUND - 4}%`, zIndex: 100 + Math.round(b.x) }} onClick={raidActive ? (e) => { e.preventDefault(); e.stopPropagation(); } : b.id === "tavern" ? (e) => { e.preventDefault(); e.stopPropagation(); setInTavern(true); } : (e) => e.stopPropagation()} aria-disabled={raidActive || undefined}>
                                 {shopOpen ? <span className="tw-openflag">OPEN</span> : null}
+                                {/* The same number the Town pill shows in the nav, now pointing at the door it
+                                    belongs to. Getting a badge and then hunting the plaza for what caused it is
+                                    the failure this avoids: the count says "something is here", the pin says
+                                    "it's behind THIS one". */}
+                                {!raidActive && (todo.byBuilding?.[b.id] || 0) > 0 ? (
+                                    <span className="tw-bld-todo" aria-hidden="true">{todo.byBuilding[b.id]}</span>
+                                ) : null}
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
@@ -2070,6 +2123,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     background: linear-gradient(90deg, rgba(255,228,136,0) 0%, rgba(255,228,136,0.28) 100%); pointer-events: none; }
 .tw-strike-bar.is-hit { animation: twStrikeFlash 0.3s ease-out; }
 @keyframes twStrikeFlash { 0% { filter: brightness(2.4); transform: scale(1.03); } 100% { filter: brightness(1); transform: scale(1); } }
+.tw-bld-todo { position: absolute; top: -6px; right: -6px; z-index: 3; min-width: 21px; height: 21px; padding: 0 5px;
+    display: grid; place-items: center; border-radius: 999px; font-size: 0.72rem; font-weight: 900; color: #2a1c05;
+    background: linear-gradient(180deg,#ffe488,#f3b23a); border: 2px solid #17121f;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5); animation: twTodoPulse 2.1s ease-in-out infinite; }
+@keyframes twTodoPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.13); } }
 .tw-strike-btn { position: relative; overflow: hidden; width: 100%; margin-top: 10px; padding: 17px; border: none; border-radius: 14px; font-weight: 900; font-size: 1.15rem; letter-spacing: 0.02em; color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22, 0 6px 18px rgba(0,0,0,0.4); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .tw-strike-btn-label { position: relative; z-index: 2; }
 /* ── COMBO CHAIN ── the only place a run of clean swings is visible, so it climbs loudly. */

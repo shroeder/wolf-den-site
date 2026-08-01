@@ -13,7 +13,7 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
-import { bumpTownQuest, getTownQuests } from "@/lib/marketplace/town-quests.js";
+import { bumpTownQuest, getTownQuests, townQuestsClaimable } from "@/lib/marketplace/town-quests.js";
 import { townEventsLive } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject, wellClaimedToday } from "@/lib/marketplace/town-projects.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
@@ -231,6 +231,34 @@ async function hangoutBuffState(buyerId, inTownSecs) {
     return { active: false, pct: HANGOUT_PCT, secsLeft: 0, justGranted: false, earnSecs: HANGOUT_EARN_SECS, inTownSecs };
 }
 
+// The todo counts ALONE, for the nav pill.
+//
+// getTownState is the highest-volume request in the app and renders the whole plaza — rosters, art, projects,
+// chat. The nav needs four small numbers, on every page, for everyone. Running the full state to read them
+// would have made a badge more expensive than the screen it points at, so this asks only what it needs.
+//
+// Same fields and the same meanings as the `todo` block inside getTownState; if one changes, change both.
+export async function getTownTodo(buyerId) {
+    if (!buyerId) return { quests: 0, well: 0, tavern: 0, event: 0, total: 0, byBuilding: {} };
+    const [claimable, wished, pint, live] = await Promise.all([
+        townQuestsClaimable(buyerId).catch(() => 0),
+        wellClaimedToday(buyerId).catch(() => true),
+        db.queryOne(`SELECT (last_drink_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS ready
+                       FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT 1 AS x FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null),
+    ]);
+    const quests = Number(claimable) || 0;
+    const well = wished ? 0 : 1;
+    // No tavern row yet means they have never drunk, so the pint is waiting.
+    const tavern = (pint === null || pint?.ready) ? 1 : 0;
+    const event = live ? 1 : 0;
+    return {
+        quests, well, tavern, event,
+        total: quests + well + tavern + event,
+        byBuilding: { tavern, well, quests, plaza: event },
+    };
+}
+
 export async function getTownState(buyerId) {
     const owner = isOwner(buyerId);
 
@@ -244,7 +272,7 @@ export async function getTownState(buyerId) {
     //   hangoutBuffState needs heartbeat.inTownSecs                 -> must follow it
     // `me` (mkt_buyer) and `recent` (mkt_visitor, and it excludes this member anyway) share nothing with it.
     // So five stages collapse to two, with identical results.
-    const [heartbeat, me, rosterAll] = await Promise.all([
+    const [heartbeat, me, rosterAll, pintReady] = await Promise.all([
         markTownSeen(buyerId), // stamp presence + measure how long they've been here
         buyerId
             ? db.queryOne(`SELECT display_name, alias, avatar_sprite_url, avatar_sprite_flip, featured_collectible,
@@ -263,6 +291,13 @@ export async function getTownState(buyerId) {
               GROUP BY b.id ORDER BY seen DESC LIMIT 41`,
             [ONLINE_WINDOW]
         ).catch(() => [])),
+        // The daily pint is the tavern's ONE genuinely transient task, so it is the only thing the tavern
+        // contributes to the todo badge. Dice were considered and left out on purpose: you can gamble every
+        // day, so counting them would leave the badge permanently lit, which is the same as having no badge.
+        buyerId
+            ? db.queryOne(`SELECT (last_drink_day IS DISTINCT FROM (NOW() AT TIME ZONE 'America/Chicago')::date) AS ready
+                             FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null)
+            : Promise.resolve(null),
     ]);
     const [hangout, myPos] = await Promise.all([
         hangoutBuffState(buyerId, heartbeat?.inTownSecs || 0),
@@ -406,6 +441,27 @@ export async function getTownState(buyerId) {
         merchant: merchantWares,
         store: storeStatus(),
         quests,
+        // ── WHAT IS ACTUALLY WAITING FOR YOU ──────────────────────────────────────────────────────────────
+        // One shape, read by two places: the Town pill in the nav (so you know there's something here without
+        // opening it) and the buildings themselves (so once you're inside, the badge points at the door it
+        // belongs to). Computed here rather than in the client, because the nav needs it WITHOUT loading the
+        // whole town — a lone number on a pill should not cost a full town render.
+        todo: (() => {
+            const claimable = (quests?.list || quests || []).filter?.((q) => q?.done && !q?.claimed).length || 0;
+            const wish = well && !well.claimedToday ? 1 : 0;
+            // No row yet means they have never drunk, so the pint IS waiting.
+            const pint = !buyerId ? 0 : (pintReady === null || pintReady?.ready) ? 1 : 0;
+            const fight = event && event.status === "active" ? 1 : 0;
+            return {
+                quests: claimable,
+                well: wish,
+                tavern: pint,
+                event: fight,
+                total: claimable + wish + pint + fight,
+                // Per-building so the client never has to re-derive which door a number belongs to.
+                byBuilding: { tavern: pint, well: wish, quests: claimable, plaza: fight },
+            };
+        })(),
         eventsLive,
         onlineCount: players.length + (buyerId ? 1 : 0),
         inTownCount,
