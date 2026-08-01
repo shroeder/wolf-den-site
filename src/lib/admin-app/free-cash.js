@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
 
-// ── WHAT CAN I ACTUALLY SPEND ────────────────────────────────────────────────────────────────────────────────
+// ── CASH POSITION — what can I actually spend ────────────────────────────────────────────────────────────────────────────────
 //
 // The bank balance is not the answer to that question and never has been. A big chunk of what's sitting there
 // is money the shop is HOLDING rather than money it OWNS: consignors are owed their cut of everything of theirs
@@ -105,19 +105,78 @@ async function storeCreditOutstanding() {
 }
 
 /** Fixed costs still to land before the month is out — rent, insurance, anything else on the overhead list. */
+// Has this monthly bill already been paid for the current month?
+//
+// Rent is paid UP FRONT, so on the 2nd of the month a straight days-left proration claimed the shop still owed
+// a full month of rent it had already handed over — the single biggest line on the report, wrong by its whole
+// value for 30 days at a time.
+//
+// Matched on the ledger CATEGORY first, which is structured, with the label as a text fallback. Learned the
+// hard way from the sales-tax miss: bank descriptions here are blank more often than not, so a memo match
+// alone finds nothing.
+//
+// The window starts FIVE DAYS BEFORE the month does, because rent has historically been paid in the tail of the
+// previous month for the coming one — the ledger's own "May Lease Payment" is dated April 26. Paying on the 1st
+// (the current habit) and paying on the 28th for next month both land inside it.
+async function monthlyBillsPaid(items) {
+    if (!items.length) return new Map();
+    const labels = items.map((i) => String(i.label || "").trim()).filter(Boolean);
+    if (!labels.length) return new Map();
+    const rows = await db.query(
+        `SELECT category, description, amount, date_ms
+           FROM ledger_entry
+          WHERE amount < 0
+            AND to_timestamp(date_ms / 1000) AT TIME ZONE 'America/Chicago'
+                >= date_trunc('month', NOW() AT TIME ZONE 'America/Chicago') - INTERVAL '5 days'`,
+        []
+    ).catch(() => []);
+    const paid = new Map();
+    for (const item of items) {
+        const label = String(item.label || "").trim();
+        if (!label) continue;
+        const low = label.toLowerCase();
+        const hit = rows.find((r) =>
+            String(r.category || "").trim().toLowerCase() === low ||
+            String(r.description || "").toLowerCase().includes(low));
+        if (hit) paid.set(item.id, { amount: money(Math.abs(Number(hit.amount) || 0)), on: Number(hit.date_ms) || null });
+    }
+    return paid;
+}
+
 async function overheadRemaining() {
     const items = await listOverhead().catch(() => []);
     const active = items.filter((i) => i.active !== false);
-    const perDay = active.reduce((s, i) => s + perDayCents(i), 0) / 100;
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysLeft = daysInMonth - now.getDate() + 1;
+
+    // A MONTHLY bill is all-or-nothing: it is either still owed in full or already paid. Prorating it by days
+    // left describes a cost that accrues evenly, which rent and insurance do not — they arrive as one payment
+    // on one day. Genuinely per-day costs (daily/weekly/yearly cadences) still prorate.
+    const monthly = active.filter((i) => (i.cadence || "monthly") === "monthly");
+    const paid = await monthlyBillsPaid(monthly);
+
+    const monthlyOwed = monthly
+        .filter((i) => !paid.has(i.id))
+        .reduce((s, i) => s + Number(i.amount_cents || 0), 0) / 100;
+    const otherPerDay = active
+        .filter((i) => (i.cadence || "monthly") !== "monthly")
+        .reduce((s, i) => s + perDayCents(i), 0) / 100;
+
     return {
-        amount: money(perDay * daysLeft),
+        amount: money(monthlyOwed + otherPerDay * daysLeft),
         daysLeft,
-        perDay: money(perDay),
-        // listOverhead returns raw rows — snake_case, cents.
-        items: active.map((i) => ({ label: i.label, amount: money(Number(i.amount_cents || 0) / 100), cadence: i.cadence })),
+        perDay: money(active.reduce((s, i) => s + perDayCents(i), 0) / 100),
+        // listOverhead returns raw rows — snake_case, cents. `paidOn` lets the screen show WHY a line is zero,
+        // so "rent isn't in the total" reads as settled rather than as a bug.
+        items: active.map((i) => ({
+            label: i.label,
+            amount: money(Number(i.amount_cents || 0) / 100),
+            cadence: i.cadence,
+            paid: paid.has(i.id),
+            paidAmount: paid.get(i.id)?.amount ?? null,
+            paidOn: paid.get(i.id)?.on ?? null,
+        })),
     };
 }
 
@@ -151,7 +210,14 @@ export async function cashPosition() {
         },
         {
             label: `Fixed costs left this month`, amount: overhead.amount, source: "computed",
-            note: `${overhead.daysLeft} days at ${"$" + overhead.perDay.toFixed(2)}/day`,
+            note: (() => {
+                const settled = overhead.items.filter((i) => i.paid);
+                const owed = overhead.items.filter((i) => !i.paid);
+                if (!owed.length) return "Everything's paid for this month";
+                return settled.length
+                    ? `${owed.map((i) => i.label).join(", ")} still due · ${settled.map((i) => i.label).join(", ")} already paid`
+                    : `${owed.map((i) => i.label).join(", ")} still due this month`;
+            })(),
             detail: overhead.items,
         },
     ];
