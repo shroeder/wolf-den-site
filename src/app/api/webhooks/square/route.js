@@ -21,7 +21,21 @@ const SITE_URL = process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "ht
 
 // Fetch an order's merchandise subtotal (total minus tax) in cents, so in-store XP is granted on the same
 // basis as online (pre-tax merchandise). Best-effort — returns null if the order can't be read.
-async function fetchOrderSubtotalCents(orderId) {
+// What a sale is worth in loyalty terms: the pre-tax subtotal, MINUS any gift card sold on it.
+//
+// Tax is excluded so we never pay points on the state's money.
+//
+// Gift cards are excluded because otherwise the same dollar earns twice — once when the card is bought, and
+// again when it is spent on actual merchandise. Store-credit top-ups were already skipped for exactly this
+// reason ("the buyer already got their coins at checkout"); a gift card is the same shape and was missed.
+//
+// The PURCHASE is the side that gets skipped, not the spend. Buying a gift card moves money without moving
+// stock — the merchandise sale happens later — and gift cards are usually bought FOR somebody else, so the
+// person who should earn the points is whoever eventually spends it.
+//
+// A MIXED sale still earns on its merchandise: only the gift-card lines come out, so buying a $50 card and a
+// $30 booster box on one ticket earns on the $30.
+async function fetchOrderEligibleCents(orderId) {
     const token = process.env.SQUARE_ACCESS_TOKEN;
     if (!token || !orderId) return null;
     try {
@@ -36,7 +50,13 @@ async function fetchOrderSubtotalCents(orderId) {
         if (!order) return null;
         const total = Number(order.total_money?.amount || 0);
         const tax = Number(order.total_tax_money?.amount || 0);
-        return Math.max(0, total - tax);
+        const subtotal = Math.max(0, total - tax);
+        // item_type is Square's own marker for a gift card line (activation OR reload). The name check is a
+        // belt-and-braces fallback for a manually-rung card that was never a catalog gift-card object.
+        const giftCard = (order.line_items || [])
+            .filter((li) => li.item_type === "GIFT_CARD" || /gift\s*card/i.test(li.name || ""))
+            .reduce((n, li) => n + Number(li.total_money?.amount || 0), 0);
+        return { subtotal, giftCard, eligible: Math.max(0, subtotal - giftCard) };
     } catch {
         return null;
     }
@@ -175,8 +195,13 @@ async function handlePurchaseLoyalty(payload) {
     const awardOrderId = `sq:${orderId}`;
     let amountCents = Number(payment.amount_money?.amount || 0);
     if (payment.order_id) {
-        const subtotal = await fetchOrderSubtotalCents(payment.order_id);
-        if (subtotal != null) amountCents = subtotal;
+        const amt = await fetchOrderEligibleCents(payment.order_id);
+        if (amt) {
+            // Checked BEFORE the auto-credit below, so a gift-card sale never awards a customer 0 XP and never
+            // mints a staff QR for a purchase that earns nothing.
+            if (amt.giftCard > 0 && amt.eligible <= 0) return { handled: true, skipped: "gift_card_purchase" };
+            amountCents = amt.eligible;
+        }
     }
 
     // Try to auto-credit a known customer (by Square id, email, or phone; also parks by email otherwise).
