@@ -264,7 +264,9 @@ export async function getInventory(buyerId) {
         db.query(`SELECT item_id, acquired_via, charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         getEquippedIds(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        db.query(`SELECT item_id, level, util FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        // stat_bonus comes along too. Without it the bag could say an item was "+1" but not what the +1 gave
+        // you — you could see that you had forged something and never what it bought.
+        db.query(`SELECT item_id, level, util, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
     ]);
     const elemOver = await getElementOverrides(buyerId).catch(() => ({})); // reforged elemental affinities
@@ -273,7 +275,7 @@ export async function getInventory(buyerId) {
     const listedSet = new Set(listedRows.map((r) => r.item_id));
     const ownedIds = new Set(ownedRows.map((r) => r.item_id));
     const equippedIds = new Set(Object.values(bySlot));
-    const enhById = new Map((enhRows || []).map((r) => [r.item_id, { level: r.level, util: r.util }]));
+    const enhById = new Map((enhRows || []).map((r) => [r.item_id, { level: r.level, util: r.util, statBonus: r.stat_bonus || null }]));
     const items = ownedRows
         .filter((r) => !listedSet.has(r.item_id)) // hide anything currently up for auction
         .map((r) => {
@@ -281,7 +283,12 @@ export async function getInventory(buyerId) {
             if (!def) return null;
             const set = setForItem(def.id);
             const enh = enhById.get(def.id);
-            return { ...def, owned: true, equipped: equippedIds.has(def.id), bound: isTradeLocked(def.rarity), enhanceLevel: enh?.level || 0, util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
+            return { ...def, owned: true, equipped: equippedIds.has(def.id), bound: isTradeLocked(def.rarity), enhanceLevel: enh?.level || 0,
+                // The forge bonus ALONE, phrased like every other stat line, so "+1" can finally say what it
+                // bought. The Auction House has shown this on a listing for ages; your own bag never did, so
+                // the one place you inspect your own gear was the one place the enhancement was invisible.
+                forgeStats: enh?.statBonus && Object.keys(enh.statBonus).length ? describeStats(enh.statBonus) : null,
+                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));

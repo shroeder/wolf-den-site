@@ -1,7 +1,6 @@
 import { after, NextResponse } from "next/server";
 
 import { getChests, openChest } from "@/lib/marketplace/chests.js";
-import { grantRandomDropBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
@@ -41,10 +40,14 @@ export async function POST(request) {
             const res = await openChest(buyer.id, String(body?.tier || ""));
             if (!res.ok) return noStore({ error: res.error }, { status: 400 });
             after(() => bumpQuestProgress(buyer.id, "chest_open", 1));
-            // Rare bonus: a small chance a chest also coughs up a drop-only badge — return it so the
-            // reveal can celebrate it inline (grant is cheap; awaited so it rides the same response).
-            const badgeDrop = Math.random() < 0.04 ? await grantRandomDropBadge(buyer.id).catch(() => null) : null;
-            return noStore({ ...res, badgeDrop, chests: await getChests(buyer.id) });
+            // Chests DO NOT drop badges. A badge is meant to say you did a thing; a 4% roll on a chest said
+            // only that you opened a chest, and it handed out achievement badges — "Forged a single item to
+            // +10", "Jackpot" — to members who had never done either. It also had the Mark of Shame in its
+            // pool, which is reserved and got dropped to a random opener.
+            //
+            // Badges are earned by their own auto_rule, granted for the event that matches them, or given by
+            // an admin. Never rolled.
+            return noStore({ ...res, chests: await getChests(buyer.id) });
         } catch (error) {
             return internalError(error, { event: "marketplace.chests.open.failure" });
         }

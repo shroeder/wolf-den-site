@@ -1125,9 +1125,33 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         <div><b>{state.fishing.angling ?? 0}</b><span>angling</span></div>
                     </div>
                     {state.fishing.available ? (
-                        <button className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }} disabled={busy || !state.fishing.casts?.left} onClick={() => setFishOpen(true)}>
-                            🎣 {state.fishing.casts?.left ? "Cast a line" : "Out of casts today"}
-                        </button>
+                        (state.fishing.casts?.left ?? 0) > 0 ? (
+                            <button className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => setFishOpen(true)}>
+                                🎣 Cast a line
+                            </button>
+                        ) : (
+                            // "Out of casts today" used to be a dead button on a screen with nothing else to do.
+                            // The recharge already existed — the fishing scene has offered it for ages — it was
+                            // simply never surfaced HERE, which is the one place you land when you run dry.
+                            <>
+                                {state.fishing.recharge?.available ? (
+                                    <button
+                                        className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }}
+                                        disabled={busy || (state.gold || 0) < (state.fishing.recharge.cost || 0)}
+                                        onClick={() => act("fish_recharge")}
+                                    >
+                                        🎣 Recharge a cast · 🪙 {(state.fishing.recharge.cost || 0).toLocaleString()}
+                                    </button>
+                                ) : (
+                                    <button className="sail-cta sail-cta-fish" style={{ width: "100%", marginTop: 12 }} disabled>
+                                        🎣 Out of casts — more tomorrow
+                                    </button>
+                                )}
+                                {state.fishing.recharge?.available && (state.gold || 0) < (state.fishing.recharge.cost || 0)
+                                    ? <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.78rem", textAlign: "center" }}>You need 🪙 {((state.fishing.recharge.cost || 0) - (state.gold || 0)).toLocaleString()} more.</p>
+                                    : null}
+                            </>
+                        )
                     ) : (
                         <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.82rem" }}>You can only fish once the boat is under way or moored at the island.</p>
                     )}

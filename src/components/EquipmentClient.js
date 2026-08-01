@@ -559,6 +559,29 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             </div>
                         </div>
                         <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
+                        {/* WHAT THE FORGE ADDED. The sheet showed a "+1" pip on the icon and the merged stat
+                            line, so an enhanced item looked exactly like a lucky roll — you could see that you
+                            had forged it and never what it bought you. Broken out on its own line, in the same
+                            phrasing as every other stat, plus the attunement if one rolled. */}
+                        {detailItem.enhanceLevel > 0 || detailItem.util ? (
+                            <div style={{ margin: "10px 0 0", padding: "9px 11px", borderRadius: 10, background: "rgba(255,183,77,0.09)", border: "1px solid rgba(255,183,77,0.28)" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: "0.8rem", fontWeight: 900, color: "#ffc966" }}>
+                                    {detailItem.enhanceLevel > 0 ? <ForgeRank level={detailItem.enhanceLevel} size={18} /> : null}
+                                    <span>{detailItem.enhanceLevel > 0 ? `Forged to +${detailItem.enhanceLevel}` : "Attuned"}</span>
+                                </div>
+                                {detailItem.forgeStats ? (
+                                    <div style={{ marginTop: 5, fontSize: "0.8rem", color: "#f2ead9", fontWeight: 700 }}>{detailItem.forgeStats}<span style={{ color: "#9aa0a6", fontWeight: 600 }}> — on top of the base stats above</span></div>
+                                ) : detailItem.enhanceLevel > 0 ? (
+                                    <div style={{ marginTop: 5, fontSize: "0.78rem", color: "#9aa0a6" }}>No stat bonus recorded for this enhance.</div>
+                                ) : null}
+                                {detailItem.util ? (
+                                    <div style={{ marginTop: 5, fontSize: "0.78rem", color: "#e0c8ff", fontWeight: 700 }}>
+                                        🔮 +{detailItem.util.value}{detailItem.util.unit} {detailItem.util.label}{detailItem.util.level > 1 ? ` Lv${detailItem.util.level}` : ""}
+                                        <span style={{ color: "#9aa0a6", fontWeight: 600 }}> — attunement</span>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
                         {/* Plain-English: what each of this item's stats actually DOES. */}
                         {Object.keys(detailItem.stats || {}).filter((k) => STAT_META[k]).length ? (
                             <div style={{ margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>

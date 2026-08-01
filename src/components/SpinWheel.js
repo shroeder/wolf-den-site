@@ -256,7 +256,11 @@ export default function SpinWheel() {
             </div>
 
             <div className={`cw-charge${st.golden ? " is-full" : ""}`}>
-                <span className="cw-charge-lab">{st.golden ? "★ GOLDEN SPIN READY — guaranteed rare+" : "Lucky Charge"}</span>
+                {/* Says what it BUYS you, not just what it is called. A bar reading "Lucky Charge 3/20" tells you
+                    nothing about why you would want it; the payoff only appeared once the bar was already full. */}
+                <span className="cw-charge-lab">{st.golden
+                    ? "★ GOLDEN SPIN READY — guaranteed rare+"
+                    : `Lucky Charge — ${Math.max(0, st.chargeMax - st.charge)} more spin${st.chargeMax - st.charge === 1 ? "" : "s"} to a guaranteed rare`}</span>
                 <span className="cw-charge-bar"><span style={{ width: `${st.golden ? 100 : chargePct}%` }} /></span>
                 {!st.golden ? <span className="cw-charge-n">{st.charge}/{st.chargeMax}</span> : null}
             </div>
