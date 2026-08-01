@@ -241,6 +241,11 @@ const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.
 //
 // Each kind reads the art the game already owns. A missing row is null, not a throw: no art should ever cost
 // somebody their reward — that's the whole failure being fixed here.
+// Where each prize LANDS. Fishing scatters rewards across four other screens — fragments onto the boat, seeds
+// into the farm bag, gear into the pack, pets into the pet list — and the reveal named none of them. A member
+// hauled up fragments two days running and asked the whole Den "I don't know where they went lol", which is a
+// reward that may as well not have paid out.
+
 async function haulSprite(kind, id = null, chestTier = null) {
     try {
         if (kind === "fragment") {
@@ -284,12 +289,12 @@ async function grantHaul(buyerId, kind, tier = "common") {
         // since day one — they're pieces you forge into a treasure chest — and inventing a third name for the
         // same object left people asking what a Hull Shard even was. It also collided with the Forge's salvage
         // tiers (Cinder Scrap … Emberheart Shard), which are a completely unrelated currency.
-        return { kind: "fragment", label: n > 1 ? `${n} Chest Fragments` : "Chest Fragment", emoji: "🔷", n, spriteUrl: await haulSprite("fragment") };
+        return { kind: "fragment", label: n > 1 ? `${n} Chest Fragments` : "Chest Fragment", emoji: "🔷", n, where: "Stored on your boat", spriteUrl: await haulSprite("fragment") };
     }
     if (kind === "seed") {
         const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
         const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
-        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, spriteUrl: await haulSprite("seed", seed.id) } : null;
+        return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seed.id) } : null;
     }
     if (kind === "consumable") {
         const pool = FISH_CONSUMABLES.slice(0, (CONSUMABLE_REACH[tier] ?? 2) + 1);
@@ -297,21 +302,21 @@ async function grantHaul(buyerId, kind, tier = "common") {
         const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
         await grantConsumable(buyerId, id, 1).catch(() => {});
         const def = CONSUMABLES?.[id];
-        return { kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id, spriteUrl: await haulSprite("consumable", id) };
+        return { kind: "consumable", label: def?.name || "Supply", emoji: def?.emoji || "🧪", id, where: "Added to your supplies", spriteUrl: await haulSprite("consumable", id) };
     }
     if (kind === "gear") {
         const item = await grantFishingGear(buyerId, tier).catch(() => null);
-        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity, spriteUrl: await haulSprite("gear", item.id) } : null;
+        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity, where: "Added to your gear bag", spriteUrl: await haulSprite("gear", item.id) } : null;
     }
     if (kind === "chest") {
         const chest = CHEST_TIER[tier] || "wooden";
         await addChests(buyerId, { [chest]: 1 }, { source: "fishing" }).catch(() => {});
-        return { kind: "chest", label: `${chest[0].toUpperCase()}${chest.slice(1)} Chest`, emoji: "🧰", tier: chest, spriteUrl: await haulSprite("chest", null, chest) };
+        return { kind: "chest", label: `${chest[0].toUpperCase()}${chest.slice(1)} Chest`, emoji: "🗝️", tier: chest, where: "Waiting in your chests", spriteUrl: await haulSprite("chest", null, chest) };
     }
     if (kind === "pet") {
         const { maybeGrantFishingPet } = await import("@/lib/marketplace/pet-drops.js");
         const pet = await maybeGrantFishingPet(buyerId, tier).catch(() => null);
-        return pet ? { kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity, spriteUrl: await haulSprite("pet", pet.id) } : null;
+        return pet ? { kind: "pet", label: pet.name, emoji: "🐾", id: pet.id, rarity: pet.rarity, where: "Joined your pets", spriteUrl: await haulSprite("pet", pet.id) } : null;
     }
     return null;
 }

@@ -573,12 +573,19 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                                     {result.prize.n > 1 ? <span className="fish-reveal-count">×{result.prize.n}</span> : null}
                                 </span>
                             ) : (
-                                <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🧰"}</span>
+                                // 🧰 used to be the fallback here, and when a haul paid nothing it rendered a
+                                // toolbox labelled "Something". Members asked each other for days what the
+                                // "tool box looking things" were — they were our placeholder for empty. A
+                                // treasure chest is what an unknown haul should look like.
+                                <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🗝️"}</span>
                             )}
                         </div>
                         <div className="fish-name" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
                         <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>
                         <p className="fish-copy">You hauled it up off the sea floor — no fish this time.</p>
+                        {/* Fishing pays into four other screens. Saying which one turns a reward the member
+                            can't find into one they can go and use. */}
+                        {result.prize?.where ? <p className="fish-where">📍 {result.prize.where}</p> : null}
                         <div className="fish-actions">
                             <button
                                 type="button"
