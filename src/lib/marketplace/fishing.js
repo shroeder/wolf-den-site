@@ -167,6 +167,49 @@ const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.
 // Grant one haul entry and describe it for the client. Best-effort throughout: failing to hand over a bonus
 // must never cost the member the thing they just landed. `tier` scales the reward and is the fish's rarity for
 // a bonus, or the treasure's own rolled tier when the cast came up treasure instead of a fish.
+// ── ART FOR A TREASURE HAUL ──────────────────────────────────────────────────────────────────────────────────
+//
+// This was CALLED in six places and DEFINED in none. Under ESM that's a ReferenceError at call time, and every
+// call site sits inside `grantHaul`, whose result is `.catch(() => null)`-ed by the caller — so the throw was
+// swallowed and the cast reported treasure with no prize. Worse, the last commit to touch it added the call to
+// the FRAGMENT path, which is the fallback used when a real haul can't be granted, so the safety net broke too
+// and every treasure since paid out literally nothing.
+//
+// Each kind reads the art the game already owns. A missing row is null, not a throw: no art should ever cost
+// somebody their reward — that's the whole failure being fixed here.
+async function haulSprite(kind, id = null, chestTier = null) {
+    try {
+        if (kind === "fragment") {
+            const r = await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'chest_fragment'`).catch(() => null);
+            return r?.url || null;
+        }
+        if (kind === "seed" && id) {
+            const r = await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = $1`, [`crop_${id}_ripe`]).catch(() => null);
+            return r?.url || null;
+        }
+        if (kind === "consumable" && id) {
+            const r = await db.queryOne(`SELECT url FROM mkt_consumable_sprite WHERE consumable_id = $1`, [id]).catch(() => null);
+            return r?.url || null;
+        }
+        if (kind === "gear" && id) {
+            const r = await db.queryOne(`SELECT url FROM mkt_item_sprite WHERE item_id = $1`, [id]).catch(() => null);
+            return r?.url || null;
+        }
+        if (kind === "chest" && chestTier) {
+            const { getChestArt } = await import("@/lib/marketplace/chest-art.js");
+            const art = await getChestArt().catch(() => ({}));
+            const v = art?.[chestTier];
+            return (typeof v === "string" ? v : v?.url) || null;
+        }
+        if (kind === "pet" && id) {
+            const { getPetSpriteData } = await import("@/lib/marketplace/pet-sprite.js");
+            const map = await getPetSpriteData().catch(() => ({}));
+            return map?.[id]?.url || null;
+        }
+    } catch { /* art is a nicety; the reward is not */ }
+    return null;
+}
+
 async function grantHaul(buyerId, kind, tier = "common") {
     if (!kind || kind === "nothing") return null;
     if (kind === "fragment") {
