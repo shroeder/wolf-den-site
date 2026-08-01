@@ -1040,19 +1040,52 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 {/* TOOLS FIRST. They were the last thing on the longest section of a long scroll, which is why they read
                     as an afterthought — they are the most interesting part of digging. */}
                 <div className="sail-tools-head">🧰 Tools <span className="muted">· fire as random procs while you dig — invest to raise the chance</span></div>
-                <div className="sail-tools-list">
+                {/* Same card shape as the excavation tracks below: sprite, level pips, a now → next readout and
+                    one buy button. These used to be a flat emoji row, which made the most interesting part of
+                    digging read as a footnote next to the tracks it sits above. */}
+                <div className="sail-upgrades is-tools">
                     {(state.digTools?.tools || []).map((t) => (
-                        <div className={`sail-tool${t.unlocked ? " is-unlocked" : ""}`} key={t.id}>
-                            <span className="sail-tool-emoji">{t.unlocked ? t.emoji : "🔒"}</span>
-                            <div className="sail-tool-body">
-                                <div className="sail-tool-name">{t.name}{t.unlocked ? <span className="muted"> · {(t.procNow * 100).toFixed(1)}% proc</span> : null}</div>
-                                <div className="muted sail-tool-desc">Clears {t.area}{t.layers > 1 ? `, ${t.layers} deep` : ""}{t.unlocked ? ` · Lv ${t.level}/${t.max}` : ` · ${t.toUnlock} more dig upgrade${t.toUnlock === 1 ? "" : "s"} to unlock`}</div>
+                        <div className={`sail-upg sail-tool${t.unlocked ? "" : " is-locked"}${t.maxed ? " is-maxed" : ""}${upgFlash === `tool:${t.id}` ? " is-bought" : ""}`} key={t.id}>
+                            <div className="sail-tool-head">
+                                <span className="sail-tool-art">
+                                    {t.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={t.sprite} alt="" className="sail-tool-img" />
+                                    ) : <span className="sail-tool-emoji">{t.emoji}</span>}
+                                    {t.unlocked ? null : <span className="sail-tool-lock" aria-hidden="true">🔒</span>}
+                                </span>
+                                <div className="sail-tool-headtext">
+                                    <span className="sail-upg-title">{t.name}</span>
+                                    <span className="muted sail-upg-lv">{t.unlocked ? `Lv ${t.level}/${t.max}` : "Locked"}</span>
+                                </div>
                             </div>
+                            {/* Pips, not a bar — five discrete levels read better as five things you can fill. */}
+                            <div className="sail-tool-pips" aria-hidden="true">
+                                {Array.from({ length: t.max }).map((_, i) => (
+                                    <span key={i} className={`sail-pip${t.unlocked && i < t.level ? " is-on" : ""}`} />
+                                ))}
+                            </div>
+                            <p className="muted sail-upg-desc">
+                                Blasts a {t.area} area{t.layers > 1 ? ` and ${t.layers} layers deep` : ""} in one hit — {t.tiles} tiles.
+                            </p>
                             {t.unlocked ? (
-                                t.maxed ? <button className="pill" disabled>✓ Max</button>
-                                    : state.gold < t.cost ? <CoinCta price={t.cost} have={state.gold} />
-                                        : <button className="btn-ghost sail-tool-buy" disabled={busy} title={`→ ${(t.procNext * 100).toFixed(1)}%`} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}>🪙 {t.cost.toLocaleString()}</button>
-                            ) : null}
+                                <div className="sail-upg-effect">
+                                    <span>Proc chance</span>
+                                    <b>{(t.procNow * 100).toFixed(1)}%{t.maxed ? "" : <> → <span className="sail-upg-next">{(t.procNext * 100).toFixed(1)}%</span></>}</b>
+                                </div>
+                            ) : (
+                                <div className="sail-tool-unlock">
+                                    <div className="sail-tool-unlockbar" aria-hidden="true">
+                                        <span style={{ width: `${Math.min(100, ((state.digTools?.points ?? 0) / t.unlockPoints) * 100)}%` }} />
+                                    </div>
+                                    <span className="muted">{state.digTools?.points ?? 0}/{t.unlockPoints} dig upgrades — {t.toUnlock} to go</span>
+                                </div>
+                            )}
+                            {t.unlocked ? (
+                                t.maxed ? <button className="pill" disabled>✓ Maxed</button>
+                                    : state.gold < t.cost ? <CoinCta price={t.cost} have={state.gold} className="sail-upg-cta" />
+                                        : <button className="btn-ghost sail-upg-buy" disabled={busy} onClick={() => buyUpgrade(`tool:${t.id}`, "upgrade_tool", { tool: t.id })}>🪙 {t.cost.toLocaleString()}</button>
+                            ) : <button className="pill" disabled>🔒 Locked</button>}
                         </div>
                     ))}
                 </div>

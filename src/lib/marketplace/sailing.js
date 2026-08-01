@@ -348,10 +348,10 @@ const digTrackValue = (t, lvl) => Math.min(DIG_TRACKS[t].cap, Math.max(0, lvl) *
 // 400 weighted chests is a number nobody could relate to a goal. Now it's the thing directly above the tools
 // on the same screen — invest in digging, and digging tools open up. You can see exactly how close you are.
 const DIG_TOOLS = [
-    { id: "wide",      name: "Wide Dig",   emoji: "🪓", unlockPoints: 3,  cols: 2, rows: 2, layers: 1 },
-    { id: "deep",      name: "Deep Blast", emoji: "💥", unlockPoints: 8,  cols: 2, rows: 2, layers: 2 },
-    { id: "quake",     name: "Quake",      emoji: "🌋", unlockPoints: 15, cols: 3, rows: 3, layers: 1 },
-    { id: "cataclysm", name: "Cataclysm",  emoji: "☄️", unlockPoints: 24, cols: 3, rows: 3, layers: 2 },
+    { id: "wide",      name: "Wide Dig",   emoji: "🪓", sprite: "/images/sailing/tool-wide.webp",      unlockPoints: 3,  cols: 2, rows: 2, layers: 1 },
+    { id: "deep",      name: "Deep Blast", emoji: "💥", sprite: "/images/sailing/tool-deep.webp",      unlockPoints: 8,  cols: 2, rows: 2, layers: 2 },
+    { id: "quake",     name: "Quake",      emoji: "🌋", sprite: "/images/sailing/tool-quake.webp",     unlockPoints: 15, cols: 3, rows: 3, layers: 1 },
+    { id: "cataclysm", name: "Cataclysm",  emoji: "☄️", sprite: "/images/sailing/tool-cataclysm.webp", unlockPoints: 24, cols: 3, rows: 3, layers: 2 },
 ];
 // Total levels invested across the five excavation tracks — the tools' unlock currency.
 const digUpgradeLevels = (row) => Object.values(DIG_TRACK_COL).reduce((n, col) => n + (Number(row?.[col]) || 0), 0);
@@ -387,7 +387,8 @@ function toolsView(row) {
         const lvl = Number(levels[t.id]) || 0;
         const unlocked = points >= t.unlockPoints;
         return {
-            id: t.id, name: t.name, emoji: t.emoji, area: `${t.cols}×${t.rows}`, layers: t.layers,
+            id: t.id, name: t.name, emoji: t.emoji, sprite: t.sprite, area: `${t.cols}×${t.rows}`, layers: t.layers,
+            tiles: t.cols * t.rows * t.layers,
             unlocked, unlockPoints: t.unlockPoints,
             // How close you are, so the lock isn't a mystery.
             toUnlock: Math.max(0, t.unlockPoints - points),

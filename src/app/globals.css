@@ -11642,15 +11642,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes digCluePop { 0% { opacity: 0; transform: scale(0.4); } 100% { opacity: 1; transform: scale(1); } }
 /* Excavation tools list (in the Excavation panel). */
 .sail-tools-head { font-weight: 800; font-size: 0.9rem; margin: 14px 0 6px; }
-.sail-tools-list { display: grid; gap: 6px; }
-.sail-tool { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.03); opacity: 0.6; }
-.sail-tool.is-unlocked { opacity: 1; background: rgba(255,255,255,0.05); }
-.sail-tool-emoji { font-size: 1.4rem; flex: 0 0 auto; }
-.sail-tool-body { flex: 1; min-width: 0; }
-.sail-tool-name { font-weight: 800; font-size: 0.86rem; }
-.sail-tool-desc { font-size: 0.76rem; }
-.sail-tool-buy { flex: none; margin-left: auto; }
-.sail-tool .coin-cta { flex: none; margin-left: auto; }
+/* Tools are UPGRADES and now look like them — the same card as .sail-upg, so the eye reads the tools and the
+   excavation tracks below as one system instead of a list and then a grid. */
+.sail-upgrades.is-tools { margin-bottom: 14px; }
+.sail-tool { position: relative; }
+.sail-tool.is-locked { opacity: 0.72; }
+.sail-tool-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+/* Round bezel, same treatment the forge parts and pet portraits get. */
+.sail-tool-art { position: relative; flex: 0 0 auto; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+    background: radial-gradient(circle at 40% 30%, rgba(255,214,140,0.16), rgba(0,0,0,0.28)); border: 1px solid rgba(214,158,80,0.4); }
+.sail-tool-img { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)); }
+.sail-tool.is-locked .sail-tool-img { filter: grayscale(1) brightness(0.55); }
+.sail-tool-emoji { font-size: 1.5rem; }
+.sail-tool-lock { position: absolute; right: -4px; bottom: -4px; font-size: 0.85rem; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+.sail-tool-headtext { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+/* Five discrete levels read better as five pips you can fill than as a continuous bar. */
+.sail-tool-pips { display: flex; gap: 4px; margin-bottom: 7px; }
+.sail-pip { flex: 1 1 auto; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); transition: background 0.18s ease, box-shadow 0.18s ease; }
+.sail-pip.is-on { background: linear-gradient(90deg, #e8b264, #ffd89a); box-shadow: 0 0 6px rgba(232,178,100,0.55); }
+/* Locked tools show the distance to unlocking rather than just saying "locked". */
+.sail-tool-unlock { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; margin: 2px 0 8px; }
+.sail-tool-unlockbar { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.sail-tool-unlockbar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, rgba(214,158,80,0.75), rgba(255,216,154,0.95)); transition: width 0.3s ease; }
 /* A dig tool procced — a quick flourish above the grid. */
 /* A tool proc is an EVENT, so it gets an event's worth of animation instead of a line of text parked over the
    board. Three pieces: a shockwave ring that expands out of the tile you just dug, the tool's own icon kicking
