@@ -410,7 +410,11 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
 
 // Image-to-image: transform a reference PNG with a prompt (gpt-image-1 edits). Used to redraw a member's
 // avatar as a full-body sprite so it actually matches their avatar. Returns the stored Blob URL.
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", meta = {} } = {}) {
+// faceRight/deHalo/resizeTo are accepted here for the SAME reason generateImage takes them: an edited sprite is
+// still a sprite and needs the same finishing. They were missing, so anything produced by editing skipped the
+// die-cut halo cleanup and the facing check entirely — visible as a grey rim on evolved pet art, and as a
+// creature that could evolve into facing the wrong way with nothing to catch it.
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", faceRight = false, deHalo = false, resizeTo = null, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -425,7 +429,6 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     // full painted backdrops while Lv1-3 were clean cutouts.
     form.append("background", "transparent");
     form.append("output_format", "png");
-    form.append("background", "transparent");
     form.append("n", "1");
 
     const resp = await fetch(IMAGE_EDITS_URL, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
@@ -441,8 +444,10 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
         throw new Error("OpenAI returned no image");
     }
 
-    const buffer = Buffer.from(b64, "base64");
-    const url = await storeImage(buffer, pathPrefix, { maxWidth: SCENE_MAX_PX });
+    let buffer = Buffer.from(b64, "base64");
+    if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
+    if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
+    const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SCENE_MAX_PX });
     // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
     // draw of the same size — estimateImageCost() adds that when edit is true.
     await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, url, ...meta });

@@ -294,7 +294,8 @@ export async function salvageItem(buyerId, itemId) {
     const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
     const unowned = REGALIA_IDS.filter((r) => !ownedReg.has(r));
     if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantItem(buyerId, pick, "forge").catch(() => {}); regaliaDrop = itemById(pick)?.name || pick; }
-    const xp = 6 + cfg.tier * 4;
+    // Salvaging is done in bulk — 585 times a week — so this reads small per action and lands as 5% of all XP.
+    const xp = 4 + cfg.tier * 3;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop }).catch(() => {});
 

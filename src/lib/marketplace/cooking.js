@@ -335,27 +335,39 @@ const DROP_WEIGHT = { 1: 40, 2: 28, 3: 18, 4: 10, 5: 4 };
 // Each source now declares the BAND it can drop from. A wooden chest can't cough up a Legendary recipe no
 // matter how many you open; the top tiers only come out of things you can't farm on demand — a boss kill, an
 // ascendant chest, a deep dig, a raid win. That's what makes owning one mean something.
+// Measured against real 7-day volumes (scripts/audit-recipe-rates.mjs), not guessed. The first pass ran at
+// 194.8 recipes/wk across 55 active members = 3.54 each, a full 64-recipe book in 18 weeks — and chests plus
+// harvest were 53% of every drop, so "spread it across all the systems" had in practice become "farm and open
+// chests". These rates land ~1.9/member/wk (a book in ~33 weeks) with chests+harvest down to 42%.
+//
+// The high-VOLUME actions are cut hardest: harvest, chests, spin, pet bonding and salvage fire hundreds of
+// times a week each, so a rate that looks small there swamps everything else. The low-volume, deliberate ones
+// (digging, the forge, a rare deal) are RAISED — they were contributing single digits, which is exactly the
+// problem, because those are the moments worth remembering.
+//
+// Re-run the audit after any change here; the tier BANDS below are separate and stay as they are — a wooden
+// chest still cannot yield a Legendary, so the top tiers remain gated by band regardless of rate.
 export const RECIPE_SOURCES = {
-    harvest:      { min: 1, max: 2, chance: 0.040 }, // the field: the common stuff, often
-    fish:         { min: 1, max: 2, chance: 0.030 }, // the same, at sea
-    chest_wooden: { min: 1, max: 2, chance: 0.060 },
-    chest_iron:   { min: 2, max: 3, chance: 0.080 },
-    chest_gold:   { min: 2, max: 3, chance: 0.110 },
-    chest_high:   { min: 3, max: 5, chance: 0.180 }, // mythic and above
-    dig:          { min: 2, max: 3, chance: 0.035 },
-    dig_deep:     { min: 3, max: 4, chance: 0.090 }, // a tool proc, not an ordinary dig
-    raid_win:     { min: 3, max: 4, chance: 0.070 },
+    harvest:      { min: 1, max: 2, chance: 0.015 }, // the field: 1039 harvests/wk, so this dominates at any rate
+    fish:         { min: 1, max: 2, chance: 0.018 }, // the same, at sea
+    chest_wooden: { min: 1, max: 2, chance: 0.025 },
+    chest_iron:   { min: 2, max: 3, chance: 0.035 },
+    chest_gold:   { min: 2, max: 3, chance: 0.055 },
+    chest_high:   { min: 3, max: 5, chance: 0.110 }, // mythic and above
+    dig:          { min: 2, max: 3, chance: 0.050 }, // RAISED — low volume, and finding one buried is the fantasy
+    dig_deep:     { min: 3, max: 4, chance: 0.140 }, // RAISED — a tool proc, not an ordinary dig
+    raid_win:     { min: 3, max: 4, chance: 0.040 },
     boss_kill:    { min: 4, max: 5, chance: 0.350 }, // weekly, shared, and the main route to the top tiers
-    forge:        { min: 2, max: 4, chance: 0.030 }, // enhancing at the anvil
-    salvage:      { min: 1, max: 2, chance: 0.020 }, // dismantling — you find a note in the lining
-    town_merchant:{ min: 3, max: 4, chance: 0.120 }, // the travelling merchant's stock
-    barkeep:      { min: 1, max: 3, chance: 0.090 }, // the daily pint: he tells you how it's made
-    crier:        { min: 2, max: 3, chance: 0.100 }, // the town crier's announcements
-    gamble:       { min: 2, max: 4, chance: 0.060 }, // tavern dice
-    spin:         { min: 1, max: 3, chance: 0.050 }, // the daily wheel
-    daily_deal:   { min: 2, max: 4, chance: 0.150 }, // a rare deal bought from the shop
-    pet_bond:     { min: 1, max: 3, chance: 0.030 }, // a pet digs one up for you
-    town_raid:    { min: 3, max: 4, chance: 0.080 }, // the plaza skirmishes
+    forge:        { min: 2, max: 4, chance: 0.060 }, // RAISED — enhancing at the anvil, only ~87 a week
+    salvage:      { min: 1, max: 2, chance: 0.010 }, // dismantling — you find a note in the lining
+    town_merchant:{ min: 3, max: 4, chance: 0.160 }, // RAISED — the travelling merchant's stock
+    barkeep:      { min: 1, max: 3, chance: 0.130 }, // RAISED — the daily pint: he tells you how it's made
+    crier:        { min: 2, max: 3, chance: 0.140 }, // RAISED — the town crier's announcements
+    gamble:       { min: 2, max: 4, chance: 0.090 }, // RAISED — tavern dice
+    spin:         { min: 1, max: 3, chance: 0.025 }, // the daily wheel — 401/wk, so it was a top-three source
+    daily_deal:   { min: 2, max: 4, chance: 0.220 }, // RAISED — a rare deal bought from the shop
+    pet_bond:     { min: 1, max: 3, chance: 0.015 }, // 643 pettings/wk once petting actually counted
+    town_raid:    { min: 3, max: 4, chance: 0.100 }, // RAISED — the plaza skirmishes
     cook:         { min: 1, max: 3, chance: 0.045 }, // cooking teaches you the next thing to cook
 };
 
@@ -863,4 +875,36 @@ export async function devReset(buyerId) {
     await db.query(`DELETE FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await db.query(`DELETE FROM mkt_kitchen WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getKitchenState(buyerId)) };
+}
+
+/**
+ * Another member's recipe book, for their public profile.
+ *
+ * Shows the same shape the Kitchen shows you about yourself: what they've found, what they haven't, and how far
+ * along they are. Browsing someone with a fuller book is the point — it's the thing that makes you want to go
+ * looking for the one you're missing.
+ *
+ * GATED ON THE VIEWER, not the owner. The Kitchen is still owner-only, so this returns null for anyone who
+ * can't cook yet — otherwise a profile page would advertise an unreleased feature to everybody.
+ *
+ * Names only for recipes they DON'T have: it says what exists to chase without handing over the tier's reward
+ * ladder, which is what the Kitchen is for.
+ */
+export async function getMemberRecipeBook(viewerId, ownerId) {
+    if (!COOK_UNLOCKED(viewerId) || !ownerId) return null;
+    const rows = await db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [ownerId]).catch(() => []);
+    const known = new Map(rows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
+    const sprites = await cookingSprites().catch(() => ({}));
+    const byTier = new Map();
+    for (const r of RECIPES) {
+        const t = Number(r.tier) || 1;
+        if (!byTier.has(t)) byTier.set(t, { tier: t, name: tierMeta(t).name, color: tierMeta(t).color, have: 0, total: 0, recipes: [] });
+        const g = byTier.get(t);
+        g.total += 1;
+        const has = known.has(r.id);
+        if (has) g.have += 1;
+        g.recipes.push({ id: r.id, name: r.name, kind: r.kind, has, timesCooked: has ? known.get(r.id) : 0, sprite: has ? sprites[r.id] || null : null });
+    }
+    const tiers = [...byTier.values()].sort((a, b) => a.tier - b.tier);
+    return { known: known.size, total: RECIPES.length, cooked: [...known.values()].reduce((n, v) => n + v, 0), tiers };
 }

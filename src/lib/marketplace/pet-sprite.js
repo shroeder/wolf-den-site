@@ -253,8 +253,12 @@ export async function generatePetSpriteLevel(petId, level) {
     if (baseRow?.url) {
         try {
             const buf = Buffer.from(await (await fetch(baseRow.url)).arrayBuffer());
+            // faceRight + deHalo must be passed here too. The text branch below has always set them; this one
+            // never did, so an evolved sprite kept the die-cut rim every other sprite has cleaned off and had
+            // nothing enforcing which way it faced.
             url = await editImage(buf, buildPetSpriteLevelEditPrompt(pet, lv), {
-                size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", meta: { ...meta, label: `${meta.label} (from Lv1)` },
+                size: "1024x1024", pathPrefix: "marketplace/pet", quality: "high", faceRight: true, deHalo: true,
+                meta: { ...meta, label: `${meta.label} (from Lv1)` },
             });
         } catch { url = null; }
     }

@@ -4,9 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import { enableWebPush, isWebPushSupported } from "@/lib/web-push-client";
 
-// First-visit "Getting started" card: enable notifications + location, each granting gold once. Hides itself
-// once every task is claimed (or when dismissed). Clicking a task triggers the real browser permission prompt,
-// and only on a genuine grant does it claim the reward.
+// "Getting started" — a first-week ramp, not a permissions prompt. Two kinds of row:
+//
+//   The two SETUP rows have a button. Clicking one triggers the real browser permission prompt and only a
+//   genuine grant claims the reward.
+//
+//   Every other row is VERIFIED SERVER-SIDE from what the member actually did and pays out on its own, so it
+//   has no button — just the gold it's worth. Play the game and the list ticks itself off.
+//
+// Hides itself once every task is claimed (or when dismissed).
 // iOS Safari only allows web push from an app added to the Home Screen (a standalone PWA) — never a plain tab.
 function iosNeedsInstall() {
     if (typeof navigator === "undefined" || typeof window === "undefined") return false;
@@ -82,6 +88,7 @@ export default function GettingStarted() {
     if (!tasks || hidden) return null;
     if (tasks.every((t) => t.claimed)) return null; // all done → gone
     const bonusLeft = tasks.reduce((s, t) => s + (t.claimed ? 0 : t.gold), 0);
+    const done = tasks.filter((t) => t.claimed).length;
 
     return (
         <section className="card getting-started">
@@ -90,7 +97,12 @@ export default function GettingStarted() {
                 {flash ? <span className="gs-flash">{flash}</span> : null}
                 <button type="button" onClick={() => setHidden(true)} aria-label="Dismiss" className="gs-x">×</button>
             </div>
-            <p className="gs-sub">Two quick taps — grab <b>{bonusLeft.toLocaleString()} 🪙</b> in setup bonuses.</p>
+            <p className="gs-sub">
+                <b>{done}/{tasks.length}</b> done · <b>{bonusLeft.toLocaleString()} 🪙</b> still on the table.
+            </p>
+            {/* A progress bar, because this is now a first-week ramp rather than two taps — you should be able to
+                see how far in you are without counting rows. */}
+            <div className="gs-track" aria-hidden="true"><span style={{ width: `${tasks.length ? (done / tasks.length) * 100 : 0}%` }} /></div>
             {tasks.map((t) => (
                 <div key={t.key} className={`gs-row${t.claimed ? " is-done" : ""}`}>
                     <span className="gs-ico" aria-hidden="true">{t.icon}</span>
@@ -98,9 +110,13 @@ export default function GettingStarted() {
                         <b>{t.label}</b>
                         <span>{t.desc}</span>
                     </div>
+                    {/* `auto` tasks have no button on purpose: they're verified from what you actually did and
+                        pay out on their own. A "claim" button on something already earned is just a chore. */}
                     {t.claimed
                         ? <span className="gs-claimed">✓ +{t.gold}</span>
-                        : <button type="button" className="gs-btn" disabled={busy === t.key} onClick={() => doTask(t.key)}>{busy === t.key ? "…" : `Enable · +${t.gold}`}</button>}
+                        : t.auto
+                            ? <span className="gs-pending">+{t.gold} 🪙</span>
+                            : <button type="button" className="gs-btn" disabled={busy === t.key} onClick={() => doTask(t.key)}>{busy === t.key ? "…" : `Enable · +${t.gold}`}</button>}
                 </div>
             ))}
             {note ? <p className="gs-note">💡 {note}</p> : null}
@@ -109,6 +125,9 @@ export default function GettingStarted() {
                 .gs-head { display: flex; align-items: center; gap: 8px; }
                 .gs-head > b { font-size: 14px; color: #ffe08a; letter-spacing: 0.02em; }
                 .gs-flash { font-size: 12px; font-weight: 900; color: #ffd75e; animation: fdPop .4s cubic-bezier(.2,1.3,.3,1) both; }
+                .gs-track { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 0 0 10px; }
+                .gs-track > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffd75e, #ffb347); transition: width .45s ease; }
+                .gs-pending { font-size: 12px; font-weight: 900; color: #9c8f7a; white-space: nowrap; }
                 .gs-x { margin-left: auto; background: none; border: none; color: #b9a892; font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px; }
                 .gs-sub { margin: 3px 0 10px; font-size: 12px; color: #cbb99a; }
                 .gs-sub b { color: #ffcf7a; }

@@ -70,7 +70,7 @@ const DUEL_THROTTLE_MS = 700;
 //
 // The per-raid CEILINGS below are what actually guard the economy (DUEL_GOLD_BUDGET / DUEL_XP_BUDGET), so
 // raising the per-kill rate makes a raid feel generous without raising what one person can extract from it.
-const DUEL_WIN_XP = 14;
+const DUEL_WIN_XP = 11;
 const DUEL_WIN_GOLD = 16;
 const DUEL_LOSS_GOLD = 5;       // consolation so a loss is never nothing
 const DUEL_LOOT_CHANCE = 0.18;  // chance a WIN also drops a low-tier chest
@@ -86,7 +86,11 @@ const DUEL_GOLD_BUDGET = 600;
 // Was 700/day. Duels were the single biggest XP source in the game (567 of them in a week) and they're
 // grindable on one screen, so the daily ceiling comes down rather than the per-duel payout — a member who
 // duels a lot still gets the fun, just not the levels.
-const DUEL_XP_BUDGET = 450;
+// 450/day made duelling the biggest XP source in the game — 567 duels a week, 15,060 XP, 10.2% of everything
+// earned by everyone. It is also the most repeatable thing available, which is the combination that levels
+// people fast. The BUDGET is the right lever rather than the per-win amount: a win still feels the same, the
+// day just stops paying sooner.
+const DUEL_XP_BUDGET = 280;
 // ── BOSS RAID (the golem) ── everyone strikes a shared HP pool; killing it ends the raid. No per-hit rewards —
 // only a fat COMPLETION reward to everyone who joined the fight (clearly better than a skirmish raid).
 const BOSS_STRIKE_THROTTLE_MS = 2600; // one timing swing per ~2.6s — the bar needs time to sweep

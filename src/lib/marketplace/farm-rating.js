@@ -15,9 +15,12 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 const RATES_PER_DAY = 3; // rating charges per day — spent on a NEW rating OR changing an existing one
 
 export const RATE_TIERS = {
-    1: { key: "like", label: "Like", icon: "👍", color: "#7ec8ff", raterXp: 12, ownerXp: 18, blurb: "Nice farm!" },
-    2: { key: "love", label: "Love", icon: "❤️", color: "#ff6fae", raterXp: 22, ownerXp: 34, blurb: "Love it!" },
-    3: { key: "admire", label: "Admire", icon: "⭐", color: "#ffd75e", raterXp: 40, ownerXp: 60, blurb: "Absolutely admire it!" },
+    // Trimmed ~35%. Between them these two paid 8,128 XP a week (5.5% of all XP) for visiting a farm and
+    // pressing a button, and the OWNER's half is XP for having been visited — the most passive income here.
+    // Ratings should still be worth giving and getting; they should not out-earn playing.
+    1: { key: "like", label: "Like", icon: "👍", color: "#7ec8ff", raterXp: 8, ownerXp: 12, blurb: "Nice farm!" },
+    2: { key: "love", label: "Love", icon: "❤️", color: "#ff6fae", raterXp: 15, ownerXp: 22, blurb: "Love it!" },
+    3: { key: "admire", label: "Admire", icon: "⭐", color: "#ffd75e", raterXp: 26, ownerXp: 38, blurb: "Absolutely admire it!" },
 };
 export const tierMeta = (t) => RATE_TIERS[t] || null;
 

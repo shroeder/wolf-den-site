@@ -10,11 +10,13 @@ import ProfileActions from "@/components/ProfileActions";
 import PublicFishing from "@/components/PublicFishing";
 import PublicGear from "@/components/PublicGear";
 import PublicPets from "@/components/PublicPets";
+import PublicRecipeBook from "@/components/PublicRecipeBook";
 import UserBadges from "@/components/UserBadges";
 import UserLevel from "@/components/UserLevel";
 import { backgroundClass } from "@/lib/marketplace/backgrounds.js";
 import { frameClass } from "@/lib/marketplace/frames.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
+import { getMemberRecipeBook } from "@/lib/marketplace/cooking.js";
 import { memberFishLog } from "@/lib/marketplace/fishing.js";
 import { fishingUnlocked } from "@/lib/marketplace/sailing.js";
 import { collectibleById, petActive, petPassive, petSpecialPassive, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
@@ -98,6 +100,9 @@ export default async function UserProfilePage({ params }) {
     // Owner-gated: only someone who can fish sees anyone's fishing log, so an unreleased feature doesn't
     // surface on every member profile in the Den.
     const fishLog = viewer && fishingUnlocked(viewer.id) ? await memberFishLog(profile.id).catch(() => null) : null;
+    // Same viewer-gate as the fishing log, and for the same reason: the Kitchen is still owner-only, so a
+    // recipe book must not appear on every profile in the Den before the feature is public.
+    const recipeBook = viewer ? await getMemberRecipeBook(viewer.id, profile.id).catch(() => null) : null;
     const petsData = (pets.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
@@ -202,6 +207,15 @@ export default async function UserProfilePage({ params }) {
             {/* Their fishing collection. Gated on the VIEWER being able to fish at all — fishing is still
                 owner-only, so this must not advertise itself on every profile in the Den. Renders nothing
                 unless they've actually landed something. */}
+            {/* Owner-gated exactly like the fishing log above. Renders nothing until they've found a recipe. */}
+            {recipeBook?.known ? (
+                <section className="card">
+                    <h2 style={{ marginTop: 0 }}>📖 Recipe Book</h2>
+                    <p className="muted" style={{ marginTop: 0 }}>What {profile.displayLabel} has learned to cook.</p>
+                    <PublicRecipeBook book={recipeBook} displayLabel={profile.displayLabel} />
+                </section>
+            ) : null}
+
             {fishLog?.caught?.length ? (
                 <section className="card">
                     <h2 style={{ marginTop: 0 }}>🎣 Fishing Log</h2>
