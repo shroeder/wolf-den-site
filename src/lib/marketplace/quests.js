@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -48,10 +49,10 @@ export const QUEST_TEMPLATES = [
     // ── Kitchen ──────────────────────────────────────────────────────────────────────────────────────────
     // The daily pool was boss- and chest-heavy: the same handful of fights every day regardless of what the
     // member actually plays. These send you to the systems that shipped after the pool was written.
-    { key: "cook_a_dish", label: "Cook a dish", metric: "cook_dish", target: 1, gold: 130, area: "/marketplace/cooking", cta: "Get cooking" },
-    { key: "cook_three", label: "Cook 3 dishes", metric: "cook_dish", target: 3, gold: 240, chest: "wooden", area: "/marketplace/cooking", cta: "Get cooking" },
-    { key: "cook_a_prep", label: "Prep an ingredient", metric: "cook_prep", target: 1, gold: 110, area: "/marketplace/cooking", cta: "Get cooking" },
-    { key: "cook_clean_run", label: "Cook a dish with a clean run", metric: "cook_clean", target: 1, gold: 200, area: "/marketplace/cooking", cta: "Get cooking" },
+    { key: "cook_a_dish", label: "Cook a dish", metric: "cook_dish", target: 1, gold: 130, area: "/marketplace/cooking", cta: "Get cooking", ownerOnly: true },
+    { key: "cook_three", label: "Cook 3 dishes", metric: "cook_dish", target: 3, gold: 240, chest: "wooden", area: "/marketplace/cooking", cta: "Get cooking", ownerOnly: true },
+    { key: "cook_a_prep", label: "Prep an ingredient", metric: "cook_prep", target: 1, gold: 110, area: "/marketplace/cooking", cta: "Get cooking", ownerOnly: true },
+    { key: "cook_clean_run", label: "Cook a dish with a clean run", metric: "cook_clean", target: 1, gold: 200, area: "/marketplace/cooking", cta: "Get cooking", ownerOnly: true },
     // ── Fishing ──────────────────────────────────────────────────────────────────────────────────────────
     { key: "fish_one", label: "Land a fish", metric: "fish", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Cast a line" },
     { key: "fish_five", label: "Land 5 fish", metric: "fish", target: 5, gold: 220, chest: "wooden", area: "/marketplace/sailing", cta: "Cast a line" },
@@ -73,16 +74,19 @@ function hashStr(s) {
 }
 
 // Which templates this member is eligible for. Sailing has launched publicly (open to all); the Farm is still
-// Sailing + Farm are both live for everyone now, so every quest template is eligible.
-function eligibleTemplates() {
-    return QUEST_TEMPLATES;
+// Sailing + Farm are both live for everyone now. The Kitchen is not, and a daily bounty pointing at a page the
+// member can't open is worse than one fewer bounty — so unreleased systems are filtered per-member, the same
+// way the feature-daily cards do it. `gate` is deliberately NOT used for this: it's set on the sailing and farm
+// templates and read nowhere, so trusting it would silently do nothing.
+function eligibleTemplates(buyerId) {
+    return QUEST_TEMPLATES.filter((t) => !t.ownerOnly || isOwner(buyerId));
 }
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
 // paid re-roll produces a different set.
 function pickDaily(buyerId, day, reset = false) {
     const salt = reset ? ":r" : "";
-    return eligibleTemplates()
+    return eligibleTemplates(buyerId)
         .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
         .slice(0, 3)

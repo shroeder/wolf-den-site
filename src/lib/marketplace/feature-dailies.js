@@ -14,7 +14,7 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
 export const FEATURE_DAILIES = {
     farm: [
-        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
+        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold", ownerOnly: true },
         { key: "farm_plant2", label: "Plant 2 seeds", metric: "plant_seed", need: 2, reward: { gold: 90 }, rewardLabel: "+90 gold" },
         { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
     ],
@@ -25,14 +25,14 @@ export const FEATURE_DAILIES = {
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
         // the one task you can finish without waiting on a four-hour timer. (Was ownerOnly while fishing was
         // unreleased; the `ownerOnly` filter below is kept for the next feature that needs it.)
-        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
+        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold", ownerOnly: true },
     ],
-    // The Kitchen — PUBLIC as of launch. One task for volume, one for the PREP chain (the part people skip),
-    // and one for skill rather than repetition, so the card can't be cleared by grinding alone.
+    // The Kitchen — ownerOnly again while the recipe economy is settled. One task for volume, one for the PREP
+    // chain (the part people skip), and one for skill rather than repetition.
     cooking: [
         { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
         { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
-        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest", ownerOnly: true },
     ],
 };
 
