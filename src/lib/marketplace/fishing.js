@@ -675,7 +675,11 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const q = clamp01(quality);
     // Gaff comes off the row we just claimed, so a member who levels it mid-cast still gets the old floor.
     const gaffLvl = Number(taken.fish_gaff_level) || 0;
-    const cm = weightFor(species, state.roll, q, gaffLvl) * (1 + (await seaPetPerks(buyerId)).size / 100);   // pounds; column renamed to lb in mig287
+    // Resolved ONCE here and reused below. `seaPets` further up belongs to castLine — a different function —
+    // and referencing it from landFish threw a ReferenceError on every single reel-in, which consumed the cast
+    // (spent in castLine) and then failed to land anything.
+    const seaPets = await seaPetPerks(buyerId);
+    const cm = weightFor(species, state.roll, q, gaffLvl) * (1 + seaPets.size / 100);   // pounds; column renamed to lb in mig287
     const pct = percentileOf(species, cm);
     // Payout scales from 45% of the species value at the small end to full value at the top of its typical
     // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.
