@@ -176,12 +176,15 @@ function pickWeighted(table) {
 async function seaPetPerks(buyerId) {
     try {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        const [bite, size, dredge] = await Promise.all([
+        const [bite, size, dredge, angling, reel] = await Promise.all([
             getPetSystemPerk(buyerId, "angler_bite"),
             getPetSystemPerk(buyerId, "angler_size"),
             getPetSystemPerk(buyerId, "sea_dredge"),
+            // The two PASSIVES — summed across every owned fishing pet, not just the equipped one.
+            getPetSystemPerk(buyerId, "angling"),
+            getPetSystemPerk(buyerId, "reelStrength"),
         ]);
-        return { bite, size, dredge };
+        return { bite: bite + angling, size: size + reel, dredge };
     } catch { return { bite: 0, size: 0, dredge: 0 }; }
 }
 

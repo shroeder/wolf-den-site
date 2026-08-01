@@ -268,6 +268,25 @@ export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 // Lv1 ×1 … Lv5 ×5); the equipped pet adds its signature perk on top (procs are NOT level-scaled).
 // The perk keys that belong to a SYSTEM rather than the boss fight. Kept as a set so combinePetBonuses can
 // route them without a second list to forget to update.
+// ── SYSTEM PASSIVES ───────────────────────────────────────────────────────────────────────────────────────
+// Stats that belong to a system rather than the boss, carried by EVERY OWNED pet rather than the equipped one.
+//
+// These already existed in PET_PASSIVE_STAT, but combinePetBonuses' add() only writes combat/econ keys and
+// silently dropped them — so the only place a pastoral pet's seedLuck was ever read was farmBonuses, which
+// looks at featured_collectible alone. Sixteen pastoral pets in your collection did nothing; the one you had
+// out did. That is an equipped bonus wearing the word "passive".
+//
+// Routed into the `system` bucket now, summed across the whole menagerie, so collecting actually pays.
+export const SYSTEM_PASSIVE_STATS = new Set([
+    "seedLuck", "growSpeed", "petXp",   // farm
+    "angling", "reelStrength",          // fishing
+]);
+// Ceilings on the OWNED total. A full collection at Lv5 with an aura lands near 29 on the farm stats today, so
+// 30 keeps a complete menagerie at roughly its current best while stopping a future pet from pushing past it.
+export const SYSTEM_PASSIVE_CAP = {
+    seedLuck: 30, growSpeed: 30, petXp: 30, angling: 25, reelStrength: 25,
+};
+
 export const SYSTEM_PERK_KEYS = new Set([
     "farm_yield", "farm_speed", "farm_seed",
     "angler_bite", "angler_size", "sea_dredge", "sea_plunder",
@@ -295,7 +314,9 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     for (const pet of ownedPets) {
         const p = petPassive(pet);
         const lm = petPassiveLevelMult(Math.max(1, Number(levelByPet[pet.id]) || 1));
-        add(p.stat, p.value * lm);
+        // System stats go to the `system` bucket; add() would drop them. Everything else is combat/econ.
+        if (SYSTEM_PASSIVE_STATS.has(p.stat)) system[p.stat] = (system[p.stat] || 0) + p.value * lm;
+        else add(p.stat, p.value * lm);
         const sp = petSpecialPassive(pet);
         if (sp) {
             if (sp.secondStat) add(sp.secondStat, sp.secondValue * lm);
@@ -328,6 +349,11 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         }
         else if (SYSTEM_PERK_KEYS.has(def.key)) system[def.key] = capSystemPerk(def.key, v * aMult);
         else add(def.key, v * aMult);
+    }
+    // Cap the OWNED totals. The aura above amplifies stats/economy but deliberately not these — a menagerie
+    // aura multiplying a farm bonus that already stacks over sixteen pets compounds twice.
+    for (const k of Object.keys(system)) {
+        if (SYSTEM_PASSIVE_CAP[k] != null) system[k] = Math.min(SYSTEM_PASSIVE_CAP[k], system[k]);
     }
     return { stats, economy, proc, system };
 }

@@ -29,6 +29,8 @@ export const PET_PASSIVE_BY_RARITY = { common: 1, rare: 2, epic: 4, legendary: 6
 // a combat/econ one. These keys are NOT combat stats, so combinePetBonuses' add() silently ignores them (they
 // never touch the boss); the farm-bonus aggregator reads the EQUIPPED pet's farm passive via petFarmPassive().
 export const FARM_PASSIVE_STATS = new Set(["seedLuck", "growSpeed", "petXp"]);
+// Fishing equivalents, kept separate so petFarmPassive can never claim them.
+export const FISH_PASSIVE_STATS = new Set(["angling", "reelStrength"]);
 // FORGE passive stats — same idea for The Forge: an owned forge pet improves your smithing odds (crafting.js),
 // NOT boss power. These keys aren't combat stats, so the pet combat aggregator ignores them.
 // The four real forge-odds keys, plus "forgemaster" — a UNIQUE legendary passive that boosts ALL of them at
@@ -42,6 +44,10 @@ export const FORGE_PASSIVE_STATS = new Set([...FORGE_ODDS_KEYS, "forgemaster"]);
 export const COOK_ODDS_KEYS = ["hot_hands", "generous", "thrifty", "prep_cook"];
 export const COOK_PASSIVE_STATS = new Set([...COOK_ODDS_KEYS, "kitchen_master"]);
 export const PET_PASSIVE_STAT = {
+    // FISHING passives — the four pets you EARN from fishing carried no passive override at all, so the pets
+    // you get for fishing did nothing for fishing. `angling` already runs pet -> equippedSeaAffinity ->
+    // anglingEffects; `reelStrength` is its partner on the landing side.
+    reef_seahorse: "angling", lantern_jelly: "angling", deep_angler: "reelStrength", tidecaller: "reelStrength",
     // Level
     bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
     wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",

@@ -39,6 +39,18 @@ export async function farmBonuses(buyerId) {
     // (c) equipped pet farm passive (pastoral pets only) — value by rarity
     const pet = buyer?.featured_collectible ? collectibleById(buyer.featured_collectible) : null;
     const petFarm = petFarmPassive(pet);
+    // (f) THE WHOLE MENAGERIE — every owned pastoral pet, not just the one you have out. These stats sat in
+    // PET_PASSIVE_STAT (the "passive" map) but the only reader was this function, which looks at the equipped
+    // pet alone — so owning sixteen pastoral pets did nothing. Capped in combinePetBonuses, then folded in
+    // here under the same BUFF_CAP as everything else.
+    let ownedFarm = {};
+    try {
+        const { getPetCombatBonus } = await import("@/lib/marketplace/pet-combat.js");
+        ownedFarm = (await getPetCombatBonus(buyerId))?.system || {};
+    } catch { ownedFarm = {}; }
+    for (const k of ["seedLuck", "growSpeed", "petXp"]) {
+        if (ownedFarm[k]) out[k] = (out[k] || 0) + ownedFarm[k];
+    }
     if (petFarm && out[petFarm.stat] != null) out[petFarm.stat] += petFarm.value;
     // Cap the combined total per stat (same ceiling decorations already enforce).
     for (const k of Object.keys(out)) out[k] = Math.min(BUFF_CAP[k], out[k]);
