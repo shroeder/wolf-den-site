@@ -280,11 +280,14 @@ export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 export const SYSTEM_PASSIVE_STATS = new Set([
     "seedLuck", "growSpeed", "petXp",   // farm
     "angling", "reelStrength",          // fishing
+    "seafaring",                        // sailing — dig stamina, a capped resource so stacking converges
 ]);
 // Ceilings on the OWNED total. A full collection at Lv5 with an aura lands near 29 on the farm stats today, so
 // 30 keeps a complete menagerie at roughly its current best while stopping a future pet from pushing past it.
 export const SYSTEM_PASSIVE_CAP = {
     seedLuck: 30, growSpeed: 30, petXp: 30, angling: 25, reelStrength: 25,
+    // Stamina is DIGS, not a percentage — a whole collection adds at most four extra digs a trip.
+    seafaring: 4,
 };
 
 export const SYSTEM_PERK_KEYS = new Set([

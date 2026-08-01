@@ -592,7 +592,7 @@ const digItemCount = (tier) => Math.min(5, 2 + Math.floor(tier / 2)); // 2 (t1) 
 // One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
 const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
-function newBoard(row) {
+function newBoard(row, petStamina = 0) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
@@ -625,7 +625,10 @@ function newBoard(row) {
     const items = free.slice(0, digItemCount(tier)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
-    const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2; // a few more digs on the bigger boards
+    // petStamina comes from the caller: every owned seafaring pet adds a dig, capped at +4 across the whole
+    // menagerie. A count rather than a percentage, so stacking converges instead of compounding. Passed in
+    // because newBoard is synchronous and the lookup is a query.
+    const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2 + petStamina; // a few more digs on the bigger boards
     const maxSenses = digSenseBudget(tier);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
     const up = {
@@ -1772,7 +1775,12 @@ export async function beginDig(buyerId) {
     const row = await readRow(buyerId);
     const state = decorate(row);
     if (state.status !== "arrived") return { ok: false, error: "not_arrived", ...(await getSailingState(buyerId)) };
-    const board = newBoard(row);
+    let petStamina = 0;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        petStamina = Math.round(await getPetSystemPerk(buyerId, "seafaring"));
+    } catch { /* no pets, no bonus */ }
+    const board = newBoard(row, petStamina);
     // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
     const eff = seaEffects(await equippedSeaAffinity(buyerId));
     if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;

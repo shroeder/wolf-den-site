@@ -56,7 +56,7 @@ export const PET_PASSIVE_STAT = {
     griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "fortune", baby_rex: "might",
     sky_whale: "xp_gain", chameleon: "fortune", elder_dragon: "crit_power",
     // Shop
-    penguin: "fortune", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "growSpeed",
+    penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "might", turtle: "growSpeed",
     parrot: "fortune", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
     // Achievement
     ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
@@ -67,11 +67,11 @@ export const PET_PASSIVE_STAT = {
     // Kitchen (earned by cooking) — COOKING passives that improve what comes out of the pot.
     pantry_mouse: "thrifty", copper_kettle: "prep_cook", hearth_cat: "hot_hands", spice_moth: "generous", gourmand_dragon: "kitchen_master",
     // Chest
-    tropical_fish: "gold_find", axolotl: "fortune", butterfly: "xp_gain", squid: "crit_power", jellyfish: "ferocity", octopus: "crit_chance",
+    tropical_fish: "seafaring", axolotl: "reelStrength", butterfly: "xp_gain", squid: "seafaring", jellyfish: "seafaring", octopus: "seafaring",
     corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
     // Boss
     vulture: "might", minotaur: "ferocity", centaur: "might", imp: "crit_chance", polar_bear: "ferocity",
-    mammoth: "might", wyvern: "crit_power", sea_serpent: "crit_chance", fairy: "xp_gain", kraken: "ferocity",
+    mammoth: "might", wyvern: "crit_power", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
     // Merchant (sailing-exclusive)
