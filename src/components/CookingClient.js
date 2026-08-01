@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import CookingMinigame from "@/components/CookingMinigame";
+import FeatureDailies from "@/components/FeatureDailies";
 
 // ── Permanent credit: the Kitchen was aannw's idea — cook the things you grow and catch instead of just
 // selling them. Her actual AI hero sprite is enshrined beside the kettle as a small medallion; tapping it
@@ -48,6 +49,9 @@ export default function CookingClient({ initial }) {
     // The kitchen had four stacked cards and upgrades were the LAST one, below a 64-row recipe list — so the
     // thing you spend gold on was the thing nobody scrolled to. Same tab treatment the recipe list already uses.
     const [view, setView] = useState("recipes");
+    // Bumped after every finished cook so the dailies card re-reads its progress immediately — a bounty that
+    // only updates on a page refresh reads as broken.
+    const [dailyTick, setDailyTick] = useState(0);
     const [flash, setFlash] = useState(null);
     const [open, setOpen] = useState(null);
     // Where you came FROM. Tapping a missing prepped ingredient jumps to the recipe that makes it; this is the
@@ -90,6 +94,7 @@ export default function CookingClient({ initial }) {
         const d = await post({ action: "cook", recipe: rec.id, quality, chain });
         if (d?.ok) {
             setResult(d);
+            setDailyTick((n) => n + 1);
             // A rising chord on the reveal, pitched by the rung — the same synthesised approach the minigame
             // uses, so no asset to load and nothing to go stale. Wrapped: blocked audio must never break the
             // reveal itself.
@@ -241,6 +246,10 @@ export default function CookingClient({ initial }) {
                     </button>
                 ))}
             </div>
+
+            {/* Same card Farm and Sailing carry, in the same spot. The Kitchen's three bounties have existed
+                and been ticking server-side since launch — nothing ever rendered them, so nobody knew. */}
+            <FeatureDailies feature="cooking" refreshKey={dailyTick} />
 
             <section className="card" hidden={view !== "pantry"}>
                 <div className="ck-sec">Pantry <span className="muted">· {s.pantryTotal || 0} ingredients</span></div>

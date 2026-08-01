@@ -29,10 +29,13 @@ export const FEATURE_DAILIES = {
     ],
     // The Kitchen — ownerOnly again while the recipe economy is settled. One task for volume, one for the PREP
     // chain (the part people skip), and one for skill rather than repetition.
+    // The Kitchen's three. Deliberately one of each SHAPE so a day in the kitchen isn't three of the same
+    // action: cook a few dishes (volume), prep ingredients (the chain that feeds them), and land a clean run
+    // (skill at the timing bar). ownerOnly came off cook_clean1 when the Kitchen went public.
     cooking: [
         { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
         { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
-        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest", ownerOnly: true },
+        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
     ],
 };
 

@@ -140,8 +140,12 @@ export async function resetDailyQuests(buyerId) {
 
 // Bump progress on any of today's unclaimed quests matching a metric (e.g. "boss_damage", "chest_open").
 export async function bumpQuestProgress(buyerId, metric, amount = 1) {
-    // Feature dailies (farm/sailing) ride the same metric pump — free tracking, no scattered hooks.
-    bumpFeatureDaily(buyerId, metric, amount).catch(() => {});
+    // Feature dailies ride the same metric pump — free tracking, no scattered hooks.
+    //
+    // AWAITED. This was fire-and-forget, and on Vercel an un-awaited promise is killed the moment the handler
+    // returns — the same way raid pushes once went out to nobody. A daily that ticks only when the request
+    // happens to outlive it is worse than one that doesn't exist, because it looks like it works.
+    await bumpFeatureDaily(buyerId, metric, amount).catch(() => {});
     const keys = KEYS_BY_METRIC[metric];
     if (!buyerId || !keys?.length || amount <= 0) return;
     const day = await ensureDailyQuests(buyerId);
