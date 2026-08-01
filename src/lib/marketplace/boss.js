@@ -781,7 +781,22 @@ async function finalizeBossKill(bossId) {
     let raffleWinner = null;
     // The Wolf Den (owner) is EXCLUDED from winning the real-world prize — they still earn in-game rewards below,
     // just never the physical raffle. Filter only the raffle pool, not the reward/chest pool.
+    // Fortune tickets are advertised on the pets screen as "Free weekly-boss raffle entries each day — real odds
+    // to win". FREE is the whole promise: you hold fortune pets, you get entries. But `pool` comes from boss_hit
+    // with HAVING SUM(damage) > 0, so a member who never swung was not in it at all and their free tickets
+    // entered no draw. The stat paid out only for people who were already fighting — exactly the people who had
+    // damage tickets anyway.
+    //
+    // The raffle pool alone is widened. `pool` still means "everyone who fought" and keeps driving participation
+    // XP, spin tokens, badges, seeds and reward items — none of which are free, and none of which should go to
+    // someone who never turned up.
     const rafflePool = pool.filter((p) => !isOwner(p.id));
+    const inRaffle = new Set(rafflePool.map((p) => p.id));
+    for (const [buyerId, bonus] of petBonuses) {
+        if (inRaffle.has(buyerId) || isOwner(buyerId)) continue;
+        const tickets = fortuneTickets(bonus?.stats?.fortune || 0, boss);
+        if (tickets > 0) rafflePool.push({ id: buyerId, dmg: 0, tickets });
+    }
     if (rafflePool.length && boss.prize_name) {
         const totalTickets = rafflePool.reduce((s, p) => s + p.tickets, 0);
         raffleWinner = weightedDraw(rafflePool, totalTickets > 0 ? (p) => p.tickets : (p) => p.dmg);

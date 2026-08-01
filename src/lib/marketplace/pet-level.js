@@ -96,10 +96,18 @@ export async function addEquippedPetXp(buyerId, amount) {
     const prevLevel = petLevelForXp(before?.xp || 0, rarity);
     const row = await db
         .queryOne(
+            // The ::int casts are REQUIRED. LEAST($3, $4) with two JS-number params gives Postgres nothing to
+            // infer from, so it types them TEXT and the insert dies on the integer xp column with 42804 —
+            // "column xp is of type integer but expression is of type text". farm.js already carries the casts;
+            // this copy never got them, so every pet-XP grant that came through here failed.
+            //
+            // The failure was invisible because the .catch below falls back to a COMPUTED xp, so the caller was
+            // told ok:true with a plausible new level while nothing was written. Pets appeared to gain XP and
+            // silently reset on the next read.
             `INSERT INTO mkt_pet_level (buyer_id, pet_id, xp, last_tick_at, updated_at)
-             VALUES ($1, $2, LEAST($3, $4), NOW(), NOW())
+             VALUES ($1, $2, LEAST($3::int, $4::int), NOW(), NOW())
              ON CONFLICT (buyer_id, pet_id)
-             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3, $4), updated_at = NOW()
+             DO UPDATE SET xp = LEAST(mkt_pet_level.xp + $3::int, $4::int), updated_at = NOW()
              RETURNING xp`,
             [buyerId, petId, add, maxXp]
         )

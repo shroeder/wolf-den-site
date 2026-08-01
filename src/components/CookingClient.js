@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import CookingMinigame from "@/components/CookingMinigame";
 
@@ -44,6 +45,9 @@ export default function CookingClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [playing, setPlaying] = useState(null);   // the recipe whose minigame is up
     const [result, setResult] = useState(null);
+    // The kitchen had four stacked cards and upgrades were the LAST one, below a 64-row recipe list — so the
+    // thing you spend gold on was the thing nobody scrolled to. Same tab treatment the recipe list already uses.
+    const [view, setView] = useState("recipes");
     const [flash, setFlash] = useState(null);
     const [open, setOpen] = useState(null);
     // Where you came FROM. Tapping a missing prepped ingredient jumps to the recipe that makes it; this is the
@@ -232,7 +236,15 @@ export default function CookingClient({ initial }) {
                 {flash ? <div className="ck-flash">{flash}</div> : null}
             </section>
 
-            <section className="card">
+            <div className="ck-viewtabs">
+                {[["recipes", "🍳", "Recipes"], ["pantry", "🧺", "Pantry"], ["upgrades", "🔨", "Upgrades"]].map(([k, icon, label]) => (
+                    <button key={k} type="button" className={`ck-viewtab${view === k ? " is-on" : ""}`} onClick={() => setView(k)}>
+                        <span aria-hidden="true">{icon}</span>{label}
+                    </button>
+                ))}
+            </div>
+
+            <section className="card" hidden={view !== "pantry"}>
                 <div className="ck-sec">Pantry <span className="muted">· {s.pantryTotal || 0} ingredients</span></div>
                 {(s.pantry || []).length === 0 ? (
                     <p className="muted ck-empty">Nothing in here yet. Harvest a crop or land a fish — you keep them both now.</p>
@@ -248,7 +260,7 @@ export default function CookingClient({ initial }) {
                 )}
             </section>
 
-            <section className="card">
+            <section className="card" hidden={view !== "recipes"}>
                 <div className="ck-sec">Recipes <span className="muted">· {s.known}/{s.recipeTotal} found</span></div>
                 <div className="ck-tabs">
                     {[["all", "All"], ["ready", "Ready"], ["prep", "Prep"], ["dish", "Dishes"]].map(([k, label]) => (
@@ -380,7 +392,7 @@ export default function CookingClient({ initial }) {
                 </div>
             </section>
 
-            <section className="card">
+            <section className="card" hidden={view !== "upgrades"}>
                 <div className="ck-sec">The kitchen <span className="muted">· spend gold to cook better</span></div>
                 {/* The SAME cards Sailing uses (.sail-upgrades / .sail-upg) rather than a bespoke kitchen list —
                     icon chip, level bar, a "now → next" effect row and a gold buy button. An upgrade should look
@@ -415,7 +427,13 @@ export default function CookingClient({ initial }) {
 
             {playing ? <CookingMinigame recipe={playing} onDone={finishCook} /> : null}
 
-            {result ? (() => {
+            {/* PORTALLED TO <body> ON PURPOSE. This card is a direct child of `.stack.reveal`, and
+                `.reveal > *` applies `fade-in-up ... both` — fill-mode `both` leaves `transform: translateY(0)`
+                on the element permanently. Any transform other than `none` makes an element the containing block
+                for its own `position: fixed` children, so `inset: 0` stopped meaning "the viewport" and the
+                payoff card laid itself out somewhere down a very long page. Rendering into <body> puts it
+                outside every ancestor transform, stacking context and overflow on this page for good. */}
+            {result && typeof document !== "undefined" ? createPortal((() => {
                 const rw = result.made.reward;
                 const topRung = Boolean(rw?.rungs && rw.rung >= rw.rungs);
                 return (
@@ -471,7 +489,7 @@ export default function CookingClient({ initial }) {
                     </div>
                 </div>
                 );
-            })() : null}
+            })(), document.body) : null}
 
             <style>{CK_CSS}</style>
         </div>
@@ -591,6 +609,15 @@ const CK_CSS = `
 .ck-ing.is-mythic { border-color: rgba(255,158,196,0.55); }
 .ck-ing-n { font-weight: 800; color: #ffd75e; font-size: 0.85rem; }
 
+/* Top-level view switch. Bigger and icon-led so it reads as navigation, not as another filter row — the
+   recipe-category tabs (.ck-tab) sit INSIDE the recipes view and must stay visibly subordinate to these. */
+.ck-viewtabs { display: flex; gap: 7px; margin: 0 0 12px; }
+.ck-viewtab { flex: 1 1 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 6px;
+    border-radius: 12px; font-size: 0.86rem; font-weight: 900; cursor: pointer; color: #cbbfa8;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); }
+.ck-viewtab span { font-size: 1.05rem; line-height: 1; }
+.ck-viewtab.is-on { background: rgba(255,215,110,0.17); border-color: rgba(255,215,110,0.5); color: #ffd75e;
+    box-shadow: 0 0 0 1px rgba(255,215,110,0.18) inset; }
 .ck-tabs { display: flex; gap: 6px; margin-bottom: 11px; }
 .ck-tab { flex: 1 1 0; padding: 7px 4px; border-radius: 9px; font-size: 0.8rem; font-weight: 800; cursor: pointer;
     background: rgba(255,255,255,0.05); border: 1px solid var(--ck-line); color: #b9c2cc; }

@@ -16,11 +16,15 @@ const STEPS = ["Prep", "Heat", "Combine", "Season", "Plate"];
 const BASE_PERIOD = 1.55;   // seconds for a full sweep on step 1
 const SPEEDUP = 0.13;       // each step tightens it by this much
 
+// Distances from centre, IDENTICAL to the forge's BANDS (0.022 / 0.055 / 0.10 / 0.16). Cooking used to run at
+// exactly double these — good was 0.36, so 72% of the bar scored — which is why it never felt like a skill
+// check. Worse, the tightest tier had no band drawn at all, so the thing you were aiming for was invisible.
+// The bar and these numbers are the same fact twice: band width on screen is max * 2, so they cannot drift.
 const GRADES = [
-    { max: 0.045, key: "flawless", label: "FLAWLESS", score: 4, color: "#ff9ec4" },
-    { max: 0.11,  key: "perfect",  label: "Perfect",  score: 3, color: "#ffd75e" },
-    { max: 0.22,  key: "great",    label: "Great",    score: 2, color: "#7ec8ff" },
-    { max: 0.36,  key: "good",     label: "Good",     score: 1, color: "#9aa0a6" },
+    { max: 0.022, key: "flawless", label: "FLAWLESS", score: 4, color: "#ff9ec4" },
+    { max: 0.055, key: "perfect",  label: "Perfect",  score: 3, color: "#ffd75e" },
+    { max: 0.10,  key: "great",    label: "Great",    score: 2, color: "#7ec8ff" },
+    { max: 0.16,  key: "good",     label: "Good",     score: 1, color: "#9aa0a6" },
     { max: 1,     key: "burnt",    label: "Burnt",    score: 0, color: "#e0685c" },
 ];
 const gradeFor = (dist) => GRADES.find((g) => dist <= g.max) || GRADES[GRADES.length - 1];
@@ -36,7 +40,8 @@ export default function CookingMinigame({ recipe, onDone }) {
     const audio = useRef(null);
 
     const markerRef = useRef(0);
-    const markerEl = useRef(null); // the DOM node — moved directly, never through React
+    const markerEl = useRef(null);
+    const spoonEl = useRef(null); // the DOM node — moved directly, never through React
     const raf = useRef(0);
     const t0 = useRef(0);
     const scoreRef = useRef(0);
@@ -60,8 +65,12 @@ export default function CookingMinigame({ recipe, onDone }) {
             const phase = (((ts - t0.current) / 1000) % period) / period;
             const pos = phase < 0.5 ? phase * 2 : 2 - phase * 2; // triangle, 0→1→0
             markerRef.current = pos;
-            const el = markerEl.current;
-            if (el) el.style.left = `${pos * 100}%`;
+            // Written straight to style, never through state — this runs 60x a second and re-rendering the
+            // dialog that often made the marker stutter on exactly the frames the timing depends on. The spoon
+            // rides off the same write, so it can never drift a frame away from the line it represents.
+            const left = `${pos * 100}%`;
+            if (markerEl.current) markerEl.current.style.left = left;
+            if (spoonEl.current) spoonEl.current.style.left = left;
             raf.current = requestAnimationFrame(loop);
         };
         raf.current = requestAnimationFrame(loop);
@@ -164,7 +173,9 @@ export default function CookingMinigame({ recipe, onDone }) {
                     <span className="ckmg-zone ckmg-zone-good" />
                     <span className="ckmg-zone ckmg-zone-great" />
                     <span className="ckmg-zone ckmg-zone-perfect" />
+                    <span className="ckmg-zone ckmg-zone-flawless" />
                     <span ref={markerEl} className="ckmg-marker" />
+                    <span ref={spoonEl} className="ckmg-rider" aria-hidden="true">🥄</span>
                     {sparks.map((sp) => (
                         <span key={sp.id} className="ckmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />
                     ))}
@@ -208,14 +219,19 @@ const MG_CSS = `
     background: rgba(255,255,255,0.05); color: #7a828c; text-transform: uppercase; letter-spacing: .04em; }
 .ckmg-step.is-done { background: rgba(74,208,127,0.16); color: #6fe0a0; }
 .ckmg-step.is-now { background: var(--rt); color: #17121f; }
-.ckmg-bar { position: relative; display: block; width: 100%; height: 62px; border-radius: 14px; overflow: hidden;
+.ckmg-bar { position: relative; display: block; width: 100%; height: 26px; border-radius: 999px; overflow: visible;
     background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.14); padding: 0; pointer-events: none; }
-.ckmg-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 4px; }
-.ckmg-zone-good { width: 72%; background: rgba(154,160,166,0.14); }
-.ckmg-zone-great { width: 44%; background: rgba(126,200,255,0.18); }
-.ckmg-zone-perfect { width: 22%; background: rgba(255,215,94,0.24); box-shadow: inset 0 0 0 1px rgba(255,215,94,0.5); }
-.ckmg-marker { position: absolute; top: 4px; bottom: 4px; width: 4px; margin-left: -2px; border-radius: 3px;
-    background: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.85); }
+/* Widths are GRADES[].max * 2 — the band you see is the band you are scored against. */
+.ckmg-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 999px; }
+.ckmg-zone-good { width: 32%; background: rgba(154,160,166,0.20); }
+.ckmg-zone-great { width: 20%; background: rgba(126,200,255,0.26); }
+.ckmg-zone-perfect { width: 11%; background: rgba(255,215,94,0.32); }
+.ckmg-zone-flawless { width: 4.4%; background: rgba(255,158,196,0.60); box-shadow: 0 0 14px rgba(255,158,196,0.7); }
+.ckmg-rider { position: absolute; top: -26px; transform: translateX(-50%); font-size: 22px; pointer-events: none;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* Overhangs the bar top and bottom like the forge's, so the exact line is readable against a lit band. */
+.ckmg-marker { position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px; border-radius: 3px;
+    background: linear-gradient(180deg, #fff, #ffd7e6); box-shadow: 0 0 12px #ffd7e6, 0 0 4px #fff; }
 .ckmg-pop { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-weight: 900; font-size: 1.05rem;
     letter-spacing: .04em; pointer-events: none; animation: ckmgPop .62s ease-out both; text-shadow: 0 2px 6px rgba(0,0,0,.8); }
 .ckmg-pop b { font-size: 0.85em; }

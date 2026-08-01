@@ -7,8 +7,11 @@ import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
 //
 // The bank balance is not the answer to that question and never has been. A big chunk of what's sitting there
 // is money the shop is HOLDING rather than money it OWNS: consignors are owed their cut of everything of theirs
-// that sold, members have store credit they can spend at any moment, the state's share of every taxable sale is
-// collected up front and remitted later, and rent lands whether or not the month went well.
+// that sold, the state's share of every taxable sale is collected up front and remitted later, and rent lands
+// whether or not the month went well.
+//
+// Store credit is deliberately NOT one of them. It is a real claim, but members redeem it in MERCHANDISE at
+// retail, not in cash, so counting it here made the shop look poorer in money than it actually is.
 //
 // So this walks down from what's on hand to what's genuinely free, one obligation at a time, and shows the
 // arithmetic. The intermediate rows matter as much as the total — "free cash is low BECAUSE consignors are owed
@@ -89,7 +92,11 @@ async function consignorPayable() {
     return { total: money(total), detail, overpaid: money(overpaid), failed: detail.some((d) => d.error), ambiguous };
 }
 
-/** Store credit members are holding — spendable by them at any time, so not spendable by the shop. */
+/* Store credit was deliberately dropped from this report. It IS a real claim on the shop, but it is claimed in
+   MERCHANDISE at retail rather than in cash, so subtracting it from the cash position overstated what the shop
+   owes in money. Owner's call: this screen answers "what money is actually free", and store credit is not a
+   money obligation. Kept here, unused, because the maths is right if it is ever wanted back. */
+/* eslint-disable-next-line no-unused-vars */
 async function storeCreditOutstanding() {
     const r = await db.queryOne(
         `SELECT COALESCE(SUM(delta_cents), 0) / 100.0 AS bal FROM mkt_store_credit_event`
@@ -115,12 +122,11 @@ async function overheadRemaining() {
 }
 
 export async function cashPosition() {
-    const [cashRow, bank, tax, consignors, credit, overhead] = await Promise.all([
+    const [cashRow, bank, tax, consignors, overhead] = await Promise.all([
         db.queryOne(`SELECT COALESCE(SUM(amount), 0) AS b FROM cash_ledger`).catch(() => null),
         entered("bank_balance"),
         entered("tax_set_aside"),
         consignorPayable(),
-        storeCreditOutstanding(),
         overheadRemaining(),
     ]);
     const drawer = money(cashRow?.b || 0);
@@ -139,7 +145,6 @@ export async function cashPosition() {
             detail: consignors.detail,
             warn: Boolean(consignors.ambiguous?.length),
         },
-        { label: "Store credit outstanding", amount: credit, source: "computed", note: "Members can spend this any time" },
         {
             label: "Sales tax set aside", amount: tax.amount, source: "entered", notedAt: tax.notedAt,
             note: "The state's share of what's already been collected",
