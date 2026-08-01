@@ -53,6 +53,8 @@ export const PERK_META = {
     sea_plunder:  { icon: "🏴", kind: "sea" },
     kitchen_heat: { icon: "🔥", kind: "kitchen" },
     kitchen_larder:{ icon: "🧺", kind: "kitchen" },
+    kitchen_portion:{ icon: "🍲", kind: "kitchen" },
+    kitchen_prep:  { icon: "🔪", kind: "kitchen" },
     forge_spark:  { icon: "🔨", kind: "forge" },
     forge_salvage:{ icon: "♦", kind: "forge" },
     town_haggle:  { icon: "🧳", kind: "town" },
@@ -64,6 +66,38 @@ export const PERK_META = {
 // petId → { name, key }. The NAME is the flavor; the KEY is the mechanic. (Passive stat lives in
 // collectibles.js PET_PASSIVE_STAT — every pet is a unique passive+active pairing.)
 export const PET_PERKS = {
+    // ── The twenty that fell through ──────────────────────────────────────────────────────────────────────
+    // These had NO entry here, so petPerk() fell back to { name: "Companion", key: activeStat || "fortune" }.
+    // A mythic fishing pet whose signature ability was called "Companion". Worse for the kitchen five: their
+    // activeStat is a cooking key, which perkDesc has no case for (blank description) and which add() drops
+    // (no effect) — so the rarest pets in the game displayed an empty perk that did nothing.
+    //
+    // Each one now points at the system it was earned in.
+    // Kitchen
+    pantry_mouse: { name: "Squirreled Away", key: "kitchen_larder" },
+    copper_kettle: { name: "Second Boil", key: "kitchen_prep" },
+    hearth_cat: { name: "Banked Embers", key: "kitchen_heat" },
+    spice_moth: { name: "Second Helping", key: "kitchen_portion" },
+    gourmand_dragon: { name: "Gourmand's Palate", key: "recipe_nose" },
+    // Fishing
+    reef_seahorse: { name: "Reef Sense", key: "angler_bite" },
+    lantern_jelly: { name: "Lantern Glow", key: "sea_dredge" },
+    deep_angler: { name: "Deepwater Pull", key: "angler_size" },
+    tidecaller: { name: "Call the Tide", key: "sea_plunder" },
+    // Town raids
+    warbanner_wolf: { name: "Warbanner", key: "town_rally" },
+    goblin_warchief: { name: "Warchief's Roar", key: "town_rally" },
+    bandit_shade: { name: "Cutpurse", key: "chest_luck" },
+    golem_heart: { name: "Forgeheart", key: "forge_salvage" },
+    // Chest-found sea creatures
+    corsair_parrot: { name: "Corsair's Share", key: "sea_plunder" },
+    marlin: { name: "Billfish Run", key: "angler_size" },
+    anglerfish: { name: "Luring Light", key: "angler_bite" },
+    sea_wyrm: { name: "Wyrm's Trench", key: "sea_dredge" },
+    // Prestige achievement pets
+    spirit_fox: { name: "Spirit's Favour", key: "fortune" },
+    runebound_drake: { name: "Runebound", key: "forge_spark" },
+    radiant_phoenix: { name: "Radiant Fortune", key: "chest_luck" },
     // Level
     bunny: { name: "Burrow Bounty", key: "farm_yield" }, frog: { name: "Tongue Lash", key: "first_hit" }, chick: { name: "Scratch & Peck", key: "farm_seed" },
     kitten: { name: "Nine Lives", key: "crit_chance" }, fox_kit: { name: "Sly Strike", key: "crit_chance" }, wolf_pup: { name: "Pack Instinct", key: "might" },
@@ -131,6 +165,8 @@ export const SYSTEM_PERK_CAP = {
     sea_plunder: 35,    // raid + sea-merchant gold
     kitchen_heat: 25,   // tier bump
     kitchen_larder: 25, // free ingredients
+    kitchen_portion: 30, // second helping — doubles the whole reward, so it stays under a third
+    kitchen_prep: 35,    // an extra prepped ingredient; cheapest of the kitchen perks, so the loosest
     recipe_nose: 40,    // multiplies drop odds that are already small
     forge_spark: 20,    // free enhance — the most abusable, so the tightest
     forge_salvage: 30,  // double parts
@@ -195,6 +231,8 @@ function perkDesc(key, v, level = 1) {
         case "sea_plunder": return `+${v}% gold from raids and the sea merchant`;
         case "kitchen_heat": return `+${v}% chance a cooked dish comes out one whole TIER better`;
         case "kitchen_larder": return `+${v}% chance a cook uses up NO ingredients at all`;
+        case "kitchen_portion": return `+${v}% chance a cook makes a SECOND helping — the same dish twice`;
+        case "kitchen_prep": return `+${v}% chance prepping an ingredient yields an extra one`;
         case "forge_spark": return `+${v}% chance an enhance at the Forge doesn't consume its parts`;
         case "forge_salvage": return `+${v}% parts from every salvage`;
         case "town_haggle": return `${v}% off everything the travelling merchant and the gold shop sell`;
@@ -233,7 +271,7 @@ export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 export const SYSTEM_PERK_KEYS = new Set([
     "farm_yield", "farm_speed", "farm_seed",
     "angler_bite", "angler_size", "sea_dredge", "sea_plunder",
-    "kitchen_heat", "kitchen_larder", "recipe_nose",
+    "kitchen_heat", "kitchen_larder", "kitchen_portion", "kitchen_prep", "recipe_nose",
     "forge_spark", "forge_salvage",
     "town_haggle", "town_rally", "chest_luck",
 ]);

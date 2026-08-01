@@ -713,14 +713,16 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // guarantee at the top is the point of the minigame having a skill ceiling at all: without it a perfect run
     // was a coin flip, which makes practising feel pointless.
     const FLAWLESS = 0.92;
-    let equippedKitchen = { heat: 0, larder: 0 };
+    let equippedKitchen = { heat: 0, larder: 0, portion: 0, prep: 0 };
     try {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        const [h, l] = await Promise.all([
+        const [h, l, po, pr] = await Promise.all([
             getPetSystemPerk(buyerId, "kitchen_heat"),
             getPetSystemPerk(buyerId, "kitchen_larder"),
+            getPetSystemPerk(buyerId, "kitchen_portion"),
+            getPetSystemPerk(buyerId, "kitchen_prep"),
         ]);
-        equippedKitchen = { heat: h, larder: l };
+        equippedKitchen = { heat: h, larder: l, portion: po, prep: pr };
     } catch { /* no companion, no bonus */ }
     const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0) + equippedKitchen.heat / 100;
     const bumped = q >= FLAWLESS || Math.random() < bumpChance;
@@ -728,14 +730,14 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
 
     let made = null;
     let goldPaid = 0;
-    let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) ? 1 : 0);
+    let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) + equippedKitchen.portion / 100 ? 1 : 0);
 
     const spriteMap = await cookingSprites();
     if (rec.kind === "prep") {
         // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
         // Prep Cook (Copper Kettle) is its own roll on top of the portion roll — prepping is the grind, so the
         // pet that helps with it should be felt on the prep chain specifically.
-        const prepBonus = Math.random() < (petBonus.prep_cook || 0) ? 1 : 0;
+        const prepBonus = Math.random() < ((petBonus.prep_cook || 0) + equippedKitchen.prep / 100) ? 1 : 0;
         portions += prepBonus;
         await addToPantry(buyerId, "prep", rec.out, portions);
         const m = PREPS[rec.out];
