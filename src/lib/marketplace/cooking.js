@@ -346,8 +346,17 @@ export const RECIPE_SOURCES = {
     dig_deep:     { min: 3, max: 4, chance: 0.090 }, // a tool proc, not an ordinary dig
     raid_win:     { min: 3, max: 4, chance: 0.070 },
     boss_kill:    { min: 4, max: 5, chance: 0.350 }, // weekly, shared, and the main route to the top tiers
-    forge:        { min: 2, max: 4, chance: 0.030 },
-    town_merchant:{ min: 3, max: 4, chance: 0.120 },
+    forge:        { min: 2, max: 4, chance: 0.030 }, // enhancing at the anvil
+    salvage:      { min: 1, max: 2, chance: 0.020 }, // dismantling — you find a note in the lining
+    town_merchant:{ min: 3, max: 4, chance: 0.120 }, // the travelling merchant's stock
+    barkeep:      { min: 1, max: 3, chance: 0.090 }, // the daily pint: he tells you how it's made
+    crier:        { min: 2, max: 3, chance: 0.100 }, // the town crier's announcements
+    gamble:       { min: 2, max: 4, chance: 0.060 }, // tavern dice
+    spin:         { min: 1, max: 3, chance: 0.050 }, // the daily wheel
+    daily_deal:   { min: 2, max: 4, chance: 0.150 }, // a rare deal bought from the shop
+    pet_bond:     { min: 1, max: 3, chance: 0.030 }, // a pet digs one up for you
+    town_raid:    { min: 3, max: 4, chance: 0.080 }, // the plaza skirmishes
+    cook:         { min: 1, max: 3, chance: 0.045 }, // cooking teaches you the next thing to cook
 };
 
 /**
@@ -779,6 +788,9 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Daily bounties. A prep counts for the prep task, a dish for the dish task, and a run graded "perfect" or
     // better counts for the skill one — so the three tasks can't all be cleared by the same three taps.
     await bumpQuestProgress(buyerId, rec.kind === "prep" ? "cook_prep" : "cook_dish", 1).catch(() => {});
+    // Cooking teaches you the next thing to cook — the one source that is its own system, so a member who has
+    // found the Kitchen can keep growing the book from inside it.
+    await tryRecipeDrop(buyerId, "cook").catch(() => {});
     if (q >= 0.72) await bumpQuestProgress(buyerId, "cook_clean", 1).catch(() => {});
 
     return {

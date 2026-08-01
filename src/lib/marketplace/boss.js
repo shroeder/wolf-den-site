@@ -1148,6 +1148,14 @@ export async function attackBoss(buyerId) {
         : await autoAccrual({ id: boss.id, hp: row.hp, started_at: boss.started_at });
     const elemProc = elem.matches > 0 ? `${weaknessInfo(boss.weakness)?.emoji || "✨"} ${weaknessInfo(boss.weakness)?.label || ""} weakness +${elem.bonusPct}%` : null;
     await trackActivity(buyerId, "boss_attack", { damage, crit, boss: boss.name, defeated }).catch(() => {});
+    // The felling blow, not every strike. The boss is the main route to Exquisite and Legendary recipes, and
+    // gating it on the kill is what keeps those tiers weekly rather than farmable.
+    if (defeated) {
+        try {
+            const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+            await tryRecipeDrop(buyerId, "boss_kill");
+        } catch { /* a recipe is a bonus; never let it fail the kill */ }
+    }
     return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 

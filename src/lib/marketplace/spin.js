@@ -333,6 +333,12 @@ export async function doSpin(buyerId) {
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
     await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
+
+    // The wheel can land on a recipe.
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        await tryRecipeDrop(buyerId, "spin");
+    } catch { /* a recipe is a bonus; never let it fail the action */ }
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
     const prizeOut = {
         ...display,

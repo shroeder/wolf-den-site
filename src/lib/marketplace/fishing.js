@@ -127,21 +127,32 @@ const RARE_TILT_CAP = 0.9;
 export const TREASURE_CHANCE = 0.20;
 
 // What the treasure is, when it isn't a fish. Percentages of that 20%.
-const TREASURE = { fragment: 38, seed: 30, consumable: 20, gear: 8, chest: 3.6, pet: 0.4 };
+//
+// Rebalanced toward LOOT. Gear was 8% and chests 3.6%, so hauling something you could actually equip was a
+// once-a-week event and the table read as fragments-and-seeds with a rumour of treasure attached. Gear is now
+// 22% and chests 9% — a bit over 30% of treasure hauls put a real object in your hands — with the extra taken
+// out of fragments and seeds, which were the two things nobody was short of.
+const TREASURE = { fragment: 24, seed: 22, consumable: 22, gear: 22, chest: 9, pet: 1 };
 
 // Landing a rare FISH still sweetens things — but as a bonus on top, and only for the genuinely rare ones, so
 // a mythic is never a bare fish with no story attached.
+// Common and rare catches used to be `nothing: 100` — the overwhelming majority of casts, paying a fish and a
+// shrug. They now carry a real chance of white/blue gear, which is the loot people actually want to see early
+// and the cheapest thing in the game to hand out: low-rarity items are plentiful and quickly duplicated, so
+// grantFishingGear skips anything already owned.
 const FISH_BONUS = {
-    common: { nothing: 100 },
-    rare: { nothing: 100 },
-    epic: { nothing: 72, fragment: 20, consumable: 8 },
-    legendary: { nothing: 40, fragment: 28, consumable: 18, gear: 10, chest: 4 },
-    mythic: { nothing: 0, fragment: 22, consumable: 24, gear: 30, chest: 20, pet: 4 },
+    common: { nothing: 58, gear: 30, fragment: 8, consumable: 4 },
+    rare: { nothing: 53, gear: 31, fragment: 9, consumable: 5, chest: 2 },
+    epic: { nothing: 55, gear: 20, fragment: 15, consumable: 8, chest: 2 },
+    legendary: { nothing: 30, fragment: 24, consumable: 18, gear: 20, chest: 8 },
+    mythic: { nothing: 0, fragment: 20, consumable: 22, gear: 30, chest: 24, pet: 4 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
-// Which chest a chest-drop gives. Wooden is the floor so a common's rare chest hit isn't better than a raid's.
-const CHEST_TIER = { common: "wooden", rare: "wooden", epic: "iron", legendary: "iron", mythic: "gold" };
+// Which chest a chest-drop gives. Wooden is the floor so a common's rare chest hit isn't better than a raid's,
+// and gold (tier 3) is the CEILING — fishing shouldn't out-drop a raid or the boss, it should just pay out
+// more often than it did.
+const CHEST_TIER = { common: "wooden", rare: "wooden", epic: "iron", legendary: "gold", mythic: "gold" };
 // Consumables fishing can hand out: sailing relics, farm supplies and pet treats. Deliberately NOT the combat
 // potions — fishing shouldn't be a route to boss damage, and every one of these feeds a loop fishing touches.
 // Rarer fish draw from the back of this list, so a mythic hands out a Kraken Bait rather than a Pet Treat.

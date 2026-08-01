@@ -436,6 +436,12 @@ export async function buyMerchantChest(buyerId, tier) {
     await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
     await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
     bumpTownQuest(buyerId, "merchant", 1).catch(() => {}); // "Window Shopping" town quest
+
+    // The travelling merchant deals in recipes as well as chests.
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        await tryRecipeDrop(buyerId, "town_merchant");
+    } catch { /* a recipe is a bonus; never let it fail the action */ }
     return { ok: true, gold: Number(paid.gold), tier, label: ware.label, remaining: ware.remaining - 1 };
 }
 

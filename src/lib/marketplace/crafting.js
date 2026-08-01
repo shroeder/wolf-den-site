@@ -287,6 +287,12 @@ export async function salvageItem(buyerId, itemId) {
     const xp = 6 + cfg.tier * 4;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_salvage", { itemId, rarity: item.rarity, tier: cfg.tier, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop }).catch(() => {});
+
+    // Dismantling: a folded note in the lining.
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        await tryRecipeDrop(buyerId, "salvage");
+    } catch { /* a recipe is a bonus; never let it fail the action */ }
     await logCraft(buyerId, "salvage", { itemId, tier: cfg.tier, meta: { rarity: item.rarity, parts: n, doubled, bonusTier, enhanceBonus, enhLevel, regaliaDrop } });
     await bumpDaily(buyerId, "salvages", 1);
     grantEventBadge(buyerId, "forge_first").catch(() => {});
@@ -381,6 +387,12 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const xp = 12 + Math.round(q * 48) + (grade === "pixel" ? 15 : grade === "perfect" ? 8 : 0);
     await awardXp(buyerId, "craft_enhance", { points: xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "craft_enhance", { itemId, level: level + 1, grade, quality: q, combo }).catch(() => {});
+
+    // The anvil turns up recipes — smiths trade notes.
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        await tryRecipeDrop(buyerId, "forge");
+    } catch { /* a recipe is a bonus; never let it fail the action */ }
     await logCraft(buyerId, "enhance", { itemId, tier, score: Math.round(q * 1000), grade, meta: { level: level + 1, gained, combo, doubled } });
     await bumpDaily(buyerId, "enhances", 1);
     await bumpDaily(buyerId, "best_grade", GRADE_RANK[grade] || 1);

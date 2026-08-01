@@ -1466,6 +1466,13 @@ export async function doRaid(buyerId, targetId = null) {
     // Log the raid AFTER resolution so gold + the copied item carry real values (this call used to sit before
     // goldDelta/itemWon were assigned, which threw in the temporal dead zone and dropped the event entirely).
     await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
+    // Only on a WIN — plunder, not participation.
+    if (sim.win) {
+        try {
+            const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+            await tryRecipeDrop(buyerId, "raid_win");
+        } catch { /* a recipe is a bonus; never let it fail the raid */ }
+    }
     if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
 
     const raidPetArt = await petArtByBuyer([
@@ -1871,6 +1878,11 @@ async function finishDig(buyerId, board) {
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
     await dropSeedFrom(buyerId, "sail_dig").catch(() => {}); // a chance to unearth a farming seed
     await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
+    // The sea floor turns up recipes — banded so ordinary digs give mid-tier ones.
+    try {
+        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+        await tryRecipeDrop(buyerId, "dig");
+    } catch { /* a recipe is a bonus; never let it fail the action */ }
     const state = await getSailingState(buyerId);
     // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
     const haul = Object.entries(byTier).map(([tier, n]) => {
