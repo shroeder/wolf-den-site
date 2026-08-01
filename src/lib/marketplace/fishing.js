@@ -172,6 +172,19 @@ function pickWeighted(table) {
     for (const [kind, w] of entries) { r -= w; if (r <= 0) return kind; }
     return "nothing";
 }
+// The equipped companion's sea perks. Fetched once per cast rather than per roll.
+async function seaPetPerks(buyerId) {
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const [bite, size, dredge] = await Promise.all([
+            getPetSystemPerk(buyerId, "angler_bite"),
+            getPetSystemPerk(buyerId, "angler_size"),
+            getPetSystemPerk(buyerId, "sea_dredge"),
+        ]);
+        return { bite, size, dredge };
+    } catch { return { bite: 0, size: 0, dredge: 0 }; }
+}
+
 const rollTreasure = () => pickWeighted(TREASURE);
 const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.common);
 
@@ -518,8 +531,11 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
 
     // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
     // learns which it was only when it surfaces.
-    const isTreasure = Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net));
-    const species = rollSpecies(anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure));
+    // Sea companions: dredge widens the treasure window, bite pushes toward rarer species, size stretches the
+    // measurement. All three are stated exactly on the pet card.
+    const seaPets = await seaPetPerks(buyerId);
+    const isTreasure = Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100);
+    const species = rollSpecies(anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100);
     const state = {
         species: species.id,
         treasure: isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
@@ -619,7 +635,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const q = clamp01(quality);
     // Gaff comes off the row we just claimed, so a member who levels it mid-cast still gets the old floor.
     const gaffLvl = Number(taken.fish_gaff_level) || 0;
-    const cm = weightFor(species, state.roll, q, gaffLvl);   // pounds; column renamed to lb in mig287
+    const cm = weightFor(species, state.roll, q, gaffLvl) * (1 + (await seaPetPerks(buyerId)).size / 100);   // pounds; column renamed to lb in mig287
     const pct = percentileOf(species, cm);
     // Payout scales from 45% of the species value at the small end to full value at the top of its typical
     // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.

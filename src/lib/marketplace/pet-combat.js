@@ -25,6 +25,18 @@ export async function getPetCombatBonus(buyerId) {
 // Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),
 // baselined against the 25%/×2.5 crit already in memberDailyDamage. Ferocity is NOT included here — GEAR
 // ferocity is 24/7 auto-damage; callers fold PET ferocity into Might before calling.
+/**
+ * The equipped pet's SYSTEM perk value for one key, or 0.
+ *
+ * One call for every system that wants to ask "does this member's companion help here?", so a farm or a forge
+ * doesn't need to know anything about how pet perks are stored.
+ */
+export async function getPetSystemPerk(buyerId, key) {
+    if (!buyerId || !key) return 0;
+    const bonus = await getPetCombatBonus(buyerId).catch(() => null);
+    return Number(bonus?.system?.[key]) || 0;
+}
+
 export function manualStatMultiplier(stats = {}) {
     const mightMult = 1 + (stats.might || 0) / 100;
     const p = Math.min(0.9, 0.25 + (stats.crit_chance || 0) / 100);

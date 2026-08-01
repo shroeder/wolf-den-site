@@ -431,9 +431,16 @@ export async function buyMerchantChest(buyerId, tier) {
     const ware = merchantWaresForTier(bonuses.merchantTier || 0, {}, boughtToday).find((w) => w.tier === tier);
     if (!ware) return { ok: false, error: "not_for_sale" };
     if (ware.remaining <= 0) return { ok: false, error: "daily_limit" };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ware.price]).catch(() => null);
+    // A haggling companion knocks its stated percentage off the asking price.
+    let haggle = 0;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        haggle = await getPetSystemPerk(buyerId, "town_haggle");
+    } catch { /* no companion, no discount */ }
+    const price = Math.max(1, Math.round(ware.price * (1 - Math.min(0.4, haggle / 100))));
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
-    await logCoin(buyerId, -ware.price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
+    await logCoin(buyerId, -price, "merchant_chest", { balanceAfter: paid.gold, meta: { tier } }).catch(() => {});
     await addChests(buyerId, { [tier]: 1 }, { source: "merchant" }).catch(() => {});
     bumpTownQuest(buyerId, "merchant", 1).catch(() => {}); // "Window Shopping" town quest
 

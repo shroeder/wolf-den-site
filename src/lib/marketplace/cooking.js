@@ -385,7 +385,15 @@ export function rollRecipe(known = [], { min = 1, max = 5 } = {}) {
 export async function tryRecipeDrop(buyerId, source) {
     const def = RECIPE_SOURCES[source];
     if (!buyerId || !def) return null;
-    if (Math.random() >= def.chance) return null;
+    // A companion with the recipe_nose perk lifts the chance at EVERY drop point at once — which is what makes
+    // it worth equipping over a damage pet if the book is what you're chasing.
+    let chance = def.chance;
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const nose = await getPetSystemPerk(buyerId, "recipe_nose");
+        if (nose > 0) chance *= 1 + nose / 100;
+    } catch { /* no pet, no bonus */ }
+    if (Math.random() >= chance) return null;
     return learnRecipe(buyerId, null, { min: def.min, max: def.max });
 }
 
@@ -665,7 +673,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Read once, up here, because the Larder roll below needs it too — and `a < b + c || 0` parses as
     // `(a < b + c) || 0`, so writing it inline both double-queried and silently discarded the pet's help.
     const petBonus = await petCookBonus(buyerId).catch(() => ({}));
-    const freeCook = Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0);
+    const freeCook = Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
     if (!freeCook) {
         const taken = [];
         for (const [ref, qty] of Object.entries(rec.need)) {
@@ -705,7 +713,16 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // guarantee at the top is the point of the minigame having a skill ceiling at all: without it a perfect run
     // was a coin flip, which makes practising feel pointless.
     const FLAWLESS = 0.92;
-    const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0);
+    let equippedKitchen = { heat: 0, larder: 0 };
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const [h, l] = await Promise.all([
+            getPetSystemPerk(buyerId, "kitchen_heat"),
+            getPetSystemPerk(buyerId, "kitchen_larder"),
+        ]);
+        equippedKitchen = { heat: h, larder: l };
+    } catch { /* no companion, no bonus */ }
+    const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0) + equippedKitchen.heat / 100;
     const bumped = q >= FLAWLESS || Math.random() < bumpChance;
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
 

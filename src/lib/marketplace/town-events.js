@@ -166,6 +166,9 @@ async function computeRaidHit(buyerId) {
     const ferocity = (stats.ferocity || 0) + (ps.ferocity || 0);
     // Base scales with your offense; even a bare hero deals a little. Small jitter so numbers feel alive.
     let dmg = 8 + might * 0.85 + ferocity * 0.5;
+    // A plaza-fighter companion boosts TOWN raids only — deliberately not the weekly boss, so a rally pet is a
+    // real choice rather than a strictly-better damage pet. getPetCombatBonus is already loaded above.
+    dmg *= 1 + Math.min(0.5, (pet?.system?.town_rally || 0) / 100);
     dmg *= 0.9 + Math.random() * 0.2;
     // Crit
     const critChance = Math.min(0.75, (stats.crit_chance || 0) + (ps.crit_chance || 0));

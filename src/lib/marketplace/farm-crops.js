@@ -353,7 +353,18 @@ export async function harvestPlot(buyerId, slot) {
     // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold.
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
     let doubled = false;
-    const dblChance = setFarmDoubleHarvest(equipped);
+    // A farm companion's yield perk stacks with the Harvester's Garb capstone. Both are stated as a plain
+    // double-harvest chance, so a member can read the two numbers and add them up themselves.
+    let petFarm = { yield: 0, seed: 0 };
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const [y, sd] = await Promise.all([
+            getPetSystemPerk(buyerId, "farm_yield"),
+            getPetSystemPerk(buyerId, "farm_seed"),
+        ]);
+        petFarm = { yield: y, seed: sd };
+    } catch { /* no companion, no bonus */ }
+    const dblChance = setFarmDoubleHarvest(equipped) + petFarm.yield / 100;
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
@@ -427,7 +438,11 @@ export async function harvestPlot(buyerId, slot) {
     // Seeds now come from packs, not from every harvest — the old always-on seed drop is gone (it's part of why
     // harvests "rewarded too often"). A bonus seed can still come from the ~5% loot roll above, and the Seed
     // Saver upgrade still recovers the planted seed. Kept null so the client toast simply omits it.
-    const foundSeed = null;
+    // A companion with the seed perk drops one on top of the harvest — the perk card promises exactly this.
+    let foundSeed = null;
+    if (petFarm.seed > 0 && Math.random() < petFarm.seed / 100) {
+        foundSeed = await dropSeedFrom(buyerId, "pet_companion").catch(() => null);
+    }
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     // A creature might RAID this harvest (chance raised by the plot's Warding Totem + rarer crops) — the client
     // fights it with a timing meter, then calls encounter_resolve for bonus loot. Server parks the pending fight.

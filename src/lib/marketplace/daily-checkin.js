@@ -20,13 +20,13 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // payoff on day 7 (then the cycle repeats — so every 7th day is a jackpot).
 
 const STREAK_REWARDS = [
-    { gold: 75, label: "75 gold", emoji: "🪙" },
-    { gold: 150, label: "150 gold", emoji: "🪙" },
+    { gold: 60, label: "60 gold", emoji: "🪙" },
+    { gold: 120, label: "120 gold", emoji: "🪙" },
     { treat: "treat_snack", label: "a Hearty Snack (pet XP)", emoji: "🍖" },
-    { gold: 250, label: "250 gold", emoji: "🪙" },
+    { gold: 200, label: "200 gold", emoji: "🪙" },
     { chest: "iron", label: "an Iron loot chest", emoji: "⚙️" },
-    { gold: 400, treat: "treat_toy", label: "400 gold + a Chew Toy", emoji: "🎁" },
-    { gold: 600, chest: "iron", label: "600 gold + an Iron chest", emoji: "🏆" }, // day-7 reward (Iron, not Gold — free weekly legendary was too rich)
+    { gold: 320, treat: "treat_toy", label: "320 gold + a Chew Toy", emoji: "🎁" },
+    { gold: 480, chest: "iron", label: "480 gold + an Iron chest", emoji: "🏆" }, // day-7 reward (Iron, not Gold — free weekly legendary was too rich)
 ];
 const rewardForStreak = (streak) => STREAK_REWARDS[((Math.max(1, streak) - 1) % 7)];
 

@@ -40,37 +40,56 @@ export const PERK_META = {
     first_blood: { icon: "🩸", kind: "proc" },
     xp_gain: { icon: "✨", kind: "econ" },
     gold_find: { icon: "💰", kind: "econ" },
+    // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────────
+    // Every active perk above points at the boss fight. 98 pets, 14 keys, all combat — so a farmer, a sailor
+    // and an angler all chose their companion off the same list of damage modifiers, and the newer half of the
+    // game had no pet that cared about it. These do.
+    farm_yield:   { icon: "🌾", kind: "farm" },
+    farm_speed:   { icon: "⏱️", kind: "farm" },
+    farm_seed:    { icon: "🌱", kind: "farm" },
+    angler_bite:  { icon: "🎣", kind: "sea" },
+    angler_size:  { icon: "📏", kind: "sea" },
+    sea_dredge:   { icon: "⚓", kind: "sea" },
+    sea_plunder:  { icon: "🏴", kind: "sea" },
+    kitchen_heat: { icon: "🔥", kind: "kitchen" },
+    kitchen_larder:{ icon: "🧺", kind: "kitchen" },
+    forge_spark:  { icon: "🔨", kind: "forge" },
+    forge_salvage:{ icon: "♦", kind: "forge" },
+    town_haggle:  { icon: "🧳", kind: "town" },
+    town_rally:   { icon: "🏘️", kind: "town" },
+    chest_luck:   { icon: "🧰", kind: "econ" },
+    recipe_nose:  { icon: "📜", kind: "kitchen" },
 };
 
 // petId → { name, key }. The NAME is the flavor; the KEY is the mechanic. (Passive stat lives in
 // collectibles.js PET_PASSIVE_STAT — every pet is a unique passive+active pairing.)
 export const PET_PERKS = {
     // Level
-    bunny: { name: "Hop Combo", key: "chain_strike" }, frog: { name: "Tongue Lash", key: "first_hit" }, chick: { name: "Rapid Peck", key: "extra_strike" },
+    bunny: { name: "Burrow Bounty", key: "farm_yield" }, frog: { name: "Tongue Lash", key: "first_hit" }, chick: { name: "Scratch & Peck", key: "farm_seed" },
     kitten: { name: "Nine Lives", key: "crit_chance" }, fox_kit: { name: "Sly Strike", key: "crit_chance" }, wolf_pup: { name: "Pack Instinct", key: "might" },
-    owl: { name: "Night Study", key: "xp_gain" }, bear_cub: { name: "Bear Hug", key: "might" }, raven: { name: "Ill Omen", key: "xp_gain" },
-    serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Leap", key: "first_hit" }, bat: { name: "Echolocate", key: "crit_chance" },
-    scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Tidal Dart", key: "crit_chance" },
-    eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Pouncing Roar", key: "first_hit" }, gorilla: { name: "Ground Pound", key: "ferocity" },
+    owl: { name: "Night Study", key: "xp_gain" }, bear_cub: { name: "Bear Hug", key: "might" }, raven: { name: "Hoard Sense", key: "chest_luck" },
+    serpent: { name: "Venom Fang", key: "crit_power" }, fawn: { name: "Gentle Graze", key: "farm_speed" }, bat: { name: "Echolocate", key: "crit_chance" },
+    scorpion: { name: "Stinger", key: "crit_power" }, tiger_cub: { name: "Ambush", key: "first_hit" }, seahorse: { name: "Shallows Sense", key: "angler_bite" },
+    eagle: { name: "Keen Eye", key: "crit_chance" }, lion_cub: { name: "Pouncing Roar", key: "first_hit" }, gorilla: { name: "Plaza Bruiser", key: "town_rally" },
     croc: { name: "Death Roll", key: "crit_power" }, hydra: { name: "Hydra Heads", key: "chain_strike" }, griffin: { name: "Sky Dive", key: "execute" },
     unicorn: { name: "Wish Granted", key: "fortune" }, dragon_whelp: { name: "Ember Burst", key: "erupt" }, pegasus: { name: "Tailwind", key: "xp_gain" },
-    baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Cloud Burst", key: "erupt" }, chameleon: { name: "Prismatic Hex", key: "crit_power" },
+    baby_rex: { name: "Apex Bite", key: "execute" }, sky_whale: { name: "Leviathan Wake", key: "angler_size" }, chameleon: { name: "Prismatic Hex", key: "crit_power" },
     elder_dragon: { name: "Cataclysm", key: "execute" },
     // Shop
-    penguin: { name: "Cold Cash", key: "gold_find" }, hedgehog: { name: "Spiny Luck", key: "fortune" }, sheep: { name: "Golden Fleece", key: "gold_find" },
-    crab: { name: "Double Pincer", key: "chain_strike" }, turtle: { name: "Shell Slam", key: "ferocity" }, parrot: { name: "Double Talk", key: "extra_strike" },
-    dolphin: { name: "Lucky Leap", key: "fortune" }, monkey: { name: "Trickster Combo", key: "extra_strike" }, panda: { name: "Bamboo Might", key: "might" },
-    kangaroo: { name: "Kick Combo", key: "extra_strike" },
+    penguin: { name: "Cold Diver", key: "sea_dredge" }, hedgehog: { name: "Sharp Bargain", key: "town_haggle" }, sheep: { name: "Golden Fleece", key: "farm_yield" },
+    crab: { name: "Seabed Sifter", key: "sea_dredge" }, turtle: { name: "Deep Hauler", key: "angler_size" }, parrot: { name: "Recipe Mimic", key: "recipe_nose" },
+    dolphin: { name: "Pod Scout", key: "angler_bite" }, monkey: { name: "Quick Hands", key: "kitchen_heat" }, panda: { name: "Bamboo Glut", key: "farm_yield" },
+    kangaroo: { name: "Plaza Kick", key: "town_rally" },
     // Achievement
-    ladybug: { name: "Lucky Spots", key: "fortune" }, bee: { name: "Sting Rush", key: "crit_chance" }, sloth: { name: "Dead Weight", key: "execute" },
-    beaver: { name: "Hard Worker", key: "might" }, raccoon: { name: "Bandit Ambush", key: "first_hit" }, flamingo: { name: "Pink Rush", key: "first_hit" },
-    toucan: { name: "Bright Beak", key: "crit_power" },
+    ladybug: { name: "Aphid Patrol", key: "farm_speed" }, bee: { name: "Pollinator", key: "farm_yield" }, sloth: { name: "Slow Ripening", key: "farm_seed" },
+    beaver: { name: "Irrigator", key: "farm_speed" }, raccoon: { name: "Pantry Raider", key: "kitchen_larder" }, flamingo: { name: "Struts the Plaza", key: "town_haggle" },
+    toucan: { name: "Sweet Tooth", key: "recipe_nose" },
     // Forge (earned at The Forge)
-    ember_whelp: { name: "Ember Spark", key: "first_hit" }, cinder_hound: { name: "Cinder Rush", key: "chain_strike" },
-    anvil_golem: { name: "Hammerfall", key: "execute" }, molten_salamander: { name: "Magma Burst", key: "erupt" },
+    ember_whelp: { name: "Ember Spark", key: "forge_spark" }, cinder_hound: { name: "Scrap Nose", key: "forge_salvage" },
+    anvil_golem: { name: "Hammerfall", key: "forge_salvage" }, molten_salamander: { name: "Magma Temper", key: "forge_spark" },
     forgeheart_wyrm: { name: "Forgefire", key: "onslaught" },
     // Chest
-    tropical_fish: { name: "Reef Flare", key: "erupt" }, axolotl: { name: "Regen Surge", key: "chain_strike" }, butterfly: { name: "Flutter Flurry", key: "chain_strike" },
+    tropical_fish: { name: "Reef Caller", key: "angler_bite" }, axolotl: { name: "Silt Sifter", key: "sea_dredge" }, butterfly: { name: "Lucky Flutter", key: "chest_luck" },
     squid: { name: "Ink Ambush", key: "crit_chance" }, jellyfish: { name: "Sting Surge", key: "erupt" }, octopus: { name: "Eight Arms", key: "extra_strike" },
     // Boss
     vulture: { name: "Circling Death", key: "first_blood" }, minotaur: { name: "Charge", key: "first_blood" }, centaur: { name: "Opening Volley", key: "first_hit" },
@@ -123,6 +142,24 @@ function perkDesc(key, v, level = 1) {
         case "seedLuck": return `+${v}% seed luck on your farm while equipped — more seeds found and kept`;
         case "growSpeed": return `−${v}% crop grow time on your farm while equipped`;
         case "petXp": return `+${v}% pet XP from tending your farm while equipped`;
+        // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────
+        // Every one states the exact number and exactly what it changes. "+2 seed luck" tells a member nothing;
+        // "1 harvest in 12 comes up double" tells them whether they want it.
+        case "farm_yield": return `${Math.max(2, Math.round(100 / v))} in 100 harvests come up DOUBLE while equipped (+${v}% double-harvest chance)`;
+        case "farm_speed": return `Your crops finish ${v}% sooner while equipped — a 12h crop lands about ${Math.round(12 * v / 100 * 60)} min early`;
+        case "farm_seed": return `+${v}% chance a harvest also drops a SEED while equipped`;
+        case "angler_bite": return `+${v}% chance a cast hooks a rarer fish than it should have`;
+        case "angler_size": return `Every fish you land measures +${v}% longer — counts for records and the log`;
+        case "sea_dredge": return `+${v}% chance a dig turns up treasure instead of dirt`;
+        case "sea_plunder": return `+${v}% gold from raids and the sea merchant`;
+        case "kitchen_heat": return `+${v}% chance a cooked dish comes out one whole TIER better`;
+        case "kitchen_larder": return `+${v}% chance a cook uses up NO ingredients at all`;
+        case "forge_spark": return `+${v}% chance an enhance at the Forge doesn't consume its parts`;
+        case "forge_salvage": return `+${v}% parts from every salvage`;
+        case "town_haggle": return `${v}% off everything the travelling merchant and the gold shop sell`;
+        case "town_rally": return `+${v}% damage on town raids — the plaza skirmishes, not the weekly boss`;
+        case "chest_luck": return `+${v}% chance any chest you open rolls on the NEXT rarity up`;
+        case "recipe_nose": return `+${v}% chance anything that can drop a recipe does`;
         default: return "";
     }
 }
@@ -148,10 +185,24 @@ export const petRealWorld = (pet) => PET_REAL_WORLD[pet?.id] || null;
 // Combine a member's whole menagerie into combat/economy bonuses. PURE — feed it owned pet objects + the
 // equipped pet. Passives (all owned) stack, each SCALED by that pet's level (levelByPet[id], default 1 →
 // Lv1 ×1 … Lv5 ×5); the equipped pet adds its signature perk on top (procs are NOT level-scaled).
+// The perk keys that belong to a SYSTEM rather than the boss fight. Kept as a set so combinePetBonuses can
+// route them without a second list to forget to update.
+export const SYSTEM_PERK_KEYS = new Set([
+    "farm_yield", "farm_speed", "farm_seed",
+    "angler_bite", "angler_size", "sea_dredge", "sea_plunder",
+    "kitchen_heat", "kitchen_larder", "recipe_nose",
+    "forge_spark", "forge_salvage",
+    "town_haggle", "town_rally", "chest_luck",
+]);
+
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}) {
     const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
+    // System perks land here rather than in stats/economy, which only know about combat. `add()` silently
+    // drops anything it doesn't recognise, so without this bucket every farm/sea/kitchen/forge/town perk
+    // would read beautifully on the pet card and do absolutely nothing.
+    const system = {};
     const add = (k, v) => {
         if (k in economy) economy[k] += v;
         else if (k in stats) stats[k] += v;
@@ -194,7 +245,8 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             const eqLevel = Math.max(1, Number(levelByPet[equippedPet.id]) || 1);
             proc.extraStrikeChance = Math.min(1, 0.2 + 0.2 * (eqLevel - 1));
         }
+        else if (SYSTEM_PERK_KEYS.has(def.key)) system[def.key] = v * aMult;
         else add(def.key, v * aMult);
     }
-    return { stats, economy, proc };
+    return { stats, economy, proc, system };
 }

@@ -66,20 +66,20 @@ const WHEELS = [
         prizes: [
             { label: "50 gold", sprite: "coins-small", weight: 16, kind: "gold", amount: 50 },
             { label: "60 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 60 },
-            { label: "100 gold", sprite: "coins-small", weight: 15, kind: "gold", amount: 100 },
+            { label: "75 gold", sprite: "coins-small", weight: 15, kind: "gold", amount: 75 },
             { label: "Pet Treat", sprite: "pet-treat", weight: 10, kind: "consumable", consumable: "treat_bone", n: 1 },
             { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
-            { label: "200 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 200 },
+            { label: "150 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 150 },
             { label: "5 Fertilizer", sprite: "fertilizer", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
             { label: "3 Dig Fragments", sprite: "dig-shard", weight: 8, kind: "fragment", n: 3 },
             { label: "MINI WHEEL", sprite: "mini-wheel", weight: 5, tier: "bonus", kind: "mini_wheel" },
-            { label: "350 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 350 },
+            { label: "250 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 250 },
             { label: "150 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 150 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
             { label: "BONUS SPIN", sprite: "bonus-spin", weight: 7, tier: "bonus", kind: "respin" },
             { label: "Wooden Chest", sprite: "chest-wood", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             { label: "BONUS GAME", sprite: "mystery-box", weight: 4, tier: "bonus", kind: "bonus_game" },
-            { label: "500 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 500 },
+            { label: "375 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 375 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
             { label: "Gold Chest", sprite: "chest-gold", weight: 2, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
             { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT },
@@ -90,14 +90,14 @@ const WHEELS = [
 
 // The MINI WHEEL bonus round — a small secondary wheel of solid prizes.
 const MINI_WHEEL_PRIZES = [
-    { label: "300 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 300 },
+    { label: "225 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 225 },
     { label: "150 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 150 },
     { label: "Hearty Snack", sprite: "pet-treat", weight: 12, kind: "consumable", consumable: "treat_snack", n: 1 },
     { label: "5 Dig Fragments", sprite: "dig-shard", weight: 12, kind: "fragment", n: 5 },
-    { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
+    { label: "450 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 450 },
     { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
     { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-    { label: "1,000 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
+    { label: "750 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 750 },
 ];
 
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3

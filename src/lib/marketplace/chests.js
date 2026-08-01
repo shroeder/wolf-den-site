@@ -201,7 +201,17 @@ export async function openChest(buyerId, tier) {
 
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const owned = new Set(ownedRows.map((r) => r.item_id));
-    const rarity = rollRarity(def.weights);
+    // A chest-luck companion can promote the roll one rarity band up — stated exactly on the pet card.
+    const RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal"];
+    let rarity = rollRarity(def.weights);
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const luck = await getPetSystemPerk(buyerId, "chest_luck");
+        if (luck > 0 && Math.random() < luck / 100) {
+            const i = RARITY_LADDER.indexOf(rarity);
+            if (i >= 0 && i < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[i + 1];
+        }
+    } catch { /* no companion, no promotion */ }
     // Pick the pool by the ROLLED rarity, not the chest tier: Ascendant/Eternal are elite (charged) gear;
     // everything common→mythic comes from the normal loot pool. This lets a chest's spread span both tiers
     // (e.g. an Ascendant chest that under-rolls to mythic still grants a real mythic item).

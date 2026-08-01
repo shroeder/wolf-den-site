@@ -266,7 +266,17 @@ export async function salvageItem(buyerId, itemId) {
     const rb = regaliaBonus(REGALIA_IDS.filter((r) => equippedSet.has(r)).length); // Blacksmith's Regalia salvage bonus
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
-    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus) { n *= 2; doubled = true; } // Efficient Salvage + Regalia
+    // A forge companion's salvage perk stacks with Efficient Salvage and the Regalia set.
+    let forgePet = { salvage: 0, spark: 0 };
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const [sv, sp] = await Promise.all([
+            getPetSystemPerk(buyerId, "forge_salvage"),
+            getPetSystemPerk(buyerId, "forge_spark"),
+        ]);
+        forgePet = { salvage: sv, spark: sp };
+    } catch { /* no companion, no bonus */ }
+    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus + forgePet.salvage / 100) { n *= 2; doubled = true; } // Efficient Salvage + Regalia + companion
     n += rb.flatParts;
     // Melt-down recovery: ~40% of the parts forged into this item (same tier as its salvage parts).
     let enhanceBonus = 0;
@@ -335,8 +345,17 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         if (!sc) return { ok: false, error: "no_scroll", ...(await getForgeState(buyerId)) };
         usedScroll = true;
     } else {
-        const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
-        if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
+        // A forge companion's spark perk can spare the parts entirely — the pet card states the exact chance.
+        let sparked = false;
+        try {
+            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+            const spark = await getPetSystemPerk(buyerId, "forge_spark");
+            sparked = spark > 0 && Math.random() < spark / 100;
+        } catch { /* no companion, no bonus */ }
+        if (!sparked) {
+            const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
+            if (!paid) return { ok: false, error: "not_enough", need: { tier, qty }, ...(await getForgeState(buyerId)) };
+        }
     }
     const q = Math.max(0, Math.min(1, Number(quality) || 0));
     // SKILL TIERS — the mini-game score decides how many stat points you forge AND how they SPREAD. Higher tiers
