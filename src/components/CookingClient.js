@@ -226,13 +226,11 @@ export default function CookingClient({ initial }) {
                     </div>
                 </div>
 
-                <div className="ck-kpis">
-                    <div className="ck-kpi"><b>Lv {s.level}</b><span>cook</span></div>
-                    <div className="ck-kpi"><b>{(s.cooksTotal || 0).toLocaleString()}</b><span>cooked</span></div>
-                    <div className="ck-kpi"><b>{s.known}<i>/{s.recipeTotal}</i></b><span>recipes</span></div>
-                    <div className="ck-kpi"><b>{pctText(s.bestQuality)}</b><span>best run</span></div>
-                    <div className="ck-kpi is-gold"><b>{(s.gold || 0).toLocaleString()}</b><span>gold</span></div>
-                </div>
+                {/* The five-tile stat grid that used to sit here is gone. "recipes" repeated the count in the
+                    Recipes header immediately below it; "cooked" and "best run" both read 0 until you have
+                    played enough for them to mean anything; and gold belongs beside the prices on the Upgrades
+                    tab, where it is a decision rather than a fact. What remains above — the pot's stage and
+                    cooks left — is the part that changes what you can do right now. */}
                 {flash ? <div className="ck-flash">{flash}</div> : null}
             </section>
 
@@ -393,7 +391,9 @@ export default function CookingClient({ initial }) {
             </section>
 
             <section className="card" hidden={view !== "upgrades"}>
-                <div className="ck-sec">The kitchen <span className="muted">· spend gold to cook better</span></div>
+                {/* Gold moved here from the old stat grid — beside the prices, where it is the number you are
+                    actually weighing an upgrade against. */}
+                <div className="ck-sec">The kitchen <span className="muted">· 🪙 {(s.gold || 0).toLocaleString()} to spend</span></div>
                 {/* The SAME cards Sailing uses (.sail-upgrades / .sail-upg) rather than a bespoke kitchen list —
                     icon chip, level bar, a "now → next" effect row and a gold buy button. An upgrade should look
                     and behave identically wherever you meet one. */}

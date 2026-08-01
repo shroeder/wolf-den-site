@@ -685,6 +685,22 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Read once, up here, because the Larder roll below needs it too — and `a < b + c || 0` parses as
     // `(a < b + c) || 0`, so writing it inline both double-queried and silently discarded the pet's help.
     const petBonus = await petCookBonus(buyerId).catch(() => ({}));
+    // MUST be resolved here, above the Larder roll. This block used to sit ~40 lines further down, next to the
+    // heat/portion rolls that also read it — but the Larder roll on the very next line reads .larder, and `let`
+    // hoists WITHOUT initialising, so every cook died on "Cannot access 'equippedKitchen' before initialization"
+    // before it could return anything. The route 500'd, the client saw no `ok`, and no result card was ever
+    // shown. Keep this above the first read: the four kitchen perks are one fact and belong together, up front.
+    let equippedKitchen = { heat: 0, larder: 0, portion: 0, prep: 0 };
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const [h, l, po, pr] = await Promise.all([
+            getPetSystemPerk(buyerId, "kitchen_heat"),
+            getPetSystemPerk(buyerId, "kitchen_larder"),
+            getPetSystemPerk(buyerId, "kitchen_portion"),
+            getPetSystemPerk(buyerId, "kitchen_prep"),
+        ]);
+        equippedKitchen = { heat: h, larder: l, portion: po, prep: pr };
+    } catch { /* no companion, no bonus */ }
     const freeCook = Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
     if (!freeCook) {
         const taken = [];
@@ -725,17 +741,6 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // guarantee at the top is the point of the minigame having a skill ceiling at all: without it a perfect run
     // was a coin flip, which makes practising feel pointless.
     const FLAWLESS = 0.92;
-    let equippedKitchen = { heat: 0, larder: 0, portion: 0, prep: 0 };
-    try {
-        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        const [h, l, po, pr] = await Promise.all([
-            getPetSystemPerk(buyerId, "kitchen_heat"),
-            getPetSystemPerk(buyerId, "kitchen_larder"),
-            getPetSystemPerk(buyerId, "kitchen_portion"),
-            getPetSystemPerk(buyerId, "kitchen_prep"),
-        ]);
-        equippedKitchen = { heat: h, larder: l, portion: po, prep: pr };
-    } catch { /* no companion, no bonus */ }
     const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0) + equippedKitchen.heat / 100;
     const bumped = q >= FLAWLESS || Math.random() < bumpChance;
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
