@@ -47,7 +47,6 @@ export default function CookingClient({ initial }) {
     // breadcrumb back, so chasing a chain three deep doesn't strand you.
     const [trail, setTrail] = useState([]);
     const [tab, setTab] = useState("all");
-    const [devOpen, setDevOpen] = useState(false);
     // The kettle gives itself a shake every few seconds. Randomised so it never falls into a metronome — a
     // predictable twitch reads as a broken loop, an unpredictable one reads as something alive.
     const [shaking, setShaking] = useState(false);
@@ -205,25 +204,6 @@ export default function CookingClient({ initial }) {
                 </div>
                 {flash ? <div className="ck-flash">{flash}</div> : null}
             </section>
-
-            {/* Collapsed by default. It's a dev tool, and expanded it was eating the entire first screen
-                above the pantry and the recipes — the things the page is actually for. */}
-            {s.isOwner ? (
-                <section className="card ck-dev">
-                    <button type="button" className="ck-dev-toggle" onClick={() => setDevOpen((v) => !v)} aria-expanded={devOpen}>
-                        <span>Test kitchen <span className="muted">· owner only</span></span>
-                        <span className="ck-dev-caret">{devOpen ? "▲" : "▼"}</span>
-                    </button>
-                    {devOpen ? (
-                        <div className="ck-dev-btns">
-                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "all" })}>Stock everything</button>
-                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "recipes" })}>All recipes</button>
-                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_stock", what: "ingredients" })}>Fill pantry</button>
-                            <button type="button" className="btn-ghost" disabled={busy} onClick={() => post({ action: "dev_reset" })}>Wipe kitchen</button>
-                        </div>
-                    ) : null}
-                </section>
-            ) : null}
 
             <section className="card">
                 <div className="ck-sec">Pantry <span className="muted">· {s.pantryTotal || 0} ingredients</span></div>
@@ -545,12 +525,7 @@ const CK_CSS = `
 .ck-flash { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: rgba(224,91,106,0.14); border: 1px solid rgba(224,91,106,0.4); color: #ffb4bc; font-size: 0.84rem; font-weight: 700; }
 .ck-sec { font-weight: 800; font-size: 0.98rem; margin-bottom: 10px; }
 .ck-empty { margin: 0; font-size: 0.85rem; }
-.ck-dev { border-color: rgba(201,162,255,0.45) !important; }
-.ck-dev-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0;
     background: none; border: none; cursor: pointer; font: inherit; font-weight: 800; font-size: 0.9rem; color: #c9a2ff; }
-.ck-dev-caret { font-size: 0.7rem; opacity: .7; }
-.ck-dev-btns { margin-top: 10px; }
-.ck-dev-btns { display: flex; flex-wrap: wrap; gap: 7px; }
 
 .ck-pantry { display: flex; flex-wrap: wrap; gap: 7px; }
 .ck-ing { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 12px;

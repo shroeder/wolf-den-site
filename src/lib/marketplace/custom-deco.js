@@ -2,6 +2,9 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { generateImage, refineDecoPrompt, describeDecoFromName } from "@/lib/marketplace/openai-image.js";
+// buildPrompt has always called housePrompt and it was NEVER imported — every creation threw
+// "housePrompt is not defined" before a single image was requested.
+import { housePrompt } from "@/lib/marketplace/art-style.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { logCreationLedger } from "@/lib/marketplace/creation-ledger.js";
 import { isOwner } from "@/lib/marketplace/owner.js";

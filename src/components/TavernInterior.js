@@ -223,8 +223,8 @@ export default function TavernInterior({ bgUrl, diceUrl, npcArt, iconArt, me, on
     const engageBarkeep = useCallback(() => {
         barSay(pick(GREET));
         // Slide the camera over to the barkeep so you're "at the bar".
-        const target = clampN((NPCS[0].x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
-        setPanExtra(target - clampN((pos.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW)));
+        const target = clamp((NPCS[0].x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW));
+        setPanExtra(target - clamp((pos.x / 100) * WORLD_W - viewportW / 2, 0, Math.max(0, WORLD_W - viewportW)));
     }, [barSay, viewportW, pos.x]);
     const askNews = useCallback(() => { const rumors = st?.rumors || []; barSay(rumors.length ? `*leans in* ${rumors[Math.floor(Math.random() * rumors.length)]}` : "*shrugs* Quiet night so far, friend."); }, [st?.rumors, barSay]);
     const askPint = useCallback(async () => {
