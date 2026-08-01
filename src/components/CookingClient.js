@@ -9,6 +9,9 @@ import CookingMinigame from "@/components/CookingMinigame";
 // selling them. Her actual AI hero sprite is enshrined beside the kettle as a small medallion; tapping it
 // tells the story. Hard-coded to the sprite blob on purpose, exactly like the Forge's tribute to Alstier1: a
 // fixed dedication should not change or break if the account or its avatar later does.
+// Reward-rarity colours for the reveal glow — the dish's tier colours the frame, the PRIZE colours the burst.
+const REVEAL_RARITY = { common: "#9aa0a6", rare: "#7ec8ff", epic: "#c9a2ff", legendary: "#ffd75e", mythic: "#ff9ec4" };
+
 const FOUNDER = {
     name: "aannw",
     sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/art/mkt_buyer/1785396661309-480247-bgglm4dqeqalWevOldEeiNBuNtjiOy.webp",
@@ -81,7 +84,31 @@ export default function CookingClient({ initial }) {
         const rec = playing;
         setPlaying(null);
         const d = await post({ action: "cook", recipe: rec.id, quality, chain });
-        if (d?.ok) { setResult(d); return; }
+        if (d?.ok) {
+            setResult(d);
+            // A rising chord on the reveal, pitched by the rung — the same synthesised approach the minigame
+            // uses, so no asset to load and nothing to go stale. Wrapped: blocked audio must never break the
+            // reveal itself.
+            try {
+                const rw = d.made?.reward;
+                const climb = rw?.rungs ? rw.rung / rw.rungs : 0.5;
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (Ctx) {
+                    const ac = new Ctx();
+                    const notes = climb >= 0.99 ? [523, 659, 784, 1047] : climb > 0.6 ? [440, 554, 659] : [349, 440];
+                    notes.forEach((f, i) => {
+                        const o = ac.createOscillator(); const g = ac.createGain();
+                        o.type = "triangle"; o.frequency.setValueAtTime(f, ac.currentTime + i * 0.09);
+                        g.gain.setValueAtTime(0.0001, ac.currentTime + i * 0.09);
+                        g.gain.exponentialRampToValueAtTime(0.13, ac.currentTime + i * 0.09 + 0.02);
+                        g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + i * 0.09 + 0.42);
+                        o.connect(g); g.connect(ac.destination);
+                        o.start(ac.currentTime + i * 0.09); o.stop(ac.currentTime + i * 0.09 + 0.45);
+                    });
+                }
+            } catch { /* audio is a bonus, never a requirement */ }
+            return;
+        }
         say(d?.error === "out_of_cooks" ? "The stove's had enough for today."
             : d?.error === "missing_ingredients" ? `You're out of ${d.missing}.`
             : d?.error === "not_learned" ? "You haven't found that recipe yet."
@@ -388,16 +415,43 @@ export default function CookingClient({ initial }) {
 
             {playing ? <CookingMinigame recipe={playing} onDone={finishCook} /> : null}
 
-            {result ? (
+            {result ? (() => {
+                const rw = result.made.reward;
+                const topRung = Boolean(rw?.rungs && rw.rung >= rw.rungs);
+                return (
                 <div className="ck-scrim" role="dialog" onClick={() => setResult(null)}>
-                    <div className="ck-reveal" style={{ "--rt": result.made.tierColor }} onClick={(e) => e.stopPropagation()}>
+                    <div
+                        className={`ck-reveal is-r${result.made.reward?.rung || 1}${result.bumped ? " is-bumped" : ""}`}
+                        style={{ "--rt": result.made.tierColor, "--rr": REVEAL_RARITY[result.made.reward?.rarity] || result.made.tierColor }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* THE PAYOFF. This was the one reveal in the game with no effects at all — a static card
+                            after a five-step minigame. Everything below scales with the RUNG you landed on, so a
+                            top-rung cook is visibly louder than a consolation one and you can tell before reading. */}
+                        <span className="ck-reveal-rays" aria-hidden="true" />
+                        <span className="ck-reveal-burst" aria-hidden="true" />
+                        {topRung ? (
+                            <span className="ck-reveal-sparks" aria-hidden="true">
+                                {Array.from({ length: 14 }, (_, i) => (
+                                    <i key={i} style={{ "--a": `${i * (360 / 14)}deg`, "--d": `${0.04 + (i % 5) * 0.05}s` }} />
+                                ))}
+                            </span>
+                        ) : null}
                         <div className="ck-reveal-tier">{result.made.tierName} · {result.grade}</div>
                         <div className="ck-reveal-art"><Art sprite={result.made.sprite} emoji="🍽️" size={110} alt={result.made.name} /></div>
                         <div className="ck-reveal-name">{result.made.name}{result.portions > 1 ? ` ×${result.portions}` : ""}</div>
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
                                 {result.made.reward.rungs ? (
-                                    <div className="ck-reveal-rung">Rung {result.made.reward.rung} of {result.made.reward.rungs}</div>
+                                    <div className="ck-reveal-rung">
+                                        <span className="ck-rung-pips" aria-hidden="true">
+                                            {Array.from({ length: result.made.reward.rungs }, (_, i) => (
+                                                <i key={i} className={i < result.made.reward.rung ? "is-on" : ""} style={{ "--i": `${i * 0.05}s` }} />
+                                            ))}
+                                        </span>
+                                        Rung {result.made.reward.rung} of {result.made.reward.rungs}
+                                        {topRung ? <b> · TOP OF THE LADDER</b> : null}
+                                    </div>
                                 ) : null}
                                 <div className={`ck-reveal-prize is-${result.made.reward.rarity || "common"}`}>
                                     <Art sprite={result.made.reward.sprite} emoji={result.made.reward.emoji} size={44} alt={result.made.reward.name} />
@@ -416,7 +470,8 @@ export default function CookingClient({ initial }) {
                         </button>
                     </div>
                 </div>
-            ) : null}
+                );
+            })() : null}
 
             <style>{CK_CSS}</style>
         </div>
@@ -630,7 +685,43 @@ const CK_CSS = `
 .ck-reveal { width: min(420px, 100%); padding: 24px 22px 18px; border-radius: 20px; text-align: center;
     background: linear-gradient(180deg, #241c33, #17121f); border: 2px solid var(--rt);
     box-shadow: 0 20px 60px rgba(0,0,0,0.7); animation: ckPop .28s cubic-bezier(.2,.9,.3,1) both; }
-.ck-reveal-tier { font-size: 0.7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--rt); }
+.ck-reveal-tier { font-size: 0.7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--rt); position: relative; z-index: 2; }
+/* ── THE PAYOFF ───────────────────────────────────────────────────────────────────────────────────────────
+   Everything here scales with the RUNG. A consolation cook gets a soft glow; the top of the ladder gets rays,
+   a full burst and sparks. You should be able to tell how well you did before you read a single word. */
+.ck-reveal { position: relative; overflow: hidden; animation: ckRevealPop .42s cubic-bezier(.2,1.5,.35,1) both; }
+.ck-reveal > *:not(.ck-reveal-rays):not(.ck-reveal-burst):not(.ck-reveal-sparks) { position: relative; z-index: 2; }
+.ck-reveal-rays { position: absolute; top: 34%; left: 50%; width: 460px; height: 460px; margin: -230px 0 0 -230px;
+    pointer-events: none; z-index: 0; opacity: 0; border-radius: 50%;
+    background: repeating-conic-gradient(from 0deg, var(--rr) 0deg 7deg, transparent 7deg 20deg);
+    -webkit-mask-image: radial-gradient(circle, #000 12%, transparent 62%); mask-image: radial-gradient(circle, #000 12%, transparent 62%);
+    animation: ckRays 8s linear infinite, ckRaysIn .5s ease-out .08s forwards; }
+.ck-reveal-burst { position: absolute; top: 34%; left: 50%; width: 260px; height: 260px; margin: -130px 0 0 -130px;
+    pointer-events: none; z-index: 0; border-radius: 50%;
+    background: radial-gradient(circle, var(--rr) 0%, transparent 68%); opacity: 0;
+    animation: ckBurst .62s ease-out .05s forwards; }
+.ck-reveal-sparks { position: absolute; top: 34%; left: 50%; width: 0; height: 0; z-index: 1; pointer-events: none; }
+.ck-reveal-sparks i { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%;
+    background: var(--rr); box-shadow: 0 0 10px 2px var(--rr); opacity: 0;
+    transform: rotate(var(--a)) translateY(0); animation: ckSpark .72s ease-out var(--d) forwards; }
+/* Rung 1-2 are consolations — dim the fireworks rather than firing them at full for a bad cook. */
+.ck-reveal.is-r1 .ck-reveal-rays, .ck-reveal.is-r2 .ck-reveal-rays { opacity: 0 !important; animation: none; }
+.ck-reveal.is-r1 .ck-reveal-burst, .ck-reveal.is-r2 .ck-reveal-burst { animation-duration: .4s; filter: saturate(.5); }
+/* A tier bump is the loudest thing that can happen — the frame itself flashes. */
+.ck-reveal.is-bumped { animation: ckRevealPop .42s cubic-bezier(.2,1.5,.35,1) both, ckBumpFlash 1.1s ease-out .3s 2; }
+.ck-reveal-art { position: relative; z-index: 2; }
+/* The ladder, as pips you can count. They fill left-to-right so the climb is visible. */
+.ck-rung-pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 7px; }
+.ck-rung-pips i { width: 12px; height: 4px; border-radius: 999px; background: rgba(255,255,255,0.14); }
+.ck-rung-pips i.is-on { background: var(--rr); box-shadow: 0 0 7px var(--rr); animation: ckPip .32s ease-out var(--i) both; }
+.ck-reveal-rung b { color: var(--rr); letter-spacing: .1em; }
+@keyframes ckRevealPop { from { opacity: 0; transform: scale(.9) translateY(14px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes ckRays { to { transform: rotate(360deg); } }
+@keyframes ckRaysIn { to { opacity: 0.16; } }
+@keyframes ckBurst { 0% { opacity: .55; transform: scale(.35); } 100% { opacity: 0; transform: scale(1.7); } }
+@keyframes ckSpark { 0% { opacity: 1; transform: rotate(var(--a)) translateY(6px); } 100% { opacity: 0; transform: rotate(var(--a)) translateY(120px); } }
+@keyframes ckPip { from { opacity: 0; transform: scaleX(.2); } to { opacity: 1; transform: scaleX(1); } }
+@keyframes ckBumpFlash { 0%,100% { box-shadow: 0 20px 60px rgba(0,0,0,0.7); } 50% { box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 46px var(--rt); } }
 .ck-reveal-art { margin: 8px 0 4px; animation: ckSteam 2.4s ease-in-out infinite; }
 .ck-reveal-name { font-weight: 900; font-size: 1.2rem; }
 .ck-reveal-desc { margin: 6px 0 0; font-size: 0.84rem; color: #b9c2cc; line-height: 1.4; }
