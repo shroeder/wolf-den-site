@@ -31,6 +31,25 @@ export const ORE_TIERS = {
     5: { tier: 5, id: "emberheart", name: "Emberheart Geode", color: "#ffb020", part: 5, weight: 2, hp: 520, xp: 96, gold: 90 },
 };
 export const oreTier = (t) => ORE_TIERS[t] || ORE_TIERS[1];
+
+// ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────────
+// Straight from the Kitchen: you see every rung BEFORE you start, and how well you play decides which one you
+// land on. Previously timing only decided how fast a seam cracked — the haul was identical whether you hit
+// every marker dead centre or mashed the button, which left the bar with nothing riding on it.
+//
+// Quality is your AVERAGE swing grade across the seam (0.5 glancing … 5.0 perfect), normalised to 0..1. Using
+// the average rather than the best swing means one lucky tap can't carry a sloppy dig, and using it rather
+// than the worst means one fumble doesn't erase a good one.
+export const MINE_RUNGS = [
+    { rung: 1, key: "rough", label: "Rough dig", min: 0, mult: 1.0, blurb: "You got it open." },
+    { rung: 2, key: "solid", label: "Solid work", min: 0.34, mult: 1.6, blurb: "Clean enough to keep the good stuff." },
+    { rung: 3, key: "clean", label: "Clean break", min: 0.60, mult: 2.4, blurb: "The seam split where you wanted it to." },
+    { rung: 4, key: "flawless", label: "Flawless seam", min: 0.84, mult: 3.4, blurb: "Every strike true — the whole vein comes out." },
+];
+const MAX_GRADE_MULT = 5.0;
+export const rungForQuality = (q) => [...MINE_RUNGS].reverse().find((r) => q >= r.min) || MINE_RUNGS[0];
+// Base ore a seam holds before the rung multiplier and the Haul track.
+export const baseOre = (tier) => 2 + tier;
 export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 
 // ── THE SWING ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -156,7 +175,8 @@ export async function getMiningState(buyerId) {
     const [current, ore, goldRow, liveCount] = await Promise.all([
         row?.current_node_id
             ? db.queryOne(
-                `SELECT n.id, n.tier, n.hp, n.hp_max, COALESCE(h.damage, 0) AS my_damage, COALESCE(h.swings, 0) AS my_swings
+                `SELECT n.id, n.tier, n.hp, n.hp_max, COALESCE(h.damage, 0) AS my_damage, COALESCE(h.swings, 0) AS my_swings,
+                        COALESCE(h.grade_sum, 0) AS my_grade_sum
                    FROM mkt_ore_node n
                    LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
                   WHERE n.id = $2 AND n.status = 'active'`,
@@ -186,12 +206,23 @@ export async function getMiningState(buyerId) {
         // The ONE seam you're working, or null until you prospect.
         node: current ? (() => {
             const o = oreTier(current.tier);
+            const haulMult = 1 + trackValue("haul", row?.haul_level);
+            const sw = Number(current.my_swings) || 0;
+            // Your running quality on THIS seam, so the ladder can show where you'd land if it broke now.
+            const q = sw > 0 ? Math.max(0, Math.min(1, (Number(current.my_grade_sum) || 0) / sw / 5.0)) : null;
             return {
                 id: Number(current.id), tier: current.tier, name: o.name, color: o.color, art: oreArt(current.tier),
                 partTier: o.part, gold: o.gold, xp: o.xp,
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
                 pct: current.hp_max ? Math.max(0, Math.round((current.hp / current.hp_max) * 100)) : 0,
-                mySwings: Number(current.my_swings) || 0,
+                mySwings: sw,
+                // The LADDER, shown before you swing: what each standard of digging pays out of this seam.
+                ladder: MINE_RUNGS.map((r) => ({
+                    rung: r.rung, key: r.key, label: r.label, blurb: r.blurb,
+                    ore: Math.max(1, Math.round(baseOre(current.tier) * r.mult * haulMult)),
+                })),
+                quality: q == null ? null : Math.round(q * 100),
+                currentRung: q == null ? null : rungForQuality(q).rung,
             };
         })() : null,
         seamsLive: Number(liveCount?.n) || 0,
@@ -289,10 +320,11 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         [nodeId, damage]
     ).catch(() => null);
     await db.query(
-        `INSERT INTO mkt_ore_node_hit (node_id, buyer_id, damage, swings, combo, last_swing_at) VALUES ($1, $2, $3, 1, $4, $5)
+        `INSERT INTO mkt_ore_node_hit (node_id, buyer_id, damage, swings, combo, last_swing_at, grade_sum) VALUES ($1, $2, $3, 1, $4, $5, $6)
          ON CONFLICT (node_id, buyer_id) DO UPDATE SET damage = mkt_ore_node_hit.damage + $3,
-             swings = mkt_ore_node_hit.swings + 1, combo = $4, last_swing_at = $5`,
-        [nodeId, buyerId, damage, combo, arrivedAt]
+             swings = mkt_ore_node_hit.swings + 1, combo = $4, last_swing_at = $5,
+             grade_sum = mkt_ore_node_hit.grade_sum + $6`,
+        [nodeId, buyerId, damage, combo, arrivedAt, grade.mult]
     ).catch(() => {});
     if (combo > (Number(row.best_combo) || 0)) {
         await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
@@ -322,7 +354,12 @@ async function claimNode(buyerId, node, row) {
     if (!won) return null; // someone else's swing landed first
 
     const o = oreTier(node.tier);
-    const haul = Math.max(1, Math.round((1 + trackValue("haul", row?.haul_level)) * (1 + Math.floor(Math.random() * 2))));
+    // How well you actually dug it: mean grade across your swings on this seam, normalised.
+    const mine = await db.queryOne(`SELECT swings, grade_sum FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`, [node.id, buyerId]).catch(() => null);
+    const swings = Math.max(1, Number(mine?.swings) || 1);
+    const quality = Math.max(0, Math.min(1, (Number(mine?.grade_sum) || 0) / swings / MAX_GRADE_MULT));
+    const rung = rungForQuality(quality);
+    const haul = Math.max(1, Math.round(baseOre(node.tier) * rung.mult * (1 + trackValue("haul", row?.haul_level))));
     await db.query(
         `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1, $2, $3)
          ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,
@@ -340,7 +377,12 @@ async function claimNode(buyerId, node, row) {
     await awardXp(buyerId, "mining", { points: o.xp, gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: haul }).catch(() => {});
 
-    return { tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier), ore: haul, gold, xp: o.xp, partTier: o.part };
+    return {
+        tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
+        ore: haul, gold, xp: o.xp, partTier: o.part,
+        rung: rung.rung, rungKey: rung.key, rungLabel: rung.label, rungBlurb: rung.blurb,
+        quality: Math.round(quality * 100), swings,
+    };
 }
 
 // ── SMELTING ─────────────────────────────────────────────────────────────────────────────────────────────────

@@ -156,6 +156,28 @@ export default function MiningClient({ initial }) {
                 {msg ? <div className="mine-msg">{msg}</div> : null}
             </div>
 
+            {/* THE LADDER — what this seam pays, shown BEFORE you swing. Straight from the Kitchen: the reward
+                isn't a surprise, how well you dig is. */}
+            {node && node.pct > 0 ? (
+                <div className="mine-ladder">
+                    <p className="mine-ladder-intro">
+                        <b>How well you swing decides what comes out.</b> Your average timing across this seam picks the rung.
+                        {node.quality != null ? <> Right now you&rsquo;re digging at <b>{node.quality}%</b>.</> : null}
+                    </p>
+                    {[...(node.ladder || [])].reverse().map((r) => (
+                        <div key={r.rung} className={`mine-rung is-${r.key}${node.currentRung === r.rung ? " is-here" : ""}`}>
+                            <span className="mine-rung-n">{r.rung}</span>
+                            <span className="mine-rung-copy"><b>{r.label}</b><em>{r.blurb}</em></span>
+                            <span className="mine-rung-pay">
+                                <Img src={node.art} className="mine-rung-ore" fallback="⬢" />
+                                <b>×{r.ore}</b>
+                            </span>
+                        </div>
+                    ))}
+                    <p className="mine-ladder-foot">Plus <b>{money(node.gold)}</b> gold and <b>{money(node.xp)}</b> XP on the crack, whatever the rung.</p>
+                </div>
+            ) : null}
+
             {node && node.pct > 0 && swingsLeft > 0
                 ? <SwingBar node={node} onSwing={onSwing} pick={s.pick} />
                 : (
@@ -228,6 +250,12 @@ export default function MiningClient({ initial }) {
                     <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
                         <Img src={crack.art} className="mine-modal-img" fallback="⬢" />
                         <h3 style={{ color: crack.color }}>{crack.name} cracked!</h3>
+                        {crack.rungLabel ? (
+                            <div className={`mine-rung-won is-${crack.rungKey}`}>
+                                <b>{crack.rungLabel}</b>
+                                <em>{crack.rungBlurb} · {crack.quality}% average over {crack.swings} swing{crack.swings === 1 ? "" : "s"}</em>
+                            </div>
+                        ) : null}
                         <div className="mine-modal-rows">
                             <span>Ore<b>+{crack.ore}</b></span>
                             <span>Gold<b>+{money(crack.gold)}</b></span>
@@ -330,6 +358,25 @@ export default function MiningClient({ initial }) {
                 .mine-smelt { padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(255,120,32,0.55); background: rgba(255,120,32,0.16);
                     color: #ffcf9a; font-weight: 800; font-size: 12px; cursor: pointer; white-space: nowrap; }
                 .mine-smelt:disabled { opacity: 0.32; cursor: default; }
+                .mine-ladder { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+                .mine-ladder-intro { margin: 0 0 10px; font-size: 12.5px; color: #cdd3d8; line-height: 1.5; }
+                .mine-rung { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 10px; margin-bottom: 6px;
+                    background: rgba(255,255,255,0.04); border: 1px solid transparent; }
+                .mine-rung.is-here { border-color: rgba(255,215,94,0.6); background: rgba(255,215,94,0.1); }
+                .mine-rung-n { width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%;
+                    background: rgba(255,255,255,0.1); font-size: 11px; font-weight: 900; }
+                .mine-rung.is-flawless .mine-rung-n { background: #ffd75e; color: #2a1400; }
+                .mine-rung.is-clean .mine-rung-n { background: #8fe3ff; color: #10222a; }
+                .mine-rung.is-solid .mine-rung-n { background: #8fe39a; color: #12261a; }
+                .mine-rung-copy { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+                .mine-rung-copy b { font-size: 0.9rem; }
+                .mine-rung-copy em { font-size: 11px; font-style: normal; color: #9aa2ab; }
+                .mine-rung-pay { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+                .mine-rung-ore { width: 24px; height: 24px; object-fit: contain; }
+                .mine-ladder-foot { margin: 8px 0 0; font-size: 11.5px; color: #9aa2ab; }
+                .mine-rung-won { margin: 0 0 10px; padding: 8px; border-radius: 10px; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
+                .mine-rung-won b { display: block; color: #ffe28a; }
+                .mine-rung-won em { font-size: 11px; font-style: normal; color: #cdb894; }
                 .mine-hint { font-size: 12px; color: #9aa2ab; margin: 10px 0 0; }
 
                 .mine-modal { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto;
