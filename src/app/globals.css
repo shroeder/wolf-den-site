@@ -11483,8 +11483,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 @keyframes formBoatIn { 0% { opacity: 0; transform: scale(0.3) rotate(-12deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
 @keyframes formBoatBob { 0%, 100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-7px) rotate(1.2deg); } }
 
-.sail-reward-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.72); padding: 20px; }
+/* Scroll, never clip. `align-items: center` centres a card that's TALLER than the phone to a position where
+   both ends sit off-screen and neither can be reached — which is how the dig recap ended up with its sprite cut
+   off at the top and "Back to port" buried under the Android nav bar. `margin: auto` on the child still centres
+   a short card, but collapses to 0 when there's no room, so the card starts at the top and the overlay scrolls.
+   The bottom padding clears the phone's gesture/nav bar. */
+.sail-reward-overlay { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-start; justify-content: center;
+    overflow-y: auto; overscroll-behavior: contain;
+    background: rgba(0,0,0,0.72);
+    padding: max(16px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom)); }
+.sail-reward-overlay > * { margin: auto; flex: 0 0 auto; }
 .sail-reward { max-width: 320px; text-align: center; animation: sailPop 0.3s cubic-bezier(0.2,1.2,0.4,1) both; }
 .sail-reward-emoji { font-size: 3rem; }
 .sail-reward-gold { font-size: 1.3rem; font-weight: 800; color: #ffd75e; margin: 4px 0; }
@@ -11755,13 +11763,22 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-embark-opt-loot { font-size: 0.7rem; color: #9fb4d8; display: inline-flex; align-items: center; gap: 3px; }
 @media (max-width: 420px) { .sail-embark-opt-name { font-size: 0.76rem; } }
 
-.sail-recap { max-width: 340px; text-align: center; position: relative; overflow: hidden; animation: sailPop 0.32s cubic-bezier(0.2,1.2,0.4,1) both; }
+/* Capped to the viewport and laid out as a column, so the "Back to port" button is ALWAYS on screen no matter
+   how much loot the dig produced — it's the only way out of this modal. The variable-length part (the haul
+   rows) is what gives, not the button. overflow:hidden stays for the confetti. */
+.sail-recap { max-width: 340px; text-align: center; position: relative; overflow: hidden; animation: sailPop 0.32s cubic-bezier(0.2,1.2,0.4,1) both;
+    display: flex; flex-direction: column; max-height: calc(100dvh - max(32px, env(safe-area-inset-top) + env(safe-area-inset-bottom))); }
+/* align-self keeps the button shrink-to-fit + centred, exactly as it was before the card became a flex column
+   (a stretch default would have silently made it full-bleed). */
+.sail-recap > .sail-cta { flex: 0 0 auto; align-self: center; }
 .sail-recap-hero { display: grid; place-items: center; margin: 4px 0 8px; min-height: 88px; }
 .sail-recap-frag { animation: recapFrag 0.7s cubic-bezier(0.2,1.35,0.4,1) both; filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
 @keyframes recapFrag { 0% { opacity: 0; transform: scale(0.3) rotate(-30deg); } 55% { transform: scale(1.18) rotate(8deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
 .sail-recap-rock { font-size: 3.4rem; display: inline-block; animation: recapRock 0.6s ease-out both; }
 @keyframes recapRock { 0% { opacity: 0; transform: translateY(-14px) rotate(-8deg); } 60% { transform: translateY(3px); } 100% { opacity: 0.85; transform: translateY(0); } }
 .sail-recap-rows { display: grid; gap: 6px; margin: 10px 0; text-align: left; }
+/* Everything above the button scrolls as one block, so a big haul can never push the only exit off-screen. */
+.sail-recap-body { width: 100%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sail-recap-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.86rem; padding: 6px 10px; border-radius: 9px; background: rgba(255,255,255,0.04); }
 .sail-recap-row > span { color: #b9c2cf; }
 .sail-recap-row b { display: inline-flex; align-items: center; gap: 5px; }

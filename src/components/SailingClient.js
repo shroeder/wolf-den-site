@@ -1221,6 +1221,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 <div className="sail-reward-overlay">
                     <div className="card sail-recap">
                         {result.won ? <Confetti /> : null}
+                        {/* Everything except the CTA scrolls together — "Back to port" is the only way out of
+                            this modal, so a long haul must never be able to push it off the bottom. */}
+                        <div className="sail-recap-body">
                         <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
                             {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} art={(result.haul && result.haul[0]?.art) || "/images/sailing/fragment-wooden.png"} /></span> : <span className="sail-recap-rock">🪨</span>}
                         </div>
@@ -1265,6 +1268,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             ) : null}
                             <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {state.fragments}</b></div>
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
+                        </div>
                         </div>
                         <button className="sail-cta" onClick={() => setResult(null)}>⚓ Back to port</button>
                     </div>
