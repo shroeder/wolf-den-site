@@ -341,7 +341,7 @@ const STRIKE_CD_BY_GRADE = { pixel: 1000, perfect: 1250, great: 1550, good: 1900
 const STRIKE_CD_MS = 2400; // worst case, and the pre-first-swing default
 // Pure double-tap guard for the raid boss. MUST stay <= the fastest grade cooldown above (and <= the server's
 // BOSS_STRIKE_THROTTLE_MS in town-events.js) — anything larger silently eats swings the bar says are ready.
-const BOSS_STRIKE_MIN_GAP_MS = 900;
+const BOSS_STRIKE_MIN_GAP_MS = 750;
 
 // A FULL ping-pong of the marker. The forge sweeps in 850–1700ms; this used to take 2600, which is why the
 // same bands that feel tight at the anvil felt generous here — the bar was simply crawling. It also speeds up
@@ -960,7 +960,7 @@ export default function TownClient({ initial }) {
     const bossStrike = useCallback(async (dist = null) => {
         const ev = state?.event;
         if (!ev) return { ok: false, error: "no_boss" };
-        // Anti-spam ONLY — matched to the server's BOSS_STRIKE_THROTTLE_MS (900ms), never above it. This used to
+        // Anti-spam ONLY — matched to the server's BOSS_STRIKE_THROTTLE_MS (750ms), never above it. This used to
         // be a flat 2500ms, which was stricter than EVERY grade cooldown the swing bar re-arms on (pixel 1000 …
         // miss 2400). So the bar would say "ready", the tap would buzz and start a fresh cooldown, and this
         // would silently drop the strike on the floor — worst on the best-timed hits, which had a 1.5s dead

@@ -97,7 +97,13 @@ const DUEL_XP_BUDGET = 280;
 // ~1.0s and a glancing one in ~2.4s (STRIKE_COOLDOWN_MS below), so a flat 2600 server throttle would have
 // rejected every good swing as "too_fast". Sits just under the fastest client cooldown to leave room for
 // latency, and still stops a scripted client hammering the endpoint.
-const BOSS_STRIKE_THROTTLE_MS = 900;
+//
+// 900 left only 100ms of headroom under the 1.0s pixel-perfect cooldown, and the gap it actually measures is
+// last_hit_at → next arrival. last_hit_at used to be written by the upsert at the END of this handler, so the
+// several Neon round trips above it were charged to the PLAYER: a 150ms handler turned the real requirement
+// into 1050ms and rejected a legitimately re-armed swing. last_hit_at is now stamped at handler entry (below),
+// and this floor drops to 750 so ordinary network jitter can't eat the margin either.
+const BOSS_STRIKE_THROTTLE_MS = 750;
 
 // How long until you can swing again, BY GRADE. Timing already decided how hard you hit; making it decide how
 // OFTEN you hit is what turns the bar from a damage roll into a rhythm you can get better at. Shared with the
@@ -641,6 +647,9 @@ export async function accrueSquarePassive(buyerId, event) {
 // and pays the completion reward (resolveTownEvent). Returns the boss's new HP + your running damage.
 export async function bossRaidStrike(buyerId, eventId, dist = null) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
+    // Stamp the swing at ARRIVAL. Everything below (gear lookup, HP update, the upsert itself) is our latency,
+    // not the player's cadence — writing NOW() at the end billed it to them and rejected re-armed swings.
+    const arrivedAt = new Date();
     const ev = await db.queryOne(`SELECT id, hp, hp_max, meta FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
     if (!ev || !ev.meta?.boss) return { ok: false, error: "no_boss" };
     const prior = await db.queryOne(`SELECT last_hit_at, combo FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`, [eventId, buyerId]).catch(() => null);
@@ -648,7 +657,12 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     const hit = await computeRaidHit(buyerId);
     // Grade the swing HERE from the raw distance-from-centre the client reports. Grading server-side (and
     // clamping the distance) means a tampered client can't simply claim PIXEL PERFECT on every swing.
-    const grade = gradeForDist(Math.min(0.5, Math.max(0, Number(dist))) || 0.5);
+    // No timing info (a swing with no bar) is treated as a glancing blow — but a distance of EXACTLY 0 is the
+    // best swing in the game, and `|| 0.5` was folding that into the miss band: dead centre came back GLANCING
+    // with a 2.4s cooldown while the client had already graded it PIXEL PERFECT at 1.0s. Test for null, not
+    // for falsiness.
+    const clamped = dist == null || Number.isNaN(Number(dist)) ? 0.5 : Math.min(0.5, Math.max(0, Number(dist)));
+    const grade = gradeForDist(clamped);
 
     // COMBO. A good-or-better swing extends the chain; anything worse resets it to 1. Read from the row so it
     // survives a refresh and a client can't hold a chain open by simply never reporting its misses.
@@ -663,10 +677,10 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     const dmg = Math.max(1, Math.round(hit.damage * grade.mult * comboMult * (proc?.mult || 1)));
     const updated = await db.queryOne(`UPDATE mkt_town_event SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`, [eventId, dmg]).catch(() => null);
     const mine = await db.queryOne(
-        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, combo, last_hit_at) VALUES ($1, $2, $3, 1, $4, NOW())
-         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, combo = $4, last_hit_at = NOW()
+        `INSERT INTO mkt_town_event_hit (event_id, buyer_id, damage, hits, combo, last_hit_at) VALUES ($1, $2, $3, 1, $4, $5)
+         ON CONFLICT (event_id, buyer_id) DO UPDATE SET damage = mkt_town_event_hit.damage + $3, hits = mkt_town_event_hit.hits + 1, combo = $4, last_hit_at = $5
          RETURNING damage, hits`,
-        [eventId, buyerId, dmg, combo]
+        [eventId, buyerId, dmg, combo, arrivedAt]
     ).catch(() => null);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     const hp = updated?.hp ?? ev.hp;
