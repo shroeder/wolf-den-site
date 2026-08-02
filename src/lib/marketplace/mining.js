@@ -190,7 +190,9 @@ export async function getMiningState(buyerId) {
         }),
         ore: (ore || []).map((r) => {
             const o = oreTier(r.tier);
-            return { tier: r.tier, name: o.name, color: o.color, art: oreArt(r.tier), qty: Number(r.qty), partTier: o.part };
+            const qty = Number(r.qty);
+            return { tier: r.tier, name: o.name, color: o.color, art: oreArt(r.tier), qty, partTier: o.part,
+                smeltCost: SMELT_COST, canSmelt: Math.floor(qty / SMELT_COST) };
         }),
         oreTotal: (ore || []).reduce((s, r) => s + Number(r.qty), 0),
         gold: Number(goldRow?.gold) || 0,
@@ -321,6 +323,31 @@ async function claimNode(buyerId, node, row) {
     await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: haul }).catch(() => {});
 
     return { tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier), ore: haul, gold, xp: o.xp, partTier: o.part };
+}
+
+// ── SMELTING ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Ore → forge parts, which is the whole reason mining exists: it feeds the Forge rather than running beside it.
+// SMELT_COST ore of tier N becomes one part of tier N — the tiers line up 1:1 so nobody has to learn a table.
+export const SMELT_COST = 3;
+
+export async function smeltOre(buyerId, tier, batches = 1) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const t = Number(tier);
+    if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
+    const n = Math.max(1, Math.min(50, Math.floor(Number(batches) || 1)));
+    const spend = SMELT_COST * n;
+
+    // Atomic guarded spend — the WHERE is what stops a double-tap smelting ore you no longer have.
+    const spent = await db
+        .queryOne(`UPDATE mkt_ore SET qty = qty - $3 WHERE buyer_id = $1 AND tier = $2 AND qty >= $3 RETURNING qty`, [buyerId, t, spend])
+        .catch(() => null);
+    if (!spent) return { ok: false, error: "not_enough_ore" };
+
+    const o = oreTier(t);
+    const { addParts } = await import("@/lib/marketplace/crafting.js");
+    await addParts(buyerId, o.part, n).catch(() => {});
+    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: n, partTier: o.part }).catch(() => {});
+    return { ok: true, smelted: { oreTier: t, oreName: o.name, oreSpent: spend, partTier: o.part, parts: n }, ...(await getMiningState(buyerId)) };
 }
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────

@@ -41,9 +41,14 @@ export const TRADE_LOCKED_RARITIES = new Set(["ascendant", "eternal", "celestial
 // (`i.source !== "admin"`, or scoping to `source === "chest"`), so the rule existed — it just wasn't shared.
 export const isRealMoneyItem = (i) => i?.source === "admin" || i?.source === "elite" || Boolean(i?.chargeReward);
 
+// Content for a feature that hasn't launched yet. An ownerOnly item must never appear in a drop pool, a shop,
+// a set browser or anyone's collection — the whole point of an owner-gated feature is that members can't tell
+// it exists. Flipping the feature live is then one flag per item, not an audit of every random-reward path.
+export const isOwnerOnlyItem = (i) => Boolean(i?.ownerOnly);
+
 /** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
 export const randomDropPool = (predicate) =>
-    ITEMS.filter((i) => !isRealMoneyItem(i) && (typeof predicate === "function" ? predicate(i) : true));
+    ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && (typeof predicate === "function" ? predicate(i) : true));
 export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
 
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.

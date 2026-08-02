@@ -269,6 +269,18 @@ export function collectibleById(id) {
     return BY_ID[id] || null;
 }
 
+// ── UNRELEASED CONTENT ───────────────────────────────────────────────────────────────────────────────────────
+// A pet belonging to a feature that hasn't launched (mining, for now) carries `ownerOnly: true`. It must not
+// appear in anyone's collection, in a random grant pool, or in the daily deals — a member should not be able
+// to infer that a feature exists from a locked slot they can never fill. Launching is then one flag per pet.
+//
+// Deliberately NOT applied to the effect aggregators (pet-combat, badges): those filter by what you actually
+// OWN, and the owner testing the feature should get the pet's real effect. Visibility is the thing being
+// gated here, not function.
+export const isOwnerOnlyPet = (p) => Boolean(p?.ownerOnly);
+/** Every pet a member may SEE or be randomly granted. Use this instead of COLLECTIBLES for anything player-facing. */
+export const PUBLIC_COLLECTIBLES = COLLECTIBLES.filter((p) => !isOwnerOnlyPet(p));
+
 // Passive bonus this pet adds just by being OWNED (all owned pets stack) — its own themed stat.
 export function petPassive(pet) {
     return { stat: PET_PASSIVE_STAT[pet.id] || pet.activeStat || "fortune", value: PET_PASSIVE_BY_RARITY[pet.rarity] || 1 };

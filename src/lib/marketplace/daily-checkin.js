@@ -11,7 +11,7 @@ import { getSpinState } from "@/lib/marketplace/spin.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
-import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
+import { PUBLIC_COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 
@@ -116,7 +116,8 @@ async function resolveLoginProcs(buyerId) {
             // Win a random pet you couldn't just get by leveling — but the item is destroyed.
             const ownedRows = await db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []);
             const owned = new Set(ownedRows.map((r) => r.ref));
-            const pool = COLLECTIBLES.filter((pt) => pt.source !== "level" && !owned.has(pt.id));
+            // PUBLIC_ so a mystery pet can never hand out content from an unlaunched feature.
+            const pool = PUBLIC_COLLECTIBLES.filter((pt) => pt.source !== "level" && !owned.has(pt.id));
             if (!pool.length) continue; // nothing to win → don't destroy the item
             const won = pool[Math.floor(Math.random() * pool.length)];
             await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, won.id]).catch(() => {});

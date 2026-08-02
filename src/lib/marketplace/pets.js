@@ -95,7 +95,10 @@ export async function petsState(buyerId, { sync = false } = {}) {
     const earnedTradeableIds = []; // pets that can go in a real trade: earned (not level-auto) AND still tradeable
     const passiveTotals = {}; // stat -> summed passive across all owned pets (each scaled by its pet level)
     const petLevels = {}; // pet_id -> { level, xp, into, span, next, maxed, stat, base, value } for owned pets
-    for (const pet of COLLECTIBLES) {
+    // The collection walks the PUBLIC list, plus anything you actually hold — so an owner testing an
+    // unlaunched feature still sees their own pet, and nobody else sees a slot they can never fill.
+    const visible = COLLECTIBLES.filter((p) => !p.ownerOnly || granted.has(p.id));
+    for (const pet of visible) {
         if (!isCollectibleUnlocked(pet, level, { owned: granted })) continue;
         ownedIds.push(pet.id);
         const p = petPassive(pet);

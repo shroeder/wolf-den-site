@@ -122,6 +122,11 @@ const fullNeed = (set) => set.full || set.items.length;
 const SET_BY_ITEM = {};
 for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
 
+// Sets belonging to a feature that hasn't launched carry `ownerOnly: true`. Same contract as pets and items:
+// invisible in the browser, but fully functional for whoever actually holds the pieces (the bonus maths below
+// walks ITEM_SETS unfiltered on purpose — an owner testing the feature should get the real set bonus).
+export const PUBLIC_ITEM_SETS = ITEM_SETS.filter((s) => !s.ownerOnly);
+
 // The set an item belongs to (for display on item cards), or null.
 export function setForItem(itemId) {
     return SET_BY_ITEM[itemId] || null;
@@ -288,7 +293,10 @@ export function setCombatMult(equippedIds, ctx = {}) {
 export function getSetsOverview(equippedIds, ownedIds) {
     const eq = new Set(equippedIds || []);
     const own = new Set(ownedIds || []);
-    return ITEM_SETS.map((set) => {
+    // The browser shows PUBLIC sets, plus any unlaunched one you already hold a piece of — so an owner testing
+    // a feature still sees their set, and nobody else sees a set they have no way to explain.
+    const visible = ITEM_SETS.filter((s) => !s.ownerOnly || s.items.some((id) => own.has(id) || eq.has(id)));
+    return visible.map((set) => {
         const pieces = set.items.map((id) => {
             const it = itemById(id);
             const sig = signatureFor(id);

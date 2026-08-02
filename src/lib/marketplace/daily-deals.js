@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { ITEMS, itemById, describeStats } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
-import { COLLECTIBLES, collectibleById, petPrice, petActive } from "@/lib/marketplace/collectibles.js";
+import { PUBLIC_COLLECTIBLES as COLLECTIBLES, collectibleById, petPrice, petActive } from "@/lib/marketplace/collectibles.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";

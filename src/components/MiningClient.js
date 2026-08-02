@@ -110,6 +110,18 @@ export default function MiningClient({ initial }) {
         return r;
     }, [post, target, reload]);
 
+    // Smelt the whole stack at once — nobody wants to tap three-at-a-time through 40 ore.
+    const smelt = async (tier) => {
+        const stack = (state.ore || []).find((o) => o.tier === tier);
+        if (!stack?.canSmelt) return;
+        const r = await post({ action: "smelt", tier, batches: stack.canSmelt });
+        if (r?.unlocked) {
+            setState(r);
+            say(`Smelted into ${r.smelted?.parts ?? stack.canSmelt} tier-${stack.partTier} part${(r.smelted?.parts ?? 1) === 1 ? "" : "s"} — they're in the Forge.`);
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* no window */ }
+        } else say(r?.error === "not_enough_ore" ? "Not enough ore." : "Couldn't smelt that.");
+    };
+
     const upgrade = async (track) => {
         const r = await post({ action: "upgrade", track });
         if (r?.unlocked) setState(r);
@@ -168,8 +180,12 @@ export default function MiningClient({ initial }) {
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={o.art} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                                 <span style={{ color: o.color }}>{o.name}</span>
-                                <em className="muted">→ tier {o.partTier} parts</em>
+                                <em className="muted">{o.smeltCost} → 1 tier-{o.partTier} part</em>
                                 <b>×{o.qty}</b>
+                                <button type="button" className="mine-smelt" disabled={!o.canSmelt} onClick={() => smelt(o.tier)}
+                                    title={o.canSmelt ? `Smelt ${o.canSmelt * o.smeltCost} ore into ${o.canSmelt} part${o.canSmelt === 1 ? "" : "s"}` : `Need ${o.smeltCost} to smelt`}>
+                                    🔥 {o.canSmelt || 0}
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -247,6 +263,8 @@ export default function MiningClient({ initial }) {
                 .mine-stash-row { display: flex; align-items: center; gap: 9px; font-size: 0.86rem; padding: 6px 9px; border-radius: 9px; background: rgba(255,255,255,0.04); }
                 .mine-stash-row img { width: 22px; height: 22px; object-fit: contain; }
                 .mine-stash-row em { margin-left: auto; font-size: 11px; font-style: normal; }
+                .mine-smelt { padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(255,176,32,0.5); background: rgba(255,176,32,0.14); color: #ffd08a; font-weight: 800; font-size: 12px; cursor: pointer; }
+                .mine-smelt:disabled { opacity: 0.35; cursor: default; }
                 .mine-track { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(255,255,255,0.06); }
                 .mine-track:first-of-type { border-top: none; }
                 .mine-track-ico { font-size: 22px; }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getMiningState, moveMiner, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
+import { getMiningState, moveMiner, smeltOre, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -32,6 +32,7 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "move": return noStore(await moveMiner(buyer.id, { x: b.x, y: b.y, facing: b.facing }));
                 case "swing": return noStore(await swingAtNode(buyer.id, Number(b.nodeId), b.dist));
+                case "smelt": return noStore(await smeltOre(buyer.id, b.tier, b.batches));
                 case "upgrade": return noStore(await upgradeMining(buyer.id, String(b.track || "")));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
