@@ -998,6 +998,20 @@ export default function TownClient({ initial }) {
     // everyone who took part, so it also survives a refresh.
     const [bossRecap, setBossRecap] = useState(null);
     const seenRecapRef = useRef(null);
+    // Closing the recap has to be recorded SERVER-side. seenRecapRef alone lives and dies with this component,
+    // so a refresh (or walking back into the Town) inside the 10-minute recap window re-opened it every time
+    // with no way to dismiss it for good.
+    const dismissRecap = useCallback(() => {
+        const id = bossRecap?.eventId;
+        setBossRecap(null);
+        if (id) {
+            seenRecapRef.current = id;
+            fetch("/api/marketplace/town", {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "recap_seen", eventId: id }),
+            }).catch(() => { /* the local ref still covers this session */ });
+        }
+    }, [bossRecap?.eventId]);
     useEffect(() => {
         const rc = state?.raidRecap;
         if (!rc) return;
@@ -1803,7 +1817,7 @@ export default function TownClient({ initial }) {
 
             {/* Itemised raid wrap-up: what YOU dealt and earned, plus the full damage board. */}
             {bossRecap ? (
-                <div className="tw-duel" role="presentation" onClick={() => setBossRecap(null)}>
+                <div className="tw-duel" role="presentation" onClick={dismissRecap}>
                     <div className="tw-recap" onClick={(e) => e.stopPropagation()}>
                         <div className="tw-recap-head">
                             <div className="tw-recap-emoji" aria-hidden="true">{bossRecap.killed ? "🏆" : "💨"}</div>
@@ -1821,7 +1835,12 @@ export default function TownClient({ initial }) {
                                     {bossRecap.me.rank === 1 ? "🥇" : bossRecap.me.rank === 2 ? "🥈" : bossRecap.me.rank === 3 ? "🥉" : "⚔️"}
                                 </span>
                                 <span className="tw-recap-perfbody">
-                                    <b>{bossRecap.me.rank ? `#${bossRecap.me.rank} of ${bossRecap.fighters}` : "You fought"}</b>
+                                    <b>
+                                        {bossRecap.me.rank ? `#${bossRecap.me.rank} of ${bossRecap.fighters}` : "You fought"}
+                                        {/* Name the band you earned — the payout is tiered by contribution now, so
+                                            "why did I get this much" has to be answerable from the recap itself. */}
+                                        {bossRecap.me.tierLabel ? <span className={`tw-recap-tier is-${bossRecap.me.tier}`}>{bossRecap.me.tierLabel}</span> : null}
+                                    </b>
                                     <em>{Number(bossRecap.me.damage).toLocaleString()} damage · {bossRecap.me.share}% of the pack&apos;s total</em>
                                 </span>
                             </div>
@@ -1875,7 +1894,7 @@ export default function TownClient({ initial }) {
                             ))}
                         </div>
 
-                        <button type="button" className="tw-levelup-btn" onClick={() => setBossRecap(null)}>
+                        <button type="button" className="tw-levelup-btn" onClick={dismissRecap}>
                             {bossRecap.killed ? "Nice work! 🐺" : "Next time"}
                         </button>
                     </div>
@@ -2212,6 +2231,12 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-recap-medal { font-size: 30px; line-height: 1; flex: 0 0 auto; }
 .tw-recap-perfbody { display: flex; flex-direction: column; gap: 1px; min-width: 0; text-align: left; }
 .tw-recap-perfbody b { font-size: 1.02rem; color: #ffe488; }
+/* The reward band earned, sat beside the rank. Coloured like the chest it pays. */
+.tw-recap-tier { margin-left: 7px; padding: 1px 7px; border-radius: 999px; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; vertical-align: middle; border: 1px solid currentColor; }
+.tw-recap-tier.is-champion { color: #ffd75e; background: rgba(255,215,94,0.14); }
+.tw-recap-tier.is-veteran { color: #ffc06b; background: rgba(255,192,107,0.12); }
+.tw-recap-tier.is-fighter { color: #b9c6d4; background: rgba(185,198,212,0.12); }
+.tw-recap-tier.is-recruit { color: #b08a52; background: rgba(176,138,82,0.14); }
 .tw-recap-perfbody em { font-style: normal; font-size: 0.78rem; color: #b7c0cf; }
 .tw-recap-sharebar { height: 8px; border-radius: 999px; background: rgba(0,0,0,0.45); overflow: hidden; margin: 9px 0 5px; }
 .tw-recap-sharebar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg,#f3b23a,#ffe488); animation: twShareGrow 0.9s cubic-bezier(.2,1,.3,1) both; }

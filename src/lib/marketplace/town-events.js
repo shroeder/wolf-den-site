@@ -171,8 +171,26 @@ const STRIKE_GRADES = [
 ];
 const STRIKE_MISS = { key: "miss", mult: 0.5, label: "GLANCING" };
 const gradeForDist = (dist) => STRIKE_GRADES.find((g) => dist <= g.max) || STRIKE_MISS;
-const BOSS_COMPLETE_GOLD = 900;   // to every fighter on a kill
-const BOSS_COMPLETE_XP = 800;
+// RAID COMPLETION TIERS. Everyone who fought gets paid — showing up is never punished — but not the same
+// amount: the flat 900/800/gold-chest meant the wolf who landed 88 strikes and the one who stood in the square
+// doing nothing walked away identical.
+//
+// Your tier comes from a BLEND of your share of the pack's damage and its strikes, weighted toward damage.
+// Damage alone would just pay out whoever owns the best gear; a low-level wolf who swung 68 times is
+// contributing, and the strike share says so even when their numbers are small. Taking the better of the two
+// instead of blending was too soft — it let a 2.5%-damage fighter tie a 13%-damage one. Both shares sum to 1
+// across the pack, so a threshold reads as "this fraction of the work": in a six-wolf raid the average share
+// is ~17%, which puts Champion meaningfully above average and Recruit where someone barely swung.
+const RAID_DAMAGE_WEIGHT = 0.7; // remainder is the strike share
+const RAID_TIERS = [
+    { key: "champion", min: 0.25, gold: 1500, xp: 1300, chest: "gold", label: "Champion" },
+    { key: "veteran", min: 0.12, gold: 1000, xp: 875, chest: "gold", label: "Veteran" },
+    { key: "fighter", min: 0.04, gold: 650, xp: 575, chest: "iron", label: "Fighter" },
+    { key: "recruit", min: 0, gold: 350, xp: 300, chest: "wooden", label: "Recruit" },
+];
+// One step down the chest ladder when the boss escapes the timer (the gold/XP already take BOSS_ESCAPE_MULT).
+const CHEST_DOWNGRADE = { gold: "iron", iron: "wooden", wooden: "wooden" };
+const tierForShare = (share) => RAID_TIERS.find((t) => share >= t.min) || RAID_TIERS[RAID_TIERS.length - 1];
 const BOSS_ESCAPE_MULT = 0.4;     // if the boss survives the timer, fighters get this fraction of the reward
 // Per-tap damage from the player's real equipped stats (+ pet), with a crit roll and a chance at a weapon-skill
 // proc. Server-authoritative so a cheating client can't inflate it. Returns { damage, crit, proc }.
@@ -300,6 +318,17 @@ export async function getActiveTownEvent(buyerId) {
 // The itemised wrap-up for the most recently finished raid: who fought, what each of them dealt, and exactly
 // what YOU walked away with. Previously the recap was assembled client-side from strike responses and skipped
 // entirely on a boss kill, so anyone who didn't land the final blow saw nothing at all — no damage, no rewards.
+// Durably close the end-of-raid recap for one fighter, so it stops coming back on every refresh.
+export async function markRaidRecapSeen(buyerId, eventId) {
+    if (!buyerId || !eventId) return { ok: false, error: "bad_request" };
+    await db.query(
+        `UPDATE mkt_town_event_hit SET recap_seen_at = NOW()
+          WHERE event_id = $1 AND buyer_id = $2 AND recap_seen_at IS NULL`,
+        [eventId, buyerId]
+    ).catch(() => {});
+    return { ok: true };
+}
+
 export async function lastRaidRecap(buyerId) {
     if (!buyerId) return null;
     const ev = await db.queryOne(
@@ -314,11 +343,15 @@ export async function lastRaidRecap(buyerId) {
     // Only show it to people who actually took part — otherwise a passer-by gets a recap for a fight they
     // never joined.
     const mine = await db.queryOne(
-        `SELECT damage, hits, passive_damage, reward_gold, reward_xp, reward_chest, rewarded
+        `SELECT damage, hits, passive_damage, reward_gold, reward_xp, reward_chest, reward_tier, rewarded, recap_seen_at
            FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`,
         [ev.id, buyerId]
     ).catch(() => null);
     if (!mine) return null;
+    // Already closed it once — don't hand it back. The dismissal used to live in a client-side ref, which meant
+    // every remount inside this 10-minute window (a refresh, or just walking back into the Town) popped the
+    // recap again with no way to make it stop.
+    if (mine.recap_seen_at) return null;
 
     // WAIT FOR THE PAYOUT before showing anyone anything. resolveTownEvent flips the event to `defeated`
     // FIRST and only then walks the fighters granting gold, XP, chests, badges and pet rolls — dozens of
@@ -359,6 +392,8 @@ export async function lastRaidRecap(buyerId) {
             gold: Number(mine.reward_gold) || 0,
             xp: Number(mine.reward_xp) || 0,
             chest: mine.reward_chest || null,
+            tier: mine.reward_tier || null,
+            tierLabel: RAID_TIERS.find((t) => t.key === mine.reward_tier)?.label || null,
             rewarded: Boolean(mine.rewarded),
         },
         board: board.map((r, i) => ({
@@ -529,7 +564,7 @@ async function resolveTownEvent(eventId, outcome) {
         [eventId, outcome === "defeated" ? "defeated" : "expired"]
     ).catch(() => null);
     if (!ev) return; // someone else already closed it
-    const hits = await db.query(`SELECT buyer_id, damage FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => []);
+    const hits = await db.query(`SELECT buyer_id, damage, hits FROM mkt_town_event_hit WHERE event_id = $1`, [eventId]).catch(() => []);
     const n = hits.length;
     // The single top damager (for the prestige "Top Dog" badge on a boss kill).
     const topId = hits.length ? hits.reduce((a, b) => (Number(b.damage) > Number(a.damage) ? b : a)).buyer_id : null;
@@ -537,22 +572,34 @@ async function resolveTownEvent(eventId, outcome) {
     if (ev.meta?.boss) {
         const killed = outcome === "defeated";
         const mult = killed ? 1 : BOSS_ESCAPE_MULT;
-        const gold = Math.round(BOSS_COMPLETE_GOLD * mult);
-        const xp = Math.round(BOSS_COMPLETE_XP * mult);
+        // Contribution shares. Damage AND strikes, because they measure different things: damage is mostly your
+        // gear, strikes are how much you actually turned up and played. Your tier takes the kinder of the two.
+        const totalDamage = hits.reduce((s, h) => s + (Number(h.damage) || 0), 0);
+        const totalStrikes = hits.reduce((s, h) => s + (Number(h.hits) || 0), 0);
         for (const h of hits) {
+            const dmgShare = totalDamage > 0 ? (Number(h.damage) || 0) / totalDamage : 0;
+            const hitShare = totalStrikes > 0 ? (Number(h.hits) || 0) / totalStrikes : 0;
+            const share = RAID_DAMAGE_WEIGHT * dmgShare + (1 - RAID_DAMAGE_WEIGHT) * hitShare;
+            // The pack's single biggest damage dealer is a Champion by definition — they carried the kill, and
+            // in a big raid their raw share can still land under the threshold.
+            const isTop = killed && String(h.buyer_id) === String(topId);
+            const tier = isTop ? RAID_TIERS[0] : tierForShare(share);
+            const gold = Math.round(tier.gold * mult);
+            const xp = Math.round(tier.xp * mult);
+            const chest = killed ? tier.chest : (CHEST_DOWNGRADE[tier.chest] || "wooden");
             if (gold > 0) {
                 const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
-                await logCoin(h.buyer_id, gold, "boss_raid", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
+                await logCoin(h.buyer_id, gold, "boss_raid", { balanceAfter: paid?.gold, ref: String(eventId), meta: { tier: tier.key } }).catch(() => {});
             }
+            // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and this runs per fighter.
             if (xp > 0) await awardXp(h.buyer_id, "boss_raid", { points: xp, gold: 0, dedupeKey: `boss_raid:${eventId}:${h.buyer_id}` }).catch(() => {});
-            // Completion chest — a Gold chest on a kill (a Wooden one if it escaped).
-            await addChests(h.buyer_id, { [killed ? "gold" : "wooden"]: 1 }, { source: "boss_raid" }).catch(() => {});
+            await addChests(h.buyer_id, { [chest]: 1 }, { source: "boss_raid" }).catch(() => {});
             // Record WHAT they got, not just the gold — the end-of-raid recap itemises this, and without the xp
             // and chest stored there's nothing to show anyone who didn't land the killing blow.
             await db.query(
-                `UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3, reward_xp = $4, reward_chest = $5
+                `UPDATE mkt_town_event_hit SET rewarded = TRUE, reward_gold = $3, reward_xp = $4, reward_chest = $5, reward_tier = $6
                   WHERE event_id = $1 AND buyer_id = $2`,
-                [eventId, h.buyer_id, gold, xp, killed ? "gold" : "wooden"]
+                [eventId, h.buyer_id, gold, xp, chest, tier.key]
             ).catch(() => {});
             // Hard raid/boss badges + the very-rare raid-exclusive pet drop (best odds on a kill).
             await checkTownRaidBadges(h.buyer_id, { topDamagerOnKill: killed && h.buyer_id === topId }).catch(() => {});
@@ -685,7 +732,24 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     const hp = updated?.hp ?? ev.hp;
     let killed = false;
-    if (hp <= 0) { await resolveTownEvent(eventId, "defeated").catch(() => {}); killed = true; }
+    let myReward = null;
+    if (hp <= 0) {
+        await resolveTownEvent(eventId, "defeated").catch(() => {});
+        killed = true;
+        // Read back what the finisher ACTUALLY earned. Rewards are tiered by contribution now, so this can no
+        // longer be assumed — the wolf who lands the last hit isn't necessarily the one who carried the fight.
+        const paid = await db.queryOne(
+            `SELECT reward_gold, reward_xp, reward_chest, reward_tier FROM mkt_town_event_hit WHERE event_id = $1 AND buyer_id = $2`,
+            [eventId, buyerId]
+        ).catch(() => null);
+        myReward = {
+            gold: Number(paid?.reward_gold) || 0,
+            xp: Number(paid?.reward_xp) || 0,
+            chest: paid?.reward_chest || null,
+            tier: paid?.reward_tier || null,
+            tierLabel: RAID_TIERS.find((t) => t.key === paid?.reward_tier)?.label || null,
+        };
+    }
     return {
         ok: true, damage: dmg, crit: Boolean(hit.crit), proc: hit.proc || null,
         grade: grade.key, gradeLabel: grade.label, mult: grade.mult,
@@ -695,7 +759,7 @@ export async function bossRaidStrike(buyerId, eventId, dist = null) {
         strikeProc: proc ? { key: proc.key, label: proc.label, tell: proc.tell, mult: proc.mult } : null,
         hp, hpMax: ev.hp_max, hpPct: ev.hp_max ? Math.max(0, Math.round((hp / ev.hp_max) * 100)) : 0,
         myDamage: Number(mine?.damage || dmg), killed,
-        reward: killed ? { gold: BOSS_COMPLETE_GOLD, xp: BOSS_COMPLETE_XP, chest: "gold" } : null,
+        reward: myReward,
     };
 }
 
