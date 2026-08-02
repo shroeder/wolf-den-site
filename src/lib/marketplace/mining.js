@@ -1,0 +1,344 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { awardXp } from "@/lib/marketplace/xp.js";
+import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
+
+// ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
+// A cave you walk your hero around. Ore nodes surface through the day; you stand next to one and swing at it on
+// the SAME timing bar as the Forge anvil and the Treasure Golem — identical grade bands, so the skill a member
+// already has transfers instead of being re-learned. Chip a node's HP to zero and its ore is yours.
+//
+// Ore smelts into FORGE PARTS (crafting.js PART_TIERS 1..5), so mining feeds the Forge that already exists
+// rather than minting a parallel currency. Ore tier maps straight onto part tier — that's the whole
+// "depending on the ore" rule, kept deliberately legible.
+//
+// OWNER-GATED. Every read and every write goes through MINING_UNLOCKED. Flip that one function to open it.
+
+export const MINING_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
+
+// ── ORE TIERS ────────────────────────────────────────────────────────────────────────────────────────────────
+// Named for the rock, coloured up the usual rarity ladder. `part` is the forge part tier it smelts into, which
+// is 1:1 on purpose — a member should be able to look at a lump of ore and know what it becomes.
+// `weight` is the spawn share at lantern 0; `hp` is how much chipping the node takes.
+export const ORE_TIERS = {
+    1: { tier: 1, id: "coal", name: "Coal Seam", color: "#8b8f96", part: 1, weight: 44, hp: 60, xp: 6, gold: 5 },
+    2: { tier: 2, id: "iron", name: "Iron Vein", color: "#cfd6dd", part: 2, weight: 30, hp: 110, xp: 12, gold: 11 },
+    3: { tier: 3, id: "silver", name: "Silver Lode", color: "#6fb0e6", part: 3, weight: 17, hp: 190, xp: 24, gold: 22 },
+    4: { tier: 4, id: "mythril", name: "Mythril Seam", color: "#b98cff", part: 4, weight: 7, hp: 320, xp: 48, gold: 44 },
+    5: { tier: 5, id: "emberheart", name: "Emberheart Geode", color: "#ffb020", part: 5, weight: 2, hp: 520, xp: 96, gold: 90 },
+};
+export const oreTier = (t) => ORE_TIERS[t] || ORE_TIERS[1];
+export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
+
+// ── THE SWING ────────────────────────────────────────────────────────────────────────────────────────────────
+// Bands and multipliers mirror town-events.js exactly. They are duplicated rather than imported because a
+// mining swing must never accidentally inherit a raid rebalance — but if you change one, change both, and the
+// comment in each says so.
+const SWING_GRADES = [
+    { key: "pixel", max: 0.022, mult: 5.0, label: "PERFECT STRIKE" },
+    { key: "perfect", max: 0.055, mult: 3.6, label: "CLEAN HIT" },
+    { key: "great", max: 0.10, mult: 2.6, label: "SOLID" },
+    { key: "good", max: 0.16, mult: 1.6, label: "GLANCING" },
+];
+const SWING_MISS = { key: "miss", mult: 0.5, label: "CHIP" };
+const gradeForDist = (dist) => SWING_GRADES.find((g) => dist <= g.max) || SWING_MISS;
+const GRADE_RANK = { miss: 0, good: 1, great: 2, perfect: 3, pixel: 4 };
+// Re-arm by grade, same ladder as the raid. The client owns the cadence and shows it; this is what it re-arms on.
+export const SWING_COOLDOWN_MS = { pixel: 700, perfect: 850, great: 1050, good: 1300, miss: 1600 };
+// Pure double-tap floor, kept comfortably UNDER the fastest grade cooldown so a legitimately re-armed swing is
+// never rejected. (The raid learned this the hard way: a floor above the fastest cooldown silently eats swings.)
+const SWING_THROTTLE_MS = 500;
+
+const COMBO_STEP = 0.10;
+const COMBO_MAX = 2.0;
+const COMBO_MIN_GRADE = "good";
+
+// ── DAILY ALLOWANCE + UPGRADES ───────────────────────────────────────────────────────────────────────────────
+const SWINGS_PER_DAY = 60;          // generous: a swing is one tap, and a node takes several
+const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
+
+// Four tracks, each buying a different KIND of mining rather than just "more of it" — same design rule as the
+// fishing rail, so they don't collapse into one obvious purchase order.
+export const MINE_TRACKS = {
+    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "⛏️", desc: "Harder swings — fewer to crack a node.", col: "pick_level" },
+    lantern: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Lantern", icon: "🏮", desc: "Light reaches deeper — richer seams surface.", col: "lantern_level" },
+    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "🎒", desc: "More ore out of every node you crack.", col: "haul_level" },
+    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "💪", desc: "More swings each day.", col: "vigor_level" },
+};
+export const trackValue = (t, lvl) => Math.min(MINE_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * MINE_TRACKS[t].per);
+// Cost curve mirrors the boat/rail tracks: each level costs more than the last.
+export const trackCost = (level) => 300 + Math.round(Math.pow(Math.max(0, level), 1.6) * 140);
+
+// PICKAXE FORMS. Total upgrade levels across all four tracks (0..40) decide which pickaxe you're swinging, so
+// every purchase moves you toward a visibly better tool — the boat-form trick, which is the single best
+// "my upgrades are real" signal in the game.
+const PICK_FORMS = [
+    { at: 0, id: "worn", name: "Worn Pick" },
+    { at: 6, id: "iron", name: "Iron Pick" },
+    { at: 13, id: "steel", name: "Steel Pick" },
+    { at: 21, id: "mythril", name: "Mythril Pick" },
+    { at: 30, id: "emberheart", name: "Emberheart Pick" },
+];
+export function pickForm(totalLevels) {
+    let form = PICK_FORMS[0];
+    for (const f of PICK_FORMS) if (totalLevels >= f.at) form = f;
+    const next = PICK_FORMS.find((f) => f.at > totalLevels) || null;
+    return { ...form, sprite: `/images/mining/pick-${form.id}.png`, nextAt: next?.at ?? null, nextName: next?.name ?? null };
+}
+
+// ── CAVE + SPAWNING ──────────────────────────────────────────────────────────────────────────────────────────
+// Nodes live for a while and are replaced as they're mined or expire, so the cave is never empty and never a
+// wall of ore. Spawning is lazy — it runs on read, so there's no cron to keep alive.
+const MAX_ACTIVE_NODES = 7;
+const NODE_TTL_MIN = 90;
+const CAVE_X = [8, 92];   // percent bounds, matching the town's coordinate space
+const CAVE_Y = [62, 88];
+
+const randBetween = (a, b) => a + Math.random() * (b - a);
+function rollOreTier(lanternPct = 0) {
+    // Lantern shifts weight off the bottom tier and onto everything above it — the same "tilt, don't gate"
+    // approach fishing uses, so a new miner still sees the whole table, just less often.
+    const entries = Object.values(ORE_TIERS).map((o) => ({
+        tier: o.tier,
+        w: o.tier === 1 ? o.weight * (1 - Math.min(0.6, lanternPct)) : o.weight * (1 + lanternPct * 2),
+    }));
+    const total = entries.reduce((s, e) => s + e.w, 0) || 1;
+    let r = Math.random() * total;
+    for (const e of entries) { r -= e.w; if (r <= 0) return e.tier; }
+    return 1;
+}
+
+// Retire what's finished and top the cave back up. Safe to call on every read.
+async function refreshNodes(lanternPct = 0) {
+    await db.query(`UPDATE mkt_ore_node SET status = 'expired' WHERE status = 'active' AND expires_at <= NOW()`).catch(() => {});
+    const live = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_ore_node WHERE status = 'active'`).catch(() => null);
+    const missing = Math.max(0, MAX_ACTIVE_NODES - (live?.n || 0));
+    for (let i = 0; i < missing; i += 1) {
+        const tier = rollOreTier(lanternPct);
+        const o = oreTier(tier);
+        await db.query(
+            `INSERT INTO mkt_ore_node (tier, x, y, hp, hp_max, expires_at)
+             VALUES ($1, $2, $3, $4, $4, NOW() + ($5 || ' minutes')::interval)`,
+            [tier, Math.round(randBetween(...CAVE_X) * 10) / 10, Math.round(randBetween(...CAVE_Y) * 10) / 10, o.hp, String(NODE_TTL_MIN)]
+        ).catch(() => {});
+    }
+}
+
+// ── STATE ────────────────────────────────────────────────────────────────────────────────────────────────────
+async function minerRow(buyerId) {
+    await db.query(`INSERT INTO mkt_mining (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    return db
+        .queryOne(
+            `UPDATE mkt_mining
+                SET swing_used = CASE WHEN swing_day = ${DAY} THEN swing_used ELSE 0 END,
+                    swing_bonus = CASE WHEN swing_day = ${DAY} THEN swing_bonus ELSE 0 END,
+                    swing_day = ${DAY}
+              WHERE buyer_id = $1
+              RETURNING *`,
+            [buyerId]
+        )
+        .catch(() => null);
+}
+
+const totalLevels = (row) => Object.values(MINE_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
+
+export async function getMiningState(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { unlocked: false };
+    const row = await minerRow(buyerId);
+    const lantern = trackValue("lantern", row?.lantern_level);
+    await refreshNodes(lantern);
+
+    const [nodes, ore, goldRow, mine] = await Promise.all([
+        db.query(
+            `SELECT n.id, n.tier, n.x, n.y, n.hp, n.hp_max, n.expires_at, COALESCE(h.damage, 0) AS my_damage
+               FROM mkt_ore_node n
+               LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
+              WHERE n.status = 'active' ORDER BY n.id`,
+            [buyerId]
+        ).catch(() => []),
+        db.query(`SELECT tier, qty FROM mkt_ore WHERE buyer_id = $1 AND qty > 0 ORDER BY tier`, [buyerId]).catch(() => []),
+        db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        Promise.resolve(null),
+    ]);
+
+    const lvls = totalLevels(row);
+    const allowance = SWINGS_PER_DAY + trackValue("vigor", row?.vigor_level) + (Number(row?.swing_bonus) || 0);
+    return {
+        unlocked: true,
+        you: { x: Number(row?.x) || 50, y: Number(row?.y) || 78, facing: Number(row?.facing) === -1 ? -1 : 1 },
+        pick: pickForm(lvls),
+        swings: { used: Number(row?.swing_used) || 0, allowance, left: Math.max(0, allowance - (Number(row?.swing_used) || 0)) },
+        tracks: Object.entries(MINE_TRACKS).map(([key, t]) => {
+            const level = Number(row?.[t.col]) || 0;
+            return {
+                key, name: t.name, icon: t.icon, desc: t.desc, level, max: t.max,
+                value: trackValue(key, level), kind: t.kind,
+                cost: level >= t.max ? null : trackCost(level),
+            };
+        }),
+        nodes: (nodes || []).map((n) => {
+            const o = oreTier(n.tier);
+            return {
+                id: Number(n.id), tier: n.tier, name: o.name, color: o.color, art: oreArt(n.tier),
+                x: Number(n.x), y: Number(n.y), hp: Number(n.hp), hpMax: Number(n.hp_max),
+                pct: n.hp_max ? Math.max(0, Math.round((n.hp / n.hp_max) * 100)) : 0,
+                myDamage: Number(n.my_damage) || 0,
+            };
+        }),
+        ore: (ore || []).map((r) => {
+            const o = oreTier(r.tier);
+            return { tier: r.tier, name: o.name, color: o.color, art: oreArt(r.tier), qty: Number(r.qty), partTier: o.part };
+        }),
+        oreTotal: (ore || []).reduce((s, r) => s + Number(r.qty), 0),
+        gold: Number(goldRow?.gold) || 0,
+        stats: {
+            nodesMined: Number(row?.nodes_mined) || 0,
+            oreTotal: Number(row?.ore_total) || 0,
+            bestCombo: Number(row?.best_combo) || 0,
+            upgradeLevels: lvls,
+        },
+    };
+}
+
+// Walk the hero. Same clamp-and-upsert shape as moveTown; the cave uses the same percent coordinate space.
+export async function moveMiner(buyerId, { x, y, facing } = {}) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const cx = Math.max(CAVE_X[0], Math.min(CAVE_X[1], Number(x) || 50));
+    const cy = Math.max(CAVE_Y[0], Math.min(CAVE_Y[1], Number(y) || 78));
+    await db.query(
+        `INSERT INTO mkt_mining (buyer_id, x, y, facing) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, updated_at = NOW()`,
+        [buyerId, cx, cy, facing === -1 ? -1 : 1]
+    ).catch(() => {});
+    return { ok: true };
+}
+
+// How hard one swing lands, before the timing grade. Pickaxe track is the whole of it for now; the mining gear
+// stat and the mining set plug in here in phase 3.
+function swingPower(row) {
+    const base = 18;
+    return Math.max(1, Math.round(base * (1 + trackValue("pick", row?.pick_level))));
+}
+
+// ── THE SWING ────────────────────────────────────────────────────────────────────────────────────────────────
+// `dist` is the client's distance-from-centre off the timing bar. Graded HERE and clamped, so a tampered client
+// can't claim a perfect strike every time.
+export async function swingAtNode(buyerId, nodeId, dist = null) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const arrivedAt = new Date(); // stamped on ARRIVAL — our latency is not the player's cadence
+    const row = await minerRow(buyerId);
+    if (!row) return { ok: false, error: "no_miner" };
+
+    const allowance = SWINGS_PER_DAY + trackValue("vigor", row.vigor_level) + (Number(row.swing_bonus) || 0);
+    if ((Number(row.swing_used) || 0) >= allowance) return { ok: false, error: "out_of_swings" };
+
+    const node = await db.queryOne(`SELECT id, tier, hp, hp_max, x, y FROM mkt_ore_node WHERE id = $1 AND status = 'active'`, [nodeId]).catch(() => null);
+    if (!node) return { ok: false, error: "node_gone" };
+
+    const prior = await db.queryOne(`SELECT combo, last_swing_at FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`, [nodeId, buyerId]).catch(() => null);
+    if (prior?.last_swing_at && Date.now() - new Date(prior.last_swing_at).getTime() < SWING_THROTTLE_MS) {
+        return { ok: false, error: "too_fast" };
+    }
+
+    // A distance of exactly 0 is the BEST swing in the game — test for null, never for falsiness. (The raid
+    // shipped `|| 0.5` here and graded dead-centre hits as the worst possible outcome.)
+    const clamped = dist == null || Number.isNaN(Number(dist)) ? 0.5 : Math.min(0.5, Math.max(0, Number(dist)));
+    const grade = gradeForDist(clamped);
+
+    const kept = (GRADE_RANK[grade.key] ?? 0) >= GRADE_RANK[COMBO_MIN_GRADE];
+    const combo = kept ? (Number(prior?.combo) || 0) + 1 : 0;
+    const comboMult = Math.min(COMBO_MAX, 1 + Math.max(0, combo - 1) * COMBO_STEP);
+
+    const damage = Math.max(1, Math.round(swingPower(row) * grade.mult * comboMult));
+
+    // Spend the swing first, atomically — a swing that lands must always have been paid for.
+    const spent = await db
+        .queryOne(
+            `UPDATE mkt_mining SET swing_used = swing_used + 1, updated_at = NOW()
+              WHERE buyer_id = $1 AND swing_day = ${DAY} AND swing_used < $2 RETURNING swing_used`,
+            [buyerId, allowance]
+        )
+        .catch(() => null);
+    if (!spent) return { ok: false, error: "out_of_swings" };
+
+    const after = await db.queryOne(
+        `UPDATE mkt_ore_node SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`,
+        [nodeId, damage]
+    ).catch(() => null);
+    await db.query(
+        `INSERT INTO mkt_ore_node_hit (node_id, buyer_id, damage, swings, combo, last_swing_at) VALUES ($1, $2, $3, 1, $4, $5)
+         ON CONFLICT (node_id, buyer_id) DO UPDATE SET damage = mkt_ore_node_hit.damage + $3,
+             swings = mkt_ore_node_hit.swings + 1, combo = $4, last_swing_at = $5`,
+        [nodeId, buyerId, damage, combo, arrivedAt]
+    ).catch(() => {});
+    if (combo > (Number(row.best_combo) || 0)) {
+        await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
+    }
+
+    const hp = after?.hp ?? node.hp;
+    let cracked = null;
+    if (hp <= 0) cracked = await claimNode(buyerId, node, row);
+
+    return {
+        ok: true,
+        damage, grade: grade.key, gradeLabel: grade.label,
+        combo, comboMult: Math.round(comboMult * 100) / 100, comboBroken: !kept && (Number(prior?.combo) || 0) >= 3,
+        cooldownMs: SWING_COOLDOWN_MS[grade.key] ?? SWING_COOLDOWN_MS.miss,
+        nodeId: Number(nodeId), hp, hpMax: Number(node.hp_max),
+        pct: node.hp_max ? Math.max(0, Math.round((hp / node.hp_max) * 100)) : 0,
+        cracked,
+        swingsLeft: Math.max(0, allowance - (Number(spent.swing_used) || 0)),
+    };
+}
+
+// The node broke. Whoever landed the blow takes the ore; the node closes and the next read spawns a replacement.
+async function claimNode(buyerId, node, row) {
+    const won = await db
+        .queryOne(`UPDATE mkt_ore_node SET status = 'mined', mined_by = $2, mined_at = NOW() WHERE id = $1 AND status = 'active' RETURNING tier`, [node.id, buyerId])
+        .catch(() => null);
+    if (!won) return null; // someone else's swing landed first
+
+    const o = oreTier(node.tier);
+    const haul = Math.max(1, Math.round((1 + trackValue("haul", row?.haul_level)) * (1 + Math.floor(Math.random() * 2))));
+    await db.query(
+        `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1, $2, $3)
+         ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,
+        [buyerId, node.tier, haul]
+    ).catch(() => {});
+    await db.query(
+        `UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, updated_at = NOW() WHERE buyer_id = $1`,
+        [buyerId, haul]
+    ).catch(() => {});
+
+    const gold = o.gold;
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+    await logCoin(buyerId, gold, "mining", { balanceAfter: paid?.gold, meta: { tier: node.tier } }).catch(() => {});
+    // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is a repeatable action.
+    await awardXp(buyerId, "mining", { points: o.xp, gold: 0 }).catch(() => {});
+    await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: haul }).catch(() => {});
+
+    return { tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier), ore: haul, gold, xp: o.xp, partTier: o.part };
+}
+
+// ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
+export async function upgradeMining(buyerId, track) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const t = MINE_TRACKS[track];
+    if (!t) return { ok: false, error: "bad_track" };
+    const row = await minerRow(buyerId);
+    const level = Number(row?.[t.col]) || 0;
+    if (level >= t.max) return { ok: false, error: "maxed" };
+    const cost = trackCost(level);
+
+    const paid = await db
+        .queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost])
+        .catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -cost, "mining_upgrade", { balanceAfter: paid.gold, meta: { track } }).catch(() => {});
+    await db.query(`UPDATE mkt_mining SET ${t.col} = ${t.col} + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    await trackActivity(buyerId, "mining_upgrade", { track, to: level + 1 }).catch(() => {});
+    return { ok: true, ...(await getMiningState(buyerId)) };
+}

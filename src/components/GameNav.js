@@ -80,7 +80,7 @@ const LINKS = [
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 // Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking"];
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";
@@ -92,6 +92,17 @@ export default function GameNav() {
     // DISHES you could cook right now. Prep recipes are excluded on purpose: a prep makes an ingredient for
     // something else, so badging it would nag you toward busywork rather than toward the thing that pays.
     const [dishesReady, setDishesReady] = useState(0);
+    // The Mine is owner-gated while it's being built. Same contract as the Kitchen: ask the server, never guess,
+    // and a non-owner simply has no Mine in the menu with nothing to see.
+    const [mine, setMine] = useState(false);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/mining", { cache: "no-store", credentials: "same-origin" })
+            .then((r) => r.json())
+            .then((d) => { if (!dead && d?.unlocked) setMine(true); })
+            .catch(() => { /* no mine, no menu entry */ });
+        return () => { dead = true; };
+    }, [pathname]);
     // Every failure mode here looks identical to "you're not the owner" — a dropped request, a cached reply from
     // before you signed in, a blip in the route — and the Kitchen just isn't in the menu, with nothing to see.
     // So: never cached, and one retry before believing a negative.
@@ -131,7 +142,8 @@ export default function GameNav() {
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
         ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
-        ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : [])];
+        ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
+        ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -258,6 +270,7 @@ export default function GameNav() {
             // The Kitchen is owner-gated. It has to be in the MENU as well as the scroll bar — the bar runs off
             // the side of the screen and a new entry appended to the end of it is, in practice, invisible.
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
+            ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
