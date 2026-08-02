@@ -8,11 +8,20 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // Farm LIKES — a positive-only, three-tier "rate a friend's farm" system. Rating is a like, not a score:
-// Like 👍 < Love ❤️ < Admire ⭐. One persistent rating per (rater → owner); revise anytime. Both earn XP the
-// first time you rate them (changing a rating spends a charge but awards nothing — anti-farm). THREE rating
-// charges per day, spent on a NEW rating OR changing an existing one — no free flip-flopping. (mig222.)
+// Like 👍 < Love ❤️ < Admire ⭐. One persistent rating row per (rater → owner), so a farm's tally stays
+// "how many people love this farm" and never inflates into "how many clicks".
+//
+// You can rate the same person AGAIN each day (mig311). Previously a rating paid out once per person ever, so
+// once you'd been round everyone your three daily charges were dead weight — revising paid nothing, and there
+// was no reason to go and admire a friend's farm a second time. Now: once per person per store-local day.
+// (Changing your mind on someone you already rated today still costs a charge and still pays nothing — that's
+// a revision, not a fresh visit.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
-const RATES_PER_DAY = 3; // rating charges per day — spent on a NEW rating OR changing an existing one
+const RATES_PER_DAY = 3; // rating charges per day — spent on a NEW rating, a REPEAT, or changing one
+// What a repeat visit pays, against a first-ever rating of that person. Held under 1 on purpose: these two
+// awards were trimmed 35% for being 5.5% of all XP in the game, and making them repeatable every day pushes
+// straight back through that ceiling. Set to 1 for full parity — it's the only number that decides this.
+const REPEAT_XP_MULT = 0.6;
 
 export const RATE_TIERS = {
     // Trimmed ~35%. Between them these two paid 8,128 XP a week (5.5% of all XP) for visiting a farm and
@@ -48,13 +57,15 @@ async function ratingSummary(ownerId, viewerId) {
     const [rows, mine] = await Promise.all([
         db.query(`SELECT tier, COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1 GROUP BY tier`, [ownerId]).catch(() => []),
         viewerId && String(viewerId) !== String(ownerId)
-            ? db.queryOne(`SELECT tier FROM mkt_farm_rating WHERE owner_id = $1 AND rater_id = $2`, [ownerId, viewerId]).catch(() => null)
+            ? db.queryOne(`SELECT tier, (last_rated_day = ${DAY}) AS rated_today FROM mkt_farm_rating WHERE owner_id = $1 AND rater_id = $2`, [ownerId, viewerId]).catch(() => null)
             : Promise.resolve(null),
     ]);
     const byTier = { 1: 0, 2: 0, 3: 0 };
     for (const r of rows || []) byTier[r.tier] = r.n;
     const total = byTier[1] + byTier[2] + byTier[3];
-    return { total, byTier, myTier: mine?.tier || null };
+    // ratedToday drives the button state: your tier is still shown as yours, but the farm can say "come back
+    // tomorrow" rather than looking like a live button that silently does nothing.
+    return { total, byTier, myTier: mine?.tier || null, ratedToday: Boolean(mine?.rated_today) };
 }
 
 // The rating block attached to a farm view: the summary, whether the viewer can rate, and their charge state.
@@ -86,8 +97,56 @@ export async function rateFarm(raterId, ownerId, tier) {
     const owner = await db.queryOne(`SELECT id FROM mkt_buyer WHERE id = $1`, [ownerId]).catch(() => null);
     if (!owner) return { ok: false, error: "no_such_farm" };
 
-    const existing = await db.queryOne(`SELECT tier FROM mkt_farm_rating WHERE rater_id = $1 AND owner_id = $2`, [raterId, ownerId]).catch(() => null);
+    const existing = await db
+        .queryOne(`SELECT tier, (last_rated_day = ${DAY}) AS rated_today FROM mkt_farm_rating WHERE rater_id = $1 AND owner_id = $2`, [raterId, ownerId])
+        .catch(() => null);
     const meta = RATE_TIERS[t];
+
+    // A REPEAT: you've rated them before, but not today. Spend a charge, pay both sides (at REPEAT_XP_MULT),
+    // and clear owner_seen_at so it shows up in their "who rated your farm" recap all over again.
+    if (existing && !existing.rated_today) {
+        const charge0 = await rateCharge(raterId);
+        if (charge0.left <= 0) {
+            const summary = await ratingSummary(ownerId, raterId);
+            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge: charge0 };
+        }
+        const slot = await db
+            .queryOne(
+                `UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1
+                  WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`,
+                [raterId, charge0.allowance]
+            )
+            .catch(() => null);
+        if (!slot) {
+            const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
+            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge };
+        }
+        // Guarded on the day as well as the pair: two taps racing each other can't both bank the XP.
+        const bumped = await db
+            .queryOne(
+                `UPDATE mkt_farm_rating SET tier = $3, updated_at = NOW(), owner_seen_at = NULL, last_rated_day = ${DAY}
+                  WHERE rater_id = $1 AND owner_id = $2 AND last_rated_day IS DISTINCT FROM ${DAY} RETURNING tier`,
+                [raterId, ownerId, t]
+            )
+            .catch(() => null);
+        if (!bumped) {
+            // Lost the race — refund the charge, treat as already-rated-today.
+            await db.query(`UPDATE mkt_buyer SET farm_rate_used = GREATEST(0, farm_rate_used - 1) WHERE id = $1 AND farm_rate_day = ${DAY}`, [raterId]).catch(() => {});
+            const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
+            return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
+        }
+        const raterXp = Math.max(1, Math.round(meta.raterXp * REPEAT_XP_MULT));
+        const ownerXp = Math.max(1, Math.round(meta.ownerXp * REPEAT_XP_MULT));
+        // gold: 0 is load-bearing on BOTH — awardXp pays gold 1:1 with points otherwise, and this is now a
+        // repeatable daily action rather than a once-per-person one.
+        await awardXp(raterId, "farm_rate_give", { points: raterXp, gold: 0 }).catch(() => {});
+        await awardXp(ownerId, "farm_rate_get", { points: ownerXp, gold: 0 }).catch(() => {});
+        await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, repeat: true }).catch(() => {});
+        await bumpQuestProgress(raterId, "farm_rate", 1).catch(() => {}); // the daily "rate a friend's farm" quest
+        await syncEarnedBadges(ownerId).catch(() => {});
+        const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
+        return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, ...summary, charge };
+    }
 
     if (existing) {
         // Tapping the tier you already gave = no-op (no charge spent).
@@ -128,7 +187,7 @@ export async function rateFarm(raterId, ownerId, tier) {
 
     const inserted = await db
         .queryOne(
-            `INSERT INTO mkt_farm_rating (rater_id, owner_id, tier, owner_seen_at) VALUES ($1, $2, $3, NULL)
+            `INSERT INTO mkt_farm_rating (rater_id, owner_id, tier, owner_seen_at, last_rated_day) VALUES ($1, $2, $3, NULL, ${DAY})
              ON CONFLICT (rater_id, owner_id) DO NOTHING RETURNING tier`,
             [raterId, ownerId, t]
         )

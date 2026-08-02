@@ -571,8 +571,11 @@ export default function FarmClient({ initial, viewingAlias }) {
     const rateFarmAt = useCallback(async (tier) => {
         const R = farm.rating;
         if (!R?.canRate || rateBusy) return;
-        if (R.myTier === tier) return; // tapping your current tier is a no-op
-        if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new OR change both need a charge
+        // Tapping the tier you already gave is a no-op ONLY if you gave it TODAY. Ratings re-arm daily, and
+        // "admire them again" is by definition tapping the same tier you last gave — this guard used to
+        // swallow exactly that tap and never reach the server.
+        if (R.myTier === tier && R.ratedToday) return;
+        if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new, repeat OR change all need a charge
         setRateBusy(true);
         setRateNote(null);
         const r = await post({ action: "rate", tier, owner: farm.owner?.alias });
@@ -584,7 +587,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         setRateBurst({ tier, id: Date.now() });
         setTimeout(() => setRateBurst((b) => (b && b.tier === tier ? null : b)), 950);
         SFX.coin();
-        setFarm((f) => ({ ...f, rating: { ...f.rating, total: r.total, byTier: r.byTier, myTier: r.myTier, charge: r.charge } }));
+        setFarm((f) => ({ ...f, rating: { ...f.rating, total: r.total, byTier: r.byTier, myTier: r.myTier, charge: r.charge, ratedToday: true } }));
     }, [farm.rating, farm.owner, rateBusy, post]);
 
     // Decorations — buy / place / drag-move / pick-up. Every action returns the fresh decoration state, which we
@@ -1844,7 +1847,7 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
 }
 
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
-    const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null } = rating || {};
+    const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null, ratedToday = false } = rating || {};
     const left = charge?.left ?? 0;
     const allowance = charge?.allowance ?? 3;
     const totalLove = (byTier[1] || 0) + (byTier[2] || 0) + (byTier[3] || 0);
@@ -1877,15 +1880,24 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 900, fontSize: 15 }}>Rate {ownerName}&apos;s farm</span>
                 {totalLove > 0 ? <span className="muted" style={{ fontSize: 11.5 }}>· {totalLove} so far</span> : null}
+                {/* You can come back tomorrow — say so, rather than leaving three live-looking buttons that
+                    would only spend a charge to change your mind. */}
+                {ratedToday ? <span className="muted" style={{ fontSize: 11.5 }}>· rated today, again tomorrow</span> : null}
                 <span style={{ marginLeft: "auto" }}><ChargeDots left={left} allowance={allowance} /></span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {RATE_TIER_UI.map((t) => {
                     const active = myTier === t.tier;
-                    const disabled = busy || (!active && left <= 0);
+                    // Already spent on this person today → nothing to do here until tomorrow. Otherwise your
+                    // existing tier is tappable again: giving it a second time on a new day is the point.
+                    const spentToday = ratedToday && active;
+                    const disabled = busy || spentToday || left <= 0;
                     const bursting = burst && burst.tier === t.tier;
                     return (
-                        <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active} title={active ? `${t.label} (your rating)` : disabled ? "No ratings left today" : `${t.label} this farm`}
+                        <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active}
+                            title={spentToday ? `${t.label} — given today, come back tomorrow`
+                                : left <= 0 ? "No ratings left today"
+                                    : active ? `${t.label} again` : `${t.label} this farm`}
                             style={{ position: "relative", overflow: "visible", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "11px 6px 8px", borderRadius: 14, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.45 : 1, WebkitTapHighlightColor: "transparent",
                                 border: `1.5px solid ${active ? t.color : "rgba(255,255,255,0.12)"}`, color: "inherit",
                                 background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}30, ${t.color}0f)` : "rgba(255,255,255,0.03)",
