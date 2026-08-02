@@ -130,6 +130,19 @@ export default function MiningClient({ initial }) {
                 <span className="mine-sub">owner preview · {swingsLeft}/{s.swings?.allowance ?? 0} swings today</span>
             </div>
 
+            {/* Two halves, two tabs — the same shape fishing and the forge use. */}
+            <div className="mine-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
+                    <Img src="/images/mining/pick-iron.png" className="mine-tab-ico" fallback="⛏️" /> Mine
+                </button>
+                <button type="button" role="tab" aria-selected={tab === "smelt"} className={tab === "smelt" ? "is-on" : ""} onClick={() => setTab("smelt")}>
+                    <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="🔥" /> Smelt
+                    {s.oreTotal ? <span className="mine-tab-badge">{s.oreTotal}</span> : null}
+                </button>
+            </div>
+
+            {tab === "mine" ? (
+            <>
             {/* ── THE SEAM ── the whole screen is the rock you're working. */}
             <div className={`mine-face${node ? "" : " is-empty"}`} key={node?.id || "none"}>
                 <div className="mine-face-bg" aria-hidden="true" />
@@ -189,7 +202,7 @@ export default function MiningClient({ initial }) {
                 <button type="button" className="mine-prospect is-ghost" onClick={prospect} disabled={busy}>Look for a different seam</button>
             ) : null}
 
-            {/* ── THE PICKAXE ── the upgrade ladder, with the tool you've actually earned front and centre. */}
+            {/* ── THE PICKAXE ── the tool you've earned, then the levers that improve it. */}
             <div className="mine-panel">
                 <div className="mine-pickhead">
                     <div className="mine-pickart"><Img src={s.pick?.sprite} className="mine-pickart-img" fallback="⛏️" /></div>
@@ -203,24 +216,35 @@ export default function MiningClient({ initial }) {
                         ) : null}
                     </div>
                 </div>
-                {(s.tracks || []).map((t) => (
-                    <div className="mine-track" key={t.key}>
-                        <span className="mine-track-ico" aria-hidden="true">{t.icon}</span>
-                        <span className="mine-track-body">
-                            <b>{t.name}</b>
-                            <em>{t.desc}</em>
-                            <span className="mine-pips" aria-label={`level ${t.level} of ${t.max}`}>
-                                {Array.from({ length: t.max }, (_, i) => <i key={i} className={i < t.level ? "on" : ""} />)}
-                            </span>
-                        </span>
-                        <button type="button" className="mine-buy" disabled={busy || t.cost == null || (s.gold ?? 0) < t.cost} onClick={() => upgrade(t.key)}>
-                            {t.cost == null ? "MAX" : `🪙 ${money(t.cost)}`}
-                        </button>
-                    </div>
-                ))}
+                {/* The same card the boat and the forge use — accent stripe, level bar, now → next. */}
+                <div className="sail-upgrades is-dig" style={{ marginTop: 12 }}>
+                    {(s.tracks || []).map((t) => <UpgCard key={t.key} t={t} gold={s.gold} busy={busy} onBuy={() => upgrade(t.key)} />)}
+                </div>
             </div>
 
-            {/* ── THE STASH ── ore, and what it turns into. */}
+            <p className="mine-hint">Find a seam, then time the marker to the middle — same bands as the anvil and the golem. Clean hits chain for more damage.</p>
+            </>
+            ) : (
+            <>
+            {/* ── SMELT TAB ── the furnace you've built, the ore waiting, and the levers that improve the melt. */}
+            <div className="mine-panel">
+                <div className="mine-pickhead">
+                    <div className="mine-pickart is-furnace"><Img src={s.furnace?.sprite} className="mine-pickart-img" fallback="🔥" /></div>
+                    <div className="mine-pickbody">
+                        <b>{s.furnace?.name}</b>
+                        {s.furnace?.nextName
+                            ? <em>{s.furnace.nextName} at {s.furnace.nextAt} upgrades · you have {s.smeltLevels ?? 0}</em>
+                            : <em>Fully built — every smelting upgrade bought.</em>}
+                        {s.furnace?.nextAt ? (
+                            <span className="mine-pickbar"><span style={{ width: `${Math.min(100, ((s.smeltLevels ?? 0) / s.furnace.nextAt) * 100)}%` }} /></span>
+                        ) : null}
+                    </div>
+                </div>
+                <div className="sail-upgrades is-forge" style={{ marginTop: 12 }}>
+                    {(s.smeltTracks || []).map((t) => <UpgCard key={t.key} t={t} gold={s.gold} busy={busy} onBuy={() => upgrade(t.key)} />)}
+                </div>
+            </div>
+
             <div className="mine-panel">
                 <div className="mine-panel-head">Ore in your pack <span className="muted">· smelts into forge parts</span></div>
                 {(s.ore || []).length ? (
@@ -239,10 +263,12 @@ export default function MiningClient({ initial }) {
                             </div>
                         ))}
                     </div>
-                ) : <p className="muted" style={{ margin: 0, fontSize: 13 }}>Nothing yet — crack a seam and it lands here.</p>}
+                ) : <p className="muted" style={{ margin: 0, fontSize: 13 }}>Nothing yet — crack a seam on the Mine tab and it lands here.</p>}
             </div>
 
-            <p className="mine-hint">Find a seam, then time the marker to the middle — same bands as the anvil and the golem. Clean hits chain for more damage.</p>
+            <p className="mine-hint">Ore of a tier melts into that tier&rsquo;s forge part. The Crucible lowers what each part costs you, the Bellows sometimes throws in an extra, and Flux sometimes lifts one a whole tier.</p>
+            </>
+            )}
 
             {/* Cracked-it reveal */}
             {crack ? (
@@ -327,6 +353,15 @@ export default function MiningClient({ initial }) {
                 .mine-prospect.is-ghost { margin-top: 8px; padding: 9px; font-size: 0.84rem; font-weight: 700; color: #cdb894;
                     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); box-shadow: none; }
 
+                .mine-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+                .mine-tabs button { position: relative; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+                    padding: 10px 12px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; color: #cdd3d8;
+                    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+                .mine-tabs button.is-on { color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffb020); border-color: transparent; box-shadow: 0 3px 0 #b47a12; }
+                .mine-tab-ico { width: 24px; height: 24px; object-fit: contain; }
+                .mine-tab-badge { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0483d; color: #fff;
+                    font-size: 11px; font-weight: 900; display: inline-grid; place-items: center; }
+                .mine-pickart.is-furnace { background: radial-gradient(circle at 50% 35%, rgba(255,120,32,0.24), rgba(255,120,32,0.05)); border-color: rgba(255,120,32,0.4); }
                 .mine-panel { margin-top: 14px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
                 .mine-panel-head { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #ffd75e; margin-bottom: 9px; }
                 .mine-pickhead { display: flex; align-items: center; gap: 12px; padding-bottom: 11px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
@@ -403,6 +438,29 @@ export default function MiningClient({ initial }) {
                 @keyframes mineBurn { from { transform: scale(0.9); } to { transform: scale(1.15); } }
             `}</style>
         </section>
+    );
+}
+
+// One upgrade card, in the house style the boat and the forge already use — accent stripe, level bar, and a
+// "what it does now → next" row. Mining had a plainer bespoke row, which is why it looked cheaper than
+// everything around it for no reason other than that nobody had reused this.
+function UpgCard({ t, gold, busy, onBuy }) {
+    return (
+        <div className={`sail-upg${t.maxed ? " is-maxed" : ""}`}>
+            <div className="sail-upg-top">
+                <span className="sail-upg-title"><span className="sail-upg-ico">{t.icon}</span>{t.name}</span>
+                <span className="muted sail-upg-lv">Lv {t.level}/{t.max}</span>
+            </div>
+            <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${t.max ? Math.min(100, (t.level / t.max) * 100) : 0}%` }} /></div>
+            <p className="muted sail-upg-desc">{t.desc}</p>
+            <div className="sail-upg-effect">
+                <span>{t.effect || "Effect"}</span>
+                <b>{t.now}{t.maxed ? "" : <> → <span className="sail-upg-next">{t.next}</span></>}</b>
+            </div>
+            {t.maxed
+                ? <button className="pill" disabled>✓ Maxed</button>
+                : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}>🪙 {Number(t.cost).toLocaleString()}</button>}
+        </div>
     );
 }
 

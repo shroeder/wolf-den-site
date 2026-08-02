@@ -31,7 +31,7 @@ const NAV_SPRITE = {
     "/marketplace/track": "rewards", "/marketplace/badges": "badges", "/marketplace/leaderboard": "ranks",
     "/marketplace/invite": "invite", "/marketplace/friends": "friends", "/marketplace/inbox": "inbox",
     "/marketplace/play": "home", "/marketplace/customize": "customize", "/marketplace/profile": "profile",
-    "/marketplace/fishing": "fishing",
+    "/marketplace/fishing": "fishing", "/marketplace/mining": "mining",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to

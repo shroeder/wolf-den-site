@@ -91,6 +91,38 @@ export const trackValue = (t, lvl) => Math.min(MINE_TRACKS[t].cap, Math.max(0, N
 // Cost curve mirrors the boat/rail tracks: each level costs more than the last.
 export const trackCost = (level) => 300 + Math.round(Math.pow(Math.max(0, level), 1.6) * 140);
 
+// SMELTING tracks. Its own half of the feature, so it gets its own levers rather than riding the pickaxe's.
+export const SMELT_TRACKS = {
+    bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "🌬️", col: "bellows_level",
+        desc: "A hotter burn sometimes yields an extra part.", effect: "Bonus part chance" },
+    crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "🫙", col: "crucible_level",
+        desc: "A bigger pot needs less ore for the same part.", effect: "Ore per part" },
+    flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "✨", col: "flux_level",
+        desc: "A purer melt sometimes lifts a part a whole tier.", effect: "Tier-up chance" },
+};
+export const smeltValue = (t, lvl) => Math.min(SMELT_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SMELT_TRACKS[t].per);
+// Ore per part. The Crucible buys this down twice over its ten levels — a visible, discrete win rather than a
+// fraction that never quite changes the number on screen.
+export const SMELT_BASE_COST = 3;
+export const smeltCostFor = (crucibleLevel = 0) => Math.max(1, SMELT_BASE_COST - Math.floor(Math.max(0, crucibleLevel) / 4));
+
+// FURNACE FORMS — the smelting equivalent of the pickaxe ladder. Total smelting levels (0..30) decide which
+// furnace you're feeding, and it's the one you see in the smelt animation, so investment is visible at the
+// exact moment it pays off.
+const FURNACE_FORMS = [
+    { at: 0, id: 1, name: "Stone Hearth" },
+    { at: 4, id: 2, name: "Banded Forge" },
+    { at: 10, id: 3, name: "Brick Smelter" },
+    { at: 17, id: 4, name: "Runed Crucible" },
+    { at: 25, id: 5, name: "Emberheart Furnace" },
+];
+export function furnaceForm(totalSmeltLevels) {
+    let form = FURNACE_FORMS[0];
+    for (const f of FURNACE_FORMS) if (totalSmeltLevels >= f.at) form = f;
+    const next = FURNACE_FORMS.find((f) => f.at > totalSmeltLevels) || null;
+    return { ...form, sprite: `/images/mining/furnace-${form.id}.png`, nextAt: next?.at ?? null, nextName: next?.name ?? null };
+}
+
 // PICKAXE FORMS. Total upgrade levels across all four tracks (0..40) decide which pickaxe you're swinging, so
 // every purchase moves you toward a visibly better tool — the boat-form trick, which is the single best
 // "my upgrades are real" signal in the game.
@@ -165,6 +197,16 @@ async function minerRow(buyerId) {
 }
 
 const totalLevels = (row) => Object.values(MINE_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
+const totalSmeltLevels = (row) => Object.values(SMELT_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
+// One shape for an upgrade card, so the mining and smelting lists render through the same component.
+const trackCards = (defs, row, valueFn, costFn, fmt) => Object.entries(defs).map(([key, t]) => {
+    const level = Number(row?.[t.col]) || 0;
+    return {
+        key, name: t.name, icon: t.icon, desc: t.desc, effect: t.effect, level, max: t.max, kind: t.kind,
+        now: fmt(key, level), next: level >= t.max ? null : fmt(key, level + 1),
+        maxed: level >= t.max, cost: level >= t.max ? null : costFn(level),
+    };
+});
 
 export async function getMiningState(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { unlocked: false };
@@ -195,13 +237,17 @@ export async function getMiningState(buyerId) {
 
         pick: pickForm(lvls),
         swings: { used: Number(row?.swing_used) || 0, allowance, left: Math.max(0, allowance - (Number(row?.swing_used) || 0)) },
-        tracks: Object.entries(MINE_TRACKS).map(([key, t]) => {
-            const level = Number(row?.[t.col]) || 0;
-            return {
-                key, name: t.name, icon: t.icon, desc: t.desc, level, max: t.max,
-                value: trackValue(key, level), kind: t.kind,
-                cost: level >= t.max ? null : trackCost(level),
-            };
+        tracks: trackCards(MINE_TRACKS, row, trackValue, trackCost, (key, lvl) => {
+            const v = trackValue(key, lvl);
+            if (key === "vigor") return `${SWINGS_PER_DAY + v} swings`;
+            if (key === "lantern") return `+${Math.round(v * 100)}% rich`;
+            return `×${(1 + v).toFixed(2)}`;
+        }),
+        furnace: furnaceForm(totalSmeltLevels(row)),
+        smeltLevels: totalSmeltLevels(row),
+        smeltTracks: trackCards(SMELT_TRACKS, row, smeltValue, trackCost, (key, lvl) => {
+            if (key === "crucible") return `${smeltCostFor(lvl)} ore → 1`;
+            return `${Math.round(smeltValue(key, lvl) * 100)}%`;
         }),
         // The ONE seam you're working, or null until you prospect.
         node: current ? (() => {
@@ -228,9 +274,10 @@ export async function getMiningState(buyerId) {
         seamsLive: Number(liveCount?.n) || 0,
         ore: (ore || []).map((r) => {
             const o = oreTier(r.tier);
+            const cost = smeltCostFor(row?.crucible_level);
             const qty = Number(r.qty);
             return { tier: r.tier, name: o.name, color: o.color, art: oreArt(r.tier), qty, partTier: o.part,
-                smeltCost: SMELT_COST, canSmelt: Math.floor(qty / SMELT_COST) };
+                smeltCost: cost, canSmelt: Math.floor(qty / cost) };
         }),
         oreTotal: (ore || []).reduce((s, r) => s + Number(r.qty), 0),
         gold: Number(goldRow?.gold) || 0,
@@ -387,15 +434,17 @@ async function claimNode(buyerId, node, row) {
 
 // ── SMELTING ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Ore → forge parts, which is the whole reason mining exists: it feeds the Forge rather than running beside it.
-// SMELT_COST ore of tier N becomes one part of tier N — the tiers line up 1:1 so nobody has to learn a table.
-export const SMELT_COST = 3;
-
+// Ore of tier N becomes a part of tier N — the tiers line up 1:1 so nobody has to learn a table. The three
+// smelting tracks bend that: the Crucible lowers the ore per part, the Bellows sometimes adds one, and Flux
+// sometimes lifts one a tier.
 export async function smeltOre(buyerId, tier, batches = 1) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
+    const row = await minerRow(buyerId);
+    const cost = smeltCostFor(row?.crucible_level);
     const n = Math.max(1, Math.min(50, Math.floor(Number(batches) || 1)));
-    const spend = SMELT_COST * n;
+    const spend = cost * n;
 
     // Atomic guarded spend — the WHERE is what stops a double-tap smelting ore you no longer have.
     const spent = await db
@@ -404,16 +453,39 @@ export async function smeltOre(buyerId, tier, batches = 1) {
     if (!spent) return { ok: false, error: "not_enough_ore" };
 
     const o = oreTier(t);
+    // BELLOWS: a hotter burn sometimes yields an extra part. Rolled per batch, so the upgrade is felt on a big
+    // smelt rather than being a rounding error on a small one.
+    const bonusChance = smeltValue("bellows", row?.bellows_level);
+    let bonus = 0;
+    for (let i = 0; i < n; i += 1) if (Math.random() < bonusChance) bonus += 1;
+    // FLUX: a purer melt sometimes lifts a part a whole tier (never past the top).
+    const fluxChance = smeltValue("flux", row?.flux_level);
+    const made = {};
+    const add = (tierN, count) => { made[tierN] = (made[tierN] || 0) + count; };
+    for (let i = 0; i < n + bonus; i += 1) {
+        const lifted = o.part < 5 && Math.random() < fluxChance;
+        add(lifted ? o.part + 1 : o.part, 1);
+    }
+
     const { addParts } = await import("@/lib/marketplace/crafting.js");
-    await addParts(buyerId, o.part, n).catch(() => {});
-    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: n, partTier: o.part }).catch(() => {});
-    return { ok: true, smelted: { oreTier: t, oreName: o.name, oreSpent: spend, partTier: o.part, parts: n }, ...(await getMiningState(buyerId)) };
+    for (const [partTier, count] of Object.entries(made)) await addParts(buyerId, Number(partTier), count).catch(() => {});
+    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: n + bonus, bonus, partTier: o.part }).catch(() => {});
+    return {
+        ok: true,
+        smelted: {
+            oreTier: t, oreName: o.name, oreSpent: spend, partTier: o.part,
+            parts: n + bonus, bonus,
+            // What actually came out, by part tier — Flux means it isn't always the tier you put in.
+            byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
+        },
+        ...(await getMiningState(buyerId)),
+    };
 }
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 export async function upgradeMining(buyerId, track) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    const t = MINE_TRACKS[track];
+    const t = MINE_TRACKS[track] || SMELT_TRACKS[track];
     if (!t) return { ok: false, error: "bad_track" };
     const row = await minerRow(buyerId);
     const level = Number(row?.[t.col]) || 0;
