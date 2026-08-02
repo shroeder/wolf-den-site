@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
-import { addChests } from "@/lib/marketplace/chests.js";
+import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
@@ -30,8 +30,14 @@ const LUCKY_GOLD_PCT = 25; // % bonus gold when a Lucky Spin lands on a gold pri
 // (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
 // everyone (the old bronze/silver/gold tiers were collapsed to one). The 🌱 Common Seed wedge is live now
 // that the farm is public (grantSeed/SEEDS handler wired below).
-// Prize sprite path (real AI art, no emoji) — public/images/spin/prizes/<name>.png.
-const P = (name) => `/images/spin/prizes/${name}.png`;
+// Prize sprite path (real AI art, no emoji) — public/images/spin/prizes/<name>.png. An absolute path passes
+// straight through, so a wedge can borrow art from another feature (e.g. the sailing fragment sprites).
+const P = (name) => (name?.startsWith("/") ? name : `/images/spin/prizes/${name}.png`);
+// The shard tier the wheel hands out. Wedge label, sprite and grant all read from this one place so they can
+// never drift apart — bump it here if the wheel should ever pay better shards.
+const FRAGMENT_PRIZE_TIER = "wooden";
+const fragSprite = (tier) => `/images/sailing/fragment-${tier}.png`;
+const fragName = (tier) => (CHEST_TIERS[tier]?.label || tier).replace(" Chest", "");
 
 // One-line explainer for a wheel prize — powers the "tap a reward to inspect it" card in the legend.
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -43,7 +49,7 @@ function prizeDesc(p) {
         case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level.`;
         case "consumable": return CONSUMABLES[p.consumable]?.desc || p.label;
         case "seed": return "A random farm seed to plant and grow in your pasture.";
-        case "fragment": return `${p.n || 1} dig fragments for the sailing dig minigame.`;
+        case "fragment": return `${p.n || 1} ${fragName(p.tierId || FRAGMENT_PRIZE_TIER)} chest fragments — collect enough of a kind to forge that chest at the docks.`;
         case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
         case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
         case "respin": return "A free bonus spin — spin again on the house.";
@@ -71,7 +77,7 @@ const WHEELS = [
             { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
             { label: "150 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 150 },
             { label: "5 Fertilizer", sprite: "fertilizer", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
-            { label: "3 Dig Fragments", sprite: "dig-shard", weight: 8, kind: "fragment", n: 3 },
+            { label: `3 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 8, kind: "fragment", n: 3, tierId: FRAGMENT_PRIZE_TIER },
             { label: "MINI WHEEL", sprite: "mini-wheel", weight: 5, tier: "bonus", kind: "mini_wheel" },
             { label: "250 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 250 },
             { label: "150 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 150 },
@@ -93,7 +99,7 @@ const MINI_WHEEL_PRIZES = [
     { label: "225 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 225 },
     { label: "150 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 150 },
     { label: "Hearty Snack", sprite: "pet-treat", weight: 12, kind: "consumable", consumable: "treat_snack", n: 1 },
-    { label: "5 Dig Fragments", sprite: "dig-shard", weight: 12, kind: "fragment", n: 5 },
+    { label: `5 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 5, tierId: FRAGMENT_PRIZE_TIER },
     { label: "450 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 450 },
     { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
     { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
@@ -224,7 +230,14 @@ async function grantPrize(buyerId, prize, opts = {}) {
     }
     if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
     if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { sprite, text: prize.label }; }
-    if (prize.kind === "fragment") { try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, prize.n || 1); } catch { /* best-effort */ } return { sprite, text: prize.label }; }
+    if (prize.kind === "fragment") {
+        // Name the TIER on the result card (and use that tier's shard art) — "dig fragments" alone left people
+        // guessing which chest they were forging toward.
+        const tier = prize.tierId || FRAGMENT_PRIZE_TIER;
+        const n = prize.n || 1;
+        try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, n, tier); } catch { /* best-effort */ }
+        return { sprite: fragSprite(tier), text: `${n} ${fragName(tier)} Chest Fragment${n === 1 ? "" : "s"}` };
+    }
     if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { sprite, text: "Spin again — on the house!" }; }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "seed") {

@@ -1696,21 +1696,31 @@ export async function rechargeWind(buyerId) {
     return { ok: true, spent: cost, shavedMinutes: Math.round(shaveMs / 60000), ...(await getSailingState(buyerId)) };
 }
 
-// Grant treasure-chest fragment(s) to a member (used by the Cheer first-of-day item proc). Upserts the sailing
-// row first, since a member may never have sailed.
-export async function grantFragment(buyerId, n = 1) {
-    if (!buyerId || n <= 0) return;
+// Naming + art for a fragment tier, so anything that HANDS OUT shards (spin wheel, fishing, Cheer proc) can
+// say which kind you got and show that tier's real sprite instead of a generic "dig fragment".
+export function fragmentInfo(tier = "wooden") {
+    const t = CHEST_TIERS[tier] ? tier : "wooden";
+    const name = (CHEST_TIERS[t].label || t).replace(" Chest", "");
+    return { tier: t, name, label: `${name} Fragment`, art: fragmentArt(t), color: CHEST_TIERS[t].color || "#b08a52" };
+}
+
+// Grant treasure-chest fragment(s) of a TIER to a member (Cheer proc, fishing, the spin wheel). Upserts the
+// sailing row first, since a member may never have sailed. Returns the tier info so callers can name the prize.
+export async function grantFragment(buyerId, n = 1, tier = "wooden") {
+    const info = fragmentInfo(tier);
+    if (!buyerId || n <= 0) return info;
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    // Granted shards are base (wooden) tier — merge into the per-tier hold.
+    // Merge into that tier's slot of the per-tier hold.
     await db.query(
         `UPDATE mkt_sailing
             SET fragments_json = jsonb_set(
-                    COALESCE(fragments_json, '{}'::jsonb), '{wooden}',
-                    to_jsonb(COALESCE((fragments_json->>'wooden')::int, 0) + $2)),
+                    COALESCE(fragments_json, '{}'::jsonb), ARRAY[$3::text],
+                    to_jsonb(COALESCE((fragments_json->>$3)::int, 0) + $2)),
                 updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, n]
+        [buyerId, n, info.tier]
     ).catch(() => {});
+    return info;
 }
 
 // Spend fragments to forge a loot chest. The cost is boatPerks().forgeCost (10, or 8 at the level-80 form).

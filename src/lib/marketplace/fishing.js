@@ -284,12 +284,14 @@ async function grantHaul(buyerId, kind, tier = "common") {
     if (kind === "fragment") {
         const n = FRAGMENT_COUNT[tier] || 1;
         const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-        await grantFragment(buyerId, n).catch(() => {});
+        const frag = await grantFragment(buyerId, n).catch(() => null);
         // "Chest Fragment", NOT the "Hull Shard" this used to invent. Sailing has called these chest fragments
         // since day one — they're pieces you forge into a treasure chest — and inventing a third name for the
         // same object left people asking what a Hull Shard even was. It also collided with the Forge's salvage
         // tiers (Cinder Scrap … Emberheart Shard), which are a completely unrelated currency.
-        return { kind: "fragment", label: n > 1 ? `${n} Chest Fragments` : "Chest Fragment", emoji: "🔷", n, where: "Stored on your boat", spriteUrl: await haulSprite("fragment") };
+        // Name the TIER + show that tier's shard art, so it's obvious which chest these are forging toward.
+        const fname = frag?.name || "Wooden";
+        return { kind: "fragment", label: `${n > 1 ? `${n} ` : ""}${fname} Chest Fragment${n > 1 ? "s" : ""}`, emoji: "🔷", n, where: "Stored on your boat", spriteUrl: frag?.art || "/images/sailing/fragment-wooden.png" };
     }
     if (kind === "seed") {
         const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
