@@ -89,6 +89,9 @@ export default function GameNav() {
     // The Kitchen is owner-gated. The nav asks the server rather than deciding locally, because "am I the owner"
     // isn't something the client knows and shouldn't be something it guesses.
     const [kitchen, setKitchen] = useState(false);
+    // DISHES you could cook right now. Prep recipes are excluded on purpose: a prep makes an ingredient for
+    // something else, so badging it would nag you toward busywork rather than toward the thing that pays.
+    const [dishesReady, setDishesReady] = useState(0);
     // Every failure mode here looks identical to "you're not the owner" — a dropped request, a cached reply from
     // before you signed in, a blip in the route — and the Kitchen just isn't in the menu, with nothing to see.
     // So: never cached, and one retry before believing a negative.
@@ -99,7 +102,15 @@ export default function GameNav() {
                 const r = await fetch("/api/marketplace/cooking", { cache: "no-store", credentials: "same-origin" });
                 const d = await r.json();
                 if (dead) return;
-                if (d?.unlocked) { setKitchen(true); return; }
+                if (d?.unlocked) {
+                    setKitchen(true);
+                    // This response is the whole kitchen already — the badge count rides along for free rather
+                    // than costing a second request. Only DISHES, and only while you have a cook left today:
+                    // a badge you can't act on is the kind people learn to ignore.
+                    const left = d?.cooks?.left ?? 1;
+                    setDishesReady(left > 0 ? (d.recipes || []).filter((x) => x.kind === "dish" && x.canCook).length : 0);
+                    return;
+                }
                 // A negative on the first go is retried once — the common cause is the session cookie not being
                 // live yet on a fresh sign-in, and a wrong "no" here is invisible rather than noisy.
                 if (attempt === 0) setTimeout(() => { if (!dead) ask(1); }, 1200);
@@ -108,7 +119,11 @@ export default function GameNav() {
             }
         };
         ask();
-        return () => { dead = true; };
+        // Cooking a dish spends the ingredients, so the badge has to be able to go DOWN without a navigation —
+        // otherwise it sits there insisting on a dish you just made.
+        const onRefresh = () => ask(1); // 1 = don't re-arm the sign-in retry; we already know the answer
+        window.addEventListener("wolfden-hud-refresh", onRefresh);
+        return () => { dead = true; window.removeEventListener("wolfden-hud-refresh", onRefresh); };
     }, [pathname]);
     // (Fishing was owner-gated at launch prep; it's public now and rides `signedIn` like Town.)
     // Farm + Forge + Auction + Town are all live for every signed-in member now.
@@ -221,6 +236,10 @@ export default function GameNav() {
         }
         if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
+        // The Kitchen only nags you about DISHES you have every ingredient for — preps just make ingredients
+        // for other recipes, and badging those would point you at the chore instead of the payoff.
+        // (not plural() — that would say "dishs")
+        if (href === "/marketplace/cooking" && dishesReady > 0) return { badge: dishesReady, title: `${dishesReady} dish${dishesReady === 1 ? "" : "es"} you can cook` };
         return { badge: null, title: null };
     };
     const dotFor = (href) => href === "/marketplace/sailing" && sailAttn;

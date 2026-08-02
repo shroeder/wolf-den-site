@@ -95,6 +95,9 @@ export default function CookingClient({ initial }) {
         if (d?.ok) {
             setResult(d);
             setDailyTick((n) => n + 1);
+            // Cooking spends ingredients and pays gold/XP — tell the site-wide HUD and the nav, so the coin
+            // counter and the Kitchen's "dishes you can cook" badge both settle without needing a navigation.
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* SSR / no window */ }
             // A rising chord on the reveal, pitched by the rung — the same synthesised approach the minigame
             // uses, so no asset to load and nothing to go stale. Wrapped: blocked audio must never break the
             // reveal itself.
@@ -127,6 +130,7 @@ export default function CookingClient({ initial }) {
     const upgrade = async (track) => {
         const d = await post({ action: "upgrade", track });
         if (!d?.ok) say(d?.error === "not_enough_gold" ? "Not enough gold." : "Couldn't upgrade that.");
+        else try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* SSR / no window */ }
     };
 
     const s = state || {};
