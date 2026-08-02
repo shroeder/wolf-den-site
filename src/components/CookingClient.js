@@ -337,7 +337,11 @@ export default function CookingClient({ initial }) {
                                                         <span>{n.name}</span>
                                                         <b>{r.known ? `${n.held}/${n.qty}` : `×${n.qty}`}</b>
                                                         {canJump ? <em className="ck-need-go">make →</em> : null}
-                                                        {canGather ? <em className="ck-need-go">get →</em> : null}
+                                                        {/* Holding the SEED is the single most confusing near-miss: the farm's bag
+                                                            lists it under the crop's own name, so "I need a carrot, the farm says I
+                                                            have 7" reads as a bug. Say "plant" rather than "get" when that's the
+                                                            actual situation — a title attribute never shows up on a phone. */}
+                                                        {canGather ? <em className="ck-need-go">{n.seeds > 0 ? `plant (${n.seeds} seed${n.seeds === 1 ? "" : "s"}) →` : "get →"}</em> : null}
                                                     </>
                                                 );
                                                 if (canJump) {

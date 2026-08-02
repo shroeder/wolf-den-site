@@ -546,7 +546,7 @@ async function kitchenRow(buyerId) {
 /** Everything the Kitchen screen needs, in one call. */
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
-    const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt] = await Promise.all([
+    const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt, seedRows] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
         db.query(`SELECT recipe_id, times_cooked FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
@@ -555,6 +555,11 @@ export async function getKitchenState(buyerId) {
         db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'kitchen'`).catch(() => null),
         db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).catch(() => []),
         getChestArt().catch(() => ({})),
+        // The SEED BAG. A crop you're short of is a very different situation depending on whether you already
+        // hold its seed, and the farm's bag chips read "🥕 Carrot ×7" — the crop's name for what is actually a
+        // seed. So "I need a carrot but the farm says I have 7" is the obvious reading, and the Kitchen was
+        // silent about it. It can now say "plant one" instead of the generic "grow it on the farm".
+        db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
     ]);
     // One bundle of art for every reward kind, built once per request rather than per recipe row.
     const rewardArt = {
@@ -564,6 +569,7 @@ export async function getKitchenState(buyerId) {
         crops: sprites,
     };
     const have = new Map(pantryRows.map((r) => [r.ref, Number(r.qty)]));
+    const seedBag = new Map(seedRows.map((r) => [r.seed_id, Number(r.count) || 0]));
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
     const usedToday = row?.cooked_today ? Number(row.cooks_today) || 0 : 0;
     const maxCooks = COOKS_PER_DAY + trackValue("batch", row?.batch_level);
@@ -576,10 +582,15 @@ export async function getKitchenState(buyerId) {
             // A prepped ingredient you're short of is not a dead end — say WHICH recipe makes it so the card
             // can link straight there. Raw ingredients get the place you go to gather them instead.
             const maker = m.kind === "prep" ? RECIPES.find((x) => x.out === ref) : null;
+            // Seeds you hold for this crop. A recipe wants the HARVESTED produce, so holding the seed isn't
+            // the same as having the ingredient — but it does change the advice from "go find one" to
+            // "plant one", and it explains the mismatch on the spot.
+            const seeds = m.kind === "crop" ? (seedBag.get(ref) || 0) : 0;
             return {
-                ...m, qty, held, enough: held >= qty,
+                ...m, qty, held, enough: held >= qty, seeds,
                 madeBy: maker ? { id: maker.id, name: maker.name } : null,
-                gather: m.kind === "crop" ? { href: "/marketplace/farm", label: "Grow it on the farm" }
+                gather: m.kind === "crop"
+                    ? { href: "/marketplace/farm", label: seeds > 0 ? `You have ${seeds} ${m.name} seed${seeds === 1 ? "" : "s"} — plant one and harvest it` : `Grow ${m.name} on the farm` }
                     : m.kind === "fish" ? { href: "/marketplace/fishing", label: "Catch it out at sea" } : null,
             };
         });
