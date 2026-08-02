@@ -13,7 +13,17 @@ import useScrollLock from "@/lib/useScrollLock";
 const WEDGES = 20;
 const WEDGE_DEG = 360 / WEDGES;
 const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°… so wedge CENTERS are at 0°,18°… (measured from the art). Icons were landing on the divider lines at offset 9.
-const ICON_R = 34;          // icon-ring radius, % of the rotor from center (fits inside the frame's hole)
+// Icon-ring radius, % of the ROTOR from centre. The trap here is that icons are positioned in rotor units
+// while wheel-frame.png is sized to the RING, and .cw-rotor is only 82% of .cw-ring — so "fits inside the
+// frame's hole" has to be worked out across two coordinate spaces, and 34 didn't.
+//
+// Measured off the art (1024² both): the frame's inner hole starts at 28.8% of the ring = 35.1% of the rotor,
+// and the disc's hub ends at 15.6% of the rotor. An icon is 11% of the rotor wide, so ±5.5:
+//     hub 15.6 + 5.5  =  21.1   <=   ICON_R   <=   35.1 - 5.5  =  29.6
+// At 34 the icons reached 39.5% of the rotor — 32.4% of the ring — so their outer edge sat UNDER the frame's
+// inner rim and every prize sprite was clipped. 25.5 is the midpoint of the legal band: dead centre of the
+// visible part of each wedge, maximum clearance from both the hub and the frame.
+const ICON_R = 25.5;
 const SPIN_MS = 5600;
 // The wheel starts turning the INSTANT you tap, on a constant-speed lead-in, and only retargets to the
 // winning wedge once the server answers. It used to sit dead still until the POST came back — on a cold
