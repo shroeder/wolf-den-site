@@ -339,6 +339,9 @@ function DuelModal({ duel, youSprite, youFlip, onClose }) {
 // you can get better at instead of a damage roll you wait out.
 const STRIKE_CD_BY_GRADE = { pixel: 1000, perfect: 1250, great: 1550, good: 1900, miss: 2400 };
 const STRIKE_CD_MS = 2400; // worst case, and the pre-first-swing default
+// Pure double-tap guard for the raid boss. MUST stay <= the fastest grade cooldown above (and <= the server's
+// BOSS_STRIKE_THROTTLE_MS in town-events.js) — anything larger silently eats swings the bar says are ready.
+const BOSS_STRIKE_MIN_GAP_MS = 900;
 
 // A FULL ping-pong of the marker. The forge sweeps in 850–1700ms; this used to take 2600, which is why the
 // same bands that feel tight at the anvil felt generous here — the bar was simply crawling. It also speeds up
@@ -359,6 +362,7 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
     // open and it swings for you" — no skill, and four players alone spiked Vercel to 17x invocations. Standing
     // in the square still does passive damage server-side, so a tap is a burst on top rather than an obligation.
     const [grade, setGrade] = useState(null); // { key, label, dmg } — last swing's result
+    const [notice, setNotice] = useState(null); // why a swing didn't land, so a dead tap is never silent
     const [cooling, setCooling] = useState(false); // drives the button's look; the marker never re-renders
     const [combo, setCombo] = useState(0);        // consecutive good-or-better swings
     const [procFx, setProcFx] = useState(null);   // the loud one-off callout when a strike procs
@@ -459,6 +463,20 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                 try { navigator.vibrate?.([30, 40, 30, 40, 30, 40, 90]); } catch { /* no haptics here */ }
             }
             if (typeof r.hpPct === "number") setLocalPct(r.hpPct);
+        } else {
+            // The swing never landed (throttled, boss already dead, request failed). Previously this branch
+            // didn't exist: the tap buzzed, started a cooldown, and then nothing appeared and nothing was said.
+            // Don't charge a cooldown for a strike that never happened, and always give it a reason.
+            clearTimeout(cdTimer);
+            cdRef.current = false;
+            cdUntilRef.current = 0;
+            setCooling(false);
+            setNotice(
+                r?.error === "too_fast" ? "Easy — wait for the bar to refill"
+                    : r?.error === "no_boss" ? "This foe is already down"
+                        : "That swing didn't land — try again",
+            );
+            setTimeout(() => setNotice(null), 1500);
         }
     }, [onStrike]);
     // The fighters ACTUALLY engaged right now (server: struck in the last 90s) + always you.
@@ -521,6 +539,7 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
                     {grade ? (
                         <div className={`tw-strike-grade is-${grade.key}`}>{grade.label} · {Number(grade.dmg).toLocaleString()}</div>
                     ) : null}
+                    {!grade && notice ? <div className="tw-strike-notice">{notice}</div> : null}
                     {/* THE CHAIN. A run of clean swings is worth more than the same swings scattered — this is
                         the only place that's visible, so it has to read at a glance and climb loudly. */}
                     {combo >= 2 ? (
@@ -939,8 +958,15 @@ export default function TownClient({ initial }) {
     // BOSS RAID: strike the shared boss. Returns the server result so the modal can float damage + drain the bar.
     // `dist` is how far the timing marker was from centre when they swung; the server grades it.
     const bossStrike = useCallback(async (dist = null) => {
-        const ev = state?.event; if (!ev || bossCdRef.current) return null;
-        bossCdRef.current = true; setTimeout(() => { bossCdRef.current = false; }, 2500);
+        const ev = state?.event;
+        if (!ev) return { ok: false, error: "no_boss" };
+        // Anti-spam ONLY — matched to the server's BOSS_STRIKE_THROTTLE_MS (900ms), never above it. This used to
+        // be a flat 2500ms, which was stricter than EVERY grade cooldown the swing bar re-arms on (pixel 1000 …
+        // miss 2400). So the bar would say "ready", the tap would buzz and start a fresh cooldown, and this
+        // would silently drop the strike on the floor — worst on the best-timed hits, which had a 1.5s dead
+        // window. Rejections are also now REPORTED rather than returned as a bare null.
+        if (bossCdRef.current) return { ok: false, error: "too_fast" };
+        bossCdRef.current = true; setTimeout(() => { bossCdRef.current = false; }, BOSS_STRIKE_MIN_GAP_MS);
         const r = await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "boss_strike", eventId: ev.id, dist }) }).then((x) => x.json()).catch(() => null);
         if (r?.ok) {
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
@@ -2163,6 +2189,8 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-strike-grade.is-great { color: #8fe39a; }
 .tw-strike-grade.is-good { color: #d7c48a; }
 .tw-strike-grade.is-miss { color: #ff8f9a; }
+/* Why a swing didn't land. Sits where the grade would, deliberately quieter than a real hit. */
+.tw-strike-notice { text-align: center; margin-top: 6px; font-weight: 700; font-size: 0.82rem; color: #b9a98f; animation: twStrikePop 0.35s ease-out; }
 @keyframes twStrikePop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ── Itemised raid recap ─────────────────────────────────────────────────────────────────────────────────── */
