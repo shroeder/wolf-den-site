@@ -7,7 +7,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
-// A cave you walk your hero around. Ore nodes surface through the day; you stand next to one and swing at it on
+// You PROSPECT — one button surfaces a random live seam — then swing at it on
 // the SAME timing bar as the Forge anvil and the Treasure Golem — identical grade bands, so the skill a member
 // already has transfers instead of being re-learned. Chip a node's HP to zero and its ore is yours.
 //
@@ -94,7 +94,9 @@ export function pickForm(totalLevels) {
 // wall of ore. Spawning is lazy — it runs on read, so there's no cron to keep alive.
 const MAX_ACTIVE_NODES = 7;
 const NODE_TTL_MIN = 90;
-const CAVE_X = [8, 92];   // percent bounds, matching the town's coordinate space
+// A node still stores an x/y. Nothing renders it since the walk-around came out, but it costs nothing and a
+// later "cave map" view would want it back — a spawn without a position is harder to add than to keep.
+const CAVE_X = [8, 92];
 const CAVE_Y = [62, 88];
 
 const randBetween = (a, b) => a + Math.random() * (b - a);
@@ -151,24 +153,26 @@ export async function getMiningState(buyerId) {
     const lantern = trackValue("lantern", row?.lantern_level);
     await refreshNodes(lantern);
 
-    const [nodes, ore, goldRow, mine] = await Promise.all([
-        db.query(
-            `SELECT n.id, n.tier, n.x, n.y, n.hp, n.hp_max, n.expires_at, COALESCE(h.damage, 0) AS my_damage
-               FROM mkt_ore_node n
-               LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
-              WHERE n.status = 'active' ORDER BY n.id`,
-            [buyerId]
-        ).catch(() => []),
+    const [current, ore, goldRow, liveCount] = await Promise.all([
+        row?.current_node_id
+            ? db.queryOne(
+                `SELECT n.id, n.tier, n.hp, n.hp_max, COALESCE(h.damage, 0) AS my_damage, COALESCE(h.swings, 0) AS my_swings
+                   FROM mkt_ore_node n
+                   LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
+                  WHERE n.id = $2 AND n.status = 'active'`,
+                [buyerId, row.current_node_id]
+            ).catch(() => null)
+            : Promise.resolve(null),
         db.query(`SELECT tier, qty FROM mkt_ore WHERE buyer_id = $1 AND qty > 0 ORDER BY tier`, [buyerId]).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        Promise.resolve(null),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_ore_node WHERE status = 'active'`).catch(() => null),
     ]);
 
     const lvls = totalLevels(row);
     const allowance = SWINGS_PER_DAY + trackValue("vigor", row?.vigor_level) + (Number(row?.swing_bonus) || 0);
     return {
         unlocked: true,
-        you: { x: Number(row?.x) || 50, y: Number(row?.y) || 78, facing: Number(row?.facing) === -1 ? -1 : 1 },
+
         pick: pickForm(lvls),
         swings: { used: Number(row?.swing_used) || 0, allowance, left: Math.max(0, allowance - (Number(row?.swing_used) || 0)) },
         tracks: Object.entries(MINE_TRACKS).map(([key, t]) => {
@@ -179,15 +183,18 @@ export async function getMiningState(buyerId) {
                 cost: level >= t.max ? null : trackCost(level),
             };
         }),
-        nodes: (nodes || []).map((n) => {
-            const o = oreTier(n.tier);
+        // The ONE seam you're working, or null until you prospect.
+        node: current ? (() => {
+            const o = oreTier(current.tier);
             return {
-                id: Number(n.id), tier: n.tier, name: o.name, color: o.color, art: oreArt(n.tier),
-                x: Number(n.x), y: Number(n.y), hp: Number(n.hp), hpMax: Number(n.hp_max),
-                pct: n.hp_max ? Math.max(0, Math.round((n.hp / n.hp_max) * 100)) : 0,
-                myDamage: Number(n.my_damage) || 0,
+                id: Number(current.id), tier: current.tier, name: o.name, color: o.color, art: oreArt(current.tier),
+                partTier: o.part, gold: o.gold, xp: o.xp,
+                hp: Number(current.hp), hpMax: Number(current.hp_max),
+                pct: current.hp_max ? Math.max(0, Math.round((current.hp / current.hp_max) * 100)) : 0,
+                mySwings: Number(current.my_swings) || 0,
             };
-        }),
+        })() : null,
+        seamsLive: Number(liveCount?.n) || 0,
         ore: (ore || []).map((r) => {
             const o = oreTier(r.tier);
             const qty = Number(r.qty);
@@ -205,17 +212,28 @@ export async function getMiningState(buyerId) {
     };
 }
 
-// Walk the hero. Same clamp-and-upsert shape as moveTown; the cave uses the same percent coordinate space.
-export async function moveMiner(buyerId, { x, y, facing } = {}) {
+// PROSPECT — surface a random live seam and make it the one you're working.
+//
+// Server-assigned, never client-chosen: if the client picked from the visible list, everyone would take the
+// Emberheart every time and the spawn weights would stop meaning anything. The tier you get to swing at has to
+// be the game's choice, which is also what makes finding a good one feel like something.
+export async function prospectNode(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    const cx = Math.max(CAVE_X[0], Math.min(CAVE_X[1], Number(x) || 50));
-    const cy = Math.max(CAVE_Y[0], Math.min(CAVE_Y[1], Number(y) || 78));
-    await db.query(
-        `INSERT INTO mkt_mining (buyer_id, x, y, facing) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (buyer_id) DO UPDATE SET x = $2, y = $3, facing = $4, updated_at = NOW()`,
-        [buyerId, cx, cy, facing === -1 ? -1 : 1]
-    ).catch(() => {});
-    return { ok: true };
+    const row = await minerRow(buyerId);
+    await refreshNodes(trackValue("lantern", row?.lantern_level));
+    // Prefer a seam you haven't already chipped, so prospecting feels like finding something new rather than
+    // handing you back the rock you just walked away from.
+    const node = await db.queryOne(
+        `SELECT n.id FROM mkt_ore_node n
+           LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
+          WHERE n.status = 'active' AND n.id IS DISTINCT FROM $2
+          ORDER BY (h.node_id IS NOT NULL), RANDOM() LIMIT 1`,
+        [buyerId, row?.current_node_id || -1]
+    ).catch(() => null);
+    if (!node) return { ok: false, error: "no_seams" };
+    await db.query(`UPDATE mkt_mining SET current_node_id = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, node.id]).catch(() => {});
+    await trackActivity(buyerId, "ore_prospect", {}).catch(() => {});
+    return { ok: true, ...(await getMiningState(buyerId)) };
 }
 
 // How hard one swing lands, before the timing grade. Pickaxe track is the whole of it for now; the mining gear

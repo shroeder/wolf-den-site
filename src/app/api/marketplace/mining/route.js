@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getMiningState, moveMiner, smeltOre, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
+import { getMiningState, prospectNode, smeltOre, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -30,7 +30,7 @@ export async function POST(request) {
             if (!buyer?.id) return noStore({ error: "unauthorized" }, { status: 401 });
             const b = await request.json().catch(() => ({}));
             switch (String(b?.action || "")) {
-                case "move": return noStore(await moveMiner(buyer.id, { x: b.x, y: b.y, facing: b.facing }));
+                case "prospect": return noStore(await prospectNode(buyer.id));
                 case "swing": return noStore(await swingAtNode(buyer.id, Number(b.nodeId), b.dist));
                 case "smelt": return noStore(await smeltOre(buyer.id, b.tier, b.batches));
                 case "upgrade": return noStore(await upgradeMining(buyer.id, String(b.track || "")));
