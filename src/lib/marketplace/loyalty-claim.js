@@ -78,6 +78,32 @@ export async function listRecentClaims(limit = 50) {
     });
 }
 
+// Staff-side detail for ONE claim, keyed by the token the push carries. The admin app uses this to find the
+// SQUARE ORDER behind the sale so it can itemize it (line items + cost + profit) against Square directly —
+// the app already owns all the unit-cost/FIFO machinery, so the server only has to hand over the order id.
+// award_order_id is stored as "sq:<orderId>" (see the Square webhook).
+export async function getClaimOrderDetail(token) {
+    if (!token) return null;
+    const row = await db
+        .queryOne(
+            `SELECT token, amount_cents, award_order_id, square_payment_id, location_id, created_at, expires_at, redeemed_at
+               FROM mkt_loyalty_claim WHERE token = $1`,
+            [token]
+        )
+        .catch(() => null);
+    if (!row) return null;
+    const awardId = String(row.award_order_id || "");
+    return {
+        token: row.token,
+        cents: Number(row.amount_cents) || 0,
+        squareOrderId: awardId.startsWith("sq:") ? awardId.slice(3) : null,
+        squarePaymentId: row.square_payment_id || null,
+        locationId: row.location_id || null,
+        redeemed: Boolean(row.redeemed_at),
+        status: row.redeemed_at ? "redeemed" : new Date(row.expires_at) <= new Date() ? "expired" : "active",
+    };
+}
+
 // Read a claim for display on the scan page (does not redeem). Returns { amountCents, expired, redeemed }.
 export async function getLoyaltyClaim(token) {
     if (!token) return null;
