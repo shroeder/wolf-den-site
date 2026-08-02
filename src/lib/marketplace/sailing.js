@@ -1044,6 +1044,22 @@ export async function sailingNeedsAttention(buyerId) {
     return Boolean(row && (row.landed || row.enc || row.castsleft));
 }
 
+// Chests you could forge RIGHT NOW out of the shards already in the hold, for the nav badge. Shards don't
+// expire and the hold is two screens deep, so a fully-paid-for chest could sit there for days with nothing
+// anywhere saying so — the one piece of sailing progress that was invisible from outside sailing.
+export async function forgeableChests(buyerId) {
+    if (!buyerId) return 0;
+    const row = await readRow(buyerId).catch(() => null);
+    if (!row) return 0;
+    const cost = boatPerks(decorate(row).level).forgeCost;
+    if (!(cost > 0)) return 0;
+    const counts = (typeof row.fragments_json === "object" && row.fragments_json) || {};
+    return Object.entries(counts).reduce(
+        (n, [tier, held]) => n + (CHEST_TIERS[tier] ? Math.floor((Number(held) || 0) / cost) : 0),
+        0,
+    );
+}
+
 // Casts still unthrown today, for the nav nudge. Deliberately separate from the boolean above so the pill can
 // say "3 casts" rather than just glowing — a number people can act on beats a dot they learn to ignore.
 export async function unusedCasts(buyerId) {

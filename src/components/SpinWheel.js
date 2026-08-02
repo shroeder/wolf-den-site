@@ -15,6 +15,12 @@ const WEDGE_DEG = 360 / WEDGES;
 const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°… so wedge CENTERS are at 0°,18°… (measured from the art). Icons were landing on the divider lines at offset 9.
 const ICON_R = 34;          // icon-ring radius, % of the rotor from center (fits inside the frame's hole)
 const SPIN_MS = 5600;
+// The wheel starts turning the INSTANT you tap, on a constant-speed lead-in, and only retargets to the
+// winning wedge once the server answers. It used to sit dead still until the POST came back — on a cold
+// lambda that's several seconds of a wheel that looks frozen, followed by a spin. A transition retargeted
+// mid-flight interpolates from wherever the disc actually is, so the hand-off is seamless.
+const LEAD_MS = 9000;
+const LEAD_DEG = 360 * 7;
 
 const MINI_WEDGES = 8;
 const MINI_DEG = 360 / MINI_WEDGES;
@@ -68,6 +74,7 @@ export default function SpinWheel() {
     const [st, setSt] = useState(null);
     const [rot, setRot] = useState(0);
     const [spinning, setSpinning] = useState(false);
+    const [phase, setPhase] = useState("idle"); // idle | lead (waiting on the server) | land (easing onto the wedge)
     const [result, setResult] = useState(null);
     const [celebrate, setCelebrate] = useState(null);
     const [mini, setMini] = useState(null);       // { prizes, index, prize } bonus mini-wheel
@@ -79,12 +86,14 @@ export default function SpinWheel() {
     const [lowCoins, setLowCoins] = useState(false);
 
     const rotorRef = useRef(null);
+    const rotRef = useRef(0); // committed rotation, so the error path can freeze without an impure updater
     const rafRef = useRef(0);
     const timerRef = useRef(null);
     const chainRef = useRef(0);
     const runSpinRef = useRef(null);
     const bonusRef = useRef(null);
     useEffect(() => { bonusRef.current = bonus; }, [bonus]); // current bonus state for the flip guard (no stale closure)
+    useEffect(() => { rotRef.current = rot; }, [rot]);
 
     // Open the match-3 board from a fresh bonusGame payload OR a bonusResume (revealed tiles pre-filled).
     const openBonus = useCallback((payload) => {
@@ -101,6 +110,18 @@ export default function SpinWheel() {
     }, [openBonus]);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount (setState is post-await, not sync)
     useEffect(() => { load(); return () => { clearTimeout(timerRef.current); cancelAnimationFrame(rafRef.current); }; }, [load]);
+
+    // Where the disc actually is right now, mid-transition (degrees, unwrapped onto `rot`'s turn count).
+    const liveAngle = useCallback((fallback) => {
+        const el = rotorRef.current;
+        if (!el) return fallback;
+        try {
+            const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+            const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+            const turns = Math.round((fallback - deg) / 360);
+            return deg + turns * 360;
+        } catch { return fallback; }
+    }, []);
 
     const startTickLoop = useCallback(() => {
         let lastWedge = null, lastTick = 0;
@@ -120,18 +141,37 @@ export default function SpinWheel() {
     const runSpin = useCallback(async () => {
         setSpinning(true); setResult(null); setMsg(null); setCelebrate(null);
         tick(0.04);
+        // Move NOW, decide later: a constant-speed lead-in covers the round trip. Arm the transition a couple
+        // of frames before moving — turning a transition on and changing the transform in one commit lets the
+        // browser skip the animation (the same trap the mini wheel fell into).
+        let landed = false;
+        setPhase("lead");
+        requestAnimationFrame(() => requestAnimationFrame(() => { if (!landed) setRot((prev) => prev + LEAD_DEG); }));
+        cancelAnimationFrame(rafRef.current); startTickLoop();
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
         const d = r ? await r.json().catch(() => null) : null;
-        if (!d?.ok) { setSpinning(false); chainRef.current = 0; setMsg(d?.error === "no_spins" ? "No spins left — earn or buy one." : "Couldn't spin."); return; }
+        if (!d?.ok) {
+            // Stop where the disc visibly is, not wherever the lead-in was headed.
+            landed = true;
+            cancelAnimationFrame(rafRef.current);
+            setRot(liveAngle(rotRef.current)); setPhase("idle");
+            setSpinning(false); chainRef.current = 0;
+            setMsg(d?.error === "no_spins" ? "No spins left — earn or buy one." : "Couldn't spin.");
+            return;
+        }
         const idx = Math.max(0, Math.min(WEDGES - 1, d.prizeIndex));
         const jitter = (Math.random() - 0.5) * WEDGE_DEG * 0.4;
         const turns = 5 + Math.floor(Math.random() * 4);
         const targetMod = (((-(idx * WEDGE_DEG + WEDGE_OFFSET)) % 360) + 360) % 360;
+        // `prev` is the lead-in's target, which is always at or ahead of the live angle — so landing from it
+        // can only ever move the disc forward. The land transition REPLACES a running one, which interpolates
+        // from wherever the disc actually is; that hand-off is safe (unlike arming from `none`).
+        landed = true;
+        setPhase("land");
         setRot((prev) => { let n = Math.ceil(prev / 360) * 360 + turns * 360 + targetMod + jitter; if (n <= prev + 360) n += 360; return n; });
-        cancelAnimationFrame(rafRef.current); startTickLoop();
         timerRef.current = setTimeout(() => {
             cancelAnimationFrame(rafRef.current);
-            setSpinning(false);
+            setSpinning(false); setPhase("idle");
             setSt((s) => ({ ...s, ...d, prize: undefined, miniWheel: undefined, bonusGame: undefined }));
             if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh"));
             // Route to the right outcome.
@@ -146,7 +186,7 @@ export default function SpinWheel() {
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);
-    }, [startTickLoop, openBonus]);
+    }, [startTickLoop, openBonus, liveAngle]);
     useEffect(() => { runSpinRef.current = runSpin; }, [runSpin]);
 
     const spin = useCallback(async () => {
@@ -169,25 +209,42 @@ export default function SpinWheel() {
     }, [spinning]);
 
     // ── MINI WHEEL bonus round: auto-spin to its winning index, then reveal. ──
+    // Step 1 — ARM the transition once the modal has popped. The disc doesn't move yet.
     useEffect(() => {
         if (!mini || mini.spinning || mini.revealed) return undefined;
-        const t = setTimeout(() => {
-            setMini((m) => {
-                if (!m) return m;
-                const targetMod = (((-(m.index * MINI_DEG + MINI_OFFSET)) % 360) + 360) % 360;
-                const turns = 5 + Math.floor(Math.random() * 3);
-                return { ...m, spinning: true, rot: turns * 360 + targetMod };
-            });
-        }, 500);
+        const t = setTimeout(() => setMini((m) => (m && !m.spinning ? { ...m, spinning: true } : m)), 450);
         return () => clearTimeout(t);
+    }, [mini]);
+    // Step 2 — a frame later, set the landing angle. Switching the transition on and moving the disc in the
+    // SAME commit is what let the browser skip the animation entirely: the wheel snapped straight to its
+    // result, and because nothing animated there was no transitionend either, so the reveal sat waiting on
+    // the fallback timer below. (The main wheel never hit this because its transform lands a fetch after its
+    // transition.) Two frames of daylight between the two guarantees a real animation.
+    useEffect(() => {
+        if (!mini || !mini.spinning || mini.revealed || mini.rot !== 0) return undefined;
+        let cancelled = false;
+        const id = requestAnimationFrame(() => {
+            if (cancelled) return;
+            requestAnimationFrame(() => {
+                if (cancelled) return;
+                setMini((m) => {
+                    if (!m || !m.spinning || m.rot !== 0) return m;
+                    const targetMod = (((-(m.index * MINI_DEG + MINI_OFFSET)) % 360) + 360) % 360;
+                    const turns = 5 + Math.floor(Math.random() * 3);
+                    return { ...m, rot: turns * 360 + targetMod }; // always ≥ 1800°, so rot === 0 stays a safe "hasn't moved" flag
+                });
+            });
+        });
+        return () => { cancelled = true; cancelAnimationFrame(id); };
     }, [mini]);
     const onMiniLanded = useCallback(() => {
         setMini((m) => (m ? { ...m, revealed: true } : m));
         playWin("mini");
     }, []);
     // Fallback: force the reveal if the CSS transitionend never fires (so the mini wheel can't get stuck).
+    // Timed from the frame the disc actually STARTS moving, not from when the transition was armed.
     useEffect(() => {
-        if (!mini || !mini.spinning || mini.revealed) return undefined;
+        if (!mini || !mini.spinning || mini.revealed || mini.rot === 0) return undefined;
         const t = setTimeout(() => onMiniLanded(), 4200);
         return () => clearTimeout(t);
     }, [mini, onMiniLanded]);
@@ -238,7 +295,7 @@ export default function SpinWheel() {
 
             <div className={`cw-stage${st.golden ? " is-golden" : ""}${spinning ? " is-spinning" : ""}`}>
                 <div className="cw-ring">
-                    <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: spinning ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
+                    <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: phase === "lead" ? `transform ${LEAD_MS}ms linear` : phase === "land" ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
                         <div className="cw-icons">

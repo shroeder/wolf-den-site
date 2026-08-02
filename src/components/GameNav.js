@@ -129,6 +129,7 @@ export default function GameNav() {
     const [petNudge, setPetNudge] = useState(0); // own pets you can still pet today (free daily reward)
     const [sailAttn, setSailAttn] = useState(false);
     const [castsLeft, setCastsLeft] = useState(0); // unthrown fishing casts — nudges people back to the rail
+    const [forgeReady, setForgeReady] = useState(0); // chests the shards in your hold can already forge
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
@@ -138,7 +139,9 @@ export default function GameNav() {
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); }).catch(() => {});
+            // The status route has always returned `casts` (and now `forgeable`); this used to read only
+            // `attention`, which quietly made the cast badge below dead code.
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setCastsLeft(d?.casts || 0); setForgeReady(d?.forgeable || 0); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
             fetch("/api/marketplace/consumables", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setConsumables((d?.stash || []).reduce((s2, c) => s2 + (c.count || 0), 0)); }).catch(() => {});
             // Town is the one hub whose tasks are invisible from outside it — the pint, a claimable bounty and
@@ -187,12 +190,23 @@ export default function GameNav() {
         if (href === "/marketplace/quests" && questsReady > 0) return { badge: questsReady, title: `${plural(questsReady, "quest")} to claim` };
         // Feature pills also badge their claimable daily-quests (farm crops + quests together).
         if (href === "/marketplace/farm") { const n = cropsReady + petNudge + (featureClaims.farm || 0); if (n > 0) return { badge: n, title: [cropsReady ? `${plural(cropsReady, "crop")} ready` : null, petNudge ? `${plural(petNudge, "pet")} to pet` : null, featureClaims.farm ? `${plural(featureClaims.farm, "quest")} to claim` : null].filter(Boolean).join(" · ") }; }
-        // Sailing badges claimable dailies OR unthrown casts — fishing happens during a voyage nobody watches,
-        // so the ten free casts quietly expire unless something points at them. Casts win when both apply:
-        // it's the one that's about to be lost.
+        // Sailing badges everything waiting on you out there, summed like the farm pill: unthrown casts
+        // (fishing happens during a voyage nobody watches, so the free casts quietly expire), claimable
+        // dailies, and chests your shards can already forge. The forge one is the reason this stopped
+        // picking a single winner — shards never expire, so a "highest priority only" rule meant a chest
+        // sitting fully paid for showed nothing the whole time anything else was pending.
         if (href === "/marketplace/sailing") {
-            if (castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left — your line's out` };
-            if ((featureClaims.sailing || 0) > 0) return { badge: featureClaims.sailing, title: `${plural(featureClaims.sailing, "quest")} to claim` };
+            const n = castsLeft + (featureClaims.sailing || 0) + forgeReady;
+            if (n > 0) {
+                return {
+                    badge: n,
+                    title: [
+                        castsLeft ? `${plural(castsLeft, "cast")} left — your line's out` : null,
+                        featureClaims.sailing ? `${plural(featureClaims.sailing, "quest")} to claim` : null,
+                        forgeReady ? `${plural(forgeReady, "chest")} ready to forge` : null,
+                    ].filter(Boolean).join(" · "),
+                };
+            }
         }
         if (href === "/marketplace/town" && (townTodo?.total || 0) > 0) {
             return {
