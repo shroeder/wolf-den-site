@@ -159,11 +159,15 @@ export async function listMysteryBagCardsByStatuses(statuses = ACTIVE_STATUSES) 
  */
 export async function listMysterySoldCards() {
     const rows = await db.query(
-        `SELECT card_id, square_variation_id, card_name, set_name, card_number, market_value, image_url, sold_at, created_at
+        `SELECT card_id, square_variation_id, packed_variation_id, card_name, set_name, card_number, market_value, image_url, sold_at, created_at
          FROM (
              -- Part A: events assigned to a specific card (one row per assigned card)
              SELECT c.card_id,
                     c.square_variation_id,
+                    -- The packed ("MP-…") variation is what a pack sale carries as its Square line item,
+                    -- so reporting needs it to cost a sold pack by the card that was actually inside.
+                    -- Prefer the event's own variation: it is what Square rang up.
+                    COALESCE(e.sold_pack_variation_id, c.packed_variation_id) AS packed_variation_id,
                     c.card_name,
                     c.set_name,
                     c.card_number,
@@ -179,7 +183,8 @@ export async function listMysterySoldCards() {
 
              -- Part B: events with no assignment, resolved by variation (else event name only)
              SELECT NULL::text AS card_id,
-                    e.sold_pack_variation_id AS square_variation_id,
+                    COALESCE(c.square_variation_id, e.sold_pack_variation_id) AS square_variation_id,
+                    e.sold_pack_variation_id AS packed_variation_id,
                     COALESCE(c.card_name, e.sold_pack_item_name, 'Mystery Pack') AS card_name,
                     c.set_name,
                     c.card_number,
@@ -189,7 +194,8 @@ export async function listMysterySoldCards() {
                     e.created_at
              FROM mystery_sold_events e
              LEFT JOIN LATERAL (
-                 SELECT mbc.card_name, mbc.set_name, mbc.card_number, mbc.market_value, mbc.image_url
+                 SELECT mbc.card_name, mbc.set_name, mbc.card_number, mbc.market_value, mbc.image_url,
+                        mbc.square_variation_id
                  FROM mystery_bag_cards mbc
                  WHERE mbc.packed_variation_id = e.sold_pack_variation_id
                     OR mbc.square_variation_id = e.sold_pack_variation_id
@@ -206,6 +212,7 @@ export async function listMysterySoldCards() {
     return rows.map((row) => ({
         cardId: row.card_id || null,
         squareVariationId: row.square_variation_id || null,
+        packedVariationId: row.packed_variation_id || null,
         name: row.card_name,
         set: row.set_name || null,
         number: row.card_number || null,
