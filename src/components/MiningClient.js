@@ -47,7 +47,8 @@ export default function MiningClient({ initial }) {
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
     const [tab, setTab] = useState("survey");
-    const [pickedSpot, setPickedSpot] = useState(null); // spot selected on the rock face // mine | smelt — two halves of the feature, like the other systems
+    const [pickedSpot, setPickedSpot] = useState(null); // spot selected on the rock face
+    const [sounding, setSounding] = useState(null); // spot mid test-strike, for the echo animation // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
     const post = useCallback(async (body) => {
@@ -67,14 +68,27 @@ export default function MiningClient({ initial }) {
         if (r?.unlocked) { setState(r); setCrack(null); }
         else say(r?.error === "no_seams" ? "No seams exposed right now — try again shortly." : "Couldn't read the rock face.");
     };
+    // Sounding out a spot is a MOMENT, not an instant state flip: the mark rings, a shockwave goes out, and
+    // the reading lands after it. The server call runs alongside the animation rather than after it, so the
+    // beat costs nothing in real time.
     const probe = async (index) => {
-        if (busy) return;
+        if (busy || sounding != null) return;
+        setSounding(index);
         setBusy(true);
-        const r = await post({ action: "probe", index });
+        clink(0.5);
+        const [r] = await Promise.all([
+            post({ action: "probe", index }),
+            new Promise((res) => setTimeout(res, 620)),
+        ]);
         setBusy(false);
-        if (r?.unlocked) { setState(r); clink(r.signal === "deep" ? 0.9 : r.signal === "ring" ? 0.6 : 0.3); }
-        else say(r?.error === "no_probes" ? "No test-strikes left — pick a spot." : "Couldn't sound that out.");
+        setSounding(null);
+        if (r?.unlocked) {
+            setState(r);
+            clink(r.signal === "deep" ? 1 : r.signal === "ring" ? 0.7 : 0.35);
+            try { navigator.vibrate?.(r.signal === "deep" ? [24, 40, 60] : r.signal === "ring" ? [16, 30] : [10]); } catch { /* no haptics */ }
+        } else say(r?.error === "no_probes" ? "No test-strikes left — pick a spot." : "Couldn't sound that out.");
     };
+
     const claimSpot = async (index) => {
         if (busy) return;
         setBusy(true);
@@ -170,20 +184,21 @@ export default function MiningClient({ initial }) {
             {tab === "survey" ? (
             <>
             {/* ── THE ROCK FACE ── the survey happens ON the wall, not in a list. */}
-            {s.survey ? (() => {
+            {(() => {
                 // Fixed scatter so the marks sit on the wall like real survey chalk rather than a neat grid.
                 const SPOT_POS = [[22, 34], [50, 24], [76, 38], [33, 66], [64, 68], [14, 56], [86, 60]];
-                const sel = s.survey.spots.find((x) => x.index === pickedSpot) || null;
+                const sv = s.survey;
+                const sel = sv ? sv.spots.find((x) => x.index === pickedSpot) || null : null;
                 return (
                     <>
                         <div className="mine-face is-survey">
                             <div className="mine-face-bg is-survey" aria-hidden="true" />
-                            {s.survey.spots.map((sp, i) => {
+                            {(sv?.spots || []).map((sp, i) => {
                                 const [x, y] = SPOT_POS[i % SPOT_POS.length];
                                 const col = sp.exact?.color || sp.signal?.color || null;
                                 return (
                                     <button key={sp.index} type="button"
-                                        className={`mine-mark${sp.revealed ? " is-read" : ""}${pickedSpot === sp.index ? " is-sel" : ""}`}
+                                        className={`mine-mark${sp.revealed ? " is-read" : ""}${pickedSpot === sp.index ? " is-sel" : ""}${sounding === sp.index ? " is-sounding" : ""}`}
                                         style={{ left: `${x}%`, top: `${y}%`, ...(col ? { "--sig": col } : {}) }}
                                         onClick={() => { setPickedSpot(sp.index); if (!sp.revealed) probe(sp.index); }}
                                         title={sp.revealed ? (sp.exact?.name || sp.signal?.label) : "Unread rock — tap to sound it"}>
@@ -194,14 +209,26 @@ export default function MiningClient({ initial }) {
                                     </button>
                                 );
                             })}
-                            <div className="mine-survey-hud">
-                                <b>{s.survey.left}</b> test-strike{s.survey.left === 1 ? "" : "s"} left · {s.survey.spots.length} spots
-                            </div>
+                            {/* No face laid out yet — the wall is still the wall, with the way in on top of it. */}
+                            {!sv ? (
+                                <div className="mine-face-cta">
+                                    <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="🏮" />
+                                    <p>Bare rock.</p>
+                                    <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
+                                        {swingsLeft <= 0 ? "No swings left today" : "🔍 Survey the rock face"}
+                                    </button>
+                                </div>
+                            ) : null}
+                            {sv ? (
+                                <div className="mine-survey-hud">
+                                    <b>{sv.left}</b> test-strike{sv.left === 1 ? "" : "s"} left · {sv.spots.length} spots
+                                </div>
+                            ) : null}
                             {msg ? <div className="mine-msg">{msg}</div> : null}
                         </div>
 
                         {/* What the selected mark told you, and what you can do about it. */}
-                        <div className="mine-readout">
+                        {sv ? <div className="mine-readout">
                             {sel ? (
                                 <>
                                     <span className="mine-readout-body">
@@ -217,15 +244,11 @@ export default function MiningClient({ initial }) {
                             ) : (
                                 <span className="mine-readout-body"><b>Tap a mark to sound it out</b><em>A deep resonance is the rich rock — but you can&rsquo;t sound out every spot.</em></span>
                             )}
-                        </div>
-                        <button type="button" className="mine-prospect is-ghost" onClick={() => { setPickedSpot(null); survey(); }} disabled={busy}>New rock face</button>
+                        </div> : null}
+                        {sv ? <button type="button" className="mine-prospect is-ghost" onClick={() => { setPickedSpot(null); survey(); }} disabled={busy}>New rock face</button> : null}
                     </>
                 );
-            })() : (
-                <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
-                    {swingsLeft <= 0 ? "No swings left today" : "🔍 Survey the rock face"}
-                </button>
-            )}
+            })()}
 
             {/* THE LANTERN — the surveying tool, then the levers that improve it. */}
             <div className="mine-panel">
@@ -487,6 +510,16 @@ export default function MiningClient({ initial }) {
                 .mine-mark.is-read { border-style: solid; border-color: var(--sig, #ffd75e); background: rgba(0,0,0,0.55);
                     box-shadow: 0 0 16px -2px var(--sig, #ffd75e); }
                 .mine-mark.is-sel { box-shadow: 0 0 0 3px var(--sig, #ffd75e), 0 0 22px -2px var(--sig, #ffd75e); }
+                /* THE TEST-STRIKE. The mark kicks, a shockwave rings out, and the reading lands after it —
+                   the same "something happened" beat the Kitchen's minigame gives a cook. */
+                .mine-mark.is-sounding { animation: mineKnock .28s ease-out 2; border-color: #ffe28a; }
+                .mine-mark.is-sounding::after { content: ""; position: absolute; inset: -6px; border-radius: 50%;
+                    border: 2px solid rgba(255,226,138,0.85); animation: mineEcho .62s ease-out forwards; pointer-events: none; }
+                @keyframes mineKnock { 0% { transform: translate(-50%,-50%) scale(1); } 45% { transform: translate(-50%,-50%) scale(0.9); } 100% { transform: translate(-50%,-50%) scale(1); } }
+                @keyframes mineEcho { from { transform: scale(0.7); opacity: 0.95; } to { transform: scale(2.6); opacity: 0; } }
+                .mine-face-cta { position: relative; text-align: center; padding: 16px; }
+                .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
+                .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }
                 .mine-mark-q { font-size: 22px; font-weight: 900; opacity: 0.8; }
                 .mine-mark-ore { width: 34px; height: 34px; object-fit: contain; }
                 .mine-mark-n { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%;
