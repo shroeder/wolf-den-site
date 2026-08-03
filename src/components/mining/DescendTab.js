@@ -83,15 +83,20 @@ export default function DescendTab({ s, msg, busy, card, startTrip, goDeeper, su
                             </span>
                         )) : <span className="muted" style={{ fontSize: 12 }}>Bag empty. Everything is still down here.</span>}
                     </div>
+                    {/* The two choices, named for what they DO. "Climb out" read as quitting — as though you
+                        were walking away from the mine — when it is actually the only way to reach the rock
+                        face and swing at the seam you just found. Stopping IS the digging. The icons follow:
+                        the lantern goes further into the dark, the pick is what you stop to use. */}
                     <div className="mine-choice">
                         <button type="button" className="mine-prospect" onClick={goDeeper} disabled={busy}>
-                            <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Deeper <em>{run.risk}% risk</em>
+                            <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Deeper <em>{run.risk}% risk</em>
                         </button>
                         <button type="button" className="mine-prospect is-ghost" onClick={surface} disabled={busy}>
-                            <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Climb out with {run.haul.length}
+                            <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Stop &amp; dig
+                            <em>{run.haul.length ? `keep ${run.haul.length}` : "empty bag"}</em>
                         </button>
                     </div>
-                    <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Climb out and the bag is yours; push too far and it isn&rsquo;t.</p>
+                    <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Stop and the bag is yours to keep and the seam is yours to dig; push too far and you lose both.</p>
                 </>
             )}
 

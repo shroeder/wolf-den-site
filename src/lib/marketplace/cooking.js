@@ -61,13 +61,29 @@ async function petCookBonus(buyerId) {
 export const COOK_UNLOCKED = (buyerId) => Boolean(buyerId);
 
 export const MAX_TRACK = 5;
-export const COOKS_PER_DAY = 5;
 
+// ── NO DAILY CAP ─────────────────────────────────────────────────────────────────────────────────────────────
+// Cooking used to be five a day (plus whatever Big Pot bought). That cap is gone for everyone: cook as much as
+// you have ingredients for. The real limit was always the pantry — you have to farm, fish and prep your way to
+// a dish — and stacking an arbitrary counter on top of a resource cost just meant logging in to spend five
+// taps and leaving. The ingredient chain is the pacing.
+//
+// Big Pot was the "extra cooks each day" track, which the removal made meaningless. Rather than refund it or
+// leave a dead upgrade on the screen, it keeps its column and its levels and now does what its NAME always
+// suggested: a bigger pot makes more food. Anyone who bought it keeps every level they paid for.
+//
+// The four tracks now split cleanly, one per axis, with no overlap:
+//   Heat      — a better TIER of dish
+//   Seasoning — a second WHOLE dish
+//   Big Pot   — MORE of whatever the dish makes
+//   Larder    — the dish costs you NOTHING
 export const COOK_TRACKS = {
-    heat:   { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "pct",   name: "Heat",      icon: "🔥", desc: "Chance the dish comes out one tier better than the recipe." },
-    season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct",   name: "Seasoning", icon: "🧂", desc: "Chance of a second helping — the same dish, twice." },
-    batch:  { max: MAX_TRACK, per: 1,    cap: 5,    kind: "count", name: "Big Pot",   icon: "🍲", desc: "Extra cooks each day." },
-    larder: { max: MAX_TRACK, per: 0.07, cap: 0.35, kind: "pct",   name: "Larder",    icon: "🧺", desc: "Chance a cook doesn't use up its ingredients at all." },
+    heat:   { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "pct", name: "Heat",      icon: "/images/cooking/track-heat.png",   desc: "Chance the dish comes out one tier better than the recipe." },
+    season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance of a second helping — the same dish, twice." },
+    // "boost", not "pct": the other three are ROLLS the card labels "Chance", and Big Pot is not a roll —
+    // every level is felt on every cook. Labelling it "Chance 30%" would have read as a 30%% shot at nothing.
+    batch:  { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "Every dish comes out bigger — more of whatever it makes." },
+    larder: { max: MAX_TRACK, per: 0.07, cap: 0.35, kind: "pct", name: "Larder",    icon: "/images/cooking/track-larder.png", desc: "Chance a cook doesn't use up its ingredients at all." },
 };
 export const TRACK_COL = { heat: "heat_level", season: "season_level", batch: "batch_level", larder: "larder_level" };
 export const trackValue = (t, lvl) => Math.min(COOK_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * COOK_TRACKS[t].per);
@@ -572,7 +588,6 @@ export async function getKitchenState(buyerId) {
     const seedBag = new Map(seedRows.map((r) => [r.seed_id, Number(r.count) || 0]));
     const cookedMap = new Map(knownRows.map((r) => [r.recipe_id, Number(r.times_cooked) || 0]));
     const usedToday = row?.cooked_today ? Number(row.cooks_today) || 0 : 0;
-    const maxCooks = COOKS_PER_DAY + trackValue("batch", row?.batch_level);
 
     const recipes = RECIPES.map((r) => {
         const known = cookedMap.has(r.id);
@@ -637,7 +652,9 @@ export async function getKitchenState(buyerId) {
         bestQuality: Number(row?.best_quality) || 0,
         bestChain: Number(row?.best_chain) || 0,
         prepsTotal: Number(row?.preps_total) || 0,
-        cooks: { used: usedToday, max: maxCooks, left: Math.max(0, maxCooks - usedToday) },
+        // Kept as a count of what you've done today, NOT an allowance. There is no cap; `left` is gone rather
+        // than set to Infinity, so anything still reading it fails loudly instead of quietly gating a button.
+        cooks: { today: usedToday },
         pantry: pantryRows
             .map((r) => ({ ...ingredientMeta(r.ref, sprites), qty: Number(r.qty) }))
             .sort((a, b) => a.kind.localeCompare(b.kind) || b.qty - a.qty),
@@ -678,19 +695,17 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     if (!knownRow) return { ok: false, error: "not_learned" };
 
     const row = await kitchenRow(buyerId);
-    const maxCooks = COOKS_PER_DAY + trackValue("batch", row?.batch_level);
     const day = await today();
-    // Claim the day's slot atomically: reset the counter when the day rolls, otherwise increment under the cap.
-    const claimed = await db.queryOne(
+    // Count the cook. This used to be a CLAIM — the same statement with `AND cooks_today < $3`, which is what
+    // enforced the daily cap. With the cap gone it is pure telemetry: it still rolls over at midnight CT so
+    // "cooked today" means what it says, and it can no longer refuse anybody a cook.
+    await db.query(
         `UPDATE mkt_kitchen
             SET cooks_today = CASE WHEN cook_day IS DISTINCT FROM $2::date THEN 1 ELSE cooks_today + 1 END,
                 cook_day = $2::date, updated_at = NOW()
-          WHERE buyer_id = $1
-            AND (cook_day IS DISTINCT FROM $2::date OR cooks_today < $3)
-          RETURNING cooks_today`,
-        [buyerId, day, maxCooks]
-    ).catch(() => null);
-    if (!claimed) return { ok: false, error: "out_of_cooks" };
+          WHERE buyer_id = $1`,
+        [buyerId, day]
+    ).catch(() => {});
 
     // The Larder can spare the ingredients entirely — rolled once for the whole dish, not per line, so a cook
     // either costs you everything it should or nothing at all.
@@ -761,6 +776,20 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     let goldPaid = 0;
     let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) + equippedKitchen.portion / 100 ? 1 : 0);
 
+    // THE BIG POT. Seasoning gives you a second DISH; the pot makes the dish you cooked BIGGER. It multiplies
+    // the serving rather than rolling for one, so every level is felt on every cook instead of being a coin
+    // flip you mostly lose.
+    //
+    // serve() folds the second helping and the pot size into one number, and rounds PROBABILISTICALLY: at +30%
+    // a two-part reward is 2.6, which pays 3 about sixty percent of the time instead of always truncating to 2.
+    // Flat rounding would have thrown away the entire upgrade on every reward small enough to matter.
+    const potMult = 1 + trackValue("batch", row?.batch_level);
+    const serve = (n) => {
+        const exact = Math.max(0, Number(n) || 0) * portions * potMult;
+        const whole = Math.floor(exact);
+        return Math.max(1, whole + (Math.random() < exact - whole ? 1 : 0));
+    };
+
     const spriteMap = await cookingSprites();
     if (rec.kind === "prep") {
         // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
@@ -768,7 +797,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // pet that helps with it should be felt on the prep chain specifically.
         const prepBonus = Math.random() < ((petBonus.prep_cook || 0) + equippedKitchen.prep / 100) ? 1 : 0;
         portions += prepBonus;
-        await addToPantry(buyerId, "prep", rec.out, portions);
+        await addToPantry(buyerId, "prep", rec.out, serve(1));
         const m = PREPS[rec.out];
         made = { kind: "prep", id: rec.out, name: m?.name || rec.out, desc: "A prepped ingredient other recipes call for.", sprite: spriteMap[rec.out] || null };
     } else {
@@ -788,7 +817,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         switch (r.kind) {
             case "gold": {
                 const bonus = rint(r.min, r.max);
-                const bonusN = bonus * portions;
+                const bonusN = serve(bonus);
                 const p2 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, bonusN]).catch(() => null);
                 await logCoin(buyerId, bonusN, "cooking", { balanceAfter: p2?.gold, meta: { recipe: rec.id, tier } }).catch(() => {});
                 goldPaid += bonusN;
@@ -797,17 +826,17 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
             // `portions` is the Seasoning track's second helping. It used to be applied ONLY to gold, so
             // "the same dish, twice" quietly meant "the same dish once" for six of the seven reward kinds —
             // the track read as broken to anyone who bought it and then won a chest.
-            case "parts": await addParts(buyerId, r.partTier, rint(r.min, r.max) * portions).catch(() => {}); break;
-            case "chest": await addChests(buyerId, { [r.chestTier]: portions }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
+            case "parts": await addParts(buyerId, r.partTier, serve(rint(r.min, r.max))).catch(() => {}); break;
+            case "chest": await addChests(buyerId, { [r.chestTier]: serve(1) }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
             case "seed": {
                 const id = r.pool[Math.floor(Math.random() * r.pool.length)];
-                for (let i = 0; i < rint(r.min, r.max) * portions; i += 1) await grantSeed(buyerId, id).catch(() => {});
+                for (let i = 0, n = serve(rint(r.min, r.max)); i < n; i += 1) await grantSeed(buyerId, id).catch(() => {});
                 break;
             }
-            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, r.n * portions]).catch(() => {}); break;
-            case "creation": await grantCustomCredit(buyerId, r.n * portions, { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
+            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, serve(r.n)]).catch(() => {}); break;
+            case "creation": await grantCustomCredit(buyerId, serve(r.n), { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
             case "consumable":
-                await grantConsumable(buyerId, r.id, portions).catch(() => {});
+                await grantConsumable(buyerId, r.id, serve(1)).catch(() => {});
                 extraSprite = conSprites[r.id] || null;
                 break;
             default: break;

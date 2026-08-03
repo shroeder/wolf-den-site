@@ -116,10 +116,11 @@ export default function GameNav() {
                 if (d?.unlocked) {
                     setKitchen(true);
                     // This response is the whole kitchen already — the badge count rides along for free rather
-                    // than costing a second request. Only DISHES, and only while you have a cook left today:
-                    // a badge you can't act on is the kind people learn to ignore.
-                    const left = d?.cooks?.left ?? 1;
-                    setDishesReady(left > 0 ? (d.recipes || []).filter((x) => x.kind === "dish" && x.canCook).length : 0);
+                    // than costing a second request. Only DISHES you can actually make right now: a badge you
+                    // can't act on is the kind people learn to ignore. The old "and only if you have a cook
+                    // left today" half of that test is gone with the daily cap — having the ingredients IS the
+                    // whole condition now.
+                    setDishesReady((d.recipes || []).filter((x) => x.kind === "dish" && x.canCook).length);
                     return;
                 }
                 // A negative on the first go is retried once — the common cause is the session cookie not being

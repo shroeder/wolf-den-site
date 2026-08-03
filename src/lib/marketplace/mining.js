@@ -35,24 +35,12 @@ export const ORE_TIERS = {
 };
 export const oreTier = (t) => ORE_TIERS[t] || ORE_TIERS[1];
 
-// ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────────
-// Straight from the Kitchen: you see every rung BEFORE you start, and how well you play decides which one you
-// land on. Previously timing only decided how fast a seam cracked — the haul was identical whether you hit
-// every marker dead centre or mashed the button, which left the bar with nothing riding on it.
-//
-// Quality is your AVERAGE swing grade across the seam (0.5 glancing … 5.0 perfect), normalised to 0..1. Using
-// the average rather than the best swing means one lucky tap can't carry a sloppy dig, and using it rather
-// than the worst means one fumble doesn't erase a good one.
-export const MINE_RUNGS = [
-    { rung: 1, key: "rough", label: "Rough dig", min: 0, mult: 1.0, blurb: "You got it open." },
-    { rung: 2, key: "solid", label: "Solid work", min: 0.34, mult: 1.6, blurb: "Clean enough to keep the good stuff." },
-    { rung: 3, key: "clean", label: "Clean break", min: 0.60, mult: 2.4, blurb: "The seam split where you wanted it to." },
-    { rung: 4, key: "flawless", label: "Flawless seam", min: 0.84, mult: 3.4, blurb: "Every strike true — the whole vein comes out." },
-];
-const MAX_GRADE_MULT = 5.0;
-export const rungForQuality = (q) => [...MINE_RUNGS].reverse().find((r) => q >= r.min) || MINE_RUNGS[0];
-// Base ore a seam holds before the rung multiplier and the Haul track.
-export const baseOre = (tier) => 2 + tier;
+// The ORE LADDER is gone. It promised a fixed ore payout per standard of digging — "Rough dig ×5, Flawless
+// ×17" — and the seam stopped paying that way when the draw came in: claimNode pulls tickets out of a BAG,
+// and the bag can hand you a chest, a piece of gear or a consumable that no ore multiplier could describe.
+// The panel outlived the mechanic and was telling players a rule the code no longer implemented, which is the
+// exact trap the Kitchen's reward lottery fell into. What replaces it is RUN_RANKS, below: your rank buys more
+// pulls and better tickets, and what comes out stays a surprise.
 export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 
 
@@ -536,8 +524,6 @@ export async function getMiningState(buyerId) {
             const o = oreTier(current.tier);
             const haulMult = 1 + trackValue("haul", row?.haul_level);
             const sw = Number(current.my_swings) || 0;
-            // Your running quality on THIS seam, so the ladder can show where you'd land if it broke now.
-            const q = sw > 0 ? Math.max(0, Math.min(1, (Number(current.my_grade_sum) || 0) / sw / 5.0)) : null;
             return {
                 id: Number(current.id), tier: current.tier, name: o.name, color: o.color, art: oreArt(current.tier),
                 partTier: o.part, gold: o.gold, xp: o.xp,
@@ -546,13 +532,18 @@ export async function getMiningState(buyerId) {
                 mySwings: sw,
                 maxHits: hitsFor(row?.vigor_level),
                 hitsLeft: Math.max(0, hitsFor(row?.vigor_level) - sw),
-                // The LADDER, shown before you swing: what each standard of digging pays out of this seam.
-                ladder: MINE_RUNGS.map((r) => ({
-                    rung: r.rung, key: r.key, label: r.label, blurb: r.blurb,
-                    ore: Math.max(1, Math.round(baseOre(current.tier) * r.mult * haulMult)),
+                // WHAT YOUR RANK BUYS — the honest version of the old ladder. It describes the DRAW (how many
+                // pulls, how loaded the bag) and never the prize, because the prize is the surprise. Sent
+                // best-first so the screen reads as something to climb toward.
+                ranks: RUN_RANKS.map((r) => ({
+                    key: r.key, label: r.label, color: r.color,
+                    from: Math.round(r.min * 100),
+                    draws: r.draws,
+                    // 0..1, purely for how full to draw the "richness" meter — never a stated probability.
+                    rich: Math.min(1, r.rareBias / 3.0),
                 })),
-                quality: q == null ? null : Math.round(q * 100),
-                currentRung: q == null ? null : rungForQuality(q).rung,
+                // One extra pull sometimes, from the Haul track — worth saying, since it's a thing you bought.
+                haulExtra: Math.round(haulMult * 100 - 100),
             };
         })() : null,
         ore: (ore || []).map((r) => {

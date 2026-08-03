@@ -3,7 +3,7 @@
 import DescendTab from "@/components/mining/DescendTab";
 import FaceTab from "@/components/mining/FaceTab";
 import HeatGame from "@/components/mining/HeatGame";
-import { CrackModal, SmeltModal, WrapModal } from "@/components/mining/MineOutcomes";
+import { SmeltModal, WrapModal } from "@/components/mining/MineOutcomes";
 import SmeltTab from "@/components/mining/SmeltTab";
 import { Img } from "@/components/mining/kit";
 import { useMine } from "@/components/mining/useMine";
@@ -78,7 +78,11 @@ export default function MiningClient({ initial }) {
                     node={node}
                     pick={s.pick}
                     onSwing={m.onSwing}
-                    onDone={(res) => { m.setBreaking(false); m.setCrack(res); }}
+                    // The minigame's own reveal IS the payoff screen — rank, every draw, the rare tickets your
+                    // timing put in the bag. A second modal used to open on top of it built for the retired
+                    // ore-ladder result, so it rendered "Ore +undefined · Gold +undefined" over the good one.
+                    // Closing drops you at the tunnel, where the next seam comes from.
+                    onDone={() => { m.setBreaking(false); m.backToTunnel(false); }}
                 />
             ) : null}
 
@@ -88,14 +92,6 @@ export default function MiningClient({ initial }) {
                     onClose={() => { m.setWrap(null); if (!m.wrap.collapsed) setTab("mine"); }}
                     onToFace={() => { m.setWrap(null); setTab("mine"); }}
                     onAgain={() => { m.setWrap(null); if (tripsLeft > 0) m.startTrip(); }}
-                />
-            ) : null}
-
-            {m.crack ? (
-                <CrackModal
-                    crack={m.crack} tripsLeft={tripsLeft}
-                    onClose={() => m.setCrack(null)}
-                    onAnother={() => { m.setCrack(null); m.backToTunnel(tripsLeft > 0); }}
                 />
             ) : null}
 
@@ -333,6 +329,23 @@ export default function MiningClient({ initial }) {
                 .mine-rung-copy em { font-size: 11px; font-style: normal; color: #9aa2ab; }
                 .mine-rung-pay { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
                 .mine-rung-ore { width: 24px; height: 24px; object-fit: contain; }
+                /* THE BAG PANEL — one row per rank: what it's called, what it takes, what it buys. */
+                .mine-rank-row { display: grid; grid-template-columns: 1fr auto 64px; align-items: center; gap: 10px;
+                    padding: 8px 10px; border-radius: 10px; margin-top: 6px;
+                    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+                .mine-rank-name { display: flex; flex-direction: column; min-width: 0; }
+                .mine-rank-name b { color: var(--rk); font-size: 13px; letter-spacing: .04em; }
+                .mine-rank-name em { font-style: normal; font-size: 10.5px; color: #8b8f96; }
+                .mine-rank-draws { font-size: 11px; color: #b9a98f; white-space: nowrap; }
+                .mine-rank-draws b { color: #f2e6e6; font-size: 15px; }
+                .mine-rank-rich { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+                .mine-rank-rich > span { display: block; height: 100%; border-radius: 999px;
+                    background: linear-gradient(90deg, var(--rk), #fff8); }
+                /* What CAN come out — shown as real sprites, never named. The tease is the point. */
+                .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
+                    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+                .mine-bag-kinds .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }
+                .mine-bag-ico { width: 24px; height: 24px; object-fit: contain; }
                 .mine-ladder-foot { margin: 8px 0 0; font-size: 11.5px; color: #9aa2ab; }
                 .mine-rung-won { margin: 0 0 10px; padding: 8px; border-radius: 10px; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
                 .mine-rung-won b { display: block; color: #ffe28a; }

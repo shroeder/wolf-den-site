@@ -7,6 +7,15 @@ import { createPortal } from "react-dom";
 import CookingMinigame from "@/components/CookingMinigame";
 import FeatureDailies from "@/components/FeatureDailies";
 
+// Kitchen icons are SPRITES, never emoji — emoji are the OS's artwork and render differently on every device.
+// Falls back to empty rather than a broken-image glyph, so a missing file is invisible instead of ugly.
+function TrackIcon({ src, className }) {
+    const [bad, setBad] = useState(false);
+    if (bad || !src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className={className} src={src} alt="" draggable="false" onError={() => setBad(true)} />;
+}
+
 // ── Permanent credit: the Kitchen was aannw's idea — cook the things you grow and catch instead of just
 // selling them. Her actual AI hero sprite is enshrined beside the kettle as a small medallion; tapping it
 // tells the story. Hard-coded to the sprite blob on purpose, exactly like the Forge's tribute to Alstier1: a
@@ -30,6 +39,9 @@ const FOUNDER = {
 
 const TIER_RING = { 1: "#cfd8e3", 2: "#7ec8ff", 3: "#c9a2ff", 4: "#ffd75e", 5: "#ff9ec4" };
 const pctText = (v) => `${Math.round((Number(v) || 0) * 100)}%`;
+// How an upgrade track states its effect. A "chance" track reads as a bare percentage; Big Pot is a size
+// increase you always get, so it reads with a plus. Same number, two different promises.
+const fmtEffect = (t, v) => (t.kind === "pct" ? pctText(v) : t.kind === "boost" ? `+${pctText(v)}` : `+${v}`);
 
 /** One ingredient/dish icon. Falls back to the emoji only when there is genuinely no sprite. */
 function Art({ sprite, emoji, size = 34, alt = "" }) {
@@ -121,8 +133,7 @@ export default function CookingClient({ initial }) {
             } catch { /* audio is a bonus, never a requirement */ }
             return;
         }
-        say(d?.error === "out_of_cooks" ? "The stove's had enough for today."
-            : d?.error === "missing_ingredients" ? `You're out of ${d.missing}.`
+        say(d?.error === "missing_ingredients" ? `You're out of ${d.missing}.`
             : d?.error === "not_learned" ? "You haven't found that recipe yet."
             : "That didn't work.");
     };
@@ -134,7 +145,7 @@ export default function CookingClient({ initial }) {
     };
 
     const s = state || {};
-    const cooksLeft = s.cooks?.left ?? 0;
+    const cookedToday = s.cooks?.today ?? 0;
     const byId = useMemo(() => Object.fromEntries((s.recipes || []).map((r) => [r.id, r])), [s.recipes]);
 
     // Jump to the recipe that makes an ingredient, remembering where we were.
@@ -222,17 +233,16 @@ export default function CookingClient({ initial }) {
                     </div>
                 ) : null}
 
-                {/* The one number that decides whether you can act right now gets its own bar. */}
+                {/* There is no daily allowance any more — cook as much as you have ingredients for. This was a
+                    pip bar counting down the five you were rationed; now it just says what you've done today,
+                    which is a thing to be pleased about rather than a meter draining toward "come back
+                    tomorrow". The real limit is the pantry, and the pantry is right below. */}
                 <div className="ck-cooks">
                     <div className="ck-cooks-row">
-                        <span className="ck-cooks-label">Cooks left today</span>
-                        <span className="ck-cooks-count"><b>{cooksLeft}</b> / {s.cooks?.max ?? 0}</span>
+                        <span className="ck-cooks-label">Cooked today</span>
+                        <span className="ck-cooks-count"><b>{cookedToday}</b></span>
                     </div>
-                    <div className="ck-cooks-bar">
-                        {Array.from({ length: s.cooks?.max ?? 0 }, (_, i) => (
-                            <span key={i} className={`ck-pip${i < cooksLeft ? " is-on" : ""}`} />
-                        ))}
-                    </div>
+                    <p className="ck-cooks-note">No daily limit — the pantry is the only thing stopping you.</p>
                 </div>
 
                 {/* The five-tile stat grid that used to sit here is gone. "recipes" repeated the count in the
@@ -244,9 +254,11 @@ export default function CookingClient({ initial }) {
             </section>
 
             <div className="ck-viewtabs">
-                {[["recipes", "🍳", "Recipes"], ["pantry", "🧺", "Pantry"], ["upgrades", "🔨", "Upgrades"]].map(([k, icon, label]) => (
+                {[["recipes", "/images/cooking/tab-recipes.png", "Recipes"],
+                  ["pantry", "/images/cooking/tab-pantry.png", "Pantry"],
+                  ["upgrades", "/images/cooking/tab-upgrades.png", "Upgrades"]].map(([k, icon, label]) => (
                     <button key={k} type="button" className={`ck-viewtab${view === k ? " is-on" : ""}`} onClick={() => setView(k)}>
-                        <span aria-hidden="true">{icon}</span>{label}
+                        <TrackIcon src={icon} className="ck-viewtab-ico" />{label}
                     </button>
                 ))}
             </div>
@@ -393,8 +405,8 @@ export default function CookingClient({ initial }) {
                                         )}
 
                                         {r.known ? (
-                                            <button type="button" className="btn ck-cook" disabled={busy || !r.canCook || cooksLeft <= 0} onClick={() => setPlaying(r)}>
-                                                {cooksLeft <= 0 ? "No cooks left today" : busy ? "Working…" : r.kind === "prep" ? "Start prepping" : "Start cooking"}
+                                            <button type="button" className="btn ck-cook" disabled={busy || !r.canCook} onClick={() => setPlaying(r)}>
+                                                {busy ? "Working…" : r.kind === "prep" ? "Start prepping" : "Start cooking"}
                                             </button>
                                         ) : (
                                             <p className="ck-locked-note">You haven&rsquo;t found this recipe yet — keep at it and it&rsquo;ll turn up.</p>
@@ -418,7 +430,7 @@ export default function CookingClient({ initial }) {
                     {(s.tracks || []).map((t) => (
                         <div className={`sail-upg${t.maxed ? " is-maxed" : ""}`} key={t.id}>
                             <div className="sail-upg-top">
-                                <span className="sail-upg-title"><span className="sail-upg-ico">{t.icon}</span>{t.name}</span>
+                                <span className="sail-upg-title"><span className="sail-upg-ico"><TrackIcon src={t.icon} /></span>{t.name}</span>
                                 <span className="muted sail-upg-lv">Lv {t.level}/{t.max}</span>
                             </div>
                             <div className="sail-upg-bar" aria-hidden="true">
@@ -426,10 +438,10 @@ export default function CookingClient({ initial }) {
                             </div>
                             <p className="muted sail-upg-desc">{t.desc}</p>
                             <div className="sail-upg-effect">
-                                <span>{t.kind === "pct" ? "Chance" : "Extra"}</span>
+                                <span>{t.kind === "pct" ? "Chance" : t.kind === "boost" ? "Serving" : "Extra"}</span>
                                 <b>
-                                    {t.kind === "pct" ? pctText(t.valueNow) : `+${t.valueNow}`}
-                                    {t.maxed ? null : <> → <span className="sail-upg-next">{t.kind === "pct" ? pctText(t.valueNext) : `+${t.valueNext}`}</span></>}
+                                    {fmtEffect(t, t.valueNow)}
+                                    {t.maxed ? null : <> → <span className="sail-upg-next">{fmtEffect(t, t.valueNext)}</span></>}
                                 </b>
                             </div>
                             {t.maxed
@@ -599,9 +611,9 @@ const CK_CSS = `
 .ck-cooks-label { font-size: 0.7rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: #7a828c; }
 .ck-cooks-count { font-size: 0.84rem; color: #98a2ae; }
 .ck-cooks-count b { color: #ffd75e; font-size: 1.02rem; }
-.ck-cooks-bar { display: flex; gap: 4px; }
-.ck-pip { flex: 1 1 0; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.09); }
-.ck-pip.is-on { background: linear-gradient(90deg, #f0c46a, #ffd75e); box-shadow: 0 0 8px rgba(255,215,94,0.45); }
+.ck-cooks-note { margin: 4px 0 0; font-size: 0.72rem; color: #7a828c; }
+.ck-viewtab-ico { width: 20px; height: 20px; object-fit: contain; flex: 0 0 auto; }
+.sail-upg-ico img { width: 22px; height: 22px; object-fit: contain; display: block; }
 
 /* KPI tiles instead of a run-on sentence that wrapped mid-stat. */
 .ck-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 14px; }

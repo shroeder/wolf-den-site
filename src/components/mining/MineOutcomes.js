@@ -4,8 +4,10 @@ import ItemArt from "@/components/ItemArt";
 import { Img, KindIcon, money, PART_NAME, RARITY_COLOR, RARITY_LABEL, statLine } from "@/components/mining/kit";
 
 // ── OUTCOMES ─────────────────────────────────────────────────────────────────────────────────────────────────
-// The three "here's what you got" moments: climbing out of the tunnel, cracking a seam, and pouring a smelt.
-// All three speak the same visual language as the chest opener — real sprite, rarity colour, the name in full.
+// The two "here's what you got" moments that live outside a minigame: stopping the descent, and pouring a
+// smelt. (Cracking a seam has its own reveal inside MiningMinigame — the rank, every draw and the rare tickets
+// your timing earned — so there is deliberately no second modal for it here.)
+// Both speak the same visual language as the chest opener — real sprite, rarity colour, the name in full.
 
 // A single thing you carried out. Gear gets the full treatment: its own art, its rarity frame, its stat line.
 function Haul({ h }) {
@@ -38,7 +40,7 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
         <div className="mine-modal" role="presentation" onClick={onClose}>
             <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
                 <h3 style={{ color: wrap.collapsed ? "#ff8f9a" : "#ffd75e" }}>
-                    {wrap.collapsed ? "The roof came in" : "You climbed out"}
+                    {wrap.collapsed ? "The roof came in" : "You stopped in time"}
                 </h3>
                 <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
                     {wrap.collapsed
@@ -67,37 +69,6 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
                         <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> To the rock face
                     </button>
                 )}
-            </div>
-        </div>
-    );
-}
-
-// THE SEAM CRACKED — the rung you earned and what it paid.
-export function CrackModal({ crack, tripsLeft, onClose, onAnother }) {
-    return (
-        <div className="mine-modal" role="presentation" onClick={onClose}>
-            <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
-                <Img src={crack.art} className="mine-modal-img" fallback="" />
-                <h3 style={{ color: crack.color }}>{crack.name} cracked!</h3>
-                {crack.rungLabel ? (
-                    <div className={`mine-rung-won is-${crack.rungKey}`}>
-                        <b>{crack.rungLabel}</b>
-                        <em>{crack.rungBlurb} · {crack.quality}% average over {crack.swings} swing{crack.swings === 1 ? "" : "s"}</em>
-                    </div>
-                ) : null}
-                <div className="mine-modal-rows">
-                    <span>Ore<b>+{crack.ore}</b></span>
-                    <span>Gold<b>+{money(crack.gold)}</b></span>
-                    <span>XP<b>+{money(crack.xp)}</b></span>
-                </div>
-                <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>Smelts into {PART_NAME[crack.partTier]}.</p>
-                {/* Seams come from the tunnel now, so the next one is another descent. This button used to call
-                    a prospect() that no longer existed and threw on every press. */}
-                <button type="button" className="mine-buy" style={{ marginTop: 12 }} onClick={onAnother}>
-                    {tripsLeft > 0
-                        ? <><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Back down for another ({tripsLeft} left)</>
-                        : "No trips left today"}
-                </button>
             </div>
         </div>
     );
