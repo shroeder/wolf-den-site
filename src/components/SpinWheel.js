@@ -83,6 +83,9 @@ function Portal({ children }) {
 export default function SpinWheel() {
     const [st, setSt] = useState(null);
     const [rot, setRot] = useState(0);
+    // Which wedge the server picked, kept after the spin so the winning slice can be marked at rest. Without
+    // it the wheel stops and says nothing about WHICH icon won — see the pointer note below.
+    const [wonIdx, setWonIdx] = useState(null);
     const [spinning, setSpinning] = useState(false);
     const [phase, setPhase] = useState("idle"); // idle | lead (waiting on the server) | land (easing onto the wedge)
     const [result, setResult] = useState(null);
@@ -156,6 +159,7 @@ export default function SpinWheel() {
         // browser skip the animation (the same trap the mini wheel fell into).
         let landed = false;
         setPhase("lead");
+        setWonIdx(null);
         requestAnimationFrame(() => requestAnimationFrame(() => { if (!landed) setRot((prev) => prev + LEAD_DEG); }));
         cancelAnimationFrame(rafRef.current); startTickLoop();
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin" }) }).catch(() => null);
@@ -170,6 +174,7 @@ export default function SpinWheel() {
             return;
         }
         const idx = Math.max(0, Math.min(WEDGES - 1, d.prizeIndex));
+        setWonIdx(idx);
         const jitter = (Math.random() - 0.5) * WEDGE_DEG * 0.4;
         const turns = 5 + Math.floor(Math.random() * 4);
         const targetMod = (((-(idx * WEDGE_DEG + WEDGE_OFFSET)) % 360) + 360) % 360;
@@ -310,7 +315,7 @@ export default function SpinWheel() {
                         <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
                         <div className="cw-icons">
                             {prizes.map((p, i) => (
-                                <div key={i} className={`cw-ico tier-${p.tier}`} style={iconPos(i, WEDGE_OFFSET, WEDGE_DEG, ICON_R)}>
+                                <div key={i} className={`cw-ico tier-${p.tier}${wonIdx === i && !spinning ? " is-won" : ""}`} style={iconPos(i, WEDGE_OFFSET, WEDGE_DEG, ICON_R)}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     {p.sprite ? <img className="cw-ico-img" src={p.sprite} alt="" draggable="false" /> : null}
                                 </div>
@@ -319,6 +324,12 @@ export default function SpinWheel() {
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
+                    {/* THE POINTER. The landing maths always brought the winning wedge to the TOP — that part
+                        was right — but nothing on screen said so. With no marker you read the wheel by whichever
+                        icon catches your eye, which is how a 50-gold spin looked like the jackpot. The mini
+                        wheel has had one of these all along. Outside the rotor, so it stays put while the disc
+                        turns under it. */}
+                    <span className="cw-pointer" aria-hidden="true" />
                 </div>
             </div>
 
@@ -546,6 +557,13 @@ const CW_CSS = `
 .cw-ico.tier-jackpot .cw-ico-img { filter: drop-shadow(0 0 6px rgba(255,215,94,0.95)); }
 .cw-ico.tier-mini .cw-ico-img { filter: drop-shadow(0 0 5px rgba(200,150,255,0.8)); }
 .cw-ico.tier-bonus .cw-ico-img { filter: drop-shadow(0 0 5px rgba(255,140,240,0.7)); }
+.cw-pointer { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none;
+    width: 0; height: 0; border-left: 11px solid transparent; border-right: 11px solid transparent;
+    border-top: 18px solid #ff4d5e; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.7)); }
+/* The wedge that actually won, once the disc has stopped. */
+.cw-ico.is-won { animation: cwWon 1.1s ease-in-out infinite alternate; }
+@keyframes cwWon { from { filter: drop-shadow(0 0 4px #ffd75e); transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1); }
+    to { filter: drop-shadow(0 0 16px #ffd75e) drop-shadow(0 0 26px #ffb020); } }
 .cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
 .cw-stage.is-golden .cw-frame { filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
 .cw-stage.is-spinning .cw-frame { animation: cwBuzz 0.14s steps(2) infinite; }

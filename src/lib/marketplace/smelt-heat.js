@@ -21,14 +21,15 @@ export const smeltGrade = (dist) =>
     SMELT_GRADES.find((g) => dist <= g.max) || SMELT_MISS;
 
 // ── THE PHASES ───────────────────────────────────────────────────────────────────────────────────────────────
-// Three pours, and the bar is FASTER every time. One slow pass was the whole reason it felt like nothing: the
-// kitchen speeds up per step, the mine tightens per swing, and the smelt now does the same across its chain.
+// FIVE pours, and the bar is FASTER every time. One slow pass was the whole reason it felt like nothing; three
+// was still over before it built any tension. Five matches the kitchen's five steps, and the names follow what
+// a smelt actually is, start to finish.
 //
-// A full sweep in milliseconds. By the third the marker crosses in just over half a second, so the PIXEL band —
-// 4.4% of the bar — goes past in about 27ms and is a genuine reflex test rather than a formality.
-export const SMELT_PHASES = 3;
-export const PHASE_LABELS = ["Charge", "Melt", "Pour"];
-export const PHASE_SWEEP_MS = [1100, 820, 600];
+// A full sweep in milliseconds. By the last one the marker crosses in well under a second, so the FLAWLESS
+// band — 4.4% of the bar — goes past in about 26ms and is a genuine reflex test rather than a formality.
+export const SMELT_PHASES = 5;
+export const PHASE_LABELS = ["Charge", "Stoke", "Melt", "Skim", "Pour"];
+export const PHASE_SWEEP_MS = [1200, 1000, 820, 690, 580];
 
 /** How long the tightest band is actually on screen for, per phase — the honest measure of difficulty. */
 export const pixelWindowMs = (phase) => Math.round(PHASE_SWEEP_MS[Math.min(phase, PHASE_SWEEP_MS.length - 1)] * 0.044);

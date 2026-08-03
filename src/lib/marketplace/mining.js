@@ -1021,12 +1021,19 @@ export async function smeltOre(buyerId, tier, dists = null) {
     for (let i = 0; i < heatTickets; i += 1) bag.push(Math.random() < 0.5 ? "up" : "extra");
     for (let i = 0; i < Math.round(flux * 12); i += 1) bag.push("up");
     for (let i = 0; i < Math.round(bellows * 12); i += 1) bag.push("extra");
-    // Only a genuinely good pour can turn up a curio — the fun stuff that isn't a part at all.
+    // A curio is the "ooh" — but a DELIBERATELY small one. The seam and the chests are where real gear comes
+    // from; a smelt turning up a legendary would make the furnace the best loot source in the game for the
+    // price of five taps. So: consumables and low chests only, and only off a genuinely good run.
     if (band.key === "pixel") bag.push("curio", "curio");
     else if (band.key === "perfect") bag.push("curio");
 
-    // Draws scale with how the WHOLE run went, not one lucky pour. A single batch, so this is 1-2 draws.
-    const draws = Math.max(1, Math.round(avgMult));
+    // ONE OR TWO PARTS from a batch, decided by how the whole hand went — not one lucky pour. A clean run is
+    // worth a second part; a scrappy one still gets you the one you paid for. Never more than two: the batch
+    // cost three ore, and a furnace that prints parts makes the seam pointless.
+    //
+    // avgMult runs 0.5 (all spilled) to 2.0 (all flawless), so the split lands a little over halfway up —
+    // roughly PERFECT-or-better across the hand.
+    const draws = avgMult >= 1.45 ? 2 : 1;
     const made = {};
     let extras = 0, ups = 0;
     const curios = [];
@@ -1035,7 +1042,9 @@ export async function smeltOre(buyerId, tier, dists = null) {
         const ticket = bag[Math.floor(Math.random() * bag.length)] || "part";
         if (ticket === "up" && o.part < 5) { add(o.part + 1, 1); ups += 1; }
         else if (ticket === "extra") { add(o.part, 2); extras += 1; }
-        else if (ticket === "curio") curios.push(Math.random() < 0.5 ? "chest" : Math.random() < 0.6 ? "consumable" : "gear");
+        // No GEAR from the furnace. It used to roll gear here, which is the one thing that makes a side
+        // activity outshine the loop it feeds — smelting exists to supply the Forge, not to replace it.
+        else if (ticket === "curio") curios.push(Math.random() < 0.72 ? "consumable" : "chest");
         else add(o.part, 1);
     }
 
@@ -1046,12 +1055,10 @@ export async function smeltOre(buyerId, tier, dists = null) {
     const bonus = [];
     for (const c of curios) {
         if (c === "chest") {
-            const chestTier = t >= 4 ? "gold" : t >= 2 ? "iron" : "wooden";
+            // Capped at iron. A gold chest out of a furnace is exactly the "crazy good" this should not be.
+            const chestTier = t >= 3 ? "iron" : "wooden";
             await addChests(buyerId, { [chestTier]: 1 }, { source: "mining" }).catch(() => {});
             bonus.push({ kind: "chest", tier: chestTier });
-        } else if (c === "gear") {
-            const got = await grantMiningGear(buyerId, 3 + t);
-            if (got) bonus.push({ kind: "gear", ...got });
         } else {
             const got = await grantMiningConsumable(buyerId);
             if (got) bonus.push({ kind: "consumable", ...got });
