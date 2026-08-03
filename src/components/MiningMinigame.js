@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { GiChest, GiCoins, GiPotionBall, GiShieldBash, GiStoneBlock, GiWarPick } from "react-icons/gi";
 
 // ── BREAKING THE SEAM ────────────────────────────────────────────────────────────────────────────────────────
+// NO EMOJI here either — sprites and Gi glyphs only. See the note in MiningClient.
 // A first-class timing minigame in its own modal, built to the same standard as the Kitchen's: nested bands you
 // can SEE, a marker that overhangs the bar so the exact line is readable, a tap target that isn't under your
 // thumb, and a hit that shakes, flashes, sparks and pops.
@@ -182,7 +184,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                 {flash ? <span key={flash.k} className="mmg-flash" style={{ "--fc": flash.c }} aria-hidden="true" /> : null}
 
                 <div className="mmg-head">
-                    <Img src={node?.art} className="mmg-art" fallback="⬢" />
+                    <Img src={node?.art} className="mmg-art" fallback={<GiStoneBlock />} />
                     <div className="mmg-headbody">
                         <div className="mmg-name">{node?.name}</div>
                         <div className="mmg-tier">smelts to tier {node?.partTier}</div>
@@ -204,7 +206,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                             {(cracked.draws || []).map((x, i) => (
                                 <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
                                     {x.art ? <Img src={x.art} className="mmg-drawn-art" fallback="◆" />
-                                        : <b className="mmg-drawn-emoji">{x.kind === "gold" ? "🪙" : x.kind === "chest" ? "🧰" : x.kind === "gear" ? "🛡️" : "🧪"}</b>}
+                                        : <b className="mmg-drawn-emoji">{x.kind === "gold" ? <GiCoins /> : x.kind === "chest" ? <GiChest /> : x.kind === "gear" ? <GiShieldBash /> : <GiPotionBall />}</b>}
                                     <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
                                     {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
                                 </span>
@@ -220,7 +222,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         <div className="mmg-bar" aria-hidden="true">
                             {BANDS.map((b) => <span key={b.key} className={`mmg-zone is-${b.key}`} style={{ width: `${b.pct}%` }} />)}
                             <span className="mmg-marker" style={{ left: `${marker * 100}%` }} />
-                            <Img src={pick?.sprite} className="mmg-rider" fallback="⛏️" />
+                            <Img src={pick?.sprite} className="mmg-rider" fallback={<GiWarPick />} />
                             {sparks.map((sp) => (
                                 <span key={sp.id} className="mmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />
                             ))}

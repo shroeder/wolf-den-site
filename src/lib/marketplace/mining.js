@@ -282,25 +282,28 @@ const COMBO_MIN_GRADE = "good";
 const SWINGS_PER_DAY = 60;          // generous: a swing is one tap, and a node takes several
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
+// `icon` is a react-icons/gi NAME, never an emoji. Emoji are drawn by the OS — they render as somebody else's
+// artwork in the middle of ours, differently on every device. Everything user-facing here is a sprite or a Gi
+// glyph. See ICONS in MiningClient.
 // Four tracks, each buying a different KIND of mining rather than just "more of it" — same design rule as the
 // fishing rail, so they don't collapse into one obvious purchase order.
 export const MINE_TRACKS = {
-    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "⛏️", col: "pick_level",
+    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "GiWarPick", col: "pick_level",
         desc: "Harder swings — fewer to crack a seam.", effect: "Swing power" },
-    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "🎒", col: "haul_level",
+    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "GiKnapsack", col: "haul_level",
         desc: "More ore out of every seam you crack.", effect: "Ore per seam" },
-    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "💪", col: "vigor_level",
+    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "GiMuscleUp", col: "vigor_level",
         desc: "More swings each day.", effect: "Daily swings" },
 };
 
 // SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
 // and both of those are about FINDING rock rather than breaking it. It kept its column, so no levels are lost.
 export const SURVEY_TRACKS = {
-    lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "🏮", col: "lantern_level",
+    lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "GiLanternFlame", col: "lantern_level",
         desc: "Light reaches further — the tunnel gives up better things the deeper you get.", effect: "Find quality" },
-    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "🪵", col: "assay_level",
+    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "GiWoodBeam", col: "assay_level",
         desc: "Timbered walls. The roof holds for longer before the risk starts climbing.", effect: "Safe depth" },
-    pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "🎒", col: "face_level",
+    pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "GiKnapsack", col: "face_level",
         desc: "A deeper pack — every purse and pocket of ore you find is bigger.", effect: "Haul size" },
 };
 export const surveyValue = (t, lvl) => Math.min(SURVEY_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SURVEY_TRACKS[t].per);
@@ -314,11 +317,11 @@ export const trackCost = (level) => 300 + Math.round(Math.pow(Math.max(0, level)
 
 // SMELTING tracks. Its own half of the feature, so it gets its own levers rather than riding the pickaxe's.
 export const SMELT_TRACKS = {
-    bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "🌬️", col: "bellows_level",
+    bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "GiBellows", col: "bellows_level",
         desc: "A hotter burn sometimes yields an extra part.", effect: "Bonus part chance" },
-    crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "🫙", col: "crucible_level",
+    crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "GiCauldron", col: "crucible_level",
         desc: "A bigger pot needs less ore for the same part.", effect: "Ore per part" },
-    flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "✨", col: "flux_level",
+    flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "GiSparkles", col: "flux_level",
         desc: "A purer melt sometimes lifts a part a whole tier.", effect: "Tier-up chance" },
 };
 export const smeltValue = (t, lvl) => Math.min(SMELT_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SMELT_TRACKS[t].per);
