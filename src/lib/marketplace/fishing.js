@@ -118,9 +118,10 @@ const RARE_TILT_CAP = 0.9;
 // Rarer fish shift the table toward the good end — a mythic on the line is the moment to hand out something
 // memorable — but even a Sardine can drop a seed or a fragment, so an ordinary cast is never truly empty.
 //
-// Balance: fishing is FIVE casts a day now, not ten. Halving the allowance without touching the table would
-// have halved the feature, so every cast is worth more — a bare "nothing" is far rarer and the good end of
-// each table is fatter. Fewer, better casts, the same shape as three mining trips a day.
+// Balance: fishing is FIVE casts a day, not ten, so each cast pays better than it used to. But the first pass
+// at that overshot badly: paired with a gear ladder that GUARANTEED the top rarity (see GEAR_ODDS), three casts
+// could produce a purple and an orange. These sit between the old table and that overcorrection; the rarity
+// fix does most of the work.
 //
 // Gear and chests still sit under the rates the Forge and the dig pay: fishing should feed those loops, not
 // replace them.
@@ -311,7 +312,9 @@ async function grantHaul(buyerId, kind, tier = "common") {
     }
     if (kind === "gear") {
         const item = await grantFishingGear(buyerId, tier).catch(() => null);
-        return item ? { kind: "gear", label: item.name, emoji: "⚔️", id: item.id, rarity: item.rarity, where: "Added to your gear bag", spriteUrl: await haulSprite("gear", item.id) } : null;
+        // The whole item — the reveal gives gear a real card now, so it needs the slot and the stats too.
+        return item ? { kind: "gear", label: item.name, id: item.id, rarity: item.rarity, slot: item.slot,
+            stats: item.stats, icon: item.icon, where: "Added to your gear bag", spriteUrl: await haulSprite("gear", item.id) } : null;
     }
     if (kind === "chest") {
         const chest = CHEST_TIER[tier] || "wooden";
@@ -507,6 +510,19 @@ async function readFishRow(buyerId) {
 // Postgres DATE column reads today as yesterday on Vercel — that bug already broke the daily check-in once.
 const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0);
 
+// THE ONE ANSWER to "how many casts do I have". Every screen and every gate reads it through here, off the row
+// plus the angling points — nothing else adds up its own total.
+//
+// Three places used to do that arithmetic separately, each with its own idea of what counted, and they
+// disagreed in public: a member watched the Sailing tab say "6/16 casts left" while the Fishing tab said
+// "0/10" and the server refused the cast outright. The Rail's Line level was missing from one path, the bought
+// recharges from another. A number a player is asked to act on cannot have three opinions behind it.
+export function castsFor(row, angling = 0) {
+    const max = castsAvailable(row, angling, fishTrackLevels(row).line);
+    const used = castsUsed(row);
+    return { used, max, left: Math.max(0, max - used), bought: rechargesToday(row) };
+}
+
 // ── CLIENT VIEW ──────────────────────────────────────────────────────────────────────────────────────────────
 // PURE function off the sailing row — no extra query, so this is free to include in every sailing state load.
 // `status` is the voyage status decorate() already computed. Fishing is offered at sea AND docked — the only
@@ -514,9 +530,7 @@ const castsUsed = (row) => (row?.fish_is_today ? Number(row.fish_casts) || 0 : 0
 export function fishingView(row, angling = 0, status = "idle") {
     const log = logOf(row);
     const lv = fishTrackLevels(row);
-    const max = castsAvailable(row, angling, lv.line);
-    const used = castsUsed(row);
-    const bought = rechargesToday(row);
+    const { max, used, bought } = castsFor(row, angling);
     const hooked = row?.fish_state || null;
     const caughtIds = Object.keys(log);
     return {
@@ -576,7 +590,7 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const lv = fishTrackLevels(row);
     // castsAvailable, NOT castsPerDay — a member who has paid for an extra cast must actually get it. This is
     // the same trap that once let the view promise "2/13 left" while the mutator refused at 11.
-    const max = castsAvailable(row, angling, lv.line);
+    const max = castsFor(row, angling).max;
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
 
     // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
@@ -911,7 +925,7 @@ export async function buyRecharge(buyerId) {
     if (!row) return { ok: false, error: "no_ship" };
     const lv = fishTrackLevels(row);
     const used = castsUsed(row);
-    const max = castsAvailable(row, angling, lv.line);
+    const max = castsFor(row, angling).max;
     if (used < max) return { ok: false, error: "still_have_casts" };
     const bought = rechargesToday(row);
     if (bought >= RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed" };

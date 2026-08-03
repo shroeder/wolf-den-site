@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import ItemArt from "@/components/ItemArt";
 import { createPortal } from "react-dom";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -357,6 +359,10 @@ export function FishingLog({ log, known, total, records, onClose }) {
 // ── THE SCENE ────────────────────────────────────────────────────────────────────────────────────────────────
 // `fishing` is the server's fishing view. `onCast`/`onLand` post to the sailing endpoint and resolve with the
 // server's reply; the parent owns the state refresh.
+// RARITY_COLOR already lives at the top of this file — the fish log uses it.
+const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
+const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+
 export default function FishingScene({ fishing, sky, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
@@ -646,10 +652,33 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                             </div>
                         </div>
                         <div className="fish-spoils">
-                            <span className="fish-chip gold">+{result.gold} 🪙</span>
-                            <span className="fish-chip xp">+{result.xp} ✨ XP</span>
-                            {(result.extras || []).map((e, i) => <span key={i} className="fish-chip extra">{e.emoji} {e.label}</span>)}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <span className="fish-chip gold"><img src="/images/ui/coin.png" alt="" className="fish-chip-ico" />+{result.gold}</span>
+                            <span className="fish-chip xp">+{result.xp} XP</span>
+                            {/* Everything that ISN'T gear stays a chip. Gear gets its own card below. */}
+                            {(result.extras || []).filter((e) => e.kind !== "gear").map((e, i) => (
+                                <span key={i} className="fish-chip extra">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    {e.spriteUrl ? <img src={e.spriteUrl} alt="" className="fish-chip-ico" /> : null}
+                                    {e.label}
+                                </span>
+                            ))}
                         </div>
+
+                        {/* GEAR, IN FULL. A piece of gear off the sea floor was a purple text pill the same size
+                            as "+5 gold" — the one thing in the haul you might actually equip, rendered as a
+                            footnote. Same treatment as a chest opening or a seam: real art, rarity frame, slot
+                            and the stat line. */}
+                        {(result.extras || []).filter((e) => e.kind === "gear").map((e, i) => (
+                            <div key={`g${i}`} className="fish-gear" style={{ "--rar": RARITY_COLOR[e.rarity] || "#cdd3d8" }}>
+                                <span className="fish-gear-lab">Off the sea floor</span>
+                                <ItemArt id={e.id} icon={e.icon} className="fish-gear-art" alt="" />
+                                <i className="fish-gear-tag">{(e.rarity || "").toUpperCase()}</i>
+                                <b className="fish-gear-name" style={{ color: RARITY_COLOR[e.rarity] || "#e7dcc8" }}>{e.label}</b>
+                                {e.slot ? <i className="fish-gear-slot">{String(e.slot).replace("_", " ")}</i> : null}
+                                {e.stats ? <i className="fish-gear-stats">{statLine(e.stats)}</i> : null}
+                            </div>
+                        ))}
                         <div className="fish-actions">
                             <button
                                 type="button"
