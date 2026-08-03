@@ -48,7 +48,8 @@ export default function MiningClient({ initial }) {
     const [shake, setShake] = useState(0);
     const [tab, setTab] = useState("survey");
     const [pickedSpot, setPickedSpot] = useState(null); // spot selected on the rock face
-    const [sounding, setSounding] = useState(null); // spot mid test-strike, for the echo animation // mine | smelt — two halves of the feature, like the other systems
+    const [sounding, setSounding] = useState(null); // spot mid test-strike, for the echo animation
+    const [reveal, setReveal] = useState(null); // the whole face, shown after you commit // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
     const post = useCallback(async (body) => {
@@ -94,7 +95,12 @@ export default function MiningClient({ initial }) {
         setBusy(true);
         const r = await post({ action: "claim_spot", index });
         setBusy(false);
-        if (r?.unlocked && r?.ok !== false) { setState(r); setTab("mine"); } // committing puts you on the rock
+        if (r?.unlocked && r?.ok !== false) {
+            setState(r);
+            setPickedSpot(null);
+            if (r.reveal) { setReveal(r.reveal); if (r.reveal.bestRead) clink(1); }
+            else setTab("mine");
+        }
         else if (r?.error === "spot_gone") { if (r?.unlocked) setState(r); say("That spot collapsed — survey again."); }
         else say("Couldn't start on that spot.");
     };
@@ -221,7 +227,10 @@ export default function MiningClient({ initial }) {
                             ) : null}
                             {sv ? (
                                 <div className="mine-survey-hud">
-                                    <b>{sv.left}</b> test-strike{sv.left === 1 ? "" : "s"} left · {sv.spots.length} spots
+                                    <span className="mine-pips-strike" aria-label={`${sv.left} of ${sv.probes} test-strikes left`}>
+                                        {Array.from({ length: sv.probes }, (_, k) => <i key={k} className={k < sv.left ? "on" : ""}>🔨</i>)}
+                                    </span>
+                                    <span>{sv.spots.length} spots · tap one to sound it</span>
                                 </div>
                             ) : null}
                             {msg ? <div className="mine-msg">{msg}</div> : null}
@@ -245,6 +254,17 @@ export default function MiningClient({ initial }) {
                                 <span className="mine-readout-body"><b>Tap a mark to sound it out</b><em>A deep resonance is the rich rock — but you can&rsquo;t sound out every spot.</em></span>
                             )}
                         </div> : null}
+                        {/* THE KEY. The bands are the whole game, so they're written down rather than learned
+                            by folklore. */}
+                        <div className="mine-legend">
+                            {(s.legend || []).map((g) => (
+                                <span key={g.key} className="mine-legend-item">
+                                    <i style={{ background: g.color }} aria-hidden="true" />
+                                    <b>{g.label}</b>
+                                    <em>{g.range}</em>
+                                </span>
+                            ))}
+                        </div>
                         {sv ? <button type="button" className="mine-prospect is-ghost" onClick={() => { setPickedSpot(null); survey(); }} disabled={busy}>New rock face</button> : null}
                     </>
                 );
@@ -405,6 +425,38 @@ export default function MiningClient({ initial }) {
             </>
             )}
 
+            {/* THE FACE REVEALED — what every spot actually was, and how your read scored. */}
+            {reveal ? (
+                <div className="mine-modal" role="presentation" onClick={() => { setReveal(null); setTab("mine"); }}>
+                    <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ color: reveal.bestRead ? "#ffd75e" : "#e7dcc8" }}>
+                            {reveal.bestRead ? "Best read on the wall" : `You took the ${reveal.rank}${reveal.rank === 2 ? "nd" : reveal.rank === 3 ? "rd" : reveal.rank === 1 ? "st" : "th"} richest of ${reveal.total}`}
+                        </h3>
+                        <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+                            {reveal.bestRead ? "Nothing better was hiding on that face." : "Here's what the rest of the rock was holding."}
+                        </p>
+                        <div className="mine-reveal-row">
+                            {reveal.spots.map((sp) => (
+                                <span key={sp.index} className={`mine-reveal-spot${sp.picked ? " is-picked" : ""}`} title={sp.name}>
+                                    <Img src={sp.art} className="mine-reveal-ore" fallback="◆" />
+                                    <em style={{ color: sp.color }}>{sp.name.split(" ")[0]}</em>
+                                    {sp.picked ? <b>yours</b> : null}
+                                </span>
+                            ))}
+                        </div>
+                        {reveal.bonus ? (
+                            <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
+                                <b>Best-read bonus</b>
+                                <em>+{money(reveal.bonus.gold)} gold · +{money(reveal.bonus.xp)} XP for reading the rock right.</em>
+                            </div>
+                        ) : null}
+                        <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setReveal(null); setTab("mine"); }}>
+                            ⛏️ Start swinging
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+
             {/* Cracked-it reveal */}
             {crack ? (
                 <div className="mine-modal" role="presentation" onClick={() => setCrack(null)}>
@@ -517,6 +569,23 @@ export default function MiningClient({ initial }) {
                     border: 2px solid rgba(255,226,138,0.85); animation: mineEcho .62s ease-out forwards; pointer-events: none; }
                 @keyframes mineKnock { 0% { transform: translate(-50%,-50%) scale(1); } 45% { transform: translate(-50%,-50%) scale(0.9); } 100% { transform: translate(-50%,-50%) scale(1); } }
                 @keyframes mineEcho { from { transform: scale(0.7); opacity: 0.95; } to { transform: scale(2.6); opacity: 0; } }
+                .mine-pips-strike { display: inline-flex; gap: 3px; }
+                .mine-pips-strike i { font-style: normal; font-size: 13px; opacity: 0.22; filter: grayscale(1); }
+                .mine-pips-strike i.on { opacity: 1; filter: none; }
+                .mine-survey-hud { display: flex; align-items: center; justify-content: center; gap: 8px; }
+                .mine-legend { display: flex; gap: 6px; margin-top: 10px; }
+                .mine-legend-item { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 7px 8px; border-radius: 10px;
+                    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); min-width: 0; }
+                .mine-legend-item i { width: 100%; height: 3px; border-radius: 999px; }
+                .mine-legend-item b { font-size: 11.5px; margin-top: 3px; }
+                .mine-legend-item em { font-size: 10.5px; font-style: normal; color: #9aa2ab; }
+                .mine-reveal-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+                .mine-reveal-spot { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 6px; border-radius: 10px;
+                    background: rgba(255,255,255,0.04); border: 1px solid transparent; min-width: 58px; }
+                .mine-reveal-spot.is-picked { border-color: #ffd75e; background: rgba(255,215,94,0.14); }
+                .mine-reveal-ore { width: 32px; height: 32px; object-fit: contain; }
+                .mine-reveal-spot em { font-size: 10.5px; font-style: normal; }
+                .mine-reveal-spot b { font-size: 9.5px; color: #ffd75e; text-transform: uppercase; letter-spacing: 0.04em; }
                 .mine-face-cta { position: relative; text-align: center; padding: 16px; }
                 .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }

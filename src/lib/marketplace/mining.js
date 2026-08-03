@@ -313,6 +313,7 @@ export async function getMiningState(buyerId) {
             };
         })() : null,
         seamsLive: Number(liveCount?.n) || 0,
+        legend: SURVEY_LEGEND.map((g) => ({ key: g.key, label: g.label, range: g.range, color: g.color })),
         // The survey in progress. Unrevealed spots carry NO signal — the answer stays on the server until a
         // test-strike is spent on it, or the whole game is readable straight out of the network tab.
         survey: (() => {
@@ -369,10 +370,12 @@ export async function getMiningState(buyerId) {
 // promising which, so probing is real information and never a certainty. Rolled ONCE per survey and stored,
 // so re-reading a spot can't reroll it into a better answer.
 export const SURVEY_SIGNALS = {
-    dull: { key: "dull", label: "A dull thud", hint: "Close to the surface. Poor rock.", color: "#8b8f96" },
-    ring: { key: "ring", label: "A clean ring", hint: "Something solid in there.", color: "#6fb0e6" },
-    deep: { key: "deep", label: "A deep resonance", hint: "Whatever that is, it's rich.", color: "#ffb020" },
+    dull: { key: "dull", label: "A dull thud", hint: "Close to the surface. Poor rock.", color: "#8b8f96", range: "Coal or Iron", low: 1, high: 2 },
+    ring: { key: "ring", label: "A clean ring", hint: "Something solid in there.", color: "#6fb0e6", range: "Iron to Mythril", low: 2, high: 4 },
+    deep: { key: "deep", label: "A deep resonance", hint: "Rich rock. Could be the best on the wall.", color: "#ffb020", range: "Mythril or Emberheart", low: 4, high: 5 },
 };
+// The legend, so the bands are LEARNABLE rather than folklore. Shown on the rock face itself.
+export const SURVEY_LEGEND = ["dull", "ring", "deep"].map((k) => SURVEY_SIGNALS[k]);
 function signalForTier(tier) {
     if (tier <= 1) return "dull";
     if (tier === 2) return Math.random() < 0.5 ? "dull" : "ring";
@@ -438,8 +441,45 @@ export async function claimSpot(buyerId, index) {
     // a seam that isn't there.
     const live = await db.queryOne(`SELECT id FROM mkt_ore_node WHERE id = $1 AND status = 'active'`, [nodeId]).catch(() => null);
     if (!live) return { ok: false, error: "spot_gone", ...(await getMiningState(buyerId)) };
+
+    // THE REVEAL. Show what every spot actually was, and where the one you took ranked. This is the part that
+    // teaches the bands: you find out whether "a clean ring" was a 2 or a 4, and you carry that into the next
+    // face. It's also the tension — you get to see the Emberheart you walked past.
+    const rows = await db.query(`SELECT id, tier FROM mkt_ore_node WHERE id = ANY($1)`, [survey.spots]).catch(() => []);
+    const tierOf = Object.fromEntries(rows.map((r) => [String(r.id), Number(r.tier)]));
+    const spots = survey.spots.map((id, idx) => {
+        const tier = tierOf[String(id)] || 0;
+        const o = tier ? oreTier(tier) : null;
+        return { index: idx, tier, name: o?.name || "Collapsed", color: o?.color || "#6b6f76", art: tier ? oreArt(tier) : null, picked: idx === i };
+    });
+    const tiers = spots.map((x) => x.tier);
+    const best = Math.max(...tiers, 0);
+    const mine = tierOf[String(nodeId)] || 0;
+    // Rank by tier, ties sharing the best rank — picking one of two equal-best seams is still a best read.
+    const rank = tiers.filter((t) => t > mine).length + 1;
+    const bestRead = mine > 0 && mine === best;
+
     await db.query(`UPDATE mkt_mining SET current_node_id = $2, survey_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, nodeId]).catch(() => {});
-    return { ok: true, ...(await getMiningState(buyerId)) };
+
+    // A good read pays. Deliberately a BONUS for getting it right and never a penalty for getting it wrong —
+    // a survey you misread still hands you a real seam to work.
+    let bonus = null;
+    if (bestRead && spots.length > 1) {
+        const o = oreTier(mine);
+        const gold = 15 + o.gold;
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+        await logCoin(buyerId, gold, "mining", { balanceAfter: paid?.gold, meta: { kind: "best_read" } }).catch(() => {});
+        // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
+        await awardXp(buyerId, "mining", { points: 10 + o.xp, gold: 0 }).catch(() => {});
+        bonus = { gold, xp: 10 + o.xp };
+    }
+    await trackActivity(buyerId, "ore_claim", { tier: mine, rank, best, bestRead }).catch(() => {});
+
+    return {
+        ok: true,
+        reveal: { spots, rank, total: spots.length, bestRead, bonus, pickedTier: mine, bestTier: best },
+        ...(await getMiningState(buyerId)),
+    };
 }
 
 // How hard one swing lands, before the timing grade. Pickaxe track is the whole of it for now; the mining gear
