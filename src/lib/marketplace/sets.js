@@ -3,6 +3,18 @@ import "server-only";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 
+// EVERY SET NEEDS ITS OWN IDENTITY AT 2 PIECES.
+// The capstones were always distinct — crit bonus, erupt, execute, extra strike, pack damage. The TIERS were
+// not: eight combat sets all read "+N% of one of the same five stats", and Wildstalker and Frostbound had
+// bonuses that were character-for-character IDENTICAL ({crit_chance:6} then {crit_chance:8, crit_power:12}),
+// so two different chases paid exactly the same thing. Nothing in the UI could tell them apart above the name.
+//
+// Each combat set now owns ONE stat at 2 pieces — the line you read first is the set's whole personality:
+//   Warlord    MIGHT      Dragonlord FEROCITY   Voidbound  FORTUNE     Wildstalker CRIT CHANCE (how often)
+//   Titanforged MIGHT+vol Celestial  FORTUNE    Frostbound CRIT POWER (how hard)  Undying FEROCITY (attrition)
+// 4-piece stat BUDGETS are held at their old totals (ranger 20, frost 20, undying 30) so nobody's damage moves
+// — this is a redistribution for legibility, not a buff.
+//
 // Themed gear SETS. Equip N matching pieces to unlock tiered stat bonuses (extra stats on top of the items),
 // and a FULL set unlocks a CAPSTONE proc (a signature-style effect). Each set also has a WEAKNESS AFFINITY:
 // when this week's boss is weak to that playstyle, an active set deals bonus damage — so the "best" set to
@@ -36,7 +48,7 @@ export const ITEM_SETS = [
     {
         id: "ranger", name: "Wildstalker's Kit",
         items: ["hunters_bow", "rangers_hood", "swift_boots", "focus_band"],
-        bonuses: [{ need: 2, stats: { crit_chance: 6 } }, { need: 4, stats: { crit_chance: 8, crit_power: 12 } }],
+        bonuses: [{ need: 2, stats: { crit_chance: 8 } }, { need: 4, stats: { crit_chance: 14, might: 6 } }],
         capstone: { first_double: true, desc: "Full set: your FIRST strike each day deals DOUBLE." },
         weakness: "sluggish",
     },
@@ -57,14 +69,14 @@ export const ITEM_SETS = [
     {
         id: "frost", name: "Frostbound",
         items: ["frost_brand", "frost_barrier", "frost_treads", "droplet_ring"],
-        bonuses: [{ need: 2, stats: { crit_chance: 6 } }, { need: 4, stats: { crit_chance: 8, crit_power: 12 } }],
+        bonuses: [{ need: 2, stats: { crit_power: 10 } }, { need: 4, stats: { crit_power: 20 } }],
         capstone: { erupt: { chance: 0.25, mult: 3 }, desc: "Full set: 25% chance on each strike to SHATTER for ×3." },
         weakness: "unstable",
     },
     {
         id: "undying", name: "The Undying",
         items: ["bone_mace", "cultist_hood", "bone_ring", "spectre_locket"],
-        bonuses: [{ need: 2, stats: { crit_power: 10 } }, { need: 4, stats: { crit_chance: 10, crit_power: 20 } }],
+        bonuses: [{ need: 2, stats: { ferocity: 10 } }, { need: 4, stats: { ferocity: 14, crit_power: 16 } }],
         capstone: { execute: 0.5, desc: "Full set: +50% damage while the boss is under 25% HP." },
         weakness: "frail",
     },
