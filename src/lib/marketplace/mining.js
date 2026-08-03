@@ -248,7 +248,7 @@ export async function getMiningState(buyerId) {
     const lantern = surveyValue("lantern", row?.lantern_level);
     await refreshNodes(lantern);
 
-    const [current, ore, goldRow, liveCount] = await Promise.all([
+    const [current, ore, goldRow, liveCount, faceRows] = await Promise.all([
         row?.current_node_id
             ? db.queryOne(
                 `SELECT n.id, n.tier, n.hp, n.hp_max, COALESCE(h.damage, 0) AS my_damage, COALESCE(h.swings, 0) AS my_swings,
@@ -262,6 +262,10 @@ export async function getMiningState(buyerId) {
         db.query(`SELECT tier, qty FROM mkt_ore WHERE buyer_id = $1 AND qty > 0 ORDER BY tier`, [buyerId]).catch(() => []),
         db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_ore_node WHERE status = 'active'`).catch(() => null),
+        // Tiers of the spots on the current face, for the MANIFEST (see below).
+        row?.survey_json?.spots?.length
+            ? db.query(`SELECT id, tier FROM mkt_ore_node WHERE id = ANY($1)`, [row.survey_json.spots]).catch(() => [])
+            : Promise.resolve([]),
     ]);
 
     const lvls = totalLevels(row);
@@ -320,7 +324,18 @@ export async function getMiningState(buyerId) {
             const sv = row?.survey_json;
             if (!sv?.spots?.length) return null;
             const revealed = Array.isArray(sv.revealed) ? sv.revealed : [];
+            // THE MANIFEST — what this wall holds, unordered. This is what stops the survey being a guess:
+            // knowing the face contains exactly one Mythril turns a "deep resonance" from a hint into a
+            // certainty, and two dull readings against two Coal tells you where the good rock ISN'T without
+            // spending a strike on it. The composition is exact; only the ARRANGEMENT is hidden.
+            const tierById = Object.fromEntries((faceRows || []).map((r) => [String(r.id), Number(r.tier)]));
+            const counts = {};
+            for (const id of sv.spots) { const t = tierById[String(id)]; if (t) counts[t] = (counts[t] || 0) + 1; }
+            const manifest = Object.entries(counts)
+                .map(([t, n]) => { const o = oreTier(Number(t)); return { tier: Number(t), n, name: o.name, color: o.color, art: oreArt(Number(t)) }; })
+                .sort((a, b) => b.tier - a.tier);
             return {
+                manifest,
                 probes: Number(sv.probes) || 0,
                 used: revealed.length,
                 left: Math.max(0, (Number(sv.probes) || 0) - revealed.length),

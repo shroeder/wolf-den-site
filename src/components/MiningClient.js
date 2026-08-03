@@ -197,6 +197,22 @@ export default function MiningClient({ initial }) {
                 const sel = sv ? sv.spots.find((x) => x.index === pickedSpot) || null : null;
                 return (
                     <>
+                        {sv?.manifest?.length ? (
+                            <div className="mine-manifest">
+                                <span className="mine-manifest-lab">This wall holds</span>
+                                <span className="mine-manifest-list">
+                                    {sv.manifest.map((m) => (
+                                        <span key={m.tier} className="mine-manifest-item" title={m.name}>
+                                            <Img src={m.art} className="mine-manifest-ore" fallback="◆" />
+                                            <b style={{ color: m.color }}>{m.name.split(" ")[0]}</b>
+                                            <em>×{m.n}</em>
+                                        </span>
+                                    ))}
+                                </span>
+                                <span className="mine-manifest-note">Where they are is the part you have to work out.</span>
+                            </div>
+                        ) : null}
+
                         <div className="mine-face is-survey">
                             <div className="mine-face-bg is-survey" aria-hidden="true" />
                             {(sv?.spots || []).map((sp, i) => {
@@ -573,6 +589,16 @@ export default function MiningClient({ initial }) {
                 .mine-pips-strike i { font-style: normal; font-size: 13px; opacity: 0.22; filter: grayscale(1); }
                 .mine-pips-strike i.on { opacity: 1; filter: none; }
                 .mine-survey-hud { display: flex; align-items: center; justify-content: center; gap: 8px; }
+                .mine-manifest { margin-bottom: 10px; padding: 10px 12px; border-radius: 12px;
+                    background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.28); }
+                .mine-manifest-lab { display: block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.06em;
+                    text-transform: uppercase; color: #ffd75e; margin-bottom: 7px; }
+                .mine-manifest-list { display: flex; gap: 7px; flex-wrap: wrap; }
+                .mine-manifest-item { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px;
+                    background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); font-size: 12px; }
+                .mine-manifest-ore { width: 20px; height: 20px; object-fit: contain; }
+                .mine-manifest-item em { font-style: normal; color: #cdd3d8; font-weight: 800; }
+                .mine-manifest-note { display: block; margin-top: 7px; font-size: 11px; color: #9aa2ab; }
                 .mine-legend { display: flex; gap: 6px; margin-top: 10px; }
                 .mine-legend-item { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 7px 8px; border-radius: 10px;
                     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); min-width: 0; }
