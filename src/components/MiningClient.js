@@ -361,6 +361,8 @@ export default function MiningClient({ initial }) {
                 .mine-rank-rich > span { display: block; height: 100%; border-radius: 999px;
                     background: linear-gradient(90deg, var(--rk), #fff8); }
                 /* What CAN come out — shown as real sprites, never named. The tease is the point. */
+                .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
+                .mine-bag-how b { color: #ffd75e; }
                 .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
                     padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
                 .mine-bag-kinds .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }

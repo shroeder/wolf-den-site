@@ -209,8 +209,9 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         <div className="mmg-name">{node?.name}</div>
                         <div className="mmg-tier">smelts to tier {node?.partTier}</div>
                     </div>
-                    <div className="mmg-tickets" title="Rare tickets your timing has put in the bag">
-                        <b>{tickets}</b><span>rare</span>
+                    {/* "rare" alone meant nothing to anyone who hadn't read the code. Say what it buys. */}
+                    <div className="mmg-tickets" title="Clean swings add chances at gear, a chest or a windfall when the seam opens">
+                        <b>{tickets}</b><span>lucky</span>
                     </div>
                 </div>
 
@@ -268,10 +269,21 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                                 )
                             ))}
                         </div>
+                        {/* WHAT A TICKET IS. The old line said "7 rare tickets went in from your timing" and
+                            never once explained what a ticket does — and it counted GREAT swings as rare when
+                            they only ever added a good ticket. Both fixed: plain words, honest numbers. */}
                         <p className="mmg-draw-note">
                             <b>{(cracked.draws || []).length} pull{(cracked.draws || []).length === 1 ? "" : "s"}</b>
-                            {" from the bag. "}
-                            {cracked.seeded ? `${cracked.seeded} rare ticket${cracked.seeded === 1 ? "" : "s"} went in from your timing.` : "No rare tickets that time — clean swings put them in."}
+                            {" from the bag — your rank decides how many."}
+                        </p>
+                        <p className="mmg-draw-note is-sub">
+                            {cracked.rareSeeds || cracked.goodSeeds ? (
+                                <>Your timing stocked it:{" "}
+                                    {cracked.rareSeeds ? <><b className="mmg-seed-rare">{cracked.rareSeeds}</b> shot{cracked.rareSeeds === 1 ? "" : "s"} at gear, a chest or a windfall</> : null}
+                                    {cracked.rareSeeds && cracked.goodSeeds ? " · " : null}
+                                    {cracked.goodSeeds ? <><b>{cracked.goodSeeds}</b> at a richer haul</> : null}
+                                </>
+                            ) : "Nothing but plain rock in the bag — clean swings are what stock it."}
                         </p>
                         <button type="button" className="mmg-tap" onClick={() => onDone(cracked)}>Pocket it</button>
                     </div>
@@ -309,7 +321,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                             <span>Swings <b>{hits}</b></span>
                             <span title="Your average swing quality — this is what the rank is read off">Quality <b>{quality}%</b></span>
                             <span className={chain >= 3 ? "mmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
-                            <span>Bag <b>{tickets}</b></span>
+                            <span title="Chances at something better than ore when the seam opens">Luck <b>{tickets}</b></span>
                         </div>
                         {notice ? <p className="mmg-notice">{notice}</p> : null}
                         <p className="mmg-hint">Dead centre is PIXEL. Clean swings drop rare tickets in the bag — what the seam pays is drawn from it when the rock opens.</p>
@@ -401,6 +413,8 @@ const MMG_CSS = `
 .mmg-hint { margin: 9px 0 0; font-size: 11px; line-height: 1.5; color: #8b8171; text-align: center; }
 
 .mmg-draw { position: relative; overflow: hidden; }
+.mmg-draw-note.is-sub { margin-top: -4px; font-size: 11.5px; color: #9aa2ab; }
+.mmg-seed-rare { color: #ffd75e; }
 /* A slow sweep of the rank's own colour behind the whole reveal. */
 .mmg-draw-rays { position: absolute; inset: -70% -70% auto -70%; height: 240%; pointer-events: none; opacity: .28;
     background: conic-gradient(from 0deg, transparent 0 11deg, var(--rk) 12deg 14deg, transparent 15deg 30deg);

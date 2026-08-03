@@ -90,6 +90,11 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                                 <span className="mine-rank-rich" aria-hidden="true"><span style={{ width: `${Math.round(r.rich * 100)}%` }} /></span>
                             </div>
                         ))}
+                        <p className="mine-bag-how">
+                            A clean swing drops a <b>lucky ticket</b> in the bag before you pull from it. PERFECT
+                            and PIXEL add a shot at gear, a chest or a windfall; GREAT adds a shot at a richer
+                            haul. They are the only reason a pull is ever anything but plain ore.
+                        </p>
                         <div className="mine-bag-kinds">
                             <span className="muted">In the bag</span>
                             <Img src={node.art} className="mine-bag-ico" fallback="" />

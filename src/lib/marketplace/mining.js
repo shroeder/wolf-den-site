@@ -32,12 +32,17 @@ export const MINING_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId)
 //
 // These were 60 / 110 / 190 / 320 / 520, tuned back when a hand was capped at eight swings and HP was just a
 // race the cap would win. It didn't: a single PERFECT strike does 90, so a 60 HP Coal seam died on tap one.
+// `name` is the SEAM — a place in the rock. `ore` is the material you carry out of it.
+//
+// There was only ever `name`, so a pile of ore was labelled with the name of the hole it came from: breaking a
+// Coal Seam paid out "Iron Vein ×6", which reads as six veins rather than six lumps of iron. Two different
+// nouns doing one job.
 export const ORE_TIERS = {
-    1: { tier: 1, id: "coal", name: "Coal Seam", color: "#8b8f96", part: 1, weight: 44, hp: 460, xp: 6, gold: 5 },
-    2: { tier: 2, id: "iron", name: "Iron Vein", color: "#cfd6dd", part: 2, weight: 30, hp: 520, xp: 12, gold: 11 },
-    3: { tier: 3, id: "silver", name: "Silver Lode", color: "#6fb0e6", part: 3, weight: 17, hp: 580, xp: 24, gold: 22 },
-    4: { tier: 4, id: "mythril", name: "Mythril Seam", color: "#b98cff", part: 4, weight: 7, hp: 640, xp: 48, gold: 44 },
-    5: { tier: 5, id: "emberheart", name: "Emberheart Geode", color: "#ffb020", part: 5, weight: 2, hp: 700, xp: 96, gold: 90 },
+    1: { tier: 1, id: "coal", name: "Coal Seam", ore: "Coal", color: "#8b8f96", part: 1, weight: 44, hp: 460, xp: 6, gold: 5 },
+    2: { tier: 2, id: "iron", name: "Iron Vein", ore: "Iron Ore", color: "#cfd6dd", part: 2, weight: 30, hp: 520, xp: 12, gold: 11 },
+    3: { tier: 3, id: "silver", name: "Silver Lode", ore: "Silver Ore", color: "#6fb0e6", part: 3, weight: 17, hp: 580, xp: 24, gold: 22 },
+    4: { tier: 4, id: "mythril", name: "Mythril Seam", ore: "Mythril Ore", color: "#b98cff", part: 4, weight: 7, hp: 640, xp: 48, gold: 44 },
+    5: { tier: 5, id: "emberheart", name: "Emberheart Geode", ore: "Emberheart Crystal", color: "#ffb020", part: 5, weight: 2, hp: 700, xp: 96, gold: 90 },
 };
 export const oreTier = (t) => ORE_TIERS[t] || ORE_TIERS[1];
 
@@ -130,7 +135,7 @@ function rollFind(card, depth, packBonus = 0) {
         case "ore": {
             const t = pickTier();
             const o = oreTier(t);
-            return { kind: "ore", tier: t, n: Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * (1 + packBonus))), name: o.name, color: o.color, art: oreArt(t) };
+            return { kind: "ore", tier: t, n: Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * (1 + packBonus))), name: o.ore, color: o.color, art: oreArt(t) };
         }
         case "gold": return { kind: "gold", n: Math.round((20 + Math.floor(Math.random() * (18 * depth + 20))) * (1 + packBonus)) };
         case "consumable": return { kind: "consumable" };
@@ -636,7 +641,7 @@ export async function getMiningState(buyerId) {
             const o = oreTier(r.tier);
             const cost = smeltCostFor(row?.crucible_level);
             const qty = Number(r.qty);
-            return { tier: r.tier, name: o.name, color: o.color, art: oreArt(r.tier), qty, partTier: o.part,
+            return { tier: r.tier, name: o.ore, color: o.color, art: oreArt(r.tier), qty, partTier: o.part,
                 smeltCost: cost, canSmelt: Math.floor(qty / cost) };
         }),
         oreTotal: (ore || []).reduce((s, r) => s + Number(r.qty), 0),
@@ -780,12 +785,12 @@ async function claimNode(buyerId, node, row, run = {}) {
         const ticket = bag[Math.floor(Math.random() * bag.length)] || "ore";
         if (ticket === "ore") {
             const n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + haulBonus)));
-            out.push({ kind: "ore", tier: node.tier, n, name: o.name, color: o.color, art: oreArt(node.tier) });
+            out.push({ kind: "ore", tier: node.tier, n, name: o.ore, color: o.color, art: oreArt(node.tier) });
         } else if (ticket === "good") {
             // The middle of the bag: a better grade of ordinary — more of it, or a rung up.
             const up = Math.random() < 0.4 && node.tier < 5 ? node.tier + 1 : node.tier;
             const uo = oreTier(up);
-            out.push({ kind: "ore", tier: up, n: Math.max(2, Math.round((4 + Math.floor(Math.random() * 3)) * (1 + haulBonus))), name: uo.name, color: uo.color, art: oreArt(up) });
+            out.push({ kind: "ore", tier: up, n: Math.max(2, Math.round((4 + Math.floor(Math.random() * 3)) * (1 + haulBonus))), name: uo.ore, color: uo.color, art: oreArt(up) });
         } else {
             // RARE tickets are where the fun lives — the things you cannot get by grinding ore.
             const roll = Math.random();
@@ -825,11 +830,16 @@ async function claimNode(buyerId, node, row, run = {}) {
     await db.query(`UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, current_node_id = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, oreTotal]).catch(() => {});
     // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
     await awardXp(buyerId, "mining", { points: Math.round(o.xp * (1 + pct)), gold: 0 }).catch(() => {});
-    await trackActivity(buyerId, "ore_mined", { tier: node.tier, draws: paid.length, seeds: seeds.length }).catch(() => {});
+    // Split, because they are not the same thing: a PERFECT or PIXEL adds a rare ticket (gear, a chest, a
+    // windfall); a GREAT adds a good one (more ore, sometimes a tier better). Reporting both as "rare tickets"
+    // overstated what a clean run had actually bought.
+    const rareSeeds = seeds.filter((x) => x === "rare").length;
+    const goodSeeds = seeds.length - rareSeeds;
+    await trackActivity(buyerId, "ore_mined", { tier: node.tier, draws: paid.length, rare: rareSeeds, good: goodSeeds }).catch(() => {});
 
     return {
         tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
-        draws: paid, seeded: seeds.length, xp: o.xp,
+        draws: paid, seeded: seeds.length, rareSeeds, goodSeeds, xp: o.xp,
         rank: rank.key, rankLabel: rank.label, rankColor: rank.color,
         score: run.score || 0, scoreMax: hits * HIT_SCORE.pixel, pct: Math.round(pct * 100), hits,
     };
@@ -920,7 +930,7 @@ export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
     return {
         ok: true,
         smelted: {
-            oreTier: t, oreName: o.name, oreSpent: spend, partTier: o.part,
+            oreTier: t, oreName: o.ore, oreSpent: spend, partTier: o.part,
             band: band.key, bandLabel: band.label, bandBlurb: band.blurb, heat: Math.round(h * 100),
             parts: totalParts, ups, extras, bonus,
             byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
