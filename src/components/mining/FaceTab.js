@@ -56,8 +56,13 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                             <b style={{ color: node.color }}>{node.name}</b>
                             <span className="muted">smelts to {PART_NAME[node.partTier]}</span>
                         </div>
+                        {/* The hand, not the rock. This bar tracked HP, which is why a seam could read
+                            "100% left" and then be gone one swing later — a good hit killed a Coal seam
+                            outright. A seam is N swings now and the bar says exactly that. */}
                         <div className="mine-hpbar"><span style={{ width: `${node.pct}%`, background: node.color }} /></div>
-                        <div className="mine-hpnum">{node.pct}% left{node.mySwings ? ` · ${node.mySwings} swing${node.mySwings === 1 ? "" : "s"} in` : ""}</div>
+                        <div className="mine-hpnum">
+                            <b>{node.hitsLeft}</b> of {node.maxHits} swings left
+                        </div>
                         {floats.map((f) => <span key={f.id} className={`mine-float is-${f.grade}`}>{f.dmg}</span>)}
                     </>
                 ) : <NoSeam s={s} tripsLeft={tripsLeft} backToTunnel={backToTunnel} />}

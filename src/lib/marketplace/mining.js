@@ -251,8 +251,32 @@ async function cutSeam(buyerId, tier) {
 }
 
 // A piece of gear out of the dark. Deeper digs reach higher rarities; never a duplicate.
+// What the rock can be carrying, by how deep you were when you found it.
+//
+// This was a fallback CHAIN — ["epic","rare","common"], take the first rarity with anything left in it — which
+// is not a rarity roll at all: past depth 5 every single gear drop was an Epic, because there is always an
+// unowned Epic. It read like a weighted table and behaved like a guarantee.
+//
+// Now it rolls, and the chain is only what it always should have been: where to look if the rolled rarity has
+// nothing left to give you.
+const GEAR_ODDS = [
+    { min: 8, roll: [["legendary", 10], ["epic", 28], ["rare", 62]] },
+    { min: 5, roll: [["epic", 12], ["rare", 36], ["common", 52]] },
+    { min: 0, roll: [["rare", 20], ["common", 80]] },
+];
+function rollGearRarity(depth) {
+    const band = GEAR_ODDS.find((b) => depth >= b.min) || GEAR_ODDS[GEAR_ODDS.length - 1];
+    const total = band.roll.reduce((n, [, w]) => n + w, 0);
+    let r = Math.random() * total;
+    for (const [rarity, w] of band.roll) { r -= w; if (r <= 0) return { rarity, order: band.roll.map(([x]) => x) }; }
+    const last = band.roll[band.roll.length - 1][0];
+    return { rarity: last, order: band.roll.map(([x]) => x) };
+}
+
 async function grantMiningGear(buyerId, depth) {
-    const ladder = depth >= 8 ? ["legendary", "epic", "rare"] : depth >= 5 ? ["epic", "rare", "common"] : ["rare", "common"];
+    const { rarity, order } = rollGearRarity(depth);
+    // Try what you rolled first, then walk the rest of the band as a fallback for an exhausted pool.
+    const ladder = [rarity, ...order.filter((x) => x !== rarity)];
     const [{ randomDropPool }, { grantItem }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/inventory.js"),
@@ -278,7 +302,11 @@ async function grantMiningConsumable(buyerId) {
     const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
     const id = MINE_CONSUMABLES[Math.floor(Math.random() * MINE_CONSUMABLES.length)];
     await grantConsumable(buyerId, id, 1).catch(() => {});
-    return { id, name: CONSUMABLES[id]?.name || id };
+    // Every consumable has its OWN painted sprite in mkt_consumable_sprite. Returning just {id,name} meant the
+    // client had nothing to draw and fell back to the generic potion — so a Pet Treat and a Lucky Lure came out
+    // of the dark looking like the same bottle. Hand back the art with the thing.
+    const art = await db.queryOne(`SELECT url FROM mkt_consumable_sprite WHERE consumable_id = $1`, [id]).catch(() => null);
+    return { id, name: CONSUMABLES[id]?.name || id, art: art?.url || null };
 }
 
 // ── THE SWING ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -567,10 +595,12 @@ export async function getMiningState(buyerId) {
                 id: Number(current.id), tier: current.tier, name: o.name, color: o.color, art: oreArt(current.tier),
                 partTier: o.part, gold: o.gold, xp: o.xp,
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
-                pct: current.hp_max ? Math.max(0, Math.round((current.hp / current.hp_max) * 100)) : 0,
                 mySwings: sw,
                 maxHits: hitsFor(row?.vigor_level),
                 hitsLeft: Math.max(0, hitsFor(row?.vigor_level) - sw),
+                // `pct` is how much of the HAND is left, not how much rock is. The bar used to track HP, which
+                // is why a seam could read "100% left" and then be gone one swing later.
+                pct: Math.max(0, Math.round((Math.max(0, hitsFor(row?.vigor_level) - sw) / Math.max(1, hitsFor(row?.vigor_level))) * 100)),
                 // WHAT YOUR RANK BUYS — the honest version of the old ladder. It describes the DRAW (how many
                 // pulls, how loaded the bag) and never the prize, because the prize is the surprise. Sent
                 // best-first so the screen reads as something to climb toward.
@@ -625,7 +655,15 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     const node = await db.queryOne(`SELECT id, tier, hp, hp_max, x, y FROM mkt_ore_node WHERE id = $1 AND status = 'active'`, [nodeId]).catch(() => null);
     if (!node) return { ok: false, error: "node_gone" };
 
-    const prior = await db.queryOne(`SELECT combo, last_swing_at FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`, [nodeId, buyerId]).catch(() => null);
+    // swings and grade_sum MUST be in this SELECT. They weren't, so `prior.swings` and `prior.grade_sum` were
+    // both undefined on every swing — which meant hitsSoFar was permanently 1 (the hand never ran out) and the
+    // score handed to claimNode was only ever the LAST swing's, so a flawless eight-swing run was ranked as a
+    // single hit out of eight and came back BUTCHERED. The columns were being written correctly the whole time;
+    // nothing ever read them back.
+    const prior = await db.queryOne(
+        `SELECT combo, last_swing_at, swings, grade_sum FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`,
+        [nodeId, buyerId]
+    ).catch(() => null);
     if (prior?.last_swing_at && Date.now() - new Date(prior.last_swing_at).getTime() < SWING_THROTTLE_MS) {
         return { ok: false, error: "too_fast" };
     }
@@ -668,9 +706,16 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
     }
 
-    // THE SEAM IS SPENT after a fixed number of swings — or early if you smash straight through it.
+    // THE SEAM IS SPENT AFTER A FIXED NUMBER OF SWINGS. Nothing else ends it.
+    //
+    // It used to also end the moment HP hit zero, and with base pick power of 18 a Coal seam's 60 HP died to a
+    // single PERFECT strike — so the "eight-swing hand that gets ranked at the end" was in practice one or two
+    // taps, and swinging WELL ended your turn fastest. The better you played, the less you got to play.
+    //
+    // Damage and HP are still tracked, because watching the rock come apart is the feedback for a good hit.
+    // They just no longer decide when you stop.
     const hp = after?.hp ?? node.hp;
-    const spent = hitsSoFar >= maxHits || hp <= 0;
+    const spent = hitsSoFar >= maxHits;
     let cracked = null;
     if (spent) cracked = await claimNode(buyerId, node, row, { score, hits: hitsSoFar, maxHits });
 

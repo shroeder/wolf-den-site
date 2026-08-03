@@ -217,7 +217,19 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
 
                 {cracked ? (
                     // THE OPEN. Staggered so each thing you pulled out lands separately.
-                    <div className="mmg-draw">
+                    <div className="mmg-draw" style={{ "--rk": cracked.rankColor }}>
+                        {/* The payoff needs to LAND. A rank that just appears is a receipt; one that stamps in
+                            over a light sweep, with the seam's colour raining down, is the reason you swung. */}
+                        <span className="mmg-draw-rays" aria-hidden="true" />
+                        <span className="mmg-draw-confetti" aria-hidden="true">
+                            {Array.from({ length: 26 }).map((_, i) => (
+                                <span key={i} style={{
+                                    left: `${(i * 41) % 100}%`,
+                                    animationDelay: `${(i % 8) * 0.06}s`,
+                                    background: i % 3 === 0 ? cracked.rankColor : ["#ffd75e", "#8fe3ff", "#8fe39a"][i % 3],
+                                }} />
+                            ))}
+                        </span>
                         <div className="mmg-rank" style={{ "--rk": cracked.rankColor }}>
                             <b>{cracked.rankLabel}</b>
                             <em>{cracked.pct}% of a flawless run · {cracked.hits} swings</em>
@@ -225,16 +237,35 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         <div className="mmg-draw-head">The seam opens</div>
                         <div className="mmg-draw-row">
                             {(cracked.draws || []).map((x, i) => (
-                                <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
-                                    {x.art ? <Img src={x.art} className="mmg-drawn-art" fallback="" />
-                                        : <Img src={KIND_ART[x.kind] || KIND_ART.gold} className="mmg-drawn-art" fallback="" />}
-                                    <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
-                                    {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
-                                </span>
+                                // GEAR gets the full treatment — its own die-cut art, the rarity frame, the
+                                // stat line — because it is the best thing the bag can hand you and the whole
+                                // reason that art exists. The CSS for this landed a while back; the branch that
+                                // uses it did not, so every piece of gear out of a seam was drawn as the
+                                // generic helm icon next to a name.
+                                x.kind === "gear" && x.id ? (
+                                    <span key={i} className="mmg-drawn is-item"
+                                        style={{ "--rar": RARITY_COLOR[x.rarity] || "#cdd3d8", animationDelay: `${i * 0.16}s` }}>
+                                        <ItemArt id={x.id} icon={x.icon} className="mmg-item-art" alt="" />
+                                        <i className="mmg-item-tag">{RARITY_LABEL[x.rarity] || x.rarity}</i>
+                                        <em className="mmg-item-name" style={{ color: RARITY_COLOR[x.rarity] || "#e7dcc8" }}>{x.name}</em>
+                                        {x.slot ? <i className="mmg-item-slot">{x.slot}</i> : null}
+                                        {x.stats ? <i className="mmg-item-stats">{statLine(x.stats)}</i> : null}
+                                    </span>
+                                ) : (
+                                    <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
+                                        {/* Consumables carry their own sprite now, so a Pet Treat and a Lucky
+                                            Lure stop coming out of the dark as the same generic bottle. */}
+                                        <Img src={x.art || KIND_ART[x.kind] || KIND_ART.gold} className="mmg-drawn-art" fallback="" />
+                                        <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
+                                        {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
+                                    </span>
+                                )
                             ))}
                         </div>
                         <p className="mmg-draw-note">
-                            {cracked.seeded ? `${cracked.seeded} rare ticket${cracked.seeded === 1 ? "" : "s"} went in the bag from your timing.` : "No rare tickets that time — clean swings put them in."}
+                            <b>{(cracked.draws || []).length} pull{(cracked.draws || []).length === 1 ? "" : "s"}</b>
+                            {" from the bag. "}
+                            {cracked.seeded ? `${cracked.seeded} rare ticket${cracked.seeded === 1 ? "" : "s"} went in from your timing.` : "No rare tickets that time — clean swings put them in."}
                         </p>
                         <button type="button" className="mmg-tap" onClick={() => onDone(cracked)}>Pocket it</button>
                     </div>
@@ -365,6 +396,22 @@ const MMG_CSS = `
 .mmg-hits { display: flex; gap: 4px; margin-bottom: 16px; }
 .mmg-hits i { flex: 1 1 0; height: 8px; border-radius: 999px; background: var(--ore); box-shadow: 0 0 8px -2px var(--ore); }
 .mmg-hits i.spent { background: rgba(255,255,255,0.13); box-shadow: none; }
+.mmg-draw { position: relative; overflow: hidden; }
+/* A slow sweep of the rank's own colour behind the whole reveal. */
+.mmg-draw-rays { position: absolute; inset: -70% -70% auto -70%; height: 240%; pointer-events: none; opacity: .28;
+    background: conic-gradient(from 0deg, transparent 0 11deg, var(--rk) 12deg 14deg, transparent 15deg 30deg);
+    animation: mmgRays 16s linear infinite; }
+@keyframes mmgRays { to { transform: rotate(360deg); } }
+.mmg-draw-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.mmg-draw-confetti span { position: absolute; top: -14px; width: 6px; height: 10px; border-radius: 2px; opacity: 0;
+    animation: mmgFall 1.6s ease-in forwards; }
+@keyframes mmgFall { 0% { opacity: 0; transform: translateY(-12px) rotate(0deg); }
+    12% { opacity: 1; } 100% { opacity: 0; transform: translateY(340px) rotate(540deg); } }
+/* The rank STAMPS in rather than fading — it is the verdict on how you played. */
+.mmg-rank { position: relative; animation: mmgStamp .42s cubic-bezier(.2,1.6,.35,1) both; }
+@keyframes mmgStamp { 0% { transform: scale(1.7); opacity: 0; filter: blur(3px); }
+    60% { transform: scale(.94); opacity: 1; filter: none; } 100% { transform: none; } }
+.mmg-draw-head, .mmg-draw-row, .mmg-draw-note, .mmg-draw .mmg-tap { position: relative; }
 .mmg-rank { margin-bottom: 12px; padding: 10px; border-radius: 12px; border: 1px solid var(--rk);
     background: color-mix(in srgb, var(--rk) 14%, transparent); animation: mmgPop .4s cubic-bezier(.2,1.4,.35,1) both; }
 .mmg-rank b { display: block; font-size: 1.3rem; letter-spacing: .06em; color: var(--rk); }
