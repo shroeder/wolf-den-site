@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { GiChest, GiCoins, GiPotionBall, GiShieldBash, GiStoneBlock, GiWarPick } from "react-icons/gi";
 
 // ── BREAKING THE SEAM ────────────────────────────────────────────────────────────────────────────────────────
 // NO EMOJI here either — sprites and Gi glyphs only. See the note in MiningClient.
@@ -19,6 +18,12 @@ const BANDS = [
     { key: "perfect", pct: 11, label: "PERFECT", color: "#8fe3ff" },
     { key: "pixel", pct: 4.4, label: "PIXEL", color: "#ffd75e" },
 ];
+const KIND_ART = {
+    gold: "/images/mining/icon-coins.png",
+    chest: "/images/mining/icon-chest.png",
+    gear: "/images/mining/icon-gear.png",
+    consumable: "/images/mining/icon-potion.png",
+};
 const GRADE_COLOR = { pixel: "#ffd75e", perfect: "#8fe3ff", great: "#8fe39a", good: "#d7c48a", miss: "#ff8f9a" };
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
 const SWEEP_MS = 900;
@@ -71,7 +76,9 @@ const Img = ({ src, className, fallback }) => {
 export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const [marker, setMarker] = useState(0.5);
     const markerRef = useRef(0.5);
-    const [hp, setHp] = useState(node?.pct ?? 100);
+    const [hits, setHits] = useState(node?.mySwings ?? 0);
+    const maxHits = node?.maxHits ?? 8;
+    const [score, setScore] = useState(0);
     const [cooling, setCooling] = useState(false);
     const [pop, setPop] = useState(null);        // the grade label that punches out on a hit
     const [sparks, setSparks] = useState([]);
@@ -162,7 +169,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         setChain(r.combo || 0);
         if (r.grade === "pixel") setTickets((t) => t + 2);
         else if (r.grade === "perfect") setTickets((t) => t + 1);
-        setHp(r.pct);
+        if (typeof r.hits === "number") setHits(r.hits);
+        if (typeof r.score === "number") setScore(r.score);
 
         if (r.cracked) {
             breakChord();
@@ -174,7 +182,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
 
     const label = (kind, x) => {
         if (kind === "gold") return `${Number(x.n).toLocaleString()} gold`;
-        if (kind === "chest") return `${x.tier} chest`;
+        if (kind === "chest") return `${x.tier[0].toUpperCase()}${x.tier.slice(1)} chest`;
         return x.name || kind;
     };
 
@@ -184,7 +192,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                 {flash ? <span key={flash.k} className="mmg-flash" style={{ "--fc": flash.c }} aria-hidden="true" /> : null}
 
                 <div className="mmg-head">
-                    <Img src={node?.art} className="mmg-art" fallback={<GiStoneBlock />} />
+                    <Img src={node?.art} className="mmg-art" fallback="" />
                     <div className="mmg-headbody">
                         <div className="mmg-name">{node?.name}</div>
                         <div className="mmg-tier">smelts to tier {node?.partTier}</div>
@@ -194,19 +202,25 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                     </div>
                 </div>
 
-                <div className="mmg-hp" aria-label={`${hp}% left`}>
-                    <span style={{ width: `${hp}%`, background: node?.color }} />
+                {/* SWINGS LEFT, not a health bar. A fixed hand of swings that gets scored — so the last one
+                    matters as much as the first, and the run has an ending you can see coming. */}
+                <div className="mmg-hits" aria-label={`${Math.max(0, maxHits - hits)} swings left`}>
+                    {Array.from({ length: maxHits }, (_, i) => <i key={i} className={i < hits ? "spent" : ""} />)}
                 </div>
 
                 {cracked ? (
                     // THE OPEN. Staggered so each thing you pulled out lands separately.
                     <div className="mmg-draw">
+                        <div className="mmg-rank" style={{ "--rk": cracked.rankColor }}>
+                            <b>{cracked.rankLabel}</b>
+                            <em>{cracked.pct}% of a flawless run · {cracked.hits} swings</em>
+                        </div>
                         <div className="mmg-draw-head">The seam opens</div>
                         <div className="mmg-draw-row">
                             {(cracked.draws || []).map((x, i) => (
                                 <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
                                     {x.art ? <Img src={x.art} className="mmg-drawn-art" fallback="◆" />
-                                        : <b className="mmg-drawn-emoji">{x.kind === "gold" ? <GiCoins /> : x.kind === "chest" ? <GiChest /> : x.kind === "gear" ? <GiShieldBash /> : <GiPotionBall />}</b>}
+                                        : <Img src={KIND_ART[x.kind] || KIND_ART.gold} className="mmg-drawn-art" fallback="" />}
                                     <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
                                     {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
                                 </span>
@@ -222,7 +236,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         <div className="mmg-bar" aria-hidden="true">
                             {BANDS.map((b) => <span key={b.key} className={`mmg-zone is-${b.key}`} style={{ width: `${b.pct}%` }} />)}
                             <span className="mmg-marker" style={{ left: `${marker * 100}%` }} />
-                            <Img src={pick?.sprite} className="mmg-rider" fallback={<GiWarPick />} />
+                            <Img src={pick?.sprite} className="mmg-rider" fallback="" />
                             {sparks.map((sp) => (
                                 <span key={sp.id} className="mmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />
                             ))}
@@ -248,7 +262,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         </button>
 
                         <div className="mmg-meta">
-                            <span>Rock <b>{hp}%</b></span>
+                            <span>Swings <b>{Math.max(0, maxHits - hits)}</b></span>
                             <span className={chain >= 3 ? "mmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
                             <span>Bag <b>{tickets}</b></span>
                         </div>
@@ -341,6 +355,13 @@ const MMG_CSS = `
 .mmg-notice { text-align: center; margin: 8px 0 0; font-size: 12px; font-weight: 700; color: #ffcf6a; }
 .mmg-hint { margin: 9px 0 0; font-size: 11px; line-height: 1.5; color: #8b8171; text-align: center; }
 
+.mmg-hits { display: flex; gap: 4px; margin-bottom: 16px; }
+.mmg-hits i { flex: 1 1 0; height: 8px; border-radius: 999px; background: var(--ore); box-shadow: 0 0 8px -2px var(--ore); }
+.mmg-hits i.spent { background: rgba(255,255,255,0.13); box-shadow: none; }
+.mmg-rank { margin-bottom: 12px; padding: 10px; border-radius: 12px; border: 1px solid var(--rk);
+    background: color-mix(in srgb, var(--rk) 14%, transparent); animation: mmgPop .4s cubic-bezier(.2,1.4,.35,1) both; }
+.mmg-rank b { display: block; font-size: 1.3rem; letter-spacing: .06em; color: var(--rk); }
+.mmg-rank em { font-style: normal; font-size: 11px; color: #b9a98f; }
 .mmg-draw { text-align: center; animation: mmgPop .4s cubic-bezier(.2,1.3,.35,1) both; }
 .mmg-draw-head { font-weight: 900; font-size: 1.15rem; color: #ffd75e; margin-bottom: 12px; letter-spacing: .04em; }
 .mmg-draw-row { display: flex; justify-content: center; gap: 9px; flex-wrap: wrap; margin-bottom: 10px; }

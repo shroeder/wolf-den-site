@@ -279,31 +279,47 @@ const COMBO_MAX = 2.0;
 const COMBO_MIN_GRADE = "good";
 
 // ── DAILY ALLOWANCE + UPGRADES ───────────────────────────────────────────────────────────────────────────────
-const SWINGS_PER_DAY = 60;          // generous: a swing is one tap, and a node takes several
+// A seam gives you a FIXED number of swings and then it's spent. You are not chipping a health bar down —
+// you are playing a hand of N swings and being RANKED on it, which is the shape every other timing game here
+// uses and the only one that gives the last swing any weight.
+const BASE_HITS = 8;
+export const hitsFor = (vigorLevel = 0) => BASE_HITS + Math.max(0, Math.min(10, Number(vigorLevel) || 0));
+// Score per grade. The spread is wide on purpose: a run of PIXELs should rank somewhere a run of GOODs cannot.
+export const HIT_SCORE = { pixel: 10, perfect: 7, great: 4, good: 2, miss: 0 };
+// Where a run lands. Scored as a % of the perfect score for that many swings.
+export const RUN_RANKS = [
+    { key: "s", label: "MASTERWORK", min: 0.88, draws: 6, rareBias: 3.0, color: "#ffd75e" },
+    { key: "a", label: "SHARP", min: 0.70, draws: 5, rareBias: 2.0, color: "#8fe3ff" },
+    { key: "b", label: "STEADY", min: 0.48, draws: 4, rareBias: 1.2, color: "#8fe39a" },
+    { key: "c", label: "ROUGH", min: 0.25, draws: 3, rareBias: 0.6, color: "#d7c48a" },
+    { key: "d", label: "BUTCHERED", min: 0, draws: 2, rareBias: 0.2, color: "#ff8f9a" },
+];
+export const rankFor = (pct) => RUN_RANKS.find((r) => pct >= r.min) || RUN_RANKS[RUN_RANKS.length - 1];
+const SWINGS_PER_DAY = 60;          // legacy, unused — trips are the budget now
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
-// `icon` is a react-icons/gi NAME, never an emoji. Emoji are drawn by the OS — they render as somebody else's
-// artwork in the middle of ours, differently on every device. Everything user-facing here is a sprite or a Gi
-// glyph. See ICONS in MiningClient.
+// `icon` is a SPRITE PATH. Not an emoji (the OS's artwork, not ours) and not a glyph NAME either — shipping
+// "GiWarPick" as data got it printed as literal text across the card title, because the card renders what it
+// is given. Data carries a picture; the card shows the picture.
 // Four tracks, each buying a different KIND of mining rather than just "more of it" — same design rule as the
 // fishing rail, so they don't collapse into one obvious purchase order.
 export const MINE_TRACKS = {
-    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "GiWarPick", col: "pick_level",
+    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "/images/mining/pick-iron.png", col: "pick_level",
         desc: "Harder swings — fewer to crack a seam.", effect: "Swing power" },
-    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "GiKnapsack", col: "haul_level",
+    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "/images/mining/track-pack.png", col: "haul_level",
         desc: "More ore out of every seam you crack.", effect: "Ore per seam" },
-    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "GiMuscleUp", col: "vigor_level",
-        desc: "More swings each day.", effect: "Daily swings" },
+    vigor: { max: 10, per: 1, cap: 10, kind: "count", name: "Endurance", icon: "/images/mining/track-vigor.png", col: "vigor_level",
+        desc: "You last longer at the rock — more swings before the seam is spent.", effect: "Swings per seam" },
 };
 
 // SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
 // and both of those are about FINDING rock rather than breaking it. It kept its column, so no levels are lost.
 export const SURVEY_TRACKS = {
-    lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "GiLanternFlame", col: "lantern_level",
+    lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "/images/mining/lantern-2.png", col: "lantern_level",
         desc: "Light reaches further — the tunnel gives up better things the deeper you get.", effect: "Find quality" },
-    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "GiWoodBeam", col: "assay_level",
+    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "/images/mining/track-shoring.png", col: "assay_level",
         desc: "Timbered walls. The roof holds for longer before the risk starts climbing.", effect: "Safe depth" },
-    pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "GiKnapsack", col: "face_level",
+    pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "/images/mining/track-pack.png", col: "face_level",
         desc: "A deeper pack — every purse and pocket of ore you find is bigger.", effect: "Haul size" },
 };
 export const surveyValue = (t, lvl) => Math.min(SURVEY_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SURVEY_TRACKS[t].per);
@@ -317,11 +333,11 @@ export const trackCost = (level) => 300 + Math.round(Math.pow(Math.max(0, level)
 
 // SMELTING tracks. Its own half of the feature, so it gets its own levers rather than riding the pickaxe's.
 export const SMELT_TRACKS = {
-    bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "GiBellows", col: "bellows_level",
+    bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "/images/mining/track-bellows.png", col: "bellows_level",
         desc: "A hotter burn sometimes yields an extra part.", effect: "Bonus part chance" },
-    crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "GiCauldron", col: "crucible_level",
+    crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "/images/mining/track-crucible.png", col: "crucible_level",
         desc: "A bigger pot needs less ore for the same part.", effect: "Ore per part" },
-    flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "GiSparkles", col: "flux_level",
+    flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "/images/mining/track-flux.png", col: "flux_level",
         desc: "A purer melt sometimes lifts a part a whole tier.", effect: "Tier-up chance" },
 };
 export const smeltValue = (t, lvl) => Math.min(SMELT_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SMELT_TRACKS[t].per);
@@ -499,7 +515,7 @@ export async function getMiningState(buyerId) {
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
         tracks: trackCards(MINE_TRACKS, row, trackValue, trackCost, (key, lvl) => {
             const v = trackValue(key, lvl);
-            if (key === "vigor") return `${SWINGS_PER_DAY + v} swings`;
+            if (key === "vigor") return `${hitsFor(lvl)} swings`;
             if (key === "lantern") return `+${Math.round(v * 100)}% rich`;
             return `×${(1 + v).toFixed(2)}`;
         }),
@@ -528,6 +544,8 @@ export async function getMiningState(buyerId) {
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
                 pct: current.hp_max ? Math.max(0, Math.round((current.hp / current.hp_max) * 100)) : 0,
                 mySwings: sw,
+                maxHits: hitsFor(row?.vigor_level),
+                hitsLeft: Math.max(0, hitsFor(row?.vigor_level) - sw),
                 // The LADDER, shown before you swing: what each standard of digging pays out of this seam.
                 ladder: MINE_RUNGS.map((r) => ({
                     rung: r.rung, key: r.key, label: r.label, blurb: r.blurb,
@@ -830,6 +848,9 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     const comboMult = Math.min(COMBO_MAX, 1 + Math.max(0, combo - 1) * COMBO_STEP);
 
     const damage = Math.max(1, Math.round(swingPower(row) * grade.mult * comboMult));
+    const maxHits = hitsFor(row?.vigor_level);
+    const hitsSoFar = (Number(prior?.swings) || 0) + 1;
+    const score = (Number(prior?.grade_sum) || 0) + (HIT_SCORE[grade.key] || 0);
 
     await db.query(`UPDATE mkt_mining SET swing_used = swing_used + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
 
@@ -843,15 +864,17 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
              swings = mkt_ore_node_hit.swings + 1, combo = $4, last_swing_at = $5,
              grade_sum = mkt_ore_node_hit.grade_sum + $6,
              pool_json = COALESCE(mkt_ore_node_hit.pool_json, '[]'::jsonb) || $7::jsonb`,
-        [nodeId, buyerId, damage, combo, arrivedAt, grade.mult, JSON.stringify(seeded)]
+        [nodeId, buyerId, damage, combo, arrivedAt, HIT_SCORE[grade.key] || 0, JSON.stringify(seeded)]
     ).catch(() => {});
     if (combo > (Number(row.best_combo) || 0)) {
         await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
     }
 
+    // THE SEAM IS SPENT after a fixed number of swings — or early if you smash straight through it.
     const hp = after?.hp ?? node.hp;
+    const spent = hitsSoFar >= maxHits || hp <= 0;
     let cracked = null;
-    if (hp <= 0) cracked = await claimNode(buyerId, node, row);
+    if (spent) cracked = await claimNode(buyerId, node, row, { score, hits: hitsSoFar, maxHits });
 
     return {
         ok: true,
@@ -860,6 +883,8 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         cooldownMs: SWING_COOLDOWN_MS[grade.key] ?? SWING_COOLDOWN_MS.miss,
         nodeId: Number(nodeId), hp, hpMax: Number(node.hp_max),
         pct: node.hp_max ? Math.max(0, Math.round((hp / node.hp_max) * 100)) : 0,
+        hits: hitsSoFar, maxHits, hitsLeft: Math.max(0, maxHits - hitsSoFar),
+        score, scoreMax: maxHits * HIT_SCORE.pixel,
         cracked,
 
     };
@@ -870,7 +895,7 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
 // The bag always holds ordinary rock. Every clean swing you landed dropped a better ticket in. Then you pull
 // three times and find out. Nothing is decided until the seam opens, which is the point — a fixed payout you
 // could compute on the way in is not a reward, it is an invoice.
-async function claimNode(buyerId, node, row) {
+async function claimNode(buyerId, node, row, run = {}) {
     const won = await db
         .queryOne(`UPDATE mkt_ore_node SET status = 'mined', mined_by = $2, mined_at = NOW() WHERE id = $1 AND status = 'active' RETURNING tier`, [node.id, buyerId])
         .catch(() => null);
@@ -881,30 +906,40 @@ async function claimNode(buyerId, node, row) {
     const o = oreTier(node.tier);
     const haulBonus = trackValue("haul", row?.haul_level);
 
+    // THE RANK. Your score across the whole hand, as a share of a flawless one.
+    const scoreMax = Math.max(1, (run.maxHits || hitsFor(row?.vigor_level)) * HIT_SCORE.pixel);
+    const pct = Math.max(0, Math.min(1, (run.score || 0) / scoreMax));
+    const rank = rankFor(pct);
+
     // The bag: ordinary tickets always, plus whatever your timing earned.
+    // The bag: ordinary rock always, the tickets your timing earned, and the RANK weighting the good end.
     const bag = [];
     for (let i = 0; i < 6; i += 1) bag.push("ore");
     for (const s2 of seeds) bag.push(s2 === "rare" ? "rare" : "good");
+    for (let i = 0; i < Math.round(rank.rareBias * 2); i += 1) bag.push(i % 2 ? "rare" : "good");
 
-    const DRAWS = 3 + (Math.random() < haulBonus ? 1 : 0);
+    const DRAWS = rank.draws + (Math.random() < haulBonus ? 1 : 0);
     const out = [];
     for (let i = 0; i < DRAWS; i += 1) {
         const ticket = bag[Math.floor(Math.random() * bag.length)] || "ore";
         if (ticket === "ore") {
-            const n = 1 + Math.floor(Math.random() * 2);
+            const n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + haulBonus)));
             out.push({ kind: "ore", tier: node.tier, n, name: o.name, color: o.color, art: oreArt(node.tier) });
         } else if (ticket === "good") {
             // The middle of the bag: a better grade of ordinary — more of it, or a rung up.
             const up = Math.random() < 0.4 && node.tier < 5 ? node.tier + 1 : node.tier;
             const uo = oreTier(up);
-            out.push({ kind: "ore", tier: up, n: 2 + Math.floor(Math.random() * 2), name: uo.name, color: uo.color, art: oreArt(up) });
+            out.push({ kind: "ore", tier: up, n: Math.max(2, Math.round((4 + Math.floor(Math.random() * 3)) * (1 + haulBonus))), name: uo.name, color: uo.color, art: oreArt(up) });
         } else {
             // RARE tickets are where the fun lives — the things you cannot get by grinding ore.
             const roll = Math.random();
-            if (roll < 0.34) out.push({ kind: "chest", tier: node.tier >= 4 ? "gold" : node.tier >= 2 ? "iron" : "wooden" });
+            // A MASTERWORK run can pull a chest a full tier above what the rock deserves.
+            const lift = rank.key === "s" ? 1 : 0;
+            const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
+            if (roll < 0.34) out.push({ kind: "chest", tier: ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden" });
             else if (roll < 0.68) out.push({ kind: "gear", depth: 3 + node.tier });
             else if (roll < 0.88) out.push({ kind: "consumable" });
-            else out.push({ kind: "gold", n: 60 + node.tier * 40 + Math.floor(Math.random() * 60) });
+            else out.push({ kind: "gold", n: Math.round((140 + node.tier * 90 + Math.floor(Math.random() * 120)) * (1 + haulBonus)) });
         }
     }
 
@@ -933,12 +968,14 @@ async function claimNode(buyerId, node, row) {
     const oreTotal = paid.filter((x) => x.kind === "ore").reduce((n, x) => n + x.n, 0);
     await db.query(`UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, current_node_id = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, oreTotal]).catch(() => {});
     // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
-    await awardXp(buyerId, "mining", { points: o.xp, gold: 0 }).catch(() => {});
+    await awardXp(buyerId, "mining", { points: Math.round(o.xp * (1 + pct)), gold: 0 }).catch(() => {});
     await trackActivity(buyerId, "ore_mined", { tier: node.tier, draws: paid.length, seeds: seeds.length }).catch(() => {});
 
     return {
         tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
         draws: paid, seeded: seeds.length, xp: o.xp,
+        rank: rank.key, rankLabel: rank.label, rankColor: rank.color,
+        score: run.score || 0, scoreMax, pct: Math.round(pct * 100), hits: run.hits || 0,
     };
 }
 

@@ -2,9 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { GiBellows, GiCauldron, GiChest, GiCoins, GiKnapsack, GiLadder, GiLanternFlame, GiMuscleUp,
-    GiPotionBall, GiPouringPot, GiShieldBash, GiSparkles, GiStoneBlock, GiWarPick, GiWoodBeam } from "react-icons/gi";
-
 import MiningMinigame from "@/components/MiningMinigame";
 
 // ── THE MINE (owner-gated) ───────────────────────────────────────────────────────────────────────────────────
@@ -22,16 +19,15 @@ const CD_DEFAULT = 1600;
 const money = (n) => Number(n || 0).toLocaleString();
 // NO EMOJI. They are the OS's artwork, not ours, and they render differently on every device — in the middle
 // of hand-painted game art they read as borrowed. Everything here is either a generated sprite or a Gi glyph.
-const ICONS = {
-    GiWarPick, GiKnapsack, GiMuscleUp, GiLanternFlame, GiWoodBeam, GiBellows, GiCauldron, GiSparkles,
+// Every kind of thing the mine hands you has its own painted sprite. A found ITEM uses its own real art when
+// we have it, so "a piece of gear" looks like the actual piece of gear.
+const KIND_ART = {
+    gold: "/images/mining/icon-coins.png",
+    chest: "/images/mining/icon-chest.png",
+    gear: "/images/mining/icon-gear.png",
+    consumable: "/images/mining/icon-potion.png",
 };
-const TrackIcon = ({ name }) => { const I = ICONS[name] || GiStoneBlock; return <I aria-hidden="true" />; };
-// One icon per kind of thing the mine can hand you, so a haul chip never falls back to a glyph font.
-const KindIcon = ({ kind, size = 20 }) => {
-    const I = kind === "gold" ? GiCoins : kind === "chest" ? GiChest : kind === "gear" ? GiShieldBash
-        : kind === "consumable" ? GiPotionBall : GiStoneBlock;
-    return <I size={size} aria-hidden="true" />;
-};
+const KindIcon = ({ kind, art, className }) => <Img src={art || KIND_ART[kind] || KIND_ART.gold} className={className} fallback="" />;
 
 const PART_NAME = { 1: "Cinder Scrap", 2: "Iron Filings", 3: "Tempered Steel", 4: "Mythril Dust", 5: "Emberheart Shard" };
 
@@ -191,7 +187,7 @@ export default function MiningClient({ initial }) {
     return (
         <section className="card mine-wrap">
             <div className="mine-top">
-                <span className="mine-title"><GiWarPick /> The Mine</span>
+                <span className="mine-title"><Img src="/images/mining/pick-iron.png" className="mine-title-ico" fallback="" /> The Mine</span>
                 <span className="mine-sub">owner preview · {s.trips?.left ?? 0}/{s.trips?.max ?? 3} trips today</span>
                 {needsSurvey && tab === "mine" ? (
                     <button type="button" className="mine-nudge" onClick={() => { setTab("survey"); startTrip(); }}>
@@ -203,16 +199,16 @@ export default function MiningClient({ initial }) {
             {/* Two halves, two tabs — the same shape fishing and the forge use. */}
             <div className="mine-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "survey"} className={tab === "survey" ? "is-on" : ""} onClick={() => setTab("survey")}>
-                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback={<GiLanternFlame />} /> <span>Descend</span>
+                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="" /> <span>Descend</span>
                     {/* Badge the strikes you can still spend — or a plain "!" when there's nothing to mine and
                         no face read, because that's the state where a player is stuck without knowing why. */}
                     {s.run ? <span className="mine-tab-badge">{s.run.depth}</span> : s.trips?.left ? <span className="mine-tab-badge">{s.trips.left}</span> : null}
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
-                    <Img src={s.pick?.sprite} className="mine-tab-ico" fallback={<GiWarPick />} /> <span>Mine</span>
+                    <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="" /> <span>Mine</span>
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "smelt"} className={tab === "smelt" ? "is-on" : ""} onClick={() => setTab("smelt")}>
-                    <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback={<GiCauldron />} /> <span>Smelt</span>
+                    <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="" /> <span>Smelt</span>
                     {s.oreTotal ? <span className="mine-tab-badge">{s.oreTotal}</span> : null}
                 </button>
             </div>
@@ -252,7 +248,7 @@ export default function MiningClient({ initial }) {
                     </>
                 ) : (
                     <div className="mine-face-cta">
-                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback={<GiLanternFlame />} />
+                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="" />
                         <p>{(s.trips?.left ?? 0) > 0 ? "The tunnel mouth." : "No trips left today."}</p>
                         <span className="muted">{(s.trips?.left ?? 0) > 0
                             ? "Go as deep as you dare. Everything you find is only yours once you climb out."
@@ -264,7 +260,7 @@ export default function MiningClient({ initial }) {
 
             {!s.run ? (
                 <button type="button" className="mine-prospect is-big" onClick={startTrip} disabled={busy || (s.trips?.left ?? 0) <= 0}>
-                    {(s.trips?.left ?? 0) > 0 ? <><GiLanternFlame /> Head down the tunnel <em>{s.trips.left} of {s.trips.max} trips left today</em></> : "No trips left today"}
+                    {(s.trips?.left ?? 0) > 0 ? <><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head down the tunnel <em>{s.trips.left} of {s.trips.max} trips left today</em></> : "No trips left today"}
                 </button>
             ) : null}
 
@@ -273,14 +269,14 @@ export default function MiningClient({ initial }) {
                     <div className="mine-haul">
                         {s.run.haul.length ? s.run.haul.map((h, i) => (
                             <span key={i} className="mine-haul-chip" title={h.name || h.kind}>
-                                {h.art ? <Img src={h.art} className="mine-haul-art" fallback="◆" /> : <b><KindIcon kind={h.kind} /></b>}
+                                {h.art ? <Img src={h.art} className="mine-haul-art" fallback="◆" /> : <KindIcon kind={h.kind} art={h.art} className="mine-haul-art" />}
                                 {h.n ? <em>×{h.n}</em> : null}
                             </span>
                         )) : <span className="muted" style={{ fontSize: 12 }}>Bag empty. Everything is still down here.</span>}
                     </div>
                     <div className="mine-choice">
-                        <button type="button" className="mine-prospect" onClick={goDeeper} disabled={busy}><GiWarPick /> Deeper <em>{s.run.risk}% risk</em></button>
-                        <button type="button" className="mine-prospect is-ghost" onClick={surface} disabled={busy}><GiLadder /> Climb out with {s.run.haul.length}</button>
+                        <button type="button" className="mine-prospect" onClick={goDeeper} disabled={busy}><Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Deeper <em>{s.run.risk}% risk</em></button>
+                        <button type="button" className="mine-prospect is-ghost" onClick={surface} disabled={busy}><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Climb out with {s.run.haul.length}</button>
                     </div>
                     <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Climb out and the bag is yours; push too far and it isn&rsquo;t.</p>
                 </>
@@ -289,7 +285,7 @@ export default function MiningClient({ initial }) {
             {/* THE LANTERN — the surveying tool, then the levers that improve it. */}
             <div className="mine-panel">
                 <div className="mine-pickhead">
-                    <div className="mine-pickart is-lantern"><Img src={s.lantern?.sprite} className="mine-pickart-img" fallback={<GiLanternFlame />} /></div>
+                    <div className="mine-pickart is-lantern"><Img src={s.lantern?.sprite} className="mine-pickart-img" fallback="" /></div>
                     <div className="mine-pickbody">
                         <b>{s.lantern?.name}</b>
                         {s.lantern?.nextName
@@ -313,7 +309,7 @@ export default function MiningClient({ initial }) {
                 {node ? (
                     <>
                         <div className="mine-rock" style={{ "--ore": node.color, animation: shake ? "mineHit .18s ease" : undefined }} key={shake}>
-                            <Img src={node.art} className="mine-rock-img" fallback={<GiStoneBlock />} />
+                            <Img src={node.art} className="mine-rock-img" fallback="" />
                         </div>
                         <div className="mine-seam-head">
                             <b style={{ color: node.color }}>{node.name}</b>
@@ -328,13 +324,13 @@ export default function MiningClient({ initial }) {
                     // to swing at, and nothing here used to explain that a seam comes from the Survey tab.
                     // So: say what's missing, say where it comes from, and put the door right here.
                     <div className="mine-empty">
-                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback={<GiLanternFlame />} />
+                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="" />
                         {s.run ? (
                             <>
                                 <p>You&rsquo;re still down the tunnel.</p>
                                 <span className="muted">Climb out and the seam you found comes back here with you.</span>
                                 <button type="button" className="mine-prospect" onClick={() => setTab("survey")}>
-                                    <GiLadder /> Back to the tunnel
+                                    <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Back to the tunnel
                                 </button>
                             </>
                         ) : swingsLeft <= 0 ? (
@@ -347,7 +343,7 @@ export default function MiningClient({ initial }) {
                                 <p>Nothing to swing at yet.</p>
                                 <span className="muted">Seams come from the tunnel: descend, climb out, and whatever you found is waiting here.</span>
                                 <button type="button" className="mine-prospect" onClick={() => { setTab("survey"); if (!s.run) startTrip(); }}>
-                                    <GiLanternFlame /> Head down the tunnel
+                                    <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head down the tunnel
                                 </button>
                             </>
                         )}
@@ -369,7 +365,7 @@ export default function MiningClient({ initial }) {
                             <span className="mine-rung-n">{r.rung}</span>
                             <span className="mine-rung-copy"><b>{r.label}</b><em>{r.blurb}</em></span>
                             <span className="mine-rung-pay">
-                                <Img src={node.art} className="mine-rung-ore" fallback={<GiStoneBlock />} />
+                                <Img src={node.art} className="mine-rung-ore" fallback="" />
                                 <b>×{r.ore}</b>
                             </span>
                         </div>
@@ -380,14 +376,14 @@ export default function MiningClient({ initial }) {
 
             {node && node.pct > 0 ? (
                 <button type="button" className="mine-prospect" onClick={() => setBreaking(true)} disabled={busy}>
-                    <GiWarPick /> Break the seam
+                    <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Break the seam
                 </button>
             ) : null}
 
             {/* ── THE PICKAXE ── the tool you've earned, then the levers that improve it. */}
             <div className="mine-panel">
                 <div className="mine-pickhead">
-                    <div className="mine-pickart"><Img src={s.pick?.sprite} className="mine-pickart-img" fallback={<GiWarPick />} /></div>
+                    <div className="mine-pickart"><Img src={s.pick?.sprite} className="mine-pickart-img" fallback="" /></div>
                     <div className="mine-pickbody">
                         <b>{s.pick?.name}</b>
                         {s.pick?.nextName
@@ -412,7 +408,7 @@ export default function MiningClient({ initial }) {
             <div className="mine-face is-smelt">
                 <div className="mine-face-bg is-smelt" aria-hidden="true" />
                 <div className="mine-forge">
-                    <Img src={s.furnace?.sprite} className="mine-forge-img" fallback={<GiCauldron />} />
+                    <Img src={s.furnace?.sprite} className="mine-forge-img" fallback="" />
                     <span className="mine-forge-glow" aria-hidden="true" />
                 </div>
                 <div className="mine-survey-hud">
@@ -423,7 +419,7 @@ export default function MiningClient({ initial }) {
 
             <div className="mine-panel">
                 <div className="mine-pickhead">
-                    <div className="mine-pickart is-furnace"><Img src={s.furnace?.sprite} className="mine-pickart-img" fallback={<GiCauldron />} /></div>
+                    <div className="mine-pickart is-furnace"><Img src={s.furnace?.sprite} className="mine-pickart-img" fallback="" /></div>
                     <div className="mine-pickbody">
                         <b>{s.furnace?.name}</b>
                         {s.furnace?.nextName
@@ -445,14 +441,14 @@ export default function MiningClient({ initial }) {
                     <div className="mine-stash-rows">
                         {s.ore.map((o) => (
                             <div className="mine-stash-row" key={o.tier}>
-                                <Img src={o.art} className="mine-stash-img" fallback={<GiStoneBlock />} />
+                                <Img src={o.art} className="mine-stash-img" fallback="" />
                                 <span className="mine-stash-name">
                                     <b style={{ color: o.color }}>{o.name}</b>
                                     <em>{o.smeltCost} ore → 1 {PART_NAME[o.partTier]}</em>
                                 </span>
                                 <b className="mine-stash-qty">×{o.qty}</b>
                                 <button type="button" className="mine-smelt" disabled={!o.canSmelt || Boolean(smelting)} onClick={() => smelt(o.tier)}>
-                                    <GiCauldron /> Smelt {o.canSmelt || ""}
+                                    <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" /> Smelt {o.canSmelt || ""}
                                 </button>
                             </div>
                         ))}
@@ -491,9 +487,11 @@ export default function MiningClient({ initial }) {
                                 {wrap.paid.map((h, i) => (
                                     <span key={i} className="mine-reveal-spot">
                                         {h.art ? <Img src={h.art} className="mine-reveal-ore" fallback="◆" />
-                                            : <b><KindIcon kind={h.kind} size={26} /></b>}
+                                            : <KindIcon kind={h.kind} art={h.art} className="mine-reveal-ore" />}
+                                        {/* FULL name. Truncating to the first word turned "Fanged Helm" into
+                                            "Fanged" and "War Cape" into "War", which mean nothing. */}
                                         <em style={{ color: h.color || "#cdd3d8" }}>
-                                            {h.kind === "gold" ? `${money(h.n)}g` : h.name ? h.name.split(" ")[0] : h.kind}
+                                            {h.kind === "gold" ? `${money(h.n)} gold` : h.name || h.kind}
                                         </em>
                                     </span>
                                 ))}
@@ -511,12 +509,12 @@ export default function MiningClient({ initial }) {
                             <button type="button" className="mine-buy" style={{ marginTop: 14 }}
                                 onClick={() => { setWrap(null); if ((s.trips?.left ?? 0) > 0) startTrip(); }}>
                                 {(s.trips?.left ?? 0) > 0
-                                    ? <><GiLanternFlame /> Head back down ({s.trips.left} left)</>
+                                    ? <><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head back down ({s.trips.left} left)</>
                                     : <>Out of trips today</>}
                             </button>
                         ) : (
                             <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setWrap(null); setTab("mine"); }}>
-                                <GiWarPick /> To the rock face
+                                <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> To the rock face
                             </button>
                         )}
                     </div>
@@ -552,7 +550,7 @@ export default function MiningClient({ initial }) {
                             <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>Streak of {reveal.brokeAt} ends here. Next wall starts a new one.</p>
                         ) : null}
                         <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setReveal(null); setTab("mine"); }}>
-                            <GiWarPick /> Start swinging
+                            <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Start swinging
                         </button>
                     </div>
                 </div>
@@ -562,7 +560,7 @@ export default function MiningClient({ initial }) {
             {crack ? (
                 <div className="mine-modal" role="presentation" onClick={() => setCrack(null)}>
                     <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
-                        <Img src={crack.art} className="mine-modal-img" fallback={<GiStoneBlock />} />
+                        <Img src={crack.art} className="mine-modal-img" fallback="" />
                         <h3 style={{ color: crack.color }}>{crack.name} cracked!</h3>
                         {crack.rungLabel ? (
                             <div className={`mine-rung-won is-${crack.rungKey}`}>
@@ -589,8 +587,8 @@ export default function MiningClient({ initial }) {
                 <div className="mine-modal" role="presentation" onClick={() => smelting.stage === "done" && setSmelting(null)}>
                     <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
                         <div className={`mine-smelt-stage is-${smelting.stage}`}>
-                            <Img src={smelting.oreArt} className="mine-smelt-ore" fallback={<GiStoneBlock />} />
-                            <Img src="/images/mining/furnace.png" className="mine-smelt-furnace" fallback={<GiCauldron />} />
+                            <Img src={smelting.oreArt} className="mine-smelt-ore" fallback="" />
+                            <Img src="/images/mining/furnace.png" className="mine-smelt-furnace" fallback="" />
                             <span className="mine-smelt-glow" aria-hidden="true" />
                         </div>
                         {smelting.stage === "done" ? (
@@ -758,6 +756,10 @@ export default function MiningClient({ initial }) {
                 .mine-choice .mine-prospect em { display: block; font-style: normal; font-size: 10.5px; font-weight: 700; opacity: .8; }
                 .mine-prospect.is-big { padding: 16px; font-size: 1.1rem; }
                 .mine-prospect.is-big em { display: block; font-style: normal; font-size: 11px; font-weight: 700; opacity: .78; margin-top: 2px; }
+                .mine-upg-ico { width: 22px; height: 22px; object-fit: contain; }
+                .mine-btn-ico { width: 22px; height: 22px; object-fit: contain; vertical-align: -5px; margin-right: 5px; }
+                .mine-title-ico { width: 24px; height: 24px; object-fit: contain; vertical-align: -4px; margin-right: 4px; }
+                .mine-reveal-spot em { line-height: 1.25; }
                 .mine-face-cta { position: relative; text-align: center; padding: 16px; }
                 .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }
@@ -939,7 +941,7 @@ function HeatGame({ stack, furnace, onPour, onCancel }) {
                     best window is just short of burning it.
                 </p>
                 <div className="mine-heat-stage">
-                    <Img src={furnace?.sprite} className="mine-heat-furnace" fallback={<GiCauldron />} />
+                    <Img src={furnace?.sprite} className="mine-heat-furnace" fallback="" />
                     <span className="mine-heat-glow" style={{ opacity: Math.min(1, heat) }} aria-hidden="true" />
                 </div>
                 <div className="mine-heat-bar" aria-hidden="true">
@@ -951,7 +953,7 @@ function HeatGame({ stack, furnace, onPour, onCancel }) {
                     {band === "cold" ? "Too cold" : band === "warm" ? "Warm" : band === "hot" ? "Hot" : band === "perfect" ? "PERFECT" : "BURNING"}
                 </div>
                 <button type="button" className="mine-prospect" onPointerDown={(e) => { e.preventDefault(); tip(); }}>
-                    <GiPouringPot /> Pour
+                    <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" /> Pour
                 </button>
                 <button type="button" className="mine-prospect is-ghost" onClick={onCancel}>Back off the fire</button>
             </div>
@@ -966,7 +968,7 @@ function UpgCard({ t, gold, busy, onBuy }) {
     return (
         <div className={`sail-upg${t.maxed ? " is-maxed" : ""}`}>
             <div className="sail-upg-top">
-                <span className="sail-upg-title"><span className="sail-upg-ico">{t.icon}</span>{t.name}</span>
+                <span className="sail-upg-title"><span className="sail-upg-ico"><Img src={t.icon} className="mine-upg-ico" fallback="" /></span>{t.name}</span>
                 <span className="muted sail-upg-lv">Lv {t.level}/{t.max}</span>
             </div>
             <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${t.max ? Math.min(100, (t.level / t.max) * 100) : 0}%` }} /></div>
@@ -977,7 +979,7 @@ function UpgCard({ t, gold, busy, onBuy }) {
             </div>
             {t.maxed
                 ? <button className="pill" disabled>Maxed</button>
-                : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}><GiCoins /> {Number(t.cost).toLocaleString()}</button>}
+                : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}><Img src="/images/mining/icon-coins.png" className="mine-btn-ico" fallback="" /> {Number(t.cost).toLocaleString()}</button>}
         </div>
     );
 }
