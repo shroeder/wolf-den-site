@@ -46,6 +46,7 @@ export default function MiningClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
+    const [tab, setTab] = useState("mine"); // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
     const post = useCallback(async (body) => {
