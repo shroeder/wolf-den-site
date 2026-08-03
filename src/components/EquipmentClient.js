@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 
@@ -58,6 +58,18 @@ function SlotIcon({ slot, size = 18 }) {
 // Resolve an item def from the loaded list (avoids re-importing ITEMS on the client render path).
 let DEFS = {};
 const itemDef = (id) => DEFS[id] || null;
+
+// EFFECTIVE stats = the base line PLUS whatever the forge added. The compare panel used the bare definition
+// for the equipped side, so a Legendary forged to +1 was weighed at its unforged value — an axe that was
+// genuinely a downgrade read "≈ SIDEGRADE", and the +1 the player had paid for was invisible in the one place
+// it mattered. `owned` carries forgeBonus; a shop preview or a plain def has none, which is correct.
+const effStats = (item, ownedById) => {
+    if (!item) return {};
+    const mine = ownedById?.get?.(item.id) || item;
+    const out = { ...(item.stats || {}) };
+    for (const [k, v] of Object.entries(mine?.forgeBonus || {})) out[k] = (out[k] || 0) + v;
+    return out;
+};
 
 // Rarity colors for set pieces + a helper to strip the "Full set:" prefix off a capstone description.
 const SET_RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
@@ -332,6 +344,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const stats = data.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
     const charged = (data.items || []).filter((i) => i.charge);
+    // Your OWNED copies, by id — these carry forgeBonus, util and enhanceLevel, which the bare ITEMS
+    // definition does not. The compare panel has to weigh the equipped piece as YOU have it, not as it ships.
+    const ownedById = useMemo(() => new Map((data.items || []).map((i) => [i.id, i])), [data.items]);
     // Group the gold shop by slot into ordered, collapsible categories (any unlisted slot → "Other").
     const shopBySlot = (data.shop || []).reduce((acc, i) => { (acc[i.slot] = acc[i.slot] || []).push(i); return acc; }, {});
     const shopCategories = [
@@ -605,35 +620,91 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     {slotDefs.map((sd) => {
                                         const eqId = equipped[sd.slot];
                                         if (eqId === detailItem.id) return null; // already sitting in this slot
-                                        const cur = eqId ? itemDef(eqId) : null;
-                                        const keys = Array.from(new Set([...Object.keys(detailItem.stats || {}), ...Object.keys(cur?.stats || {})])).filter((k) => STAT_META[k]);
-                                        let ups = 0; let downs = 0;
-                                        keys.forEach((k) => { const d = (detailItem.stats?.[k] || 0) - (cur?.stats?.[k] || 0); if (d > 0) ups += 1; else if (d < 0) downs += 1; });
+                                        const curDef = eqId ? itemDef(eqId) : null;
+                                        const cur = curDef ? (ownedById.get(eqId) || curDef) : null;
+
+                                        // Both sides at their REAL numbers — base plus forge.
+                                        const mineStats = effStats(detailItem, ownedById);
+                                        const curStats = cur ? effStats(cur, ownedById) : {};
+                                        const keys = Array.from(new Set([...Object.keys(mineStats), ...Object.keys(curStats)])).filter((k) => STAT_META[k]);
+
+                                        // The verdict weighs the SIZE of the change, not how many stats moved.
+                                        // Counting winners made "+1 Might, −2 Ferocity" a sidegrade.
+                                        let net = 0;
+                                        keys.forEach((k) => { net += (mineStats[k] || 0) - (curStats[k] || 0); });
+
+                                        // What swapping costs you that ISN'T a number. Losing a Green Thumb
+                                        // attunement or a forge level never appeared anywhere in this panel —
+                                        // you found out after the swap, if at all.
+                                        const lose = [];
+                                        const gain = [];
+                                        if (cur?.util) lose.push({ icon: "🔮", text: `+${cur.util.value}${cur.util.unit} ${cur.util.label}`, note: "attunement" });
+                                        if (detailItem.util) gain.push({ icon: "🔮", text: `+${detailItem.util.value}${detailItem.util.unit} ${detailItem.util.label}`, note: "attunement" });
+                                        if (cur?.enhanceLevel > 0) lose.push({ icon: "★", text: `Forged to +${cur.enhanceLevel}`, note: "enhancement stays with the piece" });
+                                        if (detailItem.enhanceLevel > 0) gain.push({ icon: "★", text: `Forged to +${detailItem.enhanceLevel}`, note: "already enhanced" });
+                                        if (cur?.signature) lose.push({ icon: "☆", text: cur.signature.label, note: cur.signature.desc });
+                                        if (detailItem.signature) gain.push({ icon: "☆", text: detailItem.signature.label, note: detailItem.signature.desc });
+                                        if (cur?.setName && cur.setId !== detailItem.setId) lose.push({ icon: "🛡", text: `${cur.setName} set piece`, note: "may break a set bonus" });
+                                        if (detailItem.setName && cur?.setId !== detailItem.setId) gain.push({ icon: "🛡", text: `${detailItem.setName} set piece`, note: "counts toward that set" });
+
+                                        const verdict = !cur ? { label: "FREE SLOT", color: "#8fe39a" }
+                                            : net > 0 ? { label: "UPGRADE", color: "#8fe39a" }
+                                            : net < 0 ? { label: "DOWNGRADE", color: "#ff8f9a" }
+                                            : { label: "SIDEGRADE", color: "#cdd9c6" };
+
                                         return (
-                                            <div key={sd.slot} style={{ padding: "9px 11px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                                                <div style={{ fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9aa0a6", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                                                    {multi ? `${sd.label} · ` : "vs equipped · "}{cur ? cur.name : "empty slot"}
-                                                    <span style={{ marginLeft: "auto", fontWeight: 900, color: !cur ? "#8fe39a" : ups > downs ? "#8fe39a" : downs > ups ? "#ff8f9a" : "#cdd9c6" }}>{!cur ? "🆕 free" : ups > downs ? "↑ upgrade" : downs > ups ? "↓ downgrade" : "≈ sidegrade"}</span>
+                                            <div key={sd.slot} className="eqcmp">
+                                                <div className="eqcmp-head">
+                                                    <span className="eqcmp-title">{multi ? sd.label : "Replacing"}</span>
+                                                    <span className="eqcmp-cur">{cur ? cur.name : "empty slot"}</span>
+                                                    <span className="eqcmp-verdict" style={{ "--v": verdict.color }}>{verdict.label}</span>
                                                 </div>
+
                                                 {cur && keys.length ? (
-                                                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                                    <>
+                                                        <div className="eqcmp-cols">
+                                                            <span />
+                                                            <span>Equipped</span>
+                                                            <span />
+                                                            <span>New</span>
+                                                            <span>Change</span>
+                                                        </div>
                                                         {keys.map((k) => {
-                                                            const a = detailItem.stats?.[k] || 0; const b = cur.stats?.[k] || 0; const d = a - b; const suf = STAT_META[k].suffix || "";
+                                                            const a = mineStats[k] || 0; const b = curStats[k] || 0;
+                                                            const d = a - b; const suf = STAT_META[k].suffix || "";
                                                             return (
-                                                                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "0.85rem", gap: 10 }}>
-                                                                    <span>{STAT_META[k].icon} {STAT_META[k].label}</span>
-                                                                    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                                                                        <span className="muted">{b}{suf} → {a}{suf}</span>{" "}
-                                                                        <b style={{ color: d > 0 ? "#8fe39a" : d < 0 ? "#ff8f9a" : "#9aa0a6" }}>{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</b>
-                                                                    </span>
+                                                                <div key={k} className={`eqcmp-row${d > 0 ? " is-up" : d < 0 ? " is-down" : ""}`}>
+                                                                    <span className="eqcmp-stat">{STAT_META[k].icon} {STAT_META[k].label}</span>
+                                                                    <span className="eqcmp-was">{b}{suf}</span>
+                                                                    <span className="eqcmp-arrow" aria-hidden="true">&rarr;</span>
+                                                                    <span className="eqcmp-now">{a}{suf}</span>
+                                                                    <span className="eqcmp-delta">{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</span>
                                                                 </div>
                                                             );
                                                         })}
-                                                    </div>
+                                                    </>
                                                 ) : !cur ? <div className="muted" style={{ fontSize: "0.8rem" }}>Nothing equipped here — a pure gain.</div> : null}
+
+                                                {lose.length || gain.length ? (
+                                                    <div className="eqcmp-extras">
+                                                        {lose.length ? (
+                                                            <div className="eqcmp-ex is-lose">
+                                                                <b>You&rsquo;d lose</b>
+                                                                {lose.map((x, n) => <span key={n}>{x.icon} {x.text}<em>{x.note}</em></span>)}
+                                                            </div>
+                                                        ) : null}
+                                                        {gain.length ? (
+                                                            <div className="eqcmp-ex is-gain">
+                                                                <b>You&rsquo;d gain</b>
+                                                                {gain.map((x, n) => <span key={n}>{x.icon} {x.text}<em>{x.note}</em></span>)}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                ) : null}
+
                                                 {canEquip ? (
-                                                    <button type="button" className="button primary" style={{ marginTop: 8, width: "100%" }} disabled={busy} onClick={() => { equip(sd.slot, detailItem.id); closeDetail(); }}>
-                                                        ⚔️ Equip{multi ? ` to ${sd.label}` : ""}{cur ? ` — replace ${cur.name}` : ""}
+                                                    <button type="button" className="eqcmp-go" disabled={busy} onClick={() => { equip(sd.slot, detailItem.id); closeDetail(); }}>
+                                                        Equip{multi ? ` to ${sd.label}` : ""}{cur ? ` — replace ${cur.name}` : ""}
                                                     </button>
                                                 ) : null}
                                             </div>

@@ -288,6 +288,10 @@ export async function getInventory(buyerId) {
                 // bought. The Auction House has shown this on a listing for ages; your own bag never did, so
                 // the one place you inspect your own gear was the one place the enhancement was invisible.
                 forgeStats: enh?.statBonus && Object.keys(enh.statBonus).length ? describeStats(enh.statBonus) : null,
+                // The forge bonus as NUMBERS as well as prose. The compare panel needs to add it to the base
+                // stats: without it, weighing a new piece against an enhanced one compared the new item to the
+                // equipped item's UNFORGED self and called a downgrade a sidegrade.
+                forgeBonus: enh?.statBonus && Object.keys(enh.statBonus).length ? enh.statBonus : null,
                 util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
         })
         .filter(Boolean)
