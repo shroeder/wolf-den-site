@@ -245,8 +245,8 @@ const trackCards = (defs, row, valueFn, costFn, fmt) => Object.entries(defs).map
 export async function getMiningState(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await minerRow(buyerId);
-    const lantern = surveyValue("lantern", row?.lantern_level);
-    await refreshNodes(lantern);
+    // Only retire what's finished; walls are cut on demand by startSurvey rather than kept stocked.
+    await db.query(`UPDATE mkt_ore_node SET status = 'expired' WHERE status = 'active' AND expires_at <= NOW()`).catch(() => {});
 
     const [current, ore, goldRow, liveCount, faceRows] = await Promise.all([
         row?.current_node_id
@@ -264,7 +264,7 @@ export async function getMiningState(buyerId) {
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_ore_node WHERE status = 'active'`).catch(() => null),
         // Tiers of the spots on the current face, for the MANIFEST (see below).
         row?.survey_json?.spots?.length
-            ? db.query(`SELECT id, tier FROM mkt_ore_node WHERE id = ANY($1)`, [row.survey_json.spots]).catch(() => [])
+            ? db.query(`SELECT id, tier, face_x, face_y FROM mkt_ore_node WHERE id = ANY($1)`, [row.survey_json.spots]).catch(() => [])
             : Promise.resolve([]),
     ]);
 
@@ -317,6 +317,7 @@ export async function getMiningState(buyerId) {
             };
         })() : null,
         seamsLive: Number(liveCount?.n) || 0,
+        streak: { current: Number(row?.read_streak) || 0, best: Number(row?.best_streak) || 0 },
         legend: SURVEY_LEGEND.map((g) => ({ key: g.key, label: g.label, range: g.range, color: g.color })),
         // The survey in progress. Unrevealed spots carry NO signal — the answer stays on the server until a
         // test-strike is spent on it, or the whole game is readable straight out of the network tab.
@@ -328,24 +329,35 @@ export async function getMiningState(buyerId) {
             // knowing the face contains exactly one Mythril turns a "deep resonance" from a hint into a
             // certainty, and two dull readings against two Coal tells you where the good rock ISN'T without
             // spending a strike on it. The composition is exact; only the ARRANGEMENT is hidden.
+            const byId = Object.fromEntries((faceRows || []).map((r) => [String(r.id), r]));
             const tierById = Object.fromEntries((faceRows || []).map((r) => [String(r.id), Number(r.tier)]));
             const counts = {};
             for (const id of sv.spots) { const t = tierById[String(id)]; if (t) counts[t] = (counts[t] || 0) + 1; }
-            const manifest = Object.entries(counts)
+            let manifest = Object.entries(counts)
                 .map(([t, n]) => { const o = oreTier(Number(t)); return { tier: Number(t), n, name: o.name, color: o.color, art: oreArt(Number(t)) }; })
                 .sort((a, b) => b.tier - a.tier);
+            // A MOTHERLODE wall doesn't name its prize. One entry becomes an unknown, so the manifest itself
+            // tells you there's something here worth hunting without telling you what or where.
+            if (sv.motherlode && manifest.length) {
+                manifest = manifest.map((m, idx) => (idx === 0 ? { ...m, tier: 0, n: m.n, name: "Something rich", color: "#ffd75e", art: null, unknown: true } : m));
+            }
             return {
                 manifest,
                 probes: Number(sv.probes) || 0,
                 used: revealed.length,
                 left: Math.max(0, (Number(sv.probes) || 0) - revealed.length),
-                spots: sv.spots.map((_, i) => {
+                motherlode: Boolean(sv.motherlode),
+                spots: sv.spots.map((id, i) => {
+                    const nr = byId[String(id)];
                     const shown = revealed.includes(i);
                     const key = shown ? sv.signal?.[String(i)] : null;
                     const exactTier = shown ? Number(sv.exact?.[String(i)]) || 0 : 0;
                     const o = exactTier ? oreTier(exactTier) : null;
                     return {
                         index: i, revealed: shown,
+                        // Where it actually sits on the wall, so veins read spatially.
+                        x: nr?.face_x != null ? Number(nr.face_x) : null,
+                        y: nr?.face_y != null ? Number(nr.face_y) : null,
                         signal: key ? SURVEY_SIGNALS[key] || null : null,
                         // The Assay Kit paid off on this one: name it rather than banding it.
                         exact: o ? { tier: exactTier, name: o.name, color: o.color, art: oreArt(exactTier) } : null,
@@ -399,29 +411,77 @@ function signalForTier(tier) {
     return "deep";
 }
 
-// Lay out a fresh rock face. Also the "give me a different set" action, so a survey you don't like isn't a
-// dead end — it just costs you the survey you were on.
+// ── GENERATING A FACE ─────────────────────────────────────────────────────────────────────────────────────────
+// A wall used to be five unrelated nodes plucked from a shared pool, which is exactly why the survey could
+// only ever be counting — there was nothing spatial to reason about. A face is CUT as a wall now: spots laid
+// out in a scatter, with rich rock CLUSTERED into veins.
+//
+// So "a deep resonance at mark 3" is no longer just one fact. Marks near it are more likely to be rich too,
+// which means following a vein is a strategy and a lone deep reading in a corner is a different situation
+// from one in the middle of a cluster.
+const FACE_POS = [
+    [24, 30], [52, 22], [78, 33], [34, 58], [66, 60], [16, 50], [88, 52],
+];
+const MOTHERLODE_CHANCE = 0.07; // a wall that's hiding something well above its station
+
+function cutFace(spots, lanternPct) {
+    // Everything starts ordinary; the vein is what makes rock rich.
+    const tiers = Array.from({ length: spots }, () => rollOreTier(lanternPct * 0.4));
+    // THE VEIN — an origin plus a reach. Spots near the origin get lifted, most at the centre, less at the
+    // edges, so richness falls off with distance rather than switching on and off.
+    const origin = FACE_POS[Math.floor(Math.random() * spots)];
+    const reach = 26 + Math.random() * 16;
+    for (let i = 0; i < spots; i += 1) {
+        const [x, y] = FACE_POS[i % FACE_POS.length];
+        const d = Math.hypot(x - origin[0], (y - origin[1]) * 1.4);
+        if (d > reach) continue;
+        const strength = 1 - d / reach;               // 1 at the origin, 0 at the edge of the vein
+        const lift = Math.random() < strength ? (Math.random() < strength * 0.5 ? 2 : 1) : 0;
+        tiers[i] = Math.min(5, tiers[i] + lift);
+    }
+    // MOTHERLODE — rarely, one spot on the wall is far better than the rock around it deserves. Announced in
+    // the manifest as an unknown, so the wall itself tells you there's something worth hunting for.
+    const motherlode = Math.random() < MOTHERLODE_CHANCE;
+    if (motherlode) tiers[Math.floor(Math.random() * spots)] = 5;
+    return { tiers, motherlode };
+}
+
+// Lay out a fresh rock face. Also the "give me a different wall" action, so a face you don't like isn't a
+// dead end — it just costs you the face you were on.
 export async function startSurvey(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
-    await refreshNodes(surveyValue("lantern", row?.lantern_level));
-    const nodes = await db.query(
-        `SELECT id, tier FROM mkt_ore_node WHERE status = 'active' ORDER BY RANDOM() LIMIT $1`, [spotsFor(row?.face_level)]
-    ).catch(() => []);
-    if (!nodes.length) return { ok: false, error: "no_seams" };
-    // ASSAY decides, per spot, whether a reading will name the ore outright instead of a band. Rolled NOW and
-    // frozen alongside the signal, so probing can never be repeated for a better class of answer.
+    const spots = spotsFor(row?.face_level);
+    const { tiers, motherlode } = cutFace(spots, surveyValue("lantern", row?.lantern_level));
+
+    // Cut the wall: one node per spot, at its position on the face.
+    const ids = [];
+    for (let i = 0; i < spots; i += 1) {
+        const o = oreTier(tiers[i]);
+        const [x, y] = FACE_POS[i % FACE_POS.length];
+        const jx = Math.round((x + (Math.random() * 8 - 4)) * 10) / 10;
+        const jy = Math.round((y + (Math.random() * 8 - 4)) * 10) / 10;
+        const made = await db.queryOne(
+            `INSERT INTO mkt_ore_node (tier, x, y, face_x, face_y, hp, hp_max, expires_at)
+             VALUES ($1, $2, $3, $2, $3, $4, $4, NOW() + ($5 || ' minutes')::interval) RETURNING id`,
+            [tiers[i], jx, jy, o.hp, String(NODE_TTL_MIN)]
+        ).catch(() => null);
+        if (made?.id) ids.push(String(made.id));
+    }
+    if (!ids.length) return { ok: false, error: "no_seams" };
+
     const assay = surveyValue("assay", row?.assay_level);
     const survey = {
-        spots: nodes.map((n) => String(n.id)),
+        spots: ids,
         // Signals are rolled now and frozen — probing reveals what was already true.
-        signal: Object.fromEntries(nodes.map((n, i) => [String(i), signalForTier(Number(n.tier))])),
-        exact: Object.fromEntries(nodes.map((n, i) => [String(i), Math.random() < assay ? Number(n.tier) : 0])),
+        signal: Object.fromEntries(ids.map((_, i) => [String(i), signalForTier(tiers[i])])),
+        exact: Object.fromEntries(ids.map((_, i) => [String(i), Math.random() < assay ? tiers[i] : 0])),
         revealed: [],
         probes: probesFor(row?.lantern_level),
+        motherlode,
     };
     await db.query(`UPDATE mkt_mining SET survey_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(survey)]).catch(() => {});
-    await trackActivity(buyerId, "ore_survey", {}).catch(() => {});
+    await trackActivity(buyerId, "ore_survey", { spots: ids.length, motherlode }).catch(() => {});
     return { ok: true, ...(await getMiningState(buyerId)) };
 }
 
@@ -478,21 +538,30 @@ export async function claimSpot(buyerId, index) {
 
     // A good read pays. Deliberately a BONUS for getting it right and never a penalty for getting it wrong —
     // a survey you misread still hands you a real seam to work.
+    // THE STREAK. Consecutive best reads escalate the payout, so a good run is a thing you're protecting
+    // rather than a coin landing well once. Broken by a miss, never punished beyond losing the multiplier.
+    const priorStreak = Number(row?.read_streak) || 0;
+    const streak = bestRead ? priorStreak + 1 : 0;
+    const bestEver = Math.max(Number(row?.best_streak) || 0, streak);
+    await db.query(`UPDATE mkt_mining SET read_streak = $2, best_streak = $3 WHERE buyer_id = $1`, [buyerId, streak, bestEver]).catch(() => {});
+    const streakMult = Math.min(3, 1 + Math.max(0, streak - 1) * 0.5); // 1x, 1.5x, 2x, 2.5x, 3x
+
     let bonus = null;
     if (bestRead && spots.length > 1) {
         const o = oreTier(mine);
-        const gold = 15 + o.gold;
+        const gold = Math.round((15 + o.gold) * streakMult);
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "mining", { balanceAfter: paid?.gold, meta: { kind: "best_read" } }).catch(() => {});
         // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
-        await awardXp(buyerId, "mining", { points: 10 + o.xp, gold: 0 }).catch(() => {});
-        bonus = { gold, xp: 10 + o.xp };
+        const xp = Math.round((10 + o.xp) * streakMult);
+        await awardXp(buyerId, "mining", { points: xp, gold: 0 }).catch(() => {});
+        bonus = { gold, xp, streak, streakMult: Math.round(streakMult * 10) / 10 };
     }
     await trackActivity(buyerId, "ore_claim", { tier: mine, rank, best, bestRead }).catch(() => {});
 
     return {
         ok: true,
-        reveal: { spots, rank, total: spots.length, bestRead, bonus, pickedTier: mine, bestTier: best },
+        reveal: { spots, rank, total: spots.length, bestRead, bonus, pickedTier: mine, bestTier: best, streak, streakBroken: !bestRead && priorStreak >= 2, brokeAt: priorStreak },
         ...(await getMiningState(buyerId)),
     };
 }

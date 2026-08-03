@@ -191,7 +191,8 @@ export default function MiningClient({ initial }) {
             <>
             {/* ── THE ROCK FACE ── the survey happens ON the wall, not in a list. */}
             {(() => {
-                // Fixed scatter so the marks sit on the wall like real survey chalk rather than a neat grid.
+                // Marks sit where the wall actually put them, so veins read spatially — a rich cluster LOOKS
+                // like a cluster. Falls back to a scatter only if a face predates the layout.
                 const SPOT_POS = [[22, 34], [50, 24], [76, 38], [33, 66], [64, 68], [14, 56], [86, 60]];
                 const sv = s.survey;
                 const sel = sv ? sv.spots.find((x) => x.index === pickedSpot) || null : null;
@@ -202,9 +203,10 @@ export default function MiningClient({ initial }) {
                                 <span className="mine-manifest-lab">This wall holds</span>
                                 <span className="mine-manifest-list">
                                     {sv.manifest.map((m) => (
-                                        <span key={m.tier} className="mine-manifest-item" title={m.name}>
-                                            <Img src={m.art} className="mine-manifest-ore" fallback="◆" />
-                                            <b style={{ color: m.color }}>{m.name.split(" ")[0]}</b>
+                                        <span key={`${m.tier}-${m.name}`} className={`mine-manifest-item${m.unknown ? " is-unknown" : ""}`} title={m.name}>
+                                            {m.unknown ? <span className="mine-manifest-q" aria-hidden="true">?</span>
+                                                : <Img src={m.art} className="mine-manifest-ore" fallback="◆" />}
+                                            <b style={{ color: m.color }}>{m.unknown ? "Something rich" : m.name.split(" ")[0]}</b>
                                             <em>×{m.n}</em>
                                         </span>
                                     ))}
@@ -213,10 +215,12 @@ export default function MiningClient({ initial }) {
                             </div>
                         ) : null}
 
-                        <div className="mine-face is-survey">
+                        <div className={`mine-face is-survey${sv?.motherlode ? " is-motherlode" : ""}`}>
                             <div className="mine-face-bg is-survey" aria-hidden="true" />
+                            {sv?.motherlode ? <div className="mine-motherlode-tag">✦ This wall is hiding something</div> : null}
                             {(sv?.spots || []).map((sp, i) => {
-                                const [x, y] = SPOT_POS[i % SPOT_POS.length];
+                                const [fx, fy] = SPOT_POS[i % SPOT_POS.length];
+                                const x = sp.x ?? fx, y = sp.y ?? fy;
                                 const col = sp.exact?.color || sp.signal?.color || null;
                                 return (
                                     <button key={sp.index} type="button"
@@ -247,6 +251,7 @@ export default function MiningClient({ initial }) {
                                         {Array.from({ length: sv.probes }, (_, k) => <i key={k} className={k < sv.left ? "on" : ""}>🔨</i>)}
                                     </span>
                                     <span>{sv.spots.length} spots · tap one to sound it</span>
+                                {s.streak?.current >= 2 ? <span className="mine-streak">🔥 {s.streak.current} best-read streak</span> : null}
                                 </div>
                             ) : null}
                             {msg ? <div className="mine-msg">{msg}</div> : null}
@@ -462,9 +467,12 @@ export default function MiningClient({ initial }) {
                         </div>
                         {reveal.bonus ? (
                             <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
-                                <b>Best-read bonus</b>
+                                <b>Best-read bonus{reveal.bonus.streak >= 2 ? ` · 🔥 ${reveal.bonus.streak} in a row (×${reveal.bonus.streakMult})` : ""}</b>
                                 <em>+{money(reveal.bonus.gold)} gold · +{money(reveal.bonus.xp)} XP for reading the rock right.</em>
                             </div>
+                        ) : null}
+                        {reveal.streakBroken ? (
+                            <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>Streak of {reveal.brokeAt} ends here. Next wall starts a new one.</p>
                         ) : null}
                         <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setReveal(null); setTab("mine"); }}>
                             ⛏️ Start swinging
@@ -598,6 +606,14 @@ export default function MiningClient({ initial }) {
                     background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); font-size: 12px; }
                 .mine-manifest-ore { width: 20px; height: 20px; object-fit: contain; }
                 .mine-manifest-item em { font-style: normal; color: #cdd3d8; font-weight: 800; }
+                .mine-manifest-item.is-unknown { border-color: rgba(255,215,94,0.65); background: rgba(255,215,94,0.14); animation: mineBurn 1.6s ease-in-out infinite alternate; }
+                .mine-manifest-q { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%;
+                    background: rgba(255,215,94,0.25); color: #ffe28a; font-weight: 900; font-size: 12px; }
+                .mine-motherlode-tag { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2;
+                    padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 900; color: #2a1400;
+                    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 0 18px rgba(255,190,60,0.7); }
+                .mine-face.is-motherlode { border-color: rgba(255,215,94,0.7); box-shadow: inset 0 0 60px -10px rgba(255,180,40,0.5); }
+                .mine-streak { color: #ffb020; font-weight: 800; }
                 .mine-manifest-note { display: block; margin-top: 7px; font-size: 11px; color: #9aa2ab; }
                 .mine-legend { display: flex; gap: 6px; margin-top: 10px; }
                 .mine-legend-item { flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 7px 8px; border-radius: 10px;
