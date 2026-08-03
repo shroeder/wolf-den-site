@@ -64,9 +64,10 @@ export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 // handed you a seam, pushing would be free and there would be no game here at all.
 export const TRIPS_PER_DAY = 3;
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
+export const safeDepthFor = (shoringLevel = 0) => COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3); // Shoring buys more
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs
 const COLLAPSE_CAP = 0.55;
-export const collapseChanceAt = (depth) => Math.min(COLLAPSE_CAP, Math.max(0, depth - COLLAPSE_FREE_DEPTH) * COLLAPSE_PER_DEPTH);
+export const collapseChanceAt = (depth, shoringLevel = 0) => Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel)) * COLLAPSE_PER_DEPTH);
 
 // What the tunnel can turn up. Weights shift with depth — shallow rock is mostly ore and rubble, deep rock is
 // where the gear and the strongboxes are. A `seam` card raises the tier of what you end up mining.
@@ -97,7 +98,7 @@ const ENCOUNTERS = [
     { key: "vein", title: "The vein widens", body: "The rock ahead is threaded with colour.", effect: "seam" },
 ];
 
-function rollFind(card, depth) {
+function rollFind(card, depth, packBonus = 0) {
     const tierCeil = Math.min(5, 1 + Math.floor(depth / 2));
     const pickTier = () => Math.max(1, Math.min(5, tierCeil - (Math.random() < 0.45 ? 1 : 0)));
     switch (card.key) {
@@ -109,9 +110,9 @@ function rollFind(card, depth) {
         case "ore": {
             const t = pickTier();
             const o = oreTier(t);
-            return { kind: "ore", tier: t, n: 1 + Math.floor(Math.random() * 2), name: o.name, color: o.color, art: oreArt(t) };
+            return { kind: "ore", tier: t, n: Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * (1 + packBonus))), name: o.name, color: o.color, art: oreArt(t) };
         }
-        case "gold": return { kind: "gold", n: 20 + Math.floor(Math.random() * (18 * depth + 20)) };
+        case "gold": return { kind: "gold", n: Math.round((20 + Math.floor(Math.random() * (18 * depth + 20))) * (1 + packBonus)) };
         case "consumable": return { kind: "consumable" };
         case "gear": return { kind: "gear", depth };
         case "chest": {
@@ -156,7 +157,7 @@ export async function descend(buyerId) {
 
     // THE ROOF. Rolled before the card, so a collapse is the tunnel deciding rather than a reward being shown
     // to you and then snatched back.
-    if (Math.random() < collapseChanceAt(depth)) {
+    if (Math.random() < collapseChanceAt(depth, row?.assay_level)) {
         const lost = (run.haul || []).length;
         const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
@@ -165,8 +166,8 @@ export async function descend(buyerId) {
         return { ok: true, collapsed: true, depth, lost, seam: null, ...(await getMiningState(buyerId)) };
     }
 
-    const card = drawCard(depth);
-    const found = rollFind(card, depth);
+    const card = drawCard(depth + Math.round(surveyValue("lantern", row?.lantern_level) * 10)); // Lantern reads the tunnel as deeper than it is
+    const found = rollFind(card, depth, surveyValue("pack", row?.face_level));
     const haul = [...(run.haul || [])];
     let seamTier = Number(run.seamTier) || 1;
     if (found.kind === "seam") seamTier = Math.max(seamTier, found.tier);
@@ -295,12 +296,12 @@ export const MINE_TRACKS = {
 // SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
 // and both of those are about FINDING rock rather than breaking it. It kept its column, so no levels are lost.
 export const SURVEY_TRACKS = {
-    lantern: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Lantern", icon: "🏮", col: "lantern_level",
-        desc: "Light reaches deeper — richer seams surface, and you get more test-strikes.", effect: "Rich seams" },
-    assay: { max: 10, per: 0.06, cap: 0.60, kind: "pct", name: "Assay Kit", icon: "🔬", col: "assay_level",
-        desc: "A reading sometimes names the ore outright instead of a band.", effect: "Exact reading" },
-    face: { max: 10, per: 1, cap: 10, kind: "count", name: "Wide Face", icon: "🪨", col: "face_level",
-        desc: "Clear more rock — more candidate spots to choose between.", effect: "Spots on the face" },
+    lantern: { max: 10, per: 0.04, cap: 0.40, kind: "pct", name: "Lantern", icon: "🏮", col: "lantern_level",
+        desc: "Light reaches further — the tunnel gives up better things the deeper you get.", effect: "Find quality" },
+    shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "🪵", col: "assay_level",
+        desc: "Timbered walls. The roof holds for longer before the risk starts climbing.", effect: "Safe depth" },
+    pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "🎒", col: "face_level",
+        desc: "A deeper pack — every purse and pocket of ore you find is bigger.", effect: "Haul size" },
 };
 export const surveyValue = (t, lvl) => Math.min(SURVEY_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SURVEY_TRACKS[t].per);
 // Spots on the face, and test-strikes to spend on them. Both stay well under "sound out everything", because
@@ -489,7 +490,7 @@ export async function getMiningState(buyerId) {
             seamArt: oreArt(Number(run.seamTier) || 1),
             haul: run.haul || [],
             last: run.last || null,
-            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1) * 100),
+            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level) * 100),
         } : null,
         // How the last descent ended, so the client can show the wrap-up once.
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
@@ -502,9 +503,8 @@ export async function getMiningState(buyerId) {
         lantern: lanternForm(totalSurveyLevels(row)),
         surveyLevels: totalSurveyLevels(row),
         surveyTracks: trackCards(SURVEY_TRACKS, row, surveyValue, trackCost, (key, lvl) => {
-            if (key === "face") return `${spotsFor(lvl)} spots`;
-            if (key === "lantern") return `+${Math.round(surveyValue(key, lvl) * 100)}% · ${probesFor(lvl)} strikes`;
-            return `${Math.round(surveyValue(key, lvl) * 100)}%`;
+            if (key === "shoring") return `${safeDepthFor(lvl)} safe`;
+            return `+${Math.round(surveyValue(key, lvl) * 100)}%`;
         }),
         furnace: furnaceForm(totalSmeltLevels(row)),
         smeltLevels: totalSmeltLevels(row),

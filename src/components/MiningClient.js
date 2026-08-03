@@ -241,13 +241,16 @@ export default function MiningClient({ initial }) {
                         <span className="muted">{(s.trips?.left ?? 0) > 0
                             ? "Go as deep as you dare. Everything you find is only yours once you climb out."
                             : "Three descents a day. Back tomorrow."}</span>
-                        {(s.trips?.left ?? 0) > 0 ? (
-                            <button type="button" className="mine-prospect" onClick={startTrip} disabled={busy}>🏮 Head down</button>
-                        ) : null}
                     </div>
                 )}
                 {msg ? <div className="mine-msg">{msg}</div> : null}
             </div>
+
+            {!s.run ? (
+                <button type="button" className="mine-prospect is-big" onClick={startTrip} disabled={busy || (s.trips?.left ?? 0) <= 0}>
+                    {(s.trips?.left ?? 0) > 0 ? <>🏮 Head down the tunnel <em>{s.trips.left} of {s.trips.max} trips left today</em></> : "No trips left today"}
+                </button>
+            ) : null}
 
             {s.run ? (
                 <>
@@ -726,6 +729,8 @@ export default function MiningClient({ initial }) {
                 .mine-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
                 .mine-choice .mine-prospect { margin-top: 0; }
                 .mine-choice .mine-prospect em { display: block; font-style: normal; font-size: 10.5px; font-weight: 700; opacity: .8; }
+                .mine-prospect.is-big { padding: 16px; font-size: 1.1rem; }
+                .mine-prospect.is-big em { display: block; font-style: normal; font-size: 11px; font-weight: 700; opacity: .78; margin-top: 2px; }
                 .mine-face-cta { position: relative; text-align: center; padding: 16px; }
                 .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }
