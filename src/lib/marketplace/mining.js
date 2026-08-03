@@ -272,6 +272,23 @@ export async function getMiningState(buyerId) {
             };
         })() : null,
         seamsLive: Number(liveCount?.n) || 0,
+        // The survey in progress. Unrevealed spots carry NO signal — the answer stays on the server until a
+        // test-strike is spent on it, or the whole game is readable straight out of the network tab.
+        survey: (() => {
+            const sv = row?.survey_json;
+            if (!sv?.spots?.length) return null;
+            const revealed = Array.isArray(sv.revealed) ? sv.revealed : [];
+            return {
+                probes: Number(sv.probes) || 0,
+                used: revealed.length,
+                left: Math.max(0, (Number(sv.probes) || 0) - revealed.length),
+                spots: sv.spots.map((_, i) => {
+                    const shown = revealed.includes(i);
+                    const key = shown ? sv.signal?.[String(i)] : null;
+                    return { index: i, revealed: shown, signal: key ? SURVEY_SIGNALS[key] || null : null };
+                }),
+            };
+        })(),
         ore: (ore || []).map((r) => {
             const o = oreTier(r.tier);
             const cost = smeltCostFor(row?.crucible_level);
@@ -290,27 +307,89 @@ export async function getMiningState(buyerId) {
     };
 }
 
-// PROSPECT — surface a random live seam and make it the one you're working.
+// ── THE SURVEY ───────────────────────────────────────────────────────────────────────────────────────────────
+// Finding a seam is a minigame, not a button. Five candidate spots on the rock face; a limited number of
+// test-strikes to sound them out; then you commit to one and that becomes the seam you work.
 //
-// Server-assigned, never client-chosen: if the client picked from the visible list, everyone would take the
-// Emberheart every time and the spawn weights would stop meaning anything. The tier you get to swing at has to
-// be the game's choice, which is also what makes finding a good one feel like something.
-export async function prospectNode(buyerId) {
+// A different KIND of skill from swinging on purpose. The swing is timing; the survey is inference. Another
+// timing bar would have been the same game twice on one screen.
+//
+// The spots are REAL live nodes, so what you commit to is what you get. There is no second roll hiding behind
+// the choice — the whole point is that reading the rock well is what earns the good seam.
+const SURVEY_SPOTS = 5;
+// Test-strikes you get. The Lantern finally means something for FINDING rather than only tilting spawns.
+export const probesFor = (lanternLevel = 0) => 2 + Math.floor(Math.max(0, lanternLevel) / 4); // 2..4
+
+// What a test-strike tells you. The bands OVERLAP on purpose: "deep" narrows a spot to tier 4 or 5 without
+// promising which, so probing is real information and never a certainty. Rolled ONCE per survey and stored,
+// so re-reading a spot can't reroll it into a better answer.
+export const SURVEY_SIGNALS = {
+    dull: { key: "dull", label: "A dull thud", hint: "Close to the surface. Poor rock.", color: "#8b8f96" },
+    ring: { key: "ring", label: "A clean ring", hint: "Something solid in there.", color: "#6fb0e6" },
+    deep: { key: "deep", label: "A deep resonance", hint: "Whatever that is, it's rich.", color: "#ffb020" },
+};
+function signalForTier(tier) {
+    if (tier <= 1) return "dull";
+    if (tier === 2) return Math.random() < 0.5 ? "dull" : "ring";
+    if (tier === 3) return "ring";
+    if (tier === 4) return Math.random() < 0.5 ? "ring" : "deep";
+    return "deep";
+}
+
+// Lay out a fresh rock face. Also the "give me a different set" action, so a survey you don't like isn't a
+// dead end — it just costs you the survey you were on.
+export async function startSurvey(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
     await refreshNodes(trackValue("lantern", row?.lantern_level));
-    // Prefer a seam you haven't already chipped, so prospecting feels like finding something new rather than
-    // handing you back the rock you just walked away from.
-    const node = await db.queryOne(
-        `SELECT n.id FROM mkt_ore_node n
-           LEFT JOIN mkt_ore_node_hit h ON h.node_id = n.id AND h.buyer_id = $1
-          WHERE n.status = 'active' AND n.id IS DISTINCT FROM $2
-          ORDER BY (h.node_id IS NOT NULL), RANDOM() LIMIT 1`,
-        [buyerId, row?.current_node_id || -1]
-    ).catch(() => null);
-    if (!node) return { ok: false, error: "no_seams" };
-    await db.query(`UPDATE mkt_mining SET current_node_id = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, node.id]).catch(() => {});
-    await trackActivity(buyerId, "ore_prospect", {}).catch(() => {});
+    const nodes = await db.query(
+        `SELECT id, tier FROM mkt_ore_node WHERE status = 'active' ORDER BY RANDOM() LIMIT $1`, [SURVEY_SPOTS]
+    ).catch(() => []);
+    if (!nodes.length) return { ok: false, error: "no_seams" };
+    const survey = {
+        spots: nodes.map((n) => String(n.id)),
+        // Signals are rolled now and frozen — probing reveals what was already true.
+        signal: Object.fromEntries(nodes.map((n, i) => [String(i), signalForTier(Number(n.tier))])),
+        revealed: [],
+        probes: probesFor(row?.lantern_level),
+    };
+    await db.query(`UPDATE mkt_mining SET survey_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(survey)]).catch(() => {});
+    await trackActivity(buyerId, "ore_survey", {}).catch(() => {});
+    return { ok: true, ...(await getMiningState(buyerId)) };
+}
+
+// Sound out one spot. Costs a test-strike; re-reading an already-revealed spot is free (it's just a reminder).
+export async function probeSpot(buyerId, index) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const survey = row?.survey_json;
+    if (!survey?.spots?.length) return { ok: false, error: "no_survey" };
+    const i = Math.floor(Number(index));
+    if (!(i >= 0 && i < survey.spots.length)) return { ok: false, error: "bad_spot" };
+    const revealed = Array.isArray(survey.revealed) ? survey.revealed : [];
+    if (!revealed.includes(i)) {
+        if (revealed.length >= (Number(survey.probes) || 0)) return { ok: false, error: "no_probes" };
+        revealed.push(i);
+        await db.query(`UPDATE mkt_mining SET survey_json = jsonb_set(survey_json, '{revealed}', $2::jsonb), updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify(revealed)]).catch(() => {});
+    }
+    return { ok: true, index: i, signal: survey.signal?.[String(i)] || "dull", ...(await getMiningState(buyerId)) };
+}
+
+// Commit. This spot becomes the seam you work, and the survey is done.
+export async function claimSpot(buyerId, index) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const survey = row?.survey_json;
+    if (!survey?.spots?.length) return { ok: false, error: "no_survey" };
+    const i = Math.floor(Number(index));
+    if (!(i >= 0 && i < survey.spots.length)) return { ok: false, error: "bad_spot" };
+    const nodeId = survey.spots[i];
+    // The node may have expired or been mined out while you were surveying — say so rather than handing over
+    // a seam that isn't there.
+    const live = await db.queryOne(`SELECT id FROM mkt_ore_node WHERE id = $1 AND status = 'active'`, [nodeId]).catch(() => null);
+    if (!live) return { ok: false, error: "spot_gone", ...(await getMiningState(buyerId)) };
+    await db.query(`UPDATE mkt_mining SET current_node_id = $2, survey_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, nodeId]).catch(() => {});
     return { ok: true, ...(await getMiningState(buyerId)) };
 }
 

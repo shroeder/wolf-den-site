@@ -1,0 +1,12 @@
+-- Finding a seam becomes a MINIGAME rather than a button.
+--
+-- You survey the rock face: five candidate spots, a limited number of test-strikes to sound them out, and then
+-- you commit to one. The spots are real live nodes, so the tier you commit to is the tier you get — the game
+-- is reading the rock, not a second roll behind the scenes.
+--
+-- Deliberately a different KIND of skill from swinging. The swing is timing; the survey is inference. Making
+-- it another timing bar would have been the same game twice in one screen.
+--
+-- survey_json holds { spots:[nodeId], signal:{idx:key}, probes, used } for the survey in progress. One at a
+-- time per miner, cleared when they commit or when it goes stale.
+ALTER TABLE mkt_mining ADD COLUMN IF NOT EXISTS survey_json JSONB;

@@ -57,14 +57,34 @@ export default function MiningClient({ initial }) {
     }, []);
     const say = (m) => { setMsg(m); setTimeout(() => setMsg(null), 2400); };
 
-    const prospect = async () => {
+    // ── THE SURVEY ── lay out a rock face, sound out a few spots, commit to one.
+    const survey = async () => {
         if (busy) return;
         setBusy(true);
-        const r = await post({ action: "prospect" });
+        const r = await post({ action: "survey" });
         setBusy(false);
         if (r?.unlocked) { setState(r); setCrack(null); }
-        else say(r?.error === "no_seams" ? "No seams exposed right now — try again shortly." : "Couldn't find a seam.");
+        else say(r?.error === "no_seams" ? "No seams exposed right now — try again shortly." : "Couldn't read the rock face.");
     };
+    const probe = async (index) => {
+        if (busy) return;
+        setBusy(true);
+        const r = await post({ action: "probe", index });
+        setBusy(false);
+        if (r?.unlocked) { setState(r); clink(r.signal === "deep" ? 0.9 : r.signal === "ring" ? 0.6 : 0.3); }
+        else say(r?.error === "no_probes" ? "No test-strikes left — pick a spot." : "Couldn't sound that out.");
+    };
+    const claimSpot = async (index) => {
+        if (busy) return;
+        setBusy(true);
+        const r = await post({ action: "claim_spot", index });
+        setBusy(false);
+        if (r?.unlocked && r?.ok !== false) setState(r);
+        else if (r?.error === "spot_gone") { if (r?.unlocked) setState(r); say("That spot collapsed — survey again."); }
+        else say("Couldn't start on that spot.");
+    };
+    // Kept as one name for everywhere that used to "find a seam" — it now opens a survey.
+    const prospect = survey;
 
     const onSwing = useCallback(async (d) => {
         const r = await post({ action: "swing", nodeId: state.node?.id, dist: d });
@@ -194,14 +214,47 @@ export default function MiningClient({ initial }) {
 
             {node && node.pct > 0 && swingsLeft > 0
                 ? <SwingBar node={node} onSwing={onSwing} pick={s.pick} />
-                : (
-                    <button type="button" className="mine-prospect" onClick={prospect} disabled={busy || swingsLeft <= 0}>
-                        {swingsLeft <= 0 ? "No swings left today" : node ? "⛏️ Find another seam" : "⛏️ Find a seam"}
-                    </button>
-                )}
-            {node && node.pct > 0 && swingsLeft > 0 ? (
-                <button type="button" className="mine-prospect is-ghost" onClick={prospect} disabled={busy}>Look for a different seam</button>
-            ) : null}
+                : null}
+
+            {/* ── SURVEY BOARD ── five spots, a few test-strikes, then commit. */}
+            {s.survey ? (
+                <div className="mine-survey">
+                    <div className="mine-survey-head">
+                        <b>Read the rock face</b>
+                        <span className="muted">{s.survey.left} test-strike{s.survey.left === 1 ? "" : "s"} left</span>
+                    </div>
+                    <p className="mine-survey-intro">
+                        Sound out a spot to learn what&rsquo;s behind it, then commit to one. A deep resonance is
+                        the rich rock — but you can&rsquo;t sound out all five.
+                    </p>
+                    <div className="mine-spots">
+                        {s.survey.spots.map((sp) => (
+                            <div key={sp.index} className={`mine-spot${sp.revealed ? " is-read" : ""}`} style={sp.signal ? { "--sig": sp.signal.color } : undefined}>
+                                <span className="mine-spot-n">{sp.index + 1}</span>
+                                {sp.revealed && sp.signal ? (
+                                    <span className="mine-spot-read">
+                                        <b style={{ color: sp.signal.color }}>{sp.signal.label}</b>
+                                        <em>{sp.signal.hint}</em>
+                                    </span>
+                                ) : (
+                                    <span className="mine-spot-read"><b>Unread rock</b><em>No idea what&rsquo;s behind it.</em></span>
+                                )}
+                                <span className="mine-spot-acts">
+                                    {!sp.revealed ? (
+                                        <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sp.index)}>🔨 Sound</button>
+                                    ) : null}
+                                    <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sp.index)}>Dig here</button>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    <button type="button" className="mine-prospect is-ghost" onClick={survey} disabled={busy}>New rock face</button>
+                </div>
+            ) : (
+                <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
+                    {swingsLeft <= 0 ? "No swings left today" : node && node.pct > 0 ? "🔍 Survey a new rock face" : "🔍 Survey the rock face"}
+                </button>
+            )}
 
             {/* ── THE PICKAXE ── the tool you've earned, then the levers that improve it. */}
             <div className="mine-panel">
@@ -363,6 +416,25 @@ export default function MiningClient({ initial }) {
                 .mine-tab-badge { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0483d; color: #fff;
                     font-size: 11px; font-weight: 900; display: inline-grid; place-items: center; }
                 .mine-pickart.is-furnace { background: radial-gradient(circle at 50% 35%, rgba(255,120,32,0.24), rgba(255,120,32,0.05)); border-color: rgba(255,120,32,0.4); }
+                .mine-survey { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,215,94,0.28); }
+                .mine-survey-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+                .mine-survey-head b { font-size: 1rem; color: #ffe28a; }
+                .mine-survey-head .muted { margin-left: auto; font-size: 11.5px; }
+                .mine-survey-intro { margin: 0 0 10px; font-size: 12.5px; color: #cdd3d8; line-height: 1.5; }
+                .mine-spots { display: grid; gap: 7px; }
+                .mine-spot { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 10px;
+                    background: rgba(255,255,255,0.04); border: 1px solid transparent; }
+                .mine-spot.is-read { border-color: var(--sig); background: color-mix(in srgb, var(--sig) 12%, transparent); }
+                .mine-spot-n { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%;
+                    background: rgba(255,255,255,0.1); font-size: 11px; font-weight: 900; }
+                .mine-spot-read { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+                .mine-spot-read b { font-size: 0.86rem; }
+                .mine-spot-read em { font-size: 11px; font-style: normal; color: #9aa2ab; }
+                .mine-spot-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+                .mine-spot-probe, .mine-spot-dig { padding: 6px 10px; border-radius: 9px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+                .mine-spot-probe { border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06); color: #cdd3d8; }
+                .mine-spot-dig { border: none; color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 2px 0 #b47a12; }
+                .mine-spot-probe:disabled, .mine-spot-dig:disabled { opacity: 0.4; cursor: default; }
                 .mine-panel { margin-top: 14px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
                 .mine-panel-head { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #ffd75e; margin-bottom: 9px; }
                 .mine-pickhead { display: flex; align-items: center; gap: 12px; padding-bottom: 11px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
