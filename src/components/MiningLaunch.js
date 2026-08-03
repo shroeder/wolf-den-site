@@ -10,7 +10,9 @@ import useScrollLock from "@/lib/useScrollLock";
 // ForgeAnnounce and FishingLaunch exactly — same portal, same localStorage marker, same shape — because this is
 // the third feature we've launched this way and three different announcement patterns would be worse than one.
 // Bump SEEN_KEY to re-announce after a big change.
-const SEEN_KEY = "wolfden-mining-announce-v1";
+// v2: v1 shipped with a broken bullet escape that printed raw escape text across every line, so anyone
+// who already dismissed the broken card gets the fixed one once.
+const SEEN_KEY = "wolfden-mining-announce-v2";
 
 // Portal to <body> so position:fixed is measured against the VIEWPORT, not the hub's animated (transformed)
 // container — otherwise a "full-screen" overlay gets trapped inside a tall scroll box.
@@ -67,7 +69,9 @@ export default function MiningLaunch() {
                         <li><b>Smelt</b> — five pours at the furnace, faster each time, for forge parts</li>
                         <li>Three gear sets, five pets and eleven badges that only the mine gives out</li>
                     </ul>
-                    <a className="minelaunch-go" href="/marketplace/mining" onClick={dismiss}>Head down &#9935;</a>
+                    {/* No glyph on the button — &#9935; rendered as a tofu box on Android. The pickaxe art at
+                        the top of the card already carries the theme; the button just says what it does. */}
+                    <a className="minelaunch-go" href="/marketplace/mining" onClick={dismiss}>Head down</a>
                     <button type="button" className="minelaunch-later" onClick={dismiss}>Maybe later</button>
                 </div>
             </div>
@@ -90,7 +94,14 @@ export default function MiningLaunch() {
                 .minelaunch p { margin: 0 0 12px; font-size: 0.88rem; line-height: 1.5; color: #d3c3ad; }
                 .minelaunch-list { list-style: none; margin: 0 0 15px; padding: 0; text-align: left; display: grid; gap: 7px; }
                 .minelaunch-list li { position: relative; padding-left: 20px; font-size: 0.84rem; line-height: 1.45; color: #cbbca6; }
-                .minelaunch-list li::before { content: "\\25B8"; position: absolute; left: 4px; color: #f0a93a; font-weight: 900; }
+                /* A CSS-drawn triangle, NOT a content escape. A unicode escape inside a styled-jsx template
+                   literal needs its backslash doubled to survive JS — and the doubled one reaches the CSS
+                   parser as a literal backslash, so every bullet printed the raw escape across its own label.
+                   (Writing that escape into this comment was itself a parse error: a template literal rejects
+                   the sequence even inside a comment. Twice bitten.) Borders cannot be escaped wrong. */
+                .minelaunch-list li::before { content: ""; position: absolute; left: 5px; top: 0.5em;
+                    width: 0; height: 0; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+                    border-left: 6px solid #f0a93a; }
                 .minelaunch-list b { color: #ffd08a; }
                 .minelaunch-go { display: block; padding: 14px 16px; border-radius: 14px; text-decoration: none;
                     font-size: 1rem; font-weight: 900; letter-spacing: 0.05em; color: #22160b;

@@ -7,6 +7,7 @@ import { FaDharmachakra } from "react-icons/fa6";
 
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
+import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
@@ -310,6 +311,7 @@ export default function GameNav() {
             {signedIn ? <AnnouncementModal /> : null}
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
+            {signedIn ? <SurveyModal /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">
                 <div className="game-nav-scroll">
