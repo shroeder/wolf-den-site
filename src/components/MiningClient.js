@@ -46,7 +46,8 @@ export default function MiningClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
-    const [tab, setTab] = useState("mine"); // mine | smelt — two halves of the feature, like the other systems
+    const [tab, setTab] = useState("survey");
+    const [pickedSpot, setPickedSpot] = useState(null); // spot selected on the rock face // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
     const post = useCallback(async (body) => {
@@ -168,49 +169,61 @@ export default function MiningClient({ initial }) {
 
             {tab === "survey" ? (
             <>
-            {/* ── SURVEY BOARD ── five spots, a few test-strikes, then commit. */}
-            {s.survey ? (
-                <div className="mine-survey">
-                    <div className="mine-survey-head">
-                        <b>Read the rock face</b>
-                        <span className="muted">{s.survey.left} test-strike{s.survey.left === 1 ? "" : "s"} left</span>
-                    </div>
-                    <p className="mine-survey-intro">
-                        Sound out a spot to learn what&rsquo;s behind it, then commit to one. A deep resonance is
-                        the rich rock — but you can&rsquo;t sound out all five.
-                    </p>
-                    <div className="mine-spots">
-                        {s.survey.spots.map((sp) => (
-                            <div key={sp.index} className={`mine-spot${sp.revealed ? " is-read" : ""}`} style={sp.signal ? { "--sig": sp.signal.color } : undefined}>
-                                <span className="mine-spot-n">{sp.index + 1}</span>
-                                {sp.revealed && sp.exact ? (
-                                    // The Assay Kit paid off: name it outright rather than banding it.
-                                    <span className="mine-spot-read">
-                                        <b style={{ color: sp.exact.color }}>{sp.exact.name}</b>
-                                        <em>The kit named it outright.</em>
-                                    </span>
-                                ) : sp.revealed && sp.signal ? (
-                                    <span className="mine-spot-read">
-                                        <b style={{ color: sp.signal.color }}>{sp.signal.label}</b>
-                                        <em>{sp.signal.hint}</em>
-                                    </span>
-                                ) : (
-                                    <span className="mine-spot-read"><b>Unread rock</b><em>No idea what&rsquo;s behind it.</em></span>
-                                )}
-                                <span className="mine-spot-acts">
-                                    {!sp.revealed ? (
-                                        <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sp.index)}>🔨 Sound</button>
-                                    ) : null}
-                                    <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sp.index)}>Dig here</button>
-                                </span>
+            {/* ── THE ROCK FACE ── the survey happens ON the wall, not in a list. */}
+            {s.survey ? (() => {
+                // Fixed scatter so the marks sit on the wall like real survey chalk rather than a neat grid.
+                const SPOT_POS = [[22, 34], [50, 24], [76, 38], [33, 66], [64, 68], [14, 56], [86, 60]];
+                const sel = s.survey.spots.find((x) => x.index === pickedSpot) || null;
+                return (
+                    <>
+                        <div className="mine-face is-survey">
+                            <div className="mine-face-bg is-survey" aria-hidden="true" />
+                            {s.survey.spots.map((sp, i) => {
+                                const [x, y] = SPOT_POS[i % SPOT_POS.length];
+                                const col = sp.exact?.color || sp.signal?.color || null;
+                                return (
+                                    <button key={sp.index} type="button"
+                                        className={`mine-mark${sp.revealed ? " is-read" : ""}${pickedSpot === sp.index ? " is-sel" : ""}`}
+                                        style={{ left: `${x}%`, top: `${y}%`, ...(col ? { "--sig": col } : {}) }}
+                                        onClick={() => { setPickedSpot(sp.index); if (!sp.revealed) probe(sp.index); }}
+                                        title={sp.revealed ? (sp.exact?.name || sp.signal?.label) : "Unread rock — tap to sound it"}>
+                                        {sp.revealed && (sp.exact || sp.signal)
+                                            ? <Img src={sp.exact?.art} className="mine-mark-ore" fallback="◆" />
+                                            : <span className="mine-mark-q">?</span>}
+                                        <span className="mine-mark-n">{sp.index + 1}</span>
+                                    </button>
+                                );
+                            })}
+                            <div className="mine-survey-hud">
+                                <b>{s.survey.left}</b> test-strike{s.survey.left === 1 ? "" : "s"} left · {s.survey.spots.length} spots
                             </div>
-                        ))}
-                    </div>
-                    <button type="button" className="mine-prospect is-ghost" onClick={survey} disabled={busy}>New rock face</button>
-                </div>
-            ) : (
+                            {msg ? <div className="mine-msg">{msg}</div> : null}
+                        </div>
+
+                        {/* What the selected mark told you, and what you can do about it. */}
+                        <div className="mine-readout">
+                            {sel ? (
+                                <>
+                                    <span className="mine-readout-body">
+                                        {sel.revealed
+                                            ? <><b style={{ color: sel.exact?.color || sel.signal?.color }}>{sel.exact?.name || sel.signal?.label}</b>
+                                                <em>{sel.exact ? "The kit named it outright." : sel.signal?.hint}</em></>
+                                            : <><b>Spot {sel.index + 1}</b><em>Unread — tap it to sound it out.</em></>}
+                                    </span>
+                                    {sel.revealed
+                                        ? <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sel.index)}>⛏️ Dig here</button>
+                                        : <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sel.index)}>🔨 Sound</button>}
+                                </>
+                            ) : (
+                                <span className="mine-readout-body"><b>Tap a mark to sound it out</b><em>A deep resonance is the rich rock — but you can&rsquo;t sound out every spot.</em></span>
+                            )}
+                        </div>
+                        <button type="button" className="mine-prospect is-ghost" onClick={() => { setPickedSpot(null); survey(); }} disabled={busy}>New rock face</button>
+                    </>
+                );
+            })() : (
                 <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
-                    {swingsLeft <= 0 ? "No swings left today" : node && node.pct > 0 ? "🔍 Survey a new rock face" : "🔍 Survey the rock face"}
+                    {swingsLeft <= 0 ? "No swings left today" : "🔍 Survey the rock face"}
                 </button>
             )}
 
@@ -313,7 +326,19 @@ export default function MiningClient({ initial }) {
             </>
             ) : (
             <>
-            {/* ── SMELT TAB ── the furnace you've built, the ore waiting, and the levers that improve the melt. */}
+            {/* ── THE SMELTERY ── your actual furnace, standing in the room. */}
+            <div className="mine-face is-smelt">
+                <div className="mine-face-bg is-smelt" aria-hidden="true" />
+                <div className="mine-forge">
+                    <Img src={s.furnace?.sprite} className="mine-forge-img" fallback="🔥" />
+                    <span className="mine-forge-glow" aria-hidden="true" />
+                </div>
+                <div className="mine-survey-hud">
+                    <b>{s.furnace?.name}</b>{s.oreTotal ? <> · {s.oreTotal} ore waiting</> : <> · nothing to melt</>}
+                </div>
+                {msg ? <div className="mine-msg">{msg}</div> : null}
+            </div>
+
             <div className="mine-panel">
                 <div className="mine-pickhead">
                     <div className="mine-pickart is-furnace"><Img src={s.furnace?.sprite} className="mine-pickart-img" fallback="🔥" /></div>
@@ -450,6 +475,34 @@ export default function MiningClient({ initial }) {
                     font-size: 11px; font-weight: 900; display: inline-grid; place-items: center; }
                 .mine-pickart.is-lantern { background: radial-gradient(circle at 50% 35%, rgba(111,208,255,0.2), rgba(111,208,255,0.04)); border-color: rgba(111,208,255,0.4); }
                 .mine-pickart.is-furnace { background: radial-gradient(circle at 50% 35%, rgba(255,120,32,0.24), rgba(255,120,32,0.05)); border-color: rgba(255,120,32,0.4); }
+                .mine-face.is-survey, .mine-face.is-smelt { aspect-ratio: 3 / 2; }
+                .mine-face-bg.is-survey { background-image: url("/images/mining/survey-bg.png"); }
+                .mine-face-bg.is-smelt { background-image: url("/images/mining/smelt-bg.png"); }
+                /* Survey marks — chalk rings on the wall, coloured once you've sounded them. */
+                .mine-mark { position: absolute; transform: translate(-50%,-50%); width: 54px; height: 54px; padding: 0; cursor: pointer;
+                    border-radius: 50%; display: grid; place-items: center;
+                    border: 2px dashed rgba(255,255,255,0.45); background: rgba(0,0,0,0.42); color: #e7dcc8;
+                    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+                @media (hover: hover) { .mine-mark:hover { transform: translate(-50%,-50%) scale(1.08); } }
+                .mine-mark.is-read { border-style: solid; border-color: var(--sig, #ffd75e); background: rgba(0,0,0,0.55);
+                    box-shadow: 0 0 16px -2px var(--sig, #ffd75e); }
+                .mine-mark.is-sel { box-shadow: 0 0 0 3px var(--sig, #ffd75e), 0 0 22px -2px var(--sig, #ffd75e); }
+                .mine-mark-q { font-size: 22px; font-weight: 900; opacity: 0.8; }
+                .mine-mark-ore { width: 34px; height: 34px; object-fit: contain; }
+                .mine-mark-n { position: absolute; right: -3px; bottom: -3px; width: 18px; height: 18px; border-radius: 50%;
+                    display: grid; place-items: center; font-size: 10px; font-weight: 900; color: #2a1400; background: #ffd75e; }
+                .mine-survey-hud { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-size: 12px;
+                    color: #e7dcc8; text-shadow: 0 2px 6px #000; }
+                .mine-survey-hud b { color: #ffe28a; }
+                .mine-readout { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+                    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+                .mine-readout-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+                .mine-readout-body em { font-size: 11.5px; font-style: normal; color: #9aa2ab; }
+                /* The furnace, standing in its room. */
+                .mine-forge { position: relative; width: 46%; max-width: 210px; aspect-ratio: 1; display: grid; place-items: center; }
+                .mine-forge-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 30px rgba(255,140,40,0.65)); }
+                .mine-forge-glow { position: absolute; width: 70%; height: 70%; border-radius: 50%; pointer-events: none;
+                    background: radial-gradient(circle, rgba(255,150,40,0.5), transparent 65%); animation: mineBurn 2.2s ease-in-out infinite alternate; }
                 .mine-survey { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,215,94,0.28); }
                 .mine-survey-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
                 .mine-survey-head b { font-size: 1rem; color: #ffe28a; }
