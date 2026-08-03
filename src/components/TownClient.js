@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
+import { bandLeftPct, bandPct, gradeKeyForDist } from "@/lib/marketplace/timing.js";
 import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
 
@@ -420,7 +421,7 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
         // feel is what the bar showed when your finger landed. It used to wait on the round trip before any
         // haptic or grade appeared, which read as input lag on a game that is entirely about timing.
         const dist = Math.abs(markerRef.current - 0.5);
-        const localKey = dist <= 0.022 ? "pixel" : dist <= 0.055 ? "perfect" : dist <= 0.10 ? "great" : dist <= 0.16 ? "good" : "miss";
+        const localKey = gradeKeyForDist(dist);
         const guessCd = STRIKE_CD_BY_GRADE[localKey] ?? STRIKE_CD_MS;
         cdMsRef.current = guessCd;
         cdUntilRef.current = Date.now() + guessCd;
@@ -2153,10 +2154,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     background: linear-gradient(180deg, rgba(0,0,0,0.62), rgba(0,0,0,0.44)); border: 2px solid rgba(255,255,255,0.18);
     box-shadow: inset 0 2px 10px rgba(0,0,0,0.6), 0 2px 14px rgba(0,0,0,0.4); display: flex; }
 .tw-strike-band { position: absolute; top: 0; bottom: 0; }
-/* Widths mirror the server's grade bands: good ±0.16, great ±0.10, perfect ±0.055 of the bar. */
-.tw-strike-band.is-good { left: 34%; width: 32%; background: linear-gradient(180deg, rgba(215,196,138,0.30), rgba(215,196,138,0.16)); }
-.tw-strike-band.is-great { left: 40%; width: 20%; background: linear-gradient(180deg, rgba(143,227,154,0.42), rgba(143,227,154,0.20)); }
-.tw-strike-band.is-perfect { left: 44.5%; width: 11%; background: linear-gradient(180deg, rgba(143,227,255,0.72), rgba(143,227,255,0.34));
+/* Widths are COMPUTED from the server's grade bands (lib/marketplace/timing.js), not typed in — the zone you
+   can see is the zone you are graded against, and it stays that way if the bands are ever retuned. */
+.tw-strike-band.is-good { left: ${bandLeftPct("good")}%; width: ${bandPct("good")}%; background: linear-gradient(180deg, rgba(215,196,138,0.30), rgba(215,196,138,0.16)); }
+.tw-strike-band.is-great { left: ${bandLeftPct("great")}%; width: ${bandPct("great")}%; background: linear-gradient(180deg, rgba(143,227,154,0.42), rgba(143,227,154,0.20)); }
+.tw-strike-band.is-perfect { left: ${bandLeftPct("perfect")}%; width: ${bandPct("perfect")}%; background: linear-gradient(180deg, rgba(143,227,255,0.72), rgba(143,227,255,0.34));
     box-shadow: 0 0 18px rgba(143,227,255,0.5); animation: twPerfectPulse 1.1s ease-in-out infinite; }
 @keyframes twPerfectPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.45); } }
 /* Names the zones — an unlabelled gradient told you nothing about where the payoff was. */

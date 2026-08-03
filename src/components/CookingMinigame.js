@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { bandTable } from "@/lib/marketplace/timing.js";
+
 // ── THE COOK ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The same shape as the forge's temper, because that one works and consistency is worth more here than novelty:
 // a marker sweeps a bar, you tap near the middle, and how close you land grades the hit. Five taps, a chain
@@ -16,16 +18,18 @@ const STEPS = ["Prep", "Heat", "Combine", "Season", "Plate"];
 const BASE_PERIOD = 1.55;   // seconds for a full sweep on step 1
 const SPEEDUP = 0.13;       // each step tightens it by this much
 
-// Distances from centre, IDENTICAL to the forge's BANDS (0.022 / 0.055 / 0.10 / 0.16). Cooking used to run at
-// exactly double these — good was 0.36, so 72% of the bar scored — which is why it never felt like a skill
-// check. Worse, the tightest tier had no band drawn at all, so the thing you were aiming for was invisible.
-// The bar and these numbers are the same fact twice: band width on screen is max * 2, so they cannot drift.
+// Widths from lib/marketplace/timing.js — the same cut-points as the forge, the mine and the raid. Cooking used
+// to run at exactly double these — good was 0.36, so 72% of the bar scored — which is why it never felt like a
+// skill check. The kitchen keeps its OWN names and palette (a FLAWLESS plate, warm pinks) because the bar is
+// dressed as a pan; only the difficulty is shared.
 const GRADES = [
-    { max: 0.022, key: "flawless", label: "FLAWLESS", score: 4, color: "#ff9ec4" },
-    { max: 0.055, key: "perfect",  label: "Perfect",  score: 3, color: "#ffd75e" },
-    { max: 0.10,  key: "great",    label: "Great",    score: 2, color: "#7ec8ff" },
-    { max: 0.16,  key: "good",     label: "Good",     score: 1, color: "#9aa0a6" },
-    { max: 1,     key: "burnt",    label: "Burnt",    score: 0, color: "#e0685c" },
+    ...bandTable({
+        pixel:   { key: "flawless", label: "FLAWLESS", score: 4, color: "#ff9ec4" },
+        perfect: { label: "Perfect", score: 3, color: "#ffd75e" },
+        great:   { label: "Great",   score: 2, color: "#7ec8ff" },
+        good:    { label: "Good",    score: 1, color: "#9aa0a6" },
+    }),
+    { max: 1, key: "burnt", label: "Burnt", score: 0, color: "#e0685c" },
 ];
 const gradeFor = (dist) => GRADES.find((g) => dist <= g.max) || GRADES[GRADES.length - 1];
 

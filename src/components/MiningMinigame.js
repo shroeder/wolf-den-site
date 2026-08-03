@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import ItemArt from "@/components/ItemArt";
+import { bandPct, gradeKeyForDist, GRADE_COLOR } from "@/lib/marketplace/timing.js";
 
 // ── BREAKING THE SEAM ────────────────────────────────────────────────────────────────────────────────────────
 // NO EMOJI here either — sprites and Gi glyphs only. See the note in MiningClient.
@@ -11,15 +12,13 @@ import ItemArt from "@/components/ItemArt";
 // can SEE, a marker that overhangs the bar so the exact line is readable, a tap target that isn't under your
 // thumb, and a hit that shakes, flashes, sparks and pops.
 //
-// The band widths below are the real grading bands doubled (a band of ±0.022 is 4.4% of the bar), so what you
-// are aiming at is literally what you are scored against. If those change server-side, change them here — the
-// comment in mining.js says the same thing in the other direction.
-const BANDS = [
-    { key: "good", pct: 32, label: "GOOD", color: "#d7c48a" },
-    { key: "great", pct: 20, label: "GREAT", color: "#8fe39a" },
-    { key: "perfect", pct: 11, label: "PERFECT", color: "#8fe3ff" },
-    { key: "pixel", pct: 4.4, label: "PIXEL", color: "#ffd75e" },
-];
+// The zones are DRAWN from the same cut-points the server GRADES against (lib/marketplace/timing.js), so what
+// you are aiming at is literally what you are scored against — they cannot drift apart. Widest first, so each
+// narrower band paints on top of the last.
+const BAND_LABEL = { good: "GOOD", great: "GREAT", perfect: "PERFECT", pixel: "PIXEL" };
+const BANDS = ["good", "great", "perfect", "pixel"].map((key) => ({
+    key, pct: bandPct(key), label: BAND_LABEL[key], color: GRADE_COLOR[key],
+}));
 const KIND_ART = {
     gold: "/images/mining/icon-coins.png",
     chest: "/images/mining/icon-chest.png",
@@ -33,7 +32,6 @@ const RARITY_LABEL = { common: "COMMON", rare: "RARE", epic: "EPIC", legendary: 
 const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
 const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
 
-const GRADE_COLOR = { pixel: "#ffd75e", perfect: "#8fe3ff", great: "#8fe39a", good: "#d7c48a", miss: "#ff8f9a" };
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
 const SWEEP_MS = 900;
 const GRADE_CD = { pixel: 700, perfect: 850, great: 1050, good: 1300, miss: 1600 };
@@ -133,7 +131,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         if (cdRef.current || busyRef.current || cracked) return;
         busyRef.current = true; cdRef.current = true;
         const d = Math.abs(markerRef.current - 0.5);
-        const key = d <= 0.022 ? "pixel" : d <= 0.055 ? "perfect" : d <= 0.10 ? "great" : d <= 0.16 ? "good" : "miss";
+        const key = gradeKeyForDist(d);
         const guess = GRADE_CD[key] ?? CD_DEFAULT;
         cdMs.current = guess; cdUntil.current = Date.now() + guess;
         let timer = setTimeout(() => { cdRef.current = false; setCooling(false); }, guess);

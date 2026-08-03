@@ -12,29 +12,32 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 //
 // next/core-web-vitals does not enable no-undef. This does. It is the one lint rule that would have caught all
 // four before a member did.
+// Browser + Node + Web APIs the codebase legitimately reaches for. Exported so eslint.undef.mjs — the fast
+// gate that runs the no-undef rule ALONE — cannot drift out of sync with the full lint.
+export const GLOBALS = {
+    window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
+    localStorage: "readonly", sessionStorage: "readonly", history: "readonly",
+    fetch: "readonly", Headers: "readonly", Request: "readonly", Response: "readonly",
+    FormData: "readonly", Blob: "readonly", File: "readonly", URL: "readonly",
+    URLSearchParams: "readonly", AbortController: "readonly", crypto: "readonly",
+    console: "readonly", process: "readonly", Buffer: "readonly", require: "readonly",
+    setTimeout: "readonly", clearTimeout: "readonly", setInterval: "readonly",
+    clearInterval: "readonly", queueMicrotask: "readonly", structuredClone: "readonly",
+    requestAnimationFrame: "readonly", cancelAnimationFrame: "readonly",
+    performance: "readonly", getComputedStyle: "readonly", Image: "readonly", Audio: "readonly",
+    AudioContext: "readonly", webkitAudioContext: "readonly", CustomEvent: "readonly",
+    Event: "readonly", IntersectionObserver: "readonly", ResizeObserver: "readonly",
+    MutationObserver: "readonly", TextEncoder: "readonly", TextDecoder: "readonly",
+    atob: "readonly", btoa: "readonly", Intl: "readonly",
+};
+
 const config = [
     ...nextVitals,
     {
         languageOptions: {
             ecmaVersion: 2023,
             sourceType: "module",
-            globals: {
-                // Browser + Node + Web APIs the codebase legitimately reaches for.
-                window: "readonly", document: "readonly", navigator: "readonly", location: "readonly",
-                localStorage: "readonly", sessionStorage: "readonly", history: "readonly",
-                fetch: "readonly", Headers: "readonly", Request: "readonly", Response: "readonly",
-                FormData: "readonly", Blob: "readonly", File: "readonly", URL: "readonly",
-                URLSearchParams: "readonly", AbortController: "readonly", crypto: "readonly",
-                console: "readonly", process: "readonly", Buffer: "readonly", require: "readonly",
-                setTimeout: "readonly", clearTimeout: "readonly", setInterval: "readonly",
-                clearInterval: "readonly", queueMicrotask: "readonly", structuredClone: "readonly",
-                requestAnimationFrame: "readonly", cancelAnimationFrame: "readonly",
-                performance: "readonly", getComputedStyle: "readonly", Image: "readonly", Audio: "readonly",
-                AudioContext: "readonly", webkitAudioContext: "readonly", CustomEvent: "readonly",
-                Event: "readonly", IntersectionObserver: "readonly", ResizeObserver: "readonly",
-                MutationObserver: "readonly", TextEncoder: "readonly", TextDecoder: "readonly",
-                atob: "readonly", btoa: "readonly", Intl: "readonly",
-            },
+            globals: GLOBALS,
         },
         rules: { "no-undef": "error" },
     },

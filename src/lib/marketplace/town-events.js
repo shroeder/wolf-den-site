@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastWebPush } from "@/lib/push/web-push.js";
 import { broadcastBuyerPushAll } from "@/lib/push/send.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
+import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
 import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
@@ -133,7 +134,6 @@ const STRIKE_PROCS = [
     { key: "sunder", base: 0.045, mult: 1.9, label: "⚡ SUNDERING BLOW!", tell: "You find the seam." },
     { key: "rally", base: 0.070, mult: 1.45, label: "🐺 THE PACK RALLIES!", tell: "The wolves howl with you." },
 ];
-const GRADE_RANK = { miss: 0, good: 1, great: 2, perfect: 3, pixel: 4 };
 // A perfect swing on a long chain is where the good stuff lives.
 function rollStrikeProc(gradeKey, combo) {
     const rank = GRADE_RANK[gradeKey] ?? 0;
@@ -161,14 +161,15 @@ function rollStrikeProc(gradeKey, combo) {
 // numbers above are the only record of why these values are what they are.
 const PASSIVE_RATE_PER_SEC = 0.6;    // multiplier on the member's own hit power, per second in the square
 const PASSIVE_MAX_CATCHUP_S = 30;    // never credit more than this from one poll gap (tab left open, etc.)
-// Timing grades, mirroring the Forge's bands so the feel is familiar. Server-authoritative: the client sends
-// its distance-from-centre, we grade it here and clamp, so a tampered client can't claim PERFECT every time.
-const STRIKE_GRADES = [
-    { key: "pixel", max: 0.022, mult: 5.0, label: "PIXEL PERFECT" },
-    { key: "perfect", max: 0.055, mult: 3.6, label: "PERFECT" },
-    { key: "great", max: 0.10, mult: 2.6, label: "GREAT" },
-    { key: "good", max: 0.16, mult: 1.6, label: "GOOD" },
-];
+// Timing grades. Widths from lib/marketplace/timing.js so the raid bar feels like every other bar in the game;
+// the multipliers are the raid's own. Server-authoritative: the client sends its distance-from-centre, we grade
+// it here and clamp, so a tampered client can't claim PERFECT every time.
+const STRIKE_GRADES = bandTable({
+    pixel: { mult: 5.0, label: "PIXEL PERFECT" },
+    perfect: { mult: 3.6, label: "PERFECT" },
+    great: { mult: 2.6, label: "GREAT" },
+    good: { mult: 1.6, label: "GOOD" },
+});
 const STRIKE_MISS = { key: "miss", mult: 0.5, label: "GLANCING" };
 const gradeForDist = (dist) => STRIKE_GRADES.find((g) => dist <= g.max) || STRIKE_MISS;
 // RAID COMPLETION TIERS. Everyone who fought gets paid — showing up is never punished — but not the same

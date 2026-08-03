@@ -6,6 +6,7 @@ import { GiAnvilImpact, GiCrackedShield, GiUpgrade } from "react-icons/gi";
 import HowToPlay from "@/components/HowToPlay";
 import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
+import { bandTable, GRADE_COLOR } from "@/lib/marketplace/timing.js";
 import CoinCta from "@/components/CoinCta";
 // ── Permanent credit: the Forge was Alstier1's idea. His actual AI hero sprite is enshrined in the hearth's
 // corner as a small medallion; tapping it tells the story. (Hard-coded to his sprite blob on purpose so the
@@ -51,14 +52,16 @@ const SFX = {
     win: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => clang(f, 0.2, "sine", 0.1), i * 90)); },
 };
 
-// Grade bands by distance from the target center (0..0.5). Combo continues ONLY on great+; good & miss reset it.
-const BANDS = [
-    { key: "pixel", max: 0.022, score: 4, label: "PIXEL PERFECT", color: "#ffd75e" },
-    { key: "perfect", max: 0.055, score: 3, label: "PERFECT", color: "#8fe3ff" },
-    { key: "great", max: 0.10, score: 2, label: "GREAT", color: "#8fe39a" },
-    { key: "good", max: 0.16, score: 1, label: "GOOD", color: "#d7c48a" },
-];
-const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || { key: "miss", score: 0, label: "MISS", color: "#ff8f9a" };
+// Grade bands by distance from the target center (0..0.5) — widths and palette from lib/marketplace/timing.js.
+// Combo continues ONLY on great+; good & miss reset it.
+const BANDS = bandTable({
+    pixel: { score: 4, label: "PIXEL PERFECT" },
+    perfect: { score: 3, label: "PERFECT" },
+    great: { score: 2, label: "GREAT" },
+    good: { score: 1, label: "GOOD" },
+});
+const MISS = { key: "miss", score: 0, label: "MISS", color: GRADE_COLOR.miss };
+const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || MISS;
 const STRIKES = 6;
 
 const EMPTY_FORGE = { parts: [], salvage: [], enhance: [], upgrades: [], dailies: [], regalia: null, hearthBg: null };
