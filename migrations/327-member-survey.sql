@@ -7,8 +7,12 @@
 -- One row per member, overwritten if they answer again — this is an opinion, not an event log, and the current
 -- opinion is the useful one. `favorite` and `least` are system keys (see survey.js SYSTEMS); `wish` is a short
 -- free-text answer and is deliberately capped in the API rather than the schema so the limit can move.
+-- buyer_id is UUID. mkt_buyer.id is a uuid, not a bigint — the first cut of this migration guessed BIGINT and
+-- Postgres rejected the foreign key outright ("cannot be implemented"), which failed the Vercel build. Local
+-- `next build` has no DATABASE_URL and does not run migrations, so it passed here and broke there: a schema
+-- change is only ever really verified against the actual column types.
 CREATE TABLE IF NOT EXISTS mkt_survey_response (
-    buyer_id    BIGINT PRIMARY KEY REFERENCES mkt_buyer(id) ON DELETE CASCADE,
+    buyer_id    UUID PRIMARY KEY REFERENCES mkt_buyer(id) ON DELETE CASCADE,
     favorite    TEXT,
     least       TEXT,
     wish        TEXT,
