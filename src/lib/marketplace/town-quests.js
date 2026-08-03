@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { checkTownQuestBadges } from "@/lib/marketplace/town-badges.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Daily TOWN quests handed out by the Quartermaster NPC — bounties that reward playing in the plaza itself
 // (fighting raids, being social, funding the town, the tavern, the Well, the Merchant). Progress ticks from the
@@ -60,6 +61,20 @@ const QUEST_POOL = {
     beastfriend: { emoji: "🐾", variants: [
         { label: "Good Company", desc: "Feed or pet your pets 3 times", target: 3, gold: 100 },
     ] },
+    // The mine's three verbs. The Quartermaster could not ask for any of them before — the whole feature was
+    // invisible to both quest systems because mining.js never bumped a metric.
+    delver: { ownerOnly: true, emoji: "🪜", variants: [
+        { label: "Into the Dark", desc: "Take 6 steps down the tunnel", target: 6, gold: 130 },
+        { label: "Bottom of the Shaft", desc: "Take 12 steps down the tunnel", target: 12, gold: 280 },
+    ] },
+    collier: { ownerOnly: true, emoji: "⛏️", variants: [
+        { label: "Swing a Pick", desc: "Crack open 2 seams", target: 2, gold: 120 },
+        { label: "Day at the Face", desc: "Crack open 5 seams", target: 5, gold: 250 },
+    ] },
+    founder: { ownerOnly: true, emoji: "🔥", variants: [
+        { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 120 },
+        { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 240 },
+    ] },
     hoarder: { emoji: "🧰", variants: [
         { label: "Crack Them Open", desc: "Open 3 chests", target: 3, gold: 110 },
     ] },
@@ -79,8 +94,9 @@ function chicagoDay() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Ame
 
 // The activities featured today + which variant of each, chosen deterministically from the date. Everyone sees
 // the same set, and it's stable for the whole Chicago day.
-function dailyQuests(day) {
+function dailyQuests(day, buyerId = null) {
     const order = ACTIVITY_KEYS
+        .filter((k) => !QUEST_POOL[k].ownerOnly || isOwner(buyerId))
         .map((k) => ({ k, r: hashStr(day + ":" + k) }))
         .sort((a, b) => a.r - b.r)
         .map((x) => x.k);
@@ -91,9 +107,9 @@ function dailyQuests(day) {
         return { key, emoji: pool.emoji, ...variant };
     });
 }
-function todayQuestByKey(day) {
+function todayQuestByKey(day, buyerId = null) {
     const by = {};
-    for (const q of dailyQuests(day)) by[q.key] = q;
+    for (const q of dailyQuests(day, buyerId)) by[q.key] = q;
     return by;
 }
 
@@ -101,7 +117,7 @@ function todayQuestByKey(day) {
 // today's featured quests. Best-effort; called from the town actions.
 export async function bumpTownQuest(buyerId, key, n = 1) {
     if (!buyerId) return;
-    const q = todayQuestByKey(chicagoDay())[key];
+    const q = todayQuestByKey(chicagoDay(), buyerId)[key];
     if (!q) return; // not featured today — nothing to tick
     await db.query(
         `INSERT INTO mkt_town_quest (buyer_id, day, key, progress) VALUES ($1, ${DAY}, $2, LEAST($3::int, $4::int))
@@ -114,7 +130,7 @@ export async function bumpTownQuest(buyerId, key, n = 1) {
 export async function getTownQuests(buyerId) {
     if (!buyerId) return [];
     const day = chicagoDay();
-    const todays = dailyQuests(day);
+    const todays = dailyQuests(day, buyerId);
     const rows = await db.query(`SELECT key, progress, claimed FROM mkt_town_quest WHERE buyer_id = $1 AND day = ${DAY}`, [buyerId]).catch(() => []);
     const by = Object.fromEntries(rows.map((r) => [r.key, r]));
     return todays.map((q) => {
@@ -131,7 +147,7 @@ export async function townQuestsClaimable(buyerId) {
 // Claim a completed quest's gold. Atomic flip so it can't be double-claimed. Reward is TODAY's variant.
 export async function claimTownQuest(buyerId, key) {
     if (!buyerId) return { ok: false, error: "unknown" };
-    const q = todayQuestByKey(chicagoDay())[key];
+    const q = todayQuestByKey(chicagoDay(), buyerId)[key];
     if (!q) return { ok: false, error: "unknown" };
     const claimed = await db.queryOne(
         `UPDATE mkt_town_quest SET claimed = TRUE WHERE buyer_id = $1 AND day = ${DAY} AND key = $2 AND progress >= $3::int AND claimed = FALSE RETURNING key`,

@@ -289,6 +289,7 @@ const C = (might = 0, crit_chance = 0, crit_power = 0) => { const o = {}; if (mi
 const S = (sea) => ({ sea });
 const F = (farm) => ({ farm });
 const G = (forge) => ({ forge });
+const D = (depth) => ({ depth });   // DEPTHS affinity — the mine (see items.js DEPTH_META)
 
 const BADGE_BONUSES = {
     // ── Staff / identity / prestige (hand-assigned) → modest Might, a nod for the recognition ──
@@ -389,6 +390,16 @@ const BADGE_BONUSES = {
     forge_plus10: G({ steady_hand: 3 }), forge_pixel: G({ steady_hand: 2 }), forge_emberheart: G({ keen_eye: 3 }),
     forge_artisan: G({ efficient: 2, keen_eye: 2 }), forge_grandmaster: G({ efficient: 4, keen_eye: 4, masters_touch: 4, steady_hand: 4 }),
 
+    // ── THE MINE → DEPTHS affinity. Every mining badge takes real time at the rock (50 seams, depth 12, 25
+    // masterwork runs, 1,000 ore smelted), so each one pays back into the verb that earned it: the delving
+    // badges harden the roof, the seam badges pay ore, the furnace badge feeds the furnace.
+    mine_deep: D({ nerve: 3 }), mine_nerve: D({ nerve: 4, lodesense: 2 }),
+    mine_masterwork: D({ hew: 3 }), mine_masterhand: D({ hew: 5, prospect: 3 }),
+    mine_emberheart: D({ lodesense: 4, prospect: 3 }), mine_forgefed: D({ bellows: 4, crucible: 3 }),
+    mine_tunnelrat: D({ nerve: 2 }), mine_deepwalker: D({ nerve: 5, lodesense: 4 }),
+    mine_poursteady: D({ bellows: 2 }), mine_ladle: D({ bellows: 5, crucible: 4 }),
+    mine_notadrop: D({ crucible: 6, bellows: 3 }),
+
     // ── TOWN & RAIDS → combat power (raids), scaling with difficulty ──
     town_raider: C(2), town_veteran: C(3), town_warlord: C(5, 0, 3),
     town_brawler: C(2), town_berserker: C(4, 2), town_juggernaut: C(4, 0, 3),
@@ -415,16 +426,17 @@ export const getBadgePassives = (buyerId) => sumBadgeDomain(buyerId, "combat"); 
 export const getBadgeSea = (buyerId) => sumBadgeDomain(buyerId, "sea");         // → equippedSeaAffinity (sailing)
 export const getBadgeFarm = (buyerId) => sumBadgeDomain(buyerId, "farm");       // → farmBonuses (farm)
 export const getBadgeForge = (buyerId) => sumBadgeDomain(buyerId, "forge");     // → forge smithing odds (crafting)
+export const getBadgeDepth = (buyerId) => sumBadgeDomain(buyerId, "depth");   // → equippedDepthAffinity (the mine)
 
-// All four domain totals from ONE held-slugs read — for the Badges page's "Badge Power" summary.
+// All domain totals from ONE held-slugs read — for the Badges page's "Badge Power" summary.
 export async function getBadgeBonusTotals(buyerId) {
-    if (!buyerId) return { combat: {}, sea: {}, farm: {}, forge: {} };
+    if (!buyerId) return { combat: {}, sea: {}, farm: {}, forge: {}, depth: {} };
     const held = await heldSlugs(buyerId).catch(() => new Set());
-    const totals = { combat: {}, sea: {}, farm: {}, forge: {} };
+    const totals = { combat: {}, sea: {}, farm: {}, forge: {}, depth: {} };
     for (const slug of held) {
         const b = BADGE_BONUSES[slug];
         if (!b) continue;
-        for (const dom of ["combat", "sea", "farm", "forge"]) {
+        for (const dom of ["combat", "sea", "farm", "forge", "depth"]) {
             if (!b[dom]) continue;
             for (const [k, v] of Object.entries(b[dom])) totals[dom][k] = (totals[dom][k] || 0) + v;
         }

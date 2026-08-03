@@ -113,6 +113,32 @@ export const ITEM_SETS = [
         capstone: { wheelRespin: 0.12, desc: "Lucky Streak: a 12% chance each spin is FREE — your spin is refunded." },
         weakness: null,
     },
+    // ── DEPTHS SETS ── one per verb the Mine asks of you. Bonuses are DEPTH affinity (see items.js DEPTH_META),
+    // never boss power, and the capstones are mine-only powers read in mining.js. ownerOnly for as long as the
+    // mine is — same contract the sailing and farm sets shipped under.
+    {
+        id: "delver", name: "Delver's Kit", ownerOnly: true,
+        items: ["dv_lamp_helm", "dv_rope_belt", "dv_lodestone", "dv_shoring_pack"],
+        bonuses: [{ need: 2, depth: { nerve: 3 } }, { need: 4, depth: { nerve: 5, lodesense: 4 } }],
+        // The push-your-luck loop's dream: one free mistake. You still collapse — you just walk away with the
+        // haul the one time it matters most, which is the difference between pushing to depth 12 and not.
+        capstone: { depthSecondWind: true, desc: "Second Wind: the first collapse of each day leaves your haul intact." },
+        weakness: null,
+    },
+    {
+        id: "rockbreaker", name: "Rockbreaker's Rig", ownerOnly: true,
+        items: ["rb_maul", "rb_gauntlet", "rb_assay_ring", "rb_hobnails"],
+        bonuses: [{ need: 2, depth: { hew: 4 } }, { need: 4, depth: { hew: 6, prospect: 4 } }],
+        capstone: { depthRichSeam: 0.15, desc: "Rich Seam: a 15% chance a cracked seam pays its ore TWICE." },
+        weakness: null,
+    },
+    {
+        id: "founder", name: "Founder's Regalia", ownerOnly: true,
+        items: ["fd_apron", "fd_tongs", "fd_bellows_charm", "fd_slagsifter"],
+        bonuses: [{ need: 2, depth: { bellows: 4 } }, { need: 4, depth: { bellows: 5, crucible: 5 } }],
+        capstone: { depthFreeSmelt: 0.18, desc: "Cold Crucible: an 18% chance a smelt costs you no ore at all." },
+        weakness: null,
+    },
 ];
 
 // How many equipped pieces a set's CAPSTONE needs (defaults to all items; `full` overrides when some pieces
@@ -216,6 +242,35 @@ export function setFarmDoubleHarvest(equippedIds) {
     let chance = 0;
     for (const set of ITEM_SETS) if (set.capstone?.farmDoubleYield && (counts.get(set.id) || 0) >= set.items.length) chance += set.capstone.farmDoubleYield;
     return Math.min(0.75, chance);
+}
+
+// ── DEPTHS ── aggregate DEPTH affinity granted by active set tiers + capstones (read by mining.js, never boss).
+export function setDepthBonus(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    const total = {};
+    for (const set of ITEM_SETS) {
+        const n = counts.get(set.id) || 0;
+        for (const tier of set.bonuses) {
+            if (n >= tier.need && tier.depth) for (const [k, v] of Object.entries(tier.depth)) total[k] = (total[k] || 0) + v;
+        }
+        if (set.capstone?.depth && n >= fullNeed(set)) for (const [k, v] of Object.entries(set.capstone.depth)) total[k] = (total[k] || 0) + v;
+    }
+    return total;
+}
+// The three DEPTHS capstones, each consumed at a different point in mining.js:
+//   Delver     — the day's first collapse leaves your haul intact (goDeeper)
+//   Rockbreaker— a chance a cracked seam pays its ore twice (crack)
+//   Founder    — a chance a smelt costs no ore at all (smeltOre)
+export function setDepthCapstones(equippedIds) {
+    const counts = equippedCounts(equippedIds);
+    let secondWind = false, richSeam = 0, freeSmelt = 0;
+    for (const set of ITEM_SETS) {
+        if ((counts.get(set.id) || 0) < fullNeed(set)) continue;
+        if (set.capstone?.depthSecondWind) secondWind = true;
+        if (set.capstone?.depthRichSeam) richSeam += set.capstone.depthRichSeam;
+        if (set.capstone?.depthFreeSmelt) freeSmelt += set.capstone.depthFreeSmelt;
+    }
+    return { secondWind, richSeam: Math.min(0.5, richSeam), freeSmelt: Math.min(0.5, freeSmelt) };
 }
 
 // Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `luck` = % chance

@@ -78,7 +78,7 @@ export function useMine(initial) {
         setState(r);
         if (r.collapsed) {
             setCard(null);
-            setWrap({ collapsed: true, depth: r.depth, lost: r.lost, seam: r.seam, lostTier: r.lostTier || null });
+            setWrap({ collapsed: true, depth: r.depth, lost: r.lost, seam: r.seam, lostTier: r.lostTier || null, secondWind: Boolean(r.secondWind), paid: r.secondWind ? (r.paid || []) : [] });
             clink(0.2);
             try { navigator.vibrate?.([40, 60, 40, 60, 120]); } catch { /* no haptics */ }
         } else {

@@ -169,7 +169,7 @@ export const ITEMS = [
 
     // --- Rings (some charged with real-world perks) ---
     { id: "ring_of_might", name: "Ring of Might", slot: "ring", rarity: "common", icon: "GiPowerRing", flavor: "A small edge.", stats: { might: 7, crit_chance: 4 }, reqLevel: 8, source: "level", sort: 80 },
-    { id: "ring_of_fortune", name: "Ring of Fortune", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Luck on your finger.", stats: { fortune: 16 }, sea: { bounty: 3 }, reqLevel: 20, source: "level", sort: 82 },
+    { id: "ring_of_fortune", name: "Ring of Fortune", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Luck on your finger.", stats: { fortune: 16 }, sea: { bounty: 3 }, depth: { prospect: 3 }, reqLevel: 20, source: "level", sort: 82 },
     { id: "collectors_signet", name: "Collector's Signet", slot: "ring", rarity: "legendary", icon: "GiSkullSignet", flavor: "The store remembers its own.", stats: { might: 5, fortune: 8 }, reqLevel: 25, source: "admin", charged: true, charges: 3, cooldownDays: 30, chargeReward: "free_pack_10", chargeRewardLabel: REWARDS.free_pack_10, sort: 84 },
     { id: "merchants_band", name: "Merchant's Band", slot: "ring", rarity: "epic", icon: "GiDiamondRing", flavor: "A friend of the house.", stats: { fortune: 10 }, reqLevel: 30, source: "admin", charged: true, charges: 1, cooldownDays: 30, chargeReward: "discount_10_over_100", chargeRewardLabel: REWARDS.discount_10_over_100, sort: 86 },
 
@@ -235,8 +235,8 @@ export const ITEMS = [
     { id: "steel_dagger", name: "Steel Dagger", slot: "main_hand", rarity: "common", icon: "GiPlainDagger", flavor: "Quick and quiet.", stats: { crit_chance: 7, might: 4 }, reqLevel: 4, source: "chest", sort: 200 },
     { id: "twin_fangs", name: "Twin Fangs", slot: "main_hand", rarity: "rare", icon: "GiDaggers", flavor: "Two edges, twice the trouble.", stats: { might: 6, crit_chance: 10 }, reqLevel: 16, source: "chest", sort: 201 },
     { id: "war_pick", name: "War Pick", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Finds the gap in any armor.", stats: { might: 15, crit_chance: 7 }, reqLevel: 30, source: "chest", sort: 202 },
-    { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, sea: { broadside: 5 }, reqLevel: 34, source: "chest", sort: 203 },
-    { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, sea: { broadside: 6 }, reqLevel: 60, source: "chest", sort: 204 },
+    { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, sea: { broadside: 5 }, depth: { hew: 4 }, reqLevel: 34, source: "chest", sort: 203 },
+    { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, sea: { broadside: 6 }, depth: { hew: 5 }, reqLevel: 60, source: "chest", sort: 204 },
     { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
     { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, sea: { plunder: 8 }, reqLevel: 92, source: "chest", sort: 206 },
     // -- Off hand --
@@ -282,7 +282,7 @@ export const ITEMS = [
     // -- Rings --
     { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring — later, a farmer's.", stats: { might: 7, ferocity: 4 }, farm: { fertPower: 4 }, reqLevel: 6, source: "chest", sort: 270 },
     { id: "ring_embers", name: "Ring of Embers", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Warm to the touch.", stats: { might: 11, crit_chance: 5 }, reqLevel: 24, source: "chest", sort: 271 },
-    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, sea: { bounty: 6 }, reqLevel: 36, source: "chest", sort: 272 },
+    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, sea: { bounty: 6 }, depth: { crucible: 4 }, reqLevel: 36, source: "chest", sort: 272 },
     { id: "ring_titans", name: "Ring of Titans", slot: "ring", rarity: "legendary", icon: "GiPowerRing", flavor: "Power beyond measure.", stats: { might: 16, crit_power: 14 }, reqLevel: 66, source: "chest", sort: 273 },
     { id: "kings_eternal", name: "Eternal King's Ring", slot: "ring", rarity: "mythic", icon: "GiBigDiamondRing", flavor: "Worn by every ruler who mattered.", stats: { might: 13, fortune: 27 }, reqLevel: 98, source: "chest", sort: 274 },
 
@@ -300,7 +300,7 @@ export const ITEMS = [
     { id: "suns_ward", name: "Sun's Ward", slot: "off_hand", rarity: "rare", icon: "GiHeraldicSun", flavor: "Blinding to your foes.", stats: { might: 5, ferocity: 11 }, reqLevel: 18, source: "chest", sort: 311 },
     { id: "concentration_orb", name: "Orb of Focus", slot: "off_hand", rarity: "epic", icon: "GiConcentrationOrb", flavor: "Steady the mind.", stats: { crit_chance: 8, ferocity: 14 }, reqLevel: 34, source: "chest", sort: 312 },
     { id: "spiked_wall", name: "Spiked Wall", slot: "off_hand", rarity: "legendary", icon: "GiSpikedShield", flavor: "Approach and regret it.", stats: { might: 10, ferocity: 20 }, reqLevel: 60, source: "chest", sort: 313 },
-    { id: "void_maelstrom", name: "Void Maelstrom", slot: "off_hand", rarity: "mythic", icon: "GiVortex", flavor: "It devours all it touches.", stats: { ferocity: 20, fortune: 20 }, sea: { dredge: 8 }, reqLevel: 92, source: "chest", sort: 314 },
+    { id: "void_maelstrom", name: "Void Maelstrom", slot: "off_hand", rarity: "mythic", icon: "GiVortex", flavor: "It devours all it touches.", stats: { ferocity: 20, fortune: 20 }, sea: { dredge: 8 }, depth: { prospect: 5 }, reqLevel: 92, source: "chest", sort: 314 },
     // -- Helmet --
     { id: "spartan_helm", name: "Spartan Helm", slot: "helmet", rarity: "common", icon: "GiSpartanHelmet", flavor: "Hold the line.", stats: { ferocity: 7, might: 4 }, reqLevel: 4, source: "chest", sort: 320 },
     { id: "dwarf_helm", name: "Dwarven Helm", slot: "helmet", rarity: "rare", icon: "GiDwarfHelmet", flavor: "Forged deep under the mountain.", stats: { might: 6, ferocity: 10 }, reqLevel: 20, source: "chest", sort: 321 },
@@ -332,7 +332,7 @@ export const ITEMS = [
     // -- Belt --
     { id: "chain_belt", name: "Chain Belt", slot: "belt", rarity: "common", icon: "GiBelt", flavor: "Links that hold.", stats: { might: 5, ferocity: 6 }, reqLevel: 6, source: "chest", sort: 360 },
     { id: "runners_sash", name: "Runner's Sash", slot: "belt", rarity: "rare", icon: "GiBlackBelt", flavor: "Light on the waist.", stats: { ferocity: 16 }, reqLevel: 20, source: "chest", sort: 361 },
-    { id: "girded_plate", name: "Girded Plate", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch the armor down.", stats: { might: 22 }, sea: { trove: 5 }, reqLevel: 40, source: "chest", sort: 362 },
+    { id: "girded_plate", name: "Girded Plate", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch the armor down.", stats: { might: 22 }, sea: { trove: 5 }, depth: { nerve: 4 }, reqLevel: 40, source: "chest", sort: 362 },
     { id: "kings_sash", name: "King's Sash", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Gilded and grand.", stats: { might: 14, fortune: 16 }, reqLevel: 62, source: "chest", sort: 363 },
     { id: "world_girdle", name: "Girdle of the World", slot: "belt", rarity: "mythic", icon: "GiBlackBelt", flavor: "It holds up more than your pants.", stats: { ferocity: 40 }, reqLevel: 92, source: "chest", sort: 364 },
     // -- Rings --
@@ -571,6 +571,31 @@ export const ITEMS = [
     { id: "wg_belt", name: "Fangbite Belt", slot: "belt", rarity: "rare", icon: "GiBelt", flavor: "Buckled with a snarling wolf.", stats: { might: 7, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 977 },
     { id: "wg_boots", name: "Prowler Boots", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Quiet on any trail.", stats: { ferocity: 11 }, reqLevel: 5, source: "wheel_bonus", sort: 978 },
     { id: "wg_axe", name: "Moonhowl Axe", slot: "main_hand", rarity: "rare", icon: "GiBattleAxe", flavor: "It hums under a full moon.", stats: { might: 13, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 979 },
+
+    // ── THE DEPTHS SETS ── three sets, one per verb the Mine actually asks of you, carrying DEPTH affinity
+    // (see DEPTH_META). They are ownerOnly for exactly as long as the mine is: the same contract the sailing
+    // and farm gear shipped under, so unlaunched content can never leak into a chest or the auction house.
+    //
+    // Combat stats are deliberately MODEST — these are utility pieces. Wearing the full Delver's Kit should
+    // make you better at the tunnel, not better at the boss, or the mine becomes the only way to gear up.
+
+    // DELVING — the push-your-luck descent. Nerve keeps the roof up, Lodesense finds the good rock.
+    { id: "dv_lamp_helm", name: "Deeplamp Helm", slot: "helmet", rarity: "rare", icon: "GiMiningHelmet", flavor: "The flame gutters when the air goes bad. Listen to it.", stats: { ferocity: 6, fortune: 4 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 980 },
+    { id: "dv_rope_belt", name: "Knotted Descent Belt", slot: "belt", rarity: "rare", icon: "GiRope", flavor: "Forty feet of rope and every knot tied twice.", stats: { might: 5, ferocity: 5 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 981 },
+    { id: "dv_lodestone", name: "Lodestone Pendant", slot: "amulet", rarity: "epic", icon: "GiCompass", flavor: "It pulls toward the richest rock. Follow it, not your gut.", stats: { fortune: 9 }, depth: { lodesense: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 982 },
+    { id: "dv_shoring_pack", name: "Shoring Pack", slot: "back", rarity: "epic", icon: "GiBackpack", flavor: "Timber, wedges, and the discipline to stop and use them.", stats: { ferocity: 8, might: 4 }, depth: { nerve: 5, lodesense: 3 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 983 },
+
+    // MINING — the seam at the rock face. Hew is yield, Prospecting is what else the rock was hiding.
+    { id: "rb_maul", name: "Rockbreaker's Maul", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Not a weapon. It has simply never been told that.", stats: { might: 14 }, depth: { hew: 6 }, reqLevel: 14, source: "mining", ownerOnly: true, sort: 984 },
+    { id: "rb_gauntlet", name: "Hewer's Gauntlets", slot: "off_hand", rarity: "rare", icon: "GiGauntlet", flavor: "Leather worn to the shape of a haft.", stats: { might: 7, crit_power: 5 }, depth: { hew: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 985 },
+    { id: "rb_assay_ring", name: "Assayer's Ring", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "Rubbed on the stone, it tells you what you're standing in.", stats: { fortune: 10 }, depth: { prospect: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 986 },
+    { id: "rb_hobnails", name: "Hobnailed Treads", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Iron studs bite the scree so you don't.", stats: { ferocity: 9 }, depth: { prospect: 3, hew: 2 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 987 },
+
+    // SMELTING — the furnace. Bellows is extra parts, Crucible is what survives the slag.
+    { id: "fd_apron", name: "Founder's Scale Apron", slot: "chest", rarity: "epic", icon: "GiLeatherVest", flavor: "Scarred by forty years of sparks and not one burn through.", stats: { ferocity: 10, might: 4 }, depth: { bellows: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 988 },
+    { id: "fd_tongs", name: "Long Crucible Tongs", slot: "off_hand", rarity: "epic", icon: "GiTongs", flavor: "Long enough to keep your eyebrows.", stats: { might: 6, crit_chance: 6 }, depth: { crucible: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 989 },
+    { id: "fd_bellows_charm", name: "Bellows Charm", slot: "amulet", rarity: "rare", icon: "GiWindHole", flavor: "A scrap of the old forge's leather, kept for luck.", stats: { fortune: 7 }, depth: { bellows: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 990 },
+    { id: "fd_slagsifter", name: "Slagsifter's Ring", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Everyone else throws the clinker out.", stats: { fortune: 8 }, depth: { crucible: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 991 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
@@ -692,5 +717,40 @@ export function sumItemFarm(itemIds = []) {
 export function describeFarm(farm = {}) {
     return Object.entries(farm).filter(([, v]) => v)
         .map(([k, v]) => { const m = DECO_STATS[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
+        .join(" · ");
+}
+
+// ── DEPTHS AFFINITY ── a THIRD quarantined effect layer, exactly like sea and farm, for the Mine. The mine
+// shipped reading NOTHING off your gear or your pets: you could be wearing a full mythic loadout and the roof
+// still came in at the same rate, the seam still paid the same ore, the furnace still threw the same extras.
+// Every other feature in the game rewards the loadout you built; the mine was the one that ignored it.
+//
+// Six points, two per verb, so a piece can be good at delving without being good at everything:
+//   DELVING  — nerve (the roof holds) + lodesense (richer seams down the tunnel)
+//   MINING   — hew (more ore per seam) + prospect (better odds of a find at the face)
+//   SMELTING — bellows (extra parts out of the furnace) + crucible (better odds out of the slag)
+//
+// Kept OUT of `stats` so it never touches boss power, and small integer POINTS rather than percentages —
+// mining.js owns the points→effect curve and every stacker there is capped. See depthEffects().
+export const DEPTH_META = {
+    nerve: { label: "Nerve", icon: "🪨", desc: "The roof holds longer — a lower chance the tunnel collapses on you." },
+    lodesense: { label: "Lodesense", icon: "🧭", desc: "Richer seams turn up as you descend." },
+    hew: { label: "Hew", icon: "⛏️", desc: "More ore out of every seam you crack open." },
+    prospect: { label: "Prospecting", icon: "🔦", desc: "Better odds of a bonus find at the rock face." },
+    bellows: { label: "Bellows", icon: "🌬️", desc: "A chance the furnace throws in an extra part." },
+    crucible: { label: "Crucible", icon: "⚗️", desc: "Better odds of something worth keeping out of the slag." },
+};
+export function sumItemDepth(itemIds = []) {
+    const total = {};
+    for (const id of itemIds) {
+        const it = itemById(id);
+        if (!it?.depth) continue;
+        for (const [k, v] of Object.entries(it.depth)) total[k] = (total[k] || 0) + (Number(v) || 0);
+    }
+    return total;
+}
+export function describeDepth(depth = {}) {
+    return Object.entries(depth).filter(([, v]) => v)
+        .map(([k, v]) => { const m = DEPTH_META[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
         .join(" · ");
 }

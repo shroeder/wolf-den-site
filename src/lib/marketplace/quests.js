@@ -56,6 +56,17 @@ export const QUEST_TEMPLATES = [
     // ── Fishing ──────────────────────────────────────────────────────────────────────────────────────────
     { key: "fish_one", label: "Land a fish", metric: "fish", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Cast a line" },
     { key: "fish_five", label: "Land 5 fish", metric: "fish", target: 5, gold: 220, chest: "wooden", area: "/marketplace/sailing", cta: "Cast a line" },
+
+    // ── Mine quests. ownerOnly for exactly as long as the mine is — eligibleTemplates already filters these
+    // out for everyone else, so they can never be rolled for a member who cannot open the page. One per verb,
+    // because the three halves of the mine are genuinely different activities and a player who only likes the
+    // descent should still be able to clear a mine quest.
+    { key: "mine_descend", label: "Take 5 steps down the mine tunnel", metric: "mine_depth", target: 5, gold: 140, ownerOnly: true, area: "/marketplace/mining", cta: "Head down" },
+    { key: "mine_deep_dive", label: "Take 10 steps down the mine tunnel", metric: "mine_depth", target: 10, gold: 260, chest: "wooden", ownerOnly: true, area: "/marketplace/mining", cta: "Head down" },
+    { key: "mine_crack", label: "Crack open a seam", metric: "seam_crack", target: 1, gold: 120, ownerOnly: true, area: "/marketplace/mining", cta: "Go swing a pick" },
+    { key: "mine_crack_three", label: "Crack open 3 seams", metric: "seam_crack", target: 3, gold: 240, chest: "wooden", ownerOnly: true, area: "/marketplace/mining", cta: "Go swing a pick" },
+    { key: "mine_smelt", label: "Pour a smelt at the furnace", metric: "ore_smelt", target: 1, gold: 130, ownerOnly: true, area: "/marketplace/mining", cta: "Work the heat" },
+    { key: "mine_smelt_three", label: "Pour 3 smelts", metric: "ore_smelt", target: 3, gold: 250, ownerOnly: true, area: "/marketplace/mining", cta: "Work the heat" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

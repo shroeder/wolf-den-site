@@ -44,10 +44,19 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
                 </h3>
                 <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
                     {wrap.collapsed
-                        ? `Depth ${wrap.depth}. ${wrap.lost ? `You were carrying ${wrap.lost} thing${wrap.lost === 1 ? "" : "s"}. Not any more.` : "You were carrying nothing, at least."}`
+                        ? (wrap.secondWind
+                            ? `Depth ${wrap.depth}. The roof came in — and you walked out with the lot anyway.`
+                            : `Depth ${wrap.depth}. ${wrap.lost ? `You were carrying ${wrap.lost} thing${wrap.lost === 1 ? "" : "s"}. Not any more.` : "You were carrying nothing, at least."}`)
                         : `${paid.length} thing${paid.length === 1 ? "" : "s"} out of the dark.`}
                 </p>
-                {!wrap.collapsed && paid.length ? (
+                {/* A capstone that quietly saves your haul is a capstone nobody knows they own. Say it. */}
+                {wrap.collapsed && wrap.secondWind ? (
+                    <div className="mine-rung-won is-flawless" style={{ marginBottom: 10 }}>
+                        <b>SECOND WIND</b>
+                        <em>Delver&rsquo;s Kit — the day&rsquo;s first collapse leaves your haul intact.</em>
+                    </div>
+                ) : null}
+                {paid.length && (!wrap.collapsed || wrap.secondWind) ? (
                     <div className="mine-reveal-row">{paid.map((h, i) => <Haul key={i} h={h} />)}</div>
                 ) : null}
                 {/* WHAT THE ROOF TOOK. A collapse still leaves you rock to swing at, so the loss is not "nothing

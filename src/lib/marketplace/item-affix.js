@@ -31,6 +31,10 @@ export const UTIL_AFFIXES = {
     sea_wind: { label: "Tailwind", icon: "🌬️", per: 1, cap: 5, bucket: "sea", stat: "tailwind", blurb: "faster voyages + waves" },
     // ⚒️ FORGE — stacks on the Transmuter's Boon double-combine chance
     forge_yield: { label: "Forge Yield", icon: "⚗️", per: 1, cap: 5, bucket: "forgeYield", blurb: "double-combine chance" },
+    // ── MINE attunements (DEPTHS affinity — see items.js DEPTH_META) ──
+    depth_nerve: { label: "Nerve", icon: "🪨", per: 1, cap: 5, bucket: "depth", stat: "nerve", blurb: "the roof holds longer" },
+    depth_hew: { label: "Hew", icon: "⛏️", per: 1, cap: 5, bucket: "depth", stat: "hew", blurb: "more ore per seam" },
+    depth_bellows: { label: "Bellows", icon: "🌬️", per: 1, cap: 5, bucket: "depth", stat: "bellows", blurb: "extra parts from the furnace" },
 };
 export const UTIL_KEYS = Object.keys(UTIL_AFFIXES);
 
@@ -55,7 +59,7 @@ export function describeUtil(u) {
     if (!p) return null;
     const def = UTIL_AFFIXES[p.key];
     const val = affixValue(p.key, p.level);
-    const unit = def.bucket === "sea" ? "" : "%";
+    const unit = def.bucket === "sea" || def.bucket === "depth" ? "" : "%";
     return { key: p.key, level: p.level, maxed: p.level >= UTIL_MAX, label: def.label, icon: def.icon, value: val, unit, blurb: def.blurb, text: `${def.icon} +${val}${unit} ${def.label}` };
 }
 
@@ -77,7 +81,7 @@ export function rollUtil(curUtil, chanceVal) {
 // Sum every EQUIPPED item's attunement into one totals object each feature reads.
 //   { farm: {harvestLuck,...}, petXp: %, raidDmg: %, sea: {dredge,trove,tailwind}, forgeYield: % }
 export async function getEquippedUtilTotals(buyerId) {
-    const out = { farm: {}, petXp: 0, raidDmg: 0, sea: {}, forgeYield: 0 };
+    const out = { farm: {}, petXp: 0, raidDmg: 0, sea: {}, depth: {}, forgeYield: 0 };
     if (!buyerId) return out;
     const eq = await db.query(`SELECT item_id FROM mkt_user_equipment WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const ids = eq.map((r) => r.item_id);
@@ -90,6 +94,7 @@ export async function getEquippedUtilTotals(buyerId) {
         const val = affixValue(u.key, u.level);
         if (def.bucket === "farm") out.farm[def.stat] = (out.farm[def.stat] || 0) + val;
         else if (def.bucket === "sea") out.sea[def.stat] = (out.sea[def.stat] || 0) + val;
+        else if (def.bucket === "depth") out.depth[def.stat] = (out.depth[def.stat] || 0) + val;
         else if (def.bucket === "petXp") out.petXp += val;
         else if (def.bucket === "raidDmg") out.raidDmg += val;
         else if (def.bucket === "forgeYield") out.forgeYield += val;

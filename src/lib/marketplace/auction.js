@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, describeFarm, describeSea, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeFarm, describeSea, describeDepth, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -93,7 +93,7 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
         stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, // effective (base + forge) totals
         forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, // the forge bonus alone
         farm: it.farm ? describeFarm(it.farm) : null, // 🌱 harvest/farm affinity (kept out of combat stats)
-        sea: it.sea ? describeSea(it.sea) : null, // ⚓ sailing affinity
+        sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, // ⚓ sailing affinity
         util: det?.util || null, // rare Forge attunement (spin-off bonus stat) that rides with the item
         signature: signatureFor(row.item_id), // ★ signature ability (the item's special power)
         sprite: sprites[row.item_id] || null,
@@ -150,7 +150,7 @@ export async function getSellableItems(buyerId) {
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -222,7 +222,7 @@ export async function getMyListings(buyerId) {
             stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null,
             forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,
             farm: it.farm ? describeFarm(it.farm) : null,
-            sea: it.sea ? describeSea(it.sea) : null,
+            sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null,
             util: det?.util || null,
             signature: signatureFor(r.item_id),
             enhanceLevel: det?.level || 0,

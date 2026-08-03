@@ -11,7 +11,7 @@ import ItemArt from "@/components/ItemArt";
 import ForgeRank from "@/components/ForgeRank";
 import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
-import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, itemFitsSlot } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
 
 // An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
@@ -75,7 +75,7 @@ const effStats = (item, ownedById) => {
 const SET_RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 const capText = (desc) => (desc || "").replace(/^Full set:\s*/i, "");
 // A set tier's bonus as text — stat bonuses and/or sea affinity (the sailing set grants the latter).
-const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : ""].filter(Boolean).join(" · ") || "—";
+const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : "", t.depth ? describeDepth(t.depth) : ""].filter(Boolean).join(" · ") || "—";
 
 // A rich, tappable card for one set the player is building: piece dots, a progress bar, the tiered stat
 // bonuses (active ones lit), and — the fun differentiator two sets otherwise hide — the full-set CAPSTONE.
@@ -442,6 +442,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
+                                {i.depth ? <span className="equip-card-depth">{describeDepth(i.depth)}</span> : null}
                                 <ElBadge id={i.id} elements={i.elements} />
                             </button>
                         ))}
@@ -527,6 +528,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.label}</span> : null}
                                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
                                                 {!i.signature && i.sea ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity</span> : null}
+                                                {!i.signature && !i.sea && i.depth ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffb45e" }}>⛏️ Depths affinity</span> : null}
                                                 <span style={{ fontSize: "0.72rem", fontWeight: 800, color: i.canAfford ? "#ffd75e" : "#c9a24a", marginTop: 2 }}>🪙 {i.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(i.cost || 0).toLocaleString()}</span> {(i.effectiveCost || 0).toLocaleString()}</> : (i.cost || 0).toLocaleString()}{i.canAfford ? "" : " · need more"}</span>
                                             </button>
                                         ))}
@@ -719,6 +721,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             );
                         })() : null}
                         {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
+                        {detailItem.depth ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#ffb45e" }}>⛏️ Depths affinity: {describeDepth(detailItem.depth)} <span className="muted" style={{ fontWeight: 600 }}>— helps you underground (delving · mining · smelting)</span></p> : null}
                         {detailItem.farm ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#8fe39a" }}>🌱 Farm affinity: {describeFarm(detailItem.farm)} <span className="muted" style={{ fontWeight: 600 }}>— helps you on the farm (crops · seeds · harvests)</span></p> : null}
                         {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
                         {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}

@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
@@ -308,7 +308,7 @@ export async function getInventory(buyerId) {
             const set = setForItem(i.id);
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
-                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, signature: signatureFor(i.id),
+                stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: signatureFor(i.id),
                 farmText: i.farm ? describeFarm(i.farm) : null,
                 setName: set?.name || null, setId: set?.id || null,
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,

@@ -18,6 +18,8 @@ import {
     // Forge pets
     GiSmallFire, GiHound, GiRockGolem, GiSalamander, GiFireBreath,
     GiRat, GiTeapot,
+    // Mine pets
+    GiEarthWorm, GiBeetleShell, GiGolemHead, GiCrystalGrowth, GiScarabBeetle,
 } from "react-icons/gi";
 
 // Passive bonus each OWNED pet contributes to your account (all owned pets stack), by rarity.
@@ -196,6 +198,16 @@ export const COLLECTIBLES = [
     { id: "marlin", name: "Marlin", Icon: GiFishMonster, color: "#3a9bd8", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_power", sea: { broadside: 6 }, hint: "A living cannonball", spritePrompt: "a sleek blue marlin with a long spear-like bill, mid-leap" },
     { id: "anglerfish", name: "Anglerfish", Icon: GiAnglerFish, color: "#5ad0c0", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "fortune", sea: { trove: 6 }, hint: "Its lure finds buried treasure", spritePrompt: "a deep-sea anglerfish with a glowing lure" },
     { id: "sea_wyrm", name: "Sea Wyrm", Icon: GiSeaDragon, color: "#35d07f", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "ferocity", sea: { plunder: 5, broadside: 5 }, hint: "A leviathan in miniature — master of the raid", spritePrompt: "a majestic coiling sea dragon wyrm wreathed in glowing water, awe-inspiring" },
+
+    // ── MINE PETS ── each carries DEPTHS affinity (see items.js DEPTH_META), the mine's own quarantined
+    // effect layer, so a pet can make you better underground without touching boss power. Points scale with
+    // the pet's LEVEL (1..5 → ~0.36x..1.0x) in equippedDepthAffinity, so levelling one is the whole point.
+    // ownerOnly for exactly as long as the mine is — isOwnerOnlyPet keeps them out of every drop pool.
+    { id: "tunnel_worm", name: "Tunnel Worm", Icon: GiEarthWorm, color: "#c98a6a", rarity: "rare", source: "chest", chestTier: "iron", activeStat: "xp_gain", ownerOnly: true, depth: { lodesense: 4 }, hint: "It knows which way the good rock is", spritePrompt: "a chubby friendly burrowing worm with segmented ringed body and a blunt snout, poking up out of dark tunnel soil" },
+    { id: "pit_beetle", name: "Pit Beetle", Icon: GiBeetleShell, color: "#6fb0e6", rarity: "rare", source: "chest", chestTier: "iron", activeStat: "ferocity", ownerOnly: true, depth: { nerve: 4 }, hint: "Shell like a shoring timber", spritePrompt: "a sturdy armoured beetle with a thick iridescent blue-black carapace and stout digging legs" },
+    { id: "cinder_scarab", name: "Cinder Scarab", Icon: GiScarabBeetle, color: "#ff9f1c", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_power", ownerOnly: true, depth: { bellows: 5, crucible: 2 }, hint: "It nests in the furnace and fans the coals", spritePrompt: "a glowing ember-orange scarab beetle with cracks of molten light between its wing cases, trailing sparks" },
+    { id: "geode_sprite", name: "Geode Sprite", Icon: GiCrystalGrowth, color: "#b98cff", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "fortune", ownerOnly: true, depth: { prospect: 5, hew: 2 }, hint: "Chimes when there is something worth digging for", spritePrompt: "a tiny cheerful crystal elemental sprite made of glowing violet geode shards, floating with a soft inner light" },
+    { id: "deep_golem", name: "Deep Golem", Icon: GiGolemHead, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "might", ownerOnly: true, depth: { hew: 5, nerve: 4, lodesense: 3 }, hint: "The mountain, walking — master of the deep", spritePrompt: "a majestic hulking golem of dark stone veined with glowing golden ore, awe-inspiring, standing tall" },
 
     // ── Boss-battle-only drops ─────────────────────────────────────────────────────────────────────
     { id: "vulture", name: "Vulture", Icon: GiVulture, color: "#8794a3", rarity: "rare", source: "boss", activeStat: "crit_chance", hint: "Circles the fallen", spritePrompt: "a circling bald vulture" },

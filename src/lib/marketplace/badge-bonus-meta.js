@@ -1,7 +1,7 @@
 // Display metadata for badge bonuses — shared by the Badges page hero + the badge cards. Client-safe (pure
 // data, no server-only imports). Mirrors the four bonus domains in badges.js (BADGE_BONUSES) and labels each
 // stat the way its own system names it.
-export const BONUS_DOMAINS = ["combat", "sea", "farm", "forge"];
+export const BONUS_DOMAINS = ["combat", "sea", "farm", "forge", "depth"];
 
 export const BONUS_META = {
     combat: {
@@ -37,6 +37,19 @@ export const BONUS_META = {
             petXp: { icon: "🐾", label: "Pet XP", suffix: "%" },
             fertPower: { icon: "💧", label: "Fertilizer", suffix: "%" },
             goldHarvest: { icon: "🪙", label: "Farm Gold", suffix: "%" },
+        },
+    },
+    depth: {
+        label: "The Mine", icon: "⛏️", accent: "#ffb45e", blurb: "powers delving, mining & smelting",
+        stats: {
+            // Labelled by EFFECT, not by name — the same call sea affinity's tailwind entry made. "+4 Nerve"
+            // means nothing at a glance; "Roof Safety" says what the points buy you.
+            nerve: { icon: "🪨", label: "Roof Safety", suffix: "" },
+            lodesense: { icon: "🧭", label: "Seam Quality", suffix: "" },
+            hew: { icon: "⛏️", label: "Ore Yield", suffix: "" },
+            prospect: { icon: "🔦", label: "Find Odds", suffix: "" },
+            bellows: { icon: "🌬️", label: "Extra Parts", suffix: "" },
+            crucible: { icon: "⚗️", label: "Slag Luck", suffix: "" },
         },
     },
     forge: {

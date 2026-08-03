@@ -176,6 +176,7 @@ export default function AuctionClient({ initial }) {
                                     {l.util ? <div className="ah-card-attune">🔮 +{l.util.value}{l.util.unit} {l.util.label}{l.util.level > 1 ? ` Lv${l.util.level}` : ""} <span className="ah-attune-blurb">· {l.util.blurb}</span></div> : null}
                                     {l.farm ? <div className="ah-card-farm">🌱 {l.farm}</div> : null}
                                     {l.sea ? <div className="ah-card-sea">⚓ {l.sea}</div> : null}
+                                    {l.depth ? <div className="ah-card-depth">⛏️ {l.depth}</div> : null}
                                     {l.signature ? <div className="ah-card-sig">★ {l.signature.label} — {l.signature.desc}</div> : null}
                                     {l.compare && !l.mine ? <CompareBlock c={l.compare} /> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
@@ -212,6 +213,7 @@ export default function AuctionClient({ initial }) {
                                     {it.util ? <div className="ah-card-attune">🔮 +{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</div> : null}
                                     {it.farm ? <div className="ah-card-farm">🌱 {it.farm}</div> : null}
                                     {it.sea ? <div className="ah-card-sea">⚓ {it.sea}</div> : null}
+                                    {it.depth ? <div className="ah-card-depth">⛏️ {it.depth}</div> : null}
                                     {it.signature ? <div className="ah-card-sig">★ {it.signature.label}</div> : null}
                                 </button>
                             ))}
@@ -279,6 +281,7 @@ export default function AuctionClient({ initial }) {
                         {detail.util ? <div className="ah-card-attune" style={{ textAlign: "left" }}>🔮 +{detail.util.value}{detail.util.unit} {detail.util.label}{detail.util.level > 1 ? ` Lv${detail.util.level}` : ""}{detail.util.blurb ? <span className="ah-attune-blurb"> · {detail.util.blurb}</span> : null}</div> : null}
                         {detail.farm ? <div className="ah-card-farm" style={{ textAlign: "left" }}>🌱 Farm affinity: {detail.farm} <span className="ah-attune-blurb">— helps on the farm</span></div> : null}
                         {detail.sea ? <div className="ah-card-sea" style={{ textAlign: "left" }}>⚓ Sea affinity: {detail.sea} <span className="ah-attune-blurb">— helps at sea</span></div> : null}
+                        {detail.depth ? <div className="ah-card-depth" style={{ textAlign: "left" }}>⛏️ Depths affinity: {detail.depth} <span className="ah-attune-blurb">— helps underground</span></div> : null}
                         {detail.signature ? <div className="ah-card-sig" style={{ textAlign: "left" }}>★ {detail.signature.label} — {detail.signature.desc}</div> : null}
                         {detail.compare ? <CompareBlock c={detail.compare} /> : null}
                         <div className="ah-detail-meta muted">
@@ -352,6 +355,7 @@ const AH_CSS = `
 .ah-attune-blurb { font-weight: 600; color: #b7a9cf; }
 .ah-card-farm { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #8fe39a; }
 .ah-card-sea { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #7fd8ff; }
+.ah-card-depth { font-size: 0.7rem; line-height: 1.25; font-weight: 800; color: #ffb45e; }
 .ah-card-sig { font-size: 0.7rem; line-height: 1.3; font-weight: 700; color: #ffd75e; }
 .ah-card-tap { cursor: pointer; }
 .ah-card-tapHint { font-size: 0.6rem; font-weight: 700; color: #8a93a0; opacity: 0; transition: opacity .14s; }

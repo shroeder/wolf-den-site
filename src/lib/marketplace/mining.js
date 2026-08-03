@@ -8,7 +8,11 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
 import { SMELT_GRADES, SMELT_MISS, SMELT_PHASES, smeltGrade } from "@/lib/marketplace/smelt-heat.js";
 import { addChests } from "@/lib/marketplace/chests.js";
-import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { getBadgeDepth, grantEventBadge } from "@/lib/marketplace/badges.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
+import { setDepthCapstones } from "@/lib/marketplace/sets.js";
+import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -110,6 +114,69 @@ export const perDepthFor = (braceLevel = 0) => COLLAPSE_PER_DEPTH * (1 - braceSl
 const COLLAPSE_CAP = 0.55;
 export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0) =>
     Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel)) * perDepthFor(braceLevel));
+
+// ── DEPTHS AFFINITY ─────────────────────────────────────────────────────────────────────────────────────────
+// The mine shipped reading NOTHING off your loadout. You could be in full mythic with a legendary pet and the
+// roof came in at the same rate, the seam paid the same ore, the furnace threw the same extras. Every other
+// feature rewards the build you made; this was the one that ignored it.
+//
+// Five contributors, exactly like sea affinity: equipped GEAR, active SET tiers, your featured PET (scaled by
+// its level), earned mining BADGES, and rare Forge "attunement" affixes. All small integer points; the curve
+// below turns points into effects and every stacker is capped so no single piece trivialises a system.
+export async function equippedDepthAffinity(buyerId) {
+    // Must list EVERY key in DEPTH_META — the merges below iterate `for (k in depth)`, so a key missing here is
+    // silently dropped forever. (That exact bug cost sailing four of its eight effects for months.)
+    const depth = { nerve: 0, lodesense: 0, hew: 0, prospect: 0, bellows: 0, crucible: 0 };
+    if (!buyerId) return depth;
+    const [{ sumItemDepth }, { setDepthBonus }, { getEquippedIds }] = await Promise.all([
+        import("@/lib/marketplace/items.js"),
+        import("@/lib/marketplace/sets.js"),
+        import("@/lib/marketplace/inventory.js"),
+    ]);
+    // getEquippedIds returns a {slot → id} OBJECT, not an array. Iterating it directly is a known landmine here.
+    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
+    const gear = sumItemDepth(Object.values(bySlot || {}));
+    for (const k in depth) depth[k] += gear[k] || 0;
+    const set = setDepthBonus(bySlot);
+    for (const k in depth) depth[k] += set[k] || 0;
+
+    const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const petId = me?.featured_collectible;
+    if (petId) {
+        const [{ collectibleById }, { petLevelForXp }] = await Promise.all([
+            import("@/lib/marketplace/collectibles.js"),
+            import("@/lib/marketplace/pet-level.js"),
+        ]);
+        const pet = collectibleById(petId);
+        if (pet?.depth) {
+            const xpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+            const lvl = Math.max(1, Math.min(5, petLevelForXp(xpRow?.xp || 0, pet.rarity)));
+            // Same 0.36x..1.0x level scale the sea pets use, so a level-1 pet is a taste and a level-5 is the
+            // reason you levelled it.
+            for (const k in depth) depth[k] += Math.round((pet.depth[k] || 0) * (0.2 + 0.16 * lvl));
+        }
+    }
+    const badge = await getBadgeDepth(buyerId).catch(() => ({}));
+    for (const k in depth) depth[k] += badge[k] || 0;
+    const util = (await getEquippedUtilTotals(buyerId).catch(() => ({ depth: {} }))).depth || {};
+    for (const k in depth) depth[k] += util[k] || 0;
+    return depth;
+}
+
+// Points → real effects. Plain tunable numbers, every stacker capped.
+export function depthEffects(depth = {}) {
+    return {
+        // DELVING
+        collapseCut: Math.min(0.35, (depth.nerve || 0) * 0.018),        // Nerve: −1.8% collapse chance/pt (cap −35%)
+        seamTierBonus: Math.min(0.30, (depth.lodesense || 0) * 0.022),  // Lodesense: +2.2% odds of a better seam/pt (cap +30%)
+        // MINING
+        oreBonus: Math.min(0.60, (depth.hew || 0) * 0.03),              // Hew: +3% seam ore/pt (cap +60%)
+        findBonus: Math.min(0.20, (depth.prospect || 0) * 0.012),       // Prospecting: +1.2% bonus-find odds/pt (cap +20%)
+        // SMELTING
+        extraPartChance: Math.min(0.30, (depth.bellows || 0) * 0.018),  // Bellows: +1.8% extra-part odds/pt (cap +30%)
+        curioBonus: Math.min(0.25, (depth.crucible || 0) * 0.016),      // Crucible: +1.6% slag-curio odds/pt (cap +25%)
+    };
+}
 
 // What the tunnel can turn up. Weights shift with depth — shallow rock is mostly ore and rubble, deep rock is
 // where the gear and the strongboxes are. A `seam` card raises the tier of what you end up mining.
@@ -244,17 +311,25 @@ export async function descend(buyerId) {
 
     // THE ROOF. Rolled before the card, so a collapse is the tunnel deciding rather than a reward being shown
     // to you and then snatched back.
-    if (Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level)) {
-        const lost = (run.haul || []).length;
+    const eff = depthEffects(await equippedDepthAffinity(buyerId));
+    if (Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level) * (1 - eff.collapseCut)) {
+        // SECOND WIND (full Delver's Kit): the day's FIRST collapse still ends the run, but you keep the haul.
+        // Guarded by a dated column so it is genuinely once a day and not once a page-load.
+        const capstones = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getEquippedIds(buyerId).catch(() => ({})));
+        const saved = capstones.secondWind && Boolean(await db.queryOne(
+            `UPDATE mkt_mining SET second_wind_day = ${DAY} WHERE buyer_id = $1 AND (second_wind_day IS DISTINCT FROM ${DAY}) RETURNING buyer_id`,
+            [buyerId]).catch(() => null));
+        const lost = saved ? 0 : (run.haul || []).length;
         const hadTier = Number(run.seamTier) || 1;
-        const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
+        const next = { ...run, depth, over: true, collapsed: true, haul: saved ? (run.haul || []) : [], last: { kind: "collapse" } };
+        if (saved) await payHaul(buyerId, run.haul || []).catch(() => {});
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
         // You crawl out with what you could reach on the way, which is the poorest rock in the mine. The vein
         // you'd actually found stays buried — `lostTier` is only for the wrap-up to show you what it cost.
         const seam = await cutSeam(buyerId, COLLAPSE_SEAM_TIER);
-        await trackActivity(buyerId, "mine_collapse", { depth, lost, hadTier }).catch(() => {});
+        await trackActivity(buyerId, "mine_collapse", { depth, lost, hadTier, saved }).catch(() => {});
         return {
-            ok: true, collapsed: true, depth, lost, seam,
+            ok: true, collapsed: true, depth, lost, seam, secondWind: saved,
             lostTier: hadTier > COLLAPSE_SEAM_TIER ? { tier: hadTier, name: oreTier(hadTier).name, color: oreTier(hadTier).color, art: oreArt(hadTier) } : null,
             ...(await getMiningState(buyerId)),
         };
@@ -279,19 +354,24 @@ export async function descend(buyerId) {
 
     const next = { ...run, depth, haul, seamTier, last: { kind: found.kind, label: card.label } };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+    // One step down = one tick. Both quest systems count STEPS rather than peak depth, which is what the
+    // cumulative bump actually measures — a "reach depth 10" target on an additive counter would quietly mean
+    // "take ten steps today" anyway, so the labels say that instead of lying about it.
+    await bumpQuestProgress(buyerId, "mine_depth", 1).catch(() => {});
+    await bumpTownQuest(buyerId, "delver", 1).catch(() => {});
+    const steps = await db.queryOne(`UPDATE mkt_mining SET steps_taken = COALESCE(steps_taken, 0) + 1 WHERE buyer_id = $1 RETURNING steps_taken`, [buyerId]).catch(() => null);
+    if ((Number(steps?.steps_taken) || 0) >= 300) await grantEventBadge(buyerId, "mine_tunnelrat").catch(() => {});
+    if ((Number(steps?.steps_taken) || 0) >= 1000) await grantEventBadge(buyerId, "mine_deepwalker").catch(() => {});
     return { ok: true, card: { key: card.key, label: card.label }, found, depth, ...(await getMiningState(buyerId)) };
 }
 
 // Climb out with everything you are carrying, and take the seam to the rock face.
-export async function surfaceRun(buyerId) {
-    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    const row = await minerRow(buyerId);
-    const run = row?.run_json;
-    if (!run || run.over) return { ok: false, error: "no_run" };
-
-    // Everything banked pays out NOW. The haul was only ever a promise until you climbed out with it.
+// Everything banked pays out. The haul was only ever a promise until something cashes it — climbing out with
+// it, or the Delver's Kit capstone deciding the roof does not get to keep it. Extracted so those two paths can
+// never drift: a reward added to one and not the other is the kind of bug nobody notices for months.
+async function payHaul(buyerId, haul = []) {
     const paid = [];
-    for (const item of run.haul || []) {
+    for (const item of haul) {
         if (item.kind === "ore") {
             await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
             paid.push(item);
@@ -310,6 +390,16 @@ export async function surfaceRun(buyerId) {
             if (got) paid.push({ ...item, ...got });
         }
     }
+    return paid;
+}
+
+export async function surfaceRun(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const run = row?.run_json;
+    if (!run || run.over) return { ok: false, error: "no_run" };
+
+    const paid = await payHaul(buyerId, run.haul || []);
     const next = { ...run, over: true, collapsed: false };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
     const seam = await cutSeam(buyerId, Number(run.seamTier) || 1);
@@ -888,7 +978,11 @@ async function claimNode(buyerId, node, row, run = {}) {
     // Ore, gold and XP — always. Then ONE bonus, sometimes. Exactly the farm's shape, because the bag of
     // tickets it replaces was handing out six things at once off a single Coal seam and none of them felt
     // like anything.
-    const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus)));
+    // DEPTHS: Hew adds ore on top of the Haul track, and a full Rockbreaker's Rig can pay the seam TWICE.
+    const dEff = depthEffects(await equippedDepthAffinity(buyerId));
+    const dCap = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getEquippedIds(buyerId).catch(() => ({})));
+    const richSeam = dCap.richSeam > 0 && Math.random() < dCap.richSeam;
+    const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus + dEff.oreBonus))) * (richSeam ? 2 : 1);
     await db.query(
         `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3)
          ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,
@@ -903,7 +997,7 @@ async function claimNode(buyerId, node, row, run = {}) {
     // before, worth a little luck each instead of being a currency you spend on pulls).
     const luck = Math.min(0.22, seeds.filter((x) => x === "rare").length * 0.02 + seeds.filter((x) => x !== "rare").length * 0.008);
     let bonus = null;
-    if (Math.random() < rank.bonus + luck) {
+    if (Math.random() < rank.bonus + luck + dEff.findBonus) {
         const roll = Math.random();
         const lift = rank.key === "s" ? 1 : 0;
         const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
@@ -939,7 +1033,11 @@ async function claimNode(buyerId, node, row, run = {}) {
     // a GREAT is a good one.
     const rareSeeds = seeds.filter((x) => x === "rare").length;
     const goodSeeds = seeds.length - rareSeeds;
-    await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: oreTotal, rank: rank.key, bonus: bonus?.kind || null, rare: rareSeeds, good: goodSeeds }).catch(() => {});
+    await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: oreTotal, rank: rank.key, bonus: bonus?.kind || null, rare: rareSeeds, good: goodSeeds, richSeam }).catch(() => {});
+    // Daily + town quests. The mine emitted NO quest metrics at all, so none of its verbs could ever be asked
+    // for by the Quartermaster or the daily board — the one big feature the quest systems could not see.
+    await bumpQuestProgress(buyerId, "seam_crack", 1).catch(() => {});
+    await bumpTownQuest(buyerId, "collier", 1).catch(() => {});
 
     // BADGES. Granted at the moment they're earned, like fishing's and digging's — the counters live on
     // mkt_mining, not in getMemberMetrics, so an auto-rule sweep would need a second source of truth.
@@ -998,6 +1096,15 @@ export async function smeltOre(buyerId, tier, dists = null) {
         .catch(() => null);
     if (!spent) return { ok: false, error: "not_enough_ore" };
 
+    // COLD CRUCIBLE (full Founder's Regalia): the smelt sometimes costs no ore. Refunded AFTER the guarded
+    // spend rather than skipping it, so the "do you actually have the ore" check still has to pass — you can
+    // never smelt ore you don't own just because the capstone happened to roll.
+    const smeltCaps = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getEquippedIds(buyerId).catch(() => ({})));
+    const refunded = smeltCaps.freeSmelt > 0 && Math.random() < smeltCaps.freeSmelt;
+    if (refunded) {
+        await db.query(`UPDATE mkt_ore SET qty = qty + $3 WHERE buyer_id = $1 AND tier = $2`, [buyerId, t, spend]).catch(() => {});
+    }
+
     const o = oreTier(t);
     // THREE POURS on the real timing bar. The client sends its distance-from-centre for each phase; every one
     // is graded HERE and clamped, so a tampered client cannot claim three flawless pours.
@@ -1019,6 +1126,10 @@ export async function smeltOre(buyerId, tier, dists = null) {
         .reduce((a, b) => (Math.abs(b.mult - avgMult) < Math.abs(a.mult - avgMult) ? b : a), SMELT_GRADES[0]);
     const n = 1;
 
+    // DEPTHS: Bellows adds extra-part tickets, Crucible adds curio tickets. Both are additive with the
+    // furnace tracks rather than replacing them — gear should stack with what you built, not substitute for it.
+    const sEff = depthEffects(await equippedDepthAffinity(buyerId));
+
     // THE BAG. Ordinary parts always; the pour and your upgrades seed the better tickets.
     const bellows = smeltValue("bellows", row?.bellows_level);
     const flux = smeltValue("flux", row?.flux_level);
@@ -1029,11 +1140,15 @@ export async function smeltOre(buyerId, tier, dists = null) {
     for (let i = 0; i < heatTickets; i += 1) bag.push(Math.random() < 0.5 ? "up" : "extra");
     for (let i = 0; i < Math.round(flux * 12); i += 1) bag.push("up");
     for (let i = 0; i < Math.round(bellows * 12); i += 1) bag.push("extra");
+    for (let i = 0; i < Math.round(sEff.extraPartChance * 12); i += 1) bag.push("extra");
     // A curio is the "ooh" — but a DELIBERATELY small one. The seam and the chests are where real gear comes
     // from; a smelt turning up a legendary would make the furnace the best loot source in the game for the
     // price of five taps. So: consumables and low chests only, and only off a genuinely good run.
     if (band.key === "pixel") bag.push("curio", "curio");
     else if (band.key === "perfect") bag.push("curio");
+    // Crucible affinity is the ONLY way a merely-clean pour turns up a curio, so the stat has somewhere to
+    // matter beyond making good runs better.
+    if (sEff.curioBonus > 0 && Math.random() < sEff.curioBonus) bag.push("curio");
 
     // ONE OR TWO PARTS from a batch, decided by how the whole hand went — not one lucky pour. A clean run is
     // worth a second part; a scrappy one still gets you the one you paid for. Never more than two: the batch
@@ -1078,7 +1193,19 @@ export async function smeltOre(buyerId, tier, dists = null) {
     const totalParts = Object.values(made).reduce((a, b) => a + b, 0);
     const melted = await db.queryOne(`UPDATE mkt_mining SET ore_smelted = COALESCE(ore_smelted, 0) + $2 WHERE buyer_id = $1 RETURNING ore_smelted`, [buyerId, spend]).catch(() => null);
     if ((Number(melted?.ore_smelted) || 0) >= 1000) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
-    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length }).catch(() => {});
+    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length, refunded }).catch(() => {});
+    await bumpQuestProgress(buyerId, "ore_smelt", 1).catch(() => {});
+    await bumpTownQuest(buyerId, "founder", 1).catch(() => {});
+    // A FLAWLESS pour means every one of the five phases landed in the tightest band — 4.4% of a bar that is
+    // under 600ms by the last phase. Counted per RUN, not per phase, which is why 25 is a real number.
+    const allFlawless = bands.length === SMELT_PHASES && bands.every((b) => b.key === "pixel");
+    const pours = await db.queryOne(
+        `UPDATE mkt_mining SET smelts_poured = COALESCE(smelts_poured, 0) + 1,
+             flawless_pours = COALESCE(flawless_pours, 0) + $2 WHERE buyer_id = $1
+         RETURNING smelts_poured, flawless_pours`, [buyerId, allFlawless ? 1 : 0]).catch(() => null);
+    if ((Number(pours?.smelts_poured) || 0) >= 100) await grantEventBadge(buyerId, "mine_poursteady").catch(() => {});
+    if ((Number(pours?.smelts_poured) || 0) >= 500) await grantEventBadge(buyerId, "mine_ladle").catch(() => {});
+    if ((Number(pours?.flawless_pours) || 0) >= 25) await grantEventBadge(buyerId, "mine_notadrop").catch(() => {});
     return {
         ok: true,
         smelted: {
