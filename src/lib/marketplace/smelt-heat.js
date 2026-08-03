@@ -27,3 +27,13 @@ export const heatZone = (key) => {
     const to = Math.min(HEAT_BANDS[i].max, HEAT_MAX);
     return { left: (from / HEAT_MAX) * 100, width: ((to - from) / HEAT_MAX) * 100 };
 };
+
+// ── THE PHASES ───────────────────────────────────────────────────────────────────────────────────────────────
+// A smelt is THREE pours, not one, and each is faster than the last. One pour was a single easy tap that
+// decided a whole stack; three that tighten is a hand you can lose late, which is how every other minigame
+// here works — the kitchen speeds up per step and the mine's bar tightens per swing.
+export const SMELT_PHASES = 3;
+export const PHASE_LABELS = ["Charge", "Melt", "Pour"];
+// How long the bar takes to run from cold to burnt, per phase. The window to hit PERFECT is a fixed slice of
+// that, so a shorter rise is a strictly narrower target.
+export const PHASE_RISE_MS = [2600, 1900, 1350];

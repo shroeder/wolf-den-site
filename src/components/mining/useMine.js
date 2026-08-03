@@ -148,10 +148,11 @@ export function useMine(initial) {
     }, [state.ore, smelting, forge]);
 
     // The pour landed. Send the heat we read and play the result back.
-    const pour = useCallback(async (heat, stack) => {
+    const pour = useCallback(async (heats, stack) => {
         setForge(null);
-        setSmelting({ stage: "load", oreArt: stack.art, oreName: stack.name, color: stack.color, partTier: stack.partTier, parts: stack.canSmelt, ore: stack.canSmelt * stack.smeltCost });
-        const r = await post({ action: "smelt", tier: stack.tier, batches: stack.canSmelt, heat });
+        // ONE batch — `cost` ore into one part — not the whole stack. `heats` is the three phase readings.
+        setSmelting({ stage: "load", oreArt: stack.art, oreName: stack.name, color: stack.color, partTier: stack.partTier, parts: 1, ore: stack.smeltCost });
+        const r = await post({ action: "smelt", tier: stack.tier, heats });
         setTimeout(() => setSmelting((v) => (v ? { ...v, stage: "burn" } : v)), 420);
         setTimeout(() => {
             if (r?.unlocked && r?.ok !== false) {

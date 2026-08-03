@@ -22,7 +22,11 @@ function TunnelCard({ card }) {
             ) : card.kind === "ore" ? (
                 <><Img src={card.art} className="mine-card-art" fallback="" /><b style={{ color: card.color }}>{card.name} ×{card.n}</b></>
             ) : card.kind === "seam" ? (
-                <><Img src={card.art} className="mine-card-art" fallback="" /><b style={{ color: card.color }}>{card.name}</b><em>The seam you&rsquo;ll work gets better.</em></>
+                /* Named as a DISCOVERY, and the thing you actually take is the ore. "Silver Lode" on its own
+                   read like an item you'd pocketed, which is not a thing you can do with a vein. */
+                <><Img src={card.art} className="mine-card-art" fallback="" />
+                    <b style={{ color: card.color }}>{card.oreName} ×{card.n}</b>
+                    <em>You strike {card.name} — the rock you&rsquo;ll work gets better.</em></>
             ) : card.kind === "gear" ? (
                 <><b style={{ color: "#b061ff" }}>Something buried</b><em>You won&rsquo;t know what until you&rsquo;re out.</em></>
             ) : card.kind === "chest" ? (

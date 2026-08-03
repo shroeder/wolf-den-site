@@ -82,14 +82,56 @@ export async function awardOnce(buyerId, action, meta = null) {
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.
 export const SPEND_XP_PER_DOLLAR = 5;
 
-// Level curve: cumulative XP to REACH level L is 50*(L-1)*L → L1=0, L2=100, L3=300, L4=600, L5=1000…
-// Gentle early, steeper later. Returns level + progress toward the next.
+// ── THE LEVEL CURVE ──────────────────────────────────────────────────────────────────────────────────────────
+// Up to level 20 this is unchanged: cumulative XP to REACH level L is 50*(L-1)*L → L2=100, L5=1000, L20=19,000.
+//
+// Above 20 it STEEPENS. The old curve was a plain quadratic all the way up, so each level cost only 100*L more
+// than the last and the back half of the ladder was a formality — level 100 was 495,000 XP, which at the rate
+// the Den actually earns is not a decade-long goal, it is a few months of showing up. A ladder everyone tops
+// out on stops being a ladder.
+//
+// The step cost now carries a multiplier that grows 20% per level past 20, capped at 8x so it stays a climb
+// rather than a wall:
+//
+//   L30   43,500 ->    67,200   (1.5x)
+//   L50  122,500 ->   467,600   (3.8x)
+//   L100 495,000 -> 3,432,200   (6.9x)
+//
+// TWENTY is chosen so this demotes NOBODY: the whole Den sits at or below it apart from two members at 21 and
+// the owner, and the multiplier starts at exactly 1.0 so reaching 21 costs what it always did. Retroactively
+// taking levels off people to fix a curve is not a trade worth making.
+const CURVE_KNEE = 20;
+const CURVE_GROWTH = 0.2;
+const CURVE_CAP = 8;
+const MAX_LEVEL = 200;
+
+// Cumulative XP required to REACH each level, built once. A table rather than a closed form because the
+// multiplier is capped, and a piecewise-capped sum has no tidy inverse worth the trouble.
+const LEVEL_FLOOR = (() => {
+    const out = [0, 0]; // index = level; L1 needs 0
+    let cum = 0;
+    for (let L = 1; L < MAX_LEVEL; L += 1) {
+        const step = L < CURVE_KNEE
+            ? 100 * L
+            : 100 * L * Math.min(CURVE_CAP, 1 + (L - CURVE_KNEE) * CURVE_GROWTH);
+        cum += step;
+        out[L + 1] = Math.round(cum);
+    }
+    return out;
+})();
+
+/** Cumulative XP needed to reach a level (clamped to the table). */
+export const xpForLevel = (level) => LEVEL_FLOOR[Math.max(1, Math.min(MAX_LEVEL, Math.floor(level)))] ?? 0;
+
+// Returns level + progress toward the next.
 export function levelForXp(totalXp) {
     const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-    // Largest L with 50*(L-1)*L <= xp  →  L = floor((1 + sqrt(1 + xp/12.5)) / 2)
-    const level = Math.max(1, Math.floor((1 + Math.sqrt(1 + xp / 12.5)) / 2));
-    const floorXp = 50 * (level - 1) * level;
-    const nextXp = 50 * level * (level + 1);
+    let level = 1;
+    // Walk up while the NEXT level is affordable. At most 200 steps, and levels are read constantly, so this
+    // stays a tight loop over a preallocated array rather than anything clever.
+    while (level < MAX_LEVEL && xp >= LEVEL_FLOOR[level + 1]) level += 1;
+    const floorXp = LEVEL_FLOOR[level];
+    const nextXp = level >= MAX_LEVEL ? floorXp : LEVEL_FLOOR[level + 1];
     const span = nextXp - floorXp;
     const into = xp - floorXp;
     return {

@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { heatBand } from "@/lib/marketplace/smelt-heat.js";
+import { HEAT_BANDS, heatBand, SMELT_PHASES } from "@/lib/marketplace/smelt-heat.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
@@ -150,9 +150,14 @@ function rollFind(card, depth, packBonus = 0) {
     const pickTier = () => Math.max(1, Math.min(5, tierCeil - (Math.random() < 0.45 ? 1 : 0)));
     switch (card.key) {
         case "seam": {
+            // A seam is a PLACE — you cannot carry a vein in your pocket, and a card that read like a pickup
+            // ("Silver Lode" as a thing you got) never made sense. So it does two honest things: it upgrades
+            // the rock you'll work at the face, AND you chip some ore off it there and then, which is the
+            // part that actually goes in the bag.
             const t = pickTier();
             const o = oreTier(t);
-            return { kind: "seam", tier: t, name: o.name, color: o.color, art: oreArt(t) };
+            const n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + packBonus)));
+            return { kind: "seam", tier: t, name: o.name, oreName: o.ore, n, color: o.color, art: oreArt(t) };
         }
         case "ore": {
             const t = pickTier();
@@ -259,14 +264,18 @@ export async function descend(buyerId) {
     const found = rollFind(card, depth, surveyValue("pack", row?.face_level));
     const haul = [...(run.haul || [])];
     let seamTier = Number(run.seamTier) || 1;
-    if (found.kind === "seam") seamTier = Math.max(seamTier, found.tier);
+    if (found.kind === "seam") {
+        seamTier = Math.max(seamTier, found.tier);
+        // The ore you chipped off it goes in the bag like any other find; the seam itself is not an item.
+        haul.push({ kind: "ore", tier: found.tier, n: found.n, name: found.oreName, color: found.color, art: found.art });
+    }
     else if (found.kind === "encounter") {
         if (found.effect === "seam") seamTier = Math.max(seamTier, found.tier || 1);
         else if (found.effect === "ore") haul.push({ kind: "ore", tier: found.tier, n: 2, name: found.name, color: found.color, art: found.art });
         else if (found.effect === "consumable") haul.push({ kind: "consumable" });
     } else if (found.kind !== "nothing") haul.push(found);
 
-    if (depth >= 8) await grantEventBadge(buyerId, "mine_deep").catch(() => {});
+    if (depth >= 12) await grantEventBadge(buyerId, "mine_deep").catch(() => {});
 
     const next = { ...run, depth, haul, seamTier, last: { kind: found.kind, label: card.label } };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
@@ -306,7 +315,7 @@ export async function surfaceRun(buyerId) {
     const seam = await cutSeam(buyerId, Number(run.seamTier) || 1);
     // NERVE OF IRON — went deep AND got out with it. Collapsing at depth 9 earns nothing; knowing when to stop
     // is the whole game the descent is playing.
-    if ((Number(run.depth) || 0) >= 6 && paid.length) await grantEventBadge(buyerId, "mine_nerve").catch(() => {});
+    if ((Number(run.depth) || 0) >= 10 && paid.length) await grantEventBadge(buyerId, "mine_nerve").catch(() => {});
     await trackActivity(buyerId, "mine_surface", { depth: run.depth, haul: paid.length }).catch(() => {});
     return { ok: true, surfaced: true, paid, seam, ...(await getMiningState(buyerId)) };
 }
@@ -926,9 +935,22 @@ async function claimNode(buyerId, node, row, run = {}) {
 
     // BADGES. Granted at the moment they're earned, like fishing's and digging's — the counters live on
     // mkt_mining, not in getMemberMetrics, so an auto-rule sweep would need a second source of truth.
-    await grantEventBadge(buyerId, "mine_first").catch(() => {});
-    if (rank.key === "s") await grantEventBadge(buyerId, "mine_masterwork").catch(() => {});
-    if (node.tier >= 5) await grantEventBadge(buyerId, "mine_emberheart").catch(() => {});
+    //
+    // All COUNTERS now, not "you did it once". A badge for cracking your first seam fired on the tutorial tap;
+    // these want weeks. At three trips a day, 50 seams is a couple of weeks of actually turning up, 25
+    // MASTERWORK runs is far longer because you have to keep playing well, and 10 Emberhearts means finding
+    // the rarest rock in the mine ten separate times.
+    const counts = await db.queryOne(
+        `UPDATE mkt_mining
+            SET masterwork_runs = masterwork_runs + $2,
+                emberheart_cracked = emberheart_cracked + $3
+          WHERE buyer_id = $1
+          RETURNING nodes_mined, masterwork_runs, emberheart_cracked`,
+        [buyerId, rank.key === "s" ? 1 : 0, node.tier >= 5 ? 1 : 0]
+    ).catch(() => null);
+    if ((Number(counts?.nodes_mined) || 0) >= 50) await grantEventBadge(buyerId, "mine_masterwork").catch(() => {});
+    if ((Number(counts?.masterwork_runs) || 0) >= 25) await grantEventBadge(buyerId, "mine_masterhand").catch(() => {});
+    if ((Number(counts?.emberheart_cracked) || 0) >= 10) await grantEventBadge(buyerId, "mine_emberheart").catch(() => {});
 
     return {
         tier: node.tier, name: o.name, oreName: o.ore, color: o.color, art: oreArt(node.tier),
@@ -950,14 +972,17 @@ async function claimNode(buyerId, node, row, run = {}) {
 
 // Smelt a stack. `heat` is 0..1+ from the client's heat bar — graded HERE and clamped, so a tampered client
 // can't claim a perfect pour every time.
-export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
+export async function smeltOre(buyerId, tier, heats = null) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
     const row = await minerRow(buyerId);
     const cost = smeltCostFor(row?.crucible_level);
-    const n = Math.max(1, Math.min(50, Math.floor(Number(batches) || 1)));
-    const spend = cost * n;
+
+    // ONE BATCH PER SMELT. It used to melt the entire stack in a single tap — twenty-four ore, one heat
+    // reading, eight parts — which is why the minigame did not matter: you played it once a day. A smelt is
+    // now exactly what the row says it is: `cost` ore in, one part out, one hand of the game played.
+    const spend = cost;
 
     // Atomic guarded spend — the WHERE is what stops a double-tap smelting ore you no longer have.
     const spent = await db
@@ -966,10 +991,22 @@ export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
     if (!spent) return { ok: false, error: "not_enough_ore" };
 
     const o = oreTier(t);
-    // A pour with no reading at all (an old client, a fumbled tap) is treated as merely warm rather than
-    // punished — never make someone worse off for a bug on our side.
-    const h = heat == null || Number.isNaN(Number(heat)) ? 0.55 : Math.max(0, Math.min(1.2, Number(heat)));
-    const band = heatBand(h);
+    // THREE POURS, not one. The client works the heat once per phase and sends all three readings; every one
+    // is graded here and clamped, so a tampered client cannot claim three perfect pours.
+    //
+    // The WORST phase counts double. A smelt is a chain — a cold first pour is not redeemed by nailing the
+    // last one — and averaging alone let a fumble hide behind two good reads.
+    const raw = Array.isArray(heats) ? heats : [heats];
+    const readings = raw
+        .slice(0, SMELT_PHASES)
+        .map((x) => (x == null || Number.isNaN(Number(x)) ? 0.55 : Math.max(0, Math.min(1.2, Number(x)))));
+    while (readings.length < SMELT_PHASES) readings.push(0.55);
+    const bands = readings.map((x) => heatBand(x));
+    const worst = bands.reduce((a, b) => (b.mult < a.mult ? b : a), bands[0]);
+    const avgMult = (bands.reduce((n2, b) => n2 + b.mult, 0) + worst.mult) / (bands.length + 1);
+    // The reported band is the one that best describes the whole run.
+    const band = HEAT_BANDS.reduce((a, b) => (Math.abs(b.mult - avgMult) < Math.abs(a.mult - avgMult) ? b : a), HEAT_BANDS[0]);
+    const n = 1;
 
     // THE BAG. Ordinary parts always; the pour and your upgrades seed the better tickets.
     const bellows = smeltValue("bellows", row?.bellows_level);
@@ -985,8 +1022,8 @@ export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
     if (band.key === "perfect") bag.push("curio", "curio");
     else if (band.key === "hot") bag.push("curio");
 
-    // One draw per batch, floored by the band so a cold pour still yields something.
-    const draws = Math.max(1, Math.round(n * band.mult));
+    // Draws scale with how the WHOLE run went, not one lucky pour. A single batch, so this is 1-2 draws.
+    const draws = Math.max(1, Math.round(avgMult));
     const made = {};
     let extras = 0, ups = 0;
     const curios = [];
@@ -1020,13 +1057,14 @@ export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
 
     const totalParts = Object.values(made).reduce((a, b) => a + b, 0);
     const melted = await db.queryOne(`UPDATE mkt_mining SET ore_smelted = COALESCE(ore_smelted, 0) + $2 WHERE buyer_id = $1 RETURNING ore_smelted`, [buyerId, spend]).catch(() => null);
-    if ((Number(melted?.ore_smelted) || 0) >= 100) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
+    if ((Number(melted?.ore_smelted) || 0) >= 1000) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
     await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length }).catch(() => {});
     return {
         ok: true,
         smelted: {
             oreTier: t, oreName: o.ore, oreSpent: spend, partTier: o.part,
-            band: band.key, bandLabel: band.label, bandBlurb: band.blurb, heat: Math.round(h * 100),
+            phases: bands.map((b) => ({ key: b.key, label: b.short, mult: b.mult })),
+            band: band.key, bandLabel: band.label, bandBlurb: band.blurb,
             parts: totalParts, ups, extras, bonus,
             byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
         },

@@ -43,7 +43,7 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                                     than fighting the name for width. */}
                                 <button type="button" className={`mine-smelt${o.canSmelt ? " is-ready" : ""}`} disabled={!o.canSmelt || Boolean(smelting)} onClick={() => onSmelt(o.tier)}>
                                     <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" />
-                                    {o.canSmelt ? <>Smelt <b>{o.canSmelt}</b></> : "Not enough"}
+                                    {o.canSmelt ? <>Smelt <b>1</b></> : "Not enough"}
                                 </button>
                             </div>
                         ))}

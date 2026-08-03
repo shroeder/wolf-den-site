@@ -108,7 +108,7 @@ export default function MiningClient({ initial }) {
 
             {/* THE POUR — the heat climbs, you decide when to tip the crucible. */}
             {m.forge ? (
-                <HeatGame stack={m.forge.stack} furnace={s.furnace} onPour={(h) => m.pour(h, m.forge.stack)} onCancel={() => m.setForge(null)} />
+                <HeatGame stack={m.forge.stack} furnace={s.furnace} onPour={(heats) => m.pour(heats, m.forge.stack)} onCancel={() => m.setForge(null)} />
             ) : null}
 
             {m.smelting ? <SmeltModal smelting={m.smelting} onClose={() => m.setSmelting(null)} /> : null}
@@ -378,6 +378,18 @@ export default function MiningClient({ initial }) {
                 .mine-prospect.is-buy { background: linear-gradient(180deg, #ffb45e, #e8892c); color: #2a1400;
                     box-shadow: 0 4px 16px rgba(232,137,44,0.35); }
                 .mine-prospect.is-buy:disabled { filter: grayscale(.5) brightness(.85); }
+                /* THE SMELT'S THREE PHASES — same read as the kitchen's step row. */
+                .mine-heat-steps { display: flex; gap: 5px; margin: 10px 0 12px; }
+                .mine-heat-step { flex: 1 1 0; text-align: center; padding: 6px 4px; border-radius: 9px;
+                    font-size: 10.5px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
+                    color: #7a828c; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); }
+                .mine-heat-step.is-now { color: #ffd08a; border-color: rgba(255,208,138,0.5);
+                    background: rgba(255,208,138,0.1); box-shadow: 0 0 14px -4px rgba(255,208,138,0.7); }
+                .mine-heat-step em { display: block; font-style: normal; font-size: 9px; margin-top: 2px; }
+                .mine-heat-step.is-done { color: #cfd8e3; }
+                .mine-heat-step.is-done.is-perfect { color: #7cffb2; border-color: rgba(124,255,178,0.45); }
+                .mine-heat-step.is-done.is-hot { color: #ffb020; border-color: rgba(255,176,32,0.4); }
+                .mine-heat-step.is-done.is-burnt { color: #ff8f9a; border-color: rgba(255,143,154,0.4); }
                 .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
                 .mine-bag-how b { color: #ffd75e; }
                 .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
