@@ -175,14 +175,14 @@ export default function MiningClient({ initial }) {
             {/* Two halves, two tabs — the same shape fishing and the forge use. */}
             <div className="mine-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "survey"} className={tab === "survey" ? "is-on" : ""} onClick={() => setTab("survey")}>
-                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> Survey
+                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> <span>Survey</span>
                     {s.survey?.left ? <span className="mine-tab-badge">{s.survey.left}</span> : null}
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
-                    <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="⛏️" /> Mine
+                    <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="⛏️" /> <span>Mine</span>
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "smelt"} className={tab === "smelt" ? "is-on" : ""} onClick={() => setTab("smelt")}>
-                    <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="🔥" /> Smelt
+                    <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="🔥" /> <span>Smelt</span>
                     {s.oreTotal ? <span className="mine-tab-badge">{s.oreTotal}</span> : null}
                 </button>
             </div>
@@ -564,14 +564,20 @@ export default function MiningClient({ initial }) {
                 .mine-prospect.is-ghost { margin-top: 8px; padding: 9px; font-size: 0.84rem; font-weight: 700; color: #cdb894;
                     background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); box-shadow: none; }
 
-                .mine-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-                .mine-tabs button { position: relative; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-                    padding: 10px 12px; border-radius: 12px; font-weight: 800; font-size: 0.95rem; cursor: pointer; color: #cdd3d8;
+                .mine-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+                /* min-width:0 is load-bearing. Flex items default to min-width:auto, so these buttons refused to
+                   shrink below their own content (icon + label + badge) and the third one ran off the card.
+                   The badge is positioned OUT of the flow for the same reason — it must never add width. */
+                .mine-tabs button { position: relative; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center;
+                    justify-content: center; gap: 6px; padding: 10px 8px; border-radius: 12px; font-weight: 800;
+                    font-size: 0.92rem; cursor: pointer; color: #cdd3d8; overflow: hidden;
                     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+                .mine-tabs button > span:not(.mine-tab-badge) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .mine-tabs button.is-on { color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffb020); border-color: transparent; box-shadow: 0 3px 0 #b47a12; }
-                .mine-tab-ico { width: 24px; height: 24px; object-fit: contain; }
-                .mine-tab-badge { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0483d; color: #fff;
-                    font-size: 11px; font-weight: 900; display: inline-grid; place-items: center; }
+                .mine-tab-ico { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+                .mine-tab-badge { position: absolute; top: 3px; right: 4px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+                    background: #e0483d; color: #fff; font-size: 10px; font-weight: 900; display: grid; place-items: center;
+                    box-shadow: 0 0 0 2px rgba(20,14,8,0.85); }
                 .mine-pickart.is-lantern { background: radial-gradient(circle at 50% 35%, rgba(111,208,255,0.2), rgba(111,208,255,0.04)); border-color: rgba(111,208,255,0.4); }
                 .mine-pickart.is-furnace { background: radial-gradient(circle at 50% 35%, rgba(255,120,32,0.24), rgba(255,120,32,0.05)); border-color: rgba(255,120,32,0.4); }
                 .mine-face.is-survey, .mine-face.is-smelt { aspect-ratio: 3 / 2; }
