@@ -26,6 +26,11 @@ export default function MiningClient({ initial }) {
     // This is the "why can't I mine?" state, and it's what the nudge keys off.
     const needsTrip = !s.run && !(node && node.pct > 0) && tripsLeft > 0;
 
+    // A badge is a claim that something here is worth a look, so it must never render a 0 — "Descend (0)" on a
+    // run you just started reads as an error, not as information. Depth only counts once you have actually
+    // taken a step; before that the useful number is the trips you still have. Either way, zero means no badge.
+    const descendBadge = (s.run ? s.run.depth : 0) || tripsLeft || 0;
+
     return (
         <section className="card mine-wrap">
             <div className="mine-top">
@@ -43,7 +48,7 @@ export default function MiningClient({ initial }) {
                 <button type="button" role="tab" aria-selected={tab === "descend"} className={tab === "descend" ? "is-on" : ""} onClick={() => setTab("descend")}>
                     <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="" /> <span>Descend</span>
                     {/* How deep you are if you're down there, otherwise the trips you have left. */}
-                    {s.run ? <span className="mine-tab-badge">{s.run.depth}</span> : tripsLeft ? <span className="mine-tab-badge">{tripsLeft}</span> : null}
+                    {descendBadge ? <span className="mine-tab-badge">{descendBadge}</span> : null}
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
                     <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="" /> <span>Mine</span>
