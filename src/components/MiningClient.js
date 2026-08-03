@@ -79,7 +79,7 @@ export default function MiningClient({ initial }) {
         setBusy(true);
         const r = await post({ action: "claim_spot", index });
         setBusy(false);
-        if (r?.unlocked && r?.ok !== false) setState(r);
+        if (r?.unlocked && r?.ok !== false) { setState(r); setTab("mine"); } // committing puts you on the rock
         else if (r?.error === "spot_gone") { if (r?.unlocked) setState(r); say("That spot collapsed — survey again."); }
         else say("Couldn't start on that spot.");
     };
@@ -153,8 +153,12 @@ export default function MiningClient({ initial }) {
 
             {/* Two halves, two tabs — the same shape fishing and the forge use. */}
             <div className="mine-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={tab === "survey"} className={tab === "survey" ? "is-on" : ""} onClick={() => setTab("survey")}>
+                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> Survey
+                    {s.survey?.left ? <span className="mine-tab-badge">{s.survey.left}</span> : null}
+                </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
-                    <Img src="/images/mining/pick-iron.png" className="mine-tab-ico" fallback="⛏️" /> Mine
+                    <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="⛏️" /> Mine
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "smelt"} className={tab === "smelt" ? "is-on" : ""} onClick={() => setTab("smelt")}>
                     <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="🔥" /> Smelt
@@ -162,7 +166,76 @@ export default function MiningClient({ initial }) {
                 </button>
             </div>
 
-            {tab === "mine" ? (
+            {tab === "survey" ? (
+            <>
+            {/* ── SURVEY BOARD ── five spots, a few test-strikes, then commit. */}
+            {s.survey ? (
+                <div className="mine-survey">
+                    <div className="mine-survey-head">
+                        <b>Read the rock face</b>
+                        <span className="muted">{s.survey.left} test-strike{s.survey.left === 1 ? "" : "s"} left</span>
+                    </div>
+                    <p className="mine-survey-intro">
+                        Sound out a spot to learn what&rsquo;s behind it, then commit to one. A deep resonance is
+                        the rich rock — but you can&rsquo;t sound out all five.
+                    </p>
+                    <div className="mine-spots">
+                        {s.survey.spots.map((sp) => (
+                            <div key={sp.index} className={`mine-spot${sp.revealed ? " is-read" : ""}`} style={sp.signal ? { "--sig": sp.signal.color } : undefined}>
+                                <span className="mine-spot-n">{sp.index + 1}</span>
+                                {sp.revealed && sp.exact ? (
+                                    // The Assay Kit paid off: name it outright rather than banding it.
+                                    <span className="mine-spot-read">
+                                        <b style={{ color: sp.exact.color }}>{sp.exact.name}</b>
+                                        <em>The kit named it outright.</em>
+                                    </span>
+                                ) : sp.revealed && sp.signal ? (
+                                    <span className="mine-spot-read">
+                                        <b style={{ color: sp.signal.color }}>{sp.signal.label}</b>
+                                        <em>{sp.signal.hint}</em>
+                                    </span>
+                                ) : (
+                                    <span className="mine-spot-read"><b>Unread rock</b><em>No idea what&rsquo;s behind it.</em></span>
+                                )}
+                                <span className="mine-spot-acts">
+                                    {!sp.revealed ? (
+                                        <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sp.index)}>🔨 Sound</button>
+                                    ) : null}
+                                    <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sp.index)}>Dig here</button>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                    <button type="button" className="mine-prospect is-ghost" onClick={survey} disabled={busy}>New rock face</button>
+                </div>
+            ) : (
+                <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
+                    {swingsLeft <= 0 ? "No swings left today" : node && node.pct > 0 ? "🔍 Survey a new rock face" : "🔍 Survey the rock face"}
+                </button>
+            )}
+
+            {/* THE LANTERN — the surveying tool, then the levers that improve it. */}
+            <div className="mine-panel">
+                <div className="mine-pickhead">
+                    <div className="mine-pickart is-lantern"><Img src={s.lantern?.sprite} className="mine-pickart-img" fallback="🏮" /></div>
+                    <div className="mine-pickbody">
+                        <b>{s.lantern?.name}</b>
+                        {s.lantern?.nextName
+                            ? <em>{s.lantern.nextName} at {s.lantern.nextAt} upgrades · you have {s.surveyLevels ?? 0}</em>
+                            : <em>Fully lit — every survey upgrade bought.</em>}
+                        {s.lantern?.nextAt ? (
+                            <span className="mine-pickbar"><span style={{ width: `${Math.min(100, ((s.surveyLevels ?? 0) / s.lantern.nextAt) * 100)}%` }} /></span>
+                        ) : null}
+                    </div>
+                </div>
+                <div className="sail-upgrades is-boat" style={{ marginTop: 12 }}>
+                    {(s.surveyTracks || []).map((t) => <UpgCard key={t.key} t={t} gold={s.gold} busy={busy} onBuy={() => upgrade(t.key)} />)}
+                </div>
+            </div>
+
+            <p className="mine-hint">Sound out a spot to learn what&rsquo;s behind it, then commit. A deep resonance is the rich rock — but you can&rsquo;t sound out every spot, and that&rsquo;s the game.</p>
+            </>
+            ) : tab === "mine" ? (
             <>
             {/* ── THE SEAM ── the whole screen is the rock you're working. */}
             <div className={`mine-face${node ? "" : " is-empty"}`} key={node?.id || "none"}>
@@ -215,46 +288,6 @@ export default function MiningClient({ initial }) {
             {node && node.pct > 0 && swingsLeft > 0
                 ? <SwingBar node={node} onSwing={onSwing} pick={s.pick} />
                 : null}
-
-            {/* ── SURVEY BOARD ── five spots, a few test-strikes, then commit. */}
-            {s.survey ? (
-                <div className="mine-survey">
-                    <div className="mine-survey-head">
-                        <b>Read the rock face</b>
-                        <span className="muted">{s.survey.left} test-strike{s.survey.left === 1 ? "" : "s"} left</span>
-                    </div>
-                    <p className="mine-survey-intro">
-                        Sound out a spot to learn what&rsquo;s behind it, then commit to one. A deep resonance is
-                        the rich rock — but you can&rsquo;t sound out all five.
-                    </p>
-                    <div className="mine-spots">
-                        {s.survey.spots.map((sp) => (
-                            <div key={sp.index} className={`mine-spot${sp.revealed ? " is-read" : ""}`} style={sp.signal ? { "--sig": sp.signal.color } : undefined}>
-                                <span className="mine-spot-n">{sp.index + 1}</span>
-                                {sp.revealed && sp.signal ? (
-                                    <span className="mine-spot-read">
-                                        <b style={{ color: sp.signal.color }}>{sp.signal.label}</b>
-                                        <em>{sp.signal.hint}</em>
-                                    </span>
-                                ) : (
-                                    <span className="mine-spot-read"><b>Unread rock</b><em>No idea what&rsquo;s behind it.</em></span>
-                                )}
-                                <span className="mine-spot-acts">
-                                    {!sp.revealed ? (
-                                        <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sp.index)}>🔨 Sound</button>
-                                    ) : null}
-                                    <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sp.index)}>Dig here</button>
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                    <button type="button" className="mine-prospect is-ghost" onClick={survey} disabled={busy}>New rock face</button>
-                </div>
-            ) : (
-                <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
-                    {swingsLeft <= 0 ? "No swings left today" : node && node.pct > 0 ? "🔍 Survey a new rock face" : "🔍 Survey the rock face"}
-                </button>
-            )}
 
             {/* ── THE PICKAXE ── the tool you've earned, then the levers that improve it. */}
             <div className="mine-panel">
@@ -415,6 +448,7 @@ export default function MiningClient({ initial }) {
                 .mine-tab-ico { width: 24px; height: 24px; object-fit: contain; }
                 .mine-tab-badge { min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e0483d; color: #fff;
                     font-size: 11px; font-weight: 900; display: inline-grid; place-items: center; }
+                .mine-pickart.is-lantern { background: radial-gradient(circle at 50% 35%, rgba(111,208,255,0.2), rgba(111,208,255,0.04)); border-color: rgba(111,208,255,0.4); }
                 .mine-pickart.is-furnace { background: radial-gradient(circle at 50% 35%, rgba(255,120,32,0.24), rgba(255,120,32,0.05)); border-color: rgba(255,120,32,0.4); }
                 .mine-survey { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,215,94,0.28); }
                 .mine-survey-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }

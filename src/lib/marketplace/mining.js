@@ -82,11 +82,29 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // Four tracks, each buying a different KIND of mining rather than just "more of it" — same design rule as the
 // fishing rail, so they don't collapse into one obvious purchase order.
 export const MINE_TRACKS = {
-    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "⛏️", desc: "Harder swings — fewer to crack a node.", col: "pick_level" },
-    lantern: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Lantern", icon: "🏮", desc: "Light reaches deeper — richer seams surface.", col: "lantern_level" },
-    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "🎒", desc: "More ore out of every node you crack.", col: "haul_level" },
-    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "💪", desc: "More swings each day.", col: "vigor_level" },
+    pick: { max: 10, per: 0.12, cap: 1.2, kind: "mult", name: "Pickaxe", icon: "⛏️", col: "pick_level",
+        desc: "Harder swings — fewer to crack a seam.", effect: "Swing power" },
+    haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "🎒", col: "haul_level",
+        desc: "More ore out of every seam you crack.", effect: "Ore per seam" },
+    vigor: { max: 10, per: 4, cap: 40, kind: "count", name: "Vigor", icon: "💪", col: "vigor_level",
+        desc: "More swings each day.", effect: "Daily swings" },
 };
+
+// SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
+// and both of those are about FINDING rock rather than breaking it. It kept its column, so no levels are lost.
+export const SURVEY_TRACKS = {
+    lantern: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Lantern", icon: "🏮", col: "lantern_level",
+        desc: "Light reaches deeper — richer seams surface, and you get more test-strikes.", effect: "Rich seams" },
+    assay: { max: 10, per: 0.06, cap: 0.60, kind: "pct", name: "Assay Kit", icon: "🔬", col: "assay_level",
+        desc: "A reading sometimes names the ore outright instead of a band.", effect: "Exact reading" },
+    face: { max: 10, per: 1, cap: 10, kind: "count", name: "Wide Face", icon: "🪨", col: "face_level",
+        desc: "Clear more rock — more candidate spots to choose between.", effect: "Spots on the face" },
+};
+export const surveyValue = (t, lvl) => Math.min(SURVEY_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * SURVEY_TRACKS[t].per);
+// Spots on the face, and test-strikes to spend on them. Both stay well under "sound out everything", because
+// the game is choosing what NOT to look at.
+export const spotsFor = (faceLevel = 0) => 5 + Math.floor(Math.max(0, faceLevel) / 4);   // 5..7
+export const probesFor = (lanternLevel = 0) => 2 + Math.floor(Math.max(0, lanternLevel) / 4); // 2..4
 export const trackValue = (t, lvl) => Math.min(MINE_TRACKS[t].cap, Math.max(0, Number(lvl) || 0) * MINE_TRACKS[t].per);
 // Cost curve mirrors the boat/rail tracks: each level costs more than the last.
 export const trackCost = (level) => 300 + Math.round(Math.pow(Math.max(0, level), 1.6) * 140);
@@ -121,6 +139,21 @@ export function furnaceForm(totalSmeltLevels) {
     for (const f of FURNACE_FORMS) if (totalSmeltLevels >= f.at) form = f;
     const next = FURNACE_FORMS.find((f) => f.at > totalSmeltLevels) || null;
     return { ...form, sprite: `/images/mining/furnace-${form.id}.png`, nextAt: next?.at ?? null, nextName: next?.name ?? null };
+}
+
+// LANTERN FORMS — the surveying tool ladder, so all three tabs show a tool that visibly improves.
+const LANTERN_FORMS = [
+    { at: 0, id: 1, name: "Tallow Candle" },
+    { at: 4, id: 2, name: "Tin Lantern" },
+    { at: 10, id: 3, name: "Brass Lamp" },
+    { at: 17, id: 4, name: "Runed Lantern" },
+    { at: 25, id: 5, name: "Emberheart Lamp" },
+];
+export function lanternForm(totalSurvey) {
+    let form = LANTERN_FORMS[0];
+    for (const f of LANTERN_FORMS) if (totalSurvey >= f.at) form = f;
+    const next = LANTERN_FORMS.find((f) => f.at > totalSurvey) || null;
+    return { ...form, sprite: `/images/mining/lantern-${form.id}.png`, nextAt: next?.at ?? null, nextName: next?.name ?? null };
 }
 
 // PICKAXE FORMS. Total upgrade levels across all four tracks (0..40) decide which pickaxe you're swinging, so
@@ -197,6 +230,7 @@ async function minerRow(buyerId) {
 }
 
 const totalLevels = (row) => Object.values(MINE_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
+const totalSurveyLevels = (row) => Object.values(SURVEY_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
 const totalSmeltLevels = (row) => Object.values(SMELT_TRACKS).reduce((n, t) => n + (Number(row?.[t.col]) || 0), 0);
 // One shape for an upgrade card, so the mining and smelting lists render through the same component.
 const trackCards = (defs, row, valueFn, costFn, fmt) => Object.entries(defs).map(([key, t]) => {
@@ -211,7 +245,7 @@ const trackCards = (defs, row, valueFn, costFn, fmt) => Object.entries(defs).map
 export async function getMiningState(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await minerRow(buyerId);
-    const lantern = trackValue("lantern", row?.lantern_level);
+    const lantern = surveyValue("lantern", row?.lantern_level);
     await refreshNodes(lantern);
 
     const [current, ore, goldRow, liveCount] = await Promise.all([
@@ -242,6 +276,13 @@ export async function getMiningState(buyerId) {
             if (key === "vigor") return `${SWINGS_PER_DAY + v} swings`;
             if (key === "lantern") return `+${Math.round(v * 100)}% rich`;
             return `×${(1 + v).toFixed(2)}`;
+        }),
+        lantern: lanternForm(totalSurveyLevels(row)),
+        surveyLevels: totalSurveyLevels(row),
+        surveyTracks: trackCards(SURVEY_TRACKS, row, surveyValue, trackCost, (key, lvl) => {
+            if (key === "face") return `${spotsFor(lvl)} spots`;
+            if (key === "lantern") return `+${Math.round(surveyValue(key, lvl) * 100)}% · ${probesFor(lvl)} strikes`;
+            return `${Math.round(surveyValue(key, lvl) * 100)}%`;
         }),
         furnace: furnaceForm(totalSmeltLevels(row)),
         smeltLevels: totalSmeltLevels(row),
@@ -285,7 +326,14 @@ export async function getMiningState(buyerId) {
                 spots: sv.spots.map((_, i) => {
                     const shown = revealed.includes(i);
                     const key = shown ? sv.signal?.[String(i)] : null;
-                    return { index: i, revealed: shown, signal: key ? SURVEY_SIGNALS[key] || null : null };
+                    const exactTier = shown ? Number(sv.exact?.[String(i)]) || 0 : 0;
+                    const o = exactTier ? oreTier(exactTier) : null;
+                    return {
+                        index: i, revealed: shown,
+                        signal: key ? SURVEY_SIGNALS[key] || null : null,
+                        // The Assay Kit paid off on this one: name it rather than banding it.
+                        exact: o ? { tier: exactTier, name: o.name, color: o.color, art: oreArt(exactTier) } : null,
+                    };
                 }),
             };
         })(),
@@ -316,9 +364,6 @@ export async function getMiningState(buyerId) {
 //
 // The spots are REAL live nodes, so what you commit to is what you get. There is no second roll hiding behind
 // the choice — the whole point is that reading the rock well is what earns the good seam.
-const SURVEY_SPOTS = 5;
-// Test-strikes you get. The Lantern finally means something for FINDING rather than only tilting spawns.
-export const probesFor = (lanternLevel = 0) => 2 + Math.floor(Math.max(0, lanternLevel) / 4); // 2..4
 
 // What a test-strike tells you. The bands OVERLAP on purpose: "deep" narrows a spot to tier 4 or 5 without
 // promising which, so probing is real information and never a certainty. Rolled ONCE per survey and stored,
@@ -341,15 +386,19 @@ function signalForTier(tier) {
 export async function startSurvey(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
-    await refreshNodes(trackValue("lantern", row?.lantern_level));
+    await refreshNodes(surveyValue("lantern", row?.lantern_level));
     const nodes = await db.query(
-        `SELECT id, tier FROM mkt_ore_node WHERE status = 'active' ORDER BY RANDOM() LIMIT $1`, [SURVEY_SPOTS]
+        `SELECT id, tier FROM mkt_ore_node WHERE status = 'active' ORDER BY RANDOM() LIMIT $1`, [spotsFor(row?.face_level)]
     ).catch(() => []);
     if (!nodes.length) return { ok: false, error: "no_seams" };
+    // ASSAY decides, per spot, whether a reading will name the ore outright instead of a band. Rolled NOW and
+    // frozen alongside the signal, so probing can never be repeated for a better class of answer.
+    const assay = surveyValue("assay", row?.assay_level);
     const survey = {
         spots: nodes.map((n) => String(n.id)),
         // Signals are rolled now and frozen — probing reveals what was already true.
         signal: Object.fromEntries(nodes.map((n, i) => [String(i), signalForTier(Number(n.tier))])),
+        exact: Object.fromEntries(nodes.map((n, i) => [String(i), Math.random() < assay ? Number(n.tier) : 0])),
         revealed: [],
         probes: probesFor(row?.lantern_level),
     };
@@ -564,7 +613,7 @@ export async function smeltOre(buyerId, tier, batches = 1) {
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 export async function upgradeMining(buyerId, track) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    const t = MINE_TRACKS[track] || SMELT_TRACKS[track];
+    const t = MINE_TRACKS[track] || SURVEY_TRACKS[track] || SMELT_TRACKS[track];
     if (!t) return { ok: false, error: "bad_track" };
     const row = await minerRow(buyerId);
     const level = Number(row?.[t.col]) || 0;
