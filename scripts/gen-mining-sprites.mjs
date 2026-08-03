@@ -29,6 +29,12 @@ const ASSETS = [
     { file: "ore-mythril.png", prompt: `A chunk of dark stone shot through with MYTHRIL — luminous violet-purple metallic veins with a soft inner glow and a few floating motes of purple light. ${BASE}` },
     { file: "ore-emberheart.png", prompt: `A cracked geode of black volcanic rock split open to reveal a molten ORANGE-GOLD crystalline core, glowing cracks spidering across the outside, faint embers drifting up. Clearly the rarest find. ${BASE}` },
 
+    // ── DESCENT TRACK ICONS ──
+    // Shoring (a timber portal frame) buys SAFE DEPTH — how far you get before the risk starts. Buttress is the
+    // other half of the same idea: arched stone that slows how fast the risk climbs once it has. It has to read
+    // as ARCHED and STONE next to shoring'''s square timber, or the two upgrades look like the same thing.
+    { file: "track-buttress.png", prompt: `A curved stone ARCH support — a masonry buttress of fitted grey blocks sweeping up in an arc, one iron tie-band across the crown, bracing against a hint of rough rock. Solid, heavy, clearly ARCHED and made of STONE rather than timber. ${BASE}` },
+
     // ── PICKAXE FORMS (upgrade ladder) ──
     { file: "pick-worn.png", prompt: `A battered old PICKAXE — crooked wooden handle bound with frayed twine, chipped rusty iron head, clearly the cheapest tool in the shed. ${BASE}` },
     { file: "pick-iron.png", prompt: `A solid workmanlike IRON PICKAXE — straight oak handle, clean forged iron head with a bright sharpened point, a couple of rivets. Honest and well kept. ${BASE}` },

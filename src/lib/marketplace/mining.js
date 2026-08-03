@@ -61,11 +61,27 @@ export const TRIPS_PER_DAY = 3;
 // What the roof leaves you. Deliberately the bottom of ORE_TIERS: you still get to play the timing game, and
 // the bag it pays from is the poorest one in the mine.
 const COLLAPSE_SEAM_TIER = 1;
+// THE ROOF, in two independent parts — which is the whole reason there are two upgrades for it.
+//
+//   WHERE the risk starts   → Shoring. Below your safe depth the roof simply cannot come in.
+//   HOW FAST it climbs      → Buttress. Past that depth, how much each further step adds.
+//
+// Shoring on its own hit a wall: once you were past your safe depth every extra level of it was worth exactly
+// nothing, and the run still ended within a few steps because the climb was a fixed 7.5% a step no matter what
+// you had bought. Splitting the two means deep runs are something you can actually build toward — "start
+// later" AND "grow slower" — while the cap below still guarantees the gamble never becomes a formality.
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
 export const safeDepthFor = (shoringLevel = 0) => COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3); // Shoring buys more
-const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs
+const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
+const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
+const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.
+export const braceSlow = (braceLevel = 0) => Math.min(COLLAPSE_SLOW_CAP, Math.max(0, Number(braceLevel) || 0) * COLLAPSE_SLOW_PER);
+export const perDepthFor = (braceLevel = 0) => COLLAPSE_PER_DEPTH * (1 - braceSlow(braceLevel));
+// A HARD CEILING regardless of either track. However well you have built the tunnel out, a deep enough step is
+// always a coin flip you can lose — otherwise the push-your-luck stops being a gamble at all.
 const COLLAPSE_CAP = 0.55;
-export const collapseChanceAt = (depth, shoringLevel = 0) => Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel)) * COLLAPSE_PER_DEPTH);
+export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0) =>
+    Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel)) * perDepthFor(braceLevel));
 
 // What the tunnel can turn up. Weights shift with depth — shallow rock is mostly ore and rubble, deep rock is
 // where the gear and the strongboxes are. A `seam` card raises the tier of what you end up mining.
@@ -155,7 +171,7 @@ export async function descend(buyerId) {
 
     // THE ROOF. Rolled before the card, so a collapse is the tunnel deciding rather than a reward being shown
     // to you and then snatched back.
-    if (Math.random() < collapseChanceAt(depth, row?.assay_level)) {
+    if (Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level)) {
         const lost = (run.haul || []).length;
         const hadTier = Number(run.seamTier) || 1;
         const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
@@ -329,6 +345,8 @@ export const SURVEY_TRACKS = {
         desc: "Light reaches further — the tunnel gives up better things the deeper you get.", effect: "Find quality" },
     shoring: { max: 10, per: 1, cap: 10, kind: "count", name: "Shoring", icon: "/images/mining/track-shoring.png", col: "assay_level",
         desc: "Timbered walls. The roof holds for longer before the risk starts climbing.", effect: "Safe depth" },
+    buttress: { max: 10, per: COLLAPSE_SLOW_PER, cap: COLLAPSE_SLOW_CAP, kind: "pct", name: "Buttress", icon: "/images/mining/track-buttress.png", col: "brace_level",
+        desc: "Arched stone set as you go. The risk still starts where Shoring says — it just climbs far more slowly from there.", effect: "Risk climb" },
     pack: { max: 10, per: 0.08, cap: 0.80, kind: "pct", name: "Pack", icon: "/images/mining/track-pack.png", col: "face_level",
         desc: "A deeper pack — every purse and pocket of ore you find is bigger.", effect: "Haul size" },
 };
@@ -372,12 +390,15 @@ export function furnaceForm(totalSmeltLevels) {
 }
 
 // LANTERN FORMS — the surveying tool ladder, so all three tabs show a tool that visibly improves.
+// Thresholds are a share of the TOTAL descent levels available, which Buttress just took from 30 to 40. Left
+// alone, every lantern form would arrive a third earlier than it was tuned to. Rescaled to the same 0 / 13 /
+// 33 / 57 / 83 percent of the maximum, so the ladder paces exactly as it did before the fourth track existed.
 const LANTERN_FORMS = [
     { at: 0, id: 1, name: "Tallow Candle" },
-    { at: 4, id: 2, name: "Tin Lantern" },
-    { at: 10, id: 3, name: "Brass Lamp" },
-    { at: 17, id: 4, name: "Runed Lantern" },
-    { at: 25, id: 5, name: "Emberheart Lamp" },
+    { at: 5, id: 2, name: "Tin Lantern" },
+    { at: 13, id: 3, name: "Brass Lamp" },
+    { at: 23, id: 4, name: "Runed Lantern" },
+    { at: 33, id: 5, name: "Emberheart Lamp" },
 ];
 export function lanternForm(totalSurvey) {
     let form = LANTERN_FORMS[0];
@@ -512,7 +533,7 @@ export async function getMiningState(buyerId) {
             seamArt: oreArt(Number(run.seamTier) || 1),
             haul: run.haul || [],
             last: run.last || null,
-            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level) * 100),
+            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1, row?.assay_level, row?.brace_level) * 100),
         } : null,
         // How the last descent ended, so the client can show the wrap-up once.
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
@@ -526,6 +547,9 @@ export async function getMiningState(buyerId) {
         surveyLevels: totalSurveyLevels(row),
         surveyTracks: trackCards(SURVEY_TRACKS, row, surveyValue, trackCost, (key, lvl) => {
             if (key === "shoring") return `${safeDepthFor(lvl)} safe`;
+            // Buttress reads as the actual per-step risk rather than a percentage OF a percentage — "7.5% a
+            // step" going to "7.1% a step" is a number you can feel; "+5% risk climb" is a riddle.
+            if (key === "buttress") return `${(perDepthFor(lvl) * 100).toFixed(1)}% a step`;
             return `+${Math.round(surveyValue(key, lvl) * 100)}%`;
         }),
         furnace: furnaceForm(totalSmeltLevels(row)),
