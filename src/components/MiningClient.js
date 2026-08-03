@@ -1,5 +1,6 @@
 "use client";
 
+import DepthsPanel from "@/components/mining/DepthsPanel";
 import DescendTab from "@/components/mining/DescendTab";
 import FaceTab from "@/components/mining/FaceTab";
 import HeatGame from "@/components/mining/HeatGame";
@@ -63,6 +64,9 @@ export default function MiningClient({ initial }) {
                     {s.partsReady ? <span className="mine-tab-badge">{s.partsReady}</span> : null}
                 </button>
             </div>
+
+            {/* Sits under the tabs, not inside one: the affinity feeds all three verbs. */}
+            <DepthsPanel depths={s.depths} />
 
             {tab === "descend" ? (
                 <DescendTab

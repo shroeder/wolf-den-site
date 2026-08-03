@@ -123,7 +123,25 @@ export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0) =>
 // Five contributors, exactly like sea affinity: equipped GEAR, active SET tiers, your featured PET (scaled by
 // its level), earned mining BADGES, and rare Forge "attunement" affixes. All small integer points; the curve
 // below turns points into effects and every stacker is capped so no single piece trivialises a system.
+// Every mining action now reads this TWICE — once for the roll it is about to make, and once more when
+// getMiningState builds the panel for the response. That is ~6 Neon round trips duplicated on every tap, on
+// HTTP where each one is real latency. A one-second memo collapses the pair without ever making a gear swap
+// feel stale: you cannot equip a piece and take a mining action inside the same second.
+const _depthMemo = new Map();
 export async function equippedDepthAffinity(buyerId) {
+    const hit = _depthMemo.get(buyerId);
+    if (hit && Date.now() - hit.at < 1000) return hit.val;
+    const val = await computeDepthAffinity(buyerId);
+    _depthMemo.set(buyerId, { at: Date.now(), val });
+    // The map is keyed by buyer and only ever holds the last second of traffic, but a long-lived lambda
+    // serving many members should not grow it without bound.
+    if (_depthMemo.size > 500) {
+        const cutoff = Date.now() - 1000;
+        for (const [k, v] of _depthMemo) if (v.at < cutoff) _depthMemo.delete(k);
+    }
+    return val;
+}
+async function computeDepthAffinity(buyerId) {
     // Must list EVERY key in DEPTH_META — the merges below iterate `for (k in depth)`, so a key missing here is
     // silently dropped forever. (That exact bug cost sailing four of its eight effects for months.)
     const depth = { nerve: 0, lodesense: 0, hew: 0, prospect: 0, bellows: 0, crucible: 0 };
@@ -719,7 +737,7 @@ async function minerRow(buyerId) {
                     swing_bonus = CASE WHEN swing_day = ${DAY} THEN swing_bonus ELSE 0 END,
                     swing_day = ${DAY}
               WHERE buyer_id = $1
-              RETURNING *`,
+              RETURNING *, (second_wind_day = ${DAY}) AS second_wind_used`,
             [buyerId]
         )
         .catch(() => null);
@@ -858,6 +876,33 @@ export async function getMiningState(buyerId) {
             return s + Math.floor(Number(r.qty) / Math.max(1, cost));
         }, 0),
         gold: Number(goldRow?.gold) || 0,
+        // WHAT YOUR LOADOUT IS ACTUALLY DOING DOWN HERE. Per-item affinity shows on gear cards, but nothing
+        // added it up — so the totals that every roll below reads were invisible, and a player had no way to
+        // tell whether the piece they just equipped mattered. Points AND the effect they buy, because "+9 Hew"
+        // means nothing on its own; "+27% ore" is the number you actually feel.
+        depths: await (async () => {
+            const points = await equippedDepthAffinity(buyerId);
+            const eff = depthEffects(points);
+            return {
+                points,
+                effects: {
+                    collapseCut: Math.round(eff.collapseCut * 1000) / 10,
+                    seamTierBonus: Math.round(eff.seamTierBonus * 1000) / 10,
+                    oreBonus: Math.round(eff.oreBonus * 1000) / 10,
+                    findBonus: Math.round(eff.findBonus * 1000) / 10,
+                    extraPartChance: Math.round(eff.extraPartChance * 1000) / 10,
+                    curioBonus: Math.round(eff.curioBonus * 1000) / 10,
+                },
+                capstones: setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getEquippedIds(buyerId).catch(() => ({}))),
+                // Whether today's Second Wind has already been spent, so the panel can say so rather than
+                // promising a save that has already been used.
+                // Compared in SQL (see minerRow), never in JS. Building a Date from a Postgres DATE reads
+                // today as YESTERDAY on Vercel — the server runs UTC, the store runs Chicago — and a
+                // String().slice() comparison is no safer, since the driver may hand back either a date
+                // string or a Date whose stringification looks nothing like YYYY-MM-DD.
+                secondWindUsed: row?.second_wind_used === true,
+            };
+        })(),
         stats: {
             nodesMined: Number(row?.nodes_mined) || 0,
             oreTotal: Number(row?.ore_total) || 0,
@@ -866,6 +911,7 @@ export async function getMiningState(buyerId) {
         },
     };
 }
+
 
 // How hard one swing lands, before the timing grade. Pickaxe track is the whole of it for now; the mining gear
 // stat and the mining set plug in here in phase 3.
