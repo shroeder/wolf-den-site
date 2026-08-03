@@ -242,7 +242,12 @@ async function grantMiningGear(buyerId, depth) {
         if (!pool.length) continue;
         const it = pool[Math.floor(Math.random() * pool.length)];
         await grantItem(buyerId, it.id, "mining").catch(() => {});
-        return { id: it.id, name: it.name, rarity: it.rarity };
+        // Hand back the WHOLE item. A gear drop is the best thing the mine can give you, and showing it as a
+        // generic icon with a name throws away the one moment the art was made for.
+        return {
+            id: it.id, name: it.name, rarity: it.rarity, icon: it.icon || null,
+            slot: it.slot || null, stats: it.stats || null,
+        };
     }
     return null;
 }

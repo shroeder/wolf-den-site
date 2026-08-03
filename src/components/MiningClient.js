@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import ItemArt from "@/components/ItemArt";
 import MiningMinigame from "@/components/MiningMinigame";
 
 // ── THE MINE (owner-gated) ───────────────────────────────────────────────────────────────────────────────────
@@ -21,6 +22,11 @@ const money = (n) => Number(n || 0).toLocaleString();
 // of hand-painted game art they read as borrowed. Everything here is either a generated sprite or a Gi glyph.
 // Every kind of thing the mine hands you has its own painted sprite. A found ITEM uses its own real art when
 // we have it, so "a piece of gear" looks like the actual piece of gear.
+const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+const RARITY_LABEL = { common: "COMMON", rare: "RARE", epic: "EPIC", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
+const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
+const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+
 const KIND_ART = {
     gold: "/images/mining/icon-coins.png",
     chest: "/images/mining/icon-chest.png",
@@ -230,9 +236,9 @@ export default function MiningClient({ initial }) {
                                 ) : card.kind === "gold" ? (
                                     <><b style={{ color: "#ffd75e" }}>{money(card.n)} gold</b><em>Into the bag.</em></>
                                 ) : card.kind === "ore" ? (
-                                    <><Img src={card.art} className="mine-card-art" fallback="◆" /><b style={{ color: card.color }}>{card.name} ×{card.n}</b></>
+                                    <><Img src={card.art} className="mine-card-art" fallback="" /><b style={{ color: card.color }}>{card.name} ×{card.n}</b></>
                                 ) : card.kind === "seam" ? (
-                                    <><Img src={card.art} className="mine-card-art" fallback="◆" /><b style={{ color: card.color }}>{card.name}</b><em>The seam you'll work gets better.</em></>
+                                    <><Img src={card.art} className="mine-card-art" fallback="" /><b style={{ color: card.color }}>{card.name}</b><em>The seam you'll work gets better.</em></>
                                 ) : card.kind === "gear" ? (
                                     <><b style={{ color: "#b061ff" }}>Something buried</b><em>You won't know what until you're out.</em></>
                                 ) : card.kind === "chest" ? (
@@ -269,7 +275,9 @@ export default function MiningClient({ initial }) {
                     <div className="mine-haul">
                         {s.run.haul.length ? s.run.haul.map((h, i) => (
                             <span key={i} className="mine-haul-chip" title={h.name || h.kind}>
-                                {h.art ? <Img src={h.art} className="mine-haul-art" fallback="◆" /> : <KindIcon kind={h.kind} art={h.art} className="mine-haul-art" />}
+                                {h.kind === "gear" && h.id
+                                    ? <ItemArt id={h.id} icon={h.icon} className="mine-haul-art" alt="" />
+                                    : <Img src={h.art || KIND_ART[h.kind] || KIND_ART.gold} className="mine-haul-art" fallback="" />}
                                 {h.n ? <em>×{h.n}</em> : null}
                             </span>
                         )) : <span className="muted" style={{ fontSize: 12 }}>Bag empty. Everything is still down here.</span>}
@@ -486,13 +494,19 @@ export default function MiningClient({ initial }) {
                             <div className="mine-reveal-row">
                                 {wrap.paid.map((h, i) => (
                                     <span key={i} className="mine-reveal-spot">
-                                        {h.art ? <Img src={h.art} className="mine-reveal-ore" fallback="◆" />
+                                        {h.art ? <Img src={h.art} className="mine-reveal-ore" fallback="" />
                                             : <KindIcon kind={h.kind} art={h.art} className="mine-reveal-ore" />}
                                         {/* FULL name. Truncating to the first word turned "Fanged Helm" into
                                             "Fanged" and "War Cape" into "War", which mean nothing. */}
-                                        <em style={{ color: h.color || "#cdd3d8" }}>
+                                        <em style={{ color: h.kind === "gear" ? (RARITY_COLOR[h.rarity] || "#cdd3d8") : (h.color || "#cdd3d8") }}>
                                             {h.kind === "gold" ? `${money(h.n)} gold` : h.name || h.kind}
                                         </em>
+                                        {h.kind === "gear" ? (
+                                            <>
+                                                <i className="mine-item-tag">{RARITY_LABEL[h.rarity] || h.rarity}</i>
+                                                {h.stats ? <i className="mine-item-stats">{statLine(h.stats)}</i> : null}
+                                            </>
+                                        ) : null}
                                     </span>
                                 ))}
                             </div>
@@ -534,7 +548,7 @@ export default function MiningClient({ initial }) {
                         <div className="mine-reveal-row">
                             {reveal.spots.map((sp) => (
                                 <span key={sp.index} className={`mine-reveal-spot${sp.picked ? " is-picked" : ""}`} title={sp.name}>
-                                    <Img src={sp.art} className="mine-reveal-ore" fallback="◆" />
+                                    <Img src={sp.art} className="mine-reveal-ore" fallback="" />
                                     <em style={{ color: sp.color }}>{sp.name.split(" ")[0]}</em>
                                     {sp.picked ? <b>yours</b> : null}
                                 </span>
@@ -756,6 +770,13 @@ export default function MiningClient({ initial }) {
                 .mine-choice .mine-prospect em { display: block; font-style: normal; font-size: 10.5px; font-weight: 700; opacity: .8; }
                 .mine-prospect.is-big { padding: 16px; font-size: 1.1rem; }
                 .mine-prospect.is-big em { display: block; font-style: normal; font-size: 11px; font-weight: 700; opacity: .78; margin-top: 2px; }
+                .mine-reveal-spot.is-item { flex-basis: 100%; border-color: var(--rar); background: color-mix(in srgb, var(--rar) 12%, rgba(0,0,0,0.25));
+                    box-shadow: 0 0 24px -6px var(--rar); padding: 11px; }
+                .mine-item-art { width: 66px; height: 66px; display: grid; place-items: center; }
+                .mine-item-art .item-art-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 10px var(--rar)); }
+                .mine-item-art svg { width: 48px; height: 48px; color: var(--rar); }
+                .mine-item-tag { font-style: normal; font-size: 9px; font-weight: 900; letter-spacing: .1em; color: var(--rar); }
+                .mine-item-stats { font-style: normal; font-size: 10.5px; color: #e7dcc8; }
                 .mine-upg-ico { width: 22px; height: 22px; object-fit: contain; }
                 .mine-btn-ico { width: 22px; height: 22px; object-fit: contain; vertical-align: -5px; margin-right: 5px; }
                 .mine-title-ico { width: 24px; height: 24px; object-fit: contain; vertical-align: -4px; margin-right: 4px; }

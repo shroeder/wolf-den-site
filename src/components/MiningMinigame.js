@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import ItemArt from "@/components/ItemArt";
+
 // ── BREAKING THE SEAM ────────────────────────────────────────────────────────────────────────────────────────
 // NO EMOJI here either — sprites and Gi glyphs only. See the note in MiningClient.
 // A first-class timing minigame in its own modal, built to the same standard as the Kitchen's: nested bands you
@@ -24,6 +26,13 @@ const KIND_ART = {
     gear: "/images/mining/icon-gear.png",
     consumable: "/images/mining/icon-potion.png",
 };
+// Same rarity language the chest opener uses, so a Legendary out of the rock reads exactly like a Legendary
+// out of a chest — one game, one vocabulary.
+const RARITY_COLOR = { common: "#9aa7b5", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ffb52e", mythic: "#37f5c0", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
+const RARITY_LABEL = { common: "COMMON", rare: "RARE", epic: "EPIC", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
+const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
+const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
+
 const GRADE_COLOR = { pixel: "#ffd75e", perfect: "#8fe3ff", great: "#8fe39a", good: "#d7c48a", miss: "#ff8f9a" };
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
 const SWEEP_MS = 900;
@@ -219,7 +228,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         <div className="mmg-draw-row">
                             {(cracked.draws || []).map((x, i) => (
                                 <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
-                                    {x.art ? <Img src={x.art} className="mmg-drawn-art" fallback="◆" />
+                                    {x.art ? <Img src={x.art} className="mmg-drawn-art" fallback="" />
                                         : <Img src={KIND_ART[x.kind] || KIND_ART.gold} className="mmg-drawn-art" fallback="" />}
                                     <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
                                     {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
@@ -370,6 +379,16 @@ const MMG_CSS = `
     animation: mmgDrawn .5s cubic-bezier(.2,1.4,.35,1) both; }
 .mmg-drawn.is-gear, .mmg-drawn.is-chest { border-color: rgba(255,215,94,0.6); background: rgba(255,215,94,0.12); }
 @keyframes mmgDrawn { from { opacity: 0; transform: translateY(14px) scale(.7); } to { opacity: 1; transform: none; } }
+/* A found ITEM is the headline of a draw — full width, its rarity in the frame, glowing. */
+.mmg-drawn.is-item { flex-basis: 100%; min-width: 100%; padding: 12px; border-color: var(--rar);
+    background: color-mix(in srgb, var(--rar) 13%, rgba(0,0,0,0.3)); box-shadow: 0 0 28px -6px var(--rar); }
+.mmg-item-tag { font-size: 9px; font-weight: 900; letter-spacing: .12em; color: var(--rar); }
+.mmg-item-art { width: 74px; height: 74px; display: grid; place-items: center; }
+.mmg-item-art .item-art-img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 12px var(--rar)); }
+.mmg-item-art svg { width: 54px; height: 54px; color: var(--rar); }
+.mmg-item-name { font-size: 1.02rem !important; font-weight: 900; }
+.mmg-item-slot { font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: #9aa2ab; }
+.mmg-item-stats { font-style: normal; font-size: 11px; color: #e7dcc8; }
 .mmg-drawn-art { width: 36px; height: 36px; object-fit: contain; }
 .mmg-drawn-emoji { font-size: 30px; line-height: 1; }
 .mmg-drawn em { font-style: normal; font-size: 10.5px; }
