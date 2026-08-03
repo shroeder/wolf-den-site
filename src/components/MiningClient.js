@@ -57,7 +57,10 @@ export default function MiningClient({ initial }) {
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "smelt"} className={tab === "smelt" ? "is-on" : ""} onClick={() => setTab("smelt")}>
                     <Img src={s.furnace?.sprite} className="mine-tab-ico" fallback="" /> <span>Smelt</span>
-                    {s.oreTotal ? <span className="mine-tab-badge">{s.oreTotal}</span> : null}
+                    {/* PARTS you can make, not ore you happen to own. A badge is a claim that something here
+                        is worth doing; "2" over a tab that then says "Not enough" is a lie with a red circle
+                        around it. Same mistake the Descend badge made when it rendered a 0. */}
+                    {s.partsReady ? <span className="mine-tab-badge">{s.partsReady}</span> : null}
                 </button>
             </div>
 

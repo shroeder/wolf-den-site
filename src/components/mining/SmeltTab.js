@@ -26,7 +26,7 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
             <div className="mine-panel">
                 <div className="mine-panel-head">
                     Ore in your pack
-                    {s.oreTotal ? <span className="mine-smeltable">{(s.ore || []).reduce((n, o) => n + (o.canSmelt || 0), 0)} parts ready</span> : <span className="muted"> · nothing to melt</span>}
+                    {s.partsReady ? <span className="mine-smeltable">{s.partsReady} parts ready</span> : <span className="muted"> · not enough of any one ore yet</span>}
                 </div>
                 {(s.ore || []).length ? (
                     <div className="mine-stash-rows">

@@ -724,6 +724,12 @@ export async function getMiningState(buyerId) {
                 smeltCost: cost, canSmelt: Math.floor(qty / cost) };
         }),
         oreTotal: (ore || []).reduce((s, r) => s + Number(r.qty), 0),
+        // What you could smelt RIGHT NOW, in parts. The tab badge counted raw ore, so 2 Iron Ore — three short
+        // of a single Iron Filing — lit a red "2" that promised something to do and then said "Not enough".
+        partsReady: (ore || []).reduce((s, r) => {
+            const cost = smeltCostFor(row?.crucible_level);
+            return s + Math.floor(Number(r.qty) / Math.max(1, cost));
+        }, 0),
         gold: Number(goldRow?.gold) || 0,
         stats: {
             nodesMined: Number(row?.nodes_mined) || 0,
