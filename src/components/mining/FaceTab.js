@@ -40,7 +40,7 @@ function NoSeam({ s, tripsLeft, backToTunnel }) {
 }
 
 export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, backToTunnel, onBreak, upgrade }) {
-    const live = Boolean(node && node.pct > 0);
+    const live = Boolean(node && node.hitsLeft > 0);
     const lvls = s.stats?.upgradeLevels ?? 0;
 
     return (
@@ -60,8 +60,13 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                             "100% left" and then be gone one swing later — a good hit killed a Coal seam
                             outright. A seam is N swings now and the bar says exactly that. */}
                         <div className="mine-hpbar"><span style={{ width: `${node.pct}%`, background: node.color }} /></div>
+                        {/* "8 of 8 swings left" on an untouched seam is a riddle — it reads as a fraction when
+                            nothing has happened yet. Say what the hand IS before you start, and count down
+                            once you're in it. */}
                         <div className="mine-hpnum">
-                            <b>{node.hitsLeft}</b> of {node.maxHits} swings left
+                            {node.mySwings
+                                ? <><b>{node.hitsLeft}</b> swing{node.hitsLeft === 1 ? "" : "s"} left of {node.maxHits}</>
+                                : <>A hand of <b>{node.maxHits}</b> swings</>}
                         </div>
                         {floats.map((f) => <span key={f.id} className={`mine-float is-${f.grade}`}>{f.dmg}</span>)}
                     </>
@@ -101,7 +106,8 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                     </div>
 
                     <button type="button" className="mine-prospect" onClick={onBreak} disabled={busy}>
-                        <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> Break the seam
+                        <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" />
+                        {node.mySwings ? "Back to the rock" : "Break the seam"}
                     </button>
                 </>
             ) : null}

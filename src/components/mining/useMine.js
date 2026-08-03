@@ -20,7 +20,10 @@ export function useMine(initial) {
     const [wrap, setWrap] = useState(null);      // surfaced / collapsed summary
 
     // The face
-    const [breaking, setBreaking] = useState(false); // the swing minigame is up
+    // The node the minigame is working, CAPTURED when you open it. It is deliberately not `state.node`: the
+    // seam is claimed server-side the instant it cracks, so a refresh mid-reveal empties state.node and would
+    // unmount the modal out from under the payoff screen.
+    const [breakNode, setBreakNode] = useState(null);
     const [crack, setCrack] = useState(null);
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
@@ -108,8 +111,13 @@ export function useMine(initial) {
         if (r.cracked) {
             setCrack(r.cracked);
             try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* no window */ }
+            // Take the server's word for it. This used to splice the OLD node back in at pct 0 — a leftover
+            // from when pct meant hit points — and that one line did two bad things at once: it unmounted the
+            // minigame (whose mount guard was `node.pct > 0`), so the reveal you had just earned vanished
+            // instead of appearing; and it left a phantom seam on the face with no Break button and the
+            // "No seam yet — head down" nudge lit above it.
             const fresh = await fetch("/api/marketplace/mining", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-            if (fresh?.unlocked) setState((s) => ({ ...fresh, node: s.node ? { ...s.node, hp: 0, pct: 0 } : null }));
+            if (fresh?.unlocked) setState(fresh);
         }
         return r;
     }, [post, state.node?.id, say, backToTunnel]);
@@ -154,7 +162,8 @@ export function useMine(initial) {
         // descent
         card, wrap, setWrap, startTrip, goDeeper, surface, backToTunnel,
         // face
-        breaking, setBreaking, crack, setCrack, floats, shake, onSwing,
+        breakNode, openBreak: () => setBreakNode(state.node), closeBreak: () => setBreakNode(null),
+        crack, setCrack, floats, shake, onSwing,
         // smeltery
         forge, setForge, smelting, setSmelting, smelt, pour,
         upgrade,

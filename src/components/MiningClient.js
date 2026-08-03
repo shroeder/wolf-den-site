@@ -24,7 +24,9 @@ export default function MiningClient({ initial }) {
 
     // Nothing to swing at, not down the tunnel, and trips to spend — i.e. the player CAN act but has no seam.
     // This is the "why can't I mine?" state, and it's what the nudge keys off.
-    const needsTrip = !s.run && !(node && node.pct > 0) && tripsLeft > 0;
+    // hitsLeft, not pct — "is there a seam with swings on it" is the actual question, and reading it off a
+    // percentage is how a spent seam ended up looking like a live one.
+    const needsTrip = !s.run && !(node && node.hitsLeft > 0) && tripsLeft > 0;
 
     // A badge is a claim that something here is worth a look, so it must never render a 0 — "Descend (0)" on a
     // run you just started reads as an error, not as information. Depth only counts once you have actually
@@ -68,7 +70,7 @@ export default function MiningClient({ initial }) {
                 <FaceTab
                     s={s} node={node} msg={msg} busy={busy} floats={m.floats} shake={m.shake}
                     tripsLeft={tripsLeft} backToTunnel={m.backToTunnel}
-                    onBreak={() => m.setBreaking(true)} upgrade={m.upgrade}
+                    onBreak={m.openBreak} upgrade={m.upgrade}
                 />
             ) : (
                 <SmeltTab
@@ -78,16 +80,16 @@ export default function MiningClient({ initial }) {
             )}
 
             {/* THE SWING — its own modal, its own juice. */}
-            {m.breaking && node && node.pct > 0 ? (
+            {m.breakNode ? (
                 <MiningMinigame
-                    node={node}
+                    node={m.breakNode}
                     pick={s.pick}
                     onSwing={m.onSwing}
                     // The minigame's own reveal IS the payoff screen — rank, every draw, the rare tickets your
                     // timing put in the bag. A second modal used to open on top of it built for the retired
                     // ore-ladder result, so it rendered "Ore +undefined · Gold +undefined" over the good one.
                     // Closing drops you at the tunnel, where the next seam comes from.
-                    onDone={() => { m.setBreaking(false); m.backToTunnel(false); }}
+                    onDone={() => { m.closeBreak(); m.backToTunnel(false); }}
                 />
             ) : null}
 
