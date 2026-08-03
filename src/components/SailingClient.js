@@ -465,7 +465,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             const r = await fetch("/api/marketplace/sailing", {
                 method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...extra }),
             });
-            const d = await r.json().catch(() => ({}));
+            // NULL, not {} — an unparseable body (a 502, a cold-start timeout, a dropped connection) used to
+            // become an empty object, which sails past `d && !d.error` and replaced the whole sailing state
+            // with {}. The next render then read state.speed.minPerLevel off undefined and took the page down.
+            // Two members hit exactly that. A response we could not read is not a response.
+            const d = r.ok ? await r.json().catch(() => null) : null;
             // Tailwind feedback: only celebrate (gust + sound) when the server confirms it actually shaved time.
             if (isWind) {
                 if (d && !d.error && d.shavedMinutes) {
@@ -484,7 +488,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it
                 // onto what we already have. Replacing wholesale would drop the fleet, the art maps and the
                 // upgrade views and make the screen flicker on every tap.
-                if (d.partial) setState((prev) => ({ ...prev, ...d }));
+                // Only ever REPLACE state with something that is actually a sailing state. `speed` is present
+                // on every real payload from getSailingState, so it is the cheapest proof that what came back
+                // is the whole thing and not a stub, an error shape or a truncated body. Anything else merges,
+                // which at worst adds fields and can never subtract the ones the screen renders from.
+                if (d.partial || d.speed === undefined) setState((prev) => ({ ...prev, ...d }));
                 else setState(d);
                 if (!String(action).startsWith("upgrade_")) setBountyTick((t) => t + 1); // any real voyage action can progress a bounty
 
@@ -574,18 +582,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const boatName = curForm ? curForm.name : "Wood Boat";
     // The four travel/loot upgrade levers, described with their per-level effect + current → next value.
     const upgrades = [
+        // Optional-chained throughout, like the dig tracks below already were. The guard above is the real
+        // fix; this is so a half-loaded state degrades to a blank number instead of a white screen.
         { action: "upgrade_speed", icon: "💨", name: "Speed", data: state.speed,
-            desc: <>Faster voyages — shaves <b>{state.speed.minPerLevel} min</b> off each trip, per level.</>,
-            effLabel: "Trip time", now: fmtLeft(state.speed.voyageNow), next: fmtLeft(state.speed.voyageNext) },
+            desc: <>Faster voyages — shaves <b>{state.speed?.minPerLevel ?? "—"} min</b> off each trip, per level.</>,
+            effLabel: "Trip time", now: fmtLeft(state.speed?.voyageNow), next: fmtLeft(state.speed?.voyageNext) },
         { action: "upgrade_fortune", icon: "🍀", name: "Fortune", data: state.fortune,
             desc: <>Draws trouble — <b>+1.5%</b> chance of a marine <b>encounter</b> at your voyage&apos;s midpoint, per level.</>,
-            effLabel: "Encounter chance", now: `${state.fortune.encounterNow}%`, next: `${state.fortune.encounterNext}%` },
+            effLabel: "Encounter chance", now: `${state.fortune?.encounterNow ?? 0}%`, next: `${state.fortune?.encounterNext ?? 0}%` },
         { action: "upgrade_rarity", icon: "💎", name: "Rarity", data: state.rarity,
             desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
-            effLabel: "Chest upgrade", now: `${state.rarity.pctNow}%`, next: `${state.rarity.pctNext}%` },
+            effLabel: "Chest upgrade", now: `${state.rarity?.pctNow ?? 0}%`, next: `${state.rarity?.pctNext ?? 0}%` },
         { action: "upgrade_luck", icon: "👋", name: "Luck", data: state.luck,
             desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
-            effLabel: "Waves / day", now: `${state.luck.wavesNow}`, next: `${state.luck.wavesNext}` },
+            effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`, next: `${state.luck?.wavesNext ?? 0}` },
         { action: "upgrade_raid", icon: "🏴‍☠️", name: "Raiding", data: state.raiding,
             desc: <>Sea-dog cunning — a chance a raid <b>doesn&apos;t use up</b> your daily raid (raid again!).</>,
             effLabel: "Free-raid chance", now: `${state.raiding?.pctNow ?? 0}%`, next: `${state.raiding?.pctNext ?? 0}%` },
