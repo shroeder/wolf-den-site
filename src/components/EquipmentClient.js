@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 
@@ -220,7 +220,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // Member taps a READY in-store perk → mint a claim + show its QR. Staff scan it to actually use the
     // charge (nothing is burned here). The QR encodes an opaque token behind a scheme prefix the admin app
     // recognizes, so a random camera just sees harmless text.
-    async function useCharge(item) {
+    async function redeemCharge(item) {
         setBusy(true); setErr("");
         try {
             const r = await fetch("/api/marketplace/item-charge/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id }) });
@@ -346,7 +346,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const charged = (data.items || []).filter((i) => i.charge);
     // Your OWNED copies, by id — these carry forgeBonus, util and enhanceLevel, which the bare ITEMS
     // definition does not. The compare panel has to weigh the equipped piece as YOU have it, not as it ships.
-    const ownedById = useMemo(() => new Map((data.items || []).map((i) => [i.id, i])), [data.items]);
+    //
+    // Deliberately NOT useMemo: this sits below `if (!loaded) return` and `if (!data) return`, so a hook here
+    // is a CONDITIONAL hook — the first render (loading) never reaches it and the second one does, which is a
+    // different hook count and React throws. It crashed the whole Store page. A Map over a few dozen items is
+    // not worth a hook anyway.
+    const ownedById = new Map((data.items || []).map((i) => [i.id, i]));
     // Group the gold shop by slot into ordered, collapsible categories (any unlisted slot → "Other").
     const shopBySlot = (data.shop || []).reduce((acc, i) => { (acc[i.slot] = acc[i.slot] || []).push(i); return acc; }, {});
     const shopCategories = [
@@ -463,7 +468,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 </span>
                             </div>
                             {i.charge.available ? (
-                                <button type="button" className="equip-perk-use" onClick={() => useCharge(i)} disabled={busy}>Use charge</button>
+                                <button type="button" className="equip-perk-use" onClick={() => redeemCharge(i)} disabled={busy}>Use charge</button>
                             ) : null}
                         </div>
                     ))}

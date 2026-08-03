@@ -25,6 +25,19 @@ export default [
     {
         languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: GLOBALS },
         linterOptions: { reportUnusedDisableDirectives: false },
-        rules: { "no-undef": "error" },
+        rules: {
+            "no-undef": "error",
+            // Added after a conditional useMemo — placed below two early returns — took the whole Store page
+            // down with "rendered more hooks than during the previous render". `next build` cannot catch it
+            // (the page is force-dynamic, so it is never prerendered) and no-undef has nothing to say about it.
+            // It is the same class of defect: correct-looking code that only fails when it runs.
+            "react-hooks/rules-of-hooks": "error",
+        },
+    },
+    {
+        // API routes are server code with no React in them, but the rule fires on any function called useX —
+        // useConsumable, useItem and useCharge are all "use this item", not hooks.
+        files: ["src/app/api/**"],
+        rules: { "react-hooks/rules-of-hooks": "off" },
     },
 ];

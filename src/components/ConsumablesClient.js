@@ -68,7 +68,9 @@ export default function ConsumablesClient() {
         }
     }
 
-    function useItem(item) {
+    // NOT a hook — it drinks the potion. Named useX it tripped react-hooks/rules-of-hooks, which treats any
+    // useX as a hook, and it misleads a reader for the same reason.
+    function consumeItem(item) {
         if (busy) return;
         if (item.target) { setPicking(item); return; } // needs a charged-gear target
         post({ id: item.id, action: "use" }, `use:${item.id}`);
@@ -114,7 +116,7 @@ export default function ConsumablesClient() {
                                 <ConsumableArt id={i.id} emoji={i.emoji} className="badge-tile-icon" />
                                 <span className="badge-tile-label">{i.name} ×{i.count}</span>
                                 <span className="badge-tile-desc muted">{i.desc}</span>
-                                <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => useItem(i)} style={{ marginTop: 6 }}>
+                                <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => consumeItem(i)} style={{ marginTop: 6 }}>
                                     {busy === `use:${i.id}` ? "Using…" : "Use"}
                                 </button>
                             </div>
