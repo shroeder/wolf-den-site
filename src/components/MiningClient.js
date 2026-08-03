@@ -108,7 +108,7 @@ export default function MiningClient({ initial }) {
 
             {/* THE POUR — the heat climbs, you decide when to tip the crucible. */}
             {m.forge ? (
-                <HeatGame stack={m.forge.stack} furnace={s.furnace} onPour={(dists) => m.pour(dists, m.forge.stack)} onCancel={() => m.setForge(null)} />
+                <HeatGame stack={m.forge.stack} furnace={s.furnace} onPour={(dists) => m.pour(dists, m.forge.stack)} />
             ) : null}
 
             {m.smelting ? <SmeltModal smelting={m.smelting} onClose={() => m.setSmelting(null)} /> : null}

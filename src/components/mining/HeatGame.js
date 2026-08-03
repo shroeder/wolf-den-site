@@ -27,7 +27,7 @@ const BANDS = ["good", "great", "perfect", "pixel"].map((key) => ({
 const SCORE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 0 };
 const CHAIN_KEEPS = 2; // CLEAN or better keeps the chain alive
 
-export default function HeatGame({ stack, furnace, onPour, onCancel }) {
+export default function HeatGame({ stack, furnace, onPour }) {
     const [phase, setPhase] = useState(0);
     const [locked, setLocked] = useState([]);   // the grade banked on each finished phase
     const [chain, setChain] = useState(0);
@@ -216,7 +216,9 @@ export default function HeatGame({ stack, furnace, onPour, onCancel }) {
                     <span className="is-miss">SPILLED</span>
                     {BANDS.map((b) => <span key={b.key} className={`is-${b.key}`}>{b.label}</span>)}
                 </div>
-                <button type="button" className="smb-back" onClick={onCancel} disabled={done}>Back off the fire</button>
+                {/* No way out. Once the crucible is up you pour it — same as the kitchen, which has never had a
+                    bail-out button either. Nothing is spent until the run finishes, so an escape hatch bought
+                    the player nothing except a reason to abandon a bad first pour and re-roll. */}
             </div>
             <style>{SMB_CSS}</style>
         </div>
@@ -278,9 +280,6 @@ const SMB_CSS = `
 .smb-key { display: flex; justify-content: center; gap: 9px; margin-top: 8px; font-size: 9.5px; font-weight: 800; letter-spacing: .04em; }
 .smb-key .is-miss { color: #ff8f9a; } .smb-key .is-good { color: #9aa0a6; } .smb-key .is-great { color: #7ec8ff; }
 .smb-key .is-perfect { color: #ffd75e; } .smb-key .is-pixel { color: #ff9ec4; }
-.smb-back { display: block; width: 100%; margin-top: 10px; padding: 9px; border-radius: 10px; cursor: pointer;
-    font-size: 0.8rem; font-weight: 800; color: #bfae97; background: transparent; border: 1px solid rgba(255,255,255,0.16); }
-.smb-back:disabled { opacity: 0.4; cursor: default; }
 
 /* ── JUICE — impact scales with the grade, so the pour LOOKS as good as it scored ──────────────────────── */
 .smb.is-shake-1 { animation: smbShake 0.16s ease-out; }
