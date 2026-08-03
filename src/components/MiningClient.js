@@ -223,6 +223,27 @@ export default function MiningClient({ initial }) {
                 .mine-slag-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
                 .mine-slag-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
                 .mine-part-ico { width: 15px; height: 15px; object-fit: contain; vertical-align: -3px; margin-right: 3px; }
+                /* ── SMELT REVEAL JUICE ────────────────────────────────────────────────────────────────
+                   Everything the pour earned, dealt out rather than printed. */
+                .mine-reveal-spot.is-dealt, .mine-slag-item.is-dealt { animation: mineDeal .42s cubic-bezier(.2,1.5,.35,1) both; }
+                @keyframes mineDeal { 0% { opacity: 0; transform: translateY(14px) scale(.72); } 100% { opacity: 1; transform: none; } }
+                .mine-modal-card.is-hot { border-color: rgba(255,215,94,0.75); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 60px rgba(255,180,50,0.35); }
+                .mine-slag-embers { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; z-index: 4; }
+                .mine-slag-embers span { position: absolute; width: 6px; height: 6px; border-radius: 50%;
+                    animation: mineEmberOut 1.35s cubic-bezier(.14,.7,.28,1) both; }
+                @keyframes mineEmberOut { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) scale(1); }
+                    100% { opacity: 0; transform: rotate(var(--a)) translateY(-150px) scale(.25); } }
+                /* The five pours, graded. A run carried by one great pour should not look like five mediocre ones. */
+                .mine-pours { display: flex; justify-content: center; gap: 6px; margin: 10px 0 2px; }
+                .mine-pour { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 46px; }
+                .mine-pour i { display: block; width: 100%; height: 5px; border-radius: 999px; background: #4a4a4a; }
+                .mine-pour em { font-size: 8px; font-style: normal; font-weight: 800; letter-spacing: .03em; color: #8a8f96; }
+                .mine-pour.is-pixel i { background: #ff9ec4; box-shadow: 0 0 9px #ff9ec4; } .mine-pour.is-pixel em { color: #ff9ec4; }
+                .mine-pour.is-perfect i { background: #ffd75e; box-shadow: 0 0 7px #ffd75e; } .mine-pour.is-perfect em { color: #ffd75e; }
+                .mine-pour.is-great i { background: #7ec8ff; } .mine-pour.is-great em { color: #7ec8ff; }
+                .mine-pour.is-good i { background: #9aa0a6; }
+                .mine-pour.is-miss i { background: #ff8f9a; } .mine-pour.is-miss em { color: #ff8f9a; }
+                .mine-extra-note { margin: 8px 0 0; font-size: 11.5px; font-weight: 800; color: #7cffb2; }
                 .mine-reveal-spot em { font-size: 10.5px; font-style: normal; }
                 .mine-reveal-spot b { font-size: 9.5px; color: #ffd75e; text-transform: uppercase; letter-spacing: 0.04em; }
                 .mine-nudge { flex-basis: 100%; margin-top: 6px; padding: 8px 12px; border-radius: 10px; cursor: pointer;
@@ -384,46 +405,37 @@ export default function MiningClient({ initial }) {
                 .mine-prospect.is-buy { background: linear-gradient(180deg, #ffb45e, #e8892c); color: #2a1400;
                     box-shadow: 0 4px 16px rgba(232,137,44,0.35); }
                 .mine-prospect.is-buy:disabled { filter: grayscale(.5) brightness(.85); }
-                /* THE SMELT'S THREE PHASES — same read as the kitchen's step row. */
-                /* THE SMELT BAR — the same bar as the anvil, the kitchen and the rock face. Its own class
-                   names on purpose: the mining minigame's copy of these styles lives inside THAT component's
-                   <style> block, so it only exists while that modal is mounted. Borrowing them would have left
-                   the smelt bar unstyled any time you opened it without opening the mine's first. */
-                .smb-bar { position: relative; height: 30px; border-radius: 999px; margin: 4px 0 7px;
-                    background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
-                .smb-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 999px; }
-                .smb-zone.is-good { background: rgba(215,196,138,0.18); }
-                .smb-zone.is-great { background: rgba(143,227,154,0.26); }
-                .smb-zone.is-perfect { background: rgba(143,227,255,0.34); }
-                .smb-zone.is-pixel { background: rgba(255,215,94,0.75); box-shadow: 0 0 16px rgba(255,215,94,0.85); }
-                .smb-marker { position: absolute; top: -5px; bottom: -5px; width: 4px; margin-left: -2px; border-radius: 3px;
-                    background: linear-gradient(180deg, #fff, #ffe9c9); box-shadow: 0 0 12px #fff, 0 0 20px #ffb020; }
-                .smb-pop { position: absolute; left: 50%; top: -32px; transform: translateX(-50%); font-weight: 900;
-                    font-size: 1.05rem; letter-spacing: .04em; white-space: nowrap; text-shadow: 0 2px 8px #000;
-                    animation: smbPop .5s ease-out both; }
-                @keyframes smbPop { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.8); }
-                    30% { opacity: 1; transform: translate(-50%, -2px) scale(1.12); }
-                    100% { opacity: 0; transform: translate(-50%, -14px) scale(1); } }
-                .smb-key { display: flex; gap: 3px; margin-bottom: 12px; }
-                .smb-key span { flex: 1 1 0; text-align: center; font-size: 9px; font-weight: 900; letter-spacing: .05em;
-                    padding: 3px 0; border-radius: 5px; background: rgba(255,255,255,0.05); }
-                .smb-key .is-miss { color: #ff8f9a; } .smb-key .is-good { color: #d7c48a; }
-                .smb-key .is-great { color: #8fe39a; } .smb-key .is-perfect { color: #8fe3ff; }
-                .smb-key .is-pixel { color: #2a1400; background: #ffd75e; }
-                /* A landed pour knocks the card, at a fraction of the amplitude the mine's used to use. */
-                .mine-modal-card.is-hit { animation: smbHit .2s ease-out; }
-                @keyframes smbHit { 0%,100% { transform: none; } 40% { transform: translate(-2px, 1px); } }
-                .mine-heat-steps { display: flex; gap: 5px; margin: 10px 0 12px; }
-                .mine-heat-step { flex: 1 1 0; text-align: center; padding: 6px 4px; border-radius: 9px;
-                    font-size: 10.5px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
-                    color: #7a828c; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); }
-                .mine-heat-step.is-now { color: #ffd08a; border-color: rgba(255,208,138,0.5);
-                    background: rgba(255,208,138,0.1); box-shadow: 0 0 14px -4px rgba(255,208,138,0.7); }
-                .mine-heat-step em { display: block; font-style: normal; font-size: 9px; margin-top: 2px; }
-                .mine-heat-step.is-done { color: #cfd8e3; }
-                .mine-heat-step.is-done.is-perfect { color: #7cffb2; border-color: rgba(124,255,178,0.45); }
-                .mine-heat-step.is-done.is-hot { color: #ffb020; border-color: rgba(255,176,32,0.4); }
-                .mine-heat-step.is-done.is-burnt { color: #ff8f9a; border-color: rgba(255,143,154,0.4); }
+                /* The smelt minigame's bar, steps, key and juice now live INSIDE HeatGame.js, in its own
+                   <style> block, the way CookingMinigame carries its own. They were duplicated here and
+                   the two copies had already drifted — different band colours, a marker with different
+                   glow, an .is-hit shake nothing sets any more, and .is-hot/.is-burnt step classes from
+                   band names that stopped existing. Whichever cascaded last won, which is not a thing
+                   worth leaving to chance. One copy, next to the markup that uses it. */
+                .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
+                .mine-bag-how b { color: #ffd75e; }
+                .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
+                    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
+                .mine-bag-kinds .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }
+                .mine-bag-ico { width: 24px; height: 24px; object-fit: contain; }
+                .mine-ladder-foot { margin: 8px 0 0; font-size: 11.5px; color: #9aa2ab; }
+                .mine-rung-won { margin: 0 0 10px; padding: 8px; border-radius: 10px; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
+                .mine-rung-won b { display: block; color: #ffe28a; }
+                .mine-rung-won em { font-size: 11px; font-style: normal; color: #cdb894; }
+                .mine-hint { font-size: 12px; color: #9aa2ab; margin: 10px 0 0; }
+
+                .mine-modal { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto;
+                    background: rgba(6,4,10,0.82); padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom)); }
+                .mine-modal > * { margin: auto; }
+                /* position/overflow are for the pour's ember burst, which is absolutely placed inside it. */
+                .mine-modal-card { position: relative; overflow: hidden; width: 100%; max-width: 340px; text-align: center; padding: 22px; border-radius: 18px;
+                    background: linear-gradient(180deg, #241a06, #120c03); border: 1px solid rgba(255,215,94,0.5); }
+                .mine-modal-img { width: 96px; height: 96px; object-fit: contain; }
+                .mine-modal-card h3 { margin: 8px 0 10px; }
+                .mine-modal-rows { display: flex; justify-content: center; gap: 16px; }
+                .mine-modal-rows span { display: flex; flex-direction: column; font-size: 11px; color: #9aa2ab; }
+                .mine-modal-rows b { font-size: 1.08rem; color: #ffe28a; }
+
+                /* The smelt: ore slides into the furnace mouth, the furnace flares, the parts are announced. */
                 .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
                 .mine-bag-how b { color: #ffd75e; }
                 .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
@@ -448,56 +460,17 @@ export default function MiningClient({ initial }) {
                 .mine-modal-rows b { font-size: 1.08rem; color: #ffe28a; }
 
                 /* The smelt: ore slides into the furnace mouth, the furnace flares, the parts are announced. */
-                .mine-heat-stage { position: relative; height: 130px; display: grid; place-items: center; margin: 6px 0 10px; }
-                .mine-heat-furnace { width: 116px; height: 116px; object-fit: contain; }
-                .mine-heat-glow { position: absolute; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
-                    background: radial-gradient(circle, rgba(255,150,40,0.9), transparent 62%); }
-                .mine-heat-steps { display: flex; gap: 5px; margin: 10px 0 12px; }
-                .mine-heat-step { flex: 1 1 0; text-align: center; padding: 6px 4px; border-radius: 9px;
-                    font-size: 10.5px; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
-                    color: #7a828c; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); }
-                .mine-heat-step.is-now { color: #ffd08a; border-color: rgba(255,208,138,0.5);
-                    background: rgba(255,208,138,0.1); box-shadow: 0 0 14px -4px rgba(255,208,138,0.7); }
-                .mine-heat-step em { display: block; font-style: normal; font-size: 9px; margin-top: 2px; }
-                .mine-heat-step.is-done { color: #cfd8e3; }
-                .mine-heat-step.is-done.is-perfect { color: #7cffb2; border-color: rgba(124,255,178,0.45); }
-                .mine-heat-step.is-done.is-hot { color: #ffb020; border-color: rgba(255,176,32,0.4); }
-                .mine-heat-step.is-done.is-burnt { color: #ff8f9a; border-color: rgba(255,143,154,0.4); }
-                .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
-                .mine-bag-how b { color: #ffd75e; }
-                .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;
-                    padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); }
-                .mine-bag-kinds .muted { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; margin-right: 2px; }
-                .mine-bag-ico { width: 24px; height: 24px; object-fit: contain; }
-                .mine-ladder-foot { margin: 8px 0 0; font-size: 11.5px; color: #9aa2ab; }
-                .mine-rung-won { margin: 0 0 10px; padding: 8px; border-radius: 10px; background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.4); }
-                .mine-rung-won b { display: block; color: #ffe28a; }
-                .mine-rung-won em { font-size: 11px; font-style: normal; color: #cdb894; }
-                .mine-hint { font-size: 12px; color: #9aa2ab; margin: 10px 0 0; }
-
-                .mine-modal { position: fixed; inset: 0; z-index: 300; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto;
-                    background: rgba(6,4,10,0.82); padding: max(16px, env(safe-area-inset-top)) 18px max(16px, env(safe-area-inset-bottom)); }
-                .mine-modal > * { margin: auto; }
-                .mine-modal-card { width: 100%; max-width: 340px; text-align: center; padding: 22px; border-radius: 18px;
-                    background: linear-gradient(180deg, #241a06, #120c03); border: 1px solid rgba(255,215,94,0.5); }
-                .mine-modal-img { width: 96px; height: 96px; object-fit: contain; }
-                .mine-modal-card h3 { margin: 8px 0 10px; }
-                .mine-modal-rows { display: flex; justify-content: center; gap: 16px; }
-                .mine-modal-rows span { display: flex; flex-direction: column; font-size: 11px; color: #9aa2ab; }
-                .mine-modal-rows b { font-size: 1.08rem; color: #ffe28a; }
-
-                /* The smelt: ore slides into the furnace mouth, the furnace flares, the parts are announced. */
-                .mine-heat-stage { position: relative; height: 130px; display: grid; place-items: center; margin: 6px 0 10px; }
-                .mine-heat-furnace { width: 116px; height: 116px; object-fit: contain; }
-                .mine-heat-glow { position: absolute; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
-                    background: radial-gradient(circle, rgba(255,150,40,0.9), transparent 62%); }
                 .mine-band { padding: 7px 10px; border-radius: 10px; font-weight: 900; font-size: 0.9rem; margin-bottom: 8px; }
                 .mine-band em { display: block; font-style: normal; font-weight: 600; font-size: 11px; opacity: .85; }
-                .mine-band.is-perfect { color: #7cffb2; background: rgba(124,255,178,0.14); }
-                .mine-band.is-hot { color: #ffb020; background: rgba(255,176,32,0.14); }
-                .mine-band.is-warm { color: #cdd3d8; background: rgba(255,255,255,0.06); }
-                .mine-band.is-cold { color: #6fb0e6; background: rgba(111,176,230,0.14); }
-                .mine-band.is-burnt { color: #ff5a2a; background: rgba(255,90,42,0.14); }
+                /* Band keys are pixel/perfect/great/good/miss — the shared timing bands. The old
+                   hot/warm/cold/burnt classes stopped matching anything when the smelt moved onto them, so
+                   every verdict except PERFECT rendered as unstyled text on no background. Same palette as
+                   the kitchen and the anvil, so a FLAWLESS reads the same colour everywhere in the game. */
+                .mine-band.is-pixel { color: #ff9ec4; background: rgba(255,158,196,0.16); box-shadow: 0 0 22px rgba(255,158,196,0.28); }
+                .mine-band.is-perfect { color: #ffd75e; background: rgba(255,215,94,0.15); }
+                .mine-band.is-great { color: #7ec8ff; background: rgba(126,200,255,0.14); }
+                .mine-band.is-good { color: #cdd3d8; background: rgba(255,255,255,0.06); }
+                .mine-band.is-miss { color: #ff8f9a; background: rgba(255,143,154,0.14); }
                 .mine-smelt-stage { position: relative; height: 140px; display: grid; place-items: center; }
                 .mine-smelt-furnace { width: 120px; height: 120px; object-fit: contain; }
                 .mine-smelt-ore { position: absolute; width: 48px; height: 48px; object-fit: contain; left: 50%; top: 0;

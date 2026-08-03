@@ -88,11 +88,36 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
 }
 
 // THE POUR PLAYED BACK — ore into the furnace, parts out of it.
+//
+// This screen used to be the flattest moment in the whole feature: a band word, a bare "2 parts" heading, the
+// part name as text, and the bonus names joined with a middot. You had just played five escalating timing
+// rounds and the payoff read like a receipt. It now does what the chest opener and the cook's plate-up do —
+// shows you the THING, pops it in, and scales the celebration to how well you actually poured.
+const BAND_BLURB = {
+    pixel: "Not a drop wasted.",
+    perfect: "Clean pour, clean metal.",
+    great: "Solid work at the crucible.",
+    good: "It'll do.",
+    miss: "Half of that went on the floor.",
+};
+
 export function SmeltModal({ smelting, onClose }) {
     const done = smelting.stage === "done";
+    const band = smelting.result?.band || "good";
+    const big = band === "pixel" || band === "perfect"; // worth a celebration, not just a result
     return (
         <div className="mine-modal" role="presentation" onClick={() => done && onClose()}>
-            <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className={`mine-modal-card${done && big ? " is-hot" : ""}`} onClick={(e) => e.stopPropagation()}>
+                {/* A FLAWLESS/PERFECT pour throws embers across the card. Nothing to read — you should know it
+                    went well before your eyes reach a word. */}
+                {done && big ? (
+                    <div className="mine-slag-embers" aria-hidden="true">
+                        {Array.from({ length: band === "pixel" ? 30 : 18 }).map((_, i) => (
+                            <span key={i} style={{ "--a": `${i * (360 / (band === "pixel" ? 30 : 18))}deg`, animationDelay: `${(i % 6) * 0.05}s`,
+                                background: ["#ffd75e", "#ff9f1c", "#ffe9a8"][i % 3] }} />
+                        ))}
+                    </div>
+                ) : null}
                 <div className={`mine-smelt-stage is-${smelting.stage}`}>
                     <Img src={smelting.oreArt} className="mine-smelt-ore" fallback="" />
                     <Img src="/images/mining/furnace.png" className="mine-smelt-furnace" fallback="" />
@@ -100,16 +125,31 @@ export function SmeltModal({ smelting, onClose }) {
                 </div>
                 {done ? (
                     <>
-                        <div className={`mine-band is-${smelting.result?.band || "warm"}`}>
-                            {smelting.result?.bandLabel || "Poured"} <em>{smelting.result?.bandBlurb || ""}</em>
+                        <div className={`mine-band is-${band}`}>
+                            {smelting.result?.bandLabel || "Poured"} <em>{smelting.result?.bandBlurb || BAND_BLURB[band] || ""}</em>
                         </div>
+                        {/* THE RUN, POUR BY POUR. Five rounds went into this and the result screen never showed
+                            one of them — so a run carried by a flawless last pour looked identical to a run of
+                            five mediocre ones. The server already sends the per-phase grades. */}
+                        {(smelting.result?.phases || []).length ? (
+                            <div className="mine-pours" aria-label="How each pour graded">
+                                {smelting.result.phases.map((p, i) => (
+                                    <span key={i} className={`mine-pour is-${p.key}`} title={p.label}>
+                                        <i />
+                                        <em>{p.label}</em>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                         <h3 style={{ color: "#ffd08a" }}>{smelting.result?.parts ?? smelting.parts} parts</h3>
                         {/* THE PART YOU JUST MADE, AS THE THING IT IS. This was a count and a name in plain
                             text — "2× Iron Filings" — while the painted sprite for that exact part sat in the
                             forge catalog, already generated. Every part tier has one; draw it. */}
                         <div className="mine-reveal-row">
-                            {(smelting.result?.byTier || []).map((b) => (
-                                <span key={b.partTier} className={`mine-reveal-spot${b.lifted ? " is-picked" : ""}`}>
+                            {(smelting.result?.byTier || []).map((b, i) => (
+                                // Staggered so they land one after another instead of all appearing at once —
+                                // the same trick the chest opener uses to make a haul feel dealt out to you.
+                                <span key={b.partTier} className={`mine-reveal-spot is-dealt${b.lifted ? " is-picked" : ""}`} style={{ animationDelay: `${i * 0.11}s` }}>
                                     <Img src={PART_SPRITE[b.partTier]} className="mine-reveal-art" fallback="" />
                                     <b style={{ fontSize: 18 }}>{b.count}×</b>
                                     <em style={{ color: b.lifted ? "#7cffb2" : PART_COLOR[b.partTier] || "#cdd3d8" }}>{PART_NAME[b.partTier]}</em>
@@ -124,13 +164,17 @@ export function SmeltModal({ smelting, onClose }) {
                                     used to .join(" · ") the names and throw the pictures away. */}
                                 <div className="mine-slag-row">
                                     {smelting.result.bonus.map((x, i) => (
-                                        <span key={`${x.kind}-${x.id || x.tier || i}`} className="mine-slag-item">
+                                        <span key={`${x.kind}-${x.id || x.tier || i}`} className="mine-slag-item is-dealt"
+                                            style={{ animationDelay: `${0.34 + i * 0.13}s` }}>
                                             <Img src={x.art} className="mine-reveal-art" fallback="" />
                                             <em>{x.name || (x.kind === "chest" ? `${x.tier} chest` : x.kind)}</em>
                                         </span>
                                     ))}
                                 </div>
                             </div>
+                        ) : null}
+                        {smelting.result?.extras ? (
+                            <p className="mine-extra-note">The Bellows threw in {smelting.result.extras} extra.</p>
                         ) : null}
                         <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
                             {smelting.ore} {smelting.oreName} went in. The parts are waiting in the Forge.

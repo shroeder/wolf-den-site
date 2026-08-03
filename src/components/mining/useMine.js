@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
-import { clink } from "@/components/mining/kit";
+import { clink, quench } from "@/components/mining/kit";
 
 // ── THE MINE'S STATE ─────────────────────────────────────────────────────────────────────────────────────────
 // Every server call and every piece of transient UI state, in one place. The three tabs are views onto this —
@@ -158,7 +158,9 @@ export function useMine(initial) {
             if (r?.unlocked && r?.ok !== false) {
                 setState(r);
                 setSmelting((v) => (v ? { ...v, stage: "done", result: r.smelted } : v));
-                clink(r.smelted?.band === "perfect" ? 1 : r.smelted?.band === "hot" ? 0.7 : 0.35);
+                // Bands are pixel/perfect/great/good/miss now — "hot" has not existed since the smelt moved
+                // onto the shared timing bands, so every pour but a perfect one fell through to the quietest zap.
+                quench(r.smelted?.band || "good");
                 try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* no window */ }
             } else { setSmelting(null); say(r?.error === "not_enough_ore" ? "Not enough ore." : "Couldn't smelt that."); }
         }, 1400);

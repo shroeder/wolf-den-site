@@ -56,6 +56,54 @@ export function clink(strength = 1) {
     } catch { /* audio is a bonus */ }
 }
 
+// THE POUR LANDING — the sound the result screen deserved and never had. It was a single `clink()` keyed off
+// a band name ("hot") that stopped existing when the smelt moved onto the shared timing bands, so most pours
+// fell through to the quietest zap in the file.
+//
+// A quench is steam and then metal: a burst of filtered noise for the hiss, then a short rising arpeggio whose
+// length and brightness scale with how well you poured. A spilled pour gets the hiss and one flat low note —
+// it should sound like a shrug.
+export function quench(band = "good") {
+    const a = ac(); if (!a) return;
+    try {
+        const t = a.currentTime;
+        // ── the hiss: white noise through a lowpass that closes as the steam dies ──
+        const secs = 0.5;
+        const buf = a.createBuffer(1, Math.floor(a.sampleRate * secs), a.sampleRate);
+        const ch = buf.getChannelData(0);
+        for (let i = 0; i < ch.length; i += 1) ch[i] = (Math.random() * 2 - 1) * (1 - i / ch.length);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const lp = a.createBiquadFilter(); lp.type = "lowpass";
+        lp.frequency.setValueAtTime(5200, t);
+        lp.frequency.exponentialRampToValueAtTime(420, t + secs);
+        const hg = a.createGain();
+        hg.gain.setValueAtTime(0.16, t);
+        hg.gain.exponentialRampToValueAtTime(0.0001, t + secs);
+        src.connect(lp); lp.connect(hg); hg.connect(a.destination);
+        src.start(t); src.stop(t + secs);
+
+        // ── the metal: how good it was, as notes ──
+        const NOTES = {
+            pixel: [523, 659, 784, 1047, 1319],
+            perfect: [523, 659, 784, 1047],
+            great: [523, 659, 784],
+            good: [440, 587],
+            miss: [175],
+        };
+        (NOTES[band] || NOTES.good).forEach((freq, i) => {
+            const at = t + 0.14 + i * 0.085;
+            const o = a.createOscillator(), g = a.createGain();
+            o.type = band === "miss" ? "sawtooth" : "triangle";
+            o.frequency.setValueAtTime(freq, at);
+            g.gain.setValueAtTime(0.0001, at);
+            g.gain.exponentialRampToValueAtTime(band === "miss" ? 0.09 : 0.17, at + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, at + 0.34);
+            o.connect(g); g.connect(a.destination);
+            o.start(at); o.stop(at + 0.36);
+        });
+    } catch { /* audio is a bonus */ }
+}
+
 // ── ATOMS ────────────────────────────────────────────────────────────────────────────────────────────────────
 export const Img = ({ src, alt = "", className, fallback }) => {
     const [bad, setBad] = useState(false);
