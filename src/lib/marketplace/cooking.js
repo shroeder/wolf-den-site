@@ -55,9 +55,9 @@ async function petCookBonus(buyerId) {
 // The upgrade tracks are the same shape as the boat and the rail: four of them, five levels each, priced on a
 // square curve, each doing one legible thing.
 
-// OPEN TO EVERYONE. The recipe economy was re-measured and retuned (RECIPE_SOURCES below: ~1.9 recipes per
-// member per week, a full book in ~33 weeks, no single source above a quarter of drops), which was the thing
-// holding the launch. Any signed-in member can cook.
+// OPEN TO EVERYONE. Any signed-in member can cook. The recipe economy lives in each feature's own reward table
+// now — RECIPE_BANDS below says only which TIERS a source may teach; the odds belong to the chest, the wheel,
+// the seam and the ladder that pay them out.
 export const COOK_UNLOCKED = (buyerId) => Boolean(buyerId);
 
 export const MAX_TRACK = 5;
@@ -120,6 +120,7 @@ export const TIERS = [
             { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 },
             { kind: "gold", min: 220, max: 380 },
             { kind: "parts", partTier: 2, min: 2, max: 4 },
+            { kind: "recipe", band: "cook" },
             { kind: "consumable", id: "scroll_wisdom" },
             { kind: "consumable", id: "treat_snack" },
             { kind: "consumable", id: "sail_tailwind_charm" },
@@ -132,6 +133,7 @@ export const TIERS = [
             { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 1, max: 2 },
             { kind: "gold", min: 240, max: 400 },
             { kind: "parts", partTier: 3, min: 2, max: 4 },
+            { kind: "recipe", band: "cook" },
             { kind: "consumable", id: "treat_toy" },
             { kind: "consumable", id: "farm_harvest_charm" },
             { kind: "spin", n: 2 },
@@ -226,6 +228,8 @@ export function rewardLabel(r, art = {}) {
         }
         case "spin":
             return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", fallback: KIND_FALLBACK.spin };
+        case "recipe":
+            return { name: "A new recipe", desc: "A page for the book — something new you can cook.", rarity: "epic", fallback: KIND_FALLBACK.dish };
         case "creation":
             return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", fallback: KIND_FALLBACK.creation };
         case "consumable": {
@@ -380,29 +384,60 @@ const DROP_WEIGHT = { 1: 40, 2: 28, 3: 18, 4: 10, 5: 4 };
 //
 // Re-run the audit after any change here; the tier BANDS below are separate and stay as they are — a wooden
 // chest still cannot yield a Legendary, so the top tiers remain gated by band regardless of rate.
-export const RECIPE_SOURCES = {
-    harvest:      { min: 1, max: 2, chance: 0.015 }, // the field: 1039 harvests/wk, so this dominates at any rate
-    fish:         { min: 1, max: 2, chance: 0.018 }, // the same, at sea
-    chest_wooden: { min: 1, max: 2, chance: 0.025 },
-    chest_iron:   { min: 2, max: 3, chance: 0.035 },
-    chest_gold:   { min: 2, max: 3, chance: 0.055 },
-    chest_high:   { min: 3, max: 5, chance: 0.110 }, // mythic and above
-    dig:          { min: 2, max: 3, chance: 0.050 }, // RAISED — low volume, and finding one buried is the fantasy
-    dig_deep:     { min: 3, max: 4, chance: 0.140 }, // RAISED — a tool proc, not an ordinary dig
-    raid_win:     { min: 3, max: 4, chance: 0.040 },
-    boss_kill:    { min: 4, max: 5, chance: 0.350 }, // weekly, shared, and the main route to the top tiers
-    forge:        { min: 2, max: 4, chance: 0.060 }, // RAISED — enhancing at the anvil, only ~87 a week
-    salvage:      { min: 1, max: 2, chance: 0.010 }, // dismantling — you find a note in the lining
-    town_merchant:{ min: 3, max: 4, chance: 0.160 }, // RAISED — the travelling merchant's stock
-    barkeep:      { min: 1, max: 3, chance: 0.130 }, // RAISED — the daily pint: he tells you how it's made
-    crier:        { min: 2, max: 3, chance: 0.140 }, // RAISED — the town crier's announcements
-    gamble:       { min: 2, max: 4, chance: 0.090 }, // RAISED — tavern dice
-    spin:         { min: 1, max: 3, chance: 0.025 }, // the daily wheel — 401/wk, so it was a top-three source
-    daily_deal:   { min: 2, max: 4, chance: 0.220 }, // RAISED — a rare deal bought from the shop
-    pet_bond:     { min: 1, max: 3, chance: 0.015 }, // 643 pettings/wk once petting actually counted
-    town_raid:    { min: 3, max: 4, chance: 0.100 }, // RAISED — the plaza skirmishes
-    cook:         { min: 1, max: 3, chance: 0.045 }, // cooking teaches you the next thing to cook
+// WHERE A RECIPE CAN COME FROM — the tier BAND only. The odds are not here any more.
+//
+// This used to be a table of {min, max, chance}, and every feature called tryRecipeDrop() at the end of its
+// handler: harvest a crop, roll a hidden 1.5%; open a chest, roll a hidden 2.5% ALONGSIDE whatever the chest
+// actually contained. So a recipe was never something a system gave you — it was a coin flip bolted to the
+// side of eighteen different handlers, which is exactly why finding one felt arbitrary. It wasn't the chest's
+// loot table. It wasn't the wheel. It was a parallel lottery nobody could see.
+//
+// Now a recipe is an OUTCOME inside each feature's own reward table, drawn like any other prize, and the
+// feature decides its own odds the same way it decides everything else it pays out. All that lives here is
+// which tiers a given source is allowed to teach — a wooden chest still cannot cough up a Legendary recipe
+// however many you open.
+export const RECIPE_BANDS = {
+    chest_wooden: { min: 1, max: 2 },
+    chest_iron:   { min: 2, max: 3 },
+    chest_gold:   { min: 2, max: 3 },
+    chest_high:   { min: 3, max: 5 },   // mythic and above
+    seam:         { min: 1, max: 3 },   // the mine's bag — a page pressed in the rock
+    seam_deep:    { min: 3, max: 4 },   // a rich seam
+    dig:          { min: 2, max: 3 },
+    dig_deep:     { min: 3, max: 4 },
+    fish:         { min: 1, max: 3 },   // a sealed bottle
+    spin:         { min: 1, max: 3 },
+    cook:         { min: 1, max: 3 },   // cooking teaches you the next thing to cook
+    raid_win:     { min: 3, max: 4 },
+    town_raid:    { min: 3, max: 4 },
+    boss_kill:    { min: 4, max: 5 },   // weekly, shared, and the route to the top tiers
 };
+
+/**
+ * Teach a recipe from a source's band. Call this WHEN THE FEATURE'S OWN TABLE HAS ALREADY DECIDED to pay one
+ * out — there is no chance roll in here, on purpose. The odds belong to the chest, the wheel, the seam.
+ *
+ * Returns the recipe when it was new to them, else null (they already know everything in that band), so the
+ * caller can fall back to another prize rather than paying out nothing.
+ */
+export async function grantRecipeReward(buyerId, band) {
+    const def = RECIPE_BANDS[band];
+    if (!buyerId || !def) return null;
+    return learnRecipe(buyerId, null, { min: def.min, max: def.max });
+}
+
+/**
+ * A companion with the recipe_nose perk makes a feature's recipe outcome likelier. Features multiply their own
+ * weight/chance by this rather than each re-reading the perk.
+ */
+export async function recipeLuck(buyerId) {
+    try {
+        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+        const nose = await getPetSystemPerk(buyerId, "recipe_nose");
+        return nose > 0 ? 1 + nose / 100 : 1;
+    } catch { return 1; }
+}
+
 
 /**
  * Roll a recipe the member doesn't know yet, optionally restricted to a tier band.
@@ -420,26 +455,6 @@ export function rollRecipe(known = [], { min = 1, max = 5 } = {}) {
     let n = Math.random() * total;
     for (const r of pool) { n -= DROP_WEIGHT[r.tier] || 1; if (n <= 0) return r; }
     return pool[pool.length - 1];
-}
-
-/**
- * Try to drop a recipe from a named source. Rolls the source's own chance, then its tier band.
- *
- * One call for every system, so adding a drop point is a line rather than a copy of the odds.
- */
-export async function tryRecipeDrop(buyerId, source) {
-    const def = RECIPE_SOURCES[source];
-    if (!buyerId || !def) return null;
-    // A companion with the recipe_nose perk lifts the chance at EVERY drop point at once — which is what makes
-    // it worth equipping over a damage pet if the book is what you're chasing.
-    let chance = def.chance;
-    try {
-        const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-        const nose = await getPetSystemPerk(buyerId, "recipe_nose");
-        if (nose > 0) chance *= 1 + nose / 100;
-    } catch { /* no pet, no bonus */ }
-    if (Math.random() >= chance) return null;
-    return learnRecipe(buyerId, null, { min: def.min, max: def.max });
 }
 
 // ── INGREDIENTS ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -914,6 +929,18 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 for (let i = 0, n = serve(rint(r.min, r.max)); i < n; i += 1) await grantSeed(buyerId, id).catch(() => {});
                 break;
             }
+            // Cooking teaching you the next thing to cook is the one recipe source that was always thematically
+            // right — it just wasn't ON the ladder, it was a 4.5% roll after the fact. Now it is a rung.
+            case "recipe": {
+                const rec = await grantRecipeReward(buyerId, r.band).catch(() => null);
+                if (!rec) { // knows them all in this band — pay the rung below rather than nothing
+                    const g = 240 + tier * 60;
+                    const p3 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
+                    await logCoin(buyerId, g, "cooking", { balanceAfter: p3?.gold, meta: { recipe: rec, fallback: true } }).catch(() => {});
+                    goldPaid += g;
+                }
+                break;
+            }
             case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, serve(r.n)]).catch(() => {}); break;
             case "creation": await grantCustomCredit(buyerId, serve(r.n), { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
             case "consumable":
@@ -946,9 +973,6 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Daily bounties. A prep counts for the prep task, a dish for the dish task, and a run graded "perfect" or
     // better counts for the skill one — so the three tasks can't all be cleared by the same three taps.
     await bumpQuestProgress(buyerId, rec.kind === "prep" ? "cook_prep" : "cook_dish", 1).catch(() => {});
-    // Cooking teaches you the next thing to cook — the one source that is its own system, so a member who has
-    // found the Kitchen can keep growing the book from inside it.
-    await tryRecipeDrop(buyerId, "cook").catch(() => {});
     if (q >= 0.72) await bumpQuestProgress(buyerId, "cook_clean", 1).catch(() => {});
 
     return {

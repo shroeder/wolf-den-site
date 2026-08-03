@@ -14,6 +14,18 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
 // a sliver of a shot at something great. Ascendant/Eternal only appear in the top few tiers' spreads.
+// How often a chest's contents ARE a recipe, by tier. Sits with the chest's other odds because that is what
+// it is now — part of what a chest pays out, not a lottery running beside it.
+const RECIPE_CHANCE = { wooden: 0.030, iron: 0.045, gold: 0.070, mythic: 0.110, ascendant: 0.130, eternal: 0.150 };
+
+// The recipe_nose companion perk, read once per open.
+async function recipeLuckFor(buyerId) {
+    try {
+        const { recipeLuck } = await import("@/lib/marketplace/cooking.js");
+        return await recipeLuck(buyerId);
+    } catch { return 1; }
+}
+
 export const CHEST_TIERS = {
     wooden: { label: "Wooden Chest", emoji: "📦", color: "#b08a52", weights: { common: 72, rare: 25, epic: 3 } },
     iron: { label: "Iron Chest", emoji: "🧰", color: "#9fb3c8", weights: { common: 44, rare: 40, epic: 14, legendary: 2 } },
@@ -166,19 +178,25 @@ export async function openChest(buyerId, tier) {
     // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
     // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
     try { const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js"); await dropSeedFrom(buyerId, ["wooden", "iron", "gold"].includes(tier) ? `chest_${tier}` : "chest_gold"); } catch { /* best-effort */ }
-    // Chests drop recipes, banded by tier: a wooden chest can never produce a Legendary one however many you
-    // open, and the top band is reachable only from mythic and above. Deferred import — chests.js is pulled in
-    // by cooking.js, and a static edge back would be a cycle.
-    let recipeFound = null;
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        const band = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : tier === "gold" ? "chest_gold" : "chest_high";
-        recipeFound = await tryRecipeDrop(buyerId, band);
-    } catch { /* best-effort */ }
+    // A RECIPE IS ONE OF THE THINGS A CHEST CAN CONTAIN — rolled here, in the chest's own priority chain,
+    // and returned as the chest's contents. It used to be a separate hidden roll made BEFORE the chest decided
+    // anything, then stapled to whatever else came out as a side field: you opened a chest, got a sword, and a
+    // recipe also happened. Now the chest either gives you a recipe or it doesn't, like every other outcome.
+    //
+    // Banded by tier: a wooden chest can never produce a Legendary recipe however many you open. Deferred
+    // import — chests.js is pulled in by cooking.js, and a static edge back would be a cycle.
+    const band = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : tier === "gold" ? "chest_gold" : "chest_high";
+    if (Math.random() < (RECIPE_CHANCE[tier] || 0) * await recipeLuckFor(buyerId)) {
+        const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+        const rec = await grantRecipeReward(buyerId, band).catch(() => null);
+        // Null means they already know every recipe in this band — fall through to the ordinary loot rather
+        // than paying out nothing, which is what a silent side-roll would have done.
+        if (rec) return { ok: true, remaining: dec.count, recipe: rec };
+    }
 
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
-    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop, recipe: recipeFound || undefined };
+    if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
 
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.
@@ -187,7 +205,7 @@ export async function openChest(buyerId, tier) {
         const cid = Math.random() < 0.12 ? "forge_enchant_scroll" : "forge_power_scroll";
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc }, recipe: recipeFound || undefined };
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
     }
 
     // High-tier chests can cough up a consumable instead of gear (this is the main way to get relics).
@@ -196,7 +214,7 @@ export async function openChest(buyerId, tier) {
         const cid = cc.pool[Math.floor(Math.random() * cc.pool.length)];
         await grantConsumable(buyerId, cid);
         const c = CONSUMABLES[cid];
-        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc }, recipe: recipeFound || undefined };
+        return { ok: true, remaining: dec.count, consumable: { id: cid, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc } };
     }
 
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -223,10 +241,10 @@ export async function openChest(buyerId, tier) {
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         await grantItem(buyerId, item.id, isEliteRarity ? "elite" : "chest");
-        return { ok: true, remaining: dec.count, recipe: recipeFound || undefined, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
+        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
     const gold = DUST[rarity] || 25;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
-    return { ok: true, remaining: dec.count, gold, rarity, recipe: recipeFound || undefined };
+    return { ok: true, remaining: dec.count, gold, rarity };
 }

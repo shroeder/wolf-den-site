@@ -183,11 +183,6 @@ export async function buyDailyDeal(buyerId, dealId) {
     else if (deal.kind === "pet") await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING`, [buyerId, deal.id]).catch(() => {});
     await trackActivity(buyerId, "buy_daily_deal", { id: deal.id, kind: deal.kind, price: deal.price }).catch(() => {});
 
-    // A rare deal sometimes comes with the method for it.
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(buyerId, "daily_deal");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
 
     const label = deal.kind === "gear" ? itemById(deal.id)?.name : deal.kind === "pet" ? collectibleById(deal.id)?.name : CONSUMABLES[deal.id]?.name;
     return { ok: true, gold: paid.gold, name: label || deal.name, kind: deal.kind };

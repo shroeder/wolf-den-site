@@ -536,8 +536,9 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
     // Plaza skirmishes turn up recipes looted off the swarm.
     try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(buyerId, "town_raid");
+        const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
+        // Part of the skirmish payout, at the tier your contribution earned.
+        if (Math.random() < 0.10 * await recipeLuck(buyerId)) await grantRecipeReward(buyerId, "town_raid");
     } catch { /* a recipe is a bonus; never let it fail the action */ }
     let hp = updated?.hp ?? ev.hp;
     const defeated = false; // raids run their full duration now — a cleared wave just refills

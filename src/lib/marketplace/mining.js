@@ -797,9 +797,12 @@ async function claimNode(buyerId, node, row, run = {}) {
             // A MASTERWORK run can pull a chest a full tier above what the rock deserves.
             const lift = rank.key === "s" ? 1 : 0;
             const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
-            if (roll < 0.34) out.push({ kind: "chest", tier: ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden" });
-            else if (roll < 0.68) out.push({ kind: "gear", depth: 3 + node.tier });
-            else if (roll < 0.88) out.push({ kind: "consumable" });
+            if (roll < 0.30) out.push({ kind: "chest", tier: ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden" });
+            else if (roll < 0.60) out.push({ kind: "gear", depth: 3 + node.tier });
+            else if (roll < 0.78) out.push({ kind: "consumable" });
+            // A RECIPE, pressed in the rock — one of the things a rare ticket can be, drawn from the same bag
+            // as the gear and the chests rather than rolled on the side after the seam had already paid out.
+            else if (roll < 0.88) out.push({ kind: "recipe", band: node.tier >= 4 ? "seam_deep" : "seam" });
             else out.push({ kind: "gold", n: Math.round((140 + node.tier * 90 + Math.floor(Math.random() * 120)) * (1 + haulBonus)) });
         }
     }
@@ -823,6 +826,12 @@ async function claimNode(buyerId, node, row, run = {}) {
         } else if (item.kind === "consumable") {
             const got = await grantMiningConsumable(buyerId);
             if (got) paid.push({ ...item, ...got });
+        } else if (item.kind === "recipe") {
+            const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+            const rec = await grantRecipeReward(buyerId, item.band).catch(() => null);
+            // Already know every recipe this seam could teach? Pay ore instead of nothing.
+            if (rec) paid.push({ kind: "recipe", name: rec.name, tier: rec.tier, art: "/images/cooking/dish.png" });
+            else paid.push({ kind: "ore", tier: node.tier, n: 4, name: o.ore, color: o.color, art: oreArt(node.tier) });
         }
     }
 

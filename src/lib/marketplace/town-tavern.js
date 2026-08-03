@@ -210,11 +210,6 @@ export async function gambitResolve(buyerId) {
         gold = Number(paid?.gold ?? 0);
     }
     if (outcome === "win") bumpTownQuest(buyerId, "patron", 1).catch(() => {});
-    // Winning at the dice table: somebody talks.
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(buyerId, "gamble");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
     checkTavernBadges(buyerId).catch(() => {}); // Dice Devil / Dice King (hands played)
     return { ok: true, outcome, bet, payout, jackpot, player: { dice: playerDice, hand: ph.label }, gambler: { dice: gamblerDice, hand: gh.label }, gold };
 }
@@ -232,11 +227,6 @@ export async function claimDailyPint(buyerId) {
     );
     await awardXp(buyerId, "tavern_pint", { points: PINT_XP, gold: PINT_GOLD, dedupeKey: `pint:${buyerId}:${Date.now()}` }).catch(() => {});
     bumpTownQuest(buyerId, "patron", 1).catch(() => {});
-    // The barkeep tells you how it's made over the daily pint.
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(buyerId, "barkeep");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
     const drinks = (await db.queryOne(`SELECT drinks FROM mkt_tavern WHERE buyer_id = $1`, [buyerId]).catch(() => null))?.drinks || 1;
     checkTavernBadges(buyerId).catch(() => {}); // Tavern Regular (pints downed)
     return { ok: true, drinks, xp: PINT_XP, gold: PINT_GOLD };

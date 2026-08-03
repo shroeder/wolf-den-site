@@ -36,6 +36,13 @@ const ASSETS = [
     { dir: "ui", file: "seed.png", prompt: `A small loose PILE of plump brown-and-tan plant seeds heaped together, with one tiny green sprout with two leaves rising from the middle of the pile. NO bag, NO sack, NO pouch, NO container, NO label, NO paper, NO writing of any kind. ${BASE}` },
     { dir: "ui", file: "parts.png", prompt: `A neat little pile of FORGE SCRAP — a bent iron bracket, two thick rivets and a curl of steel shaving stacked together, raw crafting material rather than a finished tool. Metallic greys with warm rust edges. ${BASE}` },
 
+    // ── THE WHEEL ──
+    // A recipe is a WEDGE on the daily spin now, so it needs art that sits with the other prize sprites
+    // (coins, chest, potion, seed pouch) and reads at wedge size.
+    // Unfurl ANY of it and the model writes on it — it came back with "RECIFE" printed across the front. So:
+    // fully rolled, ends only, no face showing. There is nothing to write on.
+    { dir: "spin/prizes", file: "recipe-scroll.png", prompt: `A tightly ROLLED-UP scroll of cream parchment, bound closed around its middle with a red ribbon and a round red wax seal, a small sprig of green herb tucked under the ribbon. The scroll is COMPLETELY rolled — only the spiral ends are visible, NO flat face, NO unfurled section, NO writing surface anywhere. NO letters, NO words, NO numbers, NO symbols. ${BASE}` },
+
     // ── THE KITCHEN ──
     // The spoon RIDES the timing bar and is on screen the entire minigame, so it has to read at ~26px and be
     // unmistakable in silhouette. Horizontal, handle to the left, so it looks like a marker travelling a track.

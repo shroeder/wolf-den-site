@@ -336,11 +336,6 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
         if (!res.ok) return res;
         await trackActivity(feederId, "feed_pet", { petId }).catch(() => {});
         await bumpQuestProgress(feederId, "feed_pet", 1).catch(() => {});
-    // A well-fed pet digs one up and drops it at your feet.
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(feederId, "pet_bond");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
         const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [feederId, petId]).catch(() => null);
         const info = petLevelInfo(row?.xp || 0, def?.rarity || "common");
         return { ...res, petId, level: info.level, xp: row?.xp || 0, into: info.into, span: info.span, maxed: info.maxed };

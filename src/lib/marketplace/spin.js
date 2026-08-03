@@ -51,6 +51,7 @@ function prizeDesc(p) {
         case "seed": return "A random farm seed to plant and grow in your pasture.";
         case "fragment": return `${p.n || 1} ${fragName(p.tierId || FRAGMENT_PRIZE_TIER)} chest fragments — collect enough of a kind to forge that chest at the docks.`;
         case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
+        case "recipe": return "A page for the Kitchen's book — something new you can cook.";
         case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
         case "respin": return "A free bonus spin — spin again on the house.";
         case "bonus_game": return "Play a pick-a-box match-3 round to win wheel-exclusive gear.";
@@ -84,6 +85,10 @@ const WHEELS = [
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
             { label: "BONUS SPIN", sprite: "bonus-spin", weight: 7, tier: "bonus", kind: "respin" },
             { label: "Wooden Chest", sprite: "chest-wood", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            // A WEDGE, not a hidden roll. The wheel used to grant recipes at a flat 2.5% AFTER it had already
+            // landed on something else — 401 spins a week made it one of the top three sources in the game, and
+            // none of it was on the wheel you were watching. Now you can see it and land on it.
+            { label: "New Recipe", sprite: "recipe-scroll", weight: 5, rare: true, tier: "rare", kind: "recipe" },
             { label: "BONUS GAME", sprite: "mystery-box", weight: 4, tier: "bonus", kind: "bonus_game" },
             { label: "375 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 375 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
@@ -102,6 +107,7 @@ const MINI_WHEEL_PRIZES = [
     { label: `5 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 5, tierId: FRAGMENT_PRIZE_TIER },
     { label: "450 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 450 },
     { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
+    { label: "New Recipe", sprite: "recipe-scroll", weight: 8, kind: "recipe" },
     { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
     { label: "750 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 750 },
 ];
@@ -240,6 +246,13 @@ async function grantPrize(buyerId, prize, opts = {}) {
     }
     if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { sprite, text: "Spin again — on the house!" }; }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { sprite, text: prize.label }; }
+    if (prize.kind === "recipe") {
+        const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+        const rec = await grantRecipeReward(buyerId, "spin").catch(() => null);
+        // Knows every recipe the wheel can teach? Pay gold rather than landing on a blank wedge.
+        if (!rec) { await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {}); return { sprite, text: "300 gold — you already know them all" }; }
+        return { sprite, text: `${rec.name} — a new recipe!` };
+    }
     if (prize.kind === "seed") {
         const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
         const sid = commons[Math.floor(Math.random() * commons.length)];
@@ -347,11 +360,6 @@ export async function doSpin(buyerId) {
     await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
 
-    // The wheel can land on a recipe.
-    try {
-        const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-        await tryRecipeDrop(buyerId, "spin");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges
     const prizeOut = {
         ...display,

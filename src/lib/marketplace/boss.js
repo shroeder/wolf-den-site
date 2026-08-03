@@ -1178,8 +1178,10 @@ export async function attackBoss(buyerId) {
     // gating it on the kill is what keeps those tiers weekly rather than farmable.
     if (defeated) {
         try {
-            const { tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
-            await tryRecipeDrop(buyerId, "boss_kill");
+            const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
+            // The weekly boss is the main route to the top two tiers and is shared by everyone who fought, so
+            // it stays generous. It is part of the kill reward now, not a roll beside it.
+            if (Math.random() < 0.35 * await recipeLuck(buyerId)) await grantRecipeReward(buyerId, "boss_kill");
         } catch { /* a recipe is a bonus; never let it fail the kill */ }
     }
     return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };

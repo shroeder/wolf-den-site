@@ -18,6 +18,7 @@ const BIG_RARITIES = new Set(["epic", "legendary", "mythic", "ascendant", "etern
 function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     if (reveal?.pet) return reveal.pet.rarity || "rare";
+    if (reveal?.recipe) return "epic";
     return reveal?.item?.rarity || reveal?.rarity || "common";
 }
 
@@ -127,6 +128,9 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     const isItem = Boolean(reveal?.item);
     const isConsumable = Boolean(reveal?.consumable);
     const isPet = Boolean(reveal?.pet);
+    // A recipe is one of the things a chest can CONTAIN now, so it gets a reveal like everything else rather
+    // than riding along as a side field on whatever the chest actually gave you.
+    const isRecipe = Boolean(reveal?.recipe);
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -161,8 +165,15 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
-                    {isPet ? (
+                    <span className="chest-rarity-tag">{isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
+                    {isRecipe ? (
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/cooking/dish.png" alt="" className="chest-reward-glyph" draggable="false" />
+                            <div className="chest-reward-name">{reveal.recipe.name}</div>
+                            <div className="chest-reward-sub muted">A new recipe for the Kitchen&rsquo;s book.</div>
+                        </>
+                    ) : isPet ? (
                         <>
                             <PetArt id={reveal.pet.id} className="chest-reward-glyph" />
                             <div className="chest-reward-name">{reveal.pet.name}</div>

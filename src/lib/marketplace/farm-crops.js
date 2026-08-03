@@ -388,12 +388,8 @@ export async function harvestPlot(buyerId, slot) {
     // rather than failing at import, which is how it took down the Kitchen page and the town's Kitchen door
     // instead of failing the build. Same trap as stockade-penalty.js; the fix there was a leaf module, here a
     // deferred import is the smaller change.
-    const { addToPantry, tryRecipeDrop } = await import("@/lib/marketplace/cooking.js");
+    const { addToPantry } = await import("@/lib/marketplace/cooking.js");
     await addToPantry(buyerId, "crop", claimed.seed_id, doubled ? 2 : 1).catch(() => {});
-    // Recipes are found, not listed, and the field is one of the places they turn up.
-    // The field only ever yields the everyday recipes now — the top tiers come from things you cannot
-    // farm on demand. See RECIPE_SOURCES.
-    const recipeFound = await tryRecipeDrop(buyerId, "harvest").catch(() => null);
     // Harvest is a huge XP minter, so the PLAYER only banks a fraction of the crop's XP (tuned down). The full
     // crop XP still feeds the PET below — the farm stays a pet-XP engine, it just doesn't flood player levels.
     const harvestPlayerXp = Math.round(xp * HARVEST_PLAYER_XP_MULT);
@@ -460,7 +456,7 @@ export async function harvestPlot(buyerId, slot) {
     // fights it with a timing meter, then calls encounter_resolve for bonus loot. Server parks the pending fight.
     const encounter = await maybeStartEncounter(buyerId, { rarity, wardChance: pEff.raidChance, seedId: claimed.seed_id }).catch(() => null);
     const freshGold = await db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, recipeFound: recipeFound ? { id: recipeFound.id, name: recipeFound.name, emoji: recipeFound.emoji, tier: recipeFound.tier } : null, newPet, encounter, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
+    return { ok: true, slot, name: def?.name || claimed.seed_id, emoji: def?.emoji || "🌾", gold, doubled, xp, petFed, chest, bonus, savedSeed, savedEmoji: savedSeed ? def?.emoji : null, foundSeed, newPet, encounter, goldAfter: freshGold?.gold ?? paid?.gold ?? null, garden: await getGarden(buyerId) };
 }
 
 // Buy a fertilizer (gold sink). Fertilizer is applied to a specific growing crop to cut its remaining time.
