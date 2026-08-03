@@ -52,7 +52,9 @@ export async function POST(request) {
             await sendAdminPush({
                 title: "A page crashed",
                 body: `${path} — ${message}${who ? ` · ${who}` : ""}`,
-                route: "marketplace",
+                // "crashes", not "marketplace" — the old route dropped you on the VENDOR screen, which told
+                // you something had broken and then showed you something unrelated.
+                route: "crashes",
                 data: { type: "client_crash", path, digest: digest || "" },
             }).catch(() => { /* best effort */ });
         }
