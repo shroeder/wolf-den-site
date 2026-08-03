@@ -84,7 +84,10 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const [marker, setMarker] = useState(0.5);
     const markerRef = useRef(0.5);
     const [hits, setHits] = useState(node?.mySwings ?? 0);
-    const maxHits = node?.maxHits ?? 8;
+    // Seam integrity and your running average swing quality, both straight from the server's answer — the two
+    // things worth knowing mid-hand now that there is no swing budget to count down.
+    const [pct, setPct] = useState(Number(node?.pct ?? 100));
+    const [quality, setQuality] = useState(0);
     const [score, setScore] = useState(0);
     const [cooling, setCooling] = useState(false);
     const [pop, setPop] = useState(null);        // the grade label that punches out on a hit
@@ -178,6 +181,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         else if (r.grade === "perfect") setTickets((t) => t + 1);
         if (typeof r.hits === "number") setHits(r.hits);
         if (typeof r.score === "number") setScore(r.score);
+        if (typeof r.pct === "number") setPct(r.pct);
+        if (typeof r.quality === "number") setQuality(r.quality);
 
         if (r.cracked) {
             breakChord();
@@ -209,10 +214,11 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                     </div>
                 </div>
 
-                {/* SWINGS LEFT, not a health bar. A fixed hand of swings that gets scored — so the last one
-                    matters as much as the first, and the run has an ending you can see coming. */}
-                <div className="mmg-hits" aria-label={`${Math.max(0, maxHits - hits)} swings left`}>
-                    {Array.from({ length: maxHits }, (_, i) => <i key={i} className={i < hits ? "spent" : ""} />)}
+                {/* THE ROCK. Swings aren't metered — the trip is the budget — so what you want to see is how
+                    close the seam is to giving way. A pip row for a fixed hand was the wrong readout for a
+                    game you can play as long as you like. */}
+                <div className="mmg-hp" aria-label={`${pct}% of the seam left`}>
+                    <span style={{ width: `${pct}%`, background: node?.color || "#ffd75e" }} />
                 </div>
 
                 {cracked ? (
@@ -300,7 +306,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         </button>
 
                         <div className="mmg-meta">
-                            <span>Swings <b>{Math.max(0, maxHits - hits)}</b></span>
+                            <span>Swings <b>{hits}</b></span>
+                            <span title="Your average swing quality — this is what the rank is read off">Quality <b>{quality}%</b></span>
                             <span className={chain >= 3 ? "mmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
                             <span>Bag <b>{tickets}</b></span>
                         </div>
@@ -393,9 +400,6 @@ const MMG_CSS = `
 .mmg-notice { text-align: center; margin: 8px 0 0; font-size: 12px; font-weight: 700; color: #ffcf6a; }
 .mmg-hint { margin: 9px 0 0; font-size: 11px; line-height: 1.5; color: #8b8171; text-align: center; }
 
-.mmg-hits { display: flex; gap: 4px; margin-bottom: 16px; }
-.mmg-hits i { flex: 1 1 0; height: 8px; border-radius: 999px; background: var(--ore); box-shadow: 0 0 8px -2px var(--ore); }
-.mmg-hits i.spent { background: rgba(255,255,255,0.13); box-shadow: none; }
 .mmg-draw { position: relative; overflow: hidden; }
 /* A slow sweep of the rank's own colour behind the whole reveal. */
 .mmg-draw-rays { position: absolute; inset: -70% -70% auto -70%; height: 240%; pointer-events: none; opacity: .28;

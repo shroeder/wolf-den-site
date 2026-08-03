@@ -26,12 +26,18 @@ export const MINING_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId)
 // Named for the rock, coloured up the usual rarity ladder. `part` is the forge part tier it smelts into, which
 // is 1:1 on purpose — a member should be able to look at a lump of ore and know what it becomes.
 // `weight` is the spawn share at lantern 0; `hp` is how much chipping the node takes.
+// `hp` is the ONLY thing that ends a seam now, so it is really "how long is this hand". Sized against base
+// swing power of 18: decent play cracks tier 1 in about nine swings, sloppy play takes nearly twenty, and a
+// maxed Pickaxe roughly halves it — which is exactly what that upgrade promises. Richer rock takes longer.
+//
+// These were 60 / 110 / 190 / 320 / 520, tuned back when a hand was capped at eight swings and HP was just a
+// race the cap would win. It didn't: a single PERFECT strike does 90, so a 60 HP Coal seam died on tap one.
 export const ORE_TIERS = {
-    1: { tier: 1, id: "coal", name: "Coal Seam", color: "#8b8f96", part: 1, weight: 44, hp: 60, xp: 6, gold: 5 },
-    2: { tier: 2, id: "iron", name: "Iron Vein", color: "#cfd6dd", part: 2, weight: 30, hp: 110, xp: 12, gold: 11 },
-    3: { tier: 3, id: "silver", name: "Silver Lode", color: "#6fb0e6", part: 3, weight: 17, hp: 190, xp: 24, gold: 22 },
-    4: { tier: 4, id: "mythril", name: "Mythril Seam", color: "#b98cff", part: 4, weight: 7, hp: 320, xp: 48, gold: 44 },
-    5: { tier: 5, id: "emberheart", name: "Emberheart Geode", color: "#ffb020", part: 5, weight: 2, hp: 520, xp: 96, gold: 90 },
+    1: { tier: 1, id: "coal", name: "Coal Seam", color: "#8b8f96", part: 1, weight: 44, hp: 460, xp: 6, gold: 5 },
+    2: { tier: 2, id: "iron", name: "Iron Vein", color: "#cfd6dd", part: 2, weight: 30, hp: 520, xp: 12, gold: 11 },
+    3: { tier: 3, id: "silver", name: "Silver Lode", color: "#6fb0e6", part: 3, weight: 17, hp: 580, xp: 24, gold: 22 },
+    4: { tier: 4, id: "mythril", name: "Mythril Seam", color: "#b98cff", part: 4, weight: 7, hp: 640, xp: 48, gold: 44 },
+    5: { tier: 5, id: "emberheart", name: "Emberheart Geode", color: "#ffb020", part: 5, weight: 2, hp: 700, xp: 96, gold: 90 },
 };
 export const oreTier = (t) => ORE_TIERS[t] || ORE_TIERS[1];
 
@@ -324,9 +330,14 @@ const SWING_MISS = { key: "miss", mult: 0.5, label: "CHIP" };
 const gradeForDist = (dist) => SWING_GRADES.find((g) => dist <= g.max) || SWING_MISS;
 // Re-arm by grade, same ladder as the raid. The client owns the cadence and shows it; this is what it re-arms on.
 export const SWING_COOLDOWN_MS = { pixel: 700, perfect: 850, great: 1050, good: 1300, miss: 1600 };
+// What you actually re-arm on, after Endurance. Floored well clear of the throttle below: a cooldown that dips
+// under the anti-double-tap floor means legitimately re-armed swings get rejected, which is the exact bug that
+// silently ate strikes in the Golem raid.
+const cooldownFor = (gradeKey, vigorLevel) =>
+    Math.max(SWING_THROTTLE_MS + 60, Math.round((SWING_COOLDOWN_MS[gradeKey] ?? SWING_COOLDOWN_MS.miss) * (1 - enduranceCut(vigorLevel))));
 // Pure double-tap floor, kept comfortably UNDER the fastest grade cooldown so a legitimately re-armed swing is
 // never rejected. (The raid learned this the hard way: a floor above the fastest cooldown silently eats swings.)
-const SWING_THROTTLE_MS = 500;
+const SWING_THROTTLE_MS = 300;
 
 const COMBO_STEP = 0.10;
 const COMBO_MAX = 2.0;
@@ -336,8 +347,15 @@ const COMBO_MIN_GRADE = "good";
 // A seam gives you a FIXED number of swings and then it's spent. You are not chipping a health bar down —
 // you are playing a hand of N swings and being RANKED on it, which is the shape every other timing game here
 // uses and the only one that gives the last swing any weight.
-const BASE_HITS = 8;
-export const hitsFor = (vigorLevel = 0) => BASE_HITS + Math.max(0, Math.min(10, Number(vigorLevel) || 0));
+// SWINGS ARE NOT METERED. The trip is the budget — three descents a day — and capping swings on top was a
+// second gate on the same activity, which is what made a seam end before it had been played. You swing until
+// the rock breaks; timing decides how fast that happens and how well it scores.
+//
+// ENDURANCE used to buy extra swings, which is meaningless once they're free. It now buys what its name always
+// described: you recover faster between them, so the whole minigame plays quicker.
+const ENDURANCE_PER = 0.04;
+const ENDURANCE_CAP = 0.40;
+export const enduranceCut = (lvl = 0) => Math.min(ENDURANCE_CAP, Math.max(0, Number(lvl) || 0) * ENDURANCE_PER);
 // Score per grade. The spread is wide on purpose: a run of PIXELs should rank somewhere a run of GOODs cannot.
 export const HIT_SCORE = { pixel: 10, perfect: 7, great: 4, good: 2, miss: 0 };
 // Where a run lands. Scored as a % of the perfect score for that many swings.
@@ -362,8 +380,8 @@ export const MINE_TRACKS = {
         desc: "Harder swings — fewer to crack a seam.", effect: "Swing power" },
     haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "/images/mining/track-pack.png", col: "haul_level",
         desc: "More ore out of every seam you crack.", effect: "Ore per seam" },
-    vigor: { max: 10, per: 1, cap: 10, kind: "count", name: "Endurance", icon: "/images/mining/track-vigor.png", col: "vigor_level",
-        desc: "You last longer at the rock — more swings before the seam is spent.", effect: "Swings per seam" },
+    vigor: { max: 10, per: ENDURANCE_PER, cap: ENDURANCE_CAP, kind: "pct", name: "Endurance", icon: "/images/mining/track-vigor.png", col: "vigor_level",
+        desc: "You recover faster between swings — the pick comes back up sooner.", effect: "Swing again" },
 };
 
 // SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
@@ -567,7 +585,7 @@ export async function getMiningState(buyerId) {
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
         tracks: trackCards(MINE_TRACKS, row, trackValue, trackCost, (key, lvl) => {
             const v = trackValue(key, lvl);
-            if (key === "vigor") return `${hitsFor(lvl)} swings`;
+            if (key === "vigor") return `${Math.round(enduranceCut(lvl) * 100)}% sooner`;
             if (key === "lantern") return `+${Math.round(v * 100)}% rich`;
             return `×${(1 + v).toFixed(2)}`;
         }),
@@ -596,11 +614,10 @@ export async function getMiningState(buyerId) {
                 partTier: o.part, gold: o.gold, xp: o.xp,
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
                 mySwings: sw,
-                maxHits: hitsFor(row?.vigor_level),
-                hitsLeft: Math.max(0, hitsFor(row?.vigor_level) - sw),
-                // `pct` is how much of the HAND is left, not how much rock is. The bar used to track HP, which
-                // is why a seam could read "100% left" and then be gone one swing later.
-                pct: Math.max(0, Math.round((Math.max(0, hitsFor(row?.vigor_level) - sw) / Math.max(1, hitsFor(row?.vigor_level))) * 100)),
+                // Back to the rock itself: there is no swing budget to count down, so what you want to know is
+                // how much seam is left. Seam HP is sized for a real hand now, so this moves at a readable pace
+                // instead of emptying on the first good hit.
+                pct: current.hp_max ? Math.max(0, Math.round((current.hp / current.hp_max) * 100)) : 0,
                 // WHAT YOUR RANK BUYS — the honest version of the old ladder. It describes the DRAW (how many
                 // pulls, how loaded the bag) and never the prize, because the prize is the surprise. Sent
                 // best-first so the screen reads as something to climb toward.
@@ -684,7 +701,6 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     const comboMult = Math.min(COMBO_MAX, 1 + Math.max(0, combo - 1) * COMBO_STEP);
 
     const damage = Math.max(1, Math.round(swingPower(row) * grade.mult * comboMult));
-    const maxHits = hitsFor(row?.vigor_level);
     const hitsSoFar = (Number(prior?.swings) || 0) + 1;
     const score = (Number(prior?.grade_sum) || 0) + (HIT_SCORE[grade.key] || 0);
 
@@ -706,28 +722,23 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
     }
 
-    // THE SEAM IS SPENT AFTER A FIXED NUMBER OF SWINGS. Nothing else ends it.
-    //
-    // It used to also end the moment HP hit zero, and with base pick power of 18 a Coal seam's 60 HP died to a
-    // single PERFECT strike — so the "eight-swing hand that gets ranked at the end" was in practice one or two
-    // taps, and swinging WELL ended your turn fastest. The better you played, the less you got to play.
-    //
-    // Damage and HP are still tracked, because watching the rock come apart is the feedback for a good hit.
-    // They just no longer decide when you stop.
+    // THE ROCK BREAKING IS THE ENDING. Swing as long as you like; the seam is spent when its HP is gone.
     const hp = after?.hp ?? node.hp;
-    const spent = hitsSoFar >= maxHits;
+    const spent = hp <= 0;
     let cracked = null;
-    if (spent) cracked = await claimNode(buyerId, node, row, { score, hits: hitsSoFar, maxHits });
+    if (spent) cracked = await claimNode(buyerId, node, row, { score, hits: hitsSoFar });
 
     return {
         ok: true,
         damage, grade: grade.key, gradeLabel: grade.label,
         combo, comboMult: Math.round(comboMult * 100) / 100, comboBroken: !kept && (Number(prior?.combo) || 0) >= 3,
-        cooldownMs: SWING_COOLDOWN_MS[grade.key] ?? SWING_COOLDOWN_MS.miss,
+        cooldownMs: cooldownFor(grade.key, row?.vigor_level),
         nodeId: Number(nodeId), hp, hpMax: Number(node.hp_max),
         pct: node.hp_max ? Math.max(0, Math.round((hp / node.hp_max) * 100)) : 0,
-        hits: hitsSoFar, maxHits, hitsLeft: Math.max(0, maxHits - hitsSoFar),
-        score, scoreMax: maxHits * HIT_SCORE.pixel,
+        hits: hitsSoFar,
+        // Your running AVERAGE swing quality, 0..100 — the thing the rank is actually read off, so the HUD can
+        // show where you'd land if the rock broke on this swing.
+        quality: Math.round((score / Math.max(1, hitsSoFar * HIT_SCORE.pixel)) * 100),
         cracked,
 
     };
@@ -749,9 +760,11 @@ async function claimNode(buyerId, node, row, run = {}) {
     const o = oreTier(node.tier);
     const haulBonus = trackValue("haul", row?.haul_level);
 
-    // THE RANK. Your score across the whole hand, as a share of a flawless one.
-    const scoreMax = Math.max(1, (run.maxHits || hitsFor(row?.vigor_level)) * HIT_SCORE.pixel);
-    const pct = Math.max(0, Math.min(1, (run.score || 0) / scoreMax));
+    // THE RANK. Your AVERAGE swing quality across however many swings it took — not a share of a fixed hand,
+    // because there is no fixed hand any more. Averaging is what keeps a long sloppy grind from out-ranking a
+    // short clean one: taking twenty swings to break a seam cannot buy you a better rank than taking six.
+    const hits = Math.max(1, Number(run.hits) || 1);
+    const pct = Math.max(0, Math.min(1, (run.score || 0) / (hits * HIT_SCORE.pixel)));
     const rank = rankFor(pct);
 
     // The bag: ordinary tickets always, plus whatever your timing earned.
@@ -818,7 +831,7 @@ async function claimNode(buyerId, node, row, run = {}) {
         tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
         draws: paid, seeded: seeds.length, xp: o.xp,
         rank: rank.key, rankLabel: rank.label, rankColor: rank.color,
-        score: run.score || 0, scoreMax, pct: Math.round(pct * 100), hits: run.hits || 0,
+        score: run.score || 0, scoreMax: hits * HIT_SCORE.pixel, pct: Math.round(pct * 100), hits,
     };
 }
 

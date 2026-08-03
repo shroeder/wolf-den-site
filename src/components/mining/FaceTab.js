@@ -40,7 +40,7 @@ function NoSeam({ s, tripsLeft, backToTunnel }) {
 }
 
 export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, backToTunnel, onBreak, upgrade }) {
-    const live = Boolean(node && node.hitsLeft > 0);
+    const live = Boolean(node && node.pct > 0);
     const lvls = s.stats?.upgradeLevels ?? 0;
 
     return (
@@ -60,13 +60,11 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                             "100% left" and then be gone one swing later — a good hit killed a Coal seam
                             outright. A seam is N swings now and the bar says exactly that. */}
                         <div className="mine-hpbar"><span style={{ width: `${node.pct}%`, background: node.color }} /></div>
-                        {/* "8 of 8 swings left" on an untouched seam is a riddle — it reads as a fraction when
-                            nothing has happened yet. Say what the hand IS before you start, and count down
-                            once you're in it. */}
+                        {/* Swings aren't rationed, so there is no budget to report. What matters is how much
+                            rock is left and how long you've been at it. */}
                         <div className="mine-hpnum">
-                            {node.mySwings
-                                ? <><b>{node.hitsLeft}</b> swing{node.hitsLeft === 1 ? "" : "s"} left of {node.maxHits}</>
-                                : <>A hand of <b>{node.maxHits}</b> swings</>}
+                            <b>{node.pct}%</b> of the seam left
+                            {node.mySwings ? ` · ${node.mySwings} swing${node.mySwings === 1 ? "" : "s"} in` : ""}
                         </div>
                         {floats.map((f) => <span key={f.id} className={`mine-float is-${f.grade}`}>{f.dmg}</span>)}
                     </>
@@ -81,8 +79,9 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                         that you are buying PULLS and better odds, and deliberately never says what comes out. */}
                     <div className="mine-ladder">
                         <p className="mine-ladder-intro">
-                            <b>Every seam pays out of a bag.</b> How well you swing decides how many times you
-                            pull from it — and how much good stuff is in it to pull.
+                            <b>Every seam pays out of a bag.</b> Swing as long as you like — the trip is the
+                            only limit. Your AVERAGE swing quality across the seam decides how many times you
+                            pull from the bag, and how much good stuff is in it to pull.
                         </p>
                         {(node.ranks || []).map((r) => (
                             <div key={r.key} className="mine-rank-row" style={{ "--rk": r.color }}>

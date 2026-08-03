@@ -26,7 +26,7 @@ export default function MiningClient({ initial }) {
     // This is the "why can't I mine?" state, and it's what the nudge keys off.
     // hitsLeft, not pct — "is there a seam with swings on it" is the actual question, and reading it off a
     // percentage is how a spent seam ended up looking like a live one.
-    const needsTrip = !s.run && !(node && node.hitsLeft > 0) && tripsLeft > 0;
+    const needsTrip = !s.run && !(node && node.pct > 0) && tripsLeft > 0;
 
     // A badge is a claim that something here is worth a look, so it must never render a 0 — "Descend (0)" on a
     // run you just started reads as an error, not as information. Depth only counts once you have actually
