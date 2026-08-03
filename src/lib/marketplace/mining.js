@@ -5,6 +5,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { addChests } from "@/lib/marketplace/chests.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -51,6 +52,206 @@ export const rungForQuality = (q) => [...MINE_RUNGS].reverse().find((r) => q >= 
 // Base ore a seam holds before the rung multiplier and the Haul track.
 export const baseOre = (tier) => 2 + tier;
 export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
+
+
+// ── THE DESCENT ──────────────────────────────────────────────────────────────────────────────────────────────
+// Push-your-luck. Each step down the tunnel flips a card; the deeper you are the better the cards AND the
+// likelier the roof comes in. Bail whenever you want and everything you are carrying is yours; push once too
+// far and the haul is gone.
+//
+// You always walk out with a SEAM either way — collapsing costs you the loot bag, not the trip. A run that can
+// end in nothing at all just teaches people to bail at depth 2 forever, which is a habit rather than a choice.
+export const TRIPS_PER_DAY = 3;
+const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
+const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs
+const COLLAPSE_CAP = 0.55;
+export const collapseChanceAt = (depth) => Math.min(COLLAPSE_CAP, Math.max(0, depth - COLLAPSE_FREE_DEPTH) * COLLAPSE_PER_DEPTH);
+
+// What the tunnel can turn up. Weights shift with depth — shallow rock is mostly ore and rubble, deep rock is
+// where the gear and the strongboxes are. A `seam` card raises the tier of what you end up mining.
+const CARD_TABLE = [
+    { key: "seam", label: "A seam in the wall", w: (d) => 26 + d * 2 },
+    { key: "ore", label: "Loose ore", w: () => 20 },
+    { key: "gold", label: "A dropped purse", w: () => 14 },
+    { key: "consumable", label: "An old cache", w: (d) => 10 + d },
+    { key: "gear", label: "Something buried", w: (d) => 4 + d * 2.2 },
+    { key: "chest", label: "A strongbox", w: (d) => 2 + d * 1.4 },
+    { key: "encounter", label: "Something down here", w: (d) => 6 + d },
+    { key: "nothing", label: "Bare rock", w: () => 16 },
+];
+const drawCard = (depth) => {
+    const rolled = CARD_TABLE.map((c) => ({ ...c, weight: c.w(depth) }));
+    const total = rolled.reduce((s, c) => s + c.weight, 0) || 1;
+    let r = Math.random() * total;
+    for (const c of rolled) { r -= c.weight; if (r <= 0) return c; }
+    return rolled[rolled.length - 1];
+};
+
+// Encounters — flavour with teeth. Each one lands an immediate consequence rather than opening another menu.
+const ENCOUNTERS = [
+    { key: "bats", title: "Bats!", body: "They boil out of the dark and knock the wind out of you.", effect: "none" },
+    { key: "gas", title: "Firedamp", body: "The lamp gutters. The air down here has gone bad.", effect: "risk" },
+    { key: "pool", title: "A still black pool", body: "Something glitters at the bottom of it.", effect: "ore" },
+    { key: "shaft", title: "An older shaft", body: "Someone cut this before you. Their tools are still here.", effect: "consumable" },
+    { key: "vein", title: "The vein widens", body: "The rock ahead is threaded with colour.", effect: "seam" },
+];
+
+function rollFind(card, depth) {
+    const tierCeil = Math.min(5, 1 + Math.floor(depth / 2));
+    const pickTier = () => Math.max(1, Math.min(5, tierCeil - (Math.random() < 0.45 ? 1 : 0)));
+    switch (card.key) {
+        case "seam": {
+            const t = pickTier();
+            const o = oreTier(t);
+            return { kind: "seam", tier: t, name: o.name, color: o.color, art: oreArt(t) };
+        }
+        case "ore": {
+            const t = pickTier();
+            const o = oreTier(t);
+            return { kind: "ore", tier: t, n: 1 + Math.floor(Math.random() * 2), name: o.name, color: o.color, art: oreArt(t) };
+        }
+        case "gold": return { kind: "gold", n: 20 + Math.floor(Math.random() * (18 * depth + 20)) };
+        case "consumable": return { kind: "consumable" };
+        case "gear": return { kind: "gear", depth };
+        case "chest": {
+            const ladder = ["wooden", "wooden", "iron", "iron", "gold", "gold", "mythic"];
+            return { kind: "chest", tier: ladder[Math.min(ladder.length - 1, depth - 1)] || "wooden" };
+        }
+        case "encounter": {
+            const e = ENCOUNTERS[Math.floor(Math.random() * ENCOUNTERS.length)];
+            const t = e.effect === "seam" || e.effect === "ore" ? pickTier() : null;
+            const o = t ? oreTier(t) : null;
+            return { kind: "encounter", key: e.key, title: e.title, body: e.body, effect: e.effect, tier: t, name: o?.name || null, color: o?.color || null, art: t ? oreArt(t) : null };
+        }
+        default: return { kind: "nothing" };
+    }
+}
+
+// Start a descent. Costs one of the day's trips.
+export async function startTrip(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    if (row?.run_json && !row.run_json.over) return { ok: false, error: "run_in_progress", ...(await getMiningState(buyerId)) };
+    if ((Number(row?.trips_used) || 0) >= TRIPS_PER_DAY) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
+    const spent = await db.queryOne(
+        `UPDATE mkt_mining SET trips_used = trips_used + 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND trips_day = ${DAY} AND trips_used < $2 RETURNING trips_used`,
+        [buyerId, TRIPS_PER_DAY]
+    ).catch(() => null);
+    if (!spent) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
+    const run = { depth: 0, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
+    await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb, current_node_id = NULL WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
+    await trackActivity(buyerId, "mine_trip", {}).catch(() => {});
+    return { ok: true, ...(await getMiningState(buyerId)) };
+}
+
+// One step deeper.
+export async function descend(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const run = row?.run_json;
+    if (!run || run.over) return { ok: false, error: "no_run" };
+    const depth = (Number(run.depth) || 0) + 1;
+
+    // THE ROOF. Rolled before the card, so a collapse is the tunnel deciding rather than a reward being shown
+    // to you and then snatched back.
+    if (Math.random() < collapseChanceAt(depth)) {
+        const lost = (run.haul || []).length;
+        const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
+        await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+        await trackActivity(buyerId, "mine_collapse", { depth, lost }).catch(() => {});
+        const seam = await cutSeam(buyerId, Math.max(1, (Number(run.seamTier) || 1) - 1));
+        return { ok: true, collapsed: true, depth, lost, seam, ...(await getMiningState(buyerId)) };
+    }
+
+    const card = drawCard(depth);
+    const found = rollFind(card, depth);
+    const haul = [...(run.haul || [])];
+    let seamTier = Number(run.seamTier) || 1;
+    if (found.kind === "seam") seamTier = Math.max(seamTier, found.tier);
+    else if (found.kind === "encounter") {
+        if (found.effect === "seam") seamTier = Math.max(seamTier, found.tier || 1);
+        else if (found.effect === "ore") haul.push({ kind: "ore", tier: found.tier, n: 2, name: found.name, color: found.color, art: found.art });
+        else if (found.effect === "consumable") haul.push({ kind: "consumable" });
+    } else if (found.kind !== "nothing") haul.push(found);
+
+    const next = { ...run, depth, haul, seamTier, last: { kind: found.kind, label: card.label } };
+    await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+    return { ok: true, card: { key: card.key, label: card.label }, found, depth, ...(await getMiningState(buyerId)) };
+}
+
+// Climb out with everything you are carrying, and take the seam to the rock face.
+export async function surfaceRun(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const run = row?.run_json;
+    if (!run || run.over) return { ok: false, error: "no_run" };
+
+    // Everything banked pays out NOW. The haul was only ever a promise until you climbed out with it.
+    const paid = [];
+    for (const item of run.haul || []) {
+        if (item.kind === "ore") {
+            await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "gold") {
+            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
+            await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "descent" } }).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "chest") {
+            await addChests(buyerId, { [item.tier]: 1 }, { source: "mining" }).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "gear") {
+            const got = await grantMiningGear(buyerId, item.depth);
+            if (got) paid.push({ ...item, ...got });
+        } else if (item.kind === "consumable") {
+            const got = await grantMiningConsumable(buyerId);
+            if (got) paid.push({ ...item, ...got });
+        }
+    }
+    const next = { ...run, over: true, collapsed: false };
+    await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
+    const seam = await cutSeam(buyerId, Number(run.seamTier) || 1);
+    await trackActivity(buyerId, "mine_surface", { depth: run.depth, haul: paid.length }).catch(() => {});
+    return { ok: true, surfaced: true, paid, seam, ...(await getMiningState(buyerId)) };
+}
+
+// The seam you walked out with becomes the rock you mine.
+async function cutSeam(buyerId, tier) {
+    const o = oreTier(Math.max(1, Math.min(5, tier)));
+    const made = await db.queryOne(
+        `INSERT INTO mkt_ore_node (tier, x, y, hp, hp_max, expires_at)
+         VALUES ($1, 50, 70, $2, $2, NOW() + INTERVAL '12 hours') RETURNING id`,
+        [o.tier, o.hp]
+    ).catch(() => null);
+    if (made?.id) await db.query(`UPDATE mkt_mining SET current_node_id = $2 WHERE buyer_id = $1`, [buyerId, made.id]).catch(() => {});
+    return made?.id ? { tier: o.tier, name: o.name, color: o.color, art: oreArt(o.tier) } : null;
+}
+
+// A piece of gear out of the dark. Deeper digs reach higher rarities; never a duplicate.
+async function grantMiningGear(buyerId, depth) {
+    const ladder = depth >= 8 ? ["legendary", "epic", "rare"] : depth >= 5 ? ["epic", "rare", "common"] : ["rare", "common"];
+    const [{ randomDropPool }, { grantItem }] = await Promise.all([
+        import("@/lib/marketplace/items.js"),
+        import("@/lib/marketplace/inventory.js"),
+    ]);
+    const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+    for (const rarity of ladder) {
+        const pool = randomDropPool((i) => i.rarity === rarity && !owned.has(i.id));
+        if (!pool.length) continue;
+        const it = pool[Math.floor(Math.random() * pool.length)];
+        await grantItem(buyerId, it.id, "mining").catch(() => {});
+        return { id: it.id, name: it.name, rarity: it.rarity };
+    }
+    return null;
+}
+
+const MINE_CONSUMABLES = ["treat_bone", "farm_growth_tonic", "pot_adrenaline", "farm_fertilizer_crate", "sail_lucky_lure"];
+async function grantMiningConsumable(buyerId) {
+    const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
+    const id = MINE_CONSUMABLES[Math.floor(Math.random() * MINE_CONSUMABLES.length)];
+    await grantConsumable(buyerId, id, 1).catch(() => {});
+    return { id, name: CONSUMABLES[id]?.name || id };
+}
 
 // ── THE SWING ────────────────────────────────────────────────────────────────────────────────────────────────
 // Bands and multipliers mirror town-events.js exactly. They are duplicated rather than imported because a
@@ -219,7 +420,9 @@ async function minerRow(buyerId) {
     return db
         .queryOne(
             `UPDATE mkt_mining
-                SET swing_used = CASE WHEN swing_day = ${DAY} THEN swing_used ELSE 0 END,
+                SET trips_used = CASE WHEN trips_day = ${DAY} THEN trips_used ELSE 0 END,
+                    trips_day = ${DAY},
+                    swing_used = CASE WHEN swing_day = ${DAY} THEN swing_used ELSE 0 END,
                     swing_bonus = CASE WHEN swing_day = ${DAY} THEN swing_bonus ELSE 0 END,
                     swing_day = ${DAY}
               WHERE buyer_id = $1
@@ -269,12 +472,26 @@ export async function getMiningState(buyerId) {
     ]);
 
     const lvls = totalLevels(row);
-    const allowance = SWINGS_PER_DAY + trackValue("vigor", row?.vigor_level) + (Number(row?.swing_bonus) || 0);
+    const tripsUsed = Number(row?.trips_used) || 0;
+    const run = row?.run_json && !row.run_json.over ? row.run_json : null;
     return {
         unlocked: true,
 
         pick: pickForm(lvls),
-        swings: { used: Number(row?.swing_used) || 0, allowance, left: Math.max(0, allowance - (Number(row?.swing_used) || 0)) },
+        trips: { used: tripsUsed, max: TRIPS_PER_DAY, left: Math.max(0, TRIPS_PER_DAY - tripsUsed) },
+        // The descent in progress, if there is one. Depth, what you are carrying, and how bad the next step is.
+        run: run ? {
+            depth: Number(run.depth) || 0,
+            seamTier: Number(run.seamTier) || 1,
+            seamName: oreTier(Number(run.seamTier) || 1).name,
+            seamColor: oreTier(Number(run.seamTier) || 1).color,
+            seamArt: oreArt(Number(run.seamTier) || 1),
+            haul: run.haul || [],
+            last: run.last || null,
+            risk: Math.round(collapseChanceAt((Number(run.depth) || 0) + 1) * 100),
+        } : null,
+        // How the last descent ended, so the client can show the wrap-up once.
+        lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
         tracks: trackCards(MINE_TRACKS, row, trackValue, trackCost, (key, lvl) => {
             const v = trackValue(key, lvl);
             if (key === "vigor") return `${SWINGS_PER_DAY + v} swings`;
@@ -582,8 +799,8 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     const row = await minerRow(buyerId);
     if (!row) return { ok: false, error: "no_miner" };
 
-    const allowance = SWINGS_PER_DAY + trackValue("vigor", row.vigor_level) + (Number(row.swing_bonus) || 0);
-    if ((Number(row.swing_used) || 0) >= allowance) return { ok: false, error: "out_of_swings" };
+    // Swings are NOT metered any more. You paid for the trip; the seam is yours to break. Metering both was
+    // two budgets guarding one activity, and the second one only ever stopped people mid-rock.
 
     const node = await db.queryOne(`SELECT id, tier, hp, hp_max, x, y FROM mkt_ore_node WHERE id = $1 AND status = 'active'`, [nodeId]).catch(() => null);
     if (!node) return { ok: false, error: "node_gone" };
@@ -598,32 +815,31 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     const clamped = dist == null || Number.isNaN(Number(dist)) ? 0.5 : Math.min(0.5, Math.max(0, Number(dist)));
     const grade = gradeForDist(clamped);
 
+    // SEEDING THE POOL. A good swing does not make a known reward bigger — it drops a rarer TICKET into the
+    // bag you will draw from when the seam breaks. So timing raises what is POSSIBLE, and the haul is still a
+    // surprise. That is the whole difference between "you earned 7 ore" and "what did I get?".
+    const seeded = grade.key === "pixel" ? ["rare", "rare"] : grade.key === "perfect" ? ["rare"]
+        : grade.key === "great" ? ["good"] : [];
+
     const kept = (GRADE_RANK[grade.key] ?? 0) >= GRADE_RANK[COMBO_MIN_GRADE];
     const combo = kept ? (Number(prior?.combo) || 0) + 1 : 0;
     const comboMult = Math.min(COMBO_MAX, 1 + Math.max(0, combo - 1) * COMBO_STEP);
 
     const damage = Math.max(1, Math.round(swingPower(row) * grade.mult * comboMult));
 
-    // Spend the swing first, atomically — a swing that lands must always have been paid for.
-    const spent = await db
-        .queryOne(
-            `UPDATE mkt_mining SET swing_used = swing_used + 1, updated_at = NOW()
-              WHERE buyer_id = $1 AND swing_day = ${DAY} AND swing_used < $2 RETURNING swing_used`,
-            [buyerId, allowance]
-        )
-        .catch(() => null);
-    if (!spent) return { ok: false, error: "out_of_swings" };
+    await db.query(`UPDATE mkt_mining SET swing_used = swing_used + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
 
     const after = await db.queryOne(
         `UPDATE mkt_ore_node SET hp = GREATEST(0, hp - $2) WHERE id = $1 AND status = 'active' RETURNING hp`,
         [nodeId, damage]
     ).catch(() => null);
     await db.query(
-        `INSERT INTO mkt_ore_node_hit (node_id, buyer_id, damage, swings, combo, last_swing_at, grade_sum) VALUES ($1, $2, $3, 1, $4, $5, $6)
+        `INSERT INTO mkt_ore_node_hit (node_id, buyer_id, damage, swings, combo, last_swing_at, grade_sum, pool_json) VALUES ($1, $2, $3, 1, $4, $5, $6, $7::jsonb)
          ON CONFLICT (node_id, buyer_id) DO UPDATE SET damage = mkt_ore_node_hit.damage + $3,
              swings = mkt_ore_node_hit.swings + 1, combo = $4, last_swing_at = $5,
-             grade_sum = mkt_ore_node_hit.grade_sum + $6`,
-        [nodeId, buyerId, damage, combo, arrivedAt, grade.mult]
+             grade_sum = mkt_ore_node_hit.grade_sum + $6,
+             pool_json = COALESCE(mkt_ore_node_hit.pool_json, '[]'::jsonb) || $7::jsonb`,
+        [nodeId, buyerId, damage, combo, arrivedAt, grade.mult, JSON.stringify(seeded)]
     ).catch(() => {});
     if (combo > (Number(row.best_combo) || 0)) {
         await db.query(`UPDATE mkt_mining SET best_combo = $2 WHERE buyer_id = $1`, [buyerId, combo]).catch(() => {});
@@ -641,46 +857,84 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         nodeId: Number(nodeId), hp, hpMax: Number(node.hp_max),
         pct: node.hp_max ? Math.max(0, Math.round((hp / node.hp_max) * 100)) : 0,
         cracked,
-        swingsLeft: Math.max(0, allowance - (Number(spent.swing_used) || 0)),
+
     };
 }
 
-// The node broke. Whoever landed the blow takes the ore; the node closes and the next read spawns a replacement.
+// The seam broke. WHAT IT HELD IS A DRAW, not a sum.
+//
+// The bag always holds ordinary rock. Every clean swing you landed dropped a better ticket in. Then you pull
+// three times and find out. Nothing is decided until the seam opens, which is the point — a fixed payout you
+// could compute on the way in is not a reward, it is an invoice.
 async function claimNode(buyerId, node, row) {
     const won = await db
         .queryOne(`UPDATE mkt_ore_node SET status = 'mined', mined_by = $2, mined_at = NOW() WHERE id = $1 AND status = 'active' RETURNING tier`, [node.id, buyerId])
         .catch(() => null);
     if (!won) return null; // someone else's swing landed first
 
+    const mine = await db.queryOne(`SELECT swings, pool_json FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`, [node.id, buyerId]).catch(() => null);
+    const seeds = Array.isArray(mine?.pool_json) ? mine.pool_json : [];
     const o = oreTier(node.tier);
-    // How well you actually dug it: mean grade across your swings on this seam, normalised.
-    const mine = await db.queryOne(`SELECT swings, grade_sum FROM mkt_ore_node_hit WHERE node_id = $1 AND buyer_id = $2`, [node.id, buyerId]).catch(() => null);
-    const swings = Math.max(1, Number(mine?.swings) || 1);
-    const quality = Math.max(0, Math.min(1, (Number(mine?.grade_sum) || 0) / swings / MAX_GRADE_MULT));
-    const rung = rungForQuality(quality);
-    const haul = Math.max(1, Math.round(baseOre(node.tier) * rung.mult * (1 + trackValue("haul", row?.haul_level))));
-    await db.query(
-        `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1, $2, $3)
-         ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,
-        [buyerId, node.tier, haul]
-    ).catch(() => {});
-    await db.query(
-        `UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, updated_at = NOW() WHERE buyer_id = $1`,
-        [buyerId, haul]
-    ).catch(() => {});
+    const haulBonus = trackValue("haul", row?.haul_level);
 
-    const gold = o.gold;
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
-    await logCoin(buyerId, gold, "mining", { balanceAfter: paid?.gold, meta: { tier: node.tier } }).catch(() => {});
-    // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is a repeatable action.
+    // The bag: ordinary tickets always, plus whatever your timing earned.
+    const bag = [];
+    for (let i = 0; i < 6; i += 1) bag.push("ore");
+    for (const s2 of seeds) bag.push(s2 === "rare" ? "rare" : "good");
+
+    const DRAWS = 3 + (Math.random() < haulBonus ? 1 : 0);
+    const out = [];
+    for (let i = 0; i < DRAWS; i += 1) {
+        const ticket = bag[Math.floor(Math.random() * bag.length)] || "ore";
+        if (ticket === "ore") {
+            const n = 1 + Math.floor(Math.random() * 2);
+            out.push({ kind: "ore", tier: node.tier, n, name: o.name, color: o.color, art: oreArt(node.tier) });
+        } else if (ticket === "good") {
+            // The middle of the bag: a better grade of ordinary — more of it, or a rung up.
+            const up = Math.random() < 0.4 && node.tier < 5 ? node.tier + 1 : node.tier;
+            const uo = oreTier(up);
+            out.push({ kind: "ore", tier: up, n: 2 + Math.floor(Math.random() * 2), name: uo.name, color: uo.color, art: oreArt(up) });
+        } else {
+            // RARE tickets are where the fun lives — the things you cannot get by grinding ore.
+            const roll = Math.random();
+            if (roll < 0.34) out.push({ kind: "chest", tier: node.tier >= 4 ? "gold" : node.tier >= 2 ? "iron" : "wooden" });
+            else if (roll < 0.68) out.push({ kind: "gear", depth: 3 + node.tier });
+            else if (roll < 0.88) out.push({ kind: "consumable" });
+            else out.push({ kind: "gold", n: 60 + node.tier * 40 + Math.floor(Math.random() * 60) });
+        }
+    }
+
+    // Pay the draw out.
+    const paid = [];
+    for (const item of out) {
+        if (item.kind === "ore") {
+            await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "gold") {
+            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
+            await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "seam" } }).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "chest") {
+            await addChests(buyerId, { [item.tier]: 1 }, { source: "mining" }).catch(() => {});
+            paid.push(item);
+        } else if (item.kind === "gear") {
+            const got = await grantMiningGear(buyerId, item.depth);
+            if (got) paid.push({ ...item, ...got }); else paid.push({ kind: "gold", n: 80 });
+        } else if (item.kind === "consumable") {
+            const got = await grantMiningConsumable(buyerId);
+            if (got) paid.push({ ...item, ...got });
+        }
+    }
+
+    const oreTotal = paid.filter((x) => x.kind === "ore").reduce((n, x) => n + x.n, 0);
+    await db.query(`UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, current_node_id = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, oreTotal]).catch(() => {});
+    // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
     await awardXp(buyerId, "mining", { points: o.xp, gold: 0 }).catch(() => {});
-    await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: haul }).catch(() => {});
+    await trackActivity(buyerId, "ore_mined", { tier: node.tier, draws: paid.length, seeds: seeds.length }).catch(() => {});
 
     return {
         tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
-        ore: haul, gold, xp: o.xp, partTier: o.part,
-        rung: rung.rung, rungKey: rung.key, rungLabel: rung.label, rungBlurb: rung.blurb,
-        quality: Math.round(quality * 100), swings,
+        draws: paid, seeded: seeds.length, xp: o.xp,
     };
 }
 

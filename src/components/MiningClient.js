@@ -47,8 +47,6 @@ export default function MiningClient({ initial }) {
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
     const [tab, setTab] = useState("survey");
-    const [pickedSpot, setPickedSpot] = useState(null); // spot selected on the rock face
-    const [sounding, setSounding] = useState(null); // spot mid test-strike, for the echo animation
     const [reveal, setReveal] = useState(null); // the whole face, shown after you commit // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
@@ -60,52 +58,48 @@ export default function MiningClient({ initial }) {
     }, []);
     const say = (m) => { setMsg(m); setTimeout(() => setMsg(null), 2400); };
 
-    // ── THE SURVEY ── lay out a rock face, sound out a few spots, commit to one.
-    const survey = async () => {
+    // ── THE DESCENT ── push-your-luck. Start a trip, keep going, or climb out with what you have.
+    const [card, setCard] = useState(null);      // the last thing the tunnel turned up
+    const [wrap, setWrap] = useState(null);      // surfaced / collapsed summary
+
+    const startTrip = async () => {
         if (busy) return;
-        setBusy(true);
-        const r = await post({ action: "survey" });
+        setBusy(true); setCard(null); setWrap(null);
+        const r = await post({ action: "trip" });
         setBusy(false);
-        if (r?.unlocked) { setState(r); setCrack(null); }
-        else say(r?.error === "no_seams" ? "No seams exposed right now — try again shortly." : "Couldn't read the rock face.");
-    };
-    // Sounding out a spot is a MOMENT, not an instant state flip: the mark rings, a shockwave goes out, and
-    // the reading lands after it. The server call runs alongside the animation rather than after it, so the
-    // beat costs nothing in real time.
-    const probe = async (index) => {
-        if (busy || sounding != null) return;
-        setSounding(index);
-        setBusy(true);
-        clink(0.5);
-        const [r] = await Promise.all([
-            post({ action: "probe", index }),
-            new Promise((res) => setTimeout(res, 620)),
-        ]);
-        setBusy(false);
-        setSounding(null);
-        if (r?.unlocked) {
-            setState(r);
-            clink(r.signal === "deep" ? 1 : r.signal === "ring" ? 0.7 : 0.35);
-            try { navigator.vibrate?.(r.signal === "deep" ? [24, 40, 60] : r.signal === "ring" ? [16, 30] : [10]); } catch { /* no haptics */ }
-        } else say(r?.error === "no_probes" ? "No test-strikes left — pick a spot." : "Couldn't sound that out.");
+        if (r?.unlocked && r?.ok !== false) setState(r);
+        else say(r?.error === "no_trips" ? "No trips left today — three a day." : r?.error === "run_in_progress" ? "You're already down there." : "Couldn't start.");
     };
 
-    const claimSpot = async (index) => {
+    const goDeeper = async () => {
         if (busy) return;
         setBusy(true);
-        const r = await post({ action: "claim_spot", index });
+        const r = await post({ action: "descend" });
         setBusy(false);
-        if (r?.unlocked && r?.ok !== false) {
-            setState(r);
-            setPickedSpot(null);
-            if (r.reveal) { setReveal(r.reveal); if (r.reveal.bestRead) clink(1); }
-            else setTab("mine");
+        if (!r?.ok) { say("Couldn't go deeper."); return; }
+        setState(r);
+        if (r.collapsed) {
+            setCard(null);
+            setWrap({ collapsed: true, depth: r.depth, lost: r.lost, seam: r.seam });
+            clink(0.2);
+            try { navigator.vibrate?.([40, 60, 40, 60, 120]); } catch { /* no haptics */ }
+        } else {
+            setCard({ ...r.found, label: r.card?.label, depth: r.depth, k: Date.now() });
+            clink(r.found?.kind === "gear" || r.found?.kind === "chest" ? 1 : r.found?.kind === "nothing" ? 0.2 : 0.6);
         }
-        else if (r?.error === "spot_gone") { if (r?.unlocked) setState(r); say("That spot collapsed — survey again."); }
-        else say("Couldn't start on that spot.");
     };
-    // Kept as one name for everywhere that used to "find a seam" — it now opens a survey.
-    const prospect = survey;
+
+    const surface = async () => {
+        if (busy) return;
+        setBusy(true);
+        const r = await post({ action: "surface" });
+        setBusy(false);
+        if (!r?.ok) { say("Couldn't climb out."); return; }
+        setState(r);
+        setCard(null);
+        setWrap({ collapsed: false, paid: r.paid || [], seam: r.seam });
+        clink(1);
+    };
 
     const onSwing = useCallback(async (d) => {
         const r = await post({ action: "swing", nodeId: state.node?.id, dist: d });
@@ -162,20 +156,20 @@ export default function MiningClient({ initial }) {
 
     const s = state;
     const node = s.node;
-    const swingsLeft = s.swings?.left ?? 0;
+    const swingsLeft = 1; // swings are unmetered now; the TRIP is the budget
     // Nothing to swing at, no wall read, and swings to spend — i.e. the player can act but has no seam. This is
     // the "why can't I mine?" state, and it's what the Survey nudges key off.
-    const needsSurvey = !s.survey && !(node && node.pct > 0) && swingsLeft > 0;
+    const needsSurvey = !s.run && !(node && node.pct > 0) && (s.trips?.left ?? 0) > 0;
     const lvls = s.stats?.upgradeLevels ?? 0;
 
     return (
         <section className="card mine-wrap">
             <div className="mine-top">
                 <span className="mine-title">⛏️ The Mine</span>
-                <span className="mine-sub">owner preview · {swingsLeft}/{s.swings?.allowance ?? 0} swings today</span>
+                <span className="mine-sub">owner preview · {s.trips?.left ?? 0}/{s.trips?.max ?? 3} trips today</span>
                 {needsSurvey && tab === "mine" ? (
-                    <button type="button" className="mine-nudge" onClick={() => { setTab("survey"); survey(); }}>
-                        No seam yet — survey one →
+                    <button type="button" className="mine-nudge" onClick={() => { setTab("survey"); startTrip(); }}>
+                        No seam yet — head down →
                     </button>
                 ) : null}
             </div>
@@ -183,11 +177,10 @@ export default function MiningClient({ initial }) {
             {/* Two halves, two tabs — the same shape fishing and the forge use. */}
             <div className="mine-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "survey"} className={tab === "survey" ? "is-on" : ""} onClick={() => setTab("survey")}>
-                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> <span>Survey</span>
+                    <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> <span>Descend</span>
                     {/* Badge the strikes you can still spend — or a plain "!" when there's nothing to mine and
                         no face read, because that's the state where a player is stuck without knowing why. */}
-                    {s.survey?.left ? <span className="mine-tab-badge">{s.survey.left}</span>
-                        : needsSurvey ? <span className="mine-tab-badge">!</span> : null}
+                    {s.run ? <span className="mine-tab-badge">{s.run.depth}</span> : s.trips?.left ? <span className="mine-tab-badge">{s.trips.left}</span> : null}
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
                     <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="⛏️" /> <span>Mine</span>
@@ -200,107 +193,69 @@ export default function MiningClient({ initial }) {
 
             {tab === "survey" ? (
             <>
-            {/* ── THE ROCK FACE ── the survey happens ON the wall, not in a list. */}
-            {(() => {
-                // Marks sit where the wall actually put them, so veins read spatially — a rich cluster LOOKS
-                // like a cluster. Falls back to a scatter only if a face predates the layout.
-                const SPOT_POS = [[22, 34], [50, 24], [76, 38], [33, 66], [64, 68], [14, 56], [86, 60]];
-                const sv = s.survey;
-                const sel = sv ? sv.spots.find((x) => x.index === pickedSpot) || null : null;
-                return (
+            <div className="mine-face is-survey">
+                <div className="mine-face-bg is-survey" aria-hidden="true" />
+                {s.run ? (
                     <>
-                        {sv?.manifest?.length ? (
-                            <div className="mine-manifest">
-                                <span className="mine-manifest-lab">This wall holds</span>
-                                <span className="mine-manifest-list">
-                                    {sv.manifest.map((m) => (
-                                        <span key={`${m.tier}-${m.name}`} className={`mine-manifest-item${m.unknown ? " is-unknown" : ""}`} title={m.name}>
-                                            {m.unknown ? <span className="mine-manifest-q" aria-hidden="true">?</span>
-                                                : <Img src={m.art} className="mine-manifest-ore" fallback="◆" />}
-                                            <b style={{ color: m.color }}>{m.unknown ? "Something rich" : m.name.split(" ")[0]}</b>
-                                            <em>×{m.n}</em>
-                                        </span>
-                                    ))}
-                                </span>
-                                <span className="mine-manifest-note">Where they are is the part you have to work out.</span>
+                        <div className="mine-depth">DEPTH {s.run.depth}</div>
+                        {card ? (
+                            <div className="mine-card" key={card.k}>
+                                <span className="mine-card-lab">{card.label}</span>
+                                {card.kind === "encounter" ? (
+                                    <><b style={{ color: "#ff9a8a" }}>{card.title}</b><em>{card.body}</em></>
+                                ) : card.kind === "nothing" ? (
+                                    <><b className="muted">Nothing</b><em>Just rock.</em></>
+                                ) : card.kind === "gold" ? (
+                                    <><b style={{ color: "#ffd75e" }}>{money(card.n)} gold</b><em>Into the bag.</em></>
+                                ) : card.kind === "ore" ? (
+                                    <><Img src={card.art} className="mine-card-art" fallback="◆" /><b style={{ color: card.color }}>{card.name} ×{card.n}</b></>
+                                ) : card.kind === "seam" ? (
+                                    <><Img src={card.art} className="mine-card-art" fallback="◆" /><b style={{ color: card.color }}>{card.name}</b><em>The seam you'll work gets better.</em></>
+                                ) : card.kind === "gear" ? (
+                                    <><b style={{ color: "#b061ff" }}>Something buried</b><em>You won't know what until you're out.</em></>
+                                ) : card.kind === "chest" ? (
+                                    <><b style={{ color: "#ffd75e" }}>A strongbox</b><em>Sealed. Carry it up.</em></>
+                                ) : (
+                                    <><b>An old cache</b><em>Supplies, by the feel of it.</em></>
+                                )}
                             </div>
-                        ) : null}
-
-                        <div className={`mine-face is-survey${sv?.motherlode ? " is-motherlode" : ""}`}>
-                            <div className="mine-face-bg is-survey" aria-hidden="true" />
-                            {sv?.motherlode ? <div className="mine-motherlode-tag">✦ This wall is hiding something</div> : null}
-                            {(sv?.spots || []).map((sp, i) => {
-                                const [fx, fy] = SPOT_POS[i % SPOT_POS.length];
-                                const x = sp.x ?? fx, y = sp.y ?? fy;
-                                const col = sp.exact?.color || sp.signal?.color || null;
-                                return (
-                                    <button key={sp.index} type="button"
-                                        className={`mine-mark${sp.revealed ? " is-read" : ""}${pickedSpot === sp.index ? " is-sel" : ""}${sounding === sp.index ? " is-sounding" : ""}`}
-                                        style={{ left: `${x}%`, top: `${y}%`, ...(col ? { "--sig": col } : {}) }}
-                                        onClick={() => { setPickedSpot(sp.index); if (!sp.revealed) probe(sp.index); }}
-                                        title={sp.revealed ? (sp.exact?.name || sp.signal?.label) : "Unread rock — tap to sound it"}>
-                                        {sp.revealed && (sp.exact || sp.signal)
-                                            ? <Img src={sp.exact?.art} className="mine-mark-ore" fallback="◆" />
-                                            : <span className="mine-mark-q">?</span>}
-                                        <span className="mine-mark-n">{sp.index + 1}</span>
-                                    </button>
-                                );
-                            })}
-                            {/* No face laid out yet — the wall is still the wall, with the way in on top of it. */}
-                            {!sv ? (
-                                <div className="mine-face-cta">
-                                    <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="🏮" />
-                                    <p>Bare rock.</p>
-                                    <button type="button" className="mine-prospect" onClick={survey} disabled={busy || swingsLeft <= 0}>
-                                        {swingsLeft <= 0 ? "No swings left today" : "🔍 Survey the rock face"}
-                                    </button>
-                                </div>
-                            ) : null}
-                            {sv ? (
-                                <div className="mine-survey-hud">
-                                    <span className="mine-pips-strike" aria-label={`${sv.left} of ${sv.probes} test-strikes left`}>
-                                        {Array.from({ length: sv.probes }, (_, k) => <i key={k} className={k < sv.left ? "on" : ""}>🔨</i>)}
-                                    </span>
-                                    <span>{sv.spots.length} spots · tap one to sound it</span>
-                                {s.streak?.current >= 2 ? <span className="mine-streak">🔥 {s.streak.current} best-read streak</span> : null}
-                                </div>
-                            ) : null}
-                            {msg ? <div className="mine-msg">{msg}</div> : null}
+                        ) : <div className="mine-card is-idle"><em>The tunnel goes on.</em></div>}
+                        <div className="mine-survey-hud">
+                            carrying <b>{s.run.haul.length}</b> · next step <b style={{ color: s.run.risk >= 35 ? "#ff8f9a" : s.run.risk >= 18 ? "#ffcf6a" : "#8fe39a" }}>{s.run.risk}%</b> collapse
                         </div>
-
-                        {/* What the selected mark told you, and what you can do about it. */}
-                        {sv ? <div className="mine-readout">
-                            {sel ? (
-                                <>
-                                    <span className="mine-readout-body">
-                                        {sel.revealed
-                                            ? <><b style={{ color: sel.exact?.color || sel.signal?.color }}>{sel.exact?.name || sel.signal?.label}</b>
-                                                <em>{sel.exact ? "The kit named it outright." : sel.signal?.hint}</em></>
-                                            : <><b>Spot {sel.index + 1}</b><em>Unread — tap it to sound it out.</em></>}
-                                    </span>
-                                    {sel.revealed
-                                        ? <button type="button" className="mine-spot-dig" disabled={busy} onClick={() => claimSpot(sel.index)}>⛏️ Dig here</button>
-                                        : <button type="button" className="mine-spot-probe" disabled={busy || s.survey.left <= 0} onClick={() => probe(sel.index)}>🔨 Sound</button>}
-                                </>
-                            ) : (
-                                <span className="mine-readout-body"><b>Tap a mark to sound it out</b><em>A deep resonance is the rich rock — but you can&rsquo;t sound out every spot.</em></span>
-                            )}
-                        </div> : null}
-                        {/* THE KEY. The bands are the whole game, so they're written down rather than learned
-                            by folklore. */}
-                        <div className="mine-legend">
-                            {(s.legend || []).map((g) => (
-                                <span key={g.key} className="mine-legend-item">
-                                    <i style={{ background: g.color }} aria-hidden="true" />
-                                    <b>{g.label}</b>
-                                    <em>{g.range}</em>
-                                </span>
-                            ))}
-                        </div>
-                        {sv ? <button type="button" className="mine-prospect is-ghost" onClick={() => { setPickedSpot(null); survey(); }} disabled={busy}>New rock face</button> : null}
                     </>
-                );
-            })()}
+                ) : (
+                    <div className="mine-face-cta">
+                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="🏮" />
+                        <p>{(s.trips?.left ?? 0) > 0 ? "The tunnel mouth." : "No trips left today."}</p>
+                        <span className="muted">{(s.trips?.left ?? 0) > 0
+                            ? "Go as deep as you dare. Everything you find is only yours once you climb out."
+                            : "Three descents a day. Back tomorrow."}</span>
+                        {(s.trips?.left ?? 0) > 0 ? (
+                            <button type="button" className="mine-prospect" onClick={startTrip} disabled={busy}>🏮 Head down</button>
+                        ) : null}
+                    </div>
+                )}
+                {msg ? <div className="mine-msg">{msg}</div> : null}
+            </div>
+
+            {s.run ? (
+                <>
+                    <div className="mine-haul">
+                        {s.run.haul.length ? s.run.haul.map((h, i) => (
+                            <span key={i} className="mine-haul-chip" title={h.name || h.kind}>
+                                {h.art ? <Img src={h.art} className="mine-haul-art" fallback="◆" /> : <b>{h.kind === "gold" ? "🪙" : h.kind === "chest" ? "🧰" : h.kind === "gear" ? "🛡️" : "🧪"}</b>}
+                                {h.n ? <em>×{h.n}</em> : null}
+                            </span>
+                        )) : <span className="muted" style={{ fontSize: 12 }}>Bag empty. Everything is still down here.</span>}
+                    </div>
+                    <div className="mine-choice">
+                        <button type="button" className="mine-prospect" onClick={goDeeper} disabled={busy}>⛏️ Deeper <em>{s.run.risk}% risk</em></button>
+                        <button type="button" className="mine-prospect is-ghost" onClick={surface} disabled={busy}>🪜 Climb out with {s.run.haul.length}</button>
+                    </div>
+                    <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Climb out and the bag is yours; push too far and it isn&rsquo;t.</p>
+                </>
+            ) : null}
 
             {/* THE LANTERN — the surveying tool, then the levers that improve it. */}
             <div className="mine-panel">
@@ -310,7 +265,7 @@ export default function MiningClient({ initial }) {
                         <b>{s.lantern?.name}</b>
                         {s.lantern?.nextName
                             ? <em>{s.lantern.nextName} at {s.lantern.nextAt} upgrades · you have {s.surveyLevels ?? 0}</em>
-                            : <em>Fully lit — every survey upgrade bought.</em>}
+                            : <em>Fully lit — every descent upgrade bought.</em>}
                         {s.lantern?.nextAt ? (
                             <span className="mine-pickbar"><span style={{ width: `${Math.min(100, ((s.surveyLevels ?? 0) / s.lantern.nextAt) * 100)}%` }} /></span>
                         ) : null}
@@ -320,8 +275,6 @@ export default function MiningClient({ initial }) {
                     {(s.surveyTracks || []).map((t) => <UpgCard key={t.key} t={t} gold={s.gold} busy={busy} onBuy={() => upgrade(t.key)} />)}
                 </div>
             </div>
-
-            <p className="mine-hint">Sound out a spot to learn what&rsquo;s behind it, then commit. A deep resonance is the rich rock — but you can&rsquo;t sound out every spot, and that&rsquo;s the game.</p>
             </>
             ) : tab === "mine" ? (
             <>
@@ -347,25 +300,25 @@ export default function MiningClient({ initial }) {
                     // So: say what's missing, say where it comes from, and put the door right here.
                     <div className="mine-empty">
                         <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="🏮" />
-                        {s.survey ? (
+                        {s.run ? (
                             <>
-                                <p>You&rsquo;ve got a wall read, but you haven&rsquo;t picked a seam yet.</p>
-                                <span className="muted">Head back and commit to one of the marks — that&rsquo;s what you swing at.</span>
+                                <p>You&rsquo;re still down the tunnel.</p>
+                                <span className="muted">Climb out and the seam you found comes back here with you.</span>
                                 <button type="button" className="mine-prospect" onClick={() => setTab("survey")}>
-                                    🔍 Back to the rock face
+                                    🪜 Back to the tunnel
                                 </button>
                             </>
                         ) : swingsLeft <= 0 ? (
                             <>
-                                <p>Out of swings for today.</p>
-                                <span className="muted">They come back tomorrow — or buy Vigor to raise the daily allowance.</span>
+                                <p>No trips left today.</p>
+                                <span className="muted">Three descents a day. They come back tomorrow.</span>
                             </>
                         ) : (
                             <>
                                 <p>Nothing to swing at yet.</p>
-                                <span className="muted">Seams come from surveying: read a rock face, pick the richest mark, then break it here.</span>
-                                <button type="button" className="mine-prospect" onClick={() => { setTab("survey"); if (!s.survey) survey(); }}>
-                                    🔍 Survey a rock face
+                                <span className="muted">Seams come from the tunnel: descend, climb out, and whatever you found is waiting here.</span>
+                                <button type="button" className="mine-prospect" onClick={() => { setTab("survey"); if (!s.run) startTrip(); }}>
+                                    🏮 Head down the tunnel
                                 </button>
                             </>
                         )}
@@ -479,6 +432,44 @@ export default function MiningClient({ initial }) {
             <p className="mine-hint">Ore of a tier melts into that tier&rsquo;s forge part. The Crucible lowers what each part costs you, the Bellows sometimes throws in an extra, and Flux sometimes lifts one a whole tier.</p>
             </>
             )}
+
+            {/* HOW THE DESCENT ENDED — everything you carried out, or everything the roof took. */}
+            {wrap ? (
+                <div className="mine-modal" role="presentation" onClick={() => { setWrap(null); setTab("mine"); }}>
+                    <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
+                        <h3 style={{ color: wrap.collapsed ? "#ff8f9a" : "#ffd75e" }}>
+                            {wrap.collapsed ? "The roof came in" : "You climbed out"}
+                        </h3>
+                        <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+                            {wrap.collapsed
+                                ? `Depth ${wrap.depth}. ${wrap.lost ? `You were carrying ${wrap.lost} thing${wrap.lost === 1 ? "" : "s"}. Not any more.` : "You were carrying nothing, at least."}`
+                                : `${(wrap.paid || []).length} thing${(wrap.paid || []).length === 1 ? "" : "s"} out of the dark.`}
+                        </p>
+                        {!wrap.collapsed && (wrap.paid || []).length ? (
+                            <div className="mine-reveal-row">
+                                {wrap.paid.map((h, i) => (
+                                    <span key={i} className="mine-reveal-spot">
+                                        {h.art ? <Img src={h.art} className="mine-reveal-ore" fallback="◆" />
+                                            : <b style={{ fontSize: 22 }}>{h.kind === "gold" ? "🪙" : h.kind === "chest" ? "🧰" : h.kind === "gear" ? "🛡️" : "🧪"}</b>}
+                                        <em style={{ color: h.color || "#cdd3d8" }}>
+                                            {h.kind === "gold" ? `${money(h.n)}g` : h.name ? h.name.split(" ")[0] : h.kind}
+                                        </em>
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+                        {wrap.seam ? (
+                            <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
+                                <b>{wrap.seam.name} waiting at the face</b>
+                                <em>{wrap.collapsed ? "You got out with the seam, at least." : "Go break it open."}</em>
+                            </div>
+                        ) : null}
+                        <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setWrap(null); setTab("mine"); }}>
+                            ⛏️ To the rock face
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             {/* THE FACE REVEALED — what every spot actually was, and how your read scored. */}
             {reveal ? (
@@ -672,6 +663,26 @@ export default function MiningClient({ initial }) {
                     font-size: 12.5px; font-weight: 800; text-align: left; color: #ffe28a;
                     background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.45); }
                 .mine-empty .mine-prospect { width: auto; padding: 11px 20px; margin-top: 12px; }
+                .mine-depth { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2;
+                    font-size: 11px; font-weight: 900; letter-spacing: .12em; color: #ffe28a; text-shadow: 0 2px 6px #000; }
+                .mine-card { position: relative; z-index: 2; width: 78%; max-width: 300px; text-align: center; padding: 14px;
+                    border-radius: 14px; background: rgba(8,5,3,0.82); border: 1px solid rgba(255,215,94,0.4);
+                    animation: minePop .3s cubic-bezier(.2,1.3,.4,1) both; }
+                .mine-card.is-idle { border-style: dashed; border-color: rgba(255,255,255,0.16); background: rgba(8,5,3,0.5); }
+                @keyframes minePop { from { opacity: 0; transform: translateY(10px) scale(.94); } to { opacity: 1; transform: none; } }
+                .mine-card-lab { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #9aa2ab; margin-bottom: 5px; }
+                .mine-card b { display: block; font-size: 1.02rem; }
+                .mine-card em { display: block; font-style: normal; font-size: 11.5px; color: #b9a98f; margin-top: 3px; }
+                .mine-card-art { width: 54px; height: 54px; object-fit: contain; margin: 0 auto 4px; display: block; }
+                .mine-haul { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; padding: 9px 11px;
+                    border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); min-height: 46px; }
+                .mine-haul-chip { display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 999px;
+                    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); font-size: 12px; }
+                .mine-haul-art { width: 20px; height: 20px; object-fit: contain; }
+                .mine-haul-chip em { font-style: normal; color: #cdd3d8; font-weight: 800; }
+                .mine-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+                .mine-choice .mine-prospect { margin-top: 0; }
+                .mine-choice .mine-prospect em { display: block; font-style: normal; font-size: 10.5px; font-weight: 700; opacity: .8; }
                 .mine-face-cta { position: relative; text-align: center; padding: 16px; }
                 .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }
