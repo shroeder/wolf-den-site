@@ -1,7 +1,7 @@
 "use client";
 
 import ItemArt from "@/components/ItemArt";
-import { Img, KindIcon, money, PART_NAME, RARITY_COLOR, RARITY_LABEL, statLine } from "@/components/mining/kit";
+import { Img, KindIcon, money, PART_COLOR, PART_NAME, PART_SPRITE, RARITY_COLOR, RARITY_LABEL, statLine } from "@/components/mining/kit";
 
 // ── OUTCOMES ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The two "here's what you got" moments that live outside a minigame: stopping the descent, and pouring a
@@ -104,11 +104,15 @@ export function SmeltModal({ smelting, onClose }) {
                             {smelting.result?.bandLabel || "Poured"} <em>{smelting.result?.bandBlurb || ""}</em>
                         </div>
                         <h3 style={{ color: "#ffd08a" }}>{smelting.result?.parts ?? smelting.parts} parts</h3>
+                        {/* THE PART YOU JUST MADE, AS THE THING IT IS. This was a count and a name in plain
+                            text — "2× Iron Filings" — while the painted sprite for that exact part sat in the
+                            forge catalog, already generated. Every part tier has one; draw it. */}
                         <div className="mine-reveal-row">
                             {(smelting.result?.byTier || []).map((b) => (
                                 <span key={b.partTier} className={`mine-reveal-spot${b.lifted ? " is-picked" : ""}`}>
+                                    <Img src={PART_SPRITE[b.partTier]} className="mine-reveal-art" fallback="" />
                                     <b style={{ fontSize: 18 }}>{b.count}×</b>
-                                    <em style={{ color: b.lifted ? "#7cffb2" : "#cdd3d8" }}>{PART_NAME[b.partTier]}</em>
+                                    <em style={{ color: b.lifted ? "#7cffb2" : PART_COLOR[b.partTier] || "#cdd3d8" }}>{PART_NAME[b.partTier]}</em>
                                     {b.lifted ? <b style={{ fontSize: 9 }}>TIER UP</b> : null}
                                 </span>
                             ))}
@@ -116,7 +120,16 @@ export function SmeltModal({ smelting, onClose }) {
                         {(smelting.result?.bonus || []).length ? (
                             <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
                                 <b>Out of the slag</b>
-                                <em>{smelting.result.bonus.map((x) => x.name || (x.kind === "chest" ? `${x.tier} chest` : x.kind)).join(" · ")}</em>
+                                {/* Same story: the server hands back `art` for consumables and chests, and this
+                                    used to .join(" · ") the names and throw the pictures away. */}
+                                <div className="mine-slag-row">
+                                    {smelting.result.bonus.map((x, i) => (
+                                        <span key={`${x.kind}-${x.id || x.tier || i}`} className="mine-slag-item">
+                                            <Img src={x.art} className="mine-reveal-art" fallback="" />
+                                            <em>{x.name || (x.kind === "chest" ? `${x.tier} chest` : x.kind)}</em>
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         ) : null}
                         <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>

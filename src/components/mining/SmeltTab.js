@@ -1,6 +1,6 @@
 "use client";
 
-import { Img, PART_NAME, ToolPanel } from "@/components/mining/kit";
+import { Img, PART_NAME, PART_SPRITE, ToolPanel } from "@/components/mining/kit";
 
 // ── THE SMELTERY ─────────────────────────────────────────────────────────────────────────────────────────────
 // Your actual furnace, standing in the room, upgrading its sprite as you build it out. Ore of a tier melts
@@ -35,7 +35,9 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                                 <Img src={o.art} className="mine-stash-img" fallback="" />
                                 <span className="mine-stash-name">
                                     <b style={{ color: o.color }}>{o.name}</b>
-                                    <em>{o.smeltCost} ore → 1 {PART_NAME[o.partTier]}</em>
+                                    {/* Show the part you'd be making, not just its name — the ore beside it
+                                        has had a sprite all along. */}
+                                    <em>{o.smeltCost} ore &rarr; 1 <Img src={PART_SPRITE[o.partTier]} className="mine-part-ico" fallback="" />{PART_NAME[o.partTier]}</em>
                                 </span>
                                 <b className="mine-stash-qty">×{o.qty}</b>
                                 {/* The button said "Smelt 8" and got clipped on a phone. It now says what it

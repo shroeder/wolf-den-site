@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
+
 // ── MINE KIT ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The pieces every mining tab needs. Each tab used to carry its own copy of the image fallback, the rarity
 // palette and the tool panel, which is how "Fanged Helm" ended up truncated in one place and not another.
@@ -17,7 +19,13 @@ export const KIND_ART = {
     consumable: "/images/ui/potion.png",
 };
 
-export const PART_NAME = { 1: "Cinder Scrap", 2: "Iron Filings", 3: "Tempered Steel", 4: "Mythril Dust", 5: "Emberheart Shard" };
+// The forge parts the mine feeds. These names were HAND-TYPED here, a second copy of a catalog that already
+// existed — and because the copy carried only the names, every mining screen announced "2× Iron Filings" as
+// bare text while the painted Iron Filings sprite sat unused in the forge catalog. Sourced from it now, so a
+// part looks the same coming out of the furnace as it does sitting in the Forge.
+export const PART_NAME = Object.fromEntries(PART_TIERS.map((p) => [p.tier, p.name]));
+export const PART_SPRITE = Object.fromEntries(PART_TIERS.map((p) => [p.tier, p.sprite]));
+export const PART_COLOR = Object.fromEntries(PART_TIERS.map((p) => [p.tier, p.color]));
 
 // The same rarity language the chest opener uses, so a Legendary out of the rock reads exactly like a
 // Legendary out of a chest — one game, one vocabulary.

@@ -19,18 +19,20 @@ export async function GET(request) {
             const row = await db.queryOne(`SELECT xp, COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyer.id]).catch(() => null);
             const xp = Math.max(0, Math.floor(Number(row?.xp) || 0));
             const gold = Math.max(0, Math.floor(Number(row?.gold) || 0));
-            const level = levelForXp(xp).level;
+            // The HUD bar tracks progress within the CURRENT level, so it visibly moves with every XP gain and
+            // reads like a real XP bar — not distance to a far-off reward milestone (which barely budged per hit
+            // and looked stuck/wrong). The next-unlock label/icon still ride along as the "what you're working
+            // toward" flavor.
+            //
+            // Every number here comes off ONE levelForXp() call. It used to take the level from levelForXp but
+            // compute the bar from an inlined `50·(L-1)·L`, which was the pre-knee curve — so once the curve
+            // steepened above level 20, a level-28 member was measured against the OLD level-29 floor they had
+            // long since passed, and the strip showed a full bar reading "0 XP →" forever.
+            const lv = levelForXp(xp);
+            const level = lv.level;
             const next = nextUnlock(level);
-            // The HUD bar tracks progress within the CURRENT level (cumulative XP to reach level L = 50·(L-1)·L),
-            // so it visibly moves with every XP gain and reads like a real XP bar — not distance to a far-off
-            // reward milestone (which barely budged per hit and looked stuck/wrong). The next-unlock label/icon
-            // still ride along as the "what you're working toward" flavor.
-            const curBase = 50 * (level - 1) * level; // XP to reach this level
-            const nextBase = 50 * level * (level + 1); // XP to reach the next level
-            const span = Math.max(1, nextBase - curBase);
-            const into = Math.max(0, xp - curBase);
-            const pct = Math.max(0, Math.min(100, Math.round((into / span) * 100)));
-            const xpToGo = Math.max(0, nextBase - xp); // XP to the next level
+            const pct = Math.round(lv.progress * 100);
+            const xpToGo = lv.xpToNext; // XP to the next level
 
             if (!next) return NextResponse.json({ authed: true, maxed: true, xp, gold, level, pct, xpToGo }, { headers: { "Cache-Control": "no-store" } });
 

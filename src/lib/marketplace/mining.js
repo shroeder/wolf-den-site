@@ -385,6 +385,14 @@ async function grantMiningGear(buyerId, depth) {
 }
 
 const MINE_CONSUMABLES = ["treat_bone", "farm_growth_tonic", "pot_adrenaline", "farm_fertilizer_crate", "sail_lucky_lure"];
+// Painted chest icon for a tier (the same art the equipment screen shows), or null if none was generated.
+async function chestArtFor(tier) {
+    const { getChestArt } = await import("@/lib/marketplace/chest-art.js");
+    const art = await getChestArt().catch(() => ({}));
+    const v = art?.[tier];
+    return (typeof v === "string" ? v : v?.url) || null;
+}
+
 async function grantMiningConsumable(buyerId) {
     const { grantConsumable, CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
     const id = MINE_CONSUMABLES[Math.floor(Math.random() * MINE_CONSUMABLES.length)];
@@ -1058,7 +1066,9 @@ export async function smeltOre(buyerId, tier, dists = null) {
             // Capped at iron. A gold chest out of a furnace is exactly the "crazy good" this should not be.
             const chestTier = t >= 3 ? "iron" : "wooden";
             await addChests(buyerId, { [chestTier]: 1 }, { source: "mining" }).catch(() => {});
-            bonus.push({ kind: "chest", tier: chestTier });
+            // Hand back the ART with the chest, the way grantMiningConsumable does. Without it the reveal had
+            // nothing to draw and printed the words "wooden chest" next to a sprite-less gap.
+            bonus.push({ kind: "chest", tier: chestTier, name: `${chestTier[0].toUpperCase()}${chestTier.slice(1)} chest`, art: await chestArtFor(chestTier) });
         } else {
             const got = await grantMiningConsumable(buyerId);
             if (got) bonus.push({ kind: "consumable", ...got });

@@ -7,6 +7,7 @@ import { BACKGROUNDS } from "@/lib/marketplace/backgrounds.js";
 import { BORDERS } from "@/lib/marketplace/borders.js";
 import { FRAMES } from "@/lib/marketplace/frames.js";
 import { LEVEL_PERKS, RANKS } from "@/lib/marketplace/ranks.js";
+import { xpForLevel } from "@/lib/marketplace/xp-curve.js";
 
 // Every level-gated unlock as { level, icon, label }.
 function allUnlocks() {
@@ -48,7 +49,7 @@ export function showcaseTrack() {
         level: L,
         reached: false,
         isNext: i === 0,
-        xpToGo: 50 * (L - 1) * L,
+        xpToGo: xpForLevel(L),   // shared curve table, not the old closed form (see xp-curve.js)
         rank: null,
         badges: [],
         perks: byLevel.get(L).map((u) => ({ icon: u.icon, label: u.label, soon: false })),

@@ -8,12 +8,11 @@ import { FRAMES } from "@/lib/marketplace/frames.js";
 import { AVATAR_COSMETICS } from "@/lib/marketplace/avatar-cosmetics.js";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { LEVEL_PERKS, RANKS, rankForLevel } from "@/lib/marketplace/ranks.js";
+import { xpForLevel } from "@/lib/marketplace/xp-curve.js";
 
-// Cumulative XP required to REACH a level (mirrors levelForXp's curve: 50*(L-1)*L).
-function xpToReachLevel(level) {
-    const L = Math.max(1, Math.floor(Number(level) || 1));
-    return 50 * (L - 1) * L;
-}
+// Cumulative XP required to REACH a level. Straight off the shared curve table — this used to re-type the
+// closed form `50*(L-1)*L`, which stopped being the curve the moment it steepened above level 20.
+const xpToReachLevel = (level) => xpForLevel(level);
 
 // Human progress label per rule, e.g. "$320 / $500" or "7 / 10 events".
 function progressLabel(rule, current, target) {

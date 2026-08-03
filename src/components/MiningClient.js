@@ -217,6 +217,12 @@ export default function MiningClient({ initial }) {
                     background: rgba(255,255,255,0.04); border: 1px solid transparent; min-width: 58px; }
                 .mine-reveal-spot.is-picked { border-color: #ffd75e; background: rgba(255,215,94,0.14); }
                 .mine-reveal-ore { width: 32px; height: 32px; object-fit: contain; }
+                /* Forge parts + slag bonuses draw their real sprite now, so the reveal spot needs the same
+                   art slot the ore already had. */
+                .mine-reveal-art { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+                .mine-slag-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+                .mine-slag-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+                .mine-part-ico { width: 15px; height: 15px; object-fit: contain; vertical-align: -3px; margin-right: 3px; }
                 .mine-reveal-spot em { font-size: 10.5px; font-style: normal; }
                 .mine-reveal-spot b { font-size: 9.5px; color: #ffd75e; text-transform: uppercase; letter-spacing: 0.04em; }
                 .mine-nudge { flex-basis: 100%; margin-top: 6px; padding: 8px 12px; border-radius: 10px; cursor: pointer;

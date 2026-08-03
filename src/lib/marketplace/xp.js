@@ -5,6 +5,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { unlocksAtLevel } from "@/lib/marketplace/unlocks.js";
 import { creditEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
+import { levelForXp } from "@/lib/marketplace/xp-curve.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
@@ -82,67 +83,10 @@ export async function awardOnce(buyerId, action, meta = null) {
 // Dollars spent → XP (uncapped). Used by the purchase/POS hook.
 export const SPEND_XP_PER_DOLLAR = 5;
 
-// ── THE LEVEL CURVE ──────────────────────────────────────────────────────────────────────────────────────────
-// Up to level 20 this is unchanged: cumulative XP to REACH level L is 50*(L-1)*L → L2=100, L5=1000, L20=19,000.
-//
-// Above 20 it STEEPENS. The old curve was a plain quadratic all the way up, so each level cost only 100*L more
-// than the last and the back half of the ladder was a formality — level 100 was 495,000 XP, which at the rate
-// the Den actually earns is not a decade-long goal, it is a few months of showing up. A ladder everyone tops
-// out on stops being a ladder.
-//
-// The step cost now carries a multiplier that grows 20% per level past 20, capped at 8x so it stays a climb
-// rather than a wall:
-//
-//   L30   43,500 ->    67,200   (1.5x)
-//   L50  122,500 ->   467,600   (3.8x)
-//   L100 495,000 -> 3,432,200   (6.9x)
-//
-// TWENTY is chosen so this demotes NOBODY: the whole Den sits at or below it apart from two members at 21 and
-// the owner, and the multiplier starts at exactly 1.0 so reaching 21 costs what it always did. Retroactively
-// taking levels off people to fix a curve is not a trade worth making.
-const CURVE_KNEE = 20;
-const CURVE_GROWTH = 0.2;
-const CURVE_CAP = 8;
-const MAX_LEVEL = 200;
-
-// Cumulative XP required to REACH each level, built once. A table rather than a closed form because the
-// multiplier is capped, and a piecewise-capped sum has no tidy inverse worth the trouble.
-const LEVEL_FLOOR = (() => {
-    const out = [0, 0]; // index = level; L1 needs 0
-    let cum = 0;
-    for (let L = 1; L < MAX_LEVEL; L += 1) {
-        const step = L < CURVE_KNEE
-            ? 100 * L
-            : 100 * L * Math.min(CURVE_CAP, 1 + (L - CURVE_KNEE) * CURVE_GROWTH);
-        cum += step;
-        out[L + 1] = Math.round(cum);
-    }
-    return out;
-})();
-
-/** Cumulative XP needed to reach a level (clamped to the table). */
-export const xpForLevel = (level) => LEVEL_FLOOR[Math.max(1, Math.min(MAX_LEVEL, Math.floor(level)))] ?? 0;
-
-// Returns level + progress toward the next.
-export function levelForXp(totalXp) {
-    const xp = Math.max(0, Math.floor(Number(totalXp) || 0));
-    let level = 1;
-    // Walk up while the NEXT level is affordable. At most 200 steps, and levels are read constantly, so this
-    // stays a tight loop over a preallocated array rather than anything clever.
-    while (level < MAX_LEVEL && xp >= LEVEL_FLOOR[level + 1]) level += 1;
-    const floorXp = LEVEL_FLOOR[level];
-    const nextXp = level >= MAX_LEVEL ? floorXp : LEVEL_FLOOR[level + 1];
-    const span = nextXp - floorXp;
-    const into = xp - floorXp;
-    return {
-        level,
-        totalXp: xp,
-        currentLevelXp: into,
-        nextLevelXp: span,
-        xpToNext: Math.max(0, nextXp - xp),
-        progress: span > 0 ? Math.min(1, into / span) : 0,
-    };
-}
+// The curve itself now lives in xp-curve.js — a pure module, so unlocks.js/track.js/the HUD route can
+// import the SAME table instead of re-deriving it. Re-exported here because half the codebase already reaches
+// for these through xp.js.
+export { levelForXp, xpForLevel, MAX_LEVEL } from "@/lib/marketplace/xp-curve.js";
 
 // Award XP to a user for an action. Returns the points granted, or null if skipped (deduped / capped /
 // no user / zero points / any error).
