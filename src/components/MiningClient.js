@@ -163,6 +163,9 @@ export default function MiningClient({ initial }) {
     const s = state;
     const node = s.node;
     const swingsLeft = s.swings?.left ?? 0;
+    // Nothing to swing at, no wall read, and swings to spend — i.e. the player can act but has no seam. This is
+    // the "why can't I mine?" state, and it's what the Survey nudges key off.
+    const needsSurvey = !s.survey && !(node && node.pct > 0) && swingsLeft > 0;
     const lvls = s.stats?.upgradeLevels ?? 0;
 
     return (
@@ -170,13 +173,21 @@ export default function MiningClient({ initial }) {
             <div className="mine-top">
                 <span className="mine-title">⛏️ The Mine</span>
                 <span className="mine-sub">owner preview · {swingsLeft}/{s.swings?.allowance ?? 0} swings today</span>
+                {needsSurvey && tab === "mine" ? (
+                    <button type="button" className="mine-nudge" onClick={() => { setTab("survey"); survey(); }}>
+                        No seam yet — survey one →
+                    </button>
+                ) : null}
             </div>
 
             {/* Two halves, two tabs — the same shape fishing and the forge use. */}
             <div className="mine-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "survey"} className={tab === "survey" ? "is-on" : ""} onClick={() => setTab("survey")}>
                     <Img src={s.lantern?.sprite} className="mine-tab-ico" fallback="🏮" /> <span>Survey</span>
-                    {s.survey?.left ? <span className="mine-tab-badge">{s.survey.left}</span> : null}
+                    {/* Badge the strikes you can still spend — or a plain "!" when there's nothing to mine and
+                        no face read, because that's the state where a player is stuck without knowing why. */}
+                    {s.survey?.left ? <span className="mine-tab-badge">{s.survey.left}</span>
+                        : needsSurvey ? <span className="mine-tab-badge">!</span> : null}
                 </button>
                 <button type="button" role="tab" aria-selected={tab === "mine"} className={tab === "mine" ? "is-on" : ""} onClick={() => setTab("mine")}>
                     <Img src={s.pick?.sprite} className="mine-tab-ico" fallback="⛏️" /> <span>Mine</span>
@@ -331,10 +342,33 @@ export default function MiningClient({ initial }) {
                         {floats.map((f) => <span key={f.id} className={`mine-float is-${f.grade}`}>{f.dmg}</span>)}
                     </>
                 ) : (
+                    // NO SEAM. This is the one place a miner gets stuck — they came to swing, there's nothing
+                    // to swing at, and nothing here used to explain that a seam comes from the Survey tab.
+                    // So: say what's missing, say where it comes from, and put the door right here.
                     <div className="mine-empty">
-                        <Img src={s.pick?.sprite} className="mine-empty-pick" fallback="⛏️" />
-                        <p>Nothing on the rock face yet.</p>
-                        <span className="muted">{s.seamsLive || 0} seam{(s.seamsLive || 0) === 1 ? "" : "s"} exposed in the mine right now.</span>
+                        <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="🏮" />
+                        {s.survey ? (
+                            <>
+                                <p>You&rsquo;ve got a wall read, but you haven&rsquo;t picked a seam yet.</p>
+                                <span className="muted">Head back and commit to one of the marks — that&rsquo;s what you swing at.</span>
+                                <button type="button" className="mine-prospect" onClick={() => setTab("survey")}>
+                                    🔍 Back to the rock face
+                                </button>
+                            </>
+                        ) : swingsLeft <= 0 ? (
+                            <>
+                                <p>Out of swings for today.</p>
+                                <span className="muted">They come back tomorrow — or buy Vigor to raise the daily allowance.</span>
+                            </>
+                        ) : (
+                            <>
+                                <p>Nothing to swing at yet.</p>
+                                <span className="muted">Seams come from surveying: read a rock face, pick the richest mark, then break it here.</span>
+                                <button type="button" className="mine-prospect" onClick={() => { setTab("survey"); if (!s.survey) survey(); }}>
+                                    🔍 Survey a rock face
+                                </button>
+                            </>
+                        )}
                     </div>
                 )}
                 {msg ? <div className="mine-msg">{msg}</div> : null}
@@ -634,6 +668,10 @@ export default function MiningClient({ initial }) {
                 .mine-reveal-ore { width: 32px; height: 32px; object-fit: contain; }
                 .mine-reveal-spot em { font-size: 10.5px; font-style: normal; }
                 .mine-reveal-spot b { font-size: 9.5px; color: #ffd75e; text-transform: uppercase; letter-spacing: 0.04em; }
+                .mine-nudge { flex-basis: 100%; margin-top: 6px; padding: 8px 12px; border-radius: 10px; cursor: pointer;
+                    font-size: 12.5px; font-weight: 800; text-align: left; color: #ffe28a;
+                    background: rgba(255,215,94,0.12); border: 1px solid rgba(255,215,94,0.45); }
+                .mine-empty .mine-prospect { width: auto; padding: 11px 20px; margin-top: 12px; }
                 .mine-face-cta { position: relative; text-align: center; padding: 16px; }
                 .mine-face-cta p { margin: 8px 0 12px; font-weight: 700; color: #e7dcc8; text-shadow: 0 2px 6px #000; }
                 .mine-face-cta .mine-prospect { margin-top: 0; width: auto; padding: 12px 22px; }
