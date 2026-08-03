@@ -322,14 +322,17 @@ export async function descend(buyerId) {
         const lost = saved ? 0 : (run.haul || []).length;
         const hadTier = Number(run.seamTier) || 1;
         const next = { ...run, depth, over: true, collapsed: true, haul: saved ? (run.haul || []) : [], last: { kind: "collapse" } };
-        if (saved) await payHaul(buyerId, run.haul || []).catch(() => {});
+        // payHaul returns what it ACTUALLY paid — gear and consumables are rolled at payout time, so the haul
+        // entry says "gear" and only the paid record knows which piece. Without handing this back the wrap-up
+        // had nothing to draw and Second Wind read as "you kept nothing" while quietly paying you everything.
+        const paid = saved ? await payHaul(buyerId, run.haul || []).catch(() => []) : [];
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
         // You crawl out with what you could reach on the way, which is the poorest rock in the mine. The vein
         // you'd actually found stays buried — `lostTier` is only for the wrap-up to show you what it cost.
         const seam = await cutSeam(buyerId, COLLAPSE_SEAM_TIER);
         await trackActivity(buyerId, "mine_collapse", { depth, lost, hadTier, saved }).catch(() => {});
         return {
-            ok: true, collapsed: true, depth, lost, seam, secondWind: saved,
+            ok: true, collapsed: true, depth, lost, seam, secondWind: saved, paid,
             lostTier: hadTier > COLLAPSE_SEAM_TIER ? { tier: hadTier, name: oreTier(hadTier).name, color: oreTier(hadTier).color, art: oreArt(hadTier) } : null,
             ...(await getMiningState(buyerId)),
         };
@@ -454,13 +457,20 @@ async function grantMiningGear(buyerId, depth) {
     const { rarity, order } = rollGearRarity(depth);
     // Try what you rolled first, then walk the rest of the band as a fallback for an exhausted pool.
     const ladder = [rarity, ...order.filter((x) => x !== rarity)];
-    const [{ randomDropPool }, { grantItem }] = await Promise.all([
+    const [{ randomDropPool, featurePool }, { grantItem }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/inventory.js"),
     ]);
     const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
     for (const rarity of ladder) {
-        const pool = randomDropPool((i) => i.rarity === rarity && !owned.has(i.id));
+        // The general pool PLUS the mine's own gear. randomDropPool excludes ownerOnly items — correct for
+        // every other reward in the game, but it also locked the three Depths sets out of the only feature
+        // that is supposed to hand them out, so twelve pieces were unobtainable by anyone at all. featurePool
+        // is scoped to source === "mining" and only reachable past the MINING_UNLOCKED check at the top.
+        const pool = [
+            ...randomDropPool((i) => i.rarity === rarity && !owned.has(i.id)),
+            ...featurePool("mining", (i) => i.rarity === rarity && !owned.has(i.id)),
+        ];
         if (!pool.length) continue;
         const it = pool[Math.floor(Math.random() * pool.length)];
         await grantItem(buyerId, it.id, "mining").catch(() => {});

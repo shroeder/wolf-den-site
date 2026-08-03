@@ -3,9 +3,20 @@ import "server-only";
 import { db } from "@/lib/db";
 import { COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 // Pet DROPS from chests + the boss. Kept in its own dependency-light module (db + collectibles + activity
 // only) so chests.js / boss.js can grant pets without an import cycle through pets.js → quests.js → chests.js.
+//
+// UNLAUNCHED PETS. Every pool here filtered raw COLLECTIBLES rather than PUBLIC_COLLECTIBLES — so a pet marked
+// `ownerOnly` (content for a feature that hasn't shipped) could drop from ANY chest for ANY member, which is
+// the exact thing the flag exists to prevent. The five mine pets would have gone straight into public hands
+// carrying an affinity for a page nobody else can open.
+//
+// Gating on the unlock rather than excluding them outright is deliberate: it means the owner can collect them
+// by playing, down the same chest path the sailing pets already use — art, reveal and notification all for
+// free — instead of needing a second bespoke drop route built just for them.
+const unlocked = (buyerId) => (p) => !p.ownerOnly || isOwner(buyerId);
 
 const CHEST_TIER_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -28,7 +39,8 @@ export async function maybeGrantChestPet(buyerId, openedTier) {
     const chance = Math.min(0.3, 0.12 + openedIdx * 0.02);
     if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
-    const eligible = COLLECTIBLES.filter((p) => p.source === "chest" && CHEST_TIER_ORDER.indexOf(p.chestTier) <= openedIdx && !owned.has(p.id));
+    const eligible = COLLECTIBLES.filter(unlocked(buyerId))
+        .filter((p) => p.source === "chest" && CHEST_TIER_ORDER.indexOf(p.chestTier) <= openedIdx && !owned.has(p.id));
     if (!eligible.length) return null;
     const pet = eligible[Math.floor(Math.random() * eligible.length)];
     return grantDrop(buyerId, pet, "chest", { tier: openedTier });
@@ -42,7 +54,7 @@ export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     if (!buyerId) return null;
     if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
-    const eligible = COLLECTIBLES.filter((p) => p.source === "boss" && !owned.has(p.id));
+    const eligible = COLLECTIBLES.filter(unlocked(buyerId)).filter((p) => p.source === "boss" && !owned.has(p.id));
     if (!eligible.length) return null;
     const legendary = eligible.filter((p) => p.rarity === "legendary");
     // 90% of drops draw only from legendary boss pets; mythic boss pets need the 10% sub-roll.
@@ -62,6 +74,7 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
     const cap = FISH_TIER_CAP[fishRarity] ?? 0;
     const owned = await ownedPetSet(buyerId);
     const eligible = COLLECTIBLES
+        .filter(unlocked(buyerId))
         .filter((p) => p.source === "fishing" && (p.fishTier ?? 0) <= cap && !owned.has(p.id))
         .sort((a, b) => (b.fishTier ?? 0) - (a.fishTier ?? 0));
     if (!eligible.length) return null;
@@ -75,7 +88,7 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
 export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false } = {}) {
     if (!buyerId) return null;
     const owned = await ownedPetSet(buyerId);
-    let eligible = COLLECTIBLES.filter((p) => p.raidExclusive && p.raidChance > 0 && !owned.has(p.id));
+    let eligible = COLLECTIBLES.filter(unlocked(buyerId)).filter((p) => p.raidExclusive && p.raidChance > 0 && !owned.has(p.id));
     if (!(boss && killed)) eligible = eligible.filter((p) => p.rarity !== "eternal"); // Golem's Heart = kill trophy only
     if (!eligible.length) return null;
     // Rarest first, so on a (near-impossible) double hit the scarcer pet wins.

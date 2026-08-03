@@ -27,6 +27,11 @@ function buyableDef(category, ref) {
     const c = CATS[category];
     if (!c) return null;
     const def = c.list.find((i) => i.id === ref);
+    // `ownerOnly` marks content for a feature that hasn't launched. The shop reads raw catalogs, so without
+    // this the five mine pets were quietly on sale for gold to every member — a companion whose entire effect
+    // is an affinity for a page they cannot open. Excluded outright rather than owner-gated: they are chest
+    // drops by design, and nothing unlaunched should ever be purchasable.
+    if (def?.ownerOnly) return null;
     if (!def || def.id === "none" || def.requiresBadges || def.eliteOnly || def.achievement) return null;
     return def;
 }

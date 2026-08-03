@@ -49,6 +49,21 @@ export const isOwnerOnlyItem = (i) => Boolean(i?.ownerOnly);
 /** Every item a RANDOM reward is allowed to hand out. Use this instead of filtering ITEMS directly. */
 export const randomDropPool = (predicate) =>
     ITEMS.filter((i) => !isRealMoneyItem(i) && !isOwnerOnlyItem(i) && (typeof predicate === "function" ? predicate(i) : true));
+
+/**
+ * A feature's OWN unlaunched gear, for that feature's own reward code — and nothing else.
+ *
+ * The ownerOnly flag keeps unlaunched content out of every public drop pool, which is right. But it also meant
+ * the Mine could not drop the three Depths sets that exist FOR the mine: twelve pieces with art, affinity and
+ * set bonuses that literally nothing in the game could ever grant, to anyone, including the owner who can
+ * actually play the feature.
+ *
+ * This is the narrow escape hatch. Callers must have already checked their own unlock gate (mining.js checks
+ * MINING_UNLOCKED before it ever gets here), and it only ever returns items whose `source` is that feature —
+ * so it can never widen into "ownerOnly items leak into chests".
+ */
+export const featurePool = (source, predicate) =>
+    ITEMS.filter((i) => !isRealMoneyItem(i) && i.source === source && (typeof predicate === "function" ? predicate(i) : true));
 export const isTradeLocked = (rarity) => TRADE_LOCKED_RARITIES.has(rarity);
 
 // Stat keys → how they read + how they apply in combat. Percent stats are additive % bonuses.
