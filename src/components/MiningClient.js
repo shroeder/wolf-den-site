@@ -476,7 +476,7 @@ export default function MiningClient({ initial }) {
 
             {/* HOW THE DESCENT ENDED — everything you carried out, or everything the roof took. */}
             {wrap ? (
-                <div className="mine-modal" role="presentation" onClick={() => { setWrap(null); setTab("mine"); }}>
+                <div className="mine-modal" role="presentation" onClick={() => { setWrap(null); if (!wrap.collapsed) setTab("mine"); }}>
                     <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
                         <h3 style={{ color: wrap.collapsed ? "#ff8f9a" : "#ffd75e" }}>
                             {wrap.collapsed ? "The roof came in" : "You climbed out"}
@@ -505,9 +505,20 @@ export default function MiningClient({ initial }) {
                                 <em>{wrap.collapsed ? "You got out with the seam, at least." : "Go break it open."}</em>
                             </div>
                         ) : null}
-                        <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setWrap(null); setTab("mine"); }}>
-                            <GiWarPick /> To the rock face
-                        </button>
+                        {/* A collapse ends with nothing at the face, so the way out is another trip — not a
+                            walk to an empty room. */}
+                        {wrap.collapsed ? (
+                            <button type="button" className="mine-buy" style={{ marginTop: 14 }}
+                                onClick={() => { setWrap(null); if ((s.trips?.left ?? 0) > 0) startTrip(); }}>
+                                {(s.trips?.left ?? 0) > 0
+                                    ? <><GiLanternFlame /> Head back down ({s.trips.left} left)</>
+                                    : <>Out of trips today</>}
+                            </button>
+                        ) : (
+                            <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => { setWrap(null); setTab("mine"); }}>
+                                <GiWarPick /> To the rock face
+                            </button>
+                        )}
                     </div>
                 </div>
             ) : null}
