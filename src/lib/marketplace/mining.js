@@ -49,10 +49,18 @@ export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 // likelier the roof comes in. Bail whenever you want and everything you are carrying is yours; push once too
 // far and the haul is gone.
 //
-// A COLLAPSE ENDS THE RUN. No haul, no seam, no rock face — the trip is spent and you walked away with
-// nothing. That is what makes climbing out a decision instead of a formality; if the roof coming in still
-// handed you a seam, pushing would be free and there would be no game here at all.
+// A COLLAPSE COSTS YOU THE HAUL AND THE TRIP — everything you were carrying is under the rock, and the depth
+// you'd worked up to is gone. But you still walk out with a seam to swing at: the WORST one there is, tier 1
+// Coal, regardless of how rich the vein had become before the roof went.
+//
+// That is the sharp part. A run that reached a Mythril seam and then collapsed doesn't hand you nothing, it
+// hands you Coal — so what the roof actually takes is the DIFFERENCE, which is the thing you were pushing for.
+// A dead-empty rock face was cleaner as a rule and worse as a game: it ended the session rather than the run,
+// and "you get no minigame today" is a punishment aimed at the player instead of at the gamble.
 export const TRIPS_PER_DAY = 3;
+// What the roof leaves you. Deliberately the bottom of ORE_TIERS: you still get to play the timing game, and
+// the bag it pays from is the poorest one in the mine.
+const COLLAPSE_SEAM_TIER = 1;
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
 export const safeDepthFor = (shoringLevel = 0) => COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3); // Shoring buys more
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs
@@ -149,11 +157,18 @@ export async function descend(buyerId) {
     // to you and then snatched back.
     if (Math.random() < collapseChanceAt(depth, row?.assay_level)) {
         const lost = (run.haul || []).length;
+        const hadTier = Number(run.seamTier) || 1;
         const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
-        await trackActivity(buyerId, "mine_collapse", { depth, lost }).catch(() => {});
-        // No seam. The rock face stays empty and the trip is gone.
-        return { ok: true, collapsed: true, depth, lost, seam: null, ...(await getMiningState(buyerId)) };
+        // You crawl out with what you could reach on the way, which is the poorest rock in the mine. The vein
+        // you'd actually found stays buried — `lostTier` is only for the wrap-up to show you what it cost.
+        const seam = await cutSeam(buyerId, COLLAPSE_SEAM_TIER);
+        await trackActivity(buyerId, "mine_collapse", { depth, lost, hadTier }).catch(() => {});
+        return {
+            ok: true, collapsed: true, depth, lost, seam,
+            lostTier: hadTier > COLLAPSE_SEAM_TIER ? { tier: hadTier, name: oreTier(hadTier).name, color: oreTier(hadTier).color, art: oreArt(hadTier) } : null,
+            ...(await getMiningState(buyerId)),
+        };
     }
 
     const card = drawCard(depth + Math.round(surveyValue("lantern", row?.lantern_level) * 10)); // Lantern reads the tunnel as deeper than it is

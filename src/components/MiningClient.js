@@ -86,10 +86,11 @@ export default function MiningClient({ initial }) {
                 />
             ) : null}
 
+            {/* A collapse leaves a seam at the face too now, so both endings walk to the same room. */}
             {m.wrap ? (
                 <WrapModal
                     wrap={m.wrap} tripsLeft={tripsLeft} maxTrips={s.trips?.max ?? 3}
-                    onClose={() => { m.setWrap(null); if (!m.wrap.collapsed) setTab("mine"); }}
+                    onClose={() => { m.setWrap(null); setTab("mine"); }}
                     onToFace={() => { m.setWrap(null); setTab("mine"); }}
                     onAgain={() => { m.setWrap(null); if (tripsLeft > 0) m.startTrip(); }}
                 />
@@ -330,6 +331,17 @@ export default function MiningClient({ initial }) {
                 .mine-rung-pay { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
                 .mine-rung-ore { width: 24px; height: 24px; object-fit: contain; }
                 /* THE BAG PANEL — one row per rank: what it's called, what it takes, what it buys. */
+                /* WHAT THE ROOF TOOK — the vein you'd found against the Coal you crawled out with. */
+                .mine-lost { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+                    margin-top: 12px; padding: 11px 10px; border-radius: 12px;
+                    background: rgba(255,143,154,0.07); border: 1px solid rgba(255,143,154,0.32); }
+                .mine-lost-was, .mine-lost-got { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+                .mine-lost-was { opacity: .5; }
+                .mine-lost-was .mine-lost-art { filter: grayscale(0.7); }
+                .mine-lost-art { width: 34px; height: 34px; object-fit: contain; }
+                .mine-lost em { font-style: normal; font-size: 11.5px; font-weight: 800; line-height: 1.15; text-align: center; }
+                .mine-lost i { font-style: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: #8b8f96; }
+                .mine-lost-arrow { color: #ff8f9a; font-size: 17px; }
                 .mine-rank-row { display: grid; grid-template-columns: 1fr auto 64px; align-items: center; gap: 10px;
                     padding: 8px 10px; border-radius: 10px; margin-top: 6px;
                     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }

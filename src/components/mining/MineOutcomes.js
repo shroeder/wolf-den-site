@@ -50,25 +50,38 @@ export function WrapModal({ wrap, tripsLeft, maxTrips, onClose, onToFace, onAgai
                 {!wrap.collapsed && paid.length ? (
                     <div className="mine-reveal-row">{paid.map((h, i) => <Haul key={i} h={h} />)}</div>
                 ) : null}
-                {wrap.seam ? (
+                {/* WHAT THE ROOF TOOK. A collapse still leaves you rock to swing at, so the loss is not "nothing
+                    at the face" — it's the DIFFERENCE between the vein you'd found and the Coal you crawled out
+                    with. Showing both side by side is the only way that reads as a cost rather than a shrug. */}
+                {wrap.collapsed && wrap.lostTier ? (
+                    <div className="mine-lost" style={{ "--had": wrap.lostTier.color }}>
+                        <span className="mine-lost-was">
+                            <Img src={wrap.lostTier.art} className="mine-lost-art" fallback="" />
+                            <em style={{ color: wrap.lostTier.color }}>{wrap.lostTier.name}</em>
+                            <i>buried</i>
+                        </span>
+                        <span className="mine-lost-arrow" aria-hidden="true">&rarr;</span>
+                        <span className="mine-lost-got">
+                            <Img src={wrap.seam?.art} className="mine-lost-art" fallback="" />
+                            <em style={{ color: wrap.seam?.color }}>{wrap.seam?.name}</em>
+                            <i>all you got out with</i>
+                        </span>
+                    </div>
+                ) : wrap.seam ? (
                     <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
                         <b>{wrap.seam.name} waiting at the face</b>
-                        <em>{wrap.collapsed ? "You got out with the seam, at least." : "Go break it open."}</em>
+                        <em>{wrap.collapsed ? "Poor rock, but it's rock. Go swing at it." : "Go break it open."}</em>
                     </div>
                 ) : null}
-                {/* A collapse ends with nothing at the face, so the way out is another trip — not a walk to an
-                    empty room. */}
-                {wrap.collapsed ? (
-                    <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={onAgain}>
-                        {tripsLeft > 0
-                            ? <><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head back down ({tripsLeft} left)</>
-                            : <>Out of trips today</>}
+                {/* Either way there is now something at the face, so the button goes there. */}
+                <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={onToFace}>
+                    <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> To the rock face
+                </button>
+                {wrap.collapsed && tripsLeft > 0 ? (
+                    <button type="button" className="mine-prospect is-ghost" style={{ marginTop: 8 }} onClick={onAgain}>
+                        <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Or straight back down ({tripsLeft} left)
                     </button>
-                ) : (
-                    <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={onToFace}>
-                        <Img src="/images/mining/pick-iron.png" className="mine-btn-ico" fallback="" /> To the rock face
-                    </button>
-                )}
+                ) : null}
             </div>
         </div>
     );

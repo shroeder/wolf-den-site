@@ -4,9 +4,9 @@ import ItemArt from "@/components/ItemArt";
 import { Img, KIND_ART, money, ToolPanel } from "@/components/mining/kit";
 
 // ── DESCEND ──────────────────────────────────────────────────────────────────────────────────────────────────
-// Push-your-luck. Every step down turns up a card and raises the odds the roof comes in. Climb out and the bag
-// is yours; push one step too far and it isn't — including the seam, which is why a collapse costs you the
-// mining as well as the haul.
+// Push-your-luck. Every step down turns up a card and raises the odds the roof comes in. Stop and the bag is
+// yours along with the seam you found; push one step too far and the bag is gone and the seam with it — you
+// crawl out with the poorest rock in the mine instead. You always get to swing at something.
 
 function TunnelCard({ card }) {
     if (!card) return <div className="mine-card is-idle"><em>The tunnel goes on.</em></div>;
@@ -96,7 +96,7 @@ export default function DescendTab({ s, msg, busy, card, startTrip, goDeeper, su
                             <em>{run.haul.length ? `keep ${run.haul.length}` : "empty bag"}</em>
                         </button>
                     </div>
-                    <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Stop and the bag is yours to keep and the seam is yours to dig; push too far and you lose both.</p>
+                    <p className="mine-hint">Deeper rock hides better things — and the roof gets worse. Stop and the bag is yours to keep and the seam is yours to dig. Push too far and the bag is gone and the vein with it — you&rsquo;ll still have rock to swing at, just the worst there is.</p>
                 </>
             )}
 
