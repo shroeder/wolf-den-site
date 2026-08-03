@@ -740,7 +740,9 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const got = await grantHaul(buyerId, kind, species.rarity).catch(() => null);
     if (got) extras.push(got);
     // Surfaced in the same haul strip as everything else — a recipe you were never told about is no reward.
-    if (recipeFound) extras.push({ kind: "recipe", label: `📜 Recipe learned — ${recipeFound.name}`, recipe: recipeFound.id });
+    // No emoji, and no celebrating here: RecipeFoundWatcher shows the card site-wide. This stays as the quiet
+    // inline receipt on the catch itself.
+    if (recipeFound) extras.push({ kind: "recipe", label: `Recipe learned — ${recipeFound.name}`, recipe: recipeFound.id });
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
     await checkFishingBadges(buyerId).catch(() => {});

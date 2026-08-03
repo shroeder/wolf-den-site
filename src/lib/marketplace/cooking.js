@@ -483,6 +483,70 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
     ).catch(() => {});
 }
 
+// ── THE REVEAL ───────────────────────────────────────────────────────────────────────────────────────────────
+// Finding a recipe is PENDING STATE, not a return value.
+//
+// learnRecipe has always returned the recipe "so callers can announce it", and of the ~18 drop points most
+// discarded it — boss kills, the forge, salvage, daily deals, pet bonds, raid wins and cooking itself all
+// called it bare. The three that did keep it put it in an API response no client component read. The book just
+// grew in silence.
+//
+// So the announcement stops being each caller's job. A row with celebrated_at IS NULL is a debt; the
+// site-wide RecipeFoundWatcher pays it wherever the member happens to be, then acknowledges. A new drop point
+// gets the celebration for free by doing nothing.
+
+/** Recipes this member has found but never been shown, oldest first, with everything the modal needs. */
+export async function pendingRecipeReveals(buyerId) {
+    if (!buyerId) return [];
+    const rows = await db.query(
+        `SELECT recipe_id FROM mkt_recipe_known
+          WHERE buyer_id = $1 AND celebrated_at IS NULL
+          ORDER BY learned_at ASC LIMIT 5`,
+        [buyerId]
+    ).catch(() => []);
+    if (!rows.length) return [];
+
+    const sprites = await cookingSprites().catch(() => ({}));
+    return rows.map((r) => {
+        const rec = recipeById(r.recipe_id);
+        if (!rec) return null;
+        const t = tierMeta(rec.tier);
+        return {
+            id: rec.id,
+            name: rec.name,
+            kind: rec.kind,
+            flavor: rec.flavor,
+            tier: rec.tier,
+            tierName: t.name,
+            tierColor: t.color,
+            sprite: sprites[rec.id] || null,
+            fallback: rec.kind === "prep" ? KIND_FALLBACK.prep : KIND_FALLBACK.dish,
+            // What it asks for, so the modal answers "can I cook this now?" instead of only "you found a thing".
+            needs: Object.entries(rec.need).map(([ref, qty]) => {
+                const m = ingredientMeta(ref, sprites);
+                return { ref, qty, name: m.name, sprite: m.sprite, fallback: m.fallback };
+            }),
+            // A prep says what it produces; a dish pays from its tier's ladder.
+            makes: rec.kind === "prep"
+                ? { name: PREPS[rec.out]?.name || rec.out, sprite: sprites[rec.out] || null, fallback: KIND_FALLBACK.prep }
+                : null,
+        };
+    }).filter(Boolean);
+}
+
+/** Mark reveals as shown. Called the moment the modal opens, so it fires exactly once even if the tab dies. */
+export async function ackRecipeReveals(buyerId, ids = []) {
+    if (!buyerId) return { ok: false };
+    const list = (Array.isArray(ids) ? ids : []).filter((x) => typeof x === "string").slice(0, 20);
+    if (!list.length) return { ok: true, acked: 0 };
+    await db.query(
+        `UPDATE mkt_recipe_known SET celebrated_at = NOW()
+          WHERE buyer_id = $1 AND celebrated_at IS NULL AND recipe_id = ANY($2)`,
+        [buyerId, list]
+    ).catch(() => {});
+    return { ok: true, acked: list.length };
+}
+
 /** Teach a recipe. Returns the recipe when it was NEW to them, else null — so callers can announce it. */
 export async function learnRecipe(buyerId, recipeId = null, band = undefined) {
     if (!buyerId) return null;

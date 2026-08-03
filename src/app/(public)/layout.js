@@ -7,6 +7,7 @@ import LevelUpWatcher from "@/components/LevelUpWatcher";
 import PetLevelUp from "@/components/PetLevelUp";
 import LocationPrompt from "@/components/LocationPrompt";
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
+import RecipeFoundWatcher from "@/components/RecipeFoundWatcher";
 import RewardNudge from "@/components/RewardNudge";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -30,6 +31,9 @@ export default function PublicLayout({ children }) {
             <BossCelebrationWatcher />
             {/* When Happy Hour goes live, everyone gets the "it started!" modal once (with a donor recap). */}
             <HappyHourWatcher />
+            {/* Recipes drop from ~18 different systems, so the "you found one!" card lives here rather than in
+                any one of them — the server marks the reveal owed and this pays it wherever the member is. */}
+            <RecipeFoundWatcher />
             {/* Pops up admin gifts (item/chest/gold) on next visit — reliable even without browser push. */}
             <GiftWatcher />
             {/* Ever-present social hub (friends + discover + messaging) for signed-in members, every page. */}
