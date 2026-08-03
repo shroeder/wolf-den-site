@@ -97,14 +97,14 @@ export const ITEM_SETS = [
     },
     {
         // ── WHEEL SET ── the wheel-exclusive gear from the Prize Wheel's match-3 BONUS GAME, made a collect-them-all
-        // set whose bonuses feed the WHEEL itself (Lucky Charge speed + spin gold + a free-respin capstone), read in
+        // set whose bonuses feed the WHEEL itself (Lucky Spin proc gold + a free-respin capstone), read in
         // spin.js — NOT boss power. `full` = 8 because two pieces share the main_hand slot (blade + axe), so all ten
         // can never be worn at once; the capstone unlocks at 8 equipped.
         id: "wheelwarden", name: "Wheelwarden's Fortune",
         items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
         full: 8,
-        // `luck` = % CHANCE per spin to trigger a Lucky Spin (a burst of Lucky Charge + bonus gold on gold prizes),
-        // NOT a guaranteed every-spin bonus — kept as a proc so the set is a fun edge, not an auto-win.
+        // `luck` = % CHANCE per spin to trigger a Lucky Spin (bonus gold on gold prizes), NOT a guaranteed
+        // every-spin bonus — kept as a proc so the set is a fun edge, not an auto-win.
         bonuses: [
             { need: 2, wheel: { luck: 10 } },
             { need: 4, wheel: { luck: 10 } },
@@ -219,7 +219,7 @@ export function setFarmDoubleHarvest(equippedIds) {
 }
 
 // Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `luck` = % chance
-// per spin to trigger a Lucky Spin (bonus Lucky Charge + bonus gold on gold prizes). It's a proc, not a
+// per spin to trigger a Lucky Spin (bonus gold on gold prizes). It's a proc, not a
 // guaranteed per-spin bonus.
 export function setWheelBonus(equippedIds) {
     const counts = equippedCounts(equippedIds);

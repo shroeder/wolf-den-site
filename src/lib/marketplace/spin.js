@@ -16,15 +16,19 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
-// gold. Your level unlocks better wheels. A pity counter guarantees a rare prize every PITY spins. Gold
-// prizes ride the Happy Hour multiplier. The wheel's prize list is ordered + stable so the UI can rotate to
-// the winning index.
+// gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
+// is ordered + stable so the UI can rotate to the winning index.
+//
+// NO PITY COUNTER. There used to be one — "Lucky Charge", a 1-of-20 bar under the wheel that guaranteed a
+// rare on the twentieth spin. It was removed at Luke's call, and the reason is worth keeping: a progress bar
+// toward a guaranteed win tells you before you tap that this spin does not matter, and the nineteen spins it
+// counts are strictly worse for having been counted. Every spin is now the same honest roll off the wheel's
+// own weights. `spins_since_rare` is left on mkt_buyer as dead data rather than dropped — nothing reads it.
 
 export const SPIN_TOKEN_COST = 400; // gold to buy one extra spin
-const PITY = 20; // guaranteed rare within this many spins
 // Wheelwarden set "Lucky Spin" proc payout (the set only grants a CHANCE at this per spin, not every spin).
-const LUCKY_CHARGE = 3;   // bonus Lucky Charge on a Lucky Spin
-const LUCKY_GOLD_PCT = 25; // % bonus gold when a Lucky Spin lands on a gold prize
+// Bumped from 25 when the pity burst went away — the proc lost half its payload and this is all it does now.
+const LUCKY_GOLD_PCT = 40; // % bonus gold when a Lucky Spin lands on a gold prize
 
 // The wheel carries a MINI JACKPOT + a grand JACKPOT, both weighted tiny so they're a rare thrill
 // (jackpot ≈ 0.8%, mini ≈ 2.5%). `tier` drives the wheel/legend styling client-side. Single wheel for
@@ -71,9 +75,12 @@ const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
-            { label: "50 gold", sprite: "coins-small", weight: 16, kind: "gold", amount: 50 },
+            // "50 gold" and "75 gold" were two adjacent wedges wearing the SAME coins-small sprite — and the
+            // wheel was carrying 21 prizes on a 20-wedge disc, so one of them had to go. Folded into one wedge
+            // at their combined weight, with the amount set to hold the payout: 50×16 + 75×15 = 1925 over 31
+            // spins, ≈62 each, so 60 at weight 31 is the same wheel to within a rounding error.
+            { label: "60 gold", sprite: "coins-small", weight: 31, kind: "gold", amount: 60 },
             { label: "60 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 60 },
-            { label: "75 gold", sprite: "coins-small", weight: 15, kind: "gold", amount: 75 },
             { label: "Pet Treat", sprite: "pet-treat", weight: 10, kind: "consumable", consumable: "treat_bone", n: 1 },
             { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
             { label: "150 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 150 },
@@ -98,6 +105,23 @@ const WHEELS = [
         ],
     },
 ];
+
+// ── THE WEDGE COUNT IS LOAD-BEARING, SO IT IS ENFORCED ───────────────────────────────────────────────────
+// wheel-disc.png is painted with exactly 20 physical wedges (dividers measured at 9° + k·18°), and the client
+// lays icons out at index × 18°. A 21st prize therefore does not get a wedge — it lands at 20 × 18° = 360°,
+// which is 0°, drawing straight on top of prize 0 at dead top. That is precisely what shipped: MAJOR JACKPOT
+// was stacked over "50 gold" at the pointer, so a 50-gold win showed a jackpot gem under the wolf's nose, and
+// the client's own `Math.min(WEDGES - 1, prizeIndex)` clamp meant actually winning the jackpot would have
+// pointed at MINI JACKPOT instead. Both were invisible for as long as nobody counted the array.
+//
+// A throw here fails the build rather than the player. If a 21st prize is genuinely wanted, the disc art has
+// to be repainted first — this constant is the contract between the array and the picture.
+export const WHEEL_WEDGES = 20;
+for (const w of WHEELS) {
+    if (w.prizes.length !== WHEEL_WEDGES) {
+        throw new Error(`spin wheel "${w.id}" has ${w.prizes.length} prizes but the disc art has ${WHEEL_WEDGES} wedges — repaint wheel-disc.png or fix the list`);
+    }
+}
 
 // The MINI WHEEL bonus round — a small secondary wheel of solid prizes.
 const MINI_WHEEL_PRIZES = [
@@ -205,9 +229,9 @@ export async function bonusFlip(buyerId, index) {
     return { ok: true, index: i, tile: gearCard(revealedId), done: Boolean(winner), winner, board: fullBoard };
 }
 
-// Weighted pick of a prize INDEX. forceRare restricts to rare segments (pity).
-function pickIndex(wheel, forceRare, rand = Math.random) {
-    const pool = wheel.prizes.map((p, i) => ({ i, w: forceRare ? (p.rare ? p.weight : 0) : p.weight }));
+// Weighted pick of a prize INDEX, straight off the wheel's own weights — no pity, no floor, no thumb.
+function pickIndex(wheel, rand = Math.random) {
+    const pool = wheel.prizes.map((p, i) => ({ i, w: p.weight }));
     const total = pool.reduce((s, x) => s + x.w, 0);
     if (total <= 0) return 0;
     let r = rand() * total;
@@ -276,7 +300,7 @@ const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
 export async function getSpinState(buyerId) {
     if (!buyerId) return { signedIn: false };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, COALESCE(spins_since_rare,0) AS pity, spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spin_count,0) AS spin_count, spin_buys_day::text AS spin_buys_day, COALESCE(spin_buys_count,0) AS spin_buys_count, spin_bonus FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(row?.xp || 0).level;
     // Resume an unfinished match-3 bonus board across a refresh so an abandoned game isn't lost.
     const bonusResume = (() => {
@@ -301,9 +325,6 @@ export async function getSpinState(buyerId) {
         freeAvailable,
         tokenCost,
         extraSpinsToday: boughtToday,
-        charge: Math.min(PITY, row?.pity || 0),
-        chargeMax: PITY,
-        golden: (row?.pity || 0) >= PITY - 1,
         isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
@@ -318,7 +339,7 @@ export async function getSpinState(buyerId) {
 // Do a spin (uses the free daily spin first, else a token). Returns the winning segment index + prize.
 export async function doSpin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day, COALESCE(spins_since_rare,0) AS pity FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_signed_in" };
     const freeAvailable = asDay(row.free_spin_day) !== today();
     // Consume a spin atomically (free first, else a token).
@@ -332,7 +353,7 @@ export async function doSpin(buyerId) {
     }
     // Every spin feeds the shared progressive jackpot.
     await bumpJackpotPot(JACKPOT_CONTRIB).catch(() => {});
-    // Wheelwarden's Fortune set (the wheel-exclusive gear worn as a set): faster Lucky Charge, bonus spin gold,
+    // Wheelwarden's Fortune set (the wheel-exclusive gear worn as a set): bonus spin gold on a Lucky proc,
     // and a free-respin capstone. Read off the equipped loadout (getEquippedIds returns a {slot→id} object,
     // which setWheelBonus normalizes).
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
@@ -340,8 +361,7 @@ export async function doSpin(buyerId) {
     const respinChance = setWheelRespinChance(equipped);   // capstone: 0..0.5
     const lucky = luckChance > 0 && Math.random() * 100 < luckChance; // did the wheel set proc this spin?
     const wheel = wheelForLevel(levelForXp(row.xp).level);
-    const forceRare = row.pity >= PITY - 1;
-    const idx = pickIndex(wheel, forceRare);
+    const idx = pickIndex(wheel);
     const prize = wheel.prizes[idx];
     // Special wedges roll a sub-game; everything else is a direct grant.
     let display;
@@ -350,9 +370,7 @@ export async function doSpin(buyerId) {
     if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
     else display = await grantPrize(buyerId, prize, { goldPct: lucky ? LUCKY_GOLD_PCT : 0 });
-    // Lucky Charge climbs 1/spin, plus a burst on a Lucky Spin proc; resets on a rare pull.
-    const chargeStep = 1 + (lucky ? LUCKY_CHARGE : 0);
-    await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1, spins_since_rare = CASE WHEN $2 THEN 0 ELSE spins_since_rare + $3 END WHERE id = $1`, [buyerId, Boolean(prize.rare), chargeStep]).catch(() => {});
+    await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1 WHERE id = $1`, [buyerId]).catch(() => {});
     // Capstone: a chance the spin is refunded (a free spin token back).
     let refunded = false;
     if (respinChance > 0 && Math.random() < respinChance) { await grantSpinTokens(buyerId, 1).catch(() => {}); refunded = true; }
@@ -366,7 +384,7 @@ export async function doSpin(buyerId) {
         label: prize.label,
         tier: prize.tier || (prize.rare ? "rare" : "normal"),
         jackpot: Boolean(prize.jackpot), mini: Boolean(prize.mini), rare: Boolean(prize.rare),
-        respin: Boolean(prize.kind === "respin"), golden: forceRare,
+        respin: Boolean(prize.kind === "respin"),
         miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
     };
     return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, lucky, ...(await getSpinState(buyerId)) };

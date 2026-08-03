@@ -12,7 +12,8 @@ const RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary:
 // (an unguarded Object.entries(null) here 500'd the whole /marketplace/sets page).
 const statText = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${k.replace(/_/g, " ")}`).join(" · ");
 // Wheelwarden set bonus: a % chance per spin to trigger a Lucky Spin (charge burst + bonus gold).
-const describeWheel = (w) => [w.luck ? `${w.luck}% Lucky Spin chance` : "", w.charge ? `+${w.charge} Lucky Charge/spin` : "", w.goldPct ? `+${w.goldPct}% spin gold` : ""].filter(Boolean).join(" · ");
+// No Lucky Charge line any more — the pity bar it fed was removed from the wheel entirely (see spin.js).
+const describeWheel = (w) => [w.luck ? `${w.luck}% Lucky Spin chance` : "", w.goldPct ? `+${w.goldPct}% spin gold` : ""].filter(Boolean).join(" · ");
 const tierText = (t) => [statText(t.stats), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : "", t.wheel ? describeWheel(t.wheel) : ""].filter(Boolean).join(" · ") || "—";
 
 // The gear-sets overview: each set as a card with its pieces shown as tappable ART tiles (equipped / owned /

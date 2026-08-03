@@ -21,9 +21,13 @@ const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°�
 // and the disc's hub ends at 15.6% of the rotor. An icon is 11% of the rotor wide, so ±5.5:
 //     hub 15.6 + 5.5  =  21.1   <=   ICON_R   <=   35.1 - 5.5  =  29.6
 // At 34 the icons reached 39.5% of the rotor — 32.4% of the ring — so their outer edge sat UNDER the frame's
-// inner rim and every prize sprite was clipped. 25.5 is the midpoint of the legal band: dead centre of the
-// visible part of each wedge, maximum clearance from both the hub and the frame.
-const ICON_R = 25.5;
+// inner rim and every prize sprite was clipped. 25.5 was the midpoint of that band, which left them huddled
+// around the hub with a wide empty gutter of wedge outside them.
+//
+// 28.5 pushes them out to where the wedge actually reads. Measured against the frame's own alpha, the ring's
+// inner rim at a wedge CENTRE (±18°, ±36°, …) starts at 34.8% of the rotor, and an icon at 28.5 has its outer
+// edge at 34.0 — clear by 0.8, with none of the clipping that killed 34.
+const ICON_R = 28.5;
 const SPIN_MS = 5600;
 // The wheel starts turning the INSTANT you tap, on a constant-speed lead-in, and only retargets to the
 // winning wedge once the server answers. It used to sit dead still until the POST came back — on a cold
@@ -173,9 +177,14 @@ export default function SpinWheel() {
             setMsg(d?.error === "no_spins" ? "No spins left — earn or buy one." : "Couldn't spin.");
             return;
         }
-        const idx = Math.max(0, Math.min(WEDGES - 1, d.prizeIndex));
+        // Wrap, don't clamp. The old Math.min(WEDGES - 1, …) silently mapped any out-of-range index onto the
+        // LAST wedge — so while the prize list was one entry too long, winning the MAJOR JACKPOT (index 20)
+        // would have parked the wheel on MINI JACKPOT and looked like a payout bug. spin.js now hard-fails a
+        // wrong-length list at build time, and a modulo here degrades honestly if one ever slips past.
+        const idx = ((Math.round(Number(d.prizeIndex) || 0) % WEDGES) + WEDGES) % WEDGES;
         setWonIdx(idx);
-        const jitter = (Math.random() - 0.5) * WEDGE_DEG * 0.4;
+        // NO JITTER. It used to stop up to ±3.6° off centre "for feel" — noise on the one signal the whole
+        // wheel exists to send. Dead centre under the wolf, every time.
         const turns = 5 + Math.floor(Math.random() * 4);
         const targetMod = (((-(idx * WEDGE_DEG + WEDGE_OFFSET)) % 360) + 360) % 360;
         // `prev` is the lead-in's target, which is always at or ahead of the live angle — so landing from it
@@ -183,7 +192,7 @@ export default function SpinWheel() {
         // from wherever the disc actually is; that hand-off is safe (unlike arming from `none`).
         landed = true;
         setPhase("land");
-        setRot((prev) => { let n = Math.ceil(prev / 360) * 360 + turns * 360 + targetMod + jitter; if (n <= prev + 360) n += 360; return n; });
+        setRot((prev) => { let n = Math.ceil(prev / 360) * 360 + turns * 360 + targetMod; if (n <= prev + 360) n += 360; return n; });
         timerRef.current = setTimeout(() => {
             cancelAnimationFrame(rafRef.current);
             setSpinning(false); setPhase("idle");
@@ -194,10 +203,11 @@ export default function SpinWheel() {
             if (d.prize?.bonusGame && d.bonusGame) { openBonus(d.bonusGame); playWin("bonus"); return; }
             setResult(d.prize);
             const kind = d.prize?.jackpot ? "jackpot" : d.prize?.mini ? "mini" : d.prize?.respin ? "bonus" : null;
-            if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), 4600); }
+            // The major jackpot gets to breathe — 4.6s was barely past the shockwave for a once-in-133 win.
+            if (kind === "jackpot" || kind === "mini") { setCelebrate({ kind, prize: d.prize }); setTimeout(() => setCelebrate(null), kind === "jackpot" ? 8000 : 4600); }
             playWin(kind || (d.prize?.rare ? "rare" : "normal"));
             if (d.refunded) { setRefundFlash(true); setTimeout(() => { try { playWin("bonus"); } catch { /* ignore */ } }, 120); setTimeout(() => setRefundFlash(false), 3000); }
-            else if (d.lucky) setMsg("✨ Lucky Spin! Wheelwarden's Fortune surged your Lucky Charge.");
+            else if (d.lucky) setMsg("Lucky Spin! Wheelwarden's Fortune fattened the payout.");
             if (d.prize?.respin && chainRef.current < 6) { chainRef.current += 1; setTimeout(() => runSpinRef.current?.(), 1400); }
             else chainRef.current = 0;
         }, SPIN_MS);
@@ -290,9 +300,8 @@ export default function SpinWheel() {
     if (!st.signedIn) return <section className="card"><p className="muted" style={{ margin: 0 }}>Sign in to spin the daily wheel.</p></section>;
 
     const prizes = st?.wheel?.prizes || [];
-    const chargePct = st.chargeMax ? Math.round((st.charge / st.chargeMax) * 100) : 0;
     const resultKind = result?.jackpot ? "jackpot" : result?.mini ? "mini" : result?.respin ? "bonus" : result?.rare ? "rare" : "normal";
-    const spinLabel = spinning ? "Spinning…" : st.golden ? "★ GOLDEN SPIN ★" : st.freeAvailable ? "FREE SPIN" : st.tokens > 0 ? `Spin · 🎟️ ${st.tokens}` : "No spins left";
+    const spinLabel = spinning ? "Spinning…" : st.freeAvailable ? "FREE SPIN" : st.tokens > 0 ? `Spin · ${st.tokens} left` : "No spins left";
 
     return (
         <section className="card cw-card">
@@ -308,8 +317,8 @@ export default function SpinWheel() {
                 <span className="cw-jackpot-note">grows every spin · community pot</span>
             </div>
 
-            <div className={`cw-stage${st.golden ? " is-golden" : ""}${spinning ? " is-spinning" : ""}`}>
-                <div className="cw-ring">
+            <div className={`cw-stage${spinning ? " is-spinning" : ""}`}>
+                <div className={`cw-ring${wonIdx != null && !spinning ? " has-won" : ""}`}>
                     <div ref={rotorRef} className="cw-rotor" style={{ transform: `translate(-50%, -50%) rotate(${rot}deg)`, transition: phase === "lead" ? `transform ${LEAD_MS}ms linear` : phase === "land" ? `transform ${SPIN_MS}ms cubic-bezier(0.08,0.72,0.04,1)` : "none" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img className="cw-disc" src="/images/spin/wheel-disc.png" alt="" draggable="false" />
@@ -324,23 +333,9 @@ export default function SpinWheel() {
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="cw-frame" src="/images/spin/wheel-frame.png" alt="" draggable="false" />
-                    {/* THE POINTER. The landing maths always brought the winning wedge to the TOP — that part
-                        was right — but nothing on screen said so. With no marker you read the wheel by whichever
-                        icon catches your eye, which is how a 50-gold spin looked like the jackpot. The mini
-                        wheel has had one of these all along. Outside the rotor, so it stays put while the disc
-                        turns under it. */}
-                    <span className="cw-pointer" aria-hidden="true" />
+                    {/* No separate pointer marker — the frame's wolf ornament ends in a gold chevron at dead
+                        top, and that IS the pointer. See .cw-ring.has-won for why the winner draws over it. */}
                 </div>
-            </div>
-
-            <div className={`cw-charge${st.golden ? " is-full" : ""}`}>
-                {/* Says what it BUYS you, not just what it is called. A bar reading "Lucky Charge 3/20" tells you
-                    nothing about why you would want it; the payoff only appeared once the bar was already full. */}
-                <span className="cw-charge-lab">{st.golden
-                    ? "★ GOLDEN SPIN READY — guaranteed rare+"
-                    : `Lucky Charge — ${Math.max(0, st.chargeMax - st.charge)} more spin${st.chargeMax - st.charge === 1 ? "" : "s"} to a guaranteed rare`}</span>
-                <span className="cw-charge-bar"><span style={{ width: `${st.golden ? 100 : chargePct}%` }} /></span>
-                {!st.golden ? <span className="cw-charge-n">{st.charge}/{st.chargeMax}</span> : null}
             </div>
 
             {result ? (
@@ -356,7 +351,7 @@ export default function SpinWheel() {
             {msg ? <div className="cw-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
 
             <div className="cw-actions">
-                <button type="button" className={`cw-go${st.golden ? " is-golden" : ""}`} onClick={spin} disabled={spinning || !st.canSpin} style={{ opacity: spinning || !st.canSpin ? 0.6 : 1 }}>{spinLabel}</button>
+                <button type="button" className="cw-go" onClick={spin} disabled={spinning || !st.canSpin} style={{ opacity: spinning || !st.canSpin ? 0.6 : 1 }}>{spinLabel}</button>
                 {!st.freeAvailable ? <button type="button" className="cw-buy" onClick={buy} disabled={spinning || st.gold < st.tokenCost}>Buy spin · 🪙 {st.tokenCost}</button> : null}
             </div>
 
@@ -374,7 +369,7 @@ export default function SpinWheel() {
                 </div>
             </details>
 
-            <p className="cw-hint">One free spin daily. Earn 🎟️ tokens from quests, boss kills &amp; streaks. Every spin builds your Lucky Charge toward a Golden Spin — and feeds the community jackpot.</p>
+            <p className="cw-hint">One free spin daily. Earn spin tokens from quests, boss kills &amp; streaks. Every spin is its own roll — and every spin feeds the community jackpot.</p>
 
             {/* ── MINI WHEEL modal ── */}
             {mini ? (
@@ -478,8 +473,24 @@ export default function SpinWheel() {
 
             {celebrate ? (
                 <Portal><div className={`cw-celebrate cw-celebrate-${celebrate.kind}`} onClick={() => setCelebrate(null)}>
+                    {/* THE MAJOR JACKPOT BLOWS THE SCREEN UP. It is the rarest thing on the wheel — a 1-weight
+                        wedge out of 133, once in 133 spins, paying the whole community pot — and it used to
+                        land with the same card and the same confetti as a 1,000-gold mini. The big one now
+                        gets its own detonation: a white flash, three shockwave rings punching outward, gold
+                        shards thrown from the centre, and a card that shakes on impact. */}
+                    {celebrate.kind === "jackpot" ? (
+                        <>
+                            <span className="cw-flash" aria-hidden="true" />
+                            <div className="cw-shock" aria-hidden="true"><span /><span /><span /></div>
+                            <div className="cw-shards" aria-hidden="true">
+                                {Array.from({ length: 28 }).map((_, i) => (
+                                    <span key={i} style={{ "--a": `${i * (360 / 28)}deg`, animationDelay: `${(i % 7) * 0.045}s`, background: ["#ffd75e", "#fff3c4", "#ffb020"][i % 3] }} />
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
                     <div className="cw-confetti" aria-hidden="true">
-                        {Array.from({ length: celebrate.kind === "jackpot" ? 100 : 54 }).map((_, i) => (
+                        {Array.from({ length: celebrate.kind === "jackpot" ? 140 : 54 }).map((_, i) => (
                             <span key={i} style={{ left: `${(i * 97) % 100}%`, animationDelay: `${(i % 12) * 0.07}s`, background: ["#ffd75e", "#ff7ad0", "#5ce0c0", "#8fd8ff", "#ff9f1c"][i % 5] }} />
                         ))}
                     </div>
@@ -488,8 +499,10 @@ export default function SpinWheel() {
                             // eslint-disable-next-line @next/next/no-img-element
                             <img className="cw-celebrate-img" src={celebrate.prize.sprite} alt="" />
                         ) : null}
-                        <div className="cw-celebrate-title">{celebrate.kind === "jackpot" ? "JACKPOT!" : "MINI JACKPOT!"}</div>
+                        {/* The wedge says MAJOR JACKPOT, so the celebration says MAJOR JACKPOT. */}
+                        <div className="cw-celebrate-title">{celebrate.kind === "jackpot" ? "MAJOR JACKPOT!" : "MINI JACKPOT!"}</div>
                         {result ? <div className="cw-celebrate-sub">{result.text}</div> : null}
+                        {celebrate.kind === "jackpot" ? <div className="cw-celebrate-brag">You took the whole pot.</div> : null}
                         <button type="button" className="cw-collect" onClick={() => setCelebrate(null)}>Collect</button>
                     </div>
                 </div></Portal>
@@ -545,7 +558,6 @@ const CW_CSS = `
 
 .cw-stage { position: relative; display: grid; place-items: center; margin: 8px auto 6px; width: 100%; max-width: 440px; aspect-ratio: 1; }
 .cw-stage::before { content: ""; position: absolute; inset: 4%; border-radius: 50%; background: radial-gradient(circle, rgba(255,190,70,0.14), transparent 68%); filter: blur(8px); transition: opacity .4s; }
-.cw-stage.is-golden::before { background: radial-gradient(circle, rgba(255,205,80,0.34), transparent 70%); animation: cwHalo 1.6s ease-in-out infinite; }
 @keyframes cwHalo { 0%,100% { opacity: 0.7; } 50% { opacity: 1; } }
 .cw-ring { position: relative; width: 100%; height: 100%; }
 .cw-rotor { position: absolute; top: 50%; left: 50%; width: 82%; height: 82%; transform-origin: center; will-change: transform; }
@@ -557,25 +569,32 @@ const CW_CSS = `
 .cw-ico.tier-jackpot .cw-ico-img { filter: drop-shadow(0 0 6px rgba(255,215,94,0.95)); }
 .cw-ico.tier-mini .cw-ico-img { filter: drop-shadow(0 0 5px rgba(200,150,255,0.8)); }
 .cw-ico.tier-bonus .cw-ico-img { filter: drop-shadow(0 0 5px rgba(255,140,240,0.7)); }
-.cw-pointer { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); z-index: 3; pointer-events: none;
-    width: 0; height: 0; border-left: 11px solid transparent; border-right: 11px solid transparent;
-    border-top: 18px solid #ff4d5e; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.7)); }
-/* The wedge that actually won, once the disc has stopped. */
-.cw-ico.is-won { animation: cwWon 1.1s ease-in-out infinite alternate; }
-@keyframes cwWon { from { filter: drop-shadow(0 0 4px #ffd75e); transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1); }
-    to { filter: drop-shadow(0 0 16px #ffd75e) drop-shadow(0 0 26px #ffb020); } }
+/* ── THE WINNER, AND WHY IT USED TO BE INVISIBLE ──────────────────────────────────────────────────────────
+   The landing maths always brought the winning wedge to dead top, which is correct — and dead top is the one
+   spot on the whole wheel the player cannot see. Measured off wheel-frame.png's alpha channel: at 0° the wolf
+   ornament goes opaque at 23.7% of the rotor, and an icon centred at 28.5 spans 23.0–34.0. The prize you just
+   won was sitting behind the wolf's snout. Every other wedge centre is clear (the rim starts at 34.8% there),
+   so the eye skipped to the fully-visible neighbours at ±18° — which is exactly how a 50-gold win got read as
+   the jackpot two wedges over.
+   Fix: once the disc has STOPPED, the rotor rises above the frame so the won icon draws in front of the
+   ornament, spotlit, held in the wolf's jaws. Only while stopped — mid-spin the icons must still sweep behind
+   the frame or the whole thing looks like stickers on glass.
+   The pulse lives on the IMG, never on .cw-ico — the ico's transform is its polar position (translate + the
+   wedge's own rotation), set inline, and the old keyframe overwrote it with rotate(var(--rot)) against a
+   variable nothing sets, so the winner nudged itself off its wedge while it celebrated. */
+.cw-ring.has-won .cw-rotor { z-index: 4; }
+.cw-ico.is-won { z-index: 5; }
+.cw-ico.is-won::before { content: ""; position: absolute; inset: -80%; border-radius: 50%; z-index: -1;
+    background: radial-gradient(circle, rgba(255,215,94,0.6), rgba(255,150,30,0.24) 42%, transparent 70%);
+    animation: cwWonHalo 1.1s ease-in-out infinite alternate; }
+.cw-ico.is-won .cw-ico-img { animation: cwWon 1.1s ease-in-out infinite alternate; }
+@keyframes cwWonHalo { from { opacity: 0.5; transform: scale(0.84); } to { opacity: 1; transform: scale(1.14); } }
+@keyframes cwWon { from { transform: scale(1.06); filter: drop-shadow(0 0 5px #ffd75e); }
+    to { transform: scale(1.3); filter: drop-shadow(0 0 16px #ffd75e) drop-shadow(0 0 26px #ffb020); } }
 .cw-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.45)); }
-.cw-stage.is-golden .cw-frame { filter: drop-shadow(0 0 16px rgba(255,200,80,0.7)); }
 .cw-stage.is-spinning .cw-frame { animation: cwBuzz 0.14s steps(2) infinite; }
 @keyframes cwBuzz { 0% { transform: translate(0,0); } 50% { transform: translate(0,-0.6px); } }
 
-.cw-charge { display: flex; align-items: center; gap: 8px; margin: 2px 2px; }
-.cw-charge-lab { font-size: 10.5px; font-weight: 800; color: #9aa2ab; white-space: nowrap; }
-.cw-charge.is-full .cw-charge-lab { color: #ffd75e; }
-.cw-charge-bar { flex: 1; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
-.cw-charge-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6b8cff, #8fd8ff); transition: width .5s ease; }
-.cw-charge.is-full .cw-charge-bar > span { background: linear-gradient(90deg, #ffb020, #ffe08a); box-shadow: 0 0 10px #ffce5a; }
-.cw-charge-n { font-size: 10.5px; font-weight: 800; color: #b6bcc4; font-variant-numeric: tabular-nums; }
 
 .cw-result { margin: 10px 0 0; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); animation: cwPop .35s cubic-bezier(.2,1.4,.35,1) both; }
 .cw-result-img { width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
@@ -590,7 +609,6 @@ const CW_CSS = `
 .cw-actions { display: flex; gap: 10px; margin: 12px 0 0; }
 .cw-go { flex: 1; padding: 13px; border-radius: 13px; border: none; cursor: pointer; font-weight: 900; font-size: 1rem; letter-spacing: 0.03em; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12, 0 8px 20px -6px rgba(255,176,32,0.6); }
 .cw-go:active { transform: translateY(2px); box-shadow: 0 1px 0 #b47a12; }
-.cw-go.is-golden { background: linear-gradient(180deg, #fff0b0, #ffca3a); box-shadow: 0 3px 0 #b47a12, 0 0 24px rgba(255,206,90,0.8); animation: cwPulse 1.3s ease-in-out infinite; }
 @keyframes cwPulse { 0%,100% { box-shadow: 0 3px 0 #b47a12, 0 0 18px rgba(255,206,90,0.6); } 50% { box-shadow: 0 3px 0 #b47a12, 0 0 30px rgba(255,206,90,0.95); } }
 .cw-buy { flex: none; padding: 13px 16px; border-radius: 13px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: #e6ebf2; font-weight: 800; font-size: 0.9rem; cursor: pointer; }
 .cw-buy:disabled { opacity: 0.5; cursor: default; }
@@ -699,6 +717,28 @@ const CW_CSS = `
 .cw-celebrate-img { width: 84px; height: 84px; object-fit: contain; animation: cwSpin .7s ease both; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
 .cw-celebrate-title { font-size: 1.6rem; font-weight: 900; color: #ffe28a; text-shadow: 0 2px 12px rgba(255,180,40,0.6); letter-spacing: 0.04em; }
 .cw-celebrate-sub { font-size: 1rem; color: #ecd6bc; margin-top: 4px; }
+
+/* ── MAJOR JACKPOT DETONATION ───────────────────────────────────────────────────────────────────────────── */
+.cw-celebrate-jackpot { background: rgba(10,4,0,0.82); }
+.cw-flash { position: absolute; inset: 0; background: #fff; pointer-events: none; animation: cwFlash 0.9s ease-out both; }
+@keyframes cwFlash { 0% { opacity: 0.95; } 22% { opacity: 0.35; } 100% { opacity: 0; } }
+.cw-shock { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.cw-shock span { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255,215,94,0.85);
+    box-shadow: 0 0 30px rgba(255,190,60,0.7), inset 0 0 26px rgba(255,190,60,0.45); animation: cwShock 1.5s cubic-bezier(.16,.72,.3,1) both; }
+.cw-shock span:nth-child(2) { animation-delay: 0.16s; border-color: rgba(255,243,196,0.75); }
+.cw-shock span:nth-child(3) { animation-delay: 0.34s; border-color: rgba(255,160,40,0.6); }
+@keyframes cwShock { from { transform: scale(0.2); opacity: 1; } to { transform: scale(9); opacity: 0; } }
+.cw-shards { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
+/* Each shard is thrown along its own angle: rotate to the bearing, then translate outward along it. */
+.cw-shards span { position: absolute; width: 7px; height: 20px; border-radius: 2px; transform-origin: center;
+    animation: cwShard 1.5s cubic-bezier(.12,.7,.25,1) both; }
+@keyframes cwShard { from { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 1; }
+    to { transform: rotate(var(--a)) translateY(-62vh) scale(0.35); opacity: 0; } }
+.cw-celebrate-jackpot .cw-celebrate-card { animation: cwPop .4s cubic-bezier(.2,1.4,.35,1) both, cwQuake 0.5s 0.1s ease-in-out 3; }
+.cw-celebrate-jackpot .cw-celebrate-img { width: 116px; height: 116px; filter: drop-shadow(0 0 22px rgba(255,215,94,0.95)); }
+.cw-celebrate-jackpot .cw-celebrate-title { font-size: 2.2rem; }
+@keyframes cwQuake { 0%,100% { margin-left: 0; } 25% { margin-left: -5px; } 75% { margin-left: 5px; } }
+.cw-celebrate-brag { margin-top: 6px; font-size: 0.82rem; font-weight: 800; letter-spacing: 0.09em; color: #ffb020; text-transform: uppercase; }
 @keyframes cwPop { from { opacity: 0; transform: scale(.85) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 @keyframes cwSpin { from { transform: rotate(-30deg) scale(.6); } to { transform: rotate(0) scale(1); } }
 
