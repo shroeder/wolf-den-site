@@ -35,7 +35,7 @@ export async function POST(request) {
                 case "descend": return noStore(await descend(buyer.id));
                 case "surface": return noStore(await surfaceRun(buyer.id));
                 case "swing": return noStore(await swingAtNode(buyer.id, Number(b.nodeId), b.dist));
-                case "smelt": return noStore(await smeltOre(buyer.id, b.tier, b.heats));
+                case "smelt": return noStore(await smeltOre(buyer.id, b.tier, b.dists));
                 case "upgrade": return noStore(await upgradeMining(buyer.id, String(b.track || "")));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }

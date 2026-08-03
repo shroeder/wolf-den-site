@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { HEAT_BANDS, heatBand, SMELT_PHASES } from "@/lib/marketplace/smelt-heat.js";
+import { SMELT_GRADES, SMELT_MISS, SMELT_PHASES, smeltGrade } from "@/lib/marketplace/smelt-heat.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
@@ -972,7 +972,7 @@ async function claimNode(buyerId, node, row, run = {}) {
 
 // Smelt a stack. `heat` is 0..1+ from the client's heat bar — graded HERE and clamped, so a tampered client
 // can't claim a perfect pour every time.
-export async function smeltOre(buyerId, tier, heats = null) {
+export async function smeltOre(buyerId, tier, dists = null) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
@@ -991,21 +991,24 @@ export async function smeltOre(buyerId, tier, heats = null) {
     if (!spent) return { ok: false, error: "not_enough_ore" };
 
     const o = oreTier(t);
-    // THREE POURS, not one. The client works the heat once per phase and sends all three readings; every one
-    // is graded here and clamped, so a tampered client cannot claim three perfect pours.
+    // THREE POURS on the real timing bar. The client sends its distance-from-centre for each phase; every one
+    // is graded HERE and clamped, so a tampered client cannot claim three flawless pours.
     //
-    // The WORST phase counts double. A smelt is a chain — a cold first pour is not redeemed by nailing the
-    // last one — and averaging alone let a fumble hide behind two good reads.
-    const raw = Array.isArray(heats) ? heats : [heats];
+    // A missing reading is treated as merely SERVICEABLE rather than punished — never make someone worse off
+    // for a bug on our side.
+    const raw = Array.isArray(dists) ? dists : [dists];
     const readings = raw
         .slice(0, SMELT_PHASES)
-        .map((x) => (x == null || Number.isNaN(Number(x)) ? 0.55 : Math.max(0, Math.min(1.2, Number(x)))));
-    while (readings.length < SMELT_PHASES) readings.push(0.55);
-    const bands = readings.map((x) => heatBand(x));
+        .map((x) => (x == null || Number.isNaN(Number(x)) ? 0.12 : Math.min(0.5, Math.max(0, Number(x)))));
+    while (readings.length < SMELT_PHASES) readings.push(0.12);
+    const bands = readings.map((x) => smeltGrade(x));
+    // The WORST pour counts double. A smelt is a chain — a spilled first pour is not redeemed by nailing the
+    // last one — and a plain average let one fumble hide behind two good reads.
     const worst = bands.reduce((a, b) => (b.mult < a.mult ? b : a), bands[0]);
     const avgMult = (bands.reduce((n2, b) => n2 + b.mult, 0) + worst.mult) / (bands.length + 1);
-    // The reported band is the one that best describes the whole run.
-    const band = HEAT_BANDS.reduce((a, b) => (Math.abs(b.mult - avgMult) < Math.abs(a.mult - avgMult) ? b : a), HEAT_BANDS[0]);
+    // The band reported back is whichever best describes the run as a whole.
+    const band = [...SMELT_GRADES, SMELT_MISS]
+        .reduce((a, b) => (Math.abs(b.mult - avgMult) < Math.abs(a.mult - avgMult) ? b : a), SMELT_GRADES[0]);
     const n = 1;
 
     // THE BAG. Ordinary parts always; the pour and your upgrades seed the better tickets.
@@ -1014,13 +1017,13 @@ export async function smeltOre(buyerId, tier, heats = null) {
     const bag = [];
     for (let i = 0; i < 10; i += 1) bag.push("part");
     // Heat quality is the biggest lever on the bag — that's what makes the pour worth playing.
-    const heatTickets = band.key === "perfect" ? 7 : band.key === "hot" ? 4 : band.key === "warm" ? 1 : 0;
+    const heatTickets = band.key === "pixel" ? 7 : band.key === "perfect" ? 5 : band.key === "great" ? 2 : 0;
     for (let i = 0; i < heatTickets; i += 1) bag.push(Math.random() < 0.5 ? "up" : "extra");
     for (let i = 0; i < Math.round(flux * 12); i += 1) bag.push("up");
     for (let i = 0; i < Math.round(bellows * 12); i += 1) bag.push("extra");
     // Only a genuinely good pour can turn up a curio — the fun stuff that isn't a part at all.
-    if (band.key === "perfect") bag.push("curio", "curio");
-    else if (band.key === "hot") bag.push("curio");
+    if (band.key === "pixel") bag.push("curio", "curio");
+    else if (band.key === "perfect") bag.push("curio");
 
     // Draws scale with how the WHOLE run went, not one lucky pour. A single batch, so this is 1-2 draws.
     const draws = Math.max(1, Math.round(avgMult));
@@ -1063,8 +1066,8 @@ export async function smeltOre(buyerId, tier, heats = null) {
         ok: true,
         smelted: {
             oreTier: t, oreName: o.ore, oreSpent: spend, partTier: o.part,
-            phases: bands.map((b) => ({ key: b.key, label: b.short, mult: b.mult })),
-            band: band.key, bandLabel: band.label, bandBlurb: band.blurb,
+            phases: bands.map((b) => ({ key: b.key, label: b.label, mult: b.mult })),
+            band: band.key, bandLabel: band.label, bandBlurb: null,
             parts: totalParts, ups, extras, bonus,
             byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
         },
