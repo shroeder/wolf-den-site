@@ -88,7 +88,7 @@ const WHEELS = [
             // A WEDGE, not a hidden roll. The wheel used to grant recipes at a flat 2.5% AFTER it had already
             // landed on something else — 401 spins a week made it one of the top three sources in the game, and
             // none of it was on the wheel you were watching. Now you can see it and land on it.
-            { label: "New Recipe", sprite: "recipe-scroll", weight: 5, rare: true, tier: "rare", kind: "recipe" },
+            { label: "New Recipe", sprite: "recipe-scroll", weight: 2, rare: true, tier: "rare", kind: "recipe" },
             { label: "BONUS GAME", sprite: "mystery-box", weight: 4, tier: "bonus", kind: "bonus_game" },
             { label: "375 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 375 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
@@ -107,7 +107,7 @@ const MINI_WHEEL_PRIZES = [
     { label: `5 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 5, tierId: FRAGMENT_PRIZE_TIER },
     { label: "450 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 450 },
     { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
-    { label: "New Recipe", sprite: "recipe-scroll", weight: 8, kind: "recipe" },
+    { label: "New Recipe", sprite: "recipe-scroll", weight: 3, kind: "recipe" },
     { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
     { label: "750 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 750 },
 ];

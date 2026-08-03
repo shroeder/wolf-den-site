@@ -349,18 +349,28 @@ export default function MiningClient({ initial }) {
                 .mine-lost em { font-style: normal; font-size: 11.5px; font-weight: 800; line-height: 1.15; text-align: center; }
                 .mine-lost i { font-style: normal; font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: #8b8f96; }
                 .mine-lost-arrow { color: #ff8f9a; font-size: 17px; }
-                .mine-rank-row { display: grid; grid-template-columns: 1fr auto 64px; align-items: center; gap: 10px;
+                .mine-rank-row { display: grid; grid-template-columns: 1fr auto 52px; align-items: center; gap: 10px;
                     padding: 8px 10px; border-radius: 10px; margin-top: 6px;
                     background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
                 .mine-rank-name { display: flex; flex-direction: column; min-width: 0; }
                 .mine-rank-name b { color: var(--rk); font-size: 13px; letter-spacing: .04em; }
                 .mine-rank-name em { font-style: normal; font-size: 10.5px; color: #8b8f96; }
                 .mine-rank-draws { font-size: 11px; color: #b9a98f; white-space: nowrap; }
+                .mine-rank-bonus { font-size: 11.5px; font-weight: 800; color: var(--rk); text-align: right; }
                 .mine-rank-draws b { color: #f2e6e6; font-size: 15px; }
                 .mine-rank-rich { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
                 .mine-rank-rich > span { display: block; height: 100%; border-radius: 999px;
                     background: linear-gradient(90deg, var(--rk), #fff8); }
                 /* What CAN come out — shown as real sprites, never named. The tease is the point. */
+                /* THE SMELT ROW. It read as a settings list; it is the payoff screen for everything you dug. */
+                .mine-smeltable { margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 900;
+                    letter-spacing: .05em; text-transform: uppercase; color: #2a1400;
+                    background: linear-gradient(180deg, #ffd97a, #f0b93f); box-shadow: 0 0 14px -3px #f0b93f; }
+                .mine-stash-row { transition: border-color .15s ease, background .15s ease; }
+                .mine-stash-row:has(.mine-smelt.is-ready) { border-color: rgba(255,160,70,0.45); background: rgba(255,140,50,0.06); }
+                .mine-smelt.is-ready { animation: mineSmeltReady 2.4s ease-in-out infinite; }
+                @keyframes mineSmeltReady { 0%,100% { box-shadow: 0 0 0 rgba(255,150,60,0); } 50% { box-shadow: 0 0 16px -2px rgba(255,150,60,0.75); } }
+                .mine-smelt b { font-size: 1.02em; }
                 .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
                 .mine-bag-how b { color: #ffd75e; }
                 .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;

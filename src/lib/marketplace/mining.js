@@ -8,6 +8,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
 import { heatBand } from "@/lib/marketplace/smelt-heat.js";
 import { addChests } from "@/lib/marketplace/chests.js";
+import { grantEventBadge } from "@/lib/marketplace/badges.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -209,6 +210,8 @@ export async function descend(buyerId) {
         else if (found.effect === "consumable") haul.push({ kind: "consumable" });
     } else if (found.kind !== "nothing") haul.push(found);
 
+    if (depth >= 8) await grantEventBadge(buyerId, "mine_deep").catch(() => {});
+
     const next = { ...run, depth, haul, seamTier, last: { kind: found.kind, label: card.label } };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
     return { ok: true, card: { key: card.key, label: card.label }, found, depth, ...(await getMiningState(buyerId)) };
@@ -245,6 +248,9 @@ export async function surfaceRun(buyerId) {
     const next = { ...run, over: true, collapsed: false };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
     const seam = await cutSeam(buyerId, Number(run.seamTier) || 1);
+    // NERVE OF IRON — went deep AND got out with it. Collapsing at depth 9 earns nothing; knowing when to stop
+    // is the whole game the descent is playing.
+    if ((Number(run.depth) || 0) >= 6 && paid.length) await grantEventBadge(buyerId, "mine_nerve").catch(() => {});
     await trackActivity(buyerId, "mine_surface", { depth: run.depth, haul: paid.length }).catch(() => {});
     return { ok: true, surfaced: true, paid, seam, ...(await getMiningState(buyerId)) };
 }
@@ -332,14 +338,11 @@ const SWING_GRADES = bandTable({
     good: { mult: 1.6, label: "GLANCING" },
 });
 const SWING_MISS = { key: "miss", mult: 0.5, label: "CHIP" };
-const gradeForDist = (dist) => SWING_GRADES.find((g) => dist <= g.max) || SWING_MISS;
+const gradeForDist = (dist, widen = 0) => SWING_GRADES.find((g) => dist <= g.max + widen) || SWING_MISS;
 // Re-arm by grade, same ladder as the raid. The client owns the cadence and shows it; this is what it re-arms on.
 export const SWING_COOLDOWN_MS = { pixel: 700, perfect: 850, great: 1050, good: 1300, miss: 1600 };
-// What you actually re-arm on, after Endurance. Floored well clear of the throttle below: a cooldown that dips
-// under the anti-double-tap floor means legitimately re-armed swings get rejected, which is the exact bug that
-// silently ate strikes in the Golem raid.
-const cooldownFor = (gradeKey, vigorLevel) =>
-    Math.max(SWING_THROTTLE_MS + 60, Math.round((SWING_COOLDOWN_MS[gradeKey] ?? SWING_COOLDOWN_MS.miss) * (1 - enduranceCut(vigorLevel))));
+// Kept only as the FLOOR the client paces itself to. There is no per-grade cooldown any more — the swing
+// button is always live, like the kitchen's.
 // Pure double-tap floor, kept comfortably UNDER the fastest grade cooldown so a legitimately re-armed swing is
 // never rejected. (The raid learned this the hard way: a floor above the fastest cooldown silently eats swings.)
 const SWING_THROTTLE_MS = 300;
@@ -356,21 +359,31 @@ const COMBO_MIN_GRADE = "good";
 // second gate on the same activity, which is what made a seam end before it had been played. You swing until
 // the rock breaks; timing decides how fast that happens and how well it scores.
 //
-// ENDURANCE used to buy extra swings, which is meaningless once they're free. It now buys what its name always
-// described: you recover faster between them, so the whole minigame plays quicker.
-const ENDURANCE_PER = 0.04;
-const ENDURANCE_CAP = 0.40;
-export const enduranceCut = (lvl = 0) => Math.min(ENDURANCE_CAP, Math.max(0, Number(lvl) || 0) * ENDURANCE_PER);
+// ENDURANCE bought extra swings, then briefly a shorter cooldown — and then the cooldown went too, because a
+// swing button that locks you out is the opposite of how the kitchen's plays. So it buys a STEADIER HAND: every
+// timing band gets wider, exactly the allowance the forge's steady-hand perk uses. It is the one upgrade that
+// makes you better at the game rather than making the game hand you more.
+const ENDURANCE_PER = 0.0022;
+const ENDURANCE_CAP = 0.022;   // at max, every band is a full PIXEL-width more forgiving
+export const steadyHand = (lvl = 0) => Math.min(ENDURANCE_CAP, Math.max(0, Number(lvl) || 0) * ENDURANCE_PER);
 // Score per grade. The spread is wide on purpose: a run of PIXELs should rank somewhere a run of GOODs cannot.
 export const HIT_SCORE = { pixel: 10, perfect: 7, great: 4, good: 2, miss: 0 };
 // Where a run lands. Scored as a % of the perfect score for that many swings.
+// WHAT A RANK IS WORTH. Modelled on the farm, deliberately: a harvest is guaranteed gold and XP, and only
+// about 5% of the time does it ALSO turn up one extra thing. That is a shape people already understand.
+//
+// The seam used to hand out DRAWS from a ticket bag — six pulls off one Coal seam, which is how a single
+// swing-session produced three chests, a piece of gear and two piles of ore. Ore is the reward now. Your rank
+// multiplies it, and buys a chance at ONE bonus on top. Never a list.
 export const RUN_RANKS = [
-    { key: "s", label: "MASTERWORK", min: 0.88, draws: 6, rareBias: 3.0, color: "#ffd75e" },
-    { key: "a", label: "SHARP", min: 0.70, draws: 5, rareBias: 2.0, color: "#8fe3ff" },
-    { key: "b", label: "STEADY", min: 0.48, draws: 4, rareBias: 1.2, color: "#8fe39a" },
-    { key: "c", label: "ROUGH", min: 0.25, draws: 3, rareBias: 0.6, color: "#d7c48a" },
-    { key: "d", label: "BUTCHERED", min: 0, draws: 2, rareBias: 0.2, color: "#ff8f9a" },
+    { key: "s", label: "MASTERWORK", min: 0.88, oreMult: 2.4, bonus: 0.30, color: "#ffd75e" },
+    { key: "a", label: "SHARP", min: 0.70, oreMult: 1.9, bonus: 0.18, color: "#8fe3ff" },
+    { key: "b", label: "STEADY", min: 0.48, oreMult: 1.5, bonus: 0.10, color: "#8fe39a" },
+    { key: "c", label: "ROUGH", min: 0.25, oreMult: 1.2, bonus: 0.05, color: "#d7c48a" },
+    { key: "d", label: "BUTCHERED", min: 0, oreMult: 1.0, bonus: 0.02, color: "#ff8f9a" },
 ];
+// Base ore in a seam before the rank multiplier and the Haul track.
+export const baseOre = (tier) => 3 + tier * 2;
 export const rankFor = (pct) => RUN_RANKS.find((r) => pct >= r.min) || RUN_RANKS[RUN_RANKS.length - 1];
 const SWINGS_PER_DAY = 60;          // legacy, unused — trips are the budget now
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
@@ -385,8 +398,8 @@ export const MINE_TRACKS = {
         desc: "Harder swings — fewer to crack a seam.", effect: "Swing power" },
     haul: { max: 10, per: 0.10, cap: 1.0, kind: "mult", name: "Haul", icon: "/images/mining/track-pack.png", col: "haul_level",
         desc: "More ore out of every seam you crack.", effect: "Ore per seam" },
-    vigor: { max: 10, per: ENDURANCE_PER, cap: ENDURANCE_CAP, kind: "pct", name: "Endurance", icon: "/images/mining/track-vigor.png", col: "vigor_level",
-        desc: "You recover faster between swings — the pick comes back up sooner.", effect: "Swing again" },
+    vigor: { max: 10, per: ENDURANCE_PER, cap: ENDURANCE_CAP, kind: "raw", name: "Endurance", icon: "/images/mining/track-vigor.png", col: "vigor_level",
+        desc: "A steadier hand. Every timing band on the bar gets wider — the same swing scores better.", effect: "Band width" },
 };
 
 // SURVEY tracks. The Lantern lives here, not in mining: it buys test-strikes and tilts which seams surface,
@@ -590,7 +603,7 @@ export async function getMiningState(buyerId) {
         lastRun: row?.run_json?.over ? { collapsed: Boolean(row.run_json.collapsed), depth: Number(row.run_json.depth) || 0 } : null,
         tracks: trackCards(MINE_TRACKS, row, trackValue, trackCost, (key, lvl) => {
             const v = trackValue(key, lvl);
-            if (key === "vigor") return `${Math.round(enduranceCut(lvl) * 100)}% sooner`;
+            if (key === "vigor") return lvl ? `+${Math.round(steadyHand(lvl) * 2000) / 10}% wider` : "standard";
             if (key === "lantern") return `+${Math.round(v * 100)}% rich`;
             return `×${(1 + v).toFixed(2)}`;
         }),
@@ -619,6 +632,8 @@ export async function getMiningState(buyerId) {
                 partTier: o.part, gold: o.gold, xp: o.xp,
                 hp: Number(current.hp), hpMax: Number(current.hp_max),
                 mySwings: sw,
+                // How much wider Endurance has made every band, so the bar can DRAW what it grades.
+                widen: steadyHand(row?.vigor_level),
                 // Back to the rock itself: there is no swing budget to count down, so what you want to know is
                 // how much seam is left. Seam HP is sized for a real hand now, so this moves at a readable pace
                 // instead of emptying on the first good hit.
@@ -629,9 +644,8 @@ export async function getMiningState(buyerId) {
                 ranks: RUN_RANKS.map((r) => ({
                     key: r.key, label: r.label, color: r.color,
                     from: Math.round(r.min * 100),
-                    draws: r.draws,
-                    // 0..1, purely for how full to draw the "richness" meter — never a stated probability.
-                    rich: Math.min(1, r.rareBias / 3.0),
+                    ore: Math.max(1, Math.round(baseOre(current.tier) * r.oreMult * haulMult)),
+                    bonus: Math.round(r.bonus * 100),
                 })),
                 // One extra pull sometimes, from the Haul track — worth saying, since it's a thing you bought.
                 haulExtra: Math.round(haulMult * 100 - 100),
@@ -693,7 +707,7 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
     // A distance of exactly 0 is the BEST swing in the game — test for null, never for falsiness. (The raid
     // shipped `|| 0.5` here and graded dead-centre hits as the worst possible outcome.)
     const clamped = dist == null || Number.isNaN(Number(dist)) ? 0.5 : Math.min(0.5, Math.max(0, Number(dist)));
-    const grade = gradeForDist(clamped);
+    const grade = gradeForDist(clamped, steadyHand(row?.vigor_level));
 
     // SEEDING THE POOL. A good swing does not make a known reward bigger — it drops a rarer TICKET into the
     // bag you will draw from when the seam breaks. So timing raises what is POSSIBLE, and the haul is still a
@@ -737,7 +751,7 @@ export async function swingAtNode(buyerId, nodeId, dist = null) {
         ok: true,
         damage, grade: grade.key, gradeLabel: grade.label,
         combo, comboMult: Math.round(comboMult * 100) / 100, comboBroken: !kept && (Number(prior?.combo) || 0) >= 3,
-        cooldownMs: cooldownFor(grade.key, row?.vigor_level),
+        cooldownMs: SWING_THROTTLE_MS,
         nodeId: Number(nodeId), hp, hpMax: Number(node.hp_max),
         pct: node.hp_max ? Math.max(0, Math.round((hp / node.hp_max) * 100)) : 0,
         hits: hitsSoFar,
@@ -772,83 +786,72 @@ async function claimNode(buyerId, node, row, run = {}) {
     const pct = Math.max(0, Math.min(1, (run.score || 0) / (hits * HIT_SCORE.pixel)));
     const rank = rankFor(pct);
 
-    // The bag: ordinary tickets always, plus whatever your timing earned.
-    // The bag: ordinary rock always, the tickets your timing earned, and the RANK weighting the good end.
-    const bag = [];
-    for (let i = 0; i < 6; i += 1) bag.push("ore");
-    for (const s2 of seeds) bag.push(s2 === "rare" ? "rare" : "good");
-    for (let i = 0; i < Math.round(rank.rareBias * 2); i += 1) bag.push(i % 2 ? "rare" : "good");
+    // ── WHAT THE SEAM PAYS ───────────────────────────────────────────────────────────────────────────────
+    // Ore, gold and XP — always. Then ONE bonus, sometimes. Exactly the farm's shape, because the bag of
+    // tickets it replaces was handing out six things at once off a single Coal seam and none of them felt
+    // like anything.
+    const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus)));
+    await db.query(
+        `INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3)
+         ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`,
+        [buyerId, node.tier, ore]
+    ).catch(() => {});
 
-    const DRAWS = rank.draws + (Math.random() < haulBonus ? 1 : 0);
-    const out = [];
-    for (let i = 0; i < DRAWS; i += 1) {
-        const ticket = bag[Math.floor(Math.random() * bag.length)] || "ore";
-        if (ticket === "ore") {
-            const n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + haulBonus)));
-            out.push({ kind: "ore", tier: node.tier, n, name: o.ore, color: o.color, art: oreArt(node.tier) });
-        } else if (ticket === "good") {
-            // The middle of the bag: a better grade of ordinary — more of it, or a rung up.
-            const up = Math.random() < 0.4 && node.tier < 5 ? node.tier + 1 : node.tier;
-            const uo = oreTier(up);
-            out.push({ kind: "ore", tier: up, n: Math.max(2, Math.round((4 + Math.floor(Math.random() * 3)) * (1 + haulBonus))), name: uo.ore, color: uo.color, art: oreArt(up) });
-        } else {
-            // RARE tickets are where the fun lives — the things you cannot get by grinding ore.
-            const roll = Math.random();
-            // A MASTERWORK run can pull a chest a full tier above what the rock deserves.
-            const lift = rank.key === "s" ? 1 : 0;
-            const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
-            if (roll < 0.30) out.push({ kind: "chest", tier: ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden" });
-            else if (roll < 0.60) out.push({ kind: "gear", depth: 3 + node.tier });
-            else if (roll < 0.78) out.push({ kind: "consumable" });
-            // A RECIPE, pressed in the rock — one of the things a rare ticket can be, drawn from the same bag
-            // as the gear and the chests rather than rolled on the side after the seam had already paid out.
-            else if (roll < 0.88) out.push({ kind: "recipe", band: node.tier >= 4 ? "seam_deep" : "seam" });
-            else out.push({ kind: "gold", n: Math.round((140 + node.tier * 90 + Math.floor(Math.random() * 120)) * (1 + haulBonus)) });
-        }
-    }
+    const gold = Math.round(o.gold * (1 + pct) * (1 + haulBonus));
+    const goldRow = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+    await logCoin(buyerId, gold, "mining", { balanceAfter: goldRow?.gold, meta: { kind: "seam", tier: node.tier } }).catch(() => {});
 
-    // Pay the draw out.
-    const paid = [];
-    for (const item of out) {
-        if (item.kind === "ore") {
-            await db.query(`INSERT INTO mkt_ore (buyer_id, tier, qty) VALUES ($1,$2,$3) ON CONFLICT (buyer_id, tier) DO UPDATE SET qty = mkt_ore.qty + EXCLUDED.qty`, [buyerId, item.tier, item.n]).catch(() => {});
-            paid.push(item);
-        } else if (item.kind === "gold") {
-            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
-            await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "seam" } }).catch(() => {});
-            paid.push(item);
-        } else if (item.kind === "chest") {
-            await addChests(buyerId, { [item.tier]: 1 }, { source: "mining" }).catch(() => {});
-            paid.push(item);
-        } else if (item.kind === "gear") {
-            const got = await grantMiningGear(buyerId, item.depth);
-            if (got) paid.push({ ...item, ...got }); else paid.push({ kind: "gold", n: 80 });
-        } else if (item.kind === "consumable") {
+    // THE BONUS. One roll, one thing. Your rank is most of it; clean swings nudge it (the same tickets as
+    // before, worth a little luck each instead of being a currency you spend on pulls).
+    const luck = Math.min(0.22, seeds.filter((x) => x === "rare").length * 0.02 + seeds.filter((x) => x !== "rare").length * 0.008);
+    let bonus = null;
+    if (Math.random() < rank.bonus + luck) {
+        const roll = Math.random();
+        const lift = rank.key === "s" ? 1 : 0;
+        const ladder = ["wooden", "iron", "gold", "mythic", "ascendant"];
+        if (roll < 0.34) {
+            const t = ladder[Math.min(ladder.length - 1, Math.max(0, node.tier - 2 + lift))] || "wooden";
+            await addChests(buyerId, { [t]: 1 }, { source: "mining" }).catch(() => {});
+            bonus = { kind: "chest", tier: t, name: `${t[0].toUpperCase()}${t.slice(1)} chest` };
+        } else if (roll < 0.62) {
+            const got = await grantMiningGear(buyerId, 3 + node.tier);
+            if (got) bonus = { kind: "gear", ...got };
+        } else if (roll < 0.90) {
             const got = await grantMiningConsumable(buyerId);
-            if (got) paid.push({ ...item, ...got });
-        } else if (item.kind === "recipe") {
+            if (got) bonus = { kind: "consumable", ...got };
+        } else {
             const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
-            const rec = await grantRecipeReward(buyerId, item.band).catch(() => null);
-            // Already know every recipe this seam could teach? Pay ore instead of nothing.
-            if (rec) paid.push({ kind: "recipe", name: rec.name, tier: rec.tier, art: "/images/cooking/dish.png" });
-            else paid.push({ kind: "ore", tier: node.tier, n: 4, name: o.ore, color: o.color, art: oreArt(node.tier) });
+            const rec = await grantRecipeReward(buyerId, node.tier >= 4 ? "seam_deep" : "seam").catch(() => null);
+            if (rec) bonus = { kind: "recipe", name: rec.name, tier: rec.tier, art: "/images/cooking/dish.png" };
+        }
+        // Every branch can come up empty (you own all the gear, you know all the recipes). Pay ore rather than
+        // showing a bonus slot with nothing in it.
+        if (!bonus) {
+            const extra = Math.max(2, Math.round(baseOre(node.tier) * 0.5));
+            await db.query(`UPDATE mkt_ore SET qty = qty + $3 WHERE buyer_id = $1 AND tier = $2`, [buyerId, node.tier, extra]).catch(() => {});
+            bonus = { kind: "ore", tier: node.tier, n: extra, name: o.ore, color: o.color, art: oreArt(node.tier) };
         }
     }
 
-    const oreTotal = paid.filter((x) => x.kind === "ore").reduce((n, x) => n + x.n, 0);
+    const oreTotal = ore + (bonus?.kind === "ore" ? bonus.n : 0);
     await db.query(`UPDATE mkt_mining SET nodes_mined = nodes_mined + 1, ore_total = ore_total + $2, current_node_id = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, oreTotal]).catch(() => {});
     // gold: 0 — awardXp pays gold 1:1 with points otherwise, and this is repeatable.
     await awardXp(buyerId, "mining", { points: Math.round(o.xp * (1 + pct)), gold: 0 }).catch(() => {});
-    // Split, because they are not the same thing: a PERFECT or PIXEL adds a rare ticket (gear, a chest, a
-    // windfall); a GREAT adds a good one (more ore, sometimes a tier better). Reporting both as "rare tickets"
-    // overstated what a clean run had actually bought.
+    // Kept apart because they are worth different amounts of luck above: a PERFECT or PIXEL is a rare ticket,
+    // a GREAT is a good one.
     const rareSeeds = seeds.filter((x) => x === "rare").length;
     const goodSeeds = seeds.length - rareSeeds;
-    await trackActivity(buyerId, "ore_mined", { tier: node.tier, draws: paid.length, rare: rareSeeds, good: goodSeeds }).catch(() => {});
+    await trackActivity(buyerId, "ore_mined", { tier: node.tier, ore: oreTotal, rank: rank.key, bonus: bonus?.kind || null, rare: rareSeeds, good: goodSeeds }).catch(() => {});
+
+    // BADGES. Granted at the moment they're earned, like fishing's and digging's — the counters live on
+    // mkt_mining, not in getMemberMetrics, so an auto-rule sweep would need a second source of truth.
+    await grantEventBadge(buyerId, "mine_first").catch(() => {});
+    if (rank.key === "s") await grantEventBadge(buyerId, "mine_masterwork").catch(() => {});
+    if (node.tier >= 5) await grantEventBadge(buyerId, "mine_emberheart").catch(() => {});
 
     return {
-        tier: node.tier, name: o.name, color: o.color, art: oreArt(node.tier),
-        draws: paid, seeded: seeds.length, rareSeeds, goodSeeds, xp: o.xp,
+        tier: node.tier, name: o.name, oreName: o.ore, color: o.color, art: oreArt(node.tier),
+        ore, gold, bonus, seeded: seeds.length, rareSeeds, goodSeeds, xp: Math.round(o.xp * (1 + pct)),
         rank: rank.key, rankLabel: rank.label, rankColor: rank.color,
         score: run.score || 0, scoreMax: hits * HIT_SCORE.pixel, pct: Math.round(pct * 100), hits,
     };
@@ -935,6 +938,8 @@ export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
     }
 
     const totalParts = Object.values(made).reduce((a, b) => a + b, 0);
+    const melted = await db.queryOne(`UPDATE mkt_mining SET ore_smelted = COALESCE(ore_smelted, 0) + $2 WHERE buyer_id = $1 RETURNING ore_smelted`, [buyerId, spend]).catch(() => null);
+    if ((Number(melted?.ore_smelted) || 0) >= 100) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
     await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length }).catch(() => {});
     return {
         ok: true,

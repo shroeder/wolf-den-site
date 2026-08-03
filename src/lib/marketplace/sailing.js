@@ -1448,7 +1448,7 @@ export async function doRaid(buyerId, targetId = null) {
         } catch { /* no companion, no plunder */ }
         goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + companion + Dread Corsair double
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
-        if (Math.random() < Math.min(0.05, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 5%)
+        if (Math.random() < Math.min(0.16, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 16%)
             // Copy one of THEIR items — but never a BOUND piece (ascendant+ can't be copied/traded).
             const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [target.id]).catch(() => []);
             const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity));
@@ -1506,7 +1506,7 @@ export async function doRaid(buyerId, targetId = null) {
     if (sim.win) {
         try {
             const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-            if (Math.random() < 0.04 * await recipeLuck(buyerId)) raidRecipe = await grantRecipeReward(buyerId, "raid_win");
+            if (Math.random() < 0.018 * await recipeLuck(buyerId)) raidRecipe = await grantRecipeReward(buyerId, "raid_win");
         } catch { /* a recipe is a bonus; never let it fail the raid */ }
     }
     if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
@@ -1940,7 +1940,7 @@ async function finishDig(buyerId, board) {
     let digRecipe = null;
     try {
         const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-        const chance = ((board.tier || 1) >= 3 ? 0.11 : 0.05) * await recipeLuck(buyerId);
+        const chance = ((board.tier || 1) >= 3 ? 0.045 : 0.018) * await recipeLuck(buyerId);
         if (Math.random() < chance) digRecipe = await grantRecipeReward(buyerId, (board.tier || 1) >= 3 ? "dig_deep" : "dig");
     } catch { /* a recipe is a bonus; never let it fail the action */ }
     const state = await getSailingState(buyerId);

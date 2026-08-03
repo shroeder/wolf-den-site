@@ -21,15 +21,13 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                 {msg ? <div className="mine-msg">{msg}</div> : null}
             </div>
 
-            <ToolPanel
-                tool={s.furnace} levels={s.smeltLevels} tracks={s.smeltTracks}
-                gold={s.gold} busy={busy} onBuy={upgrade}
-                artClass="is-furnace" trackClass="is-forge"
-                maxedNote="Fully built — every smelting upgrade bought."
-            />
-
+            {/* THE STASH FIRST. Smelting is what you came to this tab to DO — it sat under four upgrade cards,
+                so the actual verb was below the fold and the shop was above it. */}
             <div className="mine-panel">
-                <div className="mine-panel-head">Ore in your pack <span className="muted">· smelts into forge parts</span></div>
+                <div className="mine-panel-head">
+                    Ore in your pack
+                    {s.oreTotal ? <span className="mine-smeltable">{(s.ore || []).reduce((n, o) => n + (o.canSmelt || 0), 0)} parts ready</span> : <span className="muted"> · nothing to melt</span>}
+                </div>
                 {(s.ore || []).length ? (
                     <div className="mine-stash-rows">
                         {s.ore.map((o) => (
@@ -40,14 +38,26 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                                     <em>{o.smeltCost} ore → 1 {PART_NAME[o.partTier]}</em>
                                 </span>
                                 <b className="mine-stash-qty">×{o.qty}</b>
-                                <button type="button" className="mine-smelt" disabled={!o.canSmelt || Boolean(smelting)} onClick={() => onSmelt(o.tier)}>
-                                    <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" /> Smelt {o.canSmelt || ""}
+                                {/* The button said "Smelt 8" and got clipped on a phone. It now says what it
+                                    MAKES — that is the number worth reading — and wraps to its own line rather
+                                    than fighting the name for width. */}
+                                <button type="button" className={`mine-smelt${o.canSmelt ? " is-ready" : ""}`} disabled={!o.canSmelt || Boolean(smelting)} onClick={() => onSmelt(o.tier)}>
+                                    <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" />
+                                    {o.canSmelt ? <>Smelt <b>{o.canSmelt}</b></> : "Not enough"}
                                 </button>
                             </div>
                         ))}
                     </div>
                 ) : <p className="muted" style={{ margin: 0, fontSize: 13 }}>Nothing yet — crack a seam on the Mine tab and it lands here.</p>}
             </div>
+
+
+            <ToolPanel
+                tool={s.furnace} levels={s.smeltLevels} tracks={s.smeltTracks}
+                gold={s.gold} busy={busy} onBuy={upgrade}
+                artClass="is-furnace" trackClass="is-forge"
+                maxedNote="Fully built — every smelting upgrade bought."
+            />
 
             <p className="mine-hint">Ore of a tier melts into that tier&rsquo;s forge part. The Crucible lowers what each part costs you, the Bellows sometimes throws in an extra, and Flux sometimes lifts one a whole tier.</p>
         </>

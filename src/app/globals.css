@@ -11827,10 +11827,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Buy-a-cast: deliberately quieter than the free actions beside it — it should read as available, not urged. */
 .sail-act.is-recharge { border-color: rgba(255,215,94,0.35); }
 .sail-act.is-recharge b { color: #ffd75e; }
-/* Tailwind-save perk flash. */
+/* Tailwind-save perk flash.
+   It borrowed cheerToast, which ends on `translate(-50%, 0)` because it was written for an ABSOLUTELY
+   POSITIONED element sitting at left:50%. This one is a normal block in flow, so that -50% shifted it left by
+   half its own width and hung it off the edge of the screen. Its own entrance now, no centering assumed. */
+@keyframes sailNoteIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .sail-windsave { margin-top: 8px; text-align: center; font-weight: 800; font-size: 0.82rem; color: #7cffb2;
     background: rgba(124,255,178,0.12); border: 1px solid rgba(124,255,178,0.35); border-radius: 10px; padding: 7px 12px;
-    animation: cheerToast 0.3s ease-out both; }
+    animation: sailNoteIn 0.3s ease-out both; }
 @keyframes sailCtaPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 @keyframes sailCtaShine { 0% { left: -70%; } 55%,100% { left: 140%; } }
 @keyframes sailCtaBounce { 0% { transform: scale(0.6) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }

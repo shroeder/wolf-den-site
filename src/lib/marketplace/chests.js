@@ -16,7 +16,10 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 // a sliver of a shot at something great. Ascendant/Eternal only appear in the top few tiers' spreads.
 // How often a chest's contents ARE a recipe, by tier. Sits with the chest's other odds because that is what
 // it is now — part of what a chest pays out, not a lottery running beside it.
-const RECIPE_CHANCE = { wooden: 0.030, iron: 0.045, gold: 0.070, mythic: 0.110, ascendant: 0.130, eternal: 0.150 };
+// CUT HARD. A recipe should be a thing you remember, not something that turns up every few chests. Roughly a
+// third of the first pass, and the low tiers cut most — a wooden chest coughing one up 3% of the time made the
+// commonest chest in the game a reliable recipe source.
+const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, ascendant: 0.060, eternal: 0.075 };
 
 // The recipe_nose companion perk, read once per open.
 async function recipeLuckFor(buyerId) {

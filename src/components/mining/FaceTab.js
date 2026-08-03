@@ -79,24 +79,23 @@ export default function FaceTab({ s, node, msg, busy, floats, shake, tripsLeft, 
                         that you are buying PULLS and better odds, and deliberately never says what comes out. */}
                     <div className="mine-ladder">
                         <p className="mine-ladder-intro">
-                            <b>Every seam pays out of a bag.</b> Swing as long as you like — the trip is the
-                            only limit. Your AVERAGE swing quality across the seam decides how many times you
-                            pull from the bag, and how much good stuff is in it to pull.
+                            <b>How well you swing decides what the seam gives up.</b> Swing as long as you like —
+                            the trip is the only limit. Your AVERAGE swing quality across the whole seam sets the
+                            rank, and the rank sets the ore.
                         </p>
                         {(node.ranks || []).map((r) => (
                             <div key={r.key} className="mine-rank-row" style={{ "--rk": r.color }}>
                                 <span className="mine-rank-name"><b>{r.label}</b><em>{r.from}%+</em></span>
-                                <span className="mine-rank-draws"><b>{r.draws}</b> pulls</span>
-                                <span className="mine-rank-rich" aria-hidden="true"><span style={{ width: `${Math.round(r.rich * 100)}%` }} /></span>
+                                <span className="mine-rank-draws"><b>{r.ore}</b> ore</span>
+                                <span className="mine-rank-bonus">{r.bonus}%</span>
                             </div>
                         ))}
                         <p className="mine-bag-how">
-                            A clean swing drops a <b>lucky ticket</b> in the bag before you pull from it. PERFECT
-                            and PIXEL add a shot at gear, a chest or a windfall; GREAT adds a shot at a richer
-                            haul. They are the only reason a pull is ever anything but plain ore.
+                            Ore is guaranteed. The percentage is the chance the seam was <b>hiding something
+                            else</b> as well — and clean swings nudge it: PERFECT and PIXEL raise it most.
                         </p>
                         <div className="mine-bag-kinds">
-                            <span className="muted">In the bag</span>
+                            <span className="muted">Buried with it</span>
                             <Img src={node.art} className="mine-bag-ico" fallback="" />
                             <Img src={KIND_ART.chest} className="mine-bag-ico" fallback="" />
                             <Img src={KIND_ART.gear} className="mine-bag-ico" fallback="" />

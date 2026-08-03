@@ -16,8 +16,10 @@ import { bandPct, gradeKeyForDist, GRADE_COLOR } from "@/lib/marketplace/timing.
 // you are aiming at is literally what you are scored against — they cannot drift apart. Widest first, so each
 // narrower band paints on top of the last.
 const BAND_LABEL = { good: "GOOD", great: "GREAT", perfect: "PERFECT", pixel: "PIXEL" };
-const BANDS = ["good", "great", "perfect", "pixel"].map((key) => ({
-    key, pct: bandPct(key), label: BAND_LABEL[key], color: GRADE_COLOR[key],
+// `widen` is the Endurance allowance from the server. Drawn as well as graded, so a steadier hand visibly
+// makes every band fatter rather than being an invisible stat.
+const bandsFor = (widen = 0) => ["good", "great", "perfect", "pixel"].map((key) => ({
+    key, pct: Math.min(100, bandPct(key) + widen * 200), label: BAND_LABEL[key], color: GRADE_COLOR[key],
 }));
 const KIND_ART = {
     gold: "/images/ui/coin.png",
@@ -34,8 +36,9 @@ const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} $
 
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
 const SWEEP_MS = 900;
-const GRADE_CD = { pixel: 700, perfect: 850, great: 1050, good: 1300, miss: 1600 };
-const CD_DEFAULT = 1600;
+// Matches the server's anti-double-tap floor. Not a cooldown — you will never see it; it exists so a shaky
+// double-tap can't come back as "Easy — let the bar refill".
+const FLOOR_MS = 300;
 
 let _ac = null;
 const ac = () => { if (typeof window === "undefined") return null; try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === "suspended") _ac.resume(); return _ac; } catch { return null; } };
@@ -88,8 +91,11 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     // things worth knowing mid-hand now that there is no swing budget to count down.
     const [pct, setPct] = useState(Number(node?.pct ?? 100));
     const [quality, setQuality] = useState(0);
+    // Endurance's steady-hand allowance, from the server. Used to GRADE locally and to DRAW the bands, so what
+    // you see is what you are scored against.
+    const widen = Number(node?.widen) || 0;
+    const bands = bandsFor(widen);
     const [score, setScore] = useState(0);
-    const [cooling, setCooling] = useState(false);
     const [pop, setPop] = useState(null);        // the grade label that punches out on a hit
     const [sparks, setSparks] = useState([]);
     const [floats, setFloats] = useState([]);
@@ -99,7 +105,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const [tickets, setTickets] = useState(0);   // rare tickets your timing has put in the bag
     const [cracked, setCracked] = useState(null);
     const [notice, setNotice] = useState(null);
-    const cdRef = useRef(false), busyRef = useRef(false), cdUntil = useRef(0), cdMs = useRef(CD_DEFAULT), cdEl = useRef(null);
+    const busyRef = useRef(false), cdUntil = useRef(0);
     const idRef = useRef(0);
 
     // The marker sweeps. rAF rather than CSS so the sampled position and the drawn position are the same number.
@@ -110,7 +116,6 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
             const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
             const pos = phase <= 1 ? phase : 2 - phase;
             markerRef.current = pos; setMarker(pos);
-            if (cdEl.current) cdEl.current.style.transform = `scaleX(${Math.max(0, cdUntil.current - Date.now()) / (cdMs.current || CD_DEFAULT)})`;
             raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
@@ -131,14 +136,16 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     };
 
     const swing = useCallback(async () => {
-        if (cdRef.current || busyRef.current || cracked) return;
-        busyRef.current = true; cdRef.current = true;
+        // Only two reasons not to swing: one is already in flight, or the seam is already open. No cooldown —
+        // the bar takes 900ms to cross, so there is nothing to gain by tapping faster than you can aim, and
+        // locking the button was punishing a problem nobody had. The tiny floor below just matches the
+        // server's anti-double-tap so a fumbled double never comes back as an error.
+        if (busyRef.current || cracked) return;
+        if (Date.now() < cdUntil.current) return;
+        busyRef.current = true;
+        cdUntil.current = Date.now() + FLOOR_MS;
         const d = Math.abs(markerRef.current - 0.5);
-        const key = gradeKeyForDist(d);
-        const guess = GRADE_CD[key] ?? CD_DEFAULT;
-        cdMs.current = guess; cdUntil.current = Date.now() + guess;
-        let timer = setTimeout(() => { cdRef.current = false; setCooling(false); }, guess);
-        setCooling(true);
+        const key = gradeKeyForDist(d, widen);
 
         // Everything you FEEL fires now, off the local grade — the round trip must never be in the way of the
         // hit landing. The server's answer only ever corrects the numbers.
@@ -156,16 +163,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         const r = await onSwing(d);
         busyRef.current = false;
 
-        if (typeof r?.cooldownMs === "number" && r.cooldownMs !== guess) {
-            clearTimeout(timer);
-            const remain = Math.max(0, r.cooldownMs - (guess - Math.max(0, cdUntil.current - Date.now())));
-            cdMs.current = r.cooldownMs; cdUntil.current = Date.now() + remain;
-            timer = setTimeout(() => { cdRef.current = false; setCooling(false); }, remain);
-        }
-
         if (!r?.ok) {
-            clearTimeout(timer);
-            cdRef.current = false; cdUntil.current = 0; setCooling(false);
+            cdUntil.current = 0;
             setNotice(r?.error === "too_fast" ? "Easy — let the bar refill" : r?.error === "node_gone" ? "This seam is gone" : "That swing didn't land");
             setTimeout(() => setNotice(null), 1500);
             return;
@@ -200,17 +199,20 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
 
     return createPortal(
         <div className="mmg-scrim" role="dialog" aria-modal="true" aria-label={`Breaking ${node?.name}`}>
-            <div className={`mmg${shake ? ` is-shake-${shake}` : ""}`} style={{ "--ore": node?.color || "#ffd75e" }}>
+            {/* The shake used to be on the CARD, up to 11px, so every good hit threw the whole modal — the bar
+                you are aiming at and the button under your thumb — around the screen. It lives on the seam art
+                now, where the impact actually is. */}
+            <div className="mmg" style={{ "--ore": node?.color || "#ffd75e" }}>
                 {flash ? <span key={flash.k} className="mmg-flash" style={{ "--fc": flash.c }} aria-hidden="true" /> : null}
 
                 <div className="mmg-head">
-                    <Img src={node?.art} className="mmg-art" fallback="" />
+                    <Img src={node?.art} className={`mmg-art${shake ? ` is-shake-${shake}` : ""}`} fallback="" />
                     <div className="mmg-headbody">
                         <div className="mmg-name">{node?.name}</div>
                         <div className="mmg-tier">smelts to tier {node?.partTier}</div>
                     </div>
                     {/* "rare" alone meant nothing to anyone who hadn't read the code. Say what it buys. */}
-                    <div className="mmg-tickets" title="Clean swings add chances at gear, a chest or a windfall when the seam opens">
+                    <div className="mmg-tickets" title="Clean swings raise the odds of something buried with the ore">
                         <b>{tickets}</b><span>lucky</span>
                     </div>
                 </div>
@@ -242,55 +244,46 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                             <em>{cracked.pct}% of a flawless run · {cracked.hits} swings</em>
                         </div>
                         <div className="mmg-draw-head">The seam opens</div>
-                        <div className="mmg-draw-row">
-                            {(cracked.draws || []).map((x, i) => (
-                                // GEAR gets the full treatment — its own die-cut art, the rarity frame, the
-                                // stat line — because it is the best thing the bag can hand you and the whole
-                                // reason that art exists. The CSS for this landed a while back; the branch that
-                                // uses it did not, so every piece of gear out of a seam was drawn as the
-                                // generic helm icon next to a name.
-                                x.kind === "gear" && x.id ? (
-                                    <span key={i} className="mmg-drawn is-item"
-                                        style={{ "--rar": RARITY_COLOR[x.rarity] || "#cdd3d8", animationDelay: `${i * 0.16}s` }}>
-                                        <ItemArt id={x.id} icon={x.icon} className="mmg-item-art" alt="" />
-                                        <i className="mmg-item-tag">{RARITY_LABEL[x.rarity] || x.rarity}</i>
-                                        <em className="mmg-item-name" style={{ color: RARITY_COLOR[x.rarity] || "#e7dcc8" }}>{x.name}</em>
-                                        {x.slot ? <i className="mmg-item-slot">{x.slot}</i> : null}
-                                        {x.stats ? <i className="mmg-item-stats">{statLine(x.stats)}</i> : null}
-                                    </span>
-                                ) : (
-                                    <span key={i} className={`mmg-drawn is-${x.kind}`} style={{ animationDelay: `${i * 0.16}s` }}>
-                                        {/* Consumables carry their own sprite now, so a Pet Treat and a Lucky
-                                            Lure stop coming out of the dark as the same generic bottle. */}
-                                        <Img src={x.art || KIND_ART[x.kind] || KIND_ART.gold} className="mmg-drawn-art" fallback="" />
-                                        <em style={{ color: x.color || "#e7dcc8" }}>{label(x.kind, x)}</em>
-                                        {x.n && x.kind === "ore" ? <i>×{x.n}</i> : null}
-                                    </span>
-                                )
-                            ))}
+
+                        {/* THE HAUL. Ore is the reward; a bonus is the surprise on top. This was a row of up to
+                            six "pulls from the bag" — three chests and a robe out of one Coal seam — which is
+                            absurd as an economy and unreadable as a moment. The farm gets this right: one
+                            guaranteed thing, and occasionally one more. */}
+                        <div className="mmg-haul">
+                            <Img src={cracked.art} className="mmg-haul-art" fallback="" />
+                            <b style={{ color: cracked.color }}>{cracked.ore} {cracked.oreName}</b>
                         </div>
-                        {/* WHAT A TICKET IS. The old line said "7 rare tickets went in from your timing" and
-                            never once explained what a ticket does — and it counted GREAT swings as rare when
-                            they only ever added a good ticket. Both fixed: plain words, honest numbers. */}
-                        <p className="mmg-draw-note">
-                            <b>{(cracked.draws || []).length} pull{(cracked.draws || []).length === 1 ? "" : "s"}</b>
-                            {" from the bag — your rank decides how many."}
-                        </p>
-                        <p className="mmg-draw-note is-sub">
-                            {cracked.rareSeeds || cracked.goodSeeds ? (
-                                <>Your timing stocked it:{" "}
-                                    {cracked.rareSeeds ? <><b className="mmg-seed-rare">{cracked.rareSeeds}</b> shot{cracked.rareSeeds === 1 ? "" : "s"} at gear, a chest or a windfall</> : null}
-                                    {cracked.rareSeeds && cracked.goodSeeds ? " · " : null}
-                                    {cracked.goodSeeds ? <><b>{cracked.goodSeeds}</b> at a richer haul</> : null}
-                                </>
-                            ) : "Nothing but plain rock in the bag — clean swings are what stock it."}
-                        </p>
+                        <div className="mmg-earn">
+                            <span><Img src="/images/ui/coin.png" className="mmg-earn-ico" fallback="" /> +{Number(cracked.gold || 0).toLocaleString()}</span>
+                            <span>+{cracked.xp} XP</span>
+                        </div>
+
+                        {cracked.bonus ? (
+                            <div className="mmg-bonus"
+                                style={{ "--rar": cracked.bonus.kind === "gear" ? (RARITY_COLOR[cracked.bonus.rarity] || "#ffd75e") : "#ffd75e" }}>
+                                <span className="mmg-bonus-lab">Buried with it</span>
+                                {cracked.bonus.kind === "gear" && cracked.bonus.id ? (
+                                    <>
+                                        <ItemArt id={cracked.bonus.id} icon={cracked.bonus.icon} className="mmg-item-art" alt="" />
+                                        <i className="mmg-item-tag">{RARITY_LABEL[cracked.bonus.rarity] || cracked.bonus.rarity}</i>
+                                        <em className="mmg-item-name" style={{ color: RARITY_COLOR[cracked.bonus.rarity] || "#e7dcc8" }}>{cracked.bonus.name}</em>
+                                        {cracked.bonus.stats ? <i className="mmg-item-stats">{statLine(cracked.bonus.stats)}</i> : null}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Img src={cracked.bonus.art || KIND_ART[cracked.bonus.kind] || KIND_ART.gold} className="mmg-bonus-art" fallback="" />
+                                        <em>{cracked.bonus.kind === "ore" ? `${cracked.bonus.n} more ${cracked.bonus.name}` : cracked.bonus.name}</em>
+                                    </>
+                                )}
+                            </div>
+                        ) : null}
+
                         <button type="button" className="mmg-tap" onClick={() => onDone(cracked)}>Pocket it</button>
                     </div>
                 ) : (
                     <>
                         <div className="mmg-bar" aria-hidden="true">
-                            {BANDS.map((b) => <span key={b.key} className={`mmg-zone is-${b.key}`} style={{ width: `${b.pct}%` }} />)}
+                            {bands.map((b) => <span key={b.key} className={`mmg-zone is-${b.key}`} style={{ width: `${b.pct}%` }} />)}
                             <span className="mmg-marker" style={{ left: `${marker * 100}%` }} />
                             <Img src={pick?.sprite} className="mmg-rider" fallback="" />
                             {sparks.map((sp) => (
@@ -309,22 +302,25 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                         {/* The bands, named. The widths above ARE these bands, so the legend is the rules. */}
                         <div className="mmg-key">
                             <span className="is-miss">MISS</span>
-                            {BANDS.map((b) => <span key={b.key} className={`is-${b.key}`}>{b.label}</span>)}
+                            {bands.map((b) => <span key={b.key} className={`is-${b.key}`}>{b.label}</span>)}
                         </div>
 
-                        <button type="button" className="mmg-tap" onPointerDown={(e) => { e.preventDefault(); swing(); }} disabled={cooling}>
-                            <span className="mmg-tap-cd" ref={cdEl} aria-hidden="true" />
-                            <span>{cooling ? "…" : "SWING"}</span>
+                        {/* No cooldown, no disabled state, no sweep draining across the button — the kitchen's
+                            tap has none of that and is the better game for it. The marker takes 900ms to cross,
+                            so tapping faster than the bar moves gains you nothing; the cooldown was punishing
+                            you for a thing you had no reason to do. */}
+                        <button type="button" className="mmg-tap" onPointerDown={(e) => { e.preventDefault(); swing(); }}>
+                            SWING
                         </button>
 
                         <div className="mmg-meta">
                             <span>Swings <b>{hits}</b></span>
                             <span title="Your average swing quality — this is what the rank is read off">Quality <b>{quality}%</b></span>
                             <span className={chain >= 3 ? "mmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
-                            <span title="Chances at something better than ore when the seam opens">Luck <b>{tickets}</b></span>
+                            <span title="Clean swings raise the odds of something buried with the ore">Luck <b>{tickets}</b></span>
                         </div>
                         {notice ? <p className="mmg-notice">{notice}</p> : null}
-                        <p className="mmg-hint">Dead centre is PIXEL. Clean swings drop rare tickets in the bag — what the seam pays is drawn from it when the rock opens.</p>
+                        <p className="mmg-hint">Dead centre is PIXEL. Your average across the whole seam sets the rank — and the rank decides how much ore comes out, and the odds of something buried with it.</p>
                     </>
                 )}
             </div>
@@ -339,16 +335,20 @@ const MMG_CSS = `
     background: radial-gradient(120% 90% at 50% 30%, rgba(60,36,10,0.55), rgba(6,4,10,0.92) 70%);
     backdrop-filter: blur(4px); animation: mmgFade .25s ease both; }
 @keyframes mmgFade { from { opacity: 0; } to { opacity: 1; } }
-.mmg { position: relative; width: min(440px, 100%); padding: 18px 16px 14px; border-radius: 20px; overflow: hidden;
+/* max-height + scroll: the reveal used to run off the bottom of a phone with no way to reach the button. */
+.mmg { position: relative; width: min(440px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; overflow-x: hidden;
+    padding: 18px 16px 14px; border-radius: 20px;
     background: linear-gradient(180deg, #2a1e10, #16100a);
     border: 2px solid color-mix(in srgb, var(--ore) 60%, transparent);
     box-shadow: 0 24px 70px rgba(0,0,0,0.72), 0 0 50px -12px var(--ore);
     animation: mmgPop .34s cubic-bezier(.2,1.3,.35,1) both; }
 @keyframes mmgPop { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: none; } }
-.mmg.is-shake-1 { animation: mmgShake .16s ease-out; --amp: 2px; }
-.mmg.is-shake-2 { animation: mmgShake .2s ease-out; --amp: 4px; }
-.mmg.is-shake-3 { animation: mmgShake .24s ease-out; --amp: 7px; }
-.mmg.is-shake-4 { animation: mmgShake .3s ease-out; --amp: 11px; }
+/* The seam art takes the hit, at a fraction of the old amplitude. 11px of whole-modal shake on a PIXEL was
+   the "jostling": the thing you aim at and the thing you tap both moved every time you did well. */
+.mmg-art.is-shake-1 { animation: mmgShake .16s ease-out; --amp: 1px; }
+.mmg-art.is-shake-2 { animation: mmgShake .2s ease-out; --amp: 2px; }
+.mmg-art.is-shake-3 { animation: mmgShake .24s ease-out; --amp: 3px; }
+.mmg-art.is-shake-4 { animation: mmgShake .3s ease-out; --amp: 5px; }
 @keyframes mmgShake { 0%,100% { transform: none; } 20% { transform: translate(calc(var(--amp) * -1), 1px) rotate(-.4deg); }
     50% { transform: translate(var(--amp), -1px) rotate(.4deg); } 80% { transform: translate(calc(var(--amp) * -.5), 0); } }
 .mmg-flash { position: absolute; inset: 0; pointer-events: none; border-radius: 20px;
@@ -404,7 +404,6 @@ const MMG_CSS = `
     background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 4px 0 #b47a12, 0 8px 22px rgba(255,160,30,.3); }
 .mmg-tap:active { transform: translateY(2px); box-shadow: 0 2px 0 #b47a12; }
 .mmg-tap:disabled { filter: saturate(.7) brightness(.9); cursor: default; }
-.mmg-tap-cd { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left center; background: rgba(0,0,0,0.28); }
 .mmg-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 11px; font-size: 11.5px; color: #b9a98f; }
 .mmg-meta b { color: #ffe9c9; }
 .mmg-chain-hot b { color: #ffd75e; animation: mmgHot .9s ease-in-out infinite; }
@@ -429,6 +428,22 @@ const MMG_CSS = `
 .mmg-rank { position: relative; animation: mmgStamp .42s cubic-bezier(.2,1.6,.35,1) both; }
 @keyframes mmgStamp { 0% { transform: scale(1.7); opacity: 0; filter: blur(3px); }
     60% { transform: scale(.94); opacity: 1; filter: none; } 100% { transform: none; } }
+/* THE HAUL — one line, big, the thing you actually earned. */
+.mmg-haul { position: relative; display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
+.mmg-haul-art { width: 66px; height: 66px; object-fit: contain; filter: drop-shadow(0 0 16px var(--ore)); }
+.mmg-haul b { font-size: 1.7rem; font-weight: 900; letter-spacing: .01em; }
+.mmg-earn { position: relative; display: flex; justify-content: center; gap: 16px; font-size: .92rem; color: #e7dcc8; font-weight: 800; }
+.mmg-earn span { display: inline-flex; align-items: center; gap: 5px; }
+.mmg-earn-ico { width: 17px; height: 17px; object-fit: contain; }
+/* BURIED WITH IT — the occasional extra. One slot, so it reads as a find and not a receipt line. */
+.mmg-bonus { position: relative; margin-top: 14px; padding: 12px 10px 11px; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    border: 1px solid var(--rar); background: color-mix(in srgb, var(--rar) 11%, rgba(0,0,0,0.3));
+    box-shadow: 0 0 26px -10px var(--rar); animation: mmgBonusIn .45s cubic-bezier(.2,1.5,.35,1) .25s both; }
+@keyframes mmgBonusIn { from { opacity: 0; transform: scale(.86) translateY(8px); } to { opacity: 1; transform: none; } }
+.mmg-bonus-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: var(--rar); }
+.mmg-bonus-art { width: 46px; height: 46px; object-fit: contain; }
+.mmg-bonus em { font-style: normal; font-size: 1rem; font-weight: 800; color: #f2e6e6; text-align: center; }
 .mmg-draw-head, .mmg-draw-row, .mmg-draw-note, .mmg-draw .mmg-tap { position: relative; }
 .mmg-rank { margin-bottom: 12px; padding: 10px; border-radius: 12px; border: 1px solid var(--rk);
     background: color-mix(in srgb, var(--rk) 14%, transparent); animation: mmgPop .4s cubic-bezier(.2,1.4,.35,1) both; }

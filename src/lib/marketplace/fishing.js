@@ -98,9 +98,9 @@ const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"];
 const RARITY_RANK = Object.fromEntries(RARITY_ORDER.map((r, i) => [r, i]));
 
 // ── TUNING ───────────────────────────────────────────────────────────────────────────────────────────────────
-const CASTS_PER_DAY = 10;            // the daily allowance
+const CASTS_PER_DAY = 5;             // the daily allowance
 const CASTS_PER_ANGLING = 4;         // +1 cast per this many Angling points (sea affinity)
-const CASTS_MAX = 18;                // hard ceiling however much Angling you stack
+const CASTS_MAX = 10;                // hard ceiling however much Angling you stack
 const BITE_MIN_MS = 900;             // the line twitches somewhere in this window — unpredictable on purpose
 const BITE_MAX_MS = 4200;
 const BITE_GRACE_MS = 12000;         // after which the fish has clearly gone (the cast is refunded)
@@ -118,9 +118,12 @@ const RARE_TILT_CAP = 0.9;
 // Rarer fish shift the table toward the good end — a mythic on the line is the moment to hand out something
 // memorable — but even a Sardine can drop a seed or a fragment, so an ordinary cast is never truly empty.
 //
-// Balance: ~45% of casts on a common fish return a bonus, almost always a seed or fragments. Gear and chests
-// sit deliberately below the rates the Forge and dig already pay, because fishing is 10 casts a day on top of
-// everything else — it should feed those loops, never replace them.
+// Balance: fishing is FIVE casts a day now, not ten. Halving the allowance without touching the table would
+// have halved the feature, so every cast is worth more — a bare "nothing" is far rarer and the good end of
+// each table is fatter. Fewer, better casts, the same shape as three mining trips a day.
+//
+// Gear and chests still sit under the rates the Forge and the dig pay: fishing should feed those loops, not
+// replace them.
 // 80% of casts bring up a FISH. The other 20% bring up TREASURE INSTEAD — you pulled something off the sea
 // floor rather than out of it. Not both: a cast is one or the other, so "what's on the line?" always has a
 // real answer and hauling up a chest is its own moment rather than a footnote under a Sardine.
@@ -132,7 +135,7 @@ export const TREASURE_CHANCE = 0.20;
 // once-a-week event and the table read as fragments-and-seeds with a rumour of treasure attached. Gear is now
 // 22% and chests 9% — a bit over 30% of treasure hauls put a real object in your hands — with the extra taken
 // out of fragments and seeds, which were the two things nobody was short of.
-const TREASURE = { fragment: 24, seed: 22, consumable: 22, gear: 22, chest: 9, pet: 1 };
+const TREASURE = { fragment: 18, seed: 17, consumable: 22, gear: 28, chest: 14, pet: 1 };
 
 // Landing a rare FISH still sweetens things — but as a bonus on top, and only for the genuinely rare ones, so
 // a mythic is never a bare fish with no story attached.
@@ -141,11 +144,11 @@ const TREASURE = { fragment: 24, seed: 22, consumable: 22, gear: 22, chest: 9, p
 // and the cheapest thing in the game to hand out: low-rarity items are plentiful and quickly duplicated, so
 // grantFishingGear skips anything already owned.
 const FISH_BONUS = {
-    common: { nothing: 58, gear: 30, fragment: 8, consumable: 4 },
-    rare: { nothing: 53, gear: 31, fragment: 9, consumable: 5, chest: 2 },
-    epic: { nothing: 55, gear: 20, fragment: 15, consumable: 8, chest: 2 },
-    legendary: { nothing: 30, fragment: 24, consumable: 18, gear: 20, chest: 8 },
-    mythic: { nothing: 0, fragment: 20, consumable: 22, gear: 30, chest: 24, pet: 4 },
+    common: { nothing: 38, gear: 40, fragment: 13, consumable: 9 },
+    rare: { nothing: 30, gear: 39, fragment: 14, consumable: 12, chest: 5 },
+    epic: { nothing: 28, gear: 30, fragment: 19, consumable: 15, chest: 8 },
+    legendary: { nothing: 12, fragment: 25, consumable: 21, gear: 27, chest: 15 },
+    mythic: { nothing: 0, fragment: 16, consumable: 22, gear: 32, chest: 26, pet: 4 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
@@ -730,7 +733,7 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // game came from one 4% chance on a farm harvest.
     // A SEALED BOTTLE comes up with the catch — one of the things the line can land, at the same odds as any
     // other catch outcome, rather than a hidden roll made after the fish was already in the net.
-    const BOTTLE_CHANCE = 0.018;
+    const BOTTLE_CHANCE = 0.006;
     const recipeFound = Math.random() < BOTTLE_CHANCE * await recipeLuck(buyerId).catch(() => 1)
         ? await grantRecipeReward(buyerId, "fish").catch(() => null)
         : null;
