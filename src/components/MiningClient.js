@@ -128,21 +128,28 @@ export default function MiningClient({ initial }) {
         return r;
     }, [post, state.node?.id]);
 
-    // SMELTING, shown as a sequence: ore into the furnace → the burn → the parts that came out. It's the whole
-    // reason to mine, and it was previously a toast you could miss entirely.
-    const smelt = async (tier) => {
+    // SMELTING is played, not pressed. Opening the furnace starts the heat climbing; the pour is yours to time.
+    const [forge, setForge] = useState(null); // { tier, stack } while the heat game is up
+    const smelt = (tier) => {
         const stack = (state.ore || []).find((o) => o.tier === tier);
-        if (!stack?.canSmelt || smelting) return;
+        if (!stack?.canSmelt || smelting || forge) return;
+        setForge({ tier, stack });
+    };
+
+    // The pour landed. Send the heat we read and play the result back.
+    const pour = async (heat, stack) => {
+        setForge(null);
         setSmelting({ stage: "load", oreArt: stack.art, oreName: stack.name, color: stack.color, partTier: stack.partTier, parts: stack.canSmelt, ore: stack.canSmelt * stack.smeltCost });
-        const r = await post({ action: "smelt", tier, batches: stack.canSmelt });
-        setTimeout(() => setSmelting((v) => (v ? { ...v, stage: "burn" } : v)), 450);
+        const r = await post({ action: "smelt", tier: stack.tier, batches: stack.canSmelt, heat });
+        setTimeout(() => setSmelting((v) => (v ? { ...v, stage: "burn" } : v)), 420);
         setTimeout(() => {
-            if (r?.unlocked) {
+            if (r?.unlocked && r?.ok !== false) {
                 setState(r);
-                setSmelting((v) => (v ? { ...v, stage: "done" } : v));
+                setSmelting((v) => (v ? { ...v, stage: "done", result: r.smelted } : v));
+                clink(r.smelted?.band === "perfect" ? 1 : r.smelted?.band === "hot" ? 0.7 : 0.35);
                 try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* no window */ }
             } else { setSmelting(null); say(r?.error === "not_enough_ore" ? "Not enough ore." : "Couldn't smelt that."); }
-        }, 1500);
+        }, 1400);
     };
 
     const upgrade = async (track) => {
@@ -529,6 +536,9 @@ export default function MiningClient({ initial }) {
                 </div>
             ) : null}
 
+            {/* THE POUR — the heat climbs, you decide when to tip the crucible. */}
+            {forge ? <HeatGame stack={forge.stack} furnace={s.furnace} onPour={(h) => pour(h, forge.stack)} onCancel={() => setForge(null)} /> : null}
+
             {/* Smelting sequence */}
             {smelting ? (
                 <div className="mine-modal" role="presentation" onClick={() => smelting.stage === "done" && setSmelting(null)}>
@@ -540,8 +550,26 @@ export default function MiningClient({ initial }) {
                         </div>
                         {smelting.stage === "done" ? (
                             <>
-                                <h3 style={{ color: "#ffd08a" }}>{smelting.parts} × {PART_NAME[smelting.partTier]}</h3>
-                                <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>
+                                <div className={`mine-band is-${smelting.result?.band || "warm"}`}>
+                                    {smelting.result?.bandLabel || "Poured"} <em>{smelting.result?.bandBlurb || ""}</em>
+                                </div>
+                                <h3 style={{ color: "#ffd08a" }}>{smelting.result?.parts ?? smelting.parts} parts</h3>
+                                <div className="mine-reveal-row">
+                                    {(smelting.result?.byTier || []).map((b) => (
+                                        <span key={b.partTier} className={`mine-reveal-spot${b.lifted ? " is-picked" : ""}`}>
+                                            <b style={{ fontSize: 18 }}>{b.count}×</b>
+                                            <em style={{ color: b.lifted ? "#7cffb2" : "#cdd3d8" }}>{PART_NAME[b.partTier]}</em>
+                                            {b.lifted ? <b style={{ fontSize: 9 }}>TIER UP</b> : null}
+                                        </span>
+                                    ))}
+                                </div>
+                                {(smelting.result?.bonus || []).length ? (
+                                    <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
+                                        <b>Out of the slag</b>
+                                        <em>{smelting.result.bonus.map((x) => x.name || (x.kind === "chest" ? `${x.tier} chest` : x.kind)).join(" · ")}</em>
+                                    </div>
+                                ) : null}
+                                <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
                                     {smelting.ore} {smelting.oreName} went in. The parts are waiting in the Forge.
                                 </p>
                                 <button type="button" className="mine-buy" style={{ marginTop: 14 }} onClick={() => setSmelting(null)}>Back to the rock</button>
@@ -785,6 +813,28 @@ export default function MiningClient({ initial }) {
                 .mine-modal-rows b { font-size: 1.08rem; color: #ffe28a; }
 
                 /* The smelt: ore slides into the furnace mouth, the furnace flares, the parts are announced. */
+                .mine-heat-stage { position: relative; height: 130px; display: grid; place-items: center; margin: 6px 0 10px; }
+                .mine-heat-furnace { width: 116px; height: 116px; object-fit: contain; }
+                .mine-heat-glow { position: absolute; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
+                    background: radial-gradient(circle, rgba(255,150,40,0.9), transparent 62%); }
+                .mine-heat-bar { position: relative; height: 22px; border-radius: 999px; overflow: hidden;
+                    background: linear-gradient(90deg, #2b3550, #3a4150); }
+                .mine-heat-zone { position: absolute; top: 0; bottom: 0; }
+                .mine-heat-zone.is-hot { left: 56.7%; width: 16.6%; background: rgba(255,176,32,0.35); }
+                .mine-heat-zone.is-perfect { left: 73.3%; width: 10%; background: rgba(124,255,178,0.5); }
+                .mine-heat-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px;
+                    background: linear-gradient(90deg, #6fb0e6, #ffd75e 55%, #ff5a2a); }
+                .mine-heat-read { text-align: center; margin: 8px 0 10px; font-weight: 900; font-size: 1rem; }
+                .mine-heat-read.is-cold { color: #6fb0e6; } .mine-heat-read.is-warm { color: #cdd3d8; }
+                .mine-heat-read.is-hot { color: #ffb020; } .mine-heat-read.is-perfect { color: #7cffb2; }
+                .mine-heat-read.is-burnt { color: #ff5a2a; animation: mineBurn .3s ease-in-out infinite alternate; }
+                .mine-band { padding: 7px 10px; border-radius: 10px; font-weight: 900; font-size: 0.9rem; margin-bottom: 8px; }
+                .mine-band em { display: block; font-style: normal; font-weight: 600; font-size: 11px; opacity: .85; }
+                .mine-band.is-perfect { color: #7cffb2; background: rgba(124,255,178,0.14); }
+                .mine-band.is-hot { color: #ffb020; background: rgba(255,176,32,0.14); }
+                .mine-band.is-warm { color: #cdd3d8; background: rgba(255,255,255,0.06); }
+                .mine-band.is-cold { color: #6fb0e6; background: rgba(111,176,230,0.14); }
+                .mine-band.is-burnt { color: #ff5a2a; background: rgba(255,90,42,0.14); }
                 .mine-smelt-stage { position: relative; height: 140px; display: grid; place-items: center; }
                 .mine-smelt-furnace { width: 120px; height: 120px; object-fit: contain; }
                 .mine-smelt-ore { position: absolute; width: 48px; height: 48px; object-fit: contain; left: 50%; top: 0;
@@ -797,6 +847,68 @@ export default function MiningClient({ initial }) {
                 @keyframes mineBurn { from { transform: scale(0.9); } to { transform: scale(1.15); } }
             `}</style>
         </section>
+    );
+}
+
+// ── THE HEAT ── the smelting minigame.
+//
+// The furnace climbs from cold to burnt on its own. You tip the crucible when you like. The good band sits
+// near the top, so the pour is a nerve game: hold for the perfect window and risk cooking the whole batch.
+// Deliberately a DIFFERENT hand from the swing — that one is a moving marker, this one is a rising bar you
+// have to let run.
+function HeatGame({ stack, furnace, onPour, onCancel }) {
+    const [heat, setHeat] = useState(0);
+    const heatRef = useRef(0);
+    const doneRef = useRef(false);
+    const RISE_MS = 2600; // cold → burnt
+
+    useEffect(() => {
+        let raf = 0;
+        const t0 = performance.now();
+        const loop = (t) => {
+            const h = (t - t0) / RISE_MS;
+            heatRef.current = h;
+            setHeat(h);
+            if (h >= 1.2) { // let it run away and it's cooked — the pour still happens, just badly
+                if (!doneRef.current) { doneRef.current = true; onPour(1.2); }
+                return;
+            }
+            raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(raf);
+    }, [onPour]);
+
+    const tip = () => { if (doneRef.current) return; doneRef.current = true; onPour(heatRef.current); };
+    const pct = Math.min(100, (heat / 1.2) * 100);
+    const band = heat <= 0.42 ? "cold" : heat <= 0.68 ? "warm" : heat <= 0.88 ? "hot" : heat <= 1.0 ? "perfect" : "burnt";
+
+    return (
+        <div className="mine-modal" role="dialog" aria-label="Working the heat">
+            <div className="mine-modal-card" onClick={(e) => e.stopPropagation()}>
+                <h3 style={{ color: "#ffd08a", marginTop: 0 }}>Work the heat</h3>
+                <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+                    {stack.canSmelt * stack.smeltCost} {stack.name} in the crucible. Pour when it&rsquo;s right — the
+                    best window is just short of burning it.
+                </p>
+                <div className="mine-heat-stage">
+                    <Img src={furnace?.sprite} className="mine-heat-furnace" fallback="🔥" />
+                    <span className="mine-heat-glow" style={{ opacity: Math.min(1, heat) }} aria-hidden="true" />
+                </div>
+                <div className="mine-heat-bar" aria-hidden="true">
+                    <span className="mine-heat-zone is-hot" />
+                    <span className="mine-heat-zone is-perfect" />
+                    <span className="mine-heat-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <div className={`mine-heat-read is-${band}`}>
+                    {band === "cold" ? "Too cold" : band === "warm" ? "Warm" : band === "hot" ? "Hot" : band === "perfect" ? "PERFECT" : "BURNING"}
+                </div>
+                <button type="button" className="mine-prospect" onPointerDown={(e) => { e.preventDefault(); tip(); }}>
+                    🫗 Pour
+                </button>
+                <button type="button" className="mine-prospect is-ghost" onClick={onCancel}>Back off the fire</button>
+            </div>
+        </div>
     );
 }
 

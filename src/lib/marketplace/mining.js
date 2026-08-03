@@ -938,12 +938,25 @@ async function claimNode(buyerId, node, row) {
     };
 }
 
-// ── SMELTING ─────────────────────────────────────────────────────────────────────────────────────────────────
-// Ore → forge parts, which is the whole reason mining exists: it feeds the Forge rather than running beside it.
-// Ore of tier N becomes a part of tier N — the tiers line up 1:1 so nobody has to learn a table. The three
-// smelting tracks bend that: the Crucible lowers the ore per part, the Bellows sometimes adds one, and Flux
-// sometimes lifts one a tier.
-export async function smeltOre(buyerId, tier, batches = 1) {
+// ── THE SMELT ────────────────────────────────────────────────────────────────────────────────────────────────
+// A minigame, not a button. You feed ore in and work the heat: the furnace climbs, and you have to pull the
+// pour at the right moment. Too cold and the melt is dirty; too hot and you burn some of it off.
+//
+// What comes out is a DRAW, same principle as the seam. Heat quality seeds better tickets into the bag; the
+// bag decides. So a perfect pour raises what's possible without ever making the result knowable in advance —
+// and the ore tier sets the floor, so good rock still matters.
+export const HEAT_BANDS = [
+    { key: "cold", label: "Too cold", max: 0.42, mult: 0.7, blurb: "Half of it never melted." },
+    { key: "warm", label: "Warm", max: 0.68, mult: 1.0, blurb: "It ran, eventually." },
+    { key: "hot", label: "Hot", max: 0.88, mult: 1.35, blurb: "A clean, bright pour." },
+    { key: "perfect", label: "PERFECT POUR", max: 1.0, mult: 1.8, blurb: "Ran like water. Not a scrap wasted." },
+    { key: "burnt", label: "Burnt", max: 99, mult: 0.55, blurb: "You cooked it. Some of that is slag now." },
+];
+export const heatBand = (h) => HEAT_BANDS.find((b) => h <= b.max) || HEAT_BANDS[HEAT_BANDS.length - 1];
+
+// Smelt a stack. `heat` is 0..1+ from the client's heat bar — graded HERE and clamped, so a tampered client
+// can't claim a perfect pour every time.
+export async function smeltOre(buyerId, tier, batches = 1, heat = null) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
@@ -959,29 +972,66 @@ export async function smeltOre(buyerId, tier, batches = 1) {
     if (!spent) return { ok: false, error: "not_enough_ore" };
 
     const o = oreTier(t);
-    // BELLOWS: a hotter burn sometimes yields an extra part. Rolled per batch, so the upgrade is felt on a big
-    // smelt rather than being a rounding error on a small one.
-    const bonusChance = smeltValue("bellows", row?.bellows_level);
-    let bonus = 0;
-    for (let i = 0; i < n; i += 1) if (Math.random() < bonusChance) bonus += 1;
-    // FLUX: a purer melt sometimes lifts a part a whole tier (never past the top).
-    const fluxChance = smeltValue("flux", row?.flux_level);
+    // A pour with no reading at all (an old client, a fumbled tap) is treated as merely warm rather than
+    // punished — never make someone worse off for a bug on our side.
+    const h = heat == null || Number.isNaN(Number(heat)) ? 0.55 : Math.max(0, Math.min(1.2, Number(heat)));
+    const band = heatBand(h);
+
+    // THE BAG. Ordinary parts always; the pour and your upgrades seed the better tickets.
+    const bellows = smeltValue("bellows", row?.bellows_level);
+    const flux = smeltValue("flux", row?.flux_level);
+    const bag = [];
+    for (let i = 0; i < 10; i += 1) bag.push("part");
+    // Heat quality is the biggest lever on the bag — that's what makes the pour worth playing.
+    const heatTickets = band.key === "perfect" ? 7 : band.key === "hot" ? 4 : band.key === "warm" ? 1 : 0;
+    for (let i = 0; i < heatTickets; i += 1) bag.push(Math.random() < 0.5 ? "up" : "extra");
+    for (let i = 0; i < Math.round(flux * 12); i += 1) bag.push("up");
+    for (let i = 0; i < Math.round(bellows * 12); i += 1) bag.push("extra");
+    // Only a genuinely good pour can turn up a curio — the fun stuff that isn't a part at all.
+    if (band.key === "perfect") bag.push("curio", "curio");
+    else if (band.key === "hot") bag.push("curio");
+
+    // One draw per batch, floored by the band so a cold pour still yields something.
+    const draws = Math.max(1, Math.round(n * band.mult));
     const made = {};
-    const add = (tierN, count) => { made[tierN] = (made[tierN] || 0) + count; };
-    for (let i = 0; i < n + bonus; i += 1) {
-        const lifted = o.part < 5 && Math.random() < fluxChance;
-        add(lifted ? o.part + 1 : o.part, 1);
+    let extras = 0, ups = 0;
+    const curios = [];
+    const add = (pt, count) => { made[pt] = (made[pt] || 0) + count; };
+    for (let i = 0; i < draws; i += 1) {
+        const ticket = bag[Math.floor(Math.random() * bag.length)] || "part";
+        if (ticket === "up" && o.part < 5) { add(o.part + 1, 1); ups += 1; }
+        else if (ticket === "extra") { add(o.part, 2); extras += 1; }
+        else if (ticket === "curio") curios.push(Math.random() < 0.5 ? "chest" : Math.random() < 0.6 ? "consumable" : "gear");
+        else add(o.part, 1);
     }
 
     const { addParts } = await import("@/lib/marketplace/crafting.js");
     for (const [partTier, count] of Object.entries(made)) await addParts(buyerId, Number(partTier), count).catch(() => {});
-    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: n + bonus, bonus, partTier: o.part }).catch(() => {});
+
+    // Curios — the reason to care about a perfect pour beyond the part count.
+    const bonus = [];
+    for (const c of curios) {
+        if (c === "chest") {
+            const chestTier = t >= 4 ? "gold" : t >= 2 ? "iron" : "wooden";
+            await addChests(buyerId, { [chestTier]: 1 }, { source: "mining" }).catch(() => {});
+            bonus.push({ kind: "chest", tier: chestTier });
+        } else if (c === "gear") {
+            const got = await grantMiningGear(buyerId, 3 + t);
+            if (got) bonus.push({ kind: "gear", ...got });
+        } else {
+            const got = await grantMiningConsumable(buyerId);
+            if (got) bonus.push({ kind: "consumable", ...got });
+        }
+    }
+
+    const totalParts = Object.values(made).reduce((a, b) => a + b, 0);
+    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length }).catch(() => {});
     return {
         ok: true,
         smelted: {
             oreTier: t, oreName: o.name, oreSpent: spend, partTier: o.part,
-            parts: n + bonus, bonus,
-            // What actually came out, by part tier — Flux means it isn't always the tier you put in.
+            band: band.key, bandLabel: band.label, bandBlurb: band.blurb, heat: Math.round(h * 100),
+            parts: totalParts, ups, extras, bonus,
             byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
         },
         ...(await getMiningState(buyerId)),
