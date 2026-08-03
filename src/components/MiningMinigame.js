@@ -35,7 +35,16 @@ const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg"
 const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
 
 const GRADE_SHAKE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 1 };
+// THE SWEEP, and how it TIGHTENS. Every swing you land makes the next one faster, the way the kitchen's bar
+// speeds up a step at a time — a seam you're doing well on gets harder to keep doing well on, so a MASTERWORK
+// is something you hold onto rather than something you settle into.
+//
+// Floored: past a certain speed the bar stops being a skill check and starts being a slot machine, and the
+// sub-pixel accuracy is meant to be the ceiling, not reaction time.
 const SWEEP_MS = 900;
+const SWEEP_TIGHTEN = 42;   // ms shaved per landed swing
+const SWEEP_MIN_MS = 420;   // and never below this — about a PIXEL band's worth of reaction time
+const sweepFor = (hits) => Math.max(SWEEP_MIN_MS, SWEEP_MS - Math.max(0, hits) * SWEEP_TIGHTEN);
 // Matches the server's anti-double-tap floor. Not a cooldown — you will never see it; it exists so a shaky
 // double-tap can't come back as "Easy — let the bar refill".
 const FLOOR_MS = 300;
@@ -106,6 +115,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const [cracked, setCracked] = useState(null);
     const [notice, setNotice] = useState(null);
     const busyRef = useRef(false), cdUntil = useRef(0);
+    // Current sweep period. A ref because the animation loop reads it every frame and must not restart.
+    const sweepRef = useRef(SWEEP_MS);
     const idRef = useRef(0);
 
     // The marker sweeps. rAF rather than CSS so the sampled position and the drawn position are the same number.
@@ -113,7 +124,10 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         let raf = 0;
         const t0 = performance.now();
         const loop = (t) => {
-            const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
+            // Read the period off a ref, not a captured constant: the effect must not re-subscribe on every
+            // swing or the marker would jump back to the left edge each time it sped up.
+            const ms = sweepRef.current;
+            const phase = ((t - t0) % (ms * 2)) / ms;
             const pos = phase <= 1 ? phase : 2 - phase;
             markerRef.current = pos; setMarker(pos);
             raf = requestAnimationFrame(loop);
@@ -178,7 +192,10 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         setChain(r.combo || 0);
         if (r.grade === "pixel") setTickets((t) => t + 2);
         else if (r.grade === "perfect") setTickets((t) => t + 1);
-        if (typeof r.hits === "number") setHits(r.hits);
+        if (typeof r.hits === "number") {
+            setHits(r.hits);
+            sweepRef.current = sweepFor(r.hits);   // each landed swing tightens the next
+        }
         if (typeof r.score === "number") setScore(r.score);
         if (typeof r.pct === "number") setPct(r.pct);
         if (typeof r.quality === "number") setQuality(r.quality);
@@ -315,6 +332,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
 
                         <div className="mmg-meta">
                             <span>Swings <b>{hits}</b></span>
+                            <span title="The bar tightens with every swing you land">Speed <b>×{(SWEEP_MS / sweepFor(hits)).toFixed(2)}</b></span>
                             <span title="Your average swing quality — this is what the rank is read off">Quality <b>{quality}%</b></span>
                             <span className={chain >= 3 ? "mmg-chain-hot" : undefined}>Chain <b>×{chain}</b></span>
                             <span title="Clean swings raise the odds of something buried with the ore">Luck <b>{tickets}</b></span>

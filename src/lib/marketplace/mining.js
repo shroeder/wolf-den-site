@@ -113,15 +113,20 @@ export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0) =>
 
 // What the tunnel can turn up. Weights shift with depth — shallow rock is mostly ore and rubble, deep rock is
 // where the gear and the strongboxes are. A `seam` card raises the tier of what you end up mining.
+// A four-step descent was turning up two consumables, a piece of gear and a purse. The tunnel should mostly be
+// TUNNEL — rock, a better seam, the occasional purse — with an actual object as the thing you remember.
+//
+// So the object cards are cut hard and the ordinary ones raised. Depth still tilts it: pushing deep is how you
+// find things, and that is the entire point of the risk.
 const CARD_TABLE = [
     { key: "seam", label: "A seam in the wall", w: (d) => 26 + d * 2 },
-    { key: "ore", label: "Loose ore", w: () => 20 },
-    { key: "gold", label: "A dropped purse", w: () => 14 },
-    { key: "consumable", label: "An old cache", w: (d) => 10 + d },
-    { key: "gear", label: "Something buried", w: (d) => 4 + d * 2.2 },
-    { key: "chest", label: "A strongbox", w: (d) => 2 + d * 1.4 },
-    { key: "encounter", label: "Something down here", w: (d) => 6 + d },
-    { key: "nothing", label: "Bare rock", w: () => 16 },
+    { key: "ore", label: "Loose ore", w: () => 24 },
+    { key: "gold", label: "A dropped purse", w: () => 18 },
+    { key: "consumable", label: "An old cache", w: (d) => 3 + d * 0.6 },
+    { key: "gear", label: "Something buried", w: (d) => 1 + d * 0.9 },
+    { key: "chest", label: "A strongbox", w: (d) => 0.6 + d * 0.55 },
+    { key: "encounter", label: "Something down here", w: (d) => 8 + d },
+    { key: "nothing", label: "Bare rock", w: () => 26 },
 ];
 const drawCard = (depth) => {
     const rolled = CARD_TABLE.map((c) => ({ ...c, weight: c.w(depth) }));
@@ -327,10 +332,15 @@ async function cutSeam(buyerId, tier) {
 //
 // Now it rolls, and the chain is only what it always should have been: where to look if the rolled rarity has
 // nothing left to give you.
+// And WHAT it is when it comes. An Epic out of a depth-5 descent was a 12% roll, which is not rare enough for
+// the best thing in a haul — you were getting purple often enough that purple stopped meaning anything.
+//
+// Legendary is now a deep-run prize and Epic is genuinely uncommon. Common carries the weight it should: most
+// buried gear is somebody's old kit, not a warbanner.
 const GEAR_ODDS = [
-    { min: 8, roll: [["legendary", 10], ["epic", 28], ["rare", 62]] },
-    { min: 5, roll: [["epic", 12], ["rare", 36], ["common", 52]] },
-    { min: 0, roll: [["rare", 20], ["common", 80]] },
+    { min: 8, roll: [["legendary", 4], ["epic", 14], ["rare", 34], ["common", 48]] },
+    { min: 5, roll: [["epic", 5], ["rare", 22], ["common", 73]] },
+    { min: 0, roll: [["rare", 9], ["common", 91]] },
 ];
 function rollGearRarity(depth) {
     const band = GEAR_ODDS.find((b) => depth >= b.min) || GEAR_ODDS[GEAR_ODDS.length - 1];

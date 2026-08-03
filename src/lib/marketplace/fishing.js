@@ -136,7 +136,9 @@ export const TREASURE_CHANCE = 0.20;
 // once-a-week event and the table read as fragments-and-seeds with a rumour of treasure attached. Gear is now
 // 22% and chests 9% — a bit over 30% of treasure hauls put a real object in your hands — with the extra taken
 // out of fragments and seeds, which were the two things nobody was short of.
-const TREASURE = { fragment: 18, seed: 17, consumable: 22, gear: 28, chest: 14, pet: 1 };
+// A treasure haul was a real object nearly half the time (gear 28 + chest 14). Fragments and seeds are what the
+// sea floor should mostly give up; gear is the exception you remember.
+const TREASURE = { fragment: 28, seed: 26, consumable: 27, gear: 12, chest: 6, pet: 1 };
 
 // Landing a rare FISH still sweetens things — but as a bonus on top, and only for the genuinely rare ones, so
 // a mythic is never a bare fish with no story attached.
@@ -144,12 +146,14 @@ const TREASURE = { fragment: 18, seed: 17, consumable: 22, gear: 28, chest: 14, 
 // shrug. They now carry a real chance of white/blue gear, which is the loot people actually want to see early
 // and the cheapest thing in the game to hand out: low-rarity items are plentiful and quickly duplicated, so
 // grantFishingGear skips anything already owned.
+// A common fish paid GEAR 40% of the time, so a five-cast day handed out gear most days. The bonus is still
+// there — a cast is rarely empty — it is just far more often fragments or a consumable than a weapon.
 const FISH_BONUS = {
-    common: { nothing: 38, gear: 40, fragment: 13, consumable: 9 },
-    rare: { nothing: 30, gear: 39, fragment: 14, consumable: 12, chest: 5 },
-    epic: { nothing: 28, gear: 30, fragment: 19, consumable: 15, chest: 8 },
-    legendary: { nothing: 12, fragment: 25, consumable: 21, gear: 27, chest: 15 },
-    mythic: { nothing: 0, fragment: 16, consumable: 22, gear: 32, chest: 26, pet: 4 },
+    common: { nothing: 52, gear: 9, fragment: 24, consumable: 15 },
+    rare: { nothing: 46, gear: 12, fragment: 25, consumable: 15, chest: 2 },
+    epic: { nothing: 42, gear: 13, fragment: 26, consumable: 16, chest: 3 },
+    legendary: { nothing: 26, fragment: 32, consumable: 26, gear: 12, chest: 4 },
+    mythic: { nothing: 0, fragment: 34, consumable: 32, gear: 18, chest: 13, pet: 3 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
@@ -342,22 +346,39 @@ const randInt = (n) => Math.floor(Math.random() * n);
 // pick: never hand out a duplicate, and fall back down the rarity ladder rather than giving nothing.
 // Fish rarity → the gear rarities it can pull, best first. Ascendant/eternal are never in reach: those are the
 // Forge's and the raid's to give, and fishing should feed those loops rather than short-circuit them.
-const GEAR_RARITY = {
-    common: ["common"], rare: ["rare", "common"], epic: ["epic", "rare"],
-    legendary: ["legendary", "epic"], mythic: ["mythic", "legendary"],
+// This was a fallback CHAIN — take the first rarity with anything unowned left in it — which is not a rarity
+// roll, it is a GUARANTEE of the top entry, because there is always an unowned Epic. An epic fish always paid
+// an epic; a legendary always paid a legendary. (grantMiningGear had the identical bug.)
+//
+// It rolls now, and the chain survives only as what it should always have been: where to look when the rolled
+// rarity has nothing left to give. Ascendant/eternal stay out of reach — those are the Forge's and the raid's.
+const GEAR_ODDS = {
+    common:    [["common", 100]],
+    rare:      [["rare", 14], ["common", 86]],
+    epic:      [["epic", 8], ["rare", 30], ["common", 62]],
+    legendary: [["legendary", 5], ["epic", 20], ["rare", 40], ["common", 35]],
+    mythic:    [["mythic", 4], ["legendary", 16], ["epic", 38], ["rare", 42]],
 };
 async function grantFishingGear(buyerId, fishRarity) {
     const [{ randomDropPool }, { grantItem }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/inventory.js"),
     ]);
+    const table = GEAR_ODDS[fishRarity] || GEAR_ODDS.common;
+    const total = table.reduce((n, [, w]) => n + w, 0);
+    let roll = Math.random() * total;
+    let rolled = table[table.length - 1][0];
+    for (const [rarity, w] of table) { roll -= w; if (roll <= 0) { rolled = rarity; break; } }
+    const ladder = [rolled, ...table.map(([x]) => x).filter((x) => x !== rolled)];
+
     const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
-    for (const rarity of GEAR_RARITY[fishRarity] || ["common"]) {
+    for (const rarity of ladder) {
         const pool = randomDropPool((i) => i.rarity === rarity && !owned.has(i.id));
         if (!pool.length) continue;
         const item = pool[randInt(pool.length)];
         await grantItem(buyerId, item.id, "fishing").catch(() => {});
-        return { id: item.id, name: item.name, rarity: item.rarity };
+        // The WHOLE item — the reveal gives gear a real card, so it needs the art, the slot and the stats.
+        return { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot || null, stats: item.stats || null, icon: item.icon || null };
     }
     return null;
 }
