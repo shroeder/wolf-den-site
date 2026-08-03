@@ -43,13 +43,20 @@ const pctText = (v) => `${Math.round((Number(v) || 0) * 100)}%`;
 // increase you always get, so it reads with a plus. Same number, two different promises.
 const fmtEffect = (t, v) => (t.kind === "pct" ? pctText(v) : t.kind === "boost" ? `+${pctText(v)}` : `+${v}`);
 
-/** One ingredient/dish icon. Falls back to the emoji only when there is genuinely no sprite. */
-function Art({ sprite, emoji, size = 34, alt = "" }) {
-    if (sprite) {
-        // eslint-disable-next-line @next/next/no-img-element
-        return <img src={sprite} alt={alt} width={size} height={size} style={{ width: size, height: size, objectFit: "contain" }} />;
-    }
-    return <span style={{ fontSize: size * 0.8, lineHeight: 1 }} aria-hidden="true">{emoji || "•"}</span>;
+/**
+ * One ingredient/dish/reward icon. Both the real art and the fallback are SPRITES — the fallback used to be an
+ * emoji, which meant a missing sprite row put Apple's or Google's artwork in the middle of hand-painted game
+ * art, drawn differently on every device. If even the fallback is missing it renders nothing, because a blank
+ * is better than a broken-image glyph.
+ */
+function Art({ sprite, fallback, size = 34, alt = "" }) {
+    const src = sprite || fallback;
+    if (!src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    // verticalAlign matters: several of these now sit INLINE with text (the gold line, the upgrade price, the
+    // founder kicker), and an inline image defaults to the baseline, which parks it a few pixels high.
+    return <img src={src} alt={alt} width={size} height={size} draggable="false"
+        style={{ width: size, height: size, objectFit: "contain", verticalAlign: "-0.18em" }} />;
 }
 
 export default function CookingClient({ initial }) {
@@ -190,7 +197,7 @@ export default function CookingClient({ initial }) {
                     </div>
                     {/* Founder's medallion — aannw's hero sprite, permanently enshrined for dreaming up the Kitchen. */}
                     <button type="button" className="ck-founder" onClick={() => setShowFounder(true)} title={`Cooked up by ${FOUNDER.name}`} aria-label={`About the Kitchen — an idea by ${FOUNDER.name}`}>
-                        {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span aria-hidden="true">🍳</span>}
+                        {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <Art fallback="/images/cooking/dish.png" size={26} alt="" />}
                     </button>
                     <Link href="/marketplace/town" className="ck-back" aria-label="Back to Town">←</Link>
                 </div>
@@ -199,9 +206,9 @@ export default function CookingClient({ initial }) {
                     <div className="ck-founder-scrim" role="dialog" aria-modal="true" onClick={() => setShowFounder(false)}>
                         <div className="ck-founder-card" onClick={(e) => e.stopPropagation()}>
                             <div className="ck-founder-hero">
-                                {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span style={{ fontSize: 44 }} aria-hidden="true">🍳</span>}
+                                {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <Art fallback="/images/cooking/dish.png" size={44} alt="" />}
                             </div>
-                            <div className="ck-founder-kicker">🍳 Founder&apos;s Tribute</div>
+                            <div className="ck-founder-kicker"><Art fallback="/images/cooking/dish.png" size={15} alt="" /> Founder&apos;s Tribute</div>
                             <h3 className="ck-founder-name">{FOUNDER.name}</h3>
                             <p className="ck-founder-body">The Kitchen was <b>{FOUNDER.name}&apos;s</b> idea. She asked why everything you grow and everything you land just gets sold — and said there should be somewhere to actually cook it. So here it is. Her hero is enshrined beside the kettle as thanks. Every dish in the Den traces back to her.</p>
                             <button type="button" className="ck-founder-close" onClick={() => setShowFounder(false)}>Back to the kettle</button>
@@ -275,7 +282,7 @@ export default function CookingClient({ initial }) {
                     <div className="ck-pantry">
                         {s.pantry.map((p) => (
                             <span key={p.ref} className={`ck-ing is-${p.rarity}`} title={p.name}>
-                                <Art sprite={p.sprite} emoji={p.emoji} size={30} alt={p.name} />
+                                <Art sprite={p.sprite} fallback={p.fallback} size={30} alt={p.name} />
                                 <span className="ck-ing-n">{p.qty}</span>
                             </span>
                         ))}
@@ -301,7 +308,7 @@ export default function CookingClient({ initial }) {
                                     turn the same row into something to chase. */}
                                 <button type="button" className="ck-recipe-head" onClick={() => setOpen(isOpen ? null : r.id)}>
                                     <span className={`ck-recipe-art${r.known ? "" : " is-dim"}`}>
-                                        <Art sprite={r.sprite} emoji="🍽️" size={42} alt={r.name} />
+                                        <Art sprite={r.sprite} fallback="/images/cooking/dish.png" size={42} alt={r.name} />
                                     </span>
                                     <span className="ck-recipe-copy">
                                         <span className="ck-recipe-name">{r.name}</span>
@@ -325,7 +332,7 @@ export default function CookingClient({ initial }) {
                                         {!r.known ? (
                                             <div className="ck-howto">
                                                 <span className={`ck-howto-ico is-${r.source?.key}`} aria-hidden="true">
-                                                    {r.source?.key === "sea" ? "⚓" : r.source?.key === "chest" ? "🧰" : "🌾"}
+                                                    <Art size={15} alt="" fallback={r.source?.key === "sea" ? "/images/nav/sailing.png" : r.source?.key === "chest" ? "/images/ui/chest.png" : "/images/nav/farm.png"} />
                                                 </span>
                                                 <span>
                                                     <b>How to find it</b>
@@ -345,7 +352,7 @@ export default function CookingClient({ initial }) {
                                                 const canGather = short && !n.madeBy && n.gather;
                                                 const body = (
                                                     <>
-                                                        <Art sprite={n.sprite} emoji={n.emoji} size={22} alt={n.name} />
+                                                        <Art sprite={n.sprite} fallback={n.fallback} size={22} alt={n.name} />
                                                         <span>{n.name}</span>
                                                         <b>{r.known ? `${n.held}/${n.qty}` : `×${n.qty}`}</b>
                                                         {canJump ? <em className="ck-need-go">make →</em> : null}
@@ -374,7 +381,7 @@ export default function CookingClient({ initial }) {
                                         <div className="ck-block-label">Makes</div>
                                         {r.makes ? (
                                             <div className="ck-makes">
-                                                <Art sprite={r.makes.sprite} emoji="🧂" size={30} alt={r.makes.name} />
+                                                <Art sprite={r.makes.sprite} fallback="/images/cooking/prep.png" size={30} alt={r.makes.name} />
                                                 <span><b>{r.makes.name}</b> — a prepped ingredient other recipes call for.</span>
                                             </div>
                                         ) : (
@@ -393,7 +400,7 @@ export default function CookingClient({ initial }) {
                                                     {[...(r.payout?.pool || [])].reverse().map((c) => (
                                                         <div key={c.rung} className={`ck-pool-row is-${c.rarity || "common"}`}>
                                                             <span className="ck-rung">{c.rung}</span>
-                                                            <span className="ck-pool-art"><Art sprite={c.sprite} emoji={c.emoji} size={30} alt={c.name} /></span>
+                                                            <span className="ck-pool-art"><Art sprite={c.sprite} fallback={c.fallback} size={30} alt={c.name} /></span>
                                                             <span className="ck-pool-copy">
                                                                 <b>{c.name}</b>
                                                                 <span>{c.desc}</span>
@@ -422,7 +429,7 @@ export default function CookingClient({ initial }) {
             <section className="card" hidden={view !== "upgrades"}>
                 {/* Gold moved here from the old stat grid — beside the prices, where it is the number you are
                     actually weighing an upgrade against. */}
-                <div className="ck-sec">The kitchen <span className="muted">· 🪙 {(s.gold || 0).toLocaleString()} to spend</span></div>
+                <div className="ck-sec">The kitchen <span className="muted">· <Art fallback="/images/ui/coin.png" size={14} alt="" /> {(s.gold || 0).toLocaleString()} to spend</span></div>
                 {/* The SAME cards Sailing uses (.sail-upgrades / .sail-upg) rather than a bespoke kitchen list —
                     icon chip, level bar, a "now → next" effect row and a gold buy button. An upgrade should look
                     and behave identically wherever you meet one. */}
@@ -447,7 +454,7 @@ export default function CookingClient({ initial }) {
                             {t.maxed
                                 ? <span className="sail-upg-maxed">MAXED</span>
                                 : <button type="button" className="btn-ghost sail-upg-buy" disabled={busy || (s.gold || 0) < t.cost} onClick={() => upgrade(t.id)}>
-                                    🪙 {t.cost.toLocaleString()}
+                                    <Art fallback="/images/ui/coin.png" size={14} alt="" /> {t.cost.toLocaleString()}
                                 </button>}
                         </div>
                     ))}
@@ -485,7 +492,7 @@ export default function CookingClient({ initial }) {
                             </span>
                         ) : null}
                         <div className="ck-reveal-tier">{result.made.tierName} · {result.grade}</div>
-                        <div className="ck-reveal-art"><Art sprite={result.made.sprite} emoji="🍽️" size={110} alt={result.made.name} /></div>
+                        <div className="ck-reveal-art"><Art sprite={result.made.sprite} fallback="/images/cooking/dish.png" size={110} alt={result.made.name} /></div>
                         <div className="ck-reveal-name">{result.made.name}{result.portions > 1 ? ` ×${result.portions}` : ""}</div>
                         {result.made.reward ? (
                             <div className="ck-reveal-got">
@@ -501,7 +508,7 @@ export default function CookingClient({ initial }) {
                                     </div>
                                 ) : null}
                                 <div className={`ck-reveal-prize is-${result.made.reward.rarity || "common"}`}>
-                                    <Art sprite={result.made.reward.sprite} emoji={result.made.reward.emoji} size={44} alt={result.made.reward.name} />
+                                    <Art sprite={result.made.reward.sprite} fallback={result.made.reward.fallback} size={44} alt={result.made.reward.name} />
                                     <span><b>{result.made.reward.name}</b><span>{result.made.reward.desc}</span></span>
                                 </div>
                             </div>

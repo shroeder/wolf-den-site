@@ -179,7 +179,11 @@ export default function CookingMinigame({ recipe, onDone }) {
                     <span className="ckmg-zone ckmg-zone-perfect" />
                     <span className="ckmg-zone ckmg-zone-flawless" />
                     <span ref={markerEl} className="ckmg-marker" />
-                    <span ref={spoonEl} className="ckmg-rider" aria-hidden="true">🥄</span>
+                    {/* The marker you are actually aiming with. It was a spoon EMOJI — so on an iPhone you
+                        timed Apple's artwork and on a Pixel you timed Google's, at whatever size their font
+                        decided. It's our own sprite now, the same size on every device. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img ref={spoonEl} className="ckmg-rider" src="/images/cooking/spoon.png" alt="" aria-hidden="true" draggable="false" />
                     {sparks.map((sp) => (
                         <span key={sp.id} className="ckmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />
                     ))}
@@ -231,8 +235,9 @@ const MG_CSS = `
 .ckmg-zone-great { width: 20%; background: rgba(126,200,255,0.26); }
 .ckmg-zone-perfect { width: 11%; background: rgba(255,215,94,0.32); }
 .ckmg-zone-flawless { width: 4.4%; background: rgba(255,158,196,0.60); box-shadow: 0 0 14px rgba(255,158,196,0.7); }
-.ckmg-rider { position: absolute; top: -26px; transform: translateX(-50%); font-size: 22px; pointer-events: none;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* Was an emoji glyph sized with font-size; it is our own sprite now, so it gets real dimensions. */
+.ckmg-rider { position: absolute; top: -28px; transform: translateX(-50%); width: 26px; height: 26px;
+    object-fit: contain; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
 /* Overhangs the bar top and bottom like the forge's, so the exact line is readable against a lit band. */
 .ckmg-marker { position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px; border-radius: 3px;
     background: linear-gradient(180deg, #fff, #ffd7e6); box-shadow: 0 0 12px #ffd7e6, 0 0 4px #fff; }

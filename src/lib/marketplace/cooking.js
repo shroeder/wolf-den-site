@@ -191,30 +191,46 @@ const CHEST_RARITY = {
  * `art` carries the sprite maps (consumables/parts/chests/crops), passed in rather than looked up here because
  * the caller already builds them once per request instead of once per reward.
  */
+// Where a reward kind falls back to when its real sprite is missing. These used to be emoji — the OS's
+// artwork, different on every device, sitting in the middle of hand-painted game art. Every one is a real
+// sprite now, and `ui/` holds the ones no single feature owns.
+export const KIND_FALLBACK = {
+    gold: "/images/ui/coin.png",
+    parts: "/images/ui/parts.png",
+    chest: "/images/ui/chest.png",
+    seed: "/images/ui/seed.png",
+    spin: "/images/nav/spin.png",
+    creation: "/images/nav/creations.png",
+    consumable: "/images/ui/potion.png",
+    prep: "/images/cooking/prep.png",
+    dish: "/images/cooking/dish.png",
+    crop: "/images/nav/farm.png",
+};
+
 export function rewardLabel(r, art = {}) {
     const { consumables = {}, parts = {}, chests = {}, crops = {} } = art;
     switch (r.kind) {
         case "gold":
-            return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse.", rarity: "common", emoji: "🪙" };
+            return { name: `${r.min.toLocaleString()}–${r.max.toLocaleString()} gold`, desc: "Straight into your purse.", rarity: "common", fallback: KIND_FALLBACK.gold };
         case "parts": {
             const m = PART_TIERS.find((p) => p.tier === r.partTier) || PART_TIERS[0];
-            return { name: `${m.name} ×${r.min}–${r.max}`, desc: "Forge parts — salvage fodder for enhancing your gear.", rarity: PART_RARITY[m.tier - 1] || "common", sprite: parts[r.partTier] || null, emoji: "⚙️" };
+            return { name: `${m.name} ×${r.min}–${r.max}`, desc: "Forge parts — salvage fodder for enhancing your gear.", rarity: PART_RARITY[m.tier - 1] || "common", sprite: parts[r.partTier] || null, fallback: KIND_FALLBACK.parts };
         }
         case "chest": {
             const m = CHEST_TIERS[r.chestTier] || {};
-            return { name: m.label || "Chest", desc: "Opens for gear at that chest's rarity odds.", rarity: CHEST_RARITY[r.chestTier] || "common", sprite: chests[r.chestTier] || null, emoji: m.emoji || "🧰" };
+            return { name: m.label || "Chest", desc: "Opens for gear at that chest's rarity odds.", rarity: CHEST_RARITY[r.chestTier] || "common", sprite: chests[r.chestTier] || null, fallback: KIND_FALLBACK.chest };
         }
         case "seed": {
             const first = r.pool[0];
-            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, emoji: "🌱" };
+            return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, fallback: KIND_FALLBACK.seed };
         }
         case "spin":
-            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", emoji: "🎡" };
+            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", fallback: KIND_FALLBACK.spin };
         case "creation":
-            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", emoji: "🎨" };
+            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", fallback: KIND_FALLBACK.creation };
         case "consumable": {
             const c = CONSUMABLES[r.id] || {};
-            return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, emoji: c.emoji || "🧪" };
+            return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, fallback: KIND_FALLBACK.consumable };
         }
         default:
             return { name: "Something", desc: "", rarity: "common" };
@@ -429,17 +445,18 @@ export async function tryRecipeDrop(buyerId, source) {
 // ── INGREDIENTS ──────────────────────────────────────────────────────────────────────────────────────────────
 // Everything resolves to a SPRITE, never an emoji. Raw ingredients reuse art the game already owns — crops from
 // mkt_town_art (`crop_<id>_ripe`), fish from the PNGs on disk — and only the prepped ingredients and the dishes
-// needed drawing. The emoji is carried purely as a last-resort fallback if a sprite row is ever missing.
+// needed drawing. `fallback` is a sprite path too: if a sprite row is ever missing the answer is still a piece
+// of our own art, not whatever glyph the player's phone happens to ship.
 const cropMeta = (ref) => SEEDS[ref] || null;
 const fishMeta = (ref) => FISH.find((f) => f.id === ref) || null;
 export function ingredientMeta(ref, sprites = {}) {
     const pr = PREPS[ref];
-    if (pr) return { ref, kind: "prep", name: pr.name, emoji: "🧂", rarity: pr.rarity, sprite: sprites[ref] || null };
+    if (pr) return { ref, kind: "prep", name: pr.name, fallback: KIND_FALLBACK.prep, rarity: pr.rarity, sprite: sprites[ref] || null };
     const c = cropMeta(ref);
-    if (c) return { ref, kind: "crop", name: c.name, emoji: c.emoji, rarity: c.rarity, sprite: sprites[`crop:${ref}`] || null };
+    if (c) return { ref, kind: "crop", name: c.name, fallback: KIND_FALLBACK.crop, rarity: c.rarity, sprite: sprites[`crop:${ref}`] || null };
     const f = fishMeta(ref);
-    if (f) return { ref, kind: "fish", name: f.name, emoji: f.emoji, rarity: f.rarity, sprite: `/images/fish/${f.id}.png` };
-    return { ref, kind: "crop", name: ref, emoji: "\u2753", rarity: "common", sprite: null };
+    if (f) return { ref, kind: "fish", name: f.name, fallback: `/images/fish/${f.id}.png`, rarity: f.rarity, sprite: `/images/fish/${f.id}.png` };
+    return { ref, kind: "crop", name: ref, fallback: KIND_FALLBACK.crop, rarity: "common", sprite: null };
 }
 
 /** Every sprite the Kitchen needs, in one read: cooking art keyed by ref, plus the crop art from the town. */
@@ -572,7 +589,7 @@ export async function getKitchenState(buyerId) {
         db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).catch(() => []),
         getChestArt().catch(() => ({})),
         // The SEED BAG. A crop you're short of is a very different situation depending on whether you already
-        // hold its seed, and the farm's bag chips read "🥕 Carrot ×7" — the crop's name for what is actually a
+        // hold its seed, and the farm's bag chips read "Carrot ×7" — the crop's name for what is actually a
         // seed. So "I need a carrot but the farm says I have 7" is the obvious reading, and the Kitchen was
         // silent about it. It can now say "plant one" instead of the generic "grow it on the farm".
         db.query(`SELECT seed_id, count FROM mkt_farm_seed WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),

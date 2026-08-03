@@ -20,10 +20,10 @@ const BANDS = ["good", "great", "perfect", "pixel"].map((key) => ({
     key, pct: bandPct(key), label: BAND_LABEL[key], color: GRADE_COLOR[key],
 }));
 const KIND_ART = {
-    gold: "/images/mining/icon-coins.png",
-    chest: "/images/mining/icon-chest.png",
-    gear: "/images/mining/icon-gear.png",
-    consumable: "/images/mining/icon-potion.png",
+    gold: "/images/ui/coin.png",
+    chest: "/images/ui/chest.png",
+    gear: "/images/ui/gear.png",
+    consumable: "/images/ui/potion.png",
 };
 // Same rarity language the chest opener uses, so a Legendary out of the rock reads exactly like a Legendary
 // out of a chest — one game, one vocabulary.

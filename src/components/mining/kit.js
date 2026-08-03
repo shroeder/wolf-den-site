@@ -11,10 +11,10 @@ export const money = (n) => Number(n || 0).toLocaleString();
 // NO EMOJI. They are the OS's artwork, not ours, and they render differently on every device — in the middle
 // of hand-painted game art they read as borrowed. Everything here is either a generated sprite or a Gi glyph.
 export const KIND_ART = {
-    gold: "/images/mining/icon-coins.png",
-    chest: "/images/mining/icon-chest.png",
-    gear: "/images/mining/icon-gear.png",
-    consumable: "/images/mining/icon-potion.png",
+    gold: "/images/ui/coin.png",
+    chest: "/images/ui/chest.png",
+    gear: "/images/ui/gear.png",
+    consumable: "/images/ui/potion.png",
 };
 
 export const PART_NAME = { 1: "Cinder Scrap", 2: "Iron Filings", 3: "Tempered Steel", 4: "Mythril Dust", 5: "Emberheart Shard" };
@@ -77,7 +77,7 @@ export function UpgCard({ t, gold, busy, onBuy }) {
             </div>
             {t.maxed
                 ? <button className="pill" disabled>Maxed</button>
-                : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}><Img src="/images/mining/icon-coins.png" className="mine-btn-ico" fallback="" /> {Number(t.cost).toLocaleString()}</button>}
+                : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}><Img src="/images/ui/coin.png" className="mine-btn-ico" fallback="" /> {Number(t.cost).toLocaleString()}</button>}
         </div>
     );
 }

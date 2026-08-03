@@ -4,9 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 // A dedicated daily-bounty card for a single feature (farm/sailing) — the same always-present, claimable
 // daily-tasks experience as the Forge, themed per feature. Self-contained: fetches + claims its own state.
+// Icons are SPRITES, never emoji — same rule as everywhere else in the game.
+//
+// `cooking` was MISSING from this table while CookingClient renders <FeatureDailies feature="cooking" />, and
+// the lookup falls back to THEME.farm — so the Kitchen's bounty card has been titled "Today's farm bounties"
+// with a wheat icon, in green, on a screen with no farm on it.
 const THEME = {
-    farm: { accent: "#7ed57e", soft: "rgba(126,213,126,0.13)", border: "rgba(126,213,126,0.4)", title: "Today's farm bounties", icon: "🌾" },
-    sailing: { accent: "#6fd0ff", soft: "rgba(111,208,255,0.13)", border: "rgba(111,208,255,0.4)", title: "Today's voyage bounties", icon: "⚓" },
+    farm: { accent: "#7ed57e", soft: "rgba(126,213,126,0.13)", border: "rgba(126,213,126,0.4)", title: "Today's farm bounties", icon: "/images/nav/farm.png" },
+    sailing: { accent: "#6fd0ff", soft: "rgba(111,208,255,0.13)", border: "rgba(111,208,255,0.4)", title: "Today's voyage bounties", icon: "/images/nav/sailing.png" },
+    cooking: { accent: "#ffb86b", soft: "rgba(255,184,107,0.13)", border: "rgba(255,184,107,0.4)", title: "Today's kitchen orders", icon: "/images/cooking/bounties.png" },
 };
 
 export default function FeatureDailies({ feature, refreshKey = 0 }) {
@@ -40,7 +46,8 @@ export default function FeatureDailies({ feature, refreshKey = 0 }) {
     const allDone = dailies.every((q) => q.claimed);
     return (
         <section className="fd-card" style={{ "--fd-accent": t.accent, "--fd-soft": t.soft, "--fd-border": t.border }}>
-            <div className="fd-head"><span className="fd-ico">{t.icon}</span><b>{t.title}</b>{allDone ? <span className="fd-alldone">all done ✓</span> : null}</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <div className="fd-head"><span className="fd-ico"><img src={t.icon} alt="" draggable="false" /></span><b>{t.title}</b>{allDone ? <span className="fd-alldone">all done ✓</span> : null}</div>
             {dailies.map((q) => (
                 <div key={q.key} className={`fd-row${q.claimed ? " is-claimed" : ""}`}>
                     <div className="fd-body">
@@ -57,7 +64,8 @@ export default function FeatureDailies({ feature, refreshKey = 0 }) {
                 .fd-card { border-radius: 14px; padding: 12px 14px; border: 1px solid var(--fd-border); background: linear-gradient(180deg, var(--fd-soft), rgba(255,255,255,0.015) 55%); }
                 .fd-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
                 .fd-head b { font-size: 12px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; color: var(--fd-accent); }
-                .fd-ico { font-size: 15px; }
+                .fd-ico { display: inline-flex; }
+                .fd-ico img { width: 17px; height: 17px; object-fit: contain; display: block; }
                 .fd-alldone { margin-left: auto; font-size: 10.5px; font-weight: 800; color: var(--fd-accent); opacity: 0.85; }
                 .fd-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.06); }
                 .fd-row:first-of-type { border-top: none; }
