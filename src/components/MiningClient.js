@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import MiningMinigame from "@/components/MiningMinigame";
+
 // ── THE MINE (owner-gated) ───────────────────────────────────────────────────────────────────────────────────
 // PROSPECT to surface a random seam, then swing at it on the same timing bar as the Forge anvil and the
 // Treasure Golem. There is no walking: steering a hero across a cave to reach a rock was motion without
@@ -47,6 +49,7 @@ export default function MiningClient({ initial }) {
     const [floats, setFloats] = useState([]);
     const [shake, setShake] = useState(0);
     const [tab, setTab] = useState("survey");
+    const [breaking, setBreaking] = useState(false); // the swing minigame is up
     const [reveal, setReveal] = useState(null); // the whole face, shown after you commit // mine | smelt — two halves of the feature, like the other systems
     const floatId = useRef(0);
 
@@ -356,9 +359,11 @@ export default function MiningClient({ initial }) {
                 </div>
             ) : null}
 
-            {node && node.pct > 0 && swingsLeft > 0
-                ? <SwingBar node={node} onSwing={onSwing} pick={s.pick} />
-                : null}
+            {node && node.pct > 0 ? (
+                <button type="button" className="mine-prospect" onClick={() => setBreaking(true)} disabled={busy}>
+                    ⛏️ Break the seam
+                </button>
+            ) : null}
 
             {/* ── THE PICKAXE ── the tool you've earned, then the levers that improve it. */}
             <div className="mine-panel">
@@ -439,6 +444,16 @@ export default function MiningClient({ initial }) {
             <p className="mine-hint">Ore of a tier melts into that tier&rsquo;s forge part. The Crucible lowers what each part costs you, the Bellows sometimes throws in an extra, and Flux sometimes lifts one a whole tier.</p>
             </>
             )}
+
+            {/* THE SWING — its own modal, its own juice. */}
+            {breaking && node && node.pct > 0 ? (
+                <MiningMinigame
+                    node={node}
+                    pick={s.pick}
+                    onSwing={onSwing}
+                    onDone={(res) => { setBreaking(false); setCrack(res); }}
+                />
+            ) : null}
 
             {/* HOW THE DESCENT ENDED — everything you carried out, or everything the roof took. */}
             {wrap ? (
@@ -931,99 +946,6 @@ function UpgCard({ t, gold, busy, onBuy }) {
             {t.maxed
                 ? <button className="pill" disabled>✓ Maxed</button>
                 : <button className="btn-ghost sail-upg-buy" disabled={busy || (gold ?? 0) < t.cost} onClick={onBuy}>🪙 {Number(t.cost).toLocaleString()}</button>}
-        </div>
-    );
-}
-
-// The timing bar. Judged locally the instant your finger lands, then reconciled against the server's grade.
-function SwingBar({ node, onSwing, pick }) {
-    const [marker, setMarker] = useState(0.5);
-    const markerRef = useRef(0.5);
-    const [cooling, setCooling] = useState(false);
-    const [grade, setGrade] = useState(null);
-    const [notice, setNotice] = useState(null);
-    const cdRef = useRef(false), busyRef = useRef(false), cdUntil = useRef(0), cdMs = useRef(CD_DEFAULT), cdEl = useRef(null);
-
-    useEffect(() => {
-        let raf = 0;
-        const t0 = performance.now();
-        const loop = (t) => {
-            const phase = ((t - t0) % (SWEEP_MS * 2)) / SWEEP_MS;
-            const pos = phase <= 1 ? phase : 2 - phase;
-            markerRef.current = pos; setMarker(pos);
-            if (cdEl.current) cdEl.current.style.transform = `scaleX(${Math.max(0, cdUntil.current - Date.now()) / (cdMs.current || CD_DEFAULT)})`;
-            raf = requestAnimationFrame(loop);
-        };
-        raf = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(raf);
-    }, []);
-
-    const swing = useCallback(async () => {
-        if (cdRef.current || busyRef.current) return;
-        busyRef.current = true; cdRef.current = true;
-        const d = Math.abs(markerRef.current - 0.5);
-        const key = d <= 0.022 ? "pixel" : d <= 0.055 ? "perfect" : d <= 0.10 ? "great" : d <= 0.16 ? "good" : "miss";
-        const guess = GRADE_CD[key] ?? CD_DEFAULT;
-        cdMs.current = guess; cdUntil.current = Date.now() + guess;
-        let timer = setTimeout(() => { cdRef.current = false; setCooling(false); }, guess);
-        setCooling(true);
-        try {
-            navigator.vibrate?.(key === "pixel" ? [30, 30, 30, 30, 60, 40, 110] : key === "perfect" ? [22, 34, 26, 34, 70]
-                : key === "great" ? [16, 30, 40] : key === "good" ? [12, 26] : [8]);
-        } catch { /* no haptics here */ }
-
-        const r = await onSwing(d);
-        busyRef.current = false;
-        if (typeof r?.cooldownMs === "number" && r.cooldownMs !== guess) {
-            clearTimeout(timer);
-            const remain = Math.max(0, r.cooldownMs - (guess - Math.max(0, cdUntil.current - Date.now())));
-            cdMs.current = r.cooldownMs; cdUntil.current = Date.now() + remain;
-            timer = setTimeout(() => { cdRef.current = false; setCooling(false); }, remain);
-        }
-        if (r?.ok) {
-            setGrade({ key: r.grade, label: r.gradeLabel, dmg: r.damage, combo: r.combo });
-            setTimeout(() => setGrade(null), 1000);
-        } else {
-            clearTimeout(timer);
-            cdRef.current = false; cdUntil.current = 0; setCooling(false);
-            setNotice(r?.error === "too_fast" ? "Easy — let the bar refill" : r?.error === "out_of_swings" ? "Out of swings today" : "That swing didn't land");
-            setTimeout(() => setNotice(null), 1400);
-        }
-    }, [onSwing]);
-
-    return (
-        <div className="mine-swing">
-            <div className="mine-swing-bar" aria-hidden="true">
-                <span className="mine-swing-zone" />
-                <span className="mine-swing-marker" style={{ left: `${marker * 100}%` }} />
-            </div>
-            <button type="button" className="mine-swing-go" onPointerDown={(e) => { e.preventDefault(); swing(); }} disabled={cooling}>
-                <span className="mine-swing-cd" ref={cdEl} aria-hidden="true" />
-                <Img src={pick?.sprite} className="mine-swing-pick" fallback="⛏️" />
-                <span>Swing</span>
-            </button>
-            {grade ? <div className={`mine-swing-grade is-${grade.key}`}>{grade.label} · {grade.dmg}{grade.combo >= 2 ? ` · ${grade.combo}× chain` : ""}</div> : null}
-            {!grade && notice ? <div className="mine-swing-notice">{notice}</div> : null}
-
-            <style jsx global>{`
-                .mine-swing { margin-top: 12px; }
-                .mine-swing-bar { position: relative; height: 28px; border-radius: 999px; background: linear-gradient(90deg, #2a2f3a, #3a4150, #2a2f3a); overflow: hidden; }
-                .mine-swing-zone { position: absolute; left: 50%; top: 0; bottom: 0; width: 11%; transform: translateX(-50%);
-                    background: linear-gradient(90deg, rgba(255,215,94,0.15), rgba(255,215,94,0.6), rgba(255,215,94,0.15)); }
-                .mine-swing-marker { position: absolute; top: -3px; bottom: -3px; width: 4px; transform: translateX(-50%); border-radius: 2px;
-                    background: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.9); }
-                .mine-swing-go { position: relative; overflow: hidden; margin-top: 10px; width: 100%; padding: 12px; border-radius: 13px; border: none;
-                    display: flex; align-items: center; justify-content: center; gap: 9px;
-                    font-weight: 900; font-size: 1.1rem; color: #2a1400; cursor: pointer;
-                    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12; }
-                .mine-swing-go:disabled { filter: saturate(0.75) brightness(0.92); cursor: default; }
-                .mine-swing-pick { width: 30px; height: 30px; object-fit: contain; }
-                .mine-swing-cd { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; transform-origin: left center; background: rgba(0,0,0,0.3); }
-                .mine-swing-grade { text-align: center; margin-top: 8px; font-weight: 900; font-size: 0.95rem; }
-                .mine-swing-grade.is-pixel { color: #ffd75e; } .mine-swing-grade.is-perfect { color: #8fe3ff; }
-                .mine-swing-grade.is-great { color: #8fe39a; } .mine-swing-grade.is-good { color: #d7c48a; } .mine-swing-grade.is-miss { color: #ff8f9a; }
-                .mine-swing-notice { text-align: center; margin-top: 8px; font-size: 0.82rem; font-weight: 700; color: #b9a98f; }
-            `}</style>
         </div>
     );
 }

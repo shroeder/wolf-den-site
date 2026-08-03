@@ -59,8 +59,9 @@ export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 // likelier the roof comes in. Bail whenever you want and everything you are carrying is yours; push once too
 // far and the haul is gone.
 //
-// You always walk out with a SEAM either way — collapsing costs you the loot bag, not the trip. A run that can
-// end in nothing at all just teaches people to bail at depth 2 forever, which is a habit rather than a choice.
+// A COLLAPSE ENDS THE RUN. No haul, no seam, no rock face — the trip is spent and you walked away with
+// nothing. That is what makes climbing out a decision instead of a formality; if the roof coming in still
+// handed you a seam, pushing would be free and there would be no game here at all.
 export const TRIPS_PER_DAY = 3;
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs
@@ -160,8 +161,8 @@ export async function descend(buyerId) {
         const next = { ...run, depth, over: true, collapsed: true, haul: [], last: { kind: "collapse" } };
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
         await trackActivity(buyerId, "mine_collapse", { depth, lost }).catch(() => {});
-        const seam = await cutSeam(buyerId, Math.max(1, (Number(run.seamTier) || 1) - 1));
-        return { ok: true, collapsed: true, depth, lost, seam, ...(await getMiningState(buyerId)) };
+        // No seam. The rock face stays empty and the trip is gone.
+        return { ok: true, collapsed: true, depth, lost, seam: null, ...(await getMiningState(buyerId)) };
     }
 
     const card = drawCard(depth);
