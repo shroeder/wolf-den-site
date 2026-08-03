@@ -53,12 +53,30 @@ async function main() {
     //  - ledger (accounting_app): product flavors under apk/<flavor>/<variant>, channel = flavor.
     //  - market (marketplace_app): no flavors, apk/<variant>, channel = "marketplace".
     const isMarket = args.app === "market" || args.app === "marketplace";
-    const flavor = args.flavor || (isMarket ? "" : "full");
+
+    // If --apk points inside a flavor directory, that flavor WINS over the default.
+    //
+    // This bit me: `--apk .../apk/employee/debug/app-employee-debug.apk` with no --flavor uploaded the employee
+    // APK, but read its version from apk/full/'s metadata and recorded it on the FULL channel — so owner
+    // devices were briefly offered the staff build. --apk chose the file and --flavor chose everything else,
+    // and nothing checked that they agreed.
+    const fromPath = !isMarket && args.apk
+        ? (String(args.apk).split(path.sep).join("/").match(/\/apk\/([^/]+)\//) || [])[1] || null
+        : null;
+    if (fromPath && args.flavor && fromPath !== args.flavor) {
+        console.error(`--apk is a ${fromPath} build but --flavor says ${args.flavor}. Refusing to guess.`);
+        process.exit(1);
+    }
+    const flavor = args.flavor || fromPath || (isMarket ? "" : "full");
     const channel = isMarket ? "marketplace" : flavor;
     const blobPrefix = isMarket ? "wolfdenmarket" : `wolfdenledger-${flavor}`;
-    const apkDir = isMarket
-        ? path.resolve(`../marketplace_app/app/build/outputs/apk/${args.variant}`)
-        : path.resolve(`../accounting_app/app/build/outputs/apk/${flavor}/${args.variant}`);
+    // Metadata comes from beside the APK WE ARE ACTUALLY UPLOADING when one was named — reading it from the
+    // default directory is how a 605 employee build got published as full 604.
+    const apkDir = args.apk
+        ? path.dirname(path.resolve(args.apk))
+        : isMarket
+            ? path.resolve(`../marketplace_app/app/build/outputs/apk/${args.variant}`)
+            : path.resolve(`../accounting_app/app/build/outputs/apk/${flavor}/${args.variant}`);
     const metaPath = path.join(apkDir, "output-metadata.json");
 
     let versionCode;
