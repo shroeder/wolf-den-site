@@ -51,6 +51,24 @@ export function useMine(initial) {
         else say(r?.error === "no_trips" ? "No trips left today — three a day." : r?.error === "run_in_progress" ? "You're already down there." : "Couldn't start.");
     }, [busy, post, say]);
 
+    // Out of trips is not a dead end — buy another, doubling price, three a day. Same deal fishing offers.
+    const buyTrip = useCallback(async () => {
+        if (busy) return;
+        setBusy(true);
+        const r = await post({ action: "buy_trip" });
+        setBusy(false);
+        if (r?.ok) {
+            setState(r);
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* no window */ }
+            startTrip();
+        } else {
+            say(r?.error === "not_enough_gold" ? "Not enough gold for another trip."
+                : r?.error === "recharge_maxed" ? "That's every trip you can buy today."
+                : r?.error === "still_have_trips" ? "You still have a trip left."
+                : "Couldn't buy a trip.");
+        }
+    }, [busy, post, say, startTrip]);
+
     const goDeeper = useCallback(async () => {
         if (busy) return;
         setBusy(true);
@@ -160,7 +178,7 @@ export function useMine(initial) {
     return {
         state, node, msg, busy, tab, setTab, tripsLeft,
         // descent
-        card, wrap, setWrap, startTrip, goDeeper, surface, backToTunnel,
+        card, wrap, setWrap, startTrip, buyTrip, goDeeper, surface, backToTunnel,
         // face
         breakNode, openBreak: () => setBreakNode(state.node), closeBreak: () => setBreakNode(null),
         crack, setCrack, floats, shake, onSwing,

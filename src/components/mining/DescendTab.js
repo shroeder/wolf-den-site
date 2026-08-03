@@ -34,9 +34,10 @@ function TunnelCard({ card }) {
     );
 }
 
-export default function DescendTab({ s, msg, busy, card, startTrip, goDeeper, surface, upgrade }) {
+export default function DescendTab({ s, msg, busy, card, startTrip, buyTrip, goDeeper, surface, upgrade }) {
     const run = s.run;
     const tripsLeft = s.trips?.left ?? 0;
+    const recharge = s.trips?.recharge;
 
     return (
         <>
@@ -54,10 +55,12 @@ export default function DescendTab({ s, msg, busy, card, startTrip, goDeeper, su
                 ) : (
                     <div className="mine-face-cta">
                         <Img src={s.lantern?.sprite} className="mine-empty-pick" fallback="" />
-                        <p>{tripsLeft > 0 ? "The tunnel mouth." : "No trips left today."}</p>
+                        <p>{tripsLeft > 0 ? "The tunnel mouth." : "That's your three for today."}</p>
                         <span className="muted">{tripsLeft > 0
-                            ? "Go as deep as you dare. Everything you find is only yours once you climb out."
-                            : "Three descents a day. Back tomorrow."}</span>
+                            ? "Go as deep as you dare. Everything you find is only yours once you stop and dig."
+                            : recharge?.available
+                                ? "The foreman will look the other way — for a price."
+                                : "Three free descents a day, and you've bought all you can. Back tomorrow."}</span>
                     </div>
                 )}
                 {msg ? <div className="mine-msg">{msg}</div> : null}
@@ -66,11 +69,22 @@ export default function DescendTab({ s, msg, busy, card, startTrip, goDeeper, su
             {/* The CTA lives OUTSIDE the pane — inside it, a fixed aspect-ratio box with overflow hidden was
                 clipping the only button on the screen. */}
             {!run ? (
-                <button type="button" className="mine-prospect is-big" onClick={startTrip} disabled={busy || tripsLeft <= 0}>
-                    {tripsLeft > 0
-                        ? <><Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head down the tunnel <em>{tripsLeft} of {s.trips.max} trips left today</em></>
-                        : "No trips left today"}
-                </button>
+                tripsLeft > 0 ? (
+                    <button type="button" className="mine-prospect is-big" onClick={startTrip} disabled={busy}>
+                        <Img src="/images/mining/lantern-2.png" className="mine-btn-ico" fallback="" /> Head down the tunnel
+                        <em>{tripsLeft} of {s.trips.max} trips left today</em>
+                    </button>
+                ) : recharge?.available ? (
+                    /* Out of trips with gold in your pocket was a dead end and a disabled button. The price
+                       doubles each time, so the first is an easy yes and the third is a real decision. */
+                    <button type="button" className="mine-prospect is-big is-buy" onClick={buyTrip} disabled={busy || (s.gold ?? 0) < recharge.cost}>
+                        <Img src="/images/ui/coin.png" className="mine-btn-ico" fallback="" />
+                        {(s.gold ?? 0) < recharge.cost ? `Need ${money(recharge.cost)} gold` : `Buy another trip · ${money(recharge.cost)}`}
+                        <em>{recharge.boughtLeft} more available today</em>
+                    </button>
+                ) : (
+                    <button type="button" className="mine-prospect is-big" disabled>That&rsquo;s every trip today</button>
+                )
             ) : (
                 <>
                     <div className="mine-haul">

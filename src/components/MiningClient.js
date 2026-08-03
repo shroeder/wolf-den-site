@@ -64,7 +64,7 @@ export default function MiningClient({ initial }) {
             {tab === "descend" ? (
                 <DescendTab
                     s={s} msg={msg} busy={busy} card={m.card}
-                    startTrip={m.startTrip} goDeeper={m.goDeeper} surface={m.surface} upgrade={m.upgrade}
+                    startTrip={m.startTrip} buyTrip={m.buyTrip} goDeeper={m.goDeeper} surface={m.surface} upgrade={m.upgrade}
                 />
             ) : tab === "mine" ? (
                 <FaceTab
@@ -371,6 +371,10 @@ export default function MiningClient({ initial }) {
                 .mine-smelt.is-ready { animation: mineSmeltReady 2.4s ease-in-out infinite; }
                 @keyframes mineSmeltReady { 0%,100% { box-shadow: 0 0 0 rgba(255,150,60,0); } 50% { box-shadow: 0 0 16px -2px rgba(255,150,60,0.75); } }
                 .mine-smelt b { font-size: 1.02em; }
+                /* The paid-trip CTA — warm, not the usual gold, so it reads as a purchase. */
+                .mine-prospect.is-buy { background: linear-gradient(180deg, #ffb45e, #e8892c); color: #2a1400;
+                    box-shadow: 0 4px 16px rgba(232,137,44,0.35); }
+                .mine-prospect.is-buy:disabled { filter: grayscale(.5) brightness(.85); }
                 .mine-bag-how { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
                 .mine-bag-how b { color: #ffd75e; }
                 .mine-bag-kinds { display: flex; align-items: center; gap: 7px; margin-top: 11px;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { descend, getMiningState, smeltOre, startTrip, surfaceRun, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
+import { buyTrip, descend, getMiningState, smeltOre, startTrip, surfaceRun, swingAtNode, upgradeMining } from "@/lib/marketplace/mining.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -31,6 +31,7 @@ export async function POST(request) {
             const b = await request.json().catch(() => ({}));
             switch (String(b?.action || "")) {
                 case "trip": return noStore(await startTrip(buyer.id));
+                case "buy_trip": return noStore(await buyTrip(buyer.id));
                 case "descend": return noStore(await descend(buyer.id));
                 case "surface": return noStore(await surfaceRun(buyer.id));
                 case "swing": return noStore(await swingAtNode(buyer.id, Number(b.nodeId), b.dist));

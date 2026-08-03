@@ -70,6 +70,22 @@ export const oreArt = (t) => `/images/mining/ore-${oreTier(t).id}.png`;
 // A dead-empty rock face was cleaner as a rule and worse as a game: it ended the session rather than the run,
 // and "you get no minigame today" is a punishment aimed at the player instead of at the gamble.
 export const TRIPS_PER_DAY = 3;
+
+// ── BUYING ANOTHER TRIP ──────────────────────────────────────────────────────────────────────────────────────
+// Out of trips used to be a dead end — "back tomorrow", with a full purse and nothing to press. Fishing already
+// answers this (buy another cast, doubling price, daily cap), so mining uses the same shape rather than
+// inventing a second one.
+//
+// A trip is worth far more than a cast — a whole descent plus the seam it hands you — so it starts at 500 and
+// doubles: 500 → 1,000 → 2,000 is 3,500 gold to double your day. The doubling is what limits this, not the
+// entry price: the first is an easy yes, the third is a real decision, and a big balance buys sharply less
+// than it looks like it should.
+export const TRIP_RECHARGE_BASE = 500;
+export const TRIP_RECHARGE_MAX_PER_DAY = 3;
+export const tripRechargeCost = (bought = 0) => TRIP_RECHARGE_BASE * (2 ** Math.max(0, bought));
+const tripsBoughtToday = (row) => Number(row?.trips_bought) || 0;
+// The whole day's allowance: the free three plus anything paid for.
+export const tripsAllowed = (row) => TRIPS_PER_DAY + tripsBoughtToday(row);
 // What the roof leaves you. Deliberately the bottom of ORE_TIERS: you still get to play the timing game, and
 // the bag it pays from is the poorest one in the mine.
 const COLLAPSE_SEAM_TIER = 1;
@@ -160,11 +176,12 @@ export async function startTrip(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
     if (row?.run_json && !row.run_json.over) return { ok: false, error: "run_in_progress", ...(await getMiningState(buyerId)) };
-    if ((Number(row?.trips_used) || 0) >= TRIPS_PER_DAY) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
+    const allowed = tripsAllowed(row);
+    if ((Number(row?.trips_used) || 0) >= allowed) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
     const spent = await db.queryOne(
         `UPDATE mkt_mining SET trips_used = trips_used + 1, updated_at = NOW()
           WHERE buyer_id = $1 AND trips_day = ${DAY} AND trips_used < $2 RETURNING trips_used`,
-        [buyerId, TRIPS_PER_DAY]
+        [buyerId, allowed]
     ).catch(() => null);
     if (!spent) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
     const run = { depth: 0, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
@@ -174,6 +191,40 @@ export async function startTrip(buyerId) {
 }
 
 // One step deeper.
+/** Buy one more descent today. Mirrors fishing's buyRecharge, down to the conditional spend. */
+export async function buyTrip(buyerId) {
+    if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const row = await minerRow(buyerId);
+    const used = Number(row?.trips_used) || 0;
+    if (used < tripsAllowed(row)) return { ok: false, error: "still_have_trips", ...(await getMiningState(buyerId)) };
+    const bought = tripsBoughtToday(row);
+    if (bought >= TRIP_RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed", ...(await getMiningState(buyerId)) };
+
+    const cost = tripRechargeCost(bought);
+    // Conditional spend: the WHERE clause IS the balance check, so two taps can't both succeed on one balance.
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND COALESCE(gold, 0) >= $2 RETURNING gold`,
+        [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", ...(await getMiningState(buyerId)) };
+    await logCoin(buyerId, -cost, "mining_trip", { balanceAfter: paid.gold, meta: { bought: bought + 1 } }).catch(() => {});
+
+    // Guarded the same way, and only for TODAY's row — a day rollover between the read and this write must not
+    // hand out a trip against yesterday's counter.
+    const got = await db.queryOne(
+        `UPDATE mkt_mining SET trips_bought = trips_bought + 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND trips_day = ${DAY} AND trips_bought = $2 RETURNING trips_bought`,
+        [buyerId, bought]
+    ).catch(() => null);
+    if (!got) {
+        // Refund rather than take the gold for nothing.
+        await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, cost]).catch(() => {});
+        return { ok: false, error: "try_again", ...(await getMiningState(buyerId)) };
+    }
+    await trackActivity(buyerId, "mine_trip_bought", { cost, bought: bought + 1 }).catch(() => {});
+    return { ok: true, bought: bought + 1, cost, ...(await getMiningState(buyerId)) };
+}
+
 export async function descend(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
@@ -535,6 +586,7 @@ async function minerRow(buyerId) {
         .queryOne(
             `UPDATE mkt_mining
                 SET trips_used = CASE WHEN trips_day = ${DAY} THEN trips_used ELSE 0 END,
+                    trips_bought = CASE WHEN trips_day = ${DAY} THEN trips_bought ELSE 0 END,
                     trips_day = ${DAY},
                     swing_used = CASE WHEN swing_day = ${DAY} THEN swing_used ELSE 0 END,
                     swing_bonus = CASE WHEN swing_day = ${DAY} THEN swing_bonus ELSE 0 END,
@@ -587,7 +639,20 @@ export async function getMiningState(buyerId) {
         unlocked: true,
 
         pick: pickForm(lvls),
-        trips: { used: tripsUsed, max: TRIPS_PER_DAY, left: Math.max(0, TRIPS_PER_DAY - tripsUsed) },
+        trips: {
+            used: tripsUsed,
+            max: tripsAllowed(row),
+            left: Math.max(0, tripsAllowed(row) - tripsUsed),
+            free: TRIPS_PER_DAY,
+            bought: tripsBoughtToday(row),
+            // Offered only once the day's trips are gone — buying while you still have one would just be a
+            // worse way to spend gold, and reads as a trap.
+            recharge: {
+                available: tripsUsed >= tripsAllowed(row) && tripsBoughtToday(row) < TRIP_RECHARGE_MAX_PER_DAY,
+                cost: tripRechargeCost(tripsBoughtToday(row)),
+                boughtLeft: Math.max(0, TRIP_RECHARGE_MAX_PER_DAY - tripsBoughtToday(row)),
+            },
+        },
         // The descent in progress, if there is one. Depth, what you are carrying, and how bad the next step is.
         run: run ? {
             depth: Number(run.depth) || 0,
