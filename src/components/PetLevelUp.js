@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { collectibleById, PET_STAT_META } from "@/lib/marketplace/collectibles.js";
+import { collectibleById, petActive, petActiveLevelMult, petPassive, petPassiveLevelMult, PET_STAT_META } from "@/lib/marketplace/collectibles.js";
 
 // ── GLOBAL pet level-up watcher ──────────────────────────────────────────────────────────────────────────
 // Mounted once in the marketplace layout so a pet leveling up is celebrated ANYWHERE in the app — not just on
@@ -143,8 +143,26 @@ export default function PetLevelUp() {
 
     const accent = rc(current.pet.rarity);
     const evolves = current.oldArt?.url && current.newArt?.url && current.oldArt.url !== current.newArt.url;
-    const statLabel = PET_STAT_META[current.stat]?.label || current.stat;
-    const statIcon = PET_STAT_META[current.stat]?.icon || "";
+    // WHAT THE LEVEL ACTUALLY BOUGHT. A pet carries two stats — an always-on PASSIVE for owning it and an
+    // ACTIVE that only counts while it's your companion — and both scale, at different rates. The modal used
+    // to state one number with nothing to compare it to, which is the least interesting true thing it could
+    // say. Both are pure client-safe functions, so this needs nothing from the server.
+    const meta = (k) => PET_STAT_META[k] || {};
+    const gains = (() => {
+        const p = current.pet ? petPassive(current.pet) : null;
+        const a = current.pet ? petActive(current.pet) : null;
+        const line = (kind, stat, base, mult) => {
+            const from = Math.round(base * mult(current.from));
+            const to = Math.round(base * mult(current.to));
+            return { kind, stat, from, to, up: to - from, label: meta(stat).label || stat, icon: meta(stat).icon || "", desc: meta(stat).desc || "" };
+        };
+        const out = [];
+        if (p) out.push(line("Passive", p.stat, p.value, petPassiveLevelMult));
+        // Listed even when both stats share a key: they scale at different rates (passive ×0.25/level, active
+        // ×0.5), so "the same stat" still moves by different amounts on the two lines.
+        if (a) out.push(line("Active", a.stat, a.value, petActiveLevelMult));
+        return out;
+    })();
     const maxed = current.to >= 5;
 
     return createPortal(
@@ -176,15 +194,35 @@ export default function PetLevelUp() {
                     <span className="plu-flash" aria-hidden="true" />
                 </div>
 
-                <div className="plu-banner">{evolves ? "✨ EVOLVED!" : "⬆️ LEVEL UP!"}</div>
+                <div className="plu-banner">{evolves ? "EVOLVED!" : "LEVEL UP!"}</div>
                 <h2 className="plu-title">{current.pet.name} reached Lv {current.to}</h2>
                 <div className="plu-stars" aria-label={`Level ${current.to} of 5`}>
                     {Array.from({ length: 5 }).map((_, i) => (
                         <span key={i} className={i < current.to ? "on" : "off"} style={i < current.to ? { animationDelay: `${2 + i * 0.12}s` } : undefined}>★</span>
                     ))}
                 </div>
-                {current.value ? (
-                    <p className="plu-sub">Passive now <b>+{current.value} {statIcon} {statLabel}</b>{maxed ? " — MAX level! 🏆" : ""}</p>
+                {/* BEFORE → AFTER, for both stats. The whole point of a level is the number moving. */}
+                {gains.length ? (
+                    <div className="plu-gains">
+                        {gains.map((g) => (
+                            <div className={`plu-gain is-${g.kind.toLowerCase()}`} key={g.kind}>
+                                <span className="plu-gain-kind">{g.kind}</span>
+                                <span className="plu-gain-stat">{g.icon} {g.label}</span>
+                                <span className="plu-gain-nums">
+                                    <b className="was">+{g.from}</b>
+                                    <i aria-hidden="true">›</i>
+                                    <b className="now">+{g.to}</b>
+                                    {g.up > 0 ? <em>+{g.up}</em> : null}
+                                </span>
+                            </div>
+                        ))}
+                        <p className="plu-gains-note">
+                            {gains.length > 1
+                                ? "Passive counts while you simply own it. Active only counts while it's your companion."
+                                : "Counts while it's your companion."}
+                            {maxed ? " · MAX LEVEL" : ""}
+                        </p>
+                    </div>
                 ) : null}
                 <div className="plu-hint" aria-hidden="true">{queue.length > 1 ? `tap for the next one · ${queue.length - 1} more` : "tap anywhere to close"}</div>
             </div>
@@ -194,6 +232,22 @@ export default function PetLevelUp() {
 }
 
 const PLU_CSS = `
+/* WHAT THE LEVEL BOUGHT — one row per stat, before › after. */
+.plu-gains { margin-top: 14px; display: grid; gap: 7px; text-align: left; }
+.plu-gain { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px;
+    padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09); }
+.plu-gain.is-active { border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: color-mix(in srgb, var(--acc) 10%, rgba(255,255,255,0.04)); }
+.plu-gain-kind { font-size: 9.5px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; color: #9aa2ab;
+    padding: 3px 7px; border-radius: 999px; background: rgba(0,0,0,0.4); }
+.plu-gain.is-active .plu-gain-kind { color: #2a1400; background: var(--acc); }
+.plu-gain-stat { font-size: 12.5px; font-weight: 700; color: #e7dcc8; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plu-gain-nums { display: inline-flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plu-gain-nums .was { font-size: 12.5px; color: #7f8791; text-decoration: line-through; }
+.plu-gain-nums i { font-style: normal; color: #7f8791; }
+.plu-gain-nums .now { font-size: 15px; color: #fff; }
+.plu-gain-nums em { font-style: normal; font-size: 11px; font-weight: 900; color: #7cffb2; }
+.plu-gains-note { margin: 4px 2px 0; font-size: 10.5px; line-height: 1.45; color: #8b93a0; text-align: center; }
+
 .plu-scrim { position: fixed; inset: 0; z-index: 500; display: grid; place-items: center; padding: 18px;
     background: radial-gradient(120% 90% at 50% 30%, color-mix(in srgb, var(--acc, #ffd75e) 12%, rgba(6,4,12,0.82)), rgba(6,4,12,0.9) 70%);
     backdrop-filter: blur(5px); animation: pluFade .3s ease both; }

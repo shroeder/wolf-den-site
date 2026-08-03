@@ -502,7 +502,7 @@ export default function FarmClient({ initial, viewingAlias }) {
             wallet: f.wallet && r.goldGained ? { ...f.wallet, gold: f.wallet.gold + r.goldGained } : f.wallet,
         }));
         setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
-        if (i >= 0) addFloater(i, r.petLevelUp ? "⬆️ LEVEL UP!" : r.forOther ? `+${r.playerXp} XP · +${r.goldGained}g 💛` : `+${r.petXpGain || ""} XP`, "#ffe27a");
+        if (i >= 0) addFloater(i, r.petLevelUp ? "★ LEVEL UP!" : r.forOther ? `+${r.playerXp} XP · +${r.goldGained}g 💛` : `+${r.petXpGain || ""} XP`, "#ffe27a");
         if (r.petLevelUp) dispatchPetLevelUp(r.petLevelUp); // handed to the ONE global celebration modal
     }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets]);
 
@@ -2472,7 +2472,7 @@ function HarvestToast({ toast, onClose }) {
                         {toast.xp ? <div style={{ fontSize: 24, fontWeight: 900, color: "#8fe39a", marginTop: 6 }}>✨ +{toast.xp} XP</div> : null}
                         {toast.petFed ? (
                             <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: toast.petFed.leveled ? "rgba(255,210,90,0.16)" : "rgba(180,150,255,0.12)", border: `1px solid ${toast.petFed.leveled ? "rgba(255,210,90,0.55)" : "rgba(180,150,255,0.4)"}`, fontWeight: 800, fontSize: 13 }}>
-                                {toast.petFed.leveled ? `⬆️ ${toast.petFed.emoji} ${toast.petFed.name} reached Lv ${toast.petFed.level}!` : `${toast.petFed.emoji} ${toast.petFed.name} +${toast.petFed.xp} pet XP`}
+                                {toast.petFed.leveled ? `★ ${toast.petFed.emoji} ${toast.petFed.name} reached Lv ${toast.petFed.level}!` : `${toast.petFed.emoji} ${toast.petFed.name} +${toast.petFed.xp} pet XP`}
                             </div>
                         ) : null}
                         {toast.bonus ? <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: "rgba(140,200,255,0.12)", border: "1px solid rgba(140,200,255,0.45)", fontWeight: 800, fontSize: 13 }}>🎁 Harvest loot: {toast.bonus}</div> : null}
