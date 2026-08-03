@@ -17,7 +17,19 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 // (Changing your mind on someone you already rated today still costs a charge and still pays nothing — that's
 // a revision, not a fresh visit.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
-const RATES_PER_DAY = 3; // rating charges per day — spent on a NEW rating, a REPEAT, or changing one
+// HOW MANY FARMS YOU MAY VISIT, AND HOW MANY PAY.
+//
+// This was 3 a day, full stop. Once you had been round everyone, three charges was not "a limit", it was the
+// whole system switched off — you could show love to three farms and then the feature was over until tomorrow,
+// which is exactly backwards for something whose entire point is going and appreciating people's work.
+//
+// So the two things it was conflating are now separate. You may RATE twenty farms a day; only the first three
+// PAY XP. The cap that mattered was never the visiting, it was the XP: these two awards were already trimmed
+// 35% for being 5.5% of all XP in the game, and simply raising the charge count would have multiplied that by
+// seven on both sides of every rating. An unpaid rating still counts for the farm's tally and its rank, which
+// is the part you actually came to give.
+const RATES_PER_DAY = 20;      // ratings you may give per day
+const PAID_RATES_PER_DAY = 3;  // ...of which this many pay XP (to BOTH sides)
 // What a repeat visit pays, against a first-ever rating of that person. Held under 1 on purpose: these two
 // awards were trimmed 35% for being 5.5% of all XP in the game, and making them repeatable every day pushes
 // straight back through that ceiling. Set to 1 for full parity — it's the only number that decides this.
@@ -49,7 +61,11 @@ async function rateCharge(buyerId) {
     const used = b?.farm_rate_used || 0;
     const bonus = b?.farm_rate_bonus || 0; // Kindness Token consumable — extra rating charges today
     const allowance = RATES_PER_DAY + bonus;
-    return { used, allowance, left: Math.max(0, allowance - used) };
+    // paidLeft is what the UI shows as "worth XP"; `left` is how many more you may give at all.
+    return {
+        used, allowance, left: Math.max(0, allowance - used),
+        paidAllowance: PAID_RATES_PER_DAY, paidLeft: Math.max(0, PAID_RATES_PER_DAY - used),
+    };
 }
 
 // Aggregate counts of a farm's likes, by tier + total, plus the viewer's own current rating.
@@ -68,19 +84,63 @@ async function ratingSummary(ownerId, viewerId) {
     return { total, byTier, myTier: mine?.tier || null, ratedToday: Boolean(mine?.rated_today) };
 }
 
+// ── WHERE YOU PLACE, NOT WHAT YOU SCORED ─────────────────────────────────────────────────────────────────────
+// Farm Rank was a ladder of fixed thresholds — 35 points is a "Thriving Farm", 60 is a "Bountiful Estate".
+// That is a solo progress bar wearing the word "rank": it says nothing about how your farm compares to anyone
+// else's, which is the only question a rank is actually asked. And because the thresholds never move, the
+// whole Den eventually tops out at the same title and the ladder stops meaning anything.
+//
+// It is a standings position now. Same tier-weighted score (like 1 · love 2 · admire 3), but what you are told
+// is that you are 2nd of 40 — a number that can only go up by other people liking your farm more than someone
+// else's, and one that changes when they do.
+//
+// Ranked in SQL so it stays one query no matter how big the Den gets. Ties share a place (DENSE_RANK), because
+// two farms on identical love are genuinely tied and telling one of them they are 3rd would be a lie.
+async function farmStandings(ownerId) {
+    const row = await db
+        .queryOne(
+            `WITH scored AS (
+                 SELECT owner_id, SUM(CASE tier WHEN 3 THEN 3 WHEN 2 THEN 2 ELSE 1 END)::int AS score
+                   FROM mkt_farm_rating GROUP BY owner_id
+             ), placed AS (
+                 SELECT owner_id, score, DENSE_RANK() OVER (ORDER BY score DESC) AS place FROM scored
+             )
+             SELECT
+                 (SELECT place FROM placed WHERE owner_id = $1) AS place,
+                 (SELECT score FROM placed WHERE owner_id = $1) AS score,
+                 (SELECT COUNT(*)::int FROM placed) AS ranked,
+                 (SELECT MIN(score) FROM placed p2 WHERE p2.place = (SELECT place FROM placed WHERE owner_id = $1) - 1) AS next_score`,
+            [ownerId]
+        )
+        .catch(() => null);
+    const score = Number(row?.score) || 0;
+    const place = Number(row?.place) || 0;
+    return {
+        score,
+        // No place at all until someone has rated you — "unranked" is honest, "last of 40" is discouraging for
+        // a farm nobody has visited yet.
+        place: place || null,
+        ranked: Number(row?.ranked) || 0,
+        // How many points would draw level with the place above. Null at the top.
+        toNext: row?.next_score != null ? Math.max(1, Number(row.next_score) - score) : null,
+    };
+}
+
 // The rating block attached to a farm view: the summary, whether the viewer can rate, and their charge state.
 export async function farmRatingBits(ownerId, viewerId) {
     const own = String(viewerId || "") === String(ownerId);
-    const [summary, charge] = await Promise.all([
+    const [summary, charge, standings] = await Promise.all([
         ratingSummary(ownerId, viewerId),
         viewerId && !own ? rateCharge(viewerId) : Promise.resolve(null),
+        farmStandings(ownerId),
     ]);
     return {
         rating: {
             ...summary,
             canRate: Boolean(viewerId) && !own,
             isOwn: own,
-            charge, // { used, allowance, left } or null on your own farm
+            charge, // { used, allowance, left, paidAllowance, paidLeft } or null on your own farm
+            standings, // { score, place, ranked, toNext }
         },
     };
 }
@@ -135,17 +195,22 @@ export async function rateFarm(raterId, ownerId, tier) {
             const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
             return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
         }
-        const raterXp = Math.max(1, Math.round(meta.raterXp * REPEAT_XP_MULT));
-        const ownerXp = Math.max(1, Math.round(meta.ownerXp * REPEAT_XP_MULT));
+        // `slot` returns farm_rate_used AFTER the increment, so it is this rating's ordinal for the day —
+        // no extra column needed to know whether it lands inside the paid window.
+        const paysXp = Number(slot.farm_rate_used) <= PAID_RATES_PER_DAY;
+        const raterXp = paysXp ? Math.max(1, Math.round(meta.raterXp * REPEAT_XP_MULT)) : 0;
+        const ownerXp = paysXp ? Math.max(1, Math.round(meta.ownerXp * REPEAT_XP_MULT)) : 0;
         // gold: 0 is load-bearing on BOTH — awardXp pays gold 1:1 with points otherwise, and this is now a
         // repeatable daily action rather than a once-per-person one.
-        await awardXp(raterId, "farm_rate_give", { points: raterXp, gold: 0 }).catch(() => {});
-        await awardXp(ownerId, "farm_rate_get", { points: ownerXp, gold: 0 }).catch(() => {});
-        await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, repeat: true }).catch(() => {});
+        if (paysXp) {
+            await awardXp(raterId, "farm_rate_give", { points: raterXp, gold: 0 }).catch(() => {});
+            await awardXp(ownerId, "farm_rate_get", { points: ownerXp, gold: 0 }).catch(() => {});
+        }
+        await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, repeat: true, paid: paysXp }).catch(() => {});
         await bumpQuestProgress(raterId, "farm_rate", 1).catch(() => {}); // the daily "rate a friend's farm" quest
         await syncEarnedBadges(ownerId).catch(() => {});
         const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-        return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, ...summary, charge };
+        return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, paidXp: paysXp, ...summary, charge };
     }
 
     if (existing) {
@@ -210,9 +275,12 @@ export async function rateFarm(raterId, ownerId, tier) {
             seedFound = await dropSeedFrom(raterId, "green_thumb").catch(() => null);
         }
     } catch { /* a seed is a bonus; never fail the rating */ }
-    await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
-    await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
-    await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t }).catch(() => {});
+    const paysXp = Number(slot.farm_rate_used) <= PAID_RATES_PER_DAY;
+    if (paysXp) {
+        await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
+        await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
+    }
+    await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, paid: paysXp }).catch(() => {});
     // Earned cosmetic: the "Kindred Spirit" border for a generous rater at 10 distinct farms rated (the row
     // was inserted just above, so this count includes it). Idempotent grant into mkt_cosmetic_unlock.
     const given = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE rater_id = $1`, [raterId]).catch(() => null);
@@ -221,7 +289,7 @@ export async function rateFarm(raterId, ownerId, tier) {
     await syncEarnedBadges(ownerId).catch(() => {}); // Well-Liked / Adored — the OWNER just received a rating
 
     const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: meta.raterXp, seedFound, ...summary, charge };
+    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: paysXp ? meta.raterXp : 0, paidXp: paysXp, seedFound, ...summary, charge };
 }
 
 // "N people rated your farm" welcome-back recap. Returns every unseen (new or revised) rating on your farm, plus

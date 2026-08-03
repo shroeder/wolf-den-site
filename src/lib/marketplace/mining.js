@@ -23,9 +23,11 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 // rather than minting a parallel currency. Ore tier maps straight onto part tier — that's the whole
 // "depending on the ore" rule, kept deliberately legible.
 //
-// OWNER-GATED. Every read and every write goes through MINING_UNLOCKED. Flip that one function to open it.
+// LAUNCHED 2026-08-03. Every read and write still goes through MINING_UNLOCKED — the gate stays as the single
+// switch, it just opens for every signed-in member now instead of only the owner. Keeping the function (rather
+// than deleting the checks) means the mine can be closed again in one line if it ever needs to be.
 
-export const MINING_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
+export const MINING_UNLOCKED = (buyerId) => Boolean(buyerId);
 
 // ── ORE TIERS ────────────────────────────────────────────────────────────────────────────────────────────────
 // Named for the rock, coloured up the usual rarity ladder. `part` is the forge part tier it smelts into, which

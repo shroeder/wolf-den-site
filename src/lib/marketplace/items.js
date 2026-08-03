@@ -588,29 +588,29 @@ export const ITEMS = [
     { id: "wg_axe", name: "Moonhowl Axe", slot: "main_hand", rarity: "rare", icon: "GiBattleAxe", flavor: "It hums under a full moon.", stats: { might: 13, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 979 },
 
     // ── THE DEPTHS SETS ── three sets, one per verb the Mine actually asks of you, carrying DEPTH affinity
-    // (see DEPTH_META). They are ownerOnly for exactly as long as the mine is: the same contract the sailing
-    // and farm gear shipped under, so unlaunched content can never leak into a chest or the auction house.
+    // (see DEPTH_META). They were ownerOnly until the mine launched; now they drop like any other gear, with
+    // the mine's own pool (featurePool) still the richest place to find them.
     //
     // Combat stats are deliberately MODEST — these are utility pieces. Wearing the full Delver's Kit should
     // make you better at the tunnel, not better at the boss, or the mine becomes the only way to gear up.
 
     // DELVING — the push-your-luck descent. Nerve keeps the roof up, Lodesense finds the good rock.
-    { id: "dv_lamp_helm", name: "Deeplamp Helm", slot: "helmet", rarity: "rare", icon: "GiMiningHelmet", flavor: "The flame gutters when the air goes bad. Listen to it.", stats: { ferocity: 6, fortune: 4 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 980 },
-    { id: "dv_rope_belt", name: "Knotted Descent Belt", slot: "belt", rarity: "rare", icon: "GiRope", flavor: "Forty feet of rope and every knot tied twice.", stats: { might: 5, ferocity: 5 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 981 },
-    { id: "dv_lodestone", name: "Lodestone Pendant", slot: "amulet", rarity: "epic", icon: "GiCompass", flavor: "It pulls toward the richest rock. Follow it, not your gut.", stats: { fortune: 9 }, depth: { lodesense: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 982 },
-    { id: "dv_shoring_pack", name: "Shoring Pack", slot: "back", rarity: "epic", icon: "GiBackpack", flavor: "Timber, wedges, and the discipline to stop and use them.", stats: { ferocity: 8, might: 4 }, depth: { nerve: 5, lodesense: 3 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 983 },
+    { id: "dv_lamp_helm", name: "Deeplamp Helm", slot: "helmet", rarity: "rare", icon: "GiMiningHelmet", flavor: "The flame gutters when the air goes bad. Listen to it.", stats: { ferocity: 6, fortune: 4 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", sort: 980 },
+    { id: "dv_rope_belt", name: "Knotted Descent Belt", slot: "belt", rarity: "rare", icon: "GiRope", flavor: "Forty feet of rope and every knot tied twice.", stats: { might: 5, ferocity: 5 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", sort: 981 },
+    { id: "dv_lodestone", name: "Lodestone Pendant", slot: "amulet", rarity: "epic", icon: "GiCompass", flavor: "It pulls toward the richest rock. Follow it, not your gut.", stats: { fortune: 9 }, depth: { lodesense: 5 }, reqLevel: 16, source: "mining", sort: 982 },
+    { id: "dv_shoring_pack", name: "Shoring Pack", slot: "back", rarity: "epic", icon: "GiBackpack", flavor: "Timber, wedges, and the discipline to stop and use them.", stats: { ferocity: 8, might: 4 }, depth: { nerve: 5, lodesense: 3 }, reqLevel: 16, source: "mining", sort: 983 },
 
     // MINING — the seam at the rock face. Hew is yield, Prospecting is what else the rock was hiding.
-    { id: "rb_maul", name: "Rockbreaker's Maul", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Not a weapon. It has simply never been told that.", stats: { might: 14 }, depth: { hew: 6 }, reqLevel: 14, source: "mining", ownerOnly: true, sort: 984 },
-    { id: "rb_gauntlet", name: "Hewer's Gauntlets", slot: "off_hand", rarity: "rare", icon: "GiGauntlet", flavor: "Leather worn to the shape of a haft.", stats: { might: 7, crit_power: 5 }, depth: { hew: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 985 },
-    { id: "rb_assay_ring", name: "Assayer's Ring", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "Rubbed on the stone, it tells you what you're standing in.", stats: { fortune: 10 }, depth: { prospect: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 986 },
-    { id: "rb_hobnails", name: "Hobnailed Treads", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Iron studs bite the scree so you don't.", stats: { ferocity: 9 }, depth: { prospect: 3, hew: 2 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 987 },
+    { id: "rb_maul", name: "Rockbreaker's Maul", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Not a weapon. It has simply never been told that.", stats: { might: 14 }, depth: { hew: 6 }, reqLevel: 14, source: "mining", sort: 984 },
+    { id: "rb_gauntlet", name: "Hewer's Gauntlets", slot: "off_hand", rarity: "rare", icon: "GiGauntlet", flavor: "Leather worn to the shape of a haft.", stats: { might: 7, crit_power: 5 }, depth: { hew: 4 }, reqLevel: 8, source: "mining", sort: 985 },
+    { id: "rb_assay_ring", name: "Assayer's Ring", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "Rubbed on the stone, it tells you what you're standing in.", stats: { fortune: 10 }, depth: { prospect: 5 }, reqLevel: 16, source: "mining", sort: 986 },
+    { id: "rb_hobnails", name: "Hobnailed Treads", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Iron studs bite the scree so you don't.", stats: { ferocity: 9 }, depth: { prospect: 3, hew: 2 }, reqLevel: 8, source: "mining", sort: 987 },
 
     // SMELTING — the furnace. Bellows is extra parts, Crucible is what survives the slag.
-    { id: "fd_apron", name: "Founder's Scale Apron", slot: "chest", rarity: "epic", icon: "GiLeatherVest", flavor: "Scarred by forty years of sparks and not one burn through.", stats: { ferocity: 10, might: 4 }, depth: { bellows: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 988 },
-    { id: "fd_tongs", name: "Long Crucible Tongs", slot: "off_hand", rarity: "epic", icon: "GiTongs", flavor: "Long enough to keep your eyebrows.", stats: { might: 6, crit_chance: 6 }, depth: { crucible: 5 }, reqLevel: 16, source: "mining", ownerOnly: true, sort: 989 },
-    { id: "fd_bellows_charm", name: "Bellows Charm", slot: "amulet", rarity: "rare", icon: "GiWindHole", flavor: "A scrap of the old forge's leather, kept for luck.", stats: { fortune: 7 }, depth: { bellows: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 990 },
-    { id: "fd_slagsifter", name: "Slagsifter's Ring", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Everyone else throws the clinker out.", stats: { fortune: 8 }, depth: { crucible: 4 }, reqLevel: 8, source: "mining", ownerOnly: true, sort: 991 },
+    { id: "fd_apron", name: "Founder's Scale Apron", slot: "chest", rarity: "epic", icon: "GiLeatherVest", flavor: "Scarred by forty years of sparks and not one burn through.", stats: { ferocity: 10, might: 4 }, depth: { bellows: 5 }, reqLevel: 16, source: "mining", sort: 988 },
+    { id: "fd_tongs", name: "Long Crucible Tongs", slot: "off_hand", rarity: "epic", icon: "GiTongs", flavor: "Long enough to keep your eyebrows.", stats: { might: 6, crit_chance: 6 }, depth: { crucible: 5 }, reqLevel: 16, source: "mining", sort: 989 },
+    { id: "fd_bellows_charm", name: "Bellows Charm", slot: "amulet", rarity: "rare", icon: "GiWindHole", flavor: "A scrap of the old forge's leather, kept for luck.", stats: { fortune: 7 }, depth: { bellows: 4 }, reqLevel: 8, source: "mining", sort: 990 },
+    { id: "fd_slagsifter", name: "Slagsifter's Ring", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Everyone else throws the clinker out.", stats: { fortune: 8 }, depth: { crucible: 4 }, reqLevel: 8, source: "mining", sort: 991 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────

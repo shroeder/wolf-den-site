@@ -89,6 +89,7 @@ export const TOWN_BUILDINGS = [
     { id: "farm", emoji: "🌾", label: "The Farm", href: "/marketplace/farm", x: 70 },
     { id: "vault", emoji: "🏦", label: "The Vault", href: "/marketplace/credit", x: 81 },
     { id: "festival", emoji: "🎪", label: "Festival Stage", href: "/marketplace/track", x: 92 },
+    { id: "mine", emoji: "⛏️", label: "The Mine", href: "/marketplace/mining", x: 103 },
 ];
 
 // Buildings that only some members can see. The Kitchen is owner-gated while the design settles, and the town

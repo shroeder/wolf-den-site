@@ -575,7 +575,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         // "admire them again" is by definition tapping the same tier you last gave — this guard used to
         // swallow exactly that tap and never reach the server.
         if (R.myTier === tier && R.ratedToday) return;
-        if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new, repeat OR change all need a charge
+        if ((R.charge?.left ?? 0) <= 0) { setRateNote(`You've rated ${R.charge?.allowance ?? 20} farms today — that's the daily limit. Back tomorrow.`); return; } // new, repeat OR change all need a charge
         setRateBusy(true);
         setRateNote(null);
         const r = await post({ action: "rate", tier, owner: farm.owner?.alias });
@@ -886,6 +886,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
                 .farm-rank { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.35); background: linear-gradient(180deg, rgba(255,214,110,0.14), rgba(255,255,255,0.02) 60%); }
                 .farm-rank-crest { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; font-weight: 900; color: #3a2c08; background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); }
+                /* Unranked is a real state, not an error — nobody has visited yet. Read it as quiet, not broken. */
+                .farm-rank.is-unranked { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); }
+                .farm-rank.is-unranked .farm-rank-crest { color: #9aa2ab; background: rgba(255,255,255,0.06); box-shadow: none; }
+                /* Top of the board gets to glow. */
+                .farm-rank.is-first { border-color: rgba(255,214,110,0.75); box-shadow: 0 0 26px rgba(255,196,60,0.28); }
+                .farm-rank.is-first .farm-rank-crest { animation: farmRankShine 2.2s ease-in-out infinite; }
+                @keyframes farmRankShine { 0%,100% { box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); } 50% { box-shadow: 0 3px 0 #b57f22, 0 0 26px rgba(255,214,110,0.95); } }
                 .farm-rank-body { flex: 1; min-width: 0; }
                 .farm-rank-top { display: flex; align-items: baseline; gap: 8px; }
                 .farm-rank-label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #cdb98a; }
@@ -934,7 +941,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             ) : null}
 
-            {farm.mine && farm.rating ? <FarmRankBadge byTier={farm.rating.byTier} /> : null}
+            {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
 
             {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
 
@@ -1735,29 +1742,59 @@ function ChargeDots({ left, allowance }) {
 
 // Farm-rating card: a polished, juicy way to Like / Love / Admire a friend's farm (or, on your own farm, a
 // clean tally of the love you've received). Big tier buttons with an active glow + lift + burst; charge dots.
-// Farm Rank — a dopamine progression from the tier-weighted likes your farm has earned (like 1 · love 2 · admire 3).
-const FARM_RANKS = [
-    { min: 0, name: "New Sprout" }, { min: 3, name: "Seedling Plot" }, { min: 8, name: "Budding Homestead" },
-    { min: 18, name: "Growing Farmstead" }, { min: 35, name: "Thriving Farm" }, { min: 60, name: "Bountiful Estate" },
-    { min: 100, name: "Grand Plantation" }, { min: 160, name: "Legendary Grange" }, { min: 260, name: "Mythic Cornucopia" },
-];
-function FarmRankBadge({ byTier = {} }) {
-    const score = (byTier[1] || 0) + (byTier[2] || 0) * 2 + (byTier[3] || 0) * 3;
-    let idx = 0;
-    for (let i = 0; i < FARM_RANKS.length; i += 1) if (score >= FARM_RANKS[i].min) idx = i;
-    const cur = FARM_RANKS[idx];
-    const next = FARM_RANKS[idx + 1] || null;
-    const pct = next ? Math.max(4, Math.min(100, Math.round(((score - cur.min) / (next.min - cur.min)) * 100))) : 100;
+// ── FARM RANK — WHERE YOU PLACE ──────────────────────────────────────────────────────────────────────────────
+// This was a ladder of fixed thresholds: 35 points is a "Thriving Farm", 60 a "Bountiful Estate". That is a
+// solo progress bar wearing the word "rank" — it never told you how your farm compares to anyone else's, which
+// is the only question a rank is ever asked, and with static thresholds the whole Den eventually shares the
+// same title and the ladder stops meaning anything.
+//
+// It is a standings position now: 2nd of 40, computed in SQL over everyone's tier-weighted score. A number
+// that only moves when other people's farms are loved more or less than yours.
+const ordinal = (n) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+// A title for the TOP of the standings only — being 1st should be worth something to say out loud.
+const placeTitle = (place, ranked) => {
+    if (place === 1) return "Most-loved farm in the Den";
+    if (place === 2) return "Runner-up";
+    if (place === 3) return "Third on the board";
+    if (ranked >= 10 && place <= Math.ceil(ranked * 0.1)) return "Top 10% of farms";
+    if (ranked >= 4 && place <= Math.ceil(ranked / 2)) return "Upper half of the board";
+    return "On the board";
+};
+function FarmRankBadge({ standings }) {
+    const { place = null, ranked = 0, score = 0, toNext = null } = standings || {};
+    if (!place) {
+        return (
+            <div className="farm-rank is-unranked">
+                <div className="farm-rank-crest">—</div>
+                <div className="farm-rank-body">
+                    <div className="farm-rank-top">
+                        <span className="farm-rank-label">Farm Rank</span>
+                        <b className="farm-rank-name">Unranked</b>
+                    </div>
+                    <span className="farm-rank-next">No ratings yet — visit friends&rsquo; farms and they&rsquo;ll come back to yours.</span>
+                </div>
+            </div>
+        );
+    }
+    // The bar shows how far up the board you are, not progress toward a threshold — full at 1st, empty at last.
+    const pct = ranked > 1 ? Math.max(4, Math.round(((ranked - place) / (ranked - 1)) * 100)) : 100;
     return (
-        <div className="farm-rank">
-            <div className="farm-rank-crest">{idx + 1}</div>
+        <div className={`farm-rank${place === 1 ? " is-first" : ""}`}>
+            <div className="farm-rank-crest">{place === 1 ? "🥇" : place === 2 ? "🥈" : place === 3 ? "🥉" : ordinal(place)}</div>
             <div className="farm-rank-body">
                 <div className="farm-rank-top">
                     <span className="farm-rank-label">Farm Rank</span>
-                    <b className="farm-rank-name">{cur.name}</b>
+                    <b className="farm-rank-name">{placeTitle(place, ranked)}</b>
                 </div>
                 <div className="farm-rank-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
-                <span className="farm-rank-next">{next ? `${next.min - score} more to ${next.name} — earn ratings from friends` : "Top rank — a legend of the land!"}</span>
+                <span className="farm-rank-next">
+                    {ordinal(place)} of {ranked} farm{ranked === 1 ? "" : "s"} · {score} love
+                    {toNext != null ? ` · ${toNext} more to catch ${ordinal(place - 1)}` : place === 1 ? " · nobody above you" : ""}
+                </span>
             </div>
         </div>
     );
@@ -1850,6 +1887,11 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
     const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null, ratedToday = false } = rating || {};
     const left = charge?.left ?? 0;
     const allowance = charge?.allowance ?? 3;
+    // Only the first few ratings a day pay XP; the rest still count for the farm's tally and its place on the
+    // board. Twenty dots would be nonsense, so the dots now track the PAID window and the plain count carries
+    // the rest.
+    const paidLeft = charge?.paidLeft ?? 0;
+    const paidAllowance = charge?.paidAllowance ?? 3;
     const totalLove = (byTier[1] || 0) + (byTier[2] || 0) + (byTier[3] || 0);
     const card = { borderRadius: 16, padding: "13px 15px", border: "1px solid rgba(255,215,94,0.26)", background: "linear-gradient(155deg, rgba(255,215,94,0.11), rgba(255,111,174,0.06) 62%, rgba(255,255,255,0.02))", boxShadow: "0 6px 22px rgba(0,0,0,0.28)" };
     const tallyPills = (
@@ -1883,7 +1925,12 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                 {/* You can come back tomorrow — say so, rather than leaving three live-looking buttons that
                     would only spend a charge to change your mind. */}
                 {ratedToday ? <span className="muted" style={{ fontSize: 11.5 }}>· rated today, again tomorrow</span> : null}
-                <span style={{ marginLeft: "auto" }}><ChargeDots left={left} allowance={allowance} /></span>
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7 }}>
+                    {paidLeft > 0
+                        ? <ChargeDots left={paidLeft} allowance={paidAllowance} />
+                        : <span className="muted" style={{ fontSize: 10.5, fontWeight: 800 }}>XP done for today</span>}
+                    <span className="muted" style={{ fontSize: 11, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{left}/{allowance} left</span>
+                </span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {RATE_TIER_UI.map((t) => {
@@ -1897,7 +1944,8 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                         <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active}
                             title={spentToday ? `${t.label} — given today, come back tomorrow`
                                 : left <= 0 ? "No ratings left today"
-                                    : active ? `${t.label} again` : `${t.label} this farm`}
+                                    : paidLeft <= 0 ? `${t.label} this farm — counts toward their rank (no XP left today)`
+                                        : active ? `${t.label} again` : `${t.label} this farm`}
                             style={{ position: "relative", overflow: "visible", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "11px 6px 8px", borderRadius: 14, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.45 : 1, WebkitTapHighlightColor: "transparent",
                                 border: `1.5px solid ${active ? t.color : "rgba(255,255,255,0.12)"}`, color: "inherit",
                                 background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}30, ${t.color}0f)` : "rgba(255,255,255,0.03)",

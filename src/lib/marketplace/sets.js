@@ -114,10 +114,9 @@ export const ITEM_SETS = [
         weakness: null,
     },
     // ── DEPTHS SETS ── one per verb the Mine asks of you. Bonuses are DEPTH affinity (see items.js DEPTH_META),
-    // never boss power, and the capstones are mine-only powers read in mining.js. ownerOnly for as long as the
-    // mine is — same contract the sailing and farm sets shipped under.
+    // never boss power, and the capstones are mine-only powers read in mining.js.
     {
-        id: "delver", name: "Delver's Kit", ownerOnly: true,
+        id: "delver", name: "Delver's Kit",
         items: ["dv_lamp_helm", "dv_rope_belt", "dv_lodestone", "dv_shoring_pack"],
         bonuses: [{ need: 2, depth: { nerve: 3 } }, { need: 4, depth: { nerve: 5, lodesense: 4 } }],
         // The push-your-luck loop's dream: one free mistake. You still collapse — you just walk away with the
@@ -126,14 +125,14 @@ export const ITEM_SETS = [
         weakness: null,
     },
     {
-        id: "rockbreaker", name: "Rockbreaker's Rig", ownerOnly: true,
+        id: "rockbreaker", name: "Rockbreaker's Rig",
         items: ["rb_maul", "rb_gauntlet", "rb_assay_ring", "rb_hobnails"],
         bonuses: [{ need: 2, depth: { hew: 4 } }, { need: 4, depth: { hew: 6, prospect: 4 } }],
         capstone: { depthRichSeam: 0.15, desc: "Rich Seam: a 15% chance a cracked seam pays its ore TWICE." },
         weakness: null,
     },
     {
-        id: "founder", name: "Founder's Regalia", ownerOnly: true,
+        id: "founder", name: "Founder's Regalia",
         items: ["fd_apron", "fd_tongs", "fd_bellows_charm", "fd_slagsifter"],
         bonuses: [{ need: 2, depth: { bellows: 4 } }, { need: 4, depth: { bellows: 5, crucible: 5 } }],
         capstone: { depthFreeSmelt: 0.18, desc: "Cold Crucible: an 18% chance a smelt costs you no ore at all." },

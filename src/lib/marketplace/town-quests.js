@@ -63,15 +63,15 @@ const QUEST_POOL = {
     ] },
     // The mine's three verbs. The Quartermaster could not ask for any of them before — the whole feature was
     // invisible to both quest systems because mining.js never bumped a metric.
-    delver: { ownerOnly: true, emoji: "🪜", variants: [
+    delver: { emoji: "🪜", variants: [
         { label: "Into the Dark", desc: "Take 6 steps down the tunnel", target: 6, gold: 130 },
         { label: "Bottom of the Shaft", desc: "Take 12 steps down the tunnel", target: 12, gold: 280 },
     ] },
-    collier: { ownerOnly: true, emoji: "⛏️", variants: [
+    collier: { emoji: "⛏️", variants: [
         { label: "Swing a Pick", desc: "Crack open 2 seams", target: 2, gold: 120 },
         { label: "Day at the Face", desc: "Crack open 5 seams", target: 5, gold: 250 },
     ] },
-    founder: { ownerOnly: true, emoji: "🔥", variants: [
+    founder: { emoji: "🔥", variants: [
         { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 120 },
         { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 240 },
     ] },
