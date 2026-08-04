@@ -65,7 +65,13 @@ export default function GuideStrip() {
         return () => clearInterval(t);
     }, [show, here, load]);
 
-    if (!show || !g?.signedIn) return null;
+    // NOTHING TO SAY, NOTHING ON SCREEN. With every open chapter finished this sat on every page of the game
+    // reading "You know the place" over a full bar, forever — a banner whose only content was that it had no
+    // content. The strip exists to point at the next thing; when there is no next thing it gets out of the way.
+    //
+    // It is not gone for good: it comes back on its own the moment a step exists again — a chapter unlocking at
+    // a higher level, or a new one shipping — and the Guide sits in the nav the whole time regardless.
+    if (!show || !g?.signedIn || !step) return null;
     const pct = g.totals?.steps ? Math.round((g.totals.doneSteps / g.totals.steps) * 100) : 0;
     const tint = g.current?.tint || "#ffd75e";
 
@@ -77,13 +83,13 @@ export default function GuideStrip() {
             ) : <span className="gs-emblem" />}
             <span className="gs-body">
                 <span className="gs-kicker">
-                    {!step ? "The Pathfinder" : here ? "You're in the right place" : `Next · ${g.current.name}`}
+                    {here ? "You're in the right place" : `Next · ${g.current.name}`}
                 </span>
-                <b className="gs-label">{step ? step.label : "You know the place"}</b>
+                <b className="gs-label">{step.label}</b>
                 <span className="gs-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
             </span>
             <span className="gs-right">
-                {step ? <span className="gs-pay">+{Number(step.gold).toLocaleString()}</span> : null}
+                <span className="gs-pay">+{Number(step.gold).toLocaleString()}</span>
                 {here ? null : <span className="gs-chev" aria-hidden="true" />}
             </span>
         </>
@@ -99,7 +105,7 @@ export default function GuideStrip() {
         );
     }
     return (
-        <Link className="gs" href={step ? step.href : "/marketplace/guide"} style={{ "--tint": tint }}>
+        <Link className="gs" href={step.href} style={{ "--tint": tint }}>
             {body}
             <Styles />
         </Link>
