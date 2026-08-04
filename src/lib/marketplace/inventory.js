@@ -459,12 +459,34 @@ export async function redeemCharge(buyerId, itemId, { by = "admin", note = null 
     if (!owned) return { ok: false, error: "not_owned" };
     const state = chargeState(owned, item);
     if (!state.available) return { ok: false, error: state.left <= 0 ? "no_charges" : "on_cooldown", cooldownUntil: state.cooldownUntil };
-    await db.query(`UPDATE mkt_user_item SET charges_left = charges_left - 1, last_charge_at = NOW() WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]);
+
+    // CHECK-THEN-ACT, and these are REAL-WORLD rewards — a free pack, a playmat, a tournament seat. The read
+    // above and the write below were separate, and the write carried no guard of its own: two taps landing
+    // together in the admin app both passed the JS check off the same stale row, both decremented, and the
+    // member walked out with two of something they owned one of. charges_left could even go negative.
+    //
+    // The UPDATE is now the authority. The cooldown is in the WHERE too, expressed against last_charge_at in
+    // SQL rather than compared in JS, so a second tap inside the cooldown window loses the race in the
+    // database instead of being waved through by a clock that was read a moment ago.
+    const spent = await db.queryOne(
+        `UPDATE mkt_user_item
+            SET charges_left = charges_left - 1, last_charge_at = NOW()
+          WHERE buyer_id = $1 AND item_id = $2 AND charges_left > 0
+            AND (last_charge_at IS NULL OR last_charge_at <= NOW() - ($3 || ' days')::interval)
+          RETURNING charges_left`,
+        [buyerId, itemId, Math.max(0, item.cooldownDays || 0)]
+    ).catch(() => null);
+    if (!spent) {
+        // Lost the race. Re-read so the caller is told which of the two reasons it actually was.
+        const now = await db.queryOne(`SELECT charges_left, last_charge_at FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+        const s2 = chargeState(now, item);
+        return { ok: false, error: (s2?.left ?? 0) <= 0 ? "no_charges" : "on_cooldown", cooldownUntil: s2?.cooldownUntil ?? null };
+    }
     await db.query(
         `INSERT INTO mkt_item_redemption (buyer_id, item_id, reward, reward_label, redeemed_by, note) VALUES ($1, $2, $3, $4, $5, $6)`,
         [buyerId, itemId, item.chargeReward, item.chargeRewardLabel, by, note]
     ).catch(() => {});
-    return { ok: true, chargesLeft: Math.max(0, state.left - 1), reward: item.chargeRewardLabel };
+    return { ok: true, chargesLeft: Math.max(0, Number(spent.charges_left) || 0), reward: item.chargeRewardLabel };
 }
 
 // Members holding charged items, for the admin redemption browser. `q` matches name/alias/email.
