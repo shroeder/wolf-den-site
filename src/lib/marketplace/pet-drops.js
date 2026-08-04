@@ -31,19 +31,49 @@ async function grantDrop(buyerId, pet, source, meta) {
     return { id: pet.id, name: pet.name, rarity: pet.rarity, color: pet.color, hint: pet.hint || null };
 }
 
-// A chance at a chest-source pet when opening a chest — the rarer the chest, the deeper the pet pool.
+// ── A PET OUT OF A CHEST ─────────────────────────────────────────────────────────────────────────────────────
+// This was 12% on a WOODEN chest rising to 30% — one pet every three to eight chests. Chests come from the
+// wheel, the boss, quests, the mine, digging and the merchant, so that is not a chase, it is a drip: 98 of the
+// 103 pets ever obtained in the Den came out of chests, against 3 from fishing, 2 from the boss and 0 from
+// raids. Every other pet source is tuned as a prestige trophy and this one was handing them out by the fistful.
+//
+// Worse, it front-loads. The pool is un-owned pets only, so the chance never falls but the pool empties — you
+// get a flood and then permanent silence, which is the least satisfying shape a collection can have.
+//
+// Now: 2% on a wooden chest, climbing to 12% on a primordial. A pet becomes a reason to save the good chests
+// rather than something that falls out of the cheap ones.
+const CHEST_PET_BASE = 0.02;   // wooden
+const CHEST_PET_STEP = 0.015;  // per tier above wooden
+const CHEST_PET_CAP = 0.12;    // primordial
+
+// Pet RARITY was decorative: the picker took a uniform pick over everything eligible, so a legendary Octopus
+// was exactly as likely as a common Reef Fish. Weighted now, so the rarity printed on the card means something.
+const PET_RARITY_WEIGHT = { common: 100, rare: 45, epic: 18, legendary: 6, mythic: 3, ascendant: 2, eternal: 1 };
+
 export async function maybeGrantChestPet(buyerId, openedTier) {
     if (!buyerId) return null;
     const openedIdx = CHEST_TIER_ORDER.indexOf(openedTier);
     if (openedIdx < 0) return null;
-    const chance = Math.min(0.3, 0.12 + openedIdx * 0.02);
+    const chance = Math.min(CHEST_PET_CAP, CHEST_PET_BASE + openedIdx * CHEST_PET_STEP);
     if (Math.random() > chance) return null;
     const owned = await ownedPetSet(buyerId);
     const eligible = COLLECTIBLES.filter(unlocked(buyerId))
         .filter((p) => p.source === "chest" && CHEST_TIER_ORDER.indexOf(p.chestTier) <= openedIdx && !owned.has(p.id));
     if (!eligible.length) return null;
-    const pet = eligible[Math.floor(Math.random() * eligible.length)];
+    const pet = pickWeighted(eligible);
     return grantDrop(buyerId, pet, "chest", { tier: openedTier });
+}
+
+/** Weighted pick over a pet pool by rarity. Falls back to a uniform pick if every weight is unknown. */
+function pickWeighted(pool) {
+    const total = pool.reduce((n, p) => n + (PET_RARITY_WEIGHT[p.rarity] || 1), 0);
+    if (total <= 0) return pool[Math.floor(Math.random() * pool.length)];
+    let roll = Math.random() * total;
+    for (const p of pool) {
+        roll -= PET_RARITY_WEIGHT[p.rarity] || 1;
+        if (roll <= 0) return p;
+    }
+    return pool[pool.length - 1];
 }
 
 // A top boss dealer has a SMALL chance at a boss-only pet. Deliberately stingy (was 60% → too many
