@@ -74,14 +74,20 @@ const CHEST_ART = {
 };
 
 export default function DelveRun({ run, busy, onAct }) {
-    const logEnd = useRef(null);
+    const logBox = useRef(null);
     const [floats, setFloats] = useState([]);  // damage / heal numbers flying off the stage
     const [shake, setShake] = useState(0);     // 1 = you connected, 2 = you got hit
     const [flash, setFlash] = useState(null);
     const prev = useRef({ hp: run.hp, foeHp: run.foe?.hp ?? null, floor: run.floor, logLen: run.log?.length ?? 0, resultAt: null });
 
-    // Keep the newest line in view — the log is the only record of a floor once you have left it.
-    useEffect(() => { logEnd.current?.scrollIntoView({ block: "nearest" }); }, [run.log?.length]);
+    // Keep the newest line in view by scrolling the LOG BOX, never the page. This was
+    // `logEnd.scrollIntoView()`, and scrollIntoView walks up every scrollable ancestor — including the document
+    // — so every single tap yanked the window down to the log and left the stage half off the top of the
+    // screen. The one place you want to be looking is the place it scrolled away from.
+    useEffect(() => {
+        const el = logBox.current;
+        if (el) el.scrollTop = el.scrollHeight;
+    }, [run.log?.length]);
 
     const pop = useCallback((text, tone2) => {
         const id = Math.random().toString(36).slice(2);
@@ -267,11 +273,10 @@ export default function DelveRun({ run, busy, onAct }) {
             <p className="dlr-note">Fall down here and you still keep everything above. There is no way back up.</p>
 
             {run.log?.length ? (
-                <div className="dlr-log">
+                <div className="dlr-log" ref={logBox}>
                     {run.log.slice(-14).map((l, i) => (
                         <div key={i} className={`dlr-line is-${l.kind}`}><b>F{l.floor}</b> {l.text}</div>
                     ))}
-                    <div ref={logEnd} />
                 </div>
             ) : null}
 
