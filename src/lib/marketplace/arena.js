@@ -16,6 +16,11 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // exactly as the mine and the dungeons did.
 export const ARENA_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
 
+// Flip BOTH of these together when the arena opens. The podium hands out real chests on a nightly cron, and
+// every member already holds a seeded position — so while the feature is owner-gated it would be paying people
+// for a ladder they cannot open and never entered.
+export const ARENA_PUBLIC = false;
+
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // Ten, not three. Three was set when the ladder was a bottom-up grind and every fight was progress; on a
 // CHALLENGE ladder you are picking opponents who can actually beat you, so losing one shouldn't cost a third of
@@ -272,7 +277,11 @@ export const PODIUM = [
 
 // ── WHAT HAPPENED WHILE YOU WERE AWAY ────────────────────────────────────────────────────────────────────────
 // The arena is asynchronous: you are challenged while you are asleep. Without this a member just finds their
-// position changed and no explanation anywhere in the game. Everything since they last looked.
+// position changed and no explanation anywhere in the game.
+//
+// DEFENCES ONLY. It listed your own challenges too, so it popped up telling you about a fight you had just
+// watched, won, and read a full recap of thirty seconds earlier. This screen is for what you DON'T already
+// know: somebody came for your spot while you weren't looking.
 async function awayReport(buyerId, row) {
     const since = row?.last_seen_at || null;
     const rows = await db.query(
@@ -282,25 +291,19 @@ async function awayReport(buyerId, row) {
            FROM mkt_arena_bout ab
            JOIN mkt_buyer bc ON bc.id = ab.challenger_id
            JOIN mkt_buyer bd ON bd.id = ab.defender_id
-          WHERE (ab.challenger_id = $1 OR ab.defender_id = $1)
+          WHERE ab.defender_id = $1
             AND ($2::timestamptz IS NULL OR ab.created_at > $2)
           ORDER BY ab.created_at DESC LIMIT 12`,
         [buyerId, since]
     ).catch(() => []);
     if (!rows.length) return null;
-    return rows.map((r) => {
-        const defending = String(r.defender_id) === String(buyerId);
-        const them = defending
-            ? { name: r.c_name || r.c_alias, sprite: r.c_sprite }
-            : { name: r.d_name || r.d_alias, sprite: r.d_sprite };
-        return {
-            defending,
-            them,
-            won: defending ? !r.challenger_won : r.challenger_won,
-            myPos: defending ? r.defender_pos : r.challenger_pos,
-            rounds: r.rounds,
-        };
-    });
+    return rows.map((r) => ({
+        defending: true,
+        them: { name: r.c_name || r.c_alias, sprite: r.c_sprite },
+        won: !r.challenger_won,          // you held the spot if the challenger lost
+        myPos: r.defender_pos,
+        rounds: r.rounds,
+    }));
 }
 
 /** Mark the away report read, so it is shown once and not on every visit. */
@@ -407,13 +410,32 @@ async function finishBout(buyerId, row, b, won) {
     // ── TAKING THE SPOT ──────────────────────────────────────────────────────────────────────────────────
     // Beat somebody above you and you SWAP positions with them. That is the whole point of a challenge
     // ladder: standing is something you take off a specific person, not a counter that only goes up.
+    let swapped = false;
     if (won) {
         const r = winReward(myPos, foePos);
         reward = { gold: r.gold, xp: r.xp };
-        // Both writes are guarded on the position still being what we believed it was, so two bouts resolving at
-        // once can't leave two people holding the same rung.
-        await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [b.foe.id, myPos, foePos]).catch(() => {});
-        await db.query(`UPDATE mkt_arena SET position = $2, best_position = LEAST(COALESCE(best_position, $2), $2) WHERE buyer_id = $1 AND position = $3`, [buyerId, foePos, myPos]).catch(() => {});
+        // ── THE SWAP, VIA A PARKING SPACE ────────────────────────────────────────────────────────────────
+        // position carries a UNIQUE INDEX, so moving the loser onto your place while you are still standing on
+        // it violates it immediately — Postgres checks a unique index per row, not at end of statement, and a
+        // plain unique INDEX cannot be deferred. The first cut did exactly that and wrapped both writes in
+        // `.catch(() => {})`, so NEITHER landed and it failed in total silence: you won, the recap said 12 → 11,
+        // and the ladder never moved.
+        //
+        // So the challenger parks on the negative of their own position first. Negative-of-position is unique
+        // per rung, so two swaps resolving at once cannot collide in the parking space either.
+        const parked = await db.queryOne(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3 RETURNING buyer_id`, [buyerId, -myPos, myPos]).catch(() => null);
+        if (parked) {
+            const moved = await db.queryOne(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3 RETURNING buyer_id`, [b.foe.id, myPos, foePos]).catch(() => null);
+            if (moved) {
+                const took = await db.queryOne(
+                    `UPDATE mkt_arena SET position = $2, best_position = LEAST(COALESCE(best_position, $2), $2)
+                      WHERE buyer_id = $1 AND position = $3 RETURNING position`, [buyerId, foePos, -myPos]
+                ).catch(() => null);
+                swapped = Boolean(took);
+            }
+            // Whatever happened, never leave anybody parked on a negative rung.
+            if (!swapped) await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [buyerId, myPos, -myPos]).catch(() => {});
+        }
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, r.gold]).catch(() => null);
         await logCoin(buyerId, r.gold, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
@@ -423,7 +445,10 @@ async function finishBout(buyerId, row, b, won) {
 
     const size = b.size || 0;
     const posFrom = myPos;
-    const posTo = won ? foePos : myPos;
+    // Read the position BACK rather than assuming the swap worked. The recap is the only thing telling somebody
+    // what changed; it has to report what actually happened, not what was intended.
+    const after = await db.queryOne(`SELECT position FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    const posTo = Number(after?.position) || (won && swapped ? foePos : myPos);
     // Rank bands read off how many of the pack you are ABOVE, so position 1 of 84 is Alpha.
     const wasRank = rankFor(Math.max(0, size - posFrom), size);
     const nowRank = rankFor(Math.max(0, size - posTo), size);
@@ -452,7 +477,7 @@ async function finishBout(buyerId, row, b, won) {
     await db.query(
         `INSERT INTO mkt_arena_bout (challenger_id, defender_id, challenger_won, challenger_pos, defender_pos, rounds)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [buyerId, b.foe.id, won, posTo, won ? myPos : foePos, (b.log || []).length]
+        [buyerId, b.foe.id, won, posTo, won && swapped ? myPos : foePos, (b.log || []).length]
     ).catch(() => {});
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { from: posFrom, to: posTo, foe: b.foe.id }).catch(() => {});
@@ -463,6 +488,11 @@ async function finishBout(buyerId, row, b, won) {
 // First, second and third at the end of the day take a gold, iron and wooden chest. Idempotent per day via
 // prize_day, so running the cron twice cannot pay twice.
 export async function payArenaPodium() {
+    // NOT WHILE THE ARENA IS OWNER-GATED. Every member was seeded a position so the ladder exists on day one,
+    // but they cannot open the feature — paying the top three a chest tonight would hand out real rewards for
+    // something nobody can play, to people who never entered. The gate is the same one the rest of the arena
+    // reads, so opening the arena opens the podium with it and this needs no second switch.
+    if (!ARENA_PUBLIC) return { ok: true, skipped: "arena_not_public", paid: [] };
     const day = await db.queryOne(`SELECT ${DAY}::text AS d`).catch(() => null);
     if (!day?.d) return { ok: false, error: "no_day" };
     const top = await db.query(
