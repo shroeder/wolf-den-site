@@ -219,6 +219,7 @@ function publicBout(b) {
     return {
         foe: b.foe, round: b.round, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
+        recap: b.recap || null,
         reward: b.reward || null,
     };
 }
@@ -313,11 +314,27 @@ async function finishBout(buyerId, row, b, won) {
         reward = { gold, xp, chest };
     }
     b.reward = reward;
-    // Did that win cross a band? Worked out here, where both the before and after are known for certain.
+    // ── THE RECAP ────────────────────────────────────────────────────────────────────────────────────────
+    // Everything that changed, worked out HERE where the before and the after are both known for certain.
+    // Without it the result card said "you beat Miles, +74 gold" and nothing else — your rung moved, your rank
+    // bar moved, your streak moved, and the next opponent got harder, so winning read like sliding backwards.
     const size = b.ladderSize || 0;
-    const wasRank = rankFor(b.rung, size);
-    const nowRank = rankFor(b.rung + (won ? 1 : 0), size);
+    const rungFrom = b.rung;
+    const rungTo = b.rung + (won ? 1 : 0);
+    const wasRank = rankFor(rungFrom, size);
+    const nowRank = rankFor(rungTo, size);
     b.rankUp = won && nowRank.key !== wasRank.key ? { from: wasRank.name, to: nowRank.name, icon: nowRank.icon, color: nowRank.color } : null;
+    const streakNow = won ? (Number(row?.streak) || 0) + 1 : 0;
+    b.recap = {
+        won, foe: b.foe, reward,
+        rungFrom, rungTo, ladderSize: size,
+        rank: { name: nowRank.name, icon: nowRank.icon, color: nowRank.color, into: nowRank.into, span: nowRank.span, next: nowRank.next?.name || null },
+        rankUp: b.rankUp,
+        streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
+        rounds: (b.log || []).length,
+        // What is waiting on the new rung, so "what changed" includes what comes next.
+        remaining: Math.max(0, size - rungTo),
+    };
     // A loss costs the attempt and the streak, and nothing else. It never sends you back down a rung — the
     // ladder is something you climb, not something that can push you off.
     await db.query(

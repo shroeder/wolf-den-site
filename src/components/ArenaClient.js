@@ -62,9 +62,101 @@ function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down }) {
     );
 }
 
+// ── WHAT JUST CHANGED ────────────────────────────────────────────────────────────────────────────────────────
+// A results modal, always, win or lose. The old card said "You beat Miles, +74 gold" and stopped — but your
+// rung moved, your rank bar moved, your streak moved and the next opponent got harder. Winning therefore read
+// like sliding backwards, which is the exact opposite of what a ladder is for. This recaps every one of those,
+// and the rung counts UP in front of you rather than being a number you are expected to have memorised.
+function Recap({ bout, busy, onClose }) {
+    const r = bout.recap;
+    const up = r?.rankUp || null;
+    const tint = up ? up.color : r?.rank?.color || (bout.won ? "#ffd75e" : "#ff6f7d");
+    const [shown, setShown] = useState(r ? r.rungFrom : 0);
+    useEffect(() => {
+        if (!r || shown >= r.rungTo) return undefined;
+        const t = setTimeout(() => setShown((n) => n + 1), 520);
+        return () => clearTimeout(t);
+    }, [r, shown]);
+
+    // A bout finished before the recap existed still has to be dismissable.
+    if (!r) {
+        return (
+            <div className={`ar-result ${bout.won ? "is-win" : "is-loss"}`}>
+                <b>{bout.won ? `You beat ${bout.foe.name}` : `${bout.foe.name} put you down`}</b>
+                <button type="button" className="ar-btn" disabled={busy} onClick={onClose}>Back to the ladder</button>
+            </div>
+        );
+    }
+    const pct = r.rank.span ? Math.min(100, (r.rank.into / r.rank.span) * 100) : 0;
+
+    return (
+        <div className="ar-recap" role="dialog" aria-modal="true" style={{ "--tint": tint }}>
+            <div className="ar-recap-card">
+                <div className="ar-rays" aria-hidden="true">
+                    {Array.from({ length: up ? 24 : 14 }).map((_, i) => (
+                        <span key={i} style={{ "--a": `${i * (360 / (up ? 24 : 14))}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />
+                    ))}
+                </div>
+
+                <span className="ar-recap-kick">{bout.won ? "Victory" : "Defeated"}</span>
+                <b className="ar-recap-title">{bout.won ? `You beat ${r.foe.name}` : `${r.foe.name} put you down`}</b>
+                <p className="ar-recap-sub">{r.rounds} round{r.rounds === 1 ? "" : "s"} in the ring</p>
+
+                {/* THE CLIMB — the number that was missing. */}
+                <div className="ar-climb">
+                    <span className="ar-climb-lab">Rung</span>
+                    <span className="ar-climb-num">
+                        <i className="was">{r.rungFrom}</i>
+                        {r.rungTo !== r.rungFrom ? <i className="arrow" aria-hidden="true" /> : null}
+                        {r.rungTo !== r.rungFrom ? <i className="now">{shown}</i> : null}
+                    </span>
+                    <span className="ar-climb-of">of {r.ladderSize}</span>
+                </div>
+
+                {up ? (
+                    <div className="ar-recap-rankup">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={up.icon} alt="" draggable="false" />
+                        <div>
+                            <span>Rank up</span>
+                            <b>{up.to}</b>
+                            <em>You were {up.from}.</em>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="ar-recap-rank">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={r.rank.icon} alt="" draggable="false" />
+                        <div>
+                            <b>{r.rank.name}</b>
+                            <span className="ar-recap-bar"><i style={{ width: `${pct}%` }} /></span>
+                            <em>{r.rank.next ? `${Math.max(0, r.rank.span - r.rank.into)} more to ${r.rank.next}` : "Top of the pack."}</em>
+                        </div>
+                    </div>
+                )}
+
+                <div className="ar-recap-rows">
+                    {r.reward ? (
+                        <>
+                            <span><i>Gold</i><b>+{money(r.reward.gold)}</b></span>
+                            <span><i>XP</i><b>+{money(r.reward.xp)}</b></span>
+                            {r.reward.chest ? <span><i>Chest</i><b>{r.reward.chest}</b></span> : null}
+                        </>
+                    ) : <span className="ar-recap-none"><i>No purse</i><b>the rung holds</b></span>}
+                    <span><i>Streak</i><b>{r.streak}{r.streak > 0 && r.streak >= r.bestStreak ? " · best" : ""}</b></span>
+                    <span><i>Still above you</i><b>{r.remaining}</b></span>
+                </div>
+
+                <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
+                    {bout.won ? "Next fighter" : "Back to the ladder"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
-    const [rankUp, setRankUp] = useState(null);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
     const [clash, setClash] = useState(null);   // the two stances that just met
@@ -93,7 +185,9 @@ export default function ArenaClient({ initial }) {
             } else {
                 setErr(r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again.");
             }
-            if (r?.finished?.rankUp) setTimeout(() => { setRankUp(r.finished.rankUp); blip("win"); }, 1700);
+            // The rank-up used to be its own overlay on a timer, stacked behind the result card. It lives
+            // INSIDE the recap now — one modal, not two in sequence — so all that is left is the sting.
+            if (r?.finished?.rankUp) setTimeout(() => blip("win"), 900);
         } finally { setBusy(false); }
     }, [busy]);
 
@@ -154,18 +248,7 @@ export default function ArenaClient({ initial }) {
                 <p className="ar-tell"><b>Their tell:</b> {bout.tell}</p>
 
                 {bout.over ? (
-                    <div className={`ar-result ${bout.won ? "is-win" : "is-loss"}`}>
-                        {bout.won ? (
-                            <div className="ar-rays" aria-hidden="true">
-                                {Array.from({ length: 18 }).map((_, i) => <span key={i} style={{ "--a": `${i * 20}deg`, animationDelay: `${(i % 5) * 0.05}s` }} />)}
-                            </div>
-                        ) : null}
-                        <b>{bout.won ? `You beat ${bout.foe.name}` : `${bout.foe.name} put you down`}</b>
-                        {bout.won && bout.reward ? (
-                            <p>+{money(bout.reward.gold)} gold · +{money(bout.reward.xp)} XP{bout.reward.chest ? ` · a ${bout.reward.chest} chest` : ""}</p>
-                        ) : <p>The rung holds. Your attempts reset tomorrow.</p>}
-                        <button type="button" className="ar-btn" disabled={busy} onClick={() => act("dismiss")}>Back to the ladder</button>
-                    </div>
+                    <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} />
                 ) : (
                     <div className="ar-stances">
                         {STANCES.map((s) => (
@@ -278,22 +361,6 @@ export default function ArenaClient({ initial }) {
                             <span className="ar-up-lvl">Lv {o.level}</span>
                         </div>
                     ))}
-                </div>
-            ) : null}
-
-            {rankUp ? (
-                <div className="ar-rankup" role="dialog" aria-modal="true" onClick={() => setRankUp(null)} style={{ "--rank": rankUp.color }}>
-                    <div className="ar-rankup-card" onClick={(e) => e.stopPropagation()}>
-                        <div className="ar-rays" aria-hidden="true">
-                            {Array.from({ length: 24 }).map((_, i) => <span key={i} style={{ "--a": `${i * 15}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />)}
-                        </div>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img className="ar-rankup-art" src={rankUp.icon} alt="" draggable="false" />
-                        <span className="ar-rankup-kick">Rank up</span>
-                        <b className="ar-rankup-name">{rankUp.to}</b>
-                        <p className="ar-rankup-from">You were {rankUp.from}. Not any more.</p>
-                        <button type="button" className="ar-btn" onClick={() => setRankUp(null)}>Good</button>
-                    </div>
                 </div>
             ) : null}
 
@@ -496,6 +563,58 @@ function Styles() {
             .ar-result.is-loss { background: rgba(255,111,125,0.09); border: 1px solid rgba(255,111,125,0.4); }
             .ar-result b { font-size: 1.05rem; color: #fff; }
             .ar-result p { margin: 6px 0 12px; font-size: 12.5px; color: #cbd3dc; }
+
+            /* ── the recap ── */
+            .ar-recap { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 18px;
+                background: rgba(6,4,10,0.86); backdrop-filter: blur(4px); overflow-y: auto; }
+            .ar-recap-card { position: relative; overflow: hidden; width: min(390px, 100%); padding: 24px 22px 18px;
+                border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
+                border: 2px solid var(--tint); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 66px -12px var(--tint);
+                animation: arPop .42s cubic-bezier(.2,1.5,.35,1) both; }
+            .ar-recap-kick { position: relative; font-size: 10px; font-weight: 900; letter-spacing: .22em;
+                text-transform: uppercase; color: color-mix(in srgb, var(--tint) 80%, white); }
+            .ar-recap-title { position: relative; display: block; margin: 4px 0 2px; font-size: 1.25rem; font-weight: 900; color: #fff; }
+            .ar-recap-sub { position: relative; margin: 0 0 14px; font-size: 11.5px; color: #9a8fb5; }
+
+            .ar-climb { position: relative; display: flex; align-items: center; justify-content: center; gap: 9px; margin-bottom: 14px; }
+            .ar-climb-lab, .ar-climb-of { font-size: 10.5px; font-weight: 900; letter-spacing: .1em;
+                text-transform: uppercase; color: #8a7fae; }
+            .ar-climb-num { display: inline-flex; align-items: center; gap: 8px; }
+            .ar-climb-num i { font-style: normal; font-size: 1.7rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+            .ar-climb-num .was { color: #6f6486; }
+            .ar-climb-num .now { color: color-mix(in srgb, var(--tint) 75%, white);
+                text-shadow: 0 0 26px color-mix(in srgb, var(--tint) 60%, transparent);
+                animation: arTick .4s cubic-bezier(.2,1.6,.35,1); }
+            @keyframes arTick { from { transform: scale(1.55); opacity: .4 } to { transform: scale(1); opacity: 1 } }
+            .ar-climb-num .arrow { width: 9px; height: 9px; border-top: 2.5px solid var(--tint);
+                border-right: 2.5px solid var(--tint); transform: rotate(45deg); }
+
+            .ar-recap-rank, .ar-recap-rankup { position: relative; display: flex; align-items: center; gap: 13px;
+                text-align: left; padding: 11px 13px; border-radius: 14px; margin-bottom: 13px;
+                background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--tint) 42%, transparent); }
+            .ar-recap-rank img { width: 50px; height: 50px; object-fit: contain; flex: 0 0 auto; }
+            .ar-recap-rankup { background: linear-gradient(140deg, color-mix(in srgb, var(--tint) 26%, transparent), rgba(255,255,255,0.02) 68%); }
+            .ar-recap-rankup img { width: 62px; height: 62px; object-fit: contain; flex: 0 0 auto;
+                filter: drop-shadow(0 4px 14px color-mix(in srgb, var(--tint) 70%, transparent));
+                animation: arRise .7s cubic-bezier(.2,1.35,.35,1) both; }
+            .ar-recap-rankup span { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .18em;
+                text-transform: uppercase; color: #8a7fae; }
+            .ar-recap-rankup b { display: block; font-size: 1.35rem; font-weight: 900; line-height: 1.1;
+                color: color-mix(in srgb, var(--tint) 76%, white); }
+            .ar-recap-rankup em { font-style: normal; font-size: 11px; color: #9a8fb5; }
+            .ar-recap-rank b { display: block; font-size: 1rem; font-weight: 900; color: color-mix(in srgb, var(--tint) 70%, white); }
+            .ar-recap-rank em { font-style: normal; font-size: 11px; color: #9a8fb5; }
+            .ar-recap-bar { display: block; height: 5px; margin: 6px 0 4px; border-radius: 999px; overflow: hidden;
+                background: rgba(0,0,0,0.5); }
+            .ar-recap-bar > i { display: block; height: 100%; background: var(--tint); transition: width .8s cubic-bezier(.2,.8,.3,1); }
+
+            .ar-recap-rows { position: relative; display: grid; gap: 5px; margin-bottom: 15px; }
+            .ar-recap-rows > span { display: flex; align-items: center; justify-content: space-between;
+                padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,0.05); font-size: 0.85rem; }
+            .ar-recap-rows i { font-style: normal; color: #a99fc4; }
+            .ar-recap-rows b { color: #ffd75e; font-variant-numeric: tabular-nums; text-transform: capitalize; }
+            .ar-recap-none b { color: #a99fc4; }
+            .ar-recap-go { position: relative; width: 100%; }
 
             .ar-err { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
                 font-size: 12px; font-weight: 800; color: #ffd0a0;
