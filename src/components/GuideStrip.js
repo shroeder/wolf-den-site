@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { GUIDE_STEP_PATHS } from "@/lib/marketplace/guide-chapters.js";
 import { isGamePath } from "@/lib/marketplace/game-paths.js";
 
 // ── THE GUIDE, EVERYWHERE ────────────────────────────────────────────────────────────────────────────────────
@@ -37,7 +38,10 @@ export default function GuideStrip() {
         if (d) { memo = { at: Date.now(), data: d }; setG(d); }
     }, []);
 
-    const onGame = isGamePath(pathname);
+    // Game pages, PLUS every page a step points at. /looking-for and /shop are not game pages and never should
+    // be — but the guide sends you to both, and a guide that disappears the moment you follow it is worse than
+    // no guide. Derived from the catalog, so this cannot drift.
+    const onGame = isGamePath(pathname) || GUIDE_STEP_PATHS.some((h) => pathname === h || pathname.startsWith(`${h}/`));
     // The guide page shows all of this in full; a strip above it would just be the same sentence twice.
     const show = onGame && pathname !== "/marketplace/guide";
     const step = g?.current?.step || null;

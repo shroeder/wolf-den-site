@@ -22,10 +22,17 @@ const CATALOG = "src/lib/marketplace/guide-chapters.js";
 // The catalog is pure data with no imports we care about, so it can be read as text and evaluated — cheaper and
 // more robust than standing up the "@/" alias just to import one array.
 const raw = fs.readFileSync(CATALOG, "utf8");
-const body = raw.slice(raw.indexOf("export const GUIDE_CHAPTERS ="));
-const arr = body.slice(body.indexOf("["), body.lastIndexOf("];") + 1);
+// Slice the array by BRACKET DEPTH, not by lastIndexOf("];"). The first cut did the latter and broke the
+// moment a second `export const … = [...]` was added below the chapters: it swallowed everything to the end of
+// the file and tried to eval an `export`. Counting depth means anything can be added after it.
+const start = raw.indexOf("[", raw.indexOf("export const GUIDE_CHAPTERS ="));
+let depth = 0, end = start;
+for (let i = start; i < raw.length; i += 1) {
+    if (raw[i] === "[") depth += 1;
+    else if (raw[i] === "]") { depth -= 1; if (depth === 0) { end = i + 1; break; } }
+}
 // eslint-disable-next-line no-new-func
-const CHAPTERS = new Function(`return ${arr}`)();
+const CHAPTERS = new Function(`return ${raw.slice(start, end)}`)();
 
 // ── every file under src, once ──
 const files = [];

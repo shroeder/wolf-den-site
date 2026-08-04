@@ -2,6 +2,7 @@ import AnnouncementBanner from "@/components/AnnouncementBanner";
 import BossCelebrationWatcher from "@/components/BossCelebrationWatcher";
 import FeatureModal from "@/components/FeatureModal";
 import GiftWatcher from "@/components/GiftWatcher";
+import GuideStrip from "@/components/GuideStrip";
 import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
 import PetLevelUp from "@/components/PetLevelUp";
@@ -21,7 +22,14 @@ export default function PublicLayout({ children }) {
             <AnnouncementBanner />
             <SiteHeader />
             <RewardNudge />
-            <main className="shell content">{children}</main>
+            <main className="shell content">
+                {/* The Pathfinder rides ABOVE the page content, site-wide. It was mounted in the marketplace
+                    layout, which meant it vanished the moment a step sent you to /looking-for or /shop — pages
+                    the guide itself points at, and the exact abandonment it exists to prevent. It decides for
+                    itself where to show. */}
+                <GuideStrip />
+                {children}
+            </main>
             <SiteFooter />
             {/* Site-wide so a level-up earned while shopping still celebrates, not just on /marketplace. */}
             <LevelUpWatcher />

@@ -156,6 +156,12 @@ export const GUIDE_CHAPTERS = [
     },
 ];
 
+// Every page a step sends you to. GuideStrip shows on these as well as the game pages, so a step can never
+// link somewhere the guide then vanishes — which is exactly what happened with /looking-for, a page the guide
+// itself sends you to and then abandoned you on. Derived from the catalog rather than listed by hand, so
+// adding a step to a new page cannot reintroduce it.
+export const GUIDE_STEP_PATHS = [...new Set(GUIDE_CHAPTERS.flatMap((c) => c.steps.map((s) => s.href)))];
+
 export const chapterById = (id) => GUIDE_CHAPTERS.find((c) => c.id === id) || null;
 export const ALL_STEPS = GUIDE_CHAPTERS.flatMap((c) => c.steps.map((s) => ({ ...s, chapter: c.id })));
 export const stepByKey = (key) => ALL_STEPS.find((s) => s.key === key) || null;

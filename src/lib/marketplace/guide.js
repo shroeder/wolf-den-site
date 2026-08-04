@@ -35,8 +35,13 @@ async function trueSteps(buyerId, steps) {
         needs("avatar")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_buyer WHERE id = $1 AND avatar_updated_at IS NOT NULL`, [buyerId]).catch(() => null)
             : null,
+        // first_wishlist, NOT mkt_want. The Looking For list is saved on the DEVICE — mkt_want is the buy-order
+        // table (email, max price, status) and has three rows in the whole database, so this check was very
+        // nearly uncompletable: a member with a card already on their list was told to add one, added a second,
+        // and it still didn't tick. Adding a card while signed in awards `first_wishlist` exactly once, which is
+        // both recorded and precisely what the step is asking for. 16 members already have it.
         needs("wishlist")
-            ? db.queryOne(`SELECT 1 AS x FROM mkt_want WHERE buyer_id = $1 LIMIT 1`, [buyerId]).catch(() => null)
+            ? db.queryOne(`SELECT 1 AS x FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'first_wishlist' LIMIT 1`, [buyerId]).catch(() => null)
             : null,
         // A LIVE browser push subscription. This step used to be client-claimed — the only one in the book you
         // were trusted on — which meant 25 members who already had notifications on were asked to turn them on
