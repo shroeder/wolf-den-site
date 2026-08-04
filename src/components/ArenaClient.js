@@ -1,6 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+import useScrollLock from "@/lib/useScrollLock";
+
+// Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
+// filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
+// So a "full-screen" recap was being measured against the card it lives in: it laid out inline, scrolled with
+// the page, and got cut off at the bottom. Same trap SpinWheel and MiningLaunch already portal around.
+function Portal({ children }) {
+    const [el] = useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
+    useEffect(() => {
+        if (!el) return undefined;
+        document.body.appendChild(el);
+        return () => { document.body.removeChild(el); };
+    }, [el]);
+    if (!el) return null;
+    return createPortal(children, el);
+}
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // Two screens. The LADDER — who is next, who is above them, and what beating them is worth — and the BOUT,
@@ -69,6 +87,7 @@ function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down }) {
 // and the rung counts UP in front of you rather than being a number you are expected to have memorised.
 function Recap({ bout, busy, onClose }) {
     const r = bout.recap;
+    useScrollLock(true);   // the page behind must not scroll out from under the modal
     const up = r?.rankUp || null;
     const tint = up ? up.color : r?.rank?.color || (bout.won ? "#ffd75e" : "#ff6f7d");
     const [shown, setShown] = useState(r ? r.rungFrom : 0);
@@ -90,6 +109,7 @@ function Recap({ bout, busy, onClose }) {
     const pct = r.rank.span ? Math.min(100, (r.rank.into / r.rank.span) * 100) : 0;
 
     return (
+        <Portal>
         <div className="ar-recap" role="dialog" aria-modal="true" style={{ "--tint": tint }}>
             <div className="ar-recap-card">
                 <div className="ar-rays" aria-hidden="true">
@@ -152,6 +172,7 @@ function Recap({ bout, busy, onClose }) {
                 </button>
             </div>
         </div>
+        </Portal>
     );
 }
 
@@ -565,9 +586,9 @@ function Styles() {
             .ar-result p { margin: 6px 0 12px; font-size: 12.5px; color: #cbd3dc; }
 
             /* ── the recap ── */
-            .ar-recap { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 18px;
+            .ar-recap { position: fixed; inset: 0; z-index: 10100; display: grid; place-items: center; padding: 18px;
                 background: rgba(6,4,10,0.86); backdrop-filter: blur(4px); overflow-y: auto; }
-            .ar-recap-card { position: relative; overflow: hidden; width: min(390px, 100%); padding: 24px 22px 18px;
+            .ar-recap-card { position: relative; overflow: hidden; width: min(390px, 100%); max-height: 92dvh; overflow-y: auto; padding: 24px 22px 18px;
                 border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid var(--tint); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 66px -12px var(--tint);
                 animation: arPop .42s cubic-bezier(.2,1.5,.35,1) both; }
