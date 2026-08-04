@@ -10,7 +10,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
-    delveMight, delveVigour, dungeonById, encounterArt, eventsFor, potionCount, potionHealFrac, wardCut,
+    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 
@@ -86,7 +86,10 @@ function dealFloors(dungeon) {
     for (let i = 0; i < DELVE_FLOORS - 1; i += 1) {
         const e = drawOnce();
         if (!e) break;
-        floors.push({ n: i + 1, event: e, done: false });
+        // The foe is picked HERE, not when you step in, so the floor can show you a shape in the dark before
+        // you commit. A silhouette the fight then contradicts would be worse than no silhouette at all.
+        const foeId = (e.kind === KIND.fight) ? pick(dungeon.foes).id : null;
+        floors.push({ n: i + 1, event: e, foeId, done: false });
     }
 
     const isFight = (f) => f.event.kind === KIND.fight || f.event.kind === KIND.mimic;
@@ -107,6 +110,7 @@ function dealFloors(dungeon) {
                 // Never convert a RARE find into a brawl — that is the one floor nobody wants to lose.
                 if (f.event.rare) continue;
                 f.event = spareFights.splice(Math.floor(Math.random() * spareFights.length), 1)[0];
+                f.foeId = pick(dungeon.foes).id;
                 need -= 1;
             }
             if (need <= 0 || !spareFights.length) break;
@@ -118,12 +122,12 @@ function dealFloors(dungeon) {
 }
 
 /** A foe for a fight floor. HP is a multiple of YOUR attack, so a fight is ~3 exchanges whatever you're wearing. */
-function makeFoe(dungeon, event, might) {
-    const base = pick(dungeon.foes);
+function makeFoe(dungeon, event, might, foeId = null) {
+    const base = dungeon.foes.find((f) => f.id === foeId) || pick(dungeon.foes);
     const hp = Math.max(1, Math.round(might * dungeon.foeX * (event.hpMult || 1)));
     return {
         id: base.id, name: event.kind === KIND.mimic ? "Mimic" : base.name,
-        sprite: event.kind === KIND.mimic ? "/images/delves/foe-mimic.png" : base.sprite,
+        sprite: event.kind === KIND.mimic ? "/images/delves/foe-mimic.webp" : base.sprite,
         hp, maxHp: hp,
         dmg: [Math.round(dungeon.dmg[0] * (event.dmgMult || 1)), Math.round(dungeon.dmg[1] * (event.dmgMult || 1))],
     };
@@ -161,7 +165,7 @@ export async function getDelveState(buyerId) {
         tracks: Object.entries(DELVE_TRACKS).map(([key, t]) => {
             const lv = Number(row?.[t.col]) || 0;
             return {
-                key, name: t.name, desc: t.desc, icon: t.icon, level: lv, max: t.max,
+                key, name: t.name, desc: t.desc, icon: t.icon, effect: t.effect, level: lv, max: t.max,
                 now: t.fmt(lv), next: lv >= t.max ? null : t.fmt(lv + 1),
                 maxed: lv >= t.max, cost: lv >= t.max ? null : t.cost(lv),
             };
@@ -185,7 +189,9 @@ function publicRun(run) {
     return {
         dungeonId: run.dungeonId,
         dungeonName: d?.name || run.dungeonId,
-        tint: d?.tint, bg: d?.bg,
+        tint: d?.tint,
+        // The backdrop is the ROOM THIS ENCOUNTER HAPPENS IN, not one plate for the whole dungeon.
+        bg: encounterBg(run.dungeonId, cur?.event) || d?.bg,
         floor: run.floor, floors: DELVE_FLOORS,
         hp: run.hp, maxHp: run.maxHp,
         potions: run.potions, potionHeal: run.potionHeal,
@@ -197,10 +203,23 @@ function publicRun(run) {
             n: cur.n, kind: cur.event.kind, title: cur.event.title, text: cur.event.text,
             done: Boolean(cur.done), outcome: cur.outcome || null,
             rare: Boolean(cur.event.rare),
-            art: encounterArt(run.dungeonId, cur.event),
+            // A fight floor had no art at all until the foe existed, so the stage sat empty on exactly the
+            // floors that should be the most tense. It now shows the thing you are about to meet as a black
+            // SILHOUETTE — the shape without the detail, which reads as a threat rather than a spoiler. A
+            // mimic keeps its chest picture, because being wrong about that is the entire encounter.
+            art: encounterArt(run.dungeonId, cur.event) || (
+                cur.event.kind === KIND.boss ? d?.boss?.sprite
+                    : (d?.foes || []).find((f) => f.id === cur.foeId)?.sprite || d?.foes?.[0]?.sprite || null
+            ),
+            silhouette: !cur.done && (cur.event.kind === KIND.fight || cur.event.kind === KIND.boss),
         } : null,
         log: run.log || [],
         awaiting: run.awaiting || null,   // a choice the floor is waiting on
+        // THE BEAT. A floor used to resolve and advance in the same reply, so the only trace of what just
+        // happened was a line of grey text in a log — the "no clear juicy conclusion to each encounter"
+        // complaint, exactly. The floor now STOPS on its result and waits for you to walk on, which is the one
+        // moment the reward is worth showing.
+        result: run.result || null,
         potionsUsed: run.potionsUsed || 0,
         lowestHpFrac: run.lowestHpFrac ?? 1,
     };
@@ -261,6 +280,13 @@ const hurt = (run, raw) => {
     run.lowestHpFrac = Math.min(run.lowestHpFrac ?? 1, run.hp / run.maxHp);
     return dmg;
 };
+// Park the run on its outcome. Everything that used to call advance() the instant a floor resolved calls this
+// instead; advancing is now the player's tap ("Onward"), which is what turns a resolution into a beat.
+const settle = async (buyerId, run, result) => {
+    run.result = result;
+    await saveRun(buyerId, run);
+    return { ok: true, ...(await getDelveState(buyerId)) };
+};
 const bank = (run, { gold = 0, xp = 0, chest = null } = {}) => {
     run.banked.gold += gold;
     run.banked.xp += xp;
@@ -294,7 +320,14 @@ export async function delveAct(buyerId, action, choice = null) {
         return { ok: true, healed, ...(await getDelveState(buyerId)) };
     }
 
-    if (action === "flee") return finishRun(buyerId, run, { fled: true });
+    // ── ONWARD — leave the floor you just resolved. This is the only way forward: there is no "turn back".
+    // Retreat existed and paid exactly what dying pays, so it was a button that ended your run for nothing.
+    if (action === "onward") {
+        if (!run.result) return { ok: false, error: "nothing_to_leave", ...(await getDelveState(buyerId)) };
+        const res = run.result;
+        run.result = null;
+        return advance(buyerId, run, { outcome: res });
+    }
 
     // ── STRIKE — one exchange in an active fight ──
     if (action === "strike") {
@@ -308,9 +341,15 @@ export async function delveAct(buyerId, action, choice = null) {
             const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
             bank(run, { gold, xp });
             lines.push(`${run.foe.name} falls. +${gold} gold, +${xp} XP.`);
+            const felled = run.foe;
             run.foe = null;
             run.log.push({ floor: run.floor, kind: "fight", text: lines.join(" ") });
-            return advance(buyerId, run, { outcome: { gold, xp } });
+            return settle(buyerId, run, {
+                tone: ev.kind === KIND.boss ? "boss" : "win",
+                title: ev.kind === KIND.boss ? `${felled.name} falls` : `${felled.name} is down`,
+                line: ev.kind === KIND.boss ? "The dungeon is quiet. Take what it owes you." : "It does not get up.",
+                art: felled.sprite, gold, xp,
+            });
         }
         // It swings back.
         const took = hurt(run, randInt(run.foe.dmg[0], run.foe.dmg[1]));
@@ -323,7 +362,10 @@ export async function delveAct(buyerId, action, choice = null) {
 
     // ── ENTER — resolve the floor you just walked onto ──
     if (action !== "enter" && action !== "choose") return { ok: false, error: "bad_action" };
-    if (floor.done && !run.foe) return { ok: false, error: "already_done", ...(await getDelveState(buyerId)) };
+    // A finished floor with nothing left to show just moves you on. This used to be an error, which was fine
+    // while resolving and advancing happened in one reply — but a run saved under the OLD shape has a done
+    // floor and no `result` to tap past, and would have sat there refusing both buttons forever.
+    if (floor.done && !run.foe && !run.result) return advance(buyerId, run, {});
 
     const ev = floor.event;
     switch (ev.kind) {
@@ -334,7 +376,7 @@ export async function delveAct(buyerId, action, choice = null) {
                 const bossHp = Math.max(1, Math.round(run.might * d.bossX));
                 run.foe = ev.kind === KIND.boss
                     ? { id: d.boss.id, name: d.boss.name, sprite: d.boss.sprite, hp: bossHp, maxHp: bossHp, dmg: d.boss.dmg, boss: true }
-                    : makeFoe(d, ev, run.might);
+                    : makeFoe(d, ev, run.might, floor.foeId);
                 floor.done = true;
                 run.log.push({ floor: run.floor, kind: "meet", text: ev.kind === KIND.mimic ? "The chest opens itself. It has teeth." : `${run.foe.name} blocks the way.` });
                 // A mimic gets the jump on you — that's the cost of it having looked like treasure.
@@ -356,28 +398,43 @@ export async function delveAct(buyerId, action, choice = null) {
             bank(run, { gold, xp, chest: gotChest ? tier : null });
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "chest", text: `+${gold} gold, +${xp} XP${gotChest ? `, and a ${tier} chest` : ""}.` });
-            return advance(buyerId, run, { outcome: { gold, xp, chest: gotChest ? tier : null } });
+            return settle(buyerId, run, {
+                tone: ev.rare ? "rare" : "loot", title: ev.rare ? ev.title : "It opens",
+                line: gotChest ? "There is a whole chest in here." : "Coin, and something worth knowing.",
+                art: encounterArt(run.dungeonId, ev), gold, xp, chest: gotChest ? tier : null, rare: Boolean(ev.rare),
+            });
         }
         case KIND.cache: {
             const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * 1.2 * (ev.lootMult || 1));
             bank(run, { gold });
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "cache", text: `Pocketed ${gold} gold.` });
-            return advance(buyerId, run, { outcome: { gold } });
+            return settle(buyerId, run, {
+                tone: ev.rare ? "rare" : "loot", title: ev.rare ? ev.title : "Pocketed",
+                line: "Nobody was coming back for it.",
+                art: encounterArt(run.dungeonId, ev), gold, rare: Boolean(ev.rare),
+            });
         }
         case KIND.rest: {
             const healed = Math.min(run.maxHp - run.hp, Math.round(run.maxHp * 0.18));
             run.hp += healed;
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "rest", text: healed ? `You catch your breath — recovered ${healed} health.` : "You catch your breath. Nothing to mend." });
-            return advance(buyerId, run, { outcome: { healed } });
+            return settle(buyerId, run, {
+                tone: "heal", title: "A moment's quiet",
+                line: healed ? "You get your wind back." : "Nothing to mend. You take the moment anyway.",
+                art: encounterArt(run.dungeonId, ev), healed,
+            });
         }
         case KIND.trap: {
             const took = hurt(run, randInt(Math.round(d.dmg[0] * 0.8), Math.round(d.dmg[1] * 1.1)));
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "trap", text: `It catches you for ${took}.` });
             if (run.hp <= 0) return finishRun(buyerId, run, { died: true });
-            return advance(buyerId, run, { outcome: { damage: took } });
+            return settle(buyerId, run, {
+                tone: "hurt", title: "It catches you", line: "You should have been watching the floor.",
+                art: encounterArt(run.dungeonId, ev), damage: took,
+            });
         }
         case KIND.merchant:
         case KIND.well:
@@ -386,7 +443,7 @@ export async function delveAct(buyerId, action, choice = null) {
             return offerChoice(ctxFor(buyerId), run, d, floor, action, choice);
         default: {
             floor.done = true;
-            return advance(buyerId, run, {});
+            return settle(buyerId, run, { tone: "none", title: ev.title, line: "Nothing comes of it.", art: encounterArt(run.dungeonId, ev) });
         }
     }
 }
@@ -396,7 +453,7 @@ export async function delveAct(buyerId, action, choice = null) {
 // import each other (a cycle), the run-side helpers are handed over explicitly as a small context object.
 function ctxFor(buyerId) {
     const ctx = {
-        buyerId, saveRun, hurt, bank,
+        buyerId, saveRun, hurt, bank, settle,
         state: getDelveState,
         advance: (bid, run, opts) => advanceFloor(ctx, run, opts),
         finishRun: (bid, run, opts) => finishDelveRun(ctx, run, opts),

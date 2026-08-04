@@ -5,21 +5,17 @@
 // walked out. All three PAY — that is the point of the design and the card says so plainly, because "you died"
 // on a screen full of loot is otherwise a confusing thing to read.
 
-function Img({ src, className, alt = "" }) {
-    if (!src) return null;
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} className={className} alt={alt} draggable="false" />;
-}
+// Raw <img>: styled-jsx does not scope a custom component, so `.dlw-art` would never have matched.
 
 export default function DelveWrap({ finished, onClose }) {
-    const { cleared, died, fled, floor, gold, xp, bonusGold, bonusXp, chests = [] } = finished;
-    const tone = cleared ? "is-clear" : died ? "is-dead" : "is-back";
-    const title = cleared ? "The way is clear" : died ? "You fell" : "You turned back";
+    // TWO endings now. "You turned back" went with the retreat button: it ended the run and paid exactly what
+    // dying pays, so it was a button whose only function was to stop playing.
+    const { cleared, died, floor, gold, xp, bonusGold, bonusXp, chests = [] } = finished;
+    const tone = cleared ? "is-clear" : "is-dead";
+    const title = cleared ? "The way is clear" : "You fell";
     const line = cleared
         ? "The boss is down and the dungeon is quiet."
-        : died
-            ? `Floor ${floor} was as far as you got. You keep everything you had already banked.`
-            : `You climbed out from floor ${floor} with your haul intact.`;
+        : `Floor ${floor} was as far as you got. You keep everything you had already banked.`;
 
     return (
         <div className="dlw" role="dialog" aria-modal="true" onClick={onClose}>
@@ -31,7 +27,8 @@ export default function DelveWrap({ finished, onClose }) {
                         ))}
                     </div>
                 ) : null}
-                <Img src={cleared ? "/images/delves/ev-victory.png" : died ? "/images/delves/ev-death.png" : "/images/delves/ev-retreat.png"} className="dlw-art" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cleared ? "/images/delves/ev-victory.webp" : "/images/delves/ev-death.webp"} className="dlw-art" alt="" draggable="false" />
                 <h3>{title}</h3>
                 <p className="dlw-line">{line}</p>
 

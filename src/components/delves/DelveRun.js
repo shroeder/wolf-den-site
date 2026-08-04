@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── THE RUN ──────────────────────────────────────────────────────────────────────────────────────────────────
-// One floor at a time, against the dungeon's own backdrop. The floor you are on is the whole screen; the log
-// underneath is what you have already done. You never see what is ahead — the ten floors are dealt server-side
-// at the door and only the current one is ever sent, so nothing but the boss is predictable.
-
-function Img({ src, className, alt = "" }) {
-    if (!src) return null;
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} className={className} alt={alt} draggable="false" />;
-}
+// One floor at a time, in the room that floor happens in. The stage is the game: the backdrop is this
+// encounter's own plate, the thing you are dealing with stands on it, and when the floor resolves the stage
+// turns into the payoff card. You never see what is ahead — the ten floors are dealt server-side at the door
+// and only the current one is ever sent, so nothing but the boss is predictable.
+//
+// EVERY IMAGE HERE IS A RAW <img>. There used to be a tidy little `Img` wrapper, and it silently unstyled the
+// entire screen: styled-jsx scopes by appending its `jsx-<hash>` class to DOM elements, and it does NOT add it
+// to a custom component, so every rule that targeted one of those images (`.dlr-bg`, `.dlr-art`, the upgrade
+// icons in the hall) compiled to `.dlr-bg.jsx-abc` and matched nothing. The backdrop lost `object-fit: cover`
+// and rendered at its natural size inside a 16:10 box — which is exactly what "you just zoomed in on a bg and
+// keep moving the pane" looks like — and every sprite rendered at full width. The art was always there.
 
 // ── SOUND ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Built on the fly, no assets to load or go stale: a dry crack when you connect, a lower one when you are hit,
@@ -50,8 +52,25 @@ const SFX = {
     kill: () => tone([523, 659, 880], { vol: 0.15 }),
     boss: () => tone([392, 523, 659, 880, 1047], { vol: 0.17, gap: 0.09 }),
     heal: () => tone([523, 784], { type: "sine", vol: 0.13, gap: 0.09 }),
-    loot: () => tone([700, 950], { vol: 0.12, gap: 0.05 }),
+    loot: () => tone([700, 950, 1250], { vol: 0.13, gap: 0.055 }),
+    rare: () => tone([659, 880, 1047, 1319, 1568], { vol: 0.16, len: 0.22, gap: 0.085 }),
+    gain: () => tone([620, 880], { type: "sine", vol: 0.12, gap: 0.06 }),
+    step: () => tone([180, 140], { type: "sine", vol: 0.07, len: 0.09, gap: 0.05 }),
     die: () => tone([220, 165, 110], { type: "sawtooth", vol: 0.15, len: 0.3, gap: 0.13 }),
+};
+// Which sting a resolved floor plays. The beat and the sound are picked from the SAME tone the server sent, so
+// they can never disagree about whether that was a good floor.
+const RESULT_SFX = { rare: SFX.rare, boss: SFX.boss, win: SFX.kill, loot: SFX.loot, heal: SFX.heal, gain: SFX.gain, hurt: SFX.hurt, none: SFX.step };
+
+const REWARD_ART = {
+    gold: "/images/spin/prizes/coins-big.png",
+    xp: "/images/spin/prizes/xp-orb.png",
+    potion: "/images/delves/ev-potion.webp",
+};
+const CHEST_ART = {
+    wooden: "/images/spin/prizes/chest-wood.png",
+    iron: "/images/spin/prizes/chest-wood.png",
+    gold: "/images/spin/prizes/chest-gold.png",
 };
 
 export default function DelveRun({ run, busy, onAct }) {
@@ -59,7 +78,7 @@ export default function DelveRun({ run, busy, onAct }) {
     const [floats, setFloats] = useState([]);  // damage / heal numbers flying off the stage
     const [shake, setShake] = useState(0);     // 1 = you connected, 2 = you got hit
     const [flash, setFlash] = useState(null);
-    const prev = useRef({ hp: run.hp, foeHp: run.foe?.hp ?? null, floor: run.floor, logLen: run.log?.length ?? 0 });
+    const prev = useRef({ hp: run.hp, foeHp: run.foe?.hp ?? null, floor: run.floor, logLen: run.log?.length ?? 0, resultAt: null });
 
     // Keep the newest line in view — the log is the only record of a floor once you have left it.
     useEffect(() => { logEnd.current?.scrollIntoView({ block: "nearest" }); }, [run.log?.length]);
@@ -76,6 +95,8 @@ export default function DelveRun({ run, busy, onAct }) {
     // for a hit the server did not actually deal, and a kill sting can never play for a foe still standing.
     const logLen = run.log?.length ?? 0;
     const foeHp = run.foe?.hp ?? null;
+    const result = run.result || null;
+    const resultKey = result ? `${run.floor}:${result.title}` : null;
     useEffect(() => {
         const p = prev.current;
         const hpDelta = run.hp - p.hp;
@@ -88,39 +109,55 @@ export default function DelveRun({ run, busy, onAct }) {
             setShake((s) => Math.max(s, 1));
             SFX.hit();
         }
-        // It was there, now it isn't, and we haven't changed floor: it died.
-        if (p.foeHp != null && run.foe == null && run.floor === p.floor) {
-            (run.current?.kind === "boss" ? SFX.boss : SFX.kill)();
-            setFlash("win");
-        }
-        // Reached a new floor with a new log line that mentions a gain — that's loot.
-        if (run.floor > p.floor && logLen > p.logLen) {
-            const last = run.log[logLen - 1];
-            if (last && last.text.includes("+") && !last.text.includes("damage")) SFX.loot();
+        // A floor just landed on its result — this is the beat, so it gets the sting and the flash.
+        if (resultKey && resultKey !== p.resultAt) {
+            (RESULT_SFX[result.tone] || SFX.gain)();
+            setFlash(result.tone === "hurt" ? "hurt" : result.tone === "heal" ? "heal" : "win");
         }
         if (run.hp <= 0) SFX.die();
 
-        prev.current = { hp: run.hp, foeHp, floor: run.floor, logLen };
+        prev.current = { hp: run.hp, foeHp, floor: run.floor, logLen, resultAt: resultKey };
         const t1 = setTimeout(() => setShake(0), 320);
-        const t2 = setTimeout(() => setFlash(null), 380);
+        const t2 = setTimeout(() => setFlash(null), 420);
         return () => { clearTimeout(t1); clearTimeout(t2); };
-    }, [run.hp, foeHp, run.foe, run.floor, run.log, logLen, run.current?.kind, pop]);
+    }, [run.hp, foeHp, run.floor, logLen, resultKey, result, pop]);
 
     const hpFrac = Math.max(0, run.hp / run.maxHp);
     const hpState = hpFrac <= 0.25 ? "is-critical" : hpFrac <= 0.5 ? "is-hurt" : "";
     const cur = run.current;
     const fighting = Boolean(run.foe);
     const awaiting = run.awaiting;
-    // The art path comes from the SERVER with the floor (encounterArt), so the client never guesses a filename.
-    const art = fighting ? run.foe.sprite : (awaiting?.art || cur?.art || null);
+
+    // What stands on the stage, in priority order: the result of the floor you just finished, the thing hitting
+    // you, the thing asking you a question, or the shape of what is ahead.
+    const art = result?.art || (fighting ? run.foe.sprite : (awaiting?.art || cur?.art || null));
+    const silhouette = !result && !fighting && !awaiting && Boolean(cur?.silhouette);
+    const rare = Boolean(result?.rare || (cur?.rare && !fighting && !result));
+
+    const chips = result ? [
+        result.gold ? { k: "gold", art: REWARD_ART.gold, text: `+${result.gold.toLocaleString()} gold` } : null,
+        result.xp ? { k: "xp", art: REWARD_ART.xp, text: `+${result.xp.toLocaleString()} XP` } : null,
+        result.chest ? { k: "chest", art: CHEST_ART[result.chest] || CHEST_ART.wooden, text: `${result.chest} chest` } : null,
+        result.potion ? { k: "potion", art: REWARD_ART.potion, text: `+${result.potion} potion${result.potion === 1 ? "" : "s"}` } : null,
+        result.healed ? { k: "heal", art: REWARD_ART.potion, text: `+${result.healed} health` } : null,
+        result.damage ? { k: "dmg", art: null, text: `-${result.damage} health` } : null,
+    ].filter(Boolean) : [];
 
     return (
         <div className="dlr" style={{ "--tint": run.tint }}>
             {/* ── the floor ── */}
-            <div className={`dlr-stage${shake ? ` is-shake-${shake}` : ""}`}>
-                <Img src={run.bg} className="dlr-bg" />
+            <div className={`dlr-stage${shake ? ` is-shake-${shake}` : ""}${result ? " is-result" : ""}`}>
+                {run.bg ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={run.bg} className="dlr-bg" alt="" draggable="false" />
+                ) : null}
                 <span className="dlr-scrim" aria-hidden="true" />
                 {flash ? <span className={`dlr-flash is-${flash}`} aria-hidden="true" /> : null}
+                {result && result.tone !== "hurt" && result.tone !== "none" ? (
+                    <span className={`dlr-burst is-${result.tone}`} aria-hidden="true">
+                        {Array.from({ length: 18 }).map((_, i) => <span key={i} style={{ "--a": `${i * 20}deg`, animationDelay: `${(i % 5) * 0.03}s` }} />)}
+                    </span>
+                ) : null}
                 {floats.map((f) => (
                     <span key={f.id} className={`dlr-float is-${f.tone}`} style={{ left: `${f.x}%` }}>{f.text}</span>
                 ))}
@@ -132,13 +169,39 @@ export default function DelveRun({ run, busy, onAct }) {
                         <span key={i} className={`dlr-pip${i + 1 < run.floor ? " is-done" : ""}${i + 1 === run.floor ? " is-now" : ""}${i + 1 === run.floors ? " is-boss" : ""}`} />
                     ))}
                 </div>
-                {art ? <Img src={art} className={`dlr-art${fighting ? " is-foe" : ""}${cur?.rare && !fighting ? " is-rare" : ""}`} alt="" /> : null}
-                {cur?.rare && !fighting ? <span className="dlr-rare-tag">RARE FIND</span> : null}
+                {art ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        src={art}
+                        className={`dlr-art${fighting ? " is-foe" : ""}${rare ? " is-rare" : ""}${silhouette ? " is-shadow" : ""}${result ? " is-result" : ""}`}
+                        alt=""
+                        draggable="false"
+                    />
+                ) : null}
+                {rare ? <span className="dlr-rare-tag">RARE FIND</span> : null}
                 {fighting ? (
                     <div className="dlr-foe">
                         <b>{run.foe.name}</b>
                         <span className="dlr-foe-bar"><span style={{ width: `${Math.max(0, (run.foe.hp / run.foe.maxHp) * 100)}%` }} /></span>
                         <em>{run.foe.hp} / {run.foe.maxHp}</em>
+                    </div>
+                ) : null}
+                {/* The payoff, drawn ON the stage rather than as a log line. This is the beat the whole floor
+                    was building to, so it gets the room, the sprite and the numbers all in one frame. */}
+                {result ? (
+                    <div className={`dlr-payoff is-${result.tone}`}>
+                        <b>{result.title}</b>
+                        {chips.length ? (
+                            <div className="dlr-chips">
+                                {chips.map((c) => (
+                                    <span key={c.k} className={`dlr-chip is-${c.k}`}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        {c.art ? <img src={c.art} alt="" draggable="false" /> : null}
+                                        {c.text}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
                 ) : null}
             </div>
@@ -152,38 +215,43 @@ export default function DelveRun({ run, busy, onAct }) {
                 <button type="button" className="dlr-potion" disabled={busy || run.potions <= 0 || run.hp >= run.maxHp}
                     onClick={() => onAct("potion")}
                     title={run.potions <= 0 ? "No potions left" : `Restores ${Math.round(run.potionHeal * 100)}% of your health`}>
-                    <Img src="/images/delves/ev-potion.png" className="dlv-ico" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/delves/ev-potion.webp" className="dlr-potion-ico" alt="" draggable="false" />
                     <b>{run.potions}</b>
                 </button>
             </div>
 
             {/* ── what's happening ── */}
             <div className="dlr-card">
-                <b className="dlr-card-title">{awaiting?.title || cur?.title}</b>
-                <p className="dlr-card-text">{awaiting?.text || cur?.text}</p>
+                <b className="dlr-card-title">{result ? result.title : (awaiting?.title || cur?.title)}</b>
+                <p className="dlr-card-text">{result ? result.line : (awaiting?.text || cur?.text)}</p>
 
-                {awaiting ? (
+                {result ? (
+                    <div className="dlr-actions is-single">
+                        <button type="button" className="dlv-btn" disabled={busy} onClick={() => onAct("onward")}>
+                            {run.floor >= run.floors ? "Take what it owes you" : "Onward"}
+                        </button>
+                    </div>
+                ) : awaiting ? (
                     <div className="dlr-options">
                         {awaiting.options.map((o) => (
                             <button key={o.key} type="button" className="dlv-btn is-ghost dlr-option" disabled={busy}
                                 onClick={() => onAct("choose", { choice: o.key })}>
                                 <span>{o.label}</span>
+                                {/* Only PRICES are shown. What it does is the thing you are deciding. */}
                                 {o.cost ? <em>{o.cost.toLocaleString()} gold</em> : null}
+                                {o.potionCost ? <em>{o.potionCost} potion</em> : null}
+                                {o.hpCost ? <em className="is-blood">{o.hpCost} health</em> : null}
                             </button>
                         ))}
                     </div>
                 ) : fighting ? (
-                    <div className="dlr-actions">
+                    <div className="dlr-actions is-single">
                         <button type="button" className="dlv-btn is-danger" disabled={busy} onClick={() => onAct("strike")}>Strike</button>
-                        {/* Turning back ends the run but KEEPS everything banked — the same deal as dying, minus the dying. */}
-                        <button type="button" className="dlv-btn is-ghost" disabled={busy} onClick={() => onAct("flee")}>Turn back</button>
                     </div>
                 ) : (
-                    <div className="dlr-actions">
-                        <button type="button" className="dlv-btn" disabled={busy} onClick={() => onAct("enter")}>
-                            {cur?.done ? "Onward" : "Step in"}
-                        </button>
-                        <button type="button" className="dlv-btn is-ghost" disabled={busy} onClick={() => onAct("flee")}>Turn back</button>
+                    <div className="dlr-actions is-single">
+                        <button type="button" className="dlv-btn" disabled={busy} onClick={() => onAct("enter")}>Step in</button>
                     </div>
                 )}
             </div>
@@ -194,7 +262,7 @@ export default function DelveRun({ run, busy, onAct }) {
                 <span><b>{(run.banked?.xp || 0).toLocaleString()}</b> XP</span>
                 {run.banked?.chests?.length ? <span><b>{run.banked.chests.length}</b> chest{run.banked.chests.length === 1 ? "" : "s"}</span> : null}
             </div>
-            <p className="dlr-note">Turn back or fall, and you still keep everything above.</p>
+            <p className="dlr-note">Fall down here and you still keep everything above. There is no way back up.</p>
 
             {run.log?.length ? (
                 <div className="dlr-log">
@@ -215,11 +283,22 @@ export default function DelveRun({ run, busy, onAct }) {
                     52% { transform: translate(var(--amp), -2px) rotate(0.35deg) }
                     78% { transform: translate(calc(var(--amp) * -0.4), 0) }
                     100% { transform: translate(0,0) } }
-                .dlr-flash { position: absolute; inset: 0; z-index: 4; pointer-events: none; animation: dlrFlash .38s ease-out forwards; }
+                .dlr-flash { position: absolute; inset: 0; z-index: 4; pointer-events: none; animation: dlrFlash .42s ease-out forwards; }
                 .dlr-flash.is-hurt { background: radial-gradient(circle at 50% 50%, rgba(255,60,80,0.55), transparent 68%); }
                 .dlr-flash.is-heal { background: radial-gradient(circle at 50% 60%, rgba(90,230,140,0.5), transparent 66%); }
                 .dlr-flash.is-win { background: radial-gradient(circle at 50% 45%, rgba(255,215,94,0.6), transparent 66%); }
                 @keyframes dlrFlash { 0% { opacity: .95 } 100% { opacity: 0 } }
+
+                /* A ring of shards thrown off the middle of the stage when a floor pays. Cheap, and it is the
+                   difference between "a number changed" and "something happened". */
+                .dlr-burst { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; pointer-events: none; }
+                .dlr-burst span { position: absolute; width: 4px; height: 15px; border-radius: 2px; transform-origin: 50% 0;
+                    background: linear-gradient(#ffe28a, transparent); animation: dlrBurst .95s cubic-bezier(.15,.75,.3,1) both; }
+                .dlr-burst.is-heal span { background: linear-gradient(#8bf0b4, transparent); }
+                .dlr-burst.is-rare span { background: linear-gradient(#fff1b8, transparent); width: 5px; height: 22px; }
+                @keyframes dlrBurst { from { opacity: 1; transform: rotate(var(--a)) translateY(0) scaleY(.35); }
+                    to { opacity: 0; transform: rotate(var(--a)) translateY(-115px) scaleY(1); } }
+
                 .dlr-float { position: absolute; top: 44%; z-index: 5; pointer-events: none; font-size: 1.5rem; font-weight: 900;
                     text-shadow: 0 2px 10px rgba(0,0,0,0.95); animation: dlrFloat 1.05s cubic-bezier(.2,.9,.3,1) both; }
                 .dlr-float.is-dmg { color: #ffe28a; }
@@ -232,8 +311,12 @@ export default function DelveRun({ run, busy, onAct }) {
 
                 .dlr-stage { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10;
                     display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--tint) 45%, transparent); }
-                .dlr-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-                .dlr-scrim { position: absolute; inset: 0; background: radial-gradient(70% 60% at 50% 45%, transparent, rgba(8,5,14,0.8)); }
+                .dlr-stage.is-result { border-color: color-mix(in srgb, var(--tint) 80%, white); }
+                .dlr-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                    animation: dlrPan 16s ease-in-out infinite alternate; }
+                /* A slow, tiny drift. Enough that the room is alive; small enough that it never reads as a pan. */
+                @keyframes dlrPan { from { transform: scale(1.04) translate(-0.6%, 0.4%); } to { transform: scale(1.09) translate(0.8%, -0.6%); } }
+                .dlr-scrim { position: absolute; inset: 0; background: radial-gradient(72% 62% at 50% 45%, rgba(6,4,12,0.06), rgba(8,5,14,0.82)); }
                 .dlr-depth { position: absolute; top: 9px; left: 11px; z-index: 2; display: flex; align-items: baseline; gap: 5px; }
                 .dlr-depth b { font-size: 15px; font-weight: 900; color: #fff; text-shadow: 0 2px 8px #000; }
                 .dlr-depth span { font-size: 10.5px; color: #cbbfe0; text-shadow: 0 2px 6px #000; }
@@ -243,8 +326,14 @@ export default function DelveRun({ run, busy, onAct }) {
                 .dlr-pip.is-now { background: #fff; box-shadow: 0 0 8px #fff; }
                 .dlr-pip.is-boss { width: 10px; background: rgba(255,110,130,0.45); }
                 .dlr-pip.is-boss.is-done { background: #ff6f7d; }
-                .dlr-art { position: relative; z-index: 1; width: 46%; max-height: 72%; object-fit: contain;
+
+                .dlr-art { position: relative; z-index: 1; width: 46%; max-height: 70%; object-fit: contain;
                     filter: drop-shadow(0 8px 20px rgba(0,0,0,0.65)); animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+                /* What is ahead, not what it looks like. Black fill, faint rim, breathing. */
+                .dlr-art.is-shadow { filter: brightness(0) drop-shadow(0 0 12px color-mix(in srgb, var(--tint) 70%, transparent)); opacity: 0.72;
+                    animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrBreathe 2.6s ease-in-out .4s infinite alternate; }
+                .dlr-art.is-result { width: 40%; max-height: 52%; margin-bottom: 44px; animation: dlrPayoffIn .5s cubic-bezier(.2,1.5,.35,1) both; }
+                @keyframes dlrPayoffIn { from { opacity: 0; transform: scale(.55) rotate(-6deg); } to { opacity: 1; transform: none; } }
                 .dlr-art.is-rare { animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrRare 1.8s ease-in-out .4s infinite alternate; }
                 @keyframes dlrRare { from { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 10px rgba(255,215,94,.6)); }
                     to { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 28px rgba(255,215,94,1)); } }
@@ -260,6 +349,21 @@ export default function DelveRun({ run, busy, onAct }) {
                 .dlr-foe-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #ff6f7d, #ffb0b8); transition: width .3s ease; }
                 .dlr-foe em { font-size: 10px; font-style: normal; color: #e6d9ff; text-shadow: 0 1px 4px #000; }
 
+                .dlr-payoff { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 6;
+                    width: min(92%, 380px); text-align: center; animation: dlrPayoffUp .45s cubic-bezier(.2,1.3,.4,1) .12s both; }
+                @keyframes dlrPayoffUp { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
+                .dlr-payoff > b { display: block; font-size: 1.05rem; font-weight: 900; color: #fff; text-shadow: 0 2px 10px #000, 0 0 22px rgba(0,0,0,.9); }
+                .dlr-payoff.is-hurt > b { color: #ffb0b8; }
+                .dlr-payoff.is-rare > b { color: #ffe28a; }
+                .dlr-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 7px; }
+                .dlr-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 5px; border-radius: 999px;
+                    font-size: 12px; font-weight: 900; color: #ffe28a; background: rgba(10,6,16,0.78);
+                    border: 1px solid rgba(255,215,94,0.5); animation: dlrChip .4s cubic-bezier(.2,1.5,.35,1) both; }
+                .dlr-chip img { width: 20px; height: 20px; object-fit: contain; }
+                .dlr-chip.is-heal { color: #8bf0b4; border-color: rgba(139,240,180,0.5); }
+                .dlr-chip.is-dmg { color: #ff8f9a; border-color: rgba(255,143,154,0.5); padding-left: 10px; }
+                @keyframes dlrChip { from { opacity: 0; transform: translateY(8px) scale(.8); } to { opacity: 1; transform: none; } }
+
                 .dlr-you { display: flex; align-items: center; gap: 10px; margin: 11px 0; }
                 .dlr-hp { flex: 1; position: relative; display: flex; align-items: center; gap: 8px; }
                 .dlr-hp-bar { flex: 1; height: 16px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12); }
@@ -271,14 +375,17 @@ export default function DelveRun({ run, busy, onAct }) {
                 .dlr-potion { display: flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 11px; cursor: pointer;
                     background: rgba(185,140,255,0.14); border: 1px solid rgba(185,140,255,0.4); color: #e0ceff; font-weight: 900; }
                 .dlr-potion:disabled { opacity: 0.4; cursor: default; }
+                .dlr-potion-ico { width: 22px; height: 22px; object-fit: contain; }
 
                 .dlr-card { padding: 13px 15px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
                 .dlr-card-title { font-size: 1rem; color: color-mix(in srgb, var(--tint) 65%, white); }
                 .dlr-card-text { margin: 5px 0 12px; font-size: 12.5px; line-height: 1.5; color: #b9c2cc; }
-                .dlr-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+                .dlr-actions { display: grid; gap: 8px; }
+                .dlr-actions.is-single { grid-template-columns: 1fr; }
                 .dlr-options { display: grid; gap: 7px; }
-                .dlr-option { justify-content: space-between; padding: 12px 14px; font-size: 0.86rem; }
-                .dlr-option em { font-style: normal; font-size: 0.76rem; font-weight: 800; color: #ffd75e; }
+                .dlr-option { justify-content: space-between; padding: 12px 14px; font-size: 0.86rem; text-align: left; }
+                .dlr-option em { font-style: normal; font-size: 0.76rem; font-weight: 800; color: #ffd75e; white-space: nowrap; }
+                .dlr-option em.is-blood { color: #ff8f9a; }
 
                 .dlr-bank { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; color: #9aa2ab; }
                 .dlr-bank b { color: #ffd75e; }

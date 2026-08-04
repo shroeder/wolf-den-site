@@ -11360,6 +11360,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upgrades.is-dig { --accent: #ffc061; --accent-soft: rgba(255,192,97,0.45); }  /* warm amber for excavation */
 .sail-upgrades.is-farm { --accent: #7ed57e; --accent-soft: rgba(126,213,126,0.45); } /* pasture-green for the farm */
 .sail-upgrades.is-forge { --accent: #ff9a3c; --accent-soft: rgba(255,154,60,0.5); } /* ember-orange for the forge */
+.sail-upgrades.is-delve { --accent: #b98cff; --accent-soft: rgba(185,140,255,0.5); } /* dungeon violet for the delves */
 /* Glassy, depth-y upgrade card with a tinted accent edge + icon chip (was a flat outline). */
 .sail-upg { position: relative; border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 12px 12px 12px 14px;
     display: flex; flex-direction: column; gap: 7px; overflow: hidden;
@@ -11374,6 +11375,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-upg-ico { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; font-size: 1.05rem; flex: none;
     background: radial-gradient(circle at 35% 28%, rgba(255,255,255,0.18), rgba(255,255,255,0.04)); border: 1px solid var(--accent-soft);
     box-shadow: 0 0 14px -5px var(--accent); }
+/* The chip's IMAGE is sized here, globally, on purpose. UpgCard lives in mining/kit.js and is rendered by six
+   different screens; the only rule that ever sized its icon was `.mine-upg-ico` inside MiningClient's styled-jsx,
+   which is scoped to MiningClient AND aimed at a custom <Img> component — styled-jsx never adds its scope class
+   to a custom component, so it matched nothing anywhere. An unsized 256px sprite in a 30px chip is a mess. */
+.sail-upg-ico img { width: 22px; height: 22px; object-fit: contain; }
+.sail-upg-buy img { width: 16px; height: 16px; object-fit: contain; vertical-align: -2px; }
 .sail-upg-lv { font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
 /* Level progress bar — makes leveling feel like progress, not just a number. */
 .sail-upg-bar { height: 5px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }

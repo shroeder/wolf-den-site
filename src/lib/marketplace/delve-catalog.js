@@ -54,57 +54,57 @@ export const DUNGEONS = [
     {
         id: "hollow", name: "The Hollow Warren", minLevel: 10, tint: "#8fd08a",
         blurb: "A collapsed badger warren under the old orchard. Cramped, damp, and full of things that bite.",
-        bg: "/images/delves/bg-hollow.png",
+        bg: "/images/delves/bg-hollow.webp",
         foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [10, 18],
-        boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.png",
+        boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.webp",
             blurb: "Something far too large for these tunnels, and it has been waiting." },
         foes: [
-            { id: "rootrat", name: "Root Rat", sprite: "/images/delves/foe-rootrat.png" },
-            { id: "grub", name: "Bloated Grub", sprite: "/images/delves/foe-grub.png" },
-            { id: "badger", name: "Snarling Badger", sprite: "/images/delves/foe-badger.png" },
-            { id: "thornling", name: "Thornling", sprite: "/images/delves/foe-thornling.png" },
+            { id: "rootrat", name: "Root Rat", sprite: "/images/delves/foe-rootrat.webp" },
+            { id: "grub", name: "Bloated Grub", sprite: "/images/delves/foe-grub.webp" },
+            { id: "badger", name: "Snarling Badger", sprite: "/images/delves/foe-badger.webp" },
+            { id: "thornling", name: "Thornling", sprite: "/images/delves/foe-thornling.webp" },
         ],
     },
     {
         id: "sunken", name: "The Sunken Vault", minLevel: 20, tint: "#5ad0d0",
         blurb: "A flooded treasury beneath the docks. The water is cold, the gold is real, and so is what guards it.",
-        bg: "/images/delves/bg-sunken.png",
+        bg: "/images/delves/bg-sunken.webp",
         foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [16, 28],
-        boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.png",
+        boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.webp",
             blurb: "It still wears the vault key on a chain. It has not let go in a very long time." },
         foes: [
-            { id: "eelhound", name: "Eelhound", sprite: "/images/delves/foe-eelhound.png" },
-            { id: "barnacle", name: "Barnacle Brute", sprite: "/images/delves/foe-barnacle.png" },
-            { id: "siren", name: "Vault Siren", sprite: "/images/delves/foe-siren.png" },
-            { id: "coffer", name: "Animate Coffer", sprite: "/images/delves/foe-coffer.png" },
+            { id: "eelhound", name: "Eelhound", sprite: "/images/delves/foe-eelhound.webp" },
+            { id: "barnacle", name: "Barnacle Brute", sprite: "/images/delves/foe-barnacle.webp" },
+            { id: "siren", name: "Vault Siren", sprite: "/images/delves/foe-siren.webp" },
+            { id: "coffer", name: "Animate Coffer", sprite: "/images/delves/foe-coffer.webp" },
         ],
     },
     {
         id: "ember", name: "The Ember Deep", minLevel: 30, tint: "#ff9f1c",
         blurb: "A magma seam the miners broke into and sealed again. Whatever they sealed in is still burning.",
-        bg: "/images/delves/bg-ember.png",
+        bg: "/images/delves/bg-ember.webp",
         foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [26, 42],
-        boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.png",
+        boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.webp",
             blurb: "It was a smith once. Now it is the forge." },
         foes: [
-            { id: "emberling", name: "Emberling", sprite: "/images/delves/foe-emberling.png" },
-            { id: "slagbeast", name: "Slag Beast", sprite: "/images/delves/foe-slagbeast.png" },
-            { id: "ashwraith", name: "Ash Wraith", sprite: "/images/delves/foe-ashwraith.png" },
-            { id: "magmite", name: "Magmite", sprite: "/images/delves/foe-magmite.png" },
+            { id: "emberling", name: "Emberling", sprite: "/images/delves/foe-emberling.webp" },
+            { id: "slagbeast", name: "Slag Beast", sprite: "/images/delves/foe-slagbeast.webp" },
+            { id: "ashwraith", name: "Ash Wraith", sprite: "/images/delves/foe-ashwraith.webp" },
+            { id: "magmite", name: "Magmite", sprite: "/images/delves/foe-magmite.webp" },
         ],
     },
     {
         id: "astral", name: "The Astral Spire", minLevel: 50, tint: "#b98cff",
         blurb: "A tower that is only there on some nights. Ten floors up is the same as ten floors down.",
-        bg: "/images/delves/bg-astral.png",
+        bg: "/images/delves/bg-astral.webp",
         foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [40, 66],
-        boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.png",
+        boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.webp",
             blurb: "It has no face, and it is looking at you." },
         foes: [
-            { id: "voidmoth", name: "Void Moth", sprite: "/images/delves/foe-voidmoth.png" },
-            { id: "starhusk", name: "Star Husk", sprite: "/images/delves/foe-starhusk.png" },
-            { id: "mirrorkin", name: "Mirrorkin", sprite: "/images/delves/foe-mirrorkin.png" },
-            { id: "riftling", name: "Riftling", sprite: "/images/delves/foe-riftling.png" },
+            { id: "voidmoth", name: "Void Moth", sprite: "/images/delves/foe-voidmoth.webp" },
+            { id: "starhusk", name: "Star Husk", sprite: "/images/delves/foe-starhusk.webp" },
+            { id: "mirrorkin", name: "Mirrorkin", sprite: "/images/delves/foe-mirrorkin.webp" },
+            { id: "riftling", name: "Riftling", sprite: "/images/delves/foe-riftling.webp" },
         ],
     },
 ];
@@ -119,20 +119,20 @@ export const dungeonById = (id) => DUNGEONS.find((d) => d.id === id) || null;
 // halve the danger instead of deleting it.
 export const DELVE_TRACKS = {
     flask: {
-        col: "flask_level", max: 4, name: "Deeper Flask", icon: "/images/delves/track-flask.png",
+        col: "flask_level", effect: "Potion strength", max: 4, name: "Deeper Flask", icon: "/images/delves/track-flask.webp",
         desc: "Each potion restores more of your health.",
         // 60% base, +3 points a level → 72% at max. Never near 100: a potion is a lifeline, not a reset button.
         fmt: (lv) => `${60 + lv * 3}% healed`,
         cost: (lv) => 1200 + lv * 1100,
     },
     satchel: {
-        col: "satchel_level", max: 2, name: "Wider Satchel", icon: "/images/delves/track-satchel.png",
+        col: "satchel_level", effect: "Potions carried", max: 2, name: "Wider Satchel", icon: "/images/delves/track-satchel.webp",
         desc: "Carry another potion in with you.",
         fmt: (lv) => `${3 + lv} potion${3 + lv === 1 ? "" : "s"}`,
         cost: (lv) => 2600 + lv * 2400,
     },
     ward: {
-        col: "ward_level", max: 4, name: "Warded Cloak", icon: "/images/delves/track-ward.png",
+        col: "ward_level", effect: "Damage taken", max: 4, name: "Warded Cloak", icon: "/images/delves/track-ward.webp",
         desc: "Take less damage from everything down there.",
         fmt: (lv) => `-${(lv * 2.5).toFixed(1).replace(/\.0$/, "")}% damage taken`,
         cost: (lv) => 1500 + lv * 1300,
@@ -154,14 +154,31 @@ export const wardCut = (wardLv = 0) => Math.min(0.10, Math.max(0, wardLv) * 0.02
 //   2. Everything else gets its DUNGEON's version of that kind — ev-hollow-chest, ev-astral-chest. A Warren
 //      chest is a farmer's box in the dirt and a Spire chest is a display case in a starfield; one shared icon
 //      across all four decks quietly undid the theming the decks exist for.
+// ── THE ROOM YOU ARE STANDING IN ─────────────────────────────────────────────────────────────────────────────
+// A backdrop per DUNGEON per KIND. Ten floors used to share one plate, so the run read as one room with the
+// camera nudged around it — a merchant, a trap and the boss all standing in the same corridor. The room now
+// changes when the encounter does, which is the only thing that makes ten floors feel like ten places.
+//
+// A mimic deliberately gets the CHEST room: the whole trick is that the floor looks like a payday right up
+// until the lid opens. `bg-<dungeon>.png` stays as the fallback so a missing plate degrades to the old look
+// rather than to a black box.
+const BG_KINDS = new Set(["fight", "boss", "chest", "cache", "merchant", "shrine", "well", "trap", "rest", "puzzle"]);
+export function encounterBg(dungeonId, event) {
+    const d = dungeonById(dungeonId);
+    const fallback = d?.bg || null;
+    if (!event) return fallback;
+    const kind = event.kind === "mimic" ? "chest" : event.kind;
+    return BG_KINDS.has(kind) ? `/images/delves/bg-${dungeonId}-${kind}.webp` : fallback;
+}
+
 export function encounterArt(dungeonId, event) {
     if (!event) return null;
-    if (event.art) return `/images/delves/${event.art}.png`;
+    if (event.art) return `/images/delves/${event.art}.webp`;
     // A mimic must look EXACTLY like that dungeon's chest until it bites — that is the entire joke. So it
     // borrows the chest icon rather than having one of its own, and only becomes the mimic sprite once the
     // fight starts (the run sends run.foe.sprite from then on).
-    if (event.kind === "mimic") return `/images/delves/ev-${dungeonId}-chest.png`;
+    if (event.kind === "mimic") return `/images/delves/ev-${dungeonId}-chest.webp`;
     // Fights use the foe's own sprite, which the run supplies; everything else is this dungeon's version.
     if (event.kind === "fight" || event.kind === "boss") return null;
-    return `/images/delves/ev-${dungeonId}-${event.kind}.png`;
+    return `/images/delves/ev-${dungeonId}-${event.kind}.webp`;
 }

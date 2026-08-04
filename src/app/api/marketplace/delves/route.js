@@ -37,7 +37,9 @@ export async function POST(request) {
                 case "strike":
                 case "potion":
                 case "choose":
-                case "flee": return noStore(await delveAct(buyer.id, action, body?.choice ?? null));
+                // "onward" replaced "flee": a floor now stops on its result and you tap to leave it. There is
+                // no retreat verb any more — it ended the run for exactly what dying pays.
+                case "onward": return noStore(await delveAct(buyer.id, action, body?.choice ?? null));
                 case "upgrade": return noStore(await upgradeDelve(buyer.id, String(body?.track || "")));
                 case "dismiss": return noStore(await clearDelveRun(buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });

@@ -137,6 +137,55 @@ const ART = {
     "rare-corehall": [`${SCENE} An enormous hollow at the centre of a tower, filled with everything ever lost in it — coins, relics, doors, stairs — all slowly falling upward.`, "rare"],
     "rare-beforeroom": [`${SCENE} A warm furnished room that predates the tower around it: a made bed, a lit fire, a laid table, impossibly ordinary and clearly ancient.`, "rare"],
 
+    // ── PER-ENCOUNTER BACKGROUNDS ───────────────────────────────────────────────────────────────────────────
+    // One backdrop per dungeon was a mistake you could see: the same plate sat behind a merchant, a trap and a
+    // boss, so ten floors read as one room with the camera nudged. A backdrop per KIND per DUNGEON means the
+    // room changes when the encounter changes, which is the whole reason floors are different.
+    // (`mimic` deliberately reuses the chest room — that is the joke.)
+    "bg-hollow-fight": [`${SCENE} A narrow earthen tunnel choke-point where the burrow pinches down: packed soil walls braced with broken timber, torn roots hanging, claw-gouges in the dirt, one shaft of pale light. Damp greens and warm browns.`, "scene"],
+    "bg-hollow-boss": [`${SCENE} A vast root-domed brood chamber at the bottom of the warren: a floor of trampled bedding and gnawed bone, the enormous arch of the orchard's taproot overhead, green fungal glow, every tunnel mouth leading here.`, "scene"],
+    "bg-hollow-chest": [`${SCENE} A dry side-cellar off a badger tunnel, shelved with rotting crates and a collapsed timber rack, dirt floor scuffed where something was dragged in, warm lantern-coloured light from a crack above.`, "scene"],
+    "bg-hollow-cache": [`${SCENE} A small dead-end burrow lined with dry leaves and scavenged brightness — bottle glass, buttons, coins pressed into the walls — lit dimly gold.`, "scene"],
+    "bg-hollow-merchant": [`${SCENE} A widened junction of three burrows where someone has made camp: a hung blanket, crates for a counter, bundled herbs drying from the roots, a hooded lantern. Empty of people.`, "scene"],
+    "bg-hollow-shrine": [`${SCENE} A quiet root-chamber built round a weathered standing stone, ferns and clean water trickling down the wall into a worn basin, soft green light.`, "scene"],
+    "bg-hollow-well": [`${SCENE} A flooded vertical shaft in the earth, black still water filling the floor, roots trailing into it, a rope ladder rotted through, cold light from far above.`, "scene"],
+    "bg-hollow-trap": [`${SCENE} A collapsing stretch of burrow: the roof half down, snapped props, a lattice of thorny roots strung across the passage, soil still falling.`, "scene"],
+    "bg-hollow-rest": [`${SCENE} An old orchard cellar broken into by the warren: burst cider barrels, a swept patch of floor, a shaft of gentle daylight through the caved-in ceiling.`, "scene"],
+    "bg-hollow-puzzle": [`${SCENE} A junction where three identical burrow mouths open in an earthen wall, each framed by roots, one breathing faint warm mist, no way to tell them apart.`, "scene"],
+
+    "bg-sunken-fight": [`${SCENE} A flooded vault corridor, knee-deep dark water between barnacled stone columns, a rusted portcullis half raised, cold teal light rippling on the ceiling.`, "scene"],
+    "bg-sunken-boss": [`${SCENE} The great vault floor itself: an enormous circular door standing open, tide-marked walls, spilled coin drowned under black water, one shaft of grey harbour light from a broken grate.`, "scene"],
+    "bg-sunken-chest": [`${SCENE} A deposit-box room below the waterline, walls of small barnacled iron doors hanging open, water sheeting down, cold green light.`, "scene"],
+    "bg-sunken-cache": [`${SCENE} A silted counting-room floor where coin has spilled from a burst strongbox and lies glinting under a hand's depth of clear water.`, "scene"],
+    "bg-sunken-merchant": [`${SCENE} A dry stone ledge above the flood inside the vault, crates set up as a counter with rope, lamps and salvage laid out, water lapping below. Empty of people.`, "scene"],
+    "bg-sunken-shrine": [`${SCENE} A vaulted alcove of verdigris-streaked stone holding a carved basin of perfectly still clear water, pale light falling straight down into it.`, "scene"],
+    "bg-sunken-well": [`${SCENE} A drowned stairwell dropping away into black water, an iron drain grate at its lip, coins glinting through the bars, cold blue depth below.`, "scene"],
+    "bg-sunken-trap": [`${SCENE} A vault passage with a burst wall seam jetting seawater across cracked flagstones, an iron portcullis dropped halfway, everything slick and running.`, "scene"],
+    "bg-sunken-rest": [`${SCENE} A dry keeper's office above the waterline, a cot and a lit brass lantern, the flood visible through a doorway, calm and quiet.`, "scene"],
+    "bg-sunken-puzzle": [`${SCENE} A great locked vault door of brass dials and lever banks facing a flooded antechamber, cold teal light, a waterlogged note pinned beside it.`, "scene"],
+
+    "bg-ember-fight": [`${SCENE} A basalt gallery in a burning mine, a river of lava in the floor channel, hanging chains, heat shimmer distorting the far end, fierce orange light.`, "scene"],
+    "bg-ember-boss": [`${SCENE} The heart of the sealed forge: a colossal blast furnace built into the rock, white-hot at its mouth, an anvil the size of a cart, chains and slag everywhere, blinding orange.`, "scene"],
+    "bg-ember-chest": [`${SCENE} A smith's storeroom cut into black rock, tool chests and racked ingots, banked coals glowing in a corner hearth, deep shadows and warm rims.`, "scene"],
+    "bg-ember-cache": [`${SCENE} A pour floor where ingots have been stacked and abandoned, still glowing dull orange at the edges, sand moulds cracked open around them.`, "scene"],
+    "bg-ember-merchant": [`${SCENE} A scrapper's pitch beside a cold anvil in a mine gallery, sheets of metal for a counter, tongs and half-finished blades laid out, forge glow behind. Empty of people.`, "scene"],
+    "bg-ember-shrine": [`${SCENE} A quenching hall: a long stone trough of dark water beside a worn anvil, steam rolling off the surface, one shaft of clean light through the smoke.`, "scene"],
+    "bg-ember-well": [`${SCENE} A slag pit — a wide shaft down through cracked basalt with molten orange light far below, chains descending into the heat.`, "scene"],
+    "bg-ember-trap": [`${SCENE} A fractured mine floor venting jets of white steam, magma visible in the fissures, a broken walkway sagging over the crack.`, "scene"],
+    "bg-ember-rest": [`${SCENE} A shift bunkroom cut into the rock: bunks, a cold stove, tin mugs, the forge glow safely distant down the passage.`, "scene"],
+    "bg-ember-puzzle": [`${SCENE} A scorched control gallery of iron levers and pressure gauges facing three sealed blast doors, a burned-away chart on the wall.`, "scene"],
+
+    "bg-astral-fight": [`${SCENE} A stone landing inside an impossible tower, stairs arriving from three wrong directions, a starfield showing through the walls, violet nebula light and drifting motes.`, "scene"],
+    "bg-astral-boss": [`${SCENE} The tower's crown: a circular floor open to the whole night sky, a ring of standing stones, stairs falling upward into a nebula, silver and violet, utterly silent.`, "scene"],
+    "bg-astral-chest": [`${SCENE} A gallery of glass display cases on pale stone plinths, starlight spilling from an open one, the floor reflecting a sky that is not above it.`, "scene"],
+    "bg-astral-cache": [`${SCENE} A weightless drift of coins, rings and small bright objects hanging in a slow cluster in a pale stone room, trailing violet motes.`, "scene"],
+    "bg-astral-merchant": [`${SCENE} A pilgrim's folding counter of pale wood on a landing between stairs, star charts and an astrolabe laid out, a hanging lamp, deep space beyond the rail. Empty of people.`, "scene"],
+    "bg-astral-shrine": [`${SCENE} A still white chamber holding a shallow round font of liquid light on a carved plinth, everything reflected slightly wrong, cold silver glow.`, "scene"],
+    "bg-astral-well": [`${SCENE} A square window frame in a pale stone wall opening straight onto deep starfield with no room behind it, coins scattered on the sill.`, "scene"],
+    "bg-astral-trap": [`${SCENE} A flight of pale stone stairs shearing away mid-air, steps tumbling silently into a violet void, the far side impossibly distant.`, "scene"],
+    "bg-astral-rest": [`${SCENE} A quiet alcove of warm pale stone with a bench and a pool of soft silver light, the starfield hushed behind it.`, "scene"],
+    "bg-astral-puzzle": [`${SCENE} A wall carrying three narrow stone doors crowded into a space too narrow to hold three doors, violet light seaming their edges.`, "scene"],
+
     // ── upgrade track icons ──
     "track-flask": [`${OBJ} An oversized ornate healing flask with a wide belly and brass fittings, deep red liquid, engraved rune on the glass.`, "icon"],
     "track-satchel": [`${OBJ} An open leather adventurer's satchel with three glowing red potion flasks tucked into its loops.`, "icon"],
@@ -154,7 +203,10 @@ async function generate(prompt, kind) {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
                 body: JSON.stringify({
-                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: "low", n: 1,
+                    // Backdrops are the one thing on screen at full size for the whole run, and "low" showed:
+                    // mushy, muddy plates that read as one zoomed texture. Sprites are 256-512px and low is
+                    // genuinely indistinguishable there, so only the scenes pay for the better tier.
+                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: kind === "scene" ? "medium" : "low", n: 1,
                     // Scenes are meant to be opaque plates; everything else must key out cleanly.
                     ...(kind === "scene" || kind === "rare" ? {} : { background: "transparent" }),
                 }),
@@ -171,8 +223,10 @@ async function generate(prompt, kind) {
     return null;
 }
 
+// WEBP, not PNG. The forty encounter backdrops came out of the model at ~1MB each and the delve art folder hit
+// 59MB — a page nobody on a phone would ever finish loading. Same pixels, same alpha, 3.3MB for the lot.
 const want = process.argv.slice(2);
-const keys = Object.keys(ART).filter((k) => (want.length ? want.includes(k) : !fs.existsSync(path.join(OUT, `${k}.png`))));
+const keys = Object.keys(ART).filter((k) => (want.length ? want.includes(k) : !fs.existsSync(path.join(OUT, `${k}.webp`))));
 console.log(`${keys.length} delve images to generate`);
 
 const queue = [...keys];
@@ -182,8 +236,12 @@ await Promise.all(Array.from({ length: 3 }, async () => {
         const [prompt, kind] = ART[k];
         try {
             const buf = await generate(prompt, kind);
-            const out = path.join(OUT, `${k}.png`);
-            await sharp(buf).resize({ width: PX[kind], withoutEnlargement: true }).png({ compressionLevel: 9 }).toFile(out);
+            const out = path.join(OUT, `${k}.webp`);
+            await sharp(buf)
+                .resize({ width: PX[kind], withoutEnlargement: true })
+                // Backdrops are opaque and can take a lower quality; sprites need their alpha kept clean.
+                .webp(kind === "scene" ? { quality: 82 } : { quality: 88, alphaQuality: 100 })
+                .toFile(out);
             done += 1;
             console.log(`✓ ${k} (${kind}, ${Math.round(fs.statSync(out).size / 1024)}kb)`);
         } catch (e) {

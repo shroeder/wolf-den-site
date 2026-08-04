@@ -4,13 +4,14 @@
 // Pick a dungeon, or spend gold on the three things that change how a run feels. A locked dungeon still shows
 // its art and its boss — you should be able to see what you are working toward, not a grey box with a padlock.
 
+import { UpgCard } from "@/components/mining/kit.js";
+
 const money = (n) => Number(n || 0).toLocaleString();
 
-function Img({ src, className, alt = "" }) {
-    if (!src) return null;
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} className={className} alt={alt} draggable="false" loading="lazy" />;
-}
+// Raw <img> everywhere, deliberately. A local `Img` component looks tidier and silently breaks every style
+// rule aimed at it: styled-jsx appends its `jsx-<hash>` scope class to DOM elements only, never to a custom
+// component, so `.dlv-track-ico { width: 34px }` compiled to `.dlv-track-ico.jsx-abc` and matched nothing. The
+// upgrade icons rendered at their natural 256px inside a 38px grid track and buried the card under a potion.
 
 export default function DelveHall({ state, busy, onAct }) {
     const { dungeons = [], tracks = [], potions, stats, gold, power } = state;
@@ -23,8 +24,10 @@ export default function DelveHall({ state, busy, onAct }) {
                     return (
                         <div key={d.id} className={`dlv-card${locked ? " is-locked" : ""}`} style={{ "--tint": d.tint }}>
                             <div className="dlv-card-art">
-                                <Img src={d.bg} className="dlv-card-bg" />
-                                <Img src={d.boss.sprite} className="dlv-card-boss" alt={d.boss.name} />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={d.bg} className="dlv-card-bg" alt="" draggable="false" loading="lazy" />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={d.boss.sprite} className="dlv-card-boss" alt={d.boss.name} draggable="false" loading="lazy" />
                                 <span className="dlv-card-scrim" aria-hidden="true" />
                                 <span className="dlv-card-floors">{d.floors} floors</span>
                             </div>
@@ -70,34 +73,17 @@ export default function DelveHall({ state, busy, onAct }) {
             </div>
 
             <div className="dlv-kit">
-                <Img src="/images/delves/ev-potion.png" className="dlv-kit-ico" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/delves/ev-potion.webp" className="dlv-kit-ico" alt="" draggable="false" />
                 <span>You go in with <b>{potions?.count} potions</b>, each restoring <b>{potions?.healPct}%</b> of your health.</span>
             </div>
 
-            <div className="dlv-upgrades">
-                <div className="dlv-sec-head">Provisions <span className="muted">· {money(gold)} gold</span></div>
-                {tracks.map((t) => (
-                    <div key={t.key} className={`dlv-track${t.maxed ? " is-maxed" : ""}`}>
-                        <Img src={t.icon} className="dlv-track-ico" />
-                        <div className="dlv-track-body">
-                            <div className="dlv-track-top">
-                                <b>{t.name}</b>
-                                <span className="muted">Lv {t.level}/{t.max}</span>
-                            </div>
-                            <div className="dlv-track-desc">{t.desc}</div>
-                            <div className="dlv-track-eff">
-                                <span>{t.now}</span>
-                                {t.next ? <><span className="dlv-track-arrow" aria-hidden="true">→</span><b>{t.next}</b></> : null}
-                            </div>
-                        </div>
-                        {t.maxed
-                            ? <span className="dlv-track-max">MAX</span>
-                            : <button type="button" className="dlv-btn is-ghost dlv-track-buy" disabled={busy || gold < t.cost}
-                                onClick={() => onAct("upgrade", { track: t.key })}>
-                                {money(t.cost)}
-                            </button>}
-                    </div>
-                ))}
+            {/* THE SHARED UPGRADE CARD. Sailing, the farm, the kitchen, the forge and the mine all buy their
+                levers through .sail-upgrades / UpgCard; the delve had grown its own list with its own spacing,
+                its own level pill and its own price button, which is why it looked like a different game. */}
+            <div className="dlv-sec-head">Provisions <span className="muted">· {money(gold)} gold</span></div>
+            <div className="sail-upgrades is-delve">
+                {tracks.map((t) => <UpgCard key={t.key} t={t} gold={gold} busy={busy} onBuy={() => onAct("upgrade", { track: t.key })} />)}
             </div>
 
             {stats?.started ? (
@@ -143,22 +129,10 @@ export default function DelveHall({ state, busy, onAct }) {
                 .dlv-power-note b { color: #d9c2ff; }
                 .dlv-kit { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; padding: 10px 12px; border-radius: 12px;
                     font-size: 12.5px; color: #cdd3d8; background: rgba(185,140,255,0.08); border: 1px solid rgba(185,140,255,0.28); }
-                .dlv-kit-ico { width: 26px; height: 26px; object-fit: contain; }
+                .dlv-kit-ico { width: 30px; height: 30px; object-fit: contain; flex: 0 0 auto; }
                 .dlv-kit b { color: #e0ceff; }
 
                 .dlv-sec-head { margin: 16px 0 8px; font-size: 12.5px; font-weight: 900; color: #d9c2ff; }
-                .dlv-upgrades { display: grid; gap: 8px; }
-                .dlv-track { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px;
-                    padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); }
-                .dlv-track.is-maxed { border-color: rgba(255,215,94,0.35); background: rgba(255,215,94,0.07); }
-                .dlv-track-ico { width: 34px; height: 34px; object-fit: contain; }
-                .dlv-track-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
-                .dlv-track-desc { font-size: 11px; color: #9aa2ab; margin-top: 1px; }
-                .dlv-track-eff { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; color: #bda9d8; }
-                .dlv-track-arrow { color: #6f6486; }
-                .dlv-track-buy { width: auto; padding: 9px 14px; font-size: 0.82rem; }
-                .dlv-track-max { font-size: 10.5px; font-weight: 900; color: #ffd75e; letter-spacing: .08em; }
-
                 .dlv-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding-top: 11px;
                     border-top: 1px solid rgba(255,255,255,0.08); font-size: 11.5px; color: #9aa2ab; }
                 .dlv-stats b { color: #d9c2ff; }
