@@ -186,7 +186,11 @@ export async function getArenaState(buyerId) {
     const used = fightsUsed(row);
     const rung = Math.min(Number(row?.rung) || 0, Math.max(0, ladder.length));
     const next = ladder[rung] || null;
-    const bout = row?.bout_json && !row.bout_json.over ? row.bout_json : null;
+    // The bout is returned EVEN WHEN IT IS OVER. Dropping it the instant somebody fell meant the client
+    // snapped back to the ladder mid-swing: the killing blow, the result card and the rank-up were all
+    // unreachable code. It is cleared by the Back-to-the-ladder tap (clearBout), which is what that verb is
+    // for. startBout still refuses to deal a new one while an UNFINISHED bout is on the row.
+    const bout = row?.bout_json || null;
 
     return {
         unlocked: true,

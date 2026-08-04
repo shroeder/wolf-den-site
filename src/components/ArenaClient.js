@@ -45,10 +45,10 @@ function blip(kind) {
 }
 
 // A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
-function Fighter({ f, hp, maxHp, mirrored, hurt, lunge }) {
+function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
     return (
-        <div className={`ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`}>
+        <div className={`ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}${down ? " is-down" : ""}`}>
             <div className="ar-plate">
                 <b className="ar-fname">{f?.name}</b>
                 <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
@@ -80,8 +80,10 @@ export default function ArenaClient({ initial }) {
                 body: JSON.stringify({ action, ...extra }),
             }).then((x) => x.json()).catch(() => null);
             if (r?.unlocked) setSt(r);
-            // Crossing a band is the biggest thing that happens in here, so it gets the whole screen.
-            if (r?.finished?.rankUp) { setRankUp(r.finished.rankUp); blip("win"); }
+            // Crossing a band is the biggest thing that happens in here, so it gets the whole screen — but
+            // AFTER the blow that earned it. Firing it on the same frame as the reply threw the celebration
+            // over the top of the swing that caused it.
+            if (r?.finished?.rankUp) setTimeout(() => { setRankUp(r.finished.rankUp); blip("win"); }, 1700);
         } finally { setBusy(false); }
     }, [busy]);
 
@@ -117,9 +119,17 @@ export default function ArenaClient({ initial }) {
                     <span className="ar-ring-scrim" aria-hidden="true" />
                     <span className="ar-round">Round {bout.round}</span>
                     <div className="ar-floor">
-                        <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1} />
-                        <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2} />
+                        <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
+                            down={bout.over && !bout.won} />
+                        <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
+                            down={bout.over && bout.won} />
                     </div>
+                    {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
+                    {bout.over ? (
+                        <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
+                            <b>{bout.won ? "Down" : "You fall"}</b>
+                        </div>
+                    ) : null}
                     {clash ? (
                         <div className="ar-clash" aria-hidden="true">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -135,6 +145,11 @@ export default function ArenaClient({ initial }) {
 
                 {bout.over ? (
                     <div className={`ar-result ${bout.won ? "is-win" : "is-loss"}`}>
+                        {bout.won ? (
+                            <div className="ar-rays" aria-hidden="true">
+                                {Array.from({ length: 18 }).map((_, i) => <span key={i} style={{ "--a": `${i * 20}deg`, animationDelay: `${(i % 5) * 0.05}s` }} />)}
+                            </div>
+                        ) : null}
                         <b>{bout.won ? `You beat ${bout.foe.name}` : `${bout.foe.name} put you down`}</b>
                         {bout.won && bout.reward ? (
                             <p>+{money(bout.reward.gold)} gold · +{money(bout.reward.xp)} XP{bout.reward.chest ? ` · a ${bout.reward.chest} chest` : ""}</p>
@@ -433,6 +448,19 @@ function Styles() {
                 animation: arSpark .5s ease-out .3s both; }
             @keyframes arSpark { 0% { opacity: 0; transform: scale(.3) } 40% { opacity: 1; transform: scale(1.15) } 100% { opacity: 0; transform: scale(1.5) } }
 
+            /* A felled fighter drops to the sand and greys out — you SEE the blow land instead of being
+               teleported to a summary. */
+            .ar-fighter.is-down .ar-hero { animation: arDown .6s cubic-bezier(.4,0,.6,1) both; }
+            @keyframes arDown { to { transform: translateY(16px) rotate(-16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
+            .ar-fighter.is-foe.is-down .ar-hero { animation: arDownFoe .6s cubic-bezier(.4,0,.6,1) both; }
+            @keyframes arDownFoe { to { transform: scaleX(-1) translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
+            .ar-verdict { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; pointer-events: none; }
+            .ar-verdict b { font-size: 2.1rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+                animation: arVerdict .55s cubic-bezier(.2,1.5,.35,1) .25s both; }
+            .ar-verdict.is-win b { color: #ffe28a; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,190,60,.9); }
+            .ar-verdict.is-loss b { color: #ffb0b8; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,80,100,.8); }
+            @keyframes arVerdict { from { opacity: 0; transform: scale(1.7) } to { opacity: 1; transform: scale(1) } }
+
             .ar-beat { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: #e4d9c6; text-align: center; }
 
             .ar-tell { margin: 10px 0 12px; font-size: 12px; color: #cbb; text-align: center; }
@@ -449,8 +477,11 @@ function Styles() {
             .ar-stance.is-guard { border-color: rgba(111,208,255,0.5); }
             .ar-stance.is-feint { border-color: rgba(185,140,255,0.5); }
 
-            .ar-result { margin-top: 4px; padding: 15px; border-radius: 14px; text-align: center; }
-            .ar-result.is-win { background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.45); }
+            .ar-result { position: relative; overflow: hidden; margin-top: 10px; padding: 15px; border-radius: 14px; text-align: center; }
+            /* --rank is what .ar-rays colours itself from; the rays are shared with the rank-up card, which
+               sets it per band. On a plain win there is no band, so it needs a default or the rays render
+               transparent. */
+            .ar-result.is-win { --rank: #ffd75e; background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.45); }
             .ar-result.is-loss { background: rgba(255,111,125,0.09); border: 1px solid rgba(255,111,125,0.4); }
             .ar-result b { font-size: 1.05rem; color: #fff; }
             .ar-result p { margin: 6px 0 12px; font-size: 12.5px; color: #cbd3dc; }
