@@ -49,7 +49,7 @@ export default function FishingLaunch() {
                     <div className="fishlaunch-art" aria-hidden="true">🎣</div>
                     <h2>Fishing is live</h2>
                     <p>
-                        Drop a line over the rail while your boat&apos;s at sea. <b>24 species</b> to find, a personal
+                        Drop a line over the rail while your boat&apos;s at sea. <b>34 species</b> to find, a personal
                         best for each one, and a Den-wide record board to get your name onto.
                     </p>
                     <ul className="fishlaunch-list">

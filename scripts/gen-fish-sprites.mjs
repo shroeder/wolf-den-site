@@ -48,6 +48,17 @@ const FISH = {
     fish_kraken: "A young kraken with thick suckered tentacles coiling around it, deep purple and menacing",
     fish_leviathan: "A small dragon-like sea leviathan with finned spines down its back and a serpentine body",
     fish_starfish: "A five-pointed star fallen from the sky, glowing gold-white with a comet shimmer",
+    // ── the ten added after the survey asked for more species ──
+    fish_herring: "A slim silver herring with a deep blue back and a bright mirrored flank, small and quick",
+    fish_cockle: "A ridged sand cockle shell, cream and tan with fine fan ribs, one shell slightly open",
+    fish_smelt: "A tiny translucent river smelt with a pale green sheen and a faint silver lateral stripe",
+    fish_eel: "A slender ribbon eel with a long undulating body in vivid blue and yellow, flared nostrils",
+    fish_seabass: "A stout kelp bass in mottled olive and bronze with a broad spiny dorsal fin",
+    fish_urchin: "A round fire urchin covered in dense orange-red spines with a glowing ember core",
+    fish_sunfish: "A huge disc-shaped ocean sunfish, silver-grey and flattened, with tall paddle fins above and below",
+    fish_lionfish: "A dramatic lionfish with long banded fan-like fins in ember orange and cream, spines fully spread",
+    fish_narwhal: "A pale frost-white narwhal with a long spiralled ivory tusk and faint blue ice shimmer",
+    fish_tidewyrm: "A small coiling sea-dragon hatchling with jade scales, delicate fins and a glowing tide-blue crest",
 };
 
 const shrink = (buf) => sharp(buf)

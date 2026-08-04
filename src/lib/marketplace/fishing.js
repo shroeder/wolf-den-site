@@ -54,40 +54,56 @@ const F = (id, name, emoji, rarity, odds, lb, gold, xp) => ({ id, name, emoji, r
 // mythic — which shows up about twice a month — actually feels like an event.
 // Odds are literal percentages of a catch and sum to 100, so the table can be read straight down without doing
 // any arithmetic: a Sardine is 14 casts in 100, a Leviathan Fry is 1 in 500.
+// TEN NEW SPECIES (asked for in the survey — "Id love more fish species"). 24 -> 34.
+//
+// Every band's TOTAL is unchanged: common still 62, rare 28, epic 8, legendary 1.6, mythic 0.4. The existing
+// species were shaved to make room rather than the bands being widened, because the band totals ARE the
+// economy — widening `epic` to fit two more epics would quietly make every day's fishing more valuable, and
+// nothing else in the game moved to pay for it. More things to find; the same odds of finding something good.
 export const FISH = [
     // ── COMMON · 62% of catches ──
-    F("fish_sardine", "Sardine", "🐟", "common", 14.0, [0.1, 0.8], 4, 4),
-    F("fish_perch", "Silver Perch", "🐟", "common", 13.0, [0.4, 3.0], 4, 4),
-    F("fish_mackerel", "Mackerel", "🐟", "common", 12.0, [0.8, 6.0], 6, 6),
-    F("fish_crab", "Rock Crab", "🦀", "common", 11.5, [0.5, 4.0], 6, 6),
-    F("fish_squid", "Bay Squid", "🦑", "common", 11.5, [1.0, 9.0], 8, 6),
+    F("fish_sardine", "Sardine", "🐟", "common", 9.0, [0.1, 0.8], 4, 4),
+    F("fish_perch", "Silver Perch", "🐟", "common", 8.5, [0.4, 3.0], 4, 4),
+    F("fish_mackerel", "Mackerel", "🐟", "common", 8.0, [0.8, 6.0], 6, 6),
+    F("fish_crab", "Rock Crab", "🦀", "common", 7.5, [0.5, 4.0], 6, 6),
+    F("fish_squid", "Bay Squid", "🦑", "common", 7.5, [1.0, 9.0], 8, 6),
+    F("fish_herring", "Silver Herring", "🐟", "common", 7.5, [0.2, 1.6], 5, 5),
+    F("fish_cockle", "Sand Cockle", "🐚", "common", 7.0, [0.1, 0.6], 5, 5),
+    F("fish_smelt", "River Smelt", "🐟", "common", 7.0, [0.1, 1.1], 5, 4),
 
     // ── RARE · 28% ──
-    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 6.0, [2.0, 16.0], 14, 10),
-    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 5.5, [0.2, 1.5], 12, 8),
-    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 5.0, [1.0, 7.0], 16, 10),
-    F("fish_lobster", "Blue Lobster", "🦞", "rare", 4.5, [1.5, 12.0], 20, 14),
-    F("fish_octopus", "Reef Octopus", "🐙", "rare", 4.0, [3.0, 34.0], 18, 12),
+    F("fish_snapper", "Ruby Snapper", "🐠", "rare", 3.5, [2.0, 16.0], 14, 10),
+    F("fish_shrimp", "Tiger Prawn", "🦐", "rare", 3.5, [0.2, 1.5], 12, 8),
+    F("fish_pufferfish", "Pufferfish", "🐡", "rare", 3.2, [1.0, 7.0], 16, 10),
+    F("fish_lobster", "Blue Lobster", "🦞", "rare", 3.2, [1.5, 12.0], 20, 14),
+    F("fish_octopus", "Reef Octopus", "🐙", "rare", 3.0, [3.0, 34.0], 18, 12),
     F("fish_moonfish", "Moonfish", "🌙", "rare", 3.0, [2.0, 24.0], 20, 14),
+    F("fish_eel", "Ribbon Eel", "🐍", "rare", 3.0, [1.0, 9.0], 18, 12),
+    F("fish_seabass", "Kelp Bass", "🐟", "rare", 2.9, [3.0, 26.0], 16, 11),
+    F("fish_urchin", "Fire Urchin", "🌰", "rare", 2.7, [0.3, 2.4], 22, 15),
 
     // ── EPIC · 8% ──
-    F("fish_swordfish", "Swordfish", "🗡️", "epic", 2.0, [45, 700], 40, 26),
-    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 2.0, [60, 900], 36, 24),
-    F("fish_manta", "Manta Ray", "🪁", "epic", 1.6, [150, 2400], 46, 30),
-    F("fish_stormpike", "Storm Pike", "⚡", "epic", 1.4, [6, 48], 48, 32),
-    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 1.0, [2, 18], 44, 28),
+    F("fish_swordfish", "Swordfish", "🗡️", "epic", 1.4, [45, 700], 40, 26),
+    F("fish_tuna", "Bluefin Tuna", "🐟", "epic", 1.3, [60, 900], 36, 24),
+    F("fish_manta", "Manta Ray", "🪁", "epic", 1.2, [150, 2400], 46, 30),
+    F("fish_stormpike", "Storm Pike", "⚡", "epic", 1.2, [6, 48], 48, 32),
+    F("fish_anglerfish", "Anglerfish", "🏮", "epic", 1.1, [2, 18], 44, 28),
+    F("fish_sunfish", "Ocean Sunfish", "☀️", "epic", 0.9, [300, 4200], 50, 34),
+    F("fish_lionfish", "Emberfin Lionfish", "🦁", "epic", 0.9, [1.5, 14], 52, 34),
 
     // ── LEGENDARY · 1.6% ──
-    F("fish_shark", "Great White", "🦈", "legendary", 0.5, [400, 2800], 96, 66),
-    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 0.45, [180, 700], 88, 60),
-    F("fish_marlin", "Black Marlin", "🐟", "legendary", 0.4, [220, 1600], 104, 72),
-    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 0.25, [60, 240], 120, 84),
+    F("fish_shark", "Great White", "🦈", "legendary", 0.40, [400, 2800], 96, 66),
+    F("fish_dolphin", "Ghost Dolphin", "🐬", "legendary", 0.35, [180, 700], 88, 60),
+    F("fish_marlin", "Black Marlin", "🐟", "legendary", 0.32, [220, 1600], 104, 72),
+    F("fish_coelacanth", "Coelacanth", "🦴", "legendary", 0.28, [60, 240], 120, 84),
+    F("fish_narwhal", "Frost Narwhal", "🦄", "legendary", 0.25, [900, 3600], 130, 90),
 
-    // ── MYTHIC · 0.4% — four of these exist in the whole ocean ──
-    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 0.15, [4000, 40000], 210, 156),
-    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 0.1, [300, 4200], 240, 180),
-    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 0.1, [500, 6000], 280, 204),
-    F("fish_starfish", "Fallen Star", "⭐", "mythic", 0.05, [0.5, 9.0], 300, 228),
+    // ── MYTHIC · 0.4% — five of these exist in the whole ocean ──
+    F("fish_whale", "Sunlit Whale", "🐋", "mythic", 0.12, [4000, 40000], 210, 156),
+    F("fish_kraken", "Kraken Spawn", "🦑", "mythic", 0.09, [300, 4200], 240, 180),
+    F("fish_leviathan", "Leviathan Fry", "🐉", "mythic", 0.08, [500, 6000], 280, 204),
+    F("fish_starfish", "Fallen Star", "⭐", "mythic", 0.06, [0.5, 9.0], 300, 228),
+    F("fish_tidewyrm", "Tidewyrm Hatchling", "🐲", "mythic", 0.05, [700, 8000], 320, 240),
 ];
 
 const BY_ID = new Map(FISH.map((f) => [f.id, f]));

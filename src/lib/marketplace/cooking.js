@@ -263,12 +263,14 @@ export const PREPS = {
     p_dough:     { name: "Risen Dough",       rarity: "common" },
     p_butter:    { name: "Churned Butter",    rarity: "common" },
     p_stock:     { name: "Fish Stock",        rarity: "common" },
+    p_brine:     { name: "Brined Cockles",    rarity: "common" },
     p_jam:       { name: "Berry Jam",         rarity: "rare" },
     p_syrup:     { name: "Golden Syrup",      rarity: "rare" },
     p_puree:     { name: "Pumpkin Puree",     rarity: "rare" },
     p_wine:      { name: "Dark Wine",         rarity: "rare" },
     p_smoked:    { name: "Smoked Fillet",     rarity: "epic" },
     p_roe:       { name: "Cured Roe",         rarity: "epic" },
+    p_chilli:    { name: "Urchin Fire Oil",   rarity: "epic" },
     p_essence:   { name: "Star Essence",      rarity: "legendary" },
     p_leviathan: { name: "Leviathan Marrow",  rarity: "legendary" },
 };
@@ -292,6 +294,8 @@ export const RECIPES = [
     P("k_wine",    "Press the Grapes",   2, { grape: 5 },                        "p_wine",      "Six months in the dark, and worth it."),
     P("k_smoked",  "Smoke the Fillet",   3, { fish_tuna: 1, wheat: 2 },          "p_smoked",    "Two days over green wood."),
     P("k_roe",     "Cure the Roe",       3, { fish_snapper: 2, fish_perch: 2 },  "p_roe",       "Salt, patience, a cold cellar."),
+    P("k_brine",   "Brine the Cockles",  1, { fish_cockle: 4 },                  "p_brine",     "Two days in salt water and they open themselves."),
+    P("k_chilli",  "Draw the Fire Oil",  3, { fish_urchin: 2, corn: 2 },         "p_chilli",    "Handle the spines first. Everyone forgets once."),
     P("k_essence", "Distil the Star",    4, { starfruit: 3 },                    "p_essence",   "It hums faintly against the glass."),
     P("k_marrow",  "Render the Marrow",  4, { fish_whale: 1, fish_kraken: 1 },   "p_leviathan", "Nobody agrees on how it should be done."),
 
@@ -306,10 +310,16 @@ export const RECIPES = [
     R("r_sardines",    "Salt Sardines",      1, { fish_sardine: 3 },              "Eaten standing up, off the dock."),
     R("r_potato_cake", "Potato Cakes",       1, { potato: 2, p_flour: 1 },        "Fried in whatever's left in the pan."),
     R("r_perch_fry",   "Pan-Fried Perch",    1, { fish_perch: 2, p_butter: 1 },   "Salt, fire, nothing else."),
+    // ── added when the survey asked for more fish; most of these are what to DO with the new species ──
+    R("r_smelt_fry",   "Whitebait Fry",      1, { fish_smelt: 4 },                "Eaten whole, by the handful."),
+    R("r_cockle_broth","Cockle Broth",       1, { p_brine: 1, carrot: 2 },        "Thin, clean, and better than it sounds."),
+    R("r_herring_roll","Pickled Herring Roll",1, { fish_herring: 2, p_dough: 1 }, "The dockhands' lunch, and they were right."),
 
     // ═══ TIER 2 · Hearty ═══
     R("r_fish_stew",   "Fisherman's Stew",   2, { p_stock: 1, potato: 2, fish_mackerel: 1 }, "Everything that didn't sell, in one pot."),
     R("r_berry_tart",  "Berry Tart",         2, { p_jam: 1, p_dough: 1 },         "Worth burning your mouth for."),
+    R("r_eel_skewer",  "Glazed Eel Skewers", 2, { fish_eel: 1, p_syrup: 1 },      "Sweet, sticky, gone in a minute."),
+    R("r_bass_bake",   "Kelp Bass Bake",     2, { fish_seabass: 1, potato: 2, p_butter: 1 }, "Wrapped in the weed it was pulled from."),
     R("r_corn_chowder","Corn Chowder",       2, { corn: 3, potato: 2, p_stock: 1 }, "Thick enough to stand a spoon in."),
     R("r_squid_ink",   "Squid Ink Supper",   2, { fish_squid: 2, p_dough: 1 },    "Black as a moonless tide."),
     R("r_shrimp_pot",  "Prawn Pot",          2, { fish_shrimp: 3, p_butter: 1 },  "Gone in about four minutes."),
@@ -324,6 +334,9 @@ export const RECIPES = [
     // ═══ TIER 3 · Fine ═══
     R("r_harvest_pie", "Harvest Pie",        3, { p_puree: 1, p_dough: 1, carrot: 2 }, "The whole field, baked."),
     R("r_crab_boil",   "Crab Boil",          3, { fish_crab: 4, corn: 2, potato: 2 }, "Eaten with your hands, at a long table."),
+    R("r_fire_stew",   "Ember Urchin Stew",  3, { p_chilli: 1, p_stock: 1, potato: 2 }, "It bites back. That is the point."),
+    R("r_lionfish",    "Lionfish En Papillote", 3, { fish_lionfish: 1, p_butter: 1, carrot: 2 }, "All those spines, for this."),
+    R("r_cockle_pasta","Cockle Linguine",    3, { p_brine: 1, p_flour: 2, p_wine: 1 }, "The sauce is mostly the sea."),
     R("r_grape_glaze", "Glazed Roast",       3, { p_wine: 1, potato: 3 },         "Sticky, dark and slightly boozy."),
     R("r_lobster_roll","Lobster Roll",       3, { fish_lobster: 1, p_dough: 1, p_butter: 1 }, "Cold claw, warm bun, too much butter."),
     R("r_smoked_plate","Smokehouse Plate",   3, { p_smoked: 1, p_dough: 1 },      "Best eaten leaning against something."),
@@ -338,6 +351,8 @@ export const RECIPES = [
     // ═══ TIER 4 · Exquisite ═══
     R("r_lobster",     "Buttered Lobster",   4, { fish_lobster: 2, p_butter: 2, p_wine: 1 }, "The reason people row out in bad weather."),
     R("r_gold_pie",    "Golden Apple Pie",   4, { goldenapple: 2, p_dough: 1, p_syrup: 1 },  "They say it's good for the heart."),
+    R("r_sunfish",     "Sunfish Grand Plate", 4, { fish_sunfish: 1, p_puree: 1, p_butter: 2 }, "One fish. The entire table."),
+    R("r_narwhal",     "Frost Narwhal Loin",  4, { fish_narwhal: 1, p_smoked: 1, p_wine: 1 },  "Served cold enough to ache."),
     R("r_surf_turf",   "Surf and Turf",      4, { fish_octopus: 1, p_puree: 1, corn: 3 },    "Two whole days of work on one plate."),
     R("r_caviar",      "Cured Roe Service",  4, { p_roe: 2, p_dough: 1 },                    "Served on ice, in silence."),
     R("r_shark_steak", "Great White Steak",  4, { fish_shark: 1, p_wine: 1, p_butter: 1 },   "You are, briefly, top of the food chain."),
@@ -354,6 +369,8 @@ export const RECIPES = [
     R("r_kraken",      "Kraken Feast",       5, { fish_kraken: 1, p_wine: 2, p_butter: 2 },   "Served to the whole table, or not at all."),
     R("r_whale",       "Sunlit Whale Course",5, { fish_whale: 1, p_essence: 1, p_smoked: 1 }, "A dish people will still mention next winter."),
     R("r_fallen_star", "Fallen Star Plate",  5, { fish_starfish: 1, p_essence: 2 },           "It is still warm. It should not be."),
+    R("r_tidewyrm",    "Tidewyrm Ascendant", 5, { fish_tidewyrm: 1, p_essence: 1, p_chilli: 1 }, "It was still curling when it went in."),
+    R("r_deep_table",  "The Deep Table",     5, { fish_sunfish: 1, fish_narwhal: 1, p_roe: 1, p_brine: 2 }, "Everything the cold water gave up this year."),
     R("r_grand_feast", "The Grand Feast",    5, { p_leviathan: 1, p_essence: 1, p_roe: 1, p_wine: 2 }, "Everything you have, all at once."),
     R("r_wolfs_table", "The Wolf's Table",   5, { p_smoked: 2, p_roe: 1, p_syrup: 1, goldenapple: 2 }, "The one the whole den turns up for."),
 ];
