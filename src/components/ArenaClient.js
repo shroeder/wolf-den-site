@@ -68,21 +68,31 @@ export default function ArenaClient({ initial }) {
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
     const [clash, setClash] = useState(null);   // the two stances that just met
+    const [err, setErr] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     const logEnd = useRef(null);
 
+    // Every action goes through here, and it now says so when one fails. A tap that silently does nothing is
+    // the worst outcome available: somebody sat on a finished bout tapping "Back to the ladder" with no
+    // message, no spinner and no way out.
     const act = useCallback(async (action, extra = {}) => {
         if (busy) return;
-        setBusy(true);
+        setBusy(true); setErr(null);
         try {
             const r = await fetch("/api/marketplace/arena", {
                 method: "POST", headers: { "content-type": "application/json" },
                 body: JSON.stringify({ action, ...extra }),
             }).then((x) => x.json()).catch(() => null);
+
             if (r?.unlocked) setSt(r);
-            // Crossing a band is the biggest thing that happens in here, so it gets the whole screen — but
-            // AFTER the blow that earned it. Firing it on the same frame as the reply threw the celebration
-            // over the top of the swing that caused it.
+            else if (action === "dismiss") {
+                // LAST RESORT, and the important one. The bout is finished either way — the win is already
+                // banked server-side — so if the request fails there is no reason to hold somebody hostage on
+                // the result screen. Drop it locally and let the next read reconcile.
+                setSt((prev) => (prev ? { ...prev, bout: null } : prev));
+            } else {
+                setErr(r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again.");
+            }
             if (r?.finished?.rankUp) setTimeout(() => { setRankUp(r.finished.rankUp); blip("win"); }, 1700);
         } finally { setBusy(false); }
     }, [busy]);
@@ -169,6 +179,7 @@ export default function ArenaClient({ initial }) {
                     </div>
                 )}
 
+                {err ? <p className="ar-err">{err}</p> : null}
                 {bout.log?.length ? (
                     <div className="ar-log">
                         {bout.log.slice(-8).map((l, i) => (
@@ -486,6 +497,9 @@ function Styles() {
             .ar-result b { font-size: 1.05rem; color: #fff; }
             .ar-result p { margin: 6px 0 12px; font-size: 12.5px; color: #cbd3dc; }
 
+            .ar-err { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
+                font-size: 12px; font-weight: 800; color: #ffd0a0;
+                background: rgba(255,160,80,0.12); border: 1px solid rgba(255,160,80,0.4); }
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             .ar-line { font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
