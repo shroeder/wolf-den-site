@@ -13,9 +13,10 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 // One persistent rating row per (rater → owner), so a farm's tally stays "how many people love this farm" and
 // never inflates into "how many clicks".
 //
-// You may rate the same person again each DAY (mig311), and at most once per person per store-local day — so
-// the three you get have to be spread across three different farms. Changing your mind on someone you already
-// rated today still costs a charge and pays nothing: that is a revision, not a fresh visit.
+// A rating row holds your CURRENT tier plus a VOTE COUNT. You may rate the same person again each DAY, at most
+// once per person per store-local day, so your three have to be spread across three different farms — and every
+// visit ADDS to that farm's total, which is the whole reason to come back. Changing your mind on someone you
+// already rated today still costs a charge and pays nothing: that is a revision, not a fresh visit.
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // THREE A DAY, ONE PER PERSON — so the three have to be SPREAD.
 //
@@ -63,18 +64,29 @@ async function rateCharge(buyerId) {
 
 // Aggregate counts of a farm's likes, by tier + total, plus the viewer's own current rating.
 async function ratingSummary(ownerId, viewerId) {
-    const [rows, mine] = await Promise.all([
-        db.query(`SELECT tier, COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1 GROUP BY tier`, [ownerId]).catch(() => []),
+    // SUM(votes), not COUNT(*). The tally used to count distinct RATERS, so coming back the next day to rate
+    // a friend again spent a charge, paid XP to both sides, and moved their number by nothing at all.
+    const [rows, mine, supporters] = await Promise.all([
+        db.query(`SELECT tier, SUM(votes)::int AS n FROM mkt_farm_rating WHERE owner_id = $1 GROUP BY tier`, [ownerId]).catch(() => []),
         viewerId && String(viewerId) !== String(ownerId)
-            ? db.queryOne(`SELECT tier, (last_rated_day = ${DAY}) AS rated_today FROM mkt_farm_rating WHERE owner_id = $1 AND rater_id = $2`, [ownerId, viewerId]).catch(() => null)
+            ? db.queryOne(`SELECT tier, votes, (last_rated_day = ${DAY}) AS rated_today FROM mkt_farm_rating WHERE owner_id = $1 AND rater_id = $2`, [ownerId, viewerId]).catch(() => null)
             : Promise.resolve(null),
+        // Distinct people is still worth showing beside the vote total — "12 votes from 5 friends" says more
+        // than either number alone.
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [ownerId]).catch(() => null),
     ]);
     const byTier = { 1: 0, 2: 0, 3: 0 };
     for (const r of rows || []) byTier[r.tier] = r.n;
     const total = byTier[1] + byTier[2] + byTier[3];
     // ratedToday drives the button state: your tier is still shown as yours, but the farm can say "come back
     // tomorrow" rather than looking like a live button that silently does nothing.
-    return { total, byTier, myTier: mine?.tier || null, ratedToday: Boolean(mine?.rated_today) };
+    return {
+        total, byTier,
+        supporters: Number(supporters?.n) || 0,
+        myTier: mine?.tier || null,
+        myVotes: Number(mine?.votes) || 0,
+        ratedToday: Boolean(mine?.rated_today),
+    };
 }
 
 // ── WHERE YOU PLACE, NOT WHAT YOU SCORED ─────────────────────────────────────────────────────────────────────
@@ -93,7 +105,7 @@ async function farmStandings(ownerId) {
     const row = await db
         .queryOne(
             `WITH scored AS (
-                 SELECT owner_id, SUM(CASE tier WHEN 3 THEN 3 WHEN 2 THEN 2 ELSE 1 END)::int AS score
+                 SELECT owner_id, SUM(votes * CASE tier WHEN 3 THEN 3 WHEN 2 THEN 2 ELSE 1 END)::int AS score
                    FROM mkt_farm_rating GROUP BY owner_id
              ), placed AS (
                  SELECT owner_id, score, DENSE_RANK() OVER (ORDER BY score DESC) AS place FROM scored
@@ -177,8 +189,8 @@ export async function rateFarm(raterId, ownerId, tier) {
         // Guarded on the day as well as the pair: two taps racing each other can't both bank the XP.
         const bumped = await db
             .queryOne(
-                `UPDATE mkt_farm_rating SET tier = $3, updated_at = NOW(), owner_seen_at = NULL, last_rated_day = ${DAY}
-                  WHERE rater_id = $1 AND owner_id = $2 AND last_rated_day IS DISTINCT FROM ${DAY} RETURNING tier`,
+                `UPDATE mkt_farm_rating SET tier = $3, votes = votes + 1, updated_at = NOW(), owner_seen_at = NULL, last_rated_day = ${DAY}
+                  WHERE rater_id = $1 AND owner_id = $2 AND last_rated_day IS DISTINCT FROM ${DAY} RETURNING tier, votes`,
                 [raterId, ownerId, t]
             )
             .catch(() => null);

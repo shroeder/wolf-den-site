@@ -14,6 +14,8 @@ import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { addParts } from "@/lib/marketplace/crafting.js";
+import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
@@ -36,12 +38,22 @@ const LUCKY_GOLD_PCT = 40; // % bonus gold when a Lucky Spin lands on a gold pri
 // that the farm is public (grantSeed/SEEDS handler wired below).
 // Prize sprite path (real AI art, no emoji) — public/images/spin/prizes/<name>.png. An absolute path passes
 // straight through, so a wedge can borrow art from another feature (e.g. the sailing fragment sprites).
-const P = (name) => (name?.startsWith("/") ? name : `/images/spin/prizes/${name}.png`);
+const P = (name) => (!name || name.startsWith("/") || name.startsWith("http") ? name : `/images/spin/prizes/${name}.png`);
 // The shard tier the wheel hands out. Wedge label, sprite and grant all read from this one place so they can
 // never drift apart — bump it here if the wheel should ever pay better shards.
 const FRAGMENT_PRIZE_TIER = "wooden";
 const fragSprite = (tier) => `/images/sailing/fragment-${tier}.png`;
 const fragName = (tier) => (CHEST_TIERS[tier]?.label || tier).replace(" Chest", "");
+// FORGE PARTS wedge. One slot on each wheel, but the payout is rolled — usually a fistful of Iron Filings,
+// occasionally a single Emberheart Shard. A fixed "3x Tempered Steel" wedge would be a known quantity you stop
+// reading after the first week; a wedge that can pay the top tier is worth watching land every time.
+const PART_ROLLS = [
+    { tier: 2, n: 4, weight: 34 },   // Iron Filings
+    { tier: 3, n: 3, weight: 38 },   // Tempered Steel
+    { tier: 4, n: 2, weight: 20 },   // Mythril Dust
+    { tier: 5, n: 1, weight: 8 },    // Emberheart Shard - the one you tell people about
+];
+const PARTS_WEDGE_SPRITE = partSprite(3); // the wedge face; the RESULT card shows whatever tier actually landed
 
 // One-line explainer for a wheel prize — powers the "tap a reward to inspect it" card in the legend.
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -56,6 +68,7 @@ function prizeDesc(p) {
         case "fragment": return `${p.n || 1} ${fragName(p.tierId || FRAGMENT_PRIZE_TIER)} chest fragments — collect enough of a kind to forge that chest at the docks.`;
         case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
         case "recipe": return "A page for the Kitchen's book — something new you can cook.";
+        case "parts": return "A haul of Forge salvage \— Iron Filings through Emberheart Shard \— to spend enhancing your gear at the Forge.";
         case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
         case "respin": return "A free bonus spin — spin again on the house.";
         case "bonus_game": return "Play a pick-a-box match-3 round to win wheel-exclusive gear.";
@@ -67,7 +80,7 @@ function prizeDesc(p) {
 // Progressive jackpot tuning (shared community pot).
 const JACKPOT_BASE = 5000;      // pot reseeds to this when won
 const JACKPOT_CONTRIB = 15;     // every spin adds this to the pot
-const MINI_JACKPOT_AMT = 1000;  // the fixed MINI JACKPOT wedge
+const MINI_JACKPOT_AMT = 1500;  // the fixed MINI JACKPOT wedge
 
 // TWENTY wedges — one prize each, shown on the wheel with real sprites. Regular prizes + four special wedges
 // (MINI/MAJOR jackpot, MINI WHEEL bonus round, BONUS GAME gear pick).
@@ -75,29 +88,32 @@ const WHEELS = [
     {
         id: "wheel", name: "Prize Wheel", minLevel: 1,
         prizes: [
-            // "50 gold" and "75 gold" were two adjacent wedges wearing the SAME coins-small sprite — and the
-            // wheel was carrying 21 prizes on a 20-wedge disc, so one of them had to go. Folded into one wedge
-            // at their combined weight, with the amount set to hold the payout: 50×16 + 75×15 = 1925 over 31
-            // spins, ≈62 each, so 60 at weight 31 is the same wheel to within a rounding error.
-            { label: "60 gold", sprite: "coins-small", weight: 31, kind: "gold", amount: 60 },
-            { label: "60 XP", sprite: "xp-orb", weight: 12, kind: "xp", amount: 60 },
-            { label: "Pet Treat", sprite: "pet-treat", weight: 10, kind: "consumable", consumable: "treat_bone", n: 1 },
-            { label: "Farm Seed", sprite: "seed-pouch", weight: 9, kind: "seed" },
-            { label: "150 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 150 },
-            { label: "5 Fertilizer", sprite: "fertilizer", weight: 8, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
-            { label: `3 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 8, kind: "fragment", n: 3, tierId: FRAGMENT_PRIZE_TIER },
-            { label: "MINI WHEEL", sprite: "mini-wheel", weight: 5, tier: "bonus", kind: "mini_wheel" },
-            { label: "250 gold", sprite: "coins-big", weight: 8, kind: "gold", amount: 250 },
-            { label: "150 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 150 },
+            // The floor wedge. It used to be "60 gold" at weight 31 - better than a fifth of every spin ever
+            // taken landed on it, which is a lot of wheel to watch for the price of a couple of harvests. It
+            // pays more now and comes up far less; the weight it gave up is spread across the middle of the
+            // list, where the wedges people actually want to land on live.
+            { label: "100 gold", sprite: "coins-small", weight: 18, kind: "gold", amount: 100 },
+            { label: "150 XP", sprite: "xp-orb", weight: 11, kind: "xp", amount: 150 },
+            { label: "Hearty Snack", sprite: "pet-treat", weight: 9, kind: "consumable", consumable: "treat_snack", n: 1 },
+            { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
+            { label: "250 gold", sprite: "coins-big", weight: 13, kind: "gold", amount: 250 },
+            { label: "5 Fertilizer", sprite: "fertilizer", weight: 7, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
+            { label: `4 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 8, kind: "fragment", n: 4, tierId: FRAGMENT_PRIZE_TIER },
+            { label: "MINI WHEEL", sprite: "mini-wheel", weight: 6, tier: "bonus", kind: "mini_wheel" },
+            // The Forge and the Depths were the two newest systems in the game and the wheel had never heard of
+            // either. Salvage parts are the thing every enhancer is short of, so this is the wedge that makes a
+            // spin matter to someone who already has plenty of gold.
+            { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 7, kind: "parts" },
+            { label: "400 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 400 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-            { label: "BONUS SPIN", sprite: "bonus-spin", weight: 7, tier: "bonus", kind: "respin" },
-            { label: "Wooden Chest", sprite: "chest-wood", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "BONUS SPIN", sprite: "bonus-spin", weight: 8, tier: "bonus", kind: "respin" },
+            { label: "Wooden Chest", sprite: "chest-wood", weight: 7, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             // A WEDGE, not a hidden roll. The wheel used to grant recipes at a flat 2.5% AFTER it had already
-            // landed on something else — 401 spins a week made it one of the top three sources in the game, and
+            // landed on something else - 401 spins a week made it one of the top three sources in the game, and
             // none of it was on the wheel you were watching. Now you can see it and land on it.
             { label: "New Recipe", sprite: "recipe-scroll", weight: 2, rare: true, tier: "rare", kind: "recipe" },
-            { label: "BONUS GAME", sprite: "mystery-box", weight: 4, tier: "bonus", kind: "bonus_game" },
-            { label: "375 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 375 },
+            { label: "BONUS GAME", sprite: "mystery-box", weight: 5, tier: "bonus", kind: "bonus_game" },
+            { label: "600 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 600 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
             { label: "Gold Chest", sprite: "chest-gold", weight: 2, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
             { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT },
@@ -123,18 +139,33 @@ for (const w of WHEELS) {
     }
 }
 
-// The MINI WHEEL bonus round — a small secondary wheel of solid prizes.
+// ── THE MINI WHEEL BONUS ROUND ───────────────────────────────────────────────────────────────────────────
+// NINE prizes, because mini-wheel.png is painted with exactly NINE wedges. It ran on eight for its whole life:
+// the client laid icons out every 45 degrees over a disc divided every 40, so the icons drifted off their
+// wedges, and the ninth prize - the rare one - was drawn at 8 x 45 = 360 = 0, directly on top of prize zero.
+// Landing on it parked the pointer on the first prize's icon, so the best outcome in the bonus round was the
+// one outcome that looked like the worst. Same failure the main wheel had with 21 prizes on 20 wedges, and it
+// is guarded the same way below.
+//
+// This is a round you reach on ~4% of spins, so nothing on it is a consolation prize: the floor is 400 gold,
+// the treat is the 150-pet-XP one rather than the 25, and the top wedge is a Gold Chest.
 const MINI_WHEEL_PRIZES = [
-    { label: "225 gold", sprite: "coins-small", weight: 20, kind: "gold", amount: 225 },
-    { label: "150 XP", sprite: "xp-orb", weight: 14, kind: "xp", amount: 150 },
-    { label: "Hearty Snack", sprite: "pet-treat", weight: 12, kind: "consumable", consumable: "treat_snack", n: 1 },
-    { label: `5 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 5, tierId: FRAGMENT_PRIZE_TIER },
-    { label: "450 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 450 },
-    { label: "Wooden Chest", sprite: "chest-wood", weight: 10, kind: "chest", tierId: "wooden" },
-    { label: "New Recipe", sprite: "recipe-scroll", weight: 3, kind: "recipe" },
-    { label: "Adrenaline Vial", sprite: "potion-red", weight: 10, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-    { label: "750 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 750 },
+    { label: "400 gold", sprite: "coins-big", weight: 17, kind: "gold", amount: 400 },
+    { label: "400 XP", sprite: "xp-orb", weight: 13, kind: "xp", amount: 400 },
+    { label: "Chew Toy", sprite: "pet-treat", weight: 11, kind: "consumable", consumable: "treat_toy", n: 1 },
+    { label: `8 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 8, tierId: FRAGMENT_PRIZE_TIER },
+    { label: "700 gold", sprite: "coins-big", weight: 11, kind: "gold", amount: 700 },
+    { label: "Wooden Chest", sprite: "chest-wood", weight: 11, kind: "chest", tierId: "wooden" },
+    { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 10, kind: "parts" },
+    { label: "Second Wind", sprite: "potion-red", weight: 9, kind: "consumable", consumable: "pot_secondwind", n: 1 },
+    { label: "Gold Chest", sprite: "chest-gold", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
 ];
+
+// mini-wheel.png has nine painted wedges (dividers measured every 40 degrees). Same contract, same hard stop.
+export const MINI_WHEEL_WEDGES = 9;
+if (MINI_WHEEL_PRIZES.length !== MINI_WHEEL_WEDGES) {
+    throw new Error(`mini wheel has ${MINI_WHEEL_PRIZES.length} prizes but mini-wheel.png has ${MINI_WHEEL_WEDGES} wedges - repaint the disc or fix the list`);
+}
 
 // Wheel-exclusive gear the BONUS GAME awards (ids match items.js + mkt_item_sprite). All RARE; the match-3
 // board draws BOARD_ITEMS of these at random, three tiles each.
@@ -267,6 +298,13 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const n = prize.n || 1;
         try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, n, tier); } catch { /* best-effort */ }
         return { sprite: fragSprite(tier), text: `${n} ${fragName(tier)} Chest Fragment${n === 1 ? "" : "s"}` };
+    }
+    if (prize.kind === "parts") {
+        // Roll the tier, then show THAT tier's art on the result card — the wedge wears Tempered Steel, but a
+        // card reading "Emberheart Shard" beside a picture of steel filings undersells the best outcome.
+        const roll = pickWeighted(PART_ROLLS);
+        await addParts(buyerId, roll.tier, roll.n).catch(() => {});
+        return { sprite: partSprite(roll.tier) || sprite, text: `${roll.n}× ${partName(roll.tier)}` };
     }
     if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { sprite, text: "Spin again — on the house!" }; }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { sprite, text: prize.label }; }

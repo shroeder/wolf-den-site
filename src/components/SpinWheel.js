@@ -15,19 +15,22 @@ const WEDGE_DEG = 360 / WEDGES;
 const WEDGE_OFFSET = 0;      // icon ring phase: disc dividers sit at 9°,27°… so wedge CENTERS are at 0°,18°… (measured from the art). Icons were landing on the divider lines at offset 9.
 // Icon-ring radius, % of the ROTOR from centre. The trap here is that icons are positioned in rotor units
 // while wheel-frame.png is sized to the RING, and .cw-rotor is only 82% of .cw-ring — so "fits inside the
-// frame's hole" has to be worked out across two coordinate spaces, and 34 didn't.
+// frame's hole" has to be worked out across two coordinate spaces.
 //
-// Measured off the art (1024² both): the frame's inner hole starts at 28.8% of the ring = 35.1% of the rotor,
-// and the disc's hub ends at 15.6% of the rotor. An icon is 11% of the rotor wide, so ±5.5:
-//     hub 15.6 + 5.5  =  21.1   <=   ICON_R   <=   35.1 - 5.5  =  29.6
-// At 34 the icons reached 39.5% of the rotor — 32.4% of the ring — so their outer edge sat UNDER the frame's
-// inner rim and every prize sprite was clipped. 25.5 was the midpoint of that band, which left them huddled
-// around the hub with a wide empty gutter of wedge outside them.
-//
-// 28.5 pushes them out to where the wedge actually reads. Measured against the frame's own alpha, the ring's
-// inner rim at a wedge CENTRE (±18°, ±36°, …) starts at 34.8% of the rotor, and an icon at 28.5 has its outer
-// edge at 34.0 — clear by 0.8, with none of the clipping that killed 34.
-const ICON_R = 28.5;
+// Every previous number here (34, then 25.5, then 28.5) came from ONE bad measurement: walking outward from
+// the frame's centre until the first opaque pixel, which finds the WOLF HEAD hanging over the top of the disc
+// and reports it as "the frame's inner hole starts at 28.8% of the ring". The wolf is not a ring. Sweeping the
+// frame's alpha at EVERY angle says two different things:
+//     · the wolf's muzzle reaches down to 38.7% of the ring = 47.2% of the rotor, at the top only —
+//       but the disc spins, so every icon passes under it and the constraint applies to all of them;
+//     · the frame's actual inner rim sits at 66.8% of the ring = 81.4% of the rotor, everywhere else.
+// An icon is 11% of the rotor wide and its <img> is 116% of that, so it reaches ±13.9% from its centre:
+//     wolf 47.2 + 13.9  =  61.1   <=   ICON_R   <=   81.4 - 13.9  =  67.5
+// 62 sits in that band with the margin on the wolf side, where a collision would be visible under the pointer.
+// At 28.5 the icons were clustered around the hub in the narrowest part of the wedge with two-thirds of the
+// disc empty outside them — the "why are the icons so close to the middle" complaint, and the real reason a
+// win was hard to read: the sprites were nowhere near the wedge the pointer was pointing at.
+const ICON_R = 62;
 const SPIN_MS = 5600;
 // The wheel starts turning the INSTANT you tap, on a constant-speed lead-in, and only retargets to the
 // winning wedge once the server answers. It used to sit dead still until the POST came back — on a cold
@@ -36,10 +39,16 @@ const SPIN_MS = 5600;
 const LEAD_MS = 9000;
 const LEAD_DEG = 360 * 7;
 
-const MINI_WEDGES = 8;
+// mini-wheel.png is painted with NINE wedges — gold dividers measured every 40° starting at 0°, so wedge
+// CENTRES land on 20° + k·40°. It was driven as an eight-wedge disc: icons every 45° over dividers every 40°,
+// which walked them off their wedges by up to 20° (a whole half-wedge), and put the ninth prize at 8×45 = 360
+// = 0°, drawn straight on top of the first one. spin.js now hard-fails if the prize list isn't nine long.
+// Radius: the hub ends at 25% of the disc and the decorative rim starts at 74%; an icon is 15% of the stage
+// with its <img> at 116%, so it reaches ±17.4% and the legal band is 42.4 … 56.6. 49.5 is the middle of it.
+const MINI_WEDGES = 9;
 const MINI_DEG = 360 / MINI_WEDGES;
-const MINI_OFFSET = 18;      // mini disc wedge centers measured at ≈17.8° from the art (was 22.5, sitting off-center)
-const MINI_ICON_R = 33;
+const MINI_OFFSET = 20;
+const MINI_ICON_R = 49.5;
 
 // Human tier names for the prize-inspect card.
 const TIER_LABEL = { normal: "Common", rare: "Rare", bonus: "Bonus round", mini: "Mini Jackpot", jackpot: "Grand Jackpot" };
@@ -306,7 +315,7 @@ export default function SpinWheel() {
     return (
         <section className="card cw-card">
             <div className="cw-top">
-                <span className="cw-title">🎡 {st.wheel.name}</span>
+                <span className="cw-title">{st.wheel.name}</span>
                 <span className="cw-sub">🎟️ {st.tokens} · spun {st.spinCount}×</span>
             </div>
 
@@ -344,7 +353,7 @@ export default function SpinWheel() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img className="cw-result-img" src={result.sprite} alt="" draggable="false" />
                     ) : null}
-                    <span className="cw-result-kicker">{resultKind === "jackpot" ? "💎 JACKPOT!" : resultKind === "mini" ? "MINI JACKPOT!" : resultKind === "bonus" ? "BONUS SPIN!" : resultKind === "rare" ? "Rare!" : "You won"}</span>
+                    <span className="cw-result-kicker">{resultKind === "jackpot" ? "JACKPOT!" : resultKind === "mini" ? "MINI JACKPOT!" : resultKind === "bonus" ? "BONUS SPIN!" : resultKind === "rare" ? "Rare!" : "You won"}</span>
                     <span className="cw-result-prize">{result.text}</span>
                 </div>
             ) : null}
@@ -376,21 +385,21 @@ export default function SpinWheel() {
                 <Portal><div className="cw-modal">
                     <div className="cw-modal-card">
                         {mini.revealed ? <button type="button" className="cw-bonus-close" onClick={() => setMini(null)} aria-label="Close">✕</button> : null}
-                        <div className="cw-modal-title">🎡 Mini Wheel Bonus!</div>
+                        <div className="cw-modal-title">Mini Wheel Bonus!</div>
                         <div className="cw-mini-stage">
                             <div className="cw-mini-rotor" style={{ transform: `rotate(${mini.rot}deg)`, transition: mini.spinning ? "transform 3600ms cubic-bezier(0.08,0.72,0.05,1)" : "none" }} onTransitionEnd={mini.spinning && !mini.revealed ? onMiniLanded : undefined}>
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img className="cw-mini-disc" src="/images/spin/mini-wheel.png" alt="" draggable="false" />
                                 <div className="cw-icons">
                                     {mini.prizes.map((p, i) => (
-                                        <div key={i} className={`cw-ico tier-${p.tier}`} style={iconPos(i, MINI_OFFSET, MINI_DEG, MINI_ICON_R)}>
+                                        <div key={i} className={`cw-ico cw-mini-ico tier-${p.tier}`} style={iconPos(i, MINI_OFFSET, MINI_DEG, MINI_ICON_R)}>
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img className="cw-ico-img" src={p.sprite} alt="" draggable="false" />
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="cw-mini-pointer">▼</div>
+                            <span className="cw-mini-pointer" aria-hidden="true" />
                         </div>
                         {mini.revealed ? (
                             <>
@@ -650,10 +659,16 @@ const CW_CSS = `
 .cw-modal-card { width: 100%; max-width: 360px; text-align: center; padding: 20px; border-radius: 20px; background: linear-gradient(180deg, #241a06, #120c03); border: 1px solid rgba(255,215,94,0.5); box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 44px rgba(255,190,60,0.3); animation: cwPop .35s cubic-bezier(.2,1.4,.35,1) both; }
 .cw-modal-title { font-size: 1.3rem; font-weight: 900; color: #ffe28a; text-shadow: 0 2px 10px rgba(255,180,40,0.5); }
 .cw-modal-sub { font-size: 0.85rem; color: #d3bd98; margin: 4px 0 12px; }
-.cw-mini-stage { position: relative; width: 240px; height: 240px; margin: 8px auto 4px; }
+/* Was a fixed 240px. The disc is the whole show in this modal and the card has room for 300. */
+.cw-mini-stage { position: relative; width: min(300px, 100%); aspect-ratio: 1; margin: 10px auto 6px; }
 .cw-mini-rotor { position: absolute; inset: 0; transform-origin: center; }
 .cw-mini-disc { width: 100%; height: 100%; border-radius: 50%; }
-.cw-mini-pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); color: #ff4d5e; font-size: 26px; text-shadow: 0 2px 6px rgba(0,0,0,0.6); z-index: 2; }
+/* Drawn, not typed. A ▼ renders as a different shape (and sometimes a colour emoji) per platform. */
+.cw-mini-pointer { position: absolute; top: -3px; left: 50%; transform: translateX(-50%); z-index: 3; width: 0; height: 0;
+    border-left: 13px solid transparent; border-right: 13px solid transparent; border-top: 20px solid #ffd75e;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.75)) drop-shadow(0 0 8px rgba(255,190,60,0.7)); }
+/* Nine wedges of 40° give each icon a lot more arc than the main wheel's 18°, so they're painted bigger. */
+.cw-mini-ico { width: 15%; height: 15%; }
 .cw-modal-won { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 12px 0 4px; font-size: 1rem; color: #ecd6bc; }
 .cw-modal-won b { color: #fff; }
 .cw-modal-won-img { width: 42px; height: 42px; object-fit: contain; }

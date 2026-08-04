@@ -435,7 +435,19 @@ export async function getTownState(buyerId) {
         players,
         // All nine are standing fixtures (no funded unlocks); gated ones are appended per viewer, and the whole
         // street is then RE-SPACED to fit however many that is.
-        buildings: spaceOut([...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))]),
+        // The WELL gets a slot in the layout rather than a hardcoded x. It used to sit at a fixed left:20%,
+        // which is exactly where spaceOut puts the third building — so the fountain was drawn on top of The
+        // Forge, and its badge collided with the Forge's label. Laying it out WITH the buildings means it can
+        // never overlap one no matter how many are visible (the owner sees two more than everyone else).
+        ...(() => {
+            const visible = [...TOWN_BUILDINGS, ...GATED_BUILDINGS.filter((b) => b.gate !== "owner" || isOwner(buyerId))];
+            const mid = Math.ceil(visible.length / 2);
+            const laid = spaceOut([...visible.slice(0, mid), { id: "__well" }, ...visible.slice(mid)]);
+            return {
+                buildings: laid.filter((b) => b.id !== "__well"),
+                wellX: laid.find((b) => b.id === "__well")?.x ?? 20,
+            };
+        })(),
         art,
         projects,
         bonuses: { xpPct: bonuses.xpPct || 0, goldPct: bonuses.goldPct || 0, diceGoldPct: bonuses.diceGoldPct || 0, raidGoldPct: bonuses.raidGoldPct || 0, farmGrowPct: bonuses.farmGrowPct || 0, farmYieldPct: bonuses.farmYieldPct || 0 },

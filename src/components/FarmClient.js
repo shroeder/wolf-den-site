@@ -1884,7 +1884,7 @@ function FarmBgCreator({ draft, busy, onAct, onClose }) {
 }
 
 function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
-    const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null, ratedToday = false } = rating || {};
+    const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null, ratedToday = false, supporters = 0, myVotes = 0 } = rating || {};
     const left = charge?.left ?? 0;
     const allowance = charge?.allowance ?? 3;
     const totalLove = (byTier[1] || 0) + (byTier[2] || 0) + (byTier[3] || 0);
@@ -1904,7 +1904,7 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 900, fontSize: 15 }}>🏡 Your farm&apos;s love</div>
-                        <div className="muted" style={{ fontSize: 11.5, marginTop: 1 }}>{totalLove > 0 ? `${totalLove} rating${totalLove === 1 ? "" : "s"} from the pack 💛` : "No ratings yet — visit friends and they'll rate you back"}</div>
+                        <div className="muted" style={{ fontSize: 11.5, marginTop: 1 }}>{totalLove > 0 ? `${totalLove} vote${totalLove === 1 ? "" : "s"} from ${supporters} friend${supporters === 1 ? "" : "s"} 💛` : "No ratings yet — visit friends and they'll rate you back"}</div>
                     </div>
                     <div style={{ marginLeft: "auto" }}>{tallyPills}</div>
                 </div>
@@ -1916,7 +1916,8 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
         <div style={card}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 900, fontSize: 15 }}>Rate {ownerName}&apos;s farm</span>
-                {totalLove > 0 ? <span className="muted" style={{ fontSize: 11.5 }}>· {totalLove} so far</span> : null}
+                {totalLove > 0 ? <span className="muted" style={{ fontSize: 11.5 }}>· {totalLove} vote{totalLove === 1 ? "" : "s"} so far</span> : null}
+                {myVotes > 1 ? <span className="muted" style={{ fontSize: 11.5 }}>· you&rsquo;ve given {myVotes}</span> : null}
                 {/* You can come back tomorrow — say so, rather than leaving three live-looking buttons that
                     would only spend a charge to change your mind. */}
                 {ratedToday ? <span className="muted" style={{ fontSize: 11.5 }}>· rated today, again tomorrow</span> : null}

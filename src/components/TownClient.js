@@ -1073,6 +1073,9 @@ export default function TownClient({ initial }) {
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
     const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
+    // The well is laid out WITH the buildings (server-side) so it can't be drawn on top of one — it used to be
+    // pinned at a hardcoded 20%, which is exactly where an evenly-spaced row of ~11 buildings puts the third.
+    const wellX = Number(state?.wellX) || 20;
     // Per-building counts of what's waiting, computed server-side so the pill in the nav and the pins on the
     // buildings can never disagree about how much there is to do.
     const todo = state?.todo || { total: 0, byBuilding: {} };
@@ -1278,7 +1281,7 @@ export default function TownClient({ initial }) {
                             <button
                                 type="button"
                                 className={`tw-centerpiece tw-well${canWish ? " can-wish" : " is-spent"}`}
-                                style={{ left: "20%", top: `${GROUND}%` }}
+                                style={{ left: `${wellX}%`, top: `${GROUND}%` }}
                                 onClick={(e) => { e.stopPropagation(); if (canWish) claimWell(); }}
                                 disabled={!canWish || wishBusy}
                                 aria-label={canWish ? `Make a wish — claim ${well.gold} gold` : "Wishing Well — already wished today"}
@@ -1289,7 +1292,7 @@ export default function TownClient({ initial }) {
                             </button>
                         ) : (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: "20%", top: `${GROUND}%` }} />
+                            <img className="tw-centerpiece" src={art.centerpiece.url} alt="" draggable={false} style={{ left: `${wellX}%`, top: `${GROUND}%` }} />
                         )
                     ) : null}
                     {/* Buildings — locked (no entry) while a raid is on: defend the plaza first! */}
