@@ -93,6 +93,10 @@ for (const ch of CHAPTERS) {
         if (!(s.gold > 0)) problems.push(`${ch.id}/${s.key}: pays nothing`);
     }
     if (!ch.reward?.gold) problems.push(`${ch.id}: chapter has no purse`);
+    // The emblem is the chapter's whole visual identity in the path; a missing one is a broken image in the
+    // middle of the guide, which is exactly the sort of thing nobody notices until a member screenshots it.
+    if (!ch.icon) problems.push(`${ch.id}: no emblem`);
+    else if (!fs.existsSync(path.join("public", ch.icon.replace(/^\//, "")))) problems.push(`${ch.id}: emblem ${ch.icon} is not on disk`);
 }
 
 const steps = CHAPTERS.flatMap((c) => c.steps).length;

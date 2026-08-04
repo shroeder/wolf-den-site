@@ -6,12 +6,19 @@ import { useCallback, useEffect, useState } from "react";
 import { enableWebPush, isWebPushSupported } from "@/lib/web-push-client";
 
 // ── THE PATHFINDER ───────────────────────────────────────────────────────────────────────────────────────────
-// The screen leads with ONE step. Everything else is a folded chapter you can open if you want to, and most
-// people never will — which is the point. A new member should be able to look at this and see a single sentence
-// telling them what to do next and a button that takes them there.
+// A ROAD, drawn top to bottom. One rail runs the length of the page with a node on it for every chapter, and
+// you can see at a glance where you have been, where you are standing and what is still ahead of you. Above the
+// road sits the one thing you are being asked to do right now, big enough that it is the only thing you can
+// really look at.
 //
-// Chapters open below in order, showing how far in you are. A finished chapter has a purse to collect: it is
-// the only thing in here you have to tap, because a reward you collect is a reward you notice.
+// ── A CSS TRAP THAT ATE THIS SCREEN ONCE ─────────────────────────────────────────────────────────────────────
+// styled-jsx appends its `jsx-<hash>` scope class to DOM ELEMENTS ONLY. It does NOT add it to a custom
+// component, and next/link's <Link> is a custom component. So `.gs { display: grid; padding; border; … }` on a
+// <Link> compiled to `.gs.jsx-abc` and matched nothing: the card lost its box, its padding and its background
+// while its <span> children stayed perfectly styled, and it rendered as a line of naked text.
+//
+// Every rule below that lands on a <Link> is therefore written with :global(). They are all `gd-`-prefixed and
+// unique to this file, so leaking them out of the component's scope costs nothing.
 
 const money = (n) => Number(n || 0).toLocaleString();
 
@@ -23,9 +30,24 @@ function iosNeedsInstall() {
     return isIos && !standalone;
 }
 
+// Steps done, drawn as a ring. A bar says "some"; a ring says "this much of a whole thing".
+function Ring({ done, total }) {
+    const R = 34, C = 2 * Math.PI * R;
+    const frac = total ? done / total : 0;
+    return (
+        <div className="gd-ring">
+            <svg viewBox="0 0 80 80" aria-hidden="true">
+                <circle cx="40" cy="40" r={R} className="gd-ring-track" />
+                <circle cx="40" cy="40" r={R} className="gd-ring-fill" strokeDasharray={`${C * frac} ${C}`} />
+            </svg>
+            <div className="gd-ring-num"><b>{done}</b><span>/{total}</span></div>
+        </div>
+    );
+}
+
 export default function GuideClient() {
     const [g, setG] = useState(null);
-    const [open, setOpen] = useState(null);   // which chapter is expanded
+    const [open, setOpen] = useState(null);
     const [busy, setBusy] = useState(null);
     const [flash, setFlash] = useState(null);
     const [note, setNote] = useState(null);
@@ -33,7 +55,6 @@ export default function GuideClient() {
     const load = useCallback(async () => {
         const d = await fetch("/api/marketplace/guide", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
         if (d) setG(d);
-        // A step that completed itself since you were last here pays on the read, so say so.
         if (d?.paid) { setFlash(`+${money(d.paid)} gold`); setTimeout(() => setFlash(null), 2600); }
     }, []);
     useEffect(() => { load(); }, [load]);
@@ -50,10 +71,9 @@ export default function GuideClient() {
         setBusy(id);
         const r = await post({ chapter: id });
         setBusy(null);
-        if (r?.ok) { setFlash(`+${money(r.gold)} gold${r.chest ? ` and a ${r.chest} chest` : ""}`); setTimeout(() => setFlash(null), 3000); }
+        if (r?.ok) { setFlash(`+${money(r.gold)} gold${r.chest ? ` · ${r.chest} chest` : ""}`); setTimeout(() => setFlash(null), 3000); }
     }, [post]);
 
-    // The one step the server can't watch: the browser has to actually grant permission first.
     const enableNotifications = useCallback(async (key) => {
         setBusy(key); setNote(null);
         try {
@@ -61,189 +81,281 @@ export default function GuideClient() {
                 setNote(iosNeedsInstall()
                     ? "On iPhone, add the Den to your Home Screen first — Safari only allows notifications from an installed app."
                     : "This browser can't do notifications. Try Chrome, or the Den on your phone.");
-                setBusy(null); return;
+                return;
             }
             const ok = await enableWebPush().catch(() => false);
-            if (!ok) { setNote("The browser said no. You can turn it back on in site settings and try again."); setBusy(null); return; }
+            if (!ok) { setNote("The browser said no. You can turn it back on in site settings and try again."); return; }
             const r = await post({ step: key });
             if (r?.ok) { setFlash(`+${money(r.gold)} gold`); setTimeout(() => setFlash(null), 2400); }
         } finally { setBusy(null); }
     }, [post]);
 
-    if (!g) return <div className="gd-load">Finding your place…</div>;
+    if (!g) {
+        return (
+            <section className="card gd">
+                <div className="gd-skel" />
+                <style jsx>{`
+                    .gd-skel { height: 180px; border-radius: 16px; background: linear-gradient(100deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04));
+                        background-size: 220% 100%; animation: gdShim 1.3s linear infinite; }
+                    @keyframes gdShim { from { background-position: 180% 0 } to { background-position: -60% 0 } }
+                `}</style>
+            </section>
+        );
+    }
+
     if (!g.signedIn) {
         return (
-            <div className="card gd-signin">
+            <section className="card gd-signin">
                 <h2>The Pathfinder</h2>
-                <p>Sign in and it&rsquo;ll walk you through the Den one thing at a time.</p>
+                <p className="muted">Sign in and it walks you through the Den one thing at a time — and pays you for every step.</p>
                 <Link className="btn" href="/marketplace/login?returnTo=/marketplace/guide">Sign in</Link>
-            </div>
+            </section>
         );
     }
 
     const { current, chapters, totals, nextLocked, allOpenDone } = g;
-    const pct = totals.steps ? Math.round((totals.doneSteps / totals.steps) * 100) : 0;
 
     return (
-        <section className="card gd">
-            <div className="gd-head">
-                <div>
-                    <h2 className="gd-title">The Pathfinder</h2>
-                    <p className="gd-sub">One thing at a time. Nothing here is a quiz — you just play, and it ticks.</p>
+        <>
+            {/* ── the banner ── */}
+            <section className="card gd-hero">
+                <div className="gd-hero-text">
+                    <span className="gd-eyebrow">The Pathfinder</span>
+                    <h1 className="gd-h1">Your way through the Den</h1>
+                    <p className="gd-lede">One thing at a time, in the order that makes sense. Nothing to memorise — play, and it ticks itself off.</p>
+                    <div className="gd-stats">
+                        <span><b>{totals.doneChapters}</b> of {totals.chapters} chapters</span>
+                        <span><b>{money(g.level)}</b> level</span>
+                    </div>
                 </div>
-                <div className="gd-count">
-                    <b>{totals.doneSteps}</b><span>/ {totals.steps}</span>
-                </div>
-            </div>
-            <div className="gd-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
+                <Ring done={totals.doneSteps} total={totals.steps} />
+            </section>
 
-            {/* ── WHAT TO DO NEXT ── the whole screen in one card ── */}
+            {/* ── what to do right now ── */}
             {current && current.step ? (
-                <div className="gd-now" style={{ "--tint": current.tint }}>
-                    <span className="gd-now-kicker">{current.name}</span>
-                    <b className="gd-now-label">{current.step.label}</b>
+                <section className="card gd-now" style={{ "--tint": current.tint }}>
+                    <div className="gd-now-top">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="gd-now-emblem" src={current.icon} alt="" draggable="false" />
+                        <div className="gd-now-head">
+                            <span className="gd-now-kicker">{current.name} · step {current.stepIndex} of {current.stepCount}</span>
+                            <b className="gd-now-label">{current.step.label}</b>
+                        </div>
+                    </div>
                     <p className="gd-now-why">{current.step.why}</p>
                     <div className="gd-now-foot">
                         {current.step.manual ? (
-                            <button type="button" className="btn gd-now-go" disabled={busy === current.step.key}
+                            <button type="button" className="gd-cta" disabled={busy === current.step.key}
                                 onClick={() => enableNotifications(current.step.key)}>
                                 {busy === current.step.key ? "Asking…" : current.step.cta}
                             </button>
                         ) : (
-                            <Link className="btn gd-now-go" href={current.step.href}>{current.step.cta}</Link>
+                            <Link className="gd-cta" href={current.step.href}>{current.step.cta}</Link>
                         )}
-                        <span className="gd-now-pay">+{money(current.step.gold)} gold</span>
+                        <span className="gd-reward">+{money(current.step.gold)} gold</span>
                     </div>
                     {note ? <p className="gd-note">{note}</p> : null}
-                </div>
+                </section>
             ) : allOpenDone ? (
-                <div className="gd-done">
+                <section className="card gd-crest">
                     <b>You know the place.</b>
                     <p>
-                        Everything open to you is done.{" "}
-                        {nextLocked
-                            ? <>The next chapter, <b>{nextLocked.name}</b>, opens at level {nextLocked.minLevel}.</>
-                            : <>There is nothing left in the book — go and win something.</>}
+                        Every chapter open to you is finished.{" "}
+                        {nextLocked ? <>The next one, <b>{nextLocked.name}</b>, unlocks at level {nextLocked.minLevel}.</> : <>There is nothing left in the book.</>}
                     </p>
-                    <div className="gd-done-links">
-                        <Link className="btn-ghost" href="/marketplace/play">Today&rsquo;s quests</Link>
-                        <Link className="btn-ghost" href="/marketplace/town">The town</Link>
-                        <Link className="btn-ghost" href="/marketplace/spin">Your daily spin</Link>
+                    <div className="gd-crest-links">
+                        <Link className="gd-chip" href="/marketplace/play">Today&rsquo;s quests</Link>
+                        <Link className="gd-chip" href="/marketplace/town">The town</Link>
+                        <Link className="gd-chip" href="/marketplace/spin">Daily spin</Link>
                     </div>
-                </div>
+                </section>
             ) : null}
 
-            {/* ── the book ── */}
-            <div className="gd-chapters">
-                {chapters.map((c) => {
-                    const isOpen = open === c.id || (open === null && current?.chapter === c.id);
-                    return (
-                        <div key={c.id} className={`gd-ch${c.complete ? " is-done" : ""}${c.locked ? " is-locked" : ""}`} style={{ "--tint": c.tint }}>
-                            <button type="button" className="gd-ch-head" onClick={() => setOpen(isOpen ? "" : c.id)}>
-                                <span className="gd-ch-name">{c.name}</span>
-                                <span className="gd-ch-meta">
-                                    {c.locked ? `Level ${c.minLevel}` : c.complete ? "Done" : `${c.doneCount}/${c.steps.length}`}
-                                </span>
-                            </button>
-                            {isOpen ? (
-                                <div className="gd-ch-body">
-                                    <p className="gd-ch-blurb">{c.blurb}</p>
-                                    {c.locked ? (
-                                        <p className="gd-ch-gate">Opens at level {c.minLevel}. It&rsquo;ll be waiting.</p>
-                                    ) : (
+            {/* ── the road ── */}
+            <section className="card gd-road">
+                <h2 className="gd-road-title">The road</h2>
+                <div className="gd-rail">
+                    {chapters.map((c) => {
+                        const isCurrent = current?.chapter === c.id;
+                        const isOpen = open === c.id || (open === null && isCurrent);
+                        const state = c.locked ? "is-locked" : c.complete ? "is-done" : isCurrent ? "is-now" : "is-open";
+                        return (
+                            <div key={c.id} className={`gd-node ${state}${isOpen ? " is-expanded" : ""}`} style={{ "--tint": c.tint }}>
+                                <button type="button" className="gd-node-head" onClick={() => setOpen(isOpen ? "" : c.id)} aria-expanded={isOpen}>
+                                    <span className="gd-orb">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={c.icon} alt="" draggable="false" />
+                                        {c.complete ? <span className="gd-orb-tick" aria-hidden="true" /> : null}
+                                    </span>
+                                    <span className="gd-node-body">
+                                        <span className="gd-node-name">{c.name}</span>
+                                        <span className="gd-node-sub">
+                                            {c.locked ? `Unlocks at level ${c.minLevel}` : c.complete ? "Complete" : c.blurb}
+                                        </span>
+                                        {!c.locked ? (
+                                            <span className="gd-pips" aria-hidden="true">
+                                                {c.steps.map((s) => <i key={s.key} className={s.done ? "is-on" : ""} />)}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                    <span className="gd-node-meta">
+                                        {c.locked ? <span className="gd-lock">{c.minLevel}</span> : `${c.doneCount}/${c.steps.length}`}
+                                    </span>
+                                </button>
+
+                                {isOpen && !c.locked ? (
+                                    <div className="gd-node-open">
                                         <ul className="gd-steps">
                                             {c.steps.map((s) => (
                                                 <li key={s.key} className={`gd-step${s.done ? " is-done" : ""}`}>
                                                     <span className="gd-tick" aria-hidden="true" />
-                                                    <div className="gd-step-body">
+                                                    <span className="gd-step-body">
                                                         <b>{s.label}</b>
-                                                        {!s.done ? <p>{s.why}</p> : null}
-                                                    </div>
+                                                        {!s.done ? <em>{s.why}</em> : null}
+                                                    </span>
                                                     {s.done
-                                                        ? <span className="gd-step-pay is-got">+{money(s.gold)}</span>
-                                                        : <Link className="gd-step-go" href={s.href}>Go</Link>}
+                                                        ? <span className="gd-step-got">+{money(s.gold)}</span>
+                                                        : <Link className="gd-go" href={s.href}>Go</Link>}
                                                 </li>
                                             ))}
                                         </ul>
-                                    )}
-                                    {c.complete && !c.rewardClaimed ? (
-                                        <button type="button" className="btn gd-collect" disabled={busy === c.id} onClick={() => collect(c.id)}>
-                                            Collect {money(c.reward.gold)} gold{c.reward.chest ? ` + a ${c.reward.chest} chest` : ""}
-                                        </button>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                        </div>
-                    );
-                })}
-            </div>
+                                        {c.complete && !c.rewardClaimed ? (
+                                            <button type="button" className="gd-collect" disabled={busy === c.id} onClick={() => collect(c.id)}>
+                                                Collect {money(c.reward.gold)} gold{c.reward.chest ? ` + ${c.reward.chest} chest` : ""}
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
 
             {flash ? <div className="gd-flash">{flash}</div> : null}
 
             <style jsx>{`
-                .gd-load { padding: 30px; text-align: center; color: #9aa2ab; }
-                .gd-signin { text-align: center; padding: 26px; }
-                .gd-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-                .gd-title { margin: 0; font-size: 1.35rem; font-weight: 900; color: #ffe28a; }
-                .gd-sub { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: #9aa2ab; max-width: 46ch; }
-                .gd-count { flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
-                .gd-count b { font-size: 1.5rem; font-weight: 900; color: #fff; }
-                .gd-count span { font-size: 12px; color: #7f8790; margin-left: 3px; }
-                .gd-bar { height: 7px; margin: 11px 0 16px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.08); }
-                .gd-bar > span { display: block; height: 100%; border-radius: 999px; transition: width .5s ease;
-                    background: linear-gradient(90deg, #ffb020, #ffe28a); }
+                /* ── banner ── */
+                .gd-hero { display: flex; align-items: center; gap: 18px; justify-content: space-between; }
+                .gd-hero-text { min-width: 0; }
+                .gd-eyebrow { font-size: 10px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: #b79a5e; }
+                .gd-h1 { margin: 4px 0 0; font-size: clamp(1.25rem, 5.4vw, 1.7rem); font-weight: 900; line-height: 1.15;
+                    background: linear-gradient(92deg, #ffe9b0, #ffb020); -webkit-background-clip: text; background-clip: text; color: transparent; }
+                .gd-lede { margin: 7px 0 0; font-size: 12.5px; line-height: 1.55; color: #9aa2ab; max-width: 42ch; }
+                .gd-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 11.5px; color: #8a939d; }
+                .gd-stats b { color: #ffd75e; font-variant-numeric: tabular-nums; }
 
-                /* THE ONE CARD THAT MATTERS. Deliberately the biggest thing on the screen. */
-                .gd-now { padding: 16px 17px; border-radius: 16px; position: relative; overflow: hidden;
-                    background: linear-gradient(155deg, color-mix(in srgb, var(--tint) 20%, transparent), rgba(255,255,255,0.03));
-                    border: 1px solid color-mix(in srgb, var(--tint) 45%, transparent); }
-                .gd-now-kicker { font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
-                    color: color-mix(in srgb, var(--tint) 75%, white); }
-                .gd-now-label { display: block; margin: 4px 0 6px; font-size: 1.15rem; font-weight: 900; color: #fff; }
-                .gd-now-why { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: #c9d1da; max-width: 54ch; }
-                .gd-now-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-                .gd-now-go { text-decoration: none; }
-                .gd-now-pay { font-size: 12.5px; font-weight: 900; color: #ffd75e; }
-                .gd-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; color: #ffd0a0; }
+                .gd-ring { position: relative; flex: 0 0 auto; width: 92px; height: 92px; display: grid; place-items: center; }
+                .gd-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+                .gd-ring-track, .gd-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; }
+                .gd-ring-track { stroke: rgba(255,255,255,0.09); }
+                .gd-ring-fill { stroke: url(#gdgrad); stroke: #ffb020; filter: drop-shadow(0 0 6px rgba(255,176,32,0.55));
+                    transition: stroke-dasharray .7s cubic-bezier(.2,.8,.3,1); }
+                .gd-ring-num { position: relative; text-align: center; line-height: 1; }
+                .gd-ring-num b { display: block; font-size: 1.4rem; font-weight: 900; color: #fff; }
+                .gd-ring-num span { font-size: 10.5px; color: #8a939d; }
 
-                .gd-done { padding: 18px; border-radius: 16px; background: rgba(255,215,94,0.08); border: 1px solid rgba(255,215,94,0.35); }
-                .gd-done b { color: #ffe28a; font-size: 1.05rem; }
-                .gd-done p { margin: 6px 0 12px; font-size: 13px; line-height: 1.6; color: #c9d1da; }
-                .gd-done-links { display: flex; flex-wrap: wrap; gap: 8px; }
+                /* ── the one thing to do now ── */
+                .gd-now { position: relative; overflow: hidden;
+                    background: linear-gradient(152deg, color-mix(in srgb, var(--tint) 22%, transparent), rgba(255,255,255,0.02) 62%);
+                    border: 1px solid color-mix(in srgb, var(--tint) 50%, transparent);
+                    box-shadow: 0 12px 34px -18px var(--tint); }
+                .gd-now::after { content: ""; position: absolute; top: -55%; right: -18%; width: 62%; aspect-ratio: 1; border-radius: 50%;
+                    background: radial-gradient(circle, color-mix(in srgb, var(--tint) 30%, transparent), transparent 68%); pointer-events: none; }
+                .gd-now-top { display: flex; align-items: center; gap: 13px; }
+                .gd-now-emblem { flex: 0 0 auto; width: 60px; height: 60px; object-fit: contain;
+                    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.55)); }
+                .gd-now-head { min-width: 0; }
+                .gd-now-kicker { display: block; font-size: 10px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase;
+                    color: color-mix(in srgb, var(--tint) 78%, white); }
+                .gd-now-label { display: block; margin-top: 3px; font-size: clamp(1.05rem, 4.6vw, 1.3rem); font-weight: 900; color: #fff; line-height: 1.2; }
+                .gd-now-why { margin: 12px 0 15px; font-size: 13px; line-height: 1.62; color: #cbd3dc; max-width: 56ch; }
+                .gd-now-foot { display: flex; align-items: center; gap: 13px; flex-wrap: wrap; }
+                .gd-reward { font-size: 12.5px; font-weight: 900; color: #ffd75e; }
+                .gd-note { margin: 11px 0 0; font-size: 12px; line-height: 1.5; color: #ffd0a0; }
 
-                .gd-chapters { display: grid; gap: 7px; margin-top: 18px; }
-                .gd-ch { border-radius: 13px; overflow: hidden; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); }
-                .gd-ch.is-done { border-color: color-mix(in srgb, var(--tint) 40%, transparent); }
-                .gd-ch.is-locked { opacity: 0.55; }
-                .gd-ch-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-                    padding: 12px 14px; background: none; border: none; cursor: pointer; text-align: left; }
-                .gd-ch-name { font-size: 0.95rem; font-weight: 900; color: color-mix(in srgb, var(--tint) 65%, white); }
-                .gd-ch-meta { font-size: 11.5px; font-weight: 800; color: #9aa2ab; font-variant-numeric: tabular-nums; }
-                .gd-ch.is-done .gd-ch-meta { color: color-mix(in srgb, var(--tint) 70%, white); }
-                .gd-ch-body { padding: 0 14px 14px; }
-                .gd-ch-blurb { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: #9aa2ab; }
-                .gd-ch-gate { margin: 0; font-size: 12px; color: #7f8790; }
+                /* ── finished-everything crest ── */
+                .gd-crest { text-align: center; border: 1px solid rgba(255,215,94,0.4);
+                    background: radial-gradient(120% 100% at 50% 0%, rgba(255,176,32,0.16), rgba(255,255,255,0.02) 70%); }
+                .gd-crest b { font-size: 1.1rem; color: #ffe28a; }
+                .gd-crest p { margin: 7px 0 13px; font-size: 13px; line-height: 1.6; color: #c2cad3; }
+                .gd-crest-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 
-                .gd-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-                .gd-step { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: start; gap: 10px;
-                    padding: 10px 11px; border-radius: 11px; background: rgba(0,0,0,0.22); }
-                .gd-tick { width: 16px; height: 16px; margin-top: 2px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.22); }
-                .gd-step.is-done .gd-tick { border-color: color-mix(in srgb, var(--tint) 80%, white);
-                    background: color-mix(in srgb, var(--tint) 80%, white); box-shadow: 0 0 10px -2px var(--tint); }
-                .gd-step-body b { font-size: 13px; color: #e6ecf2; }
-                .gd-step.is-done .gd-step-body b { color: #9aa2ab; }
-                .gd-step-body p { margin: 3px 0 0; font-size: 11.5px; line-height: 1.5; color: #8f98a3; }
-                .gd-step-go { flex: 0 0 auto; padding: 6px 13px; border-radius: 9px; font-size: 12px; font-weight: 900;
-                    text-decoration: none; color: #201206; background: linear-gradient(180deg, #ffe08a, #ffb020); }
-                .gd-step-pay { font-size: 11.5px; font-weight: 900; color: #6f7883; white-space: nowrap; }
-                .gd-collect { width: 100%; margin-top: 11px; }
+                /* ── the road ── */
+                .gd-road-title { margin: 0 0 14px; font-size: 0.82rem; font-weight: 900; letter-spacing: .14em;
+                    text-transform: uppercase; color: #8a939d; }
+                /* The rail itself: one continuous line behind the orbs, so the chapters read as a route rather
+                   than as a list of unrelated boxes. */
+                .gd-rail { position: relative; display: grid; gap: 4px; }
+                .gd-rail::before { content: ""; position: absolute; left: 27px; top: 26px; bottom: 26px; width: 2px;
+                    background: linear-gradient(180deg, rgba(255,215,94,0.5), rgba(255,255,255,0.09)); border-radius: 2px; }
+                .gd-node { position: relative; border-radius: 14px; transition: background .18s ease; }
+                .gd-node.is-expanded { background: rgba(255,255,255,0.035); }
+                .gd-node-head { display: grid; grid-template-columns: 54px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+                    width: 100%; padding: 9px 12px 9px 0; background: none; border: none; cursor: pointer; text-align: left; }
+                .gd-orb { position: relative; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center;
+                    background: radial-gradient(circle at 38% 30%, rgba(255,255,255,0.13), rgba(8,6,12,0.92));
+                    border: 2px solid rgba(255,255,255,0.12); box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
+                .gd-orb img { width: 34px; height: 34px; object-fit: contain; }
+                .gd-node.is-done .gd-orb { border-color: color-mix(in srgb, var(--tint) 85%, white); box-shadow: 0 0 16px -3px var(--tint); }
+                .gd-node.is-now .gd-orb { border-color: #ffd75e; animation: gdPulse 2.1s ease-in-out infinite; }
+                @keyframes gdPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,215,94,0.5) } 60% { box-shadow: 0 0 0 9px rgba(255,215,94,0) } }
+                .gd-node.is-locked .gd-orb { filter: grayscale(1) brightness(0.62); border-color: rgba(255,255,255,0.09); }
+                .gd-orb-tick { position: absolute; right: -2px; bottom: -2px; width: 19px; height: 19px; border-radius: 50%;
+                    background: color-mix(in srgb, var(--tint) 85%, white); border: 2px solid #14100c; }
+                .gd-orb-tick::after { content: ""; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px;
+                    border: solid #14100c; border-width: 0 2.2px 2.2px 0; transform: rotate(43deg); }
+
+                .gd-node-body { min-width: 0; }
+                .gd-node-name { display: block; font-size: 0.95rem; font-weight: 900; color: #e9eef3; }
+                .gd-node.is-locked .gd-node-name { color: #7f8790; }
+                .gd-node.is-done .gd-node-name { color: color-mix(in srgb, var(--tint) 62%, white); }
+                .gd-node-sub { display: block; margin-top: 1px; font-size: 11.5px; line-height: 1.4; color: #838c96;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .gd-pips { display: flex; gap: 4px; margin-top: 6px; }
+                .gd-pips i { width: 15px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.15); }
+                .gd-pips i.is-on { background: color-mix(in srgb, var(--tint) 85%, white); }
+                .gd-node-meta { font-size: 11.5px; font-weight: 900; color: #8a939d; font-variant-numeric: tabular-nums; padding-left: 4px; }
+                .gd-lock { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px;
+                    font-size: 11px; color: #6f7883; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); }
+
+                .gd-node-open { padding: 2px 12px 13px 66px; }
+                .gd-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+                .gd-step { display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; align-items: start; gap: 10px;
+                    padding: 10px 12px; border-radius: 11px; background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.05); }
+                .gd-tick { width: 15px; height: 15px; margin-top: 2px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); }
+                .gd-step.is-done .gd-tick { border-color: transparent; background: color-mix(in srgb, var(--tint) 85%, white); }
+                .gd-step-body b { display: block; font-size: 12.5px; color: #e6ecf2; }
+                .gd-step.is-done .gd-step-body b { color: #8a939d; }
+                .gd-step-body em { display: block; margin-top: 4px; font-style: normal; font-size: 11.5px; line-height: 1.55; color: #8f98a3; }
+                .gd-step-got { font-size: 11px; font-weight: 900; color: #66707a; white-space: nowrap; }
+                .gd-collect { width: 100%; margin-top: 10px; padding: 12px; border-radius: 12px; border: none; cursor: pointer;
+                    font-size: 0.86rem; font-weight: 900; color: #241500; background: linear-gradient(180deg, #ffe08a, #ffb020);
+                    box-shadow: 0 3px 0 #b47a12, 0 8px 22px -8px rgba(255,176,32,0.9); }
+                .gd-collect:disabled { opacity: .6; }
 
                 .gd-flash { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 200;
-                    padding: 11px 20px; border-radius: 999px; font-weight: 900; color: #201206;
-                    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                    animation: gdFlash .3s cubic-bezier(.2,1.4,.35,1) both; }
-                @keyframes gdFlash { from { opacity: 0; transform: translate(-50%, 12px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+                    padding: 11px 21px; border-radius: 999px; font-weight: 900; color: #241500;
+                    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 10px 30px rgba(0,0,0,0.55);
+                    animation: gdFlash .32s cubic-bezier(.2,1.4,.35,1) both; }
+                @keyframes gdFlash { from { opacity: 0; transform: translate(-50%, 12px) scale(.9) } to { opacity: 1; transform: translate(-50%, 0) scale(1) } }
             `}</style>
-        </section>
+
+            {/* Rules that land on a <Link>. See the note at the top of the file: styled-jsx will not scope a
+                custom component, so these have to be global or they match nothing at all. */}
+            <style jsx global>{`
+                .gd-cta { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border-radius: 12px;
+                    border: none; cursor: pointer; text-decoration: none; font-size: 0.92rem; font-weight: 900; color: #241500;
+                    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12, 0 10px 26px -10px rgba(255,176,32,0.95);
+                    transition: transform .12s ease; }
+                .gd-cta:active { transform: translateY(2px); box-shadow: 0 1px 0 #b47a12; }
+                .gd-cta:disabled { opacity: .6; }
+                .gd-go { display: inline-block; padding: 7px 15px; border-radius: 9px; text-decoration: none; white-space: nowrap;
+                    font-size: 11.5px; font-weight: 900; color: #241500; background: linear-gradient(180deg, #ffe08a, #ffb020); }
+                .gd-chip { display: inline-block; padding: 9px 15px; border-radius: 999px; text-decoration: none;
+                    font-size: 12.5px; font-weight: 800; color: #ecd6bc; background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.14); }
+            `}</style>
+        </>
     );
 }

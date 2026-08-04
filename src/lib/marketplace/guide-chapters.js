@@ -24,7 +24,7 @@
 
 export const GUIDE_CHAPTERS = [
     {
-        id: "hero", name: "Your Hero", minLevel: 1, tint: "#ffd75e",
+        id: "hero", name: "Your Hero", minLevel: 1, tint: "#ffd75e", icon: "/images/guide/ch-hero.webp",
         blurb: "The character sheet everything else feeds into.",
         steps: [
             { key: "hero_look", label: "Open your hero", why: "Everything you earn lands here. Your level, your gold and the eight gear slots you'll spend the rest of the game filling.", href: "/marketplace/inventory", cta: "Open my gear", gold: 150, events: ["view_inventory", "view_profile", "inspect_item"] },
@@ -34,7 +34,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 300, chest: "wooden" },
     },
     {
-        id: "farm", name: "The Farm", minLevel: 1, tint: "#7ed57e",
+        id: "farm", name: "The Farm", minLevel: 1, tint: "#7ed57e", icon: "/images/guide/ch-farm.webp",
         blurb: "Grows while you're gone. The engine room of the whole game.",
         steps: [
             { key: "farm_plant", label: "Plant your first crop", why: "Crops grow on a real clock whether the tab is open or not. This is the one system that pays you for coming back tomorrow.", href: "/marketplace/farm", cta: "Go to the farm", gold: 200, events: ["plant_seed"] },
@@ -44,7 +44,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 400, chest: "wooden" },
     },
     {
-        id: "chests", name: "Chests", minLevel: 2, tint: "#ffb020",
+        id: "chests", name: "Chests", minLevel: 2, tint: "#ffb020", icon: "/images/guide/ch-chests.webp",
         blurb: "Where most of your early gear comes from.",
         steps: [
             { key: "chest_open", label: "Open a chest", why: "Chests drop gear, gold and the occasional pet. They come from quests, the wheel, the boss and the sea — you will never be short of them for long.", href: "/marketplace/inventory", cta: "Open one", gold: 200, events: ["open_chest"] },
@@ -54,7 +54,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 400, chest: "iron" },
     },
     {
-        id: "pets", name: "Pets", minLevel: 2, tint: "#ff9ad5",
+        id: "pets", name: "Pets", minLevel: 2, tint: "#ff9ad5", icon: "/images/guide/ch-pets.webp",
         blurb: "A companion that fights beside you and earns while you're away.",
         steps: [
             { key: "pet_equip", label: "Equip a pet", why: "An equipped pet adds its passive to everything you do and levels up alongside you. Only one at a time, so pick for what you actually play.", href: "/marketplace/pets", cta: "Equip a pet", gold: 200, events: ["equip_pet"] },
@@ -63,7 +63,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 350, chest: "iron" },
     },
     {
-        id: "boss", name: "The Boss", minLevel: 3, tint: "#ff6f7d",
+        id: "boss", name: "The Boss", minLevel: 3, tint: "#ff6f7d", icon: "/images/guide/ch-boss.webp",
         blurb: "The whole Den against one monster, every week.",
         steps: [
             { key: "boss_look", label: "Go and look at the boss", why: "Everyone fights the same boss. Its weakness changes each week, and gear matching that element hits far harder.", href: "/marketplace/boss", cta: "See the boss", gold: 150, events: ["view_boss"] },
@@ -73,7 +73,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 500, chest: "iron" },
     },
     {
-        id: "town", name: "The Town", minLevel: 3, tint: "#8fd8ff",
+        id: "town", name: "The Town", minLevel: 3, tint: "#8fd8ff", icon: "/images/guide/ch-town.webp",
         blurb: "Where the other members actually are.",
         steps: [
             { key: "town_pet", label: "Pet somebody else's animal", why: "Everyone's hero and pets stand in the plaza. Petting one pays you both, and it's the fastest way to meet the rest of the Den.", href: "/marketplace/town", cta: "Go to town", gold: 200, events: ["pet_other"] },
@@ -83,7 +83,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 500, chest: "iron" },
     },
     {
-        id: "sea", name: "The Sea", minLevel: 5, tint: "#6fd0ff",
+        id: "sea", name: "The Sea", minLevel: 5, tint: "#6fd0ff", icon: "/images/guide/ch-sea.webp",
         blurb: "Fishing, voyages, and digging up what washed ashore.",
         steps: [
             { key: "sea_fish", label: "Land a fish", why: "Casting is free and quick. Fish pay gold, and the rare ones are worth putting on your profile.", href: "/marketplace/fishing", cta: "Go fishing", gold: 200, events: ["fish_caught"] },
@@ -93,7 +93,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 600, chest: "gold" },
     },
     {
-        id: "kitchen", name: "The Kitchen", minLevel: 5, tint: "#ffb45e",
+        id: "kitchen", name: "The Kitchen", minLevel: 5, tint: "#ffb45e", icon: "/images/guide/ch-kitchen.webp",
         blurb: "Turns what the farm grows into buffs that matter.",
         steps: [
             { key: "kitchen_recipe", label: "Learn a recipe", why: "Recipes drop from the wheel, chests and the town. Each one unlocks a dish with its own buff.", href: "/marketplace/cooking", cta: "Open the kitchen", gold: 200, events: ["recipe_learned"] },
@@ -102,7 +102,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 450, chest: "iron" },
     },
     {
-        id: "forge", name: "The Forge", minLevel: 8, tint: "#ff9a3c",
+        id: "forge", name: "The Forge", minLevel: 8, tint: "#ff9a3c", icon: "/images/guide/ch-forge.webp",
         blurb: "Where spare gear becomes better gear.",
         steps: [
             { key: "forge_salvage", label: "Salvage a spare piece", why: "Duplicate gear is raw material. Salvaging breaks it into tiered parts and costs you nothing you were using.", href: "/marketplace/blacksmith", cta: "Open the forge", gold: 200, events: ["craft_salvage", "sell_gear"] },
@@ -111,7 +111,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 600, chest: "gold" },
     },
     {
-        id: "deco", name: "Making It Yours", minLevel: 8, tint: "#b98cff",
+        id: "deco", name: "Making It Yours", minLevel: 8, tint: "#b98cff", icon: "/images/guide/ch-deco.webp",
         blurb: "The farm is also a place you decorate.",
         steps: [
             { key: "deco_place", label: "Place a decoration", why: "A hundred of them, and the good ones carry real buffs. Where you put things is up to you — people come and look.", href: "/marketplace/farm", cta: "Decorate", gold: 200, events: ["place_deco", "arrange_deco"] },
@@ -119,7 +119,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 350, chest: "iron" },
     },
     {
-        id: "mine", name: "The Mine", minLevel: 10, tint: "#c39b6a",
+        id: "mine", name: "The Mine", minLevel: 10, tint: "#c39b6a", icon: "/images/guide/ch-mine.webp",
         blurb: "Three trips a day, and the deeper you go the worse the odds.",
         steps: [
             { key: "mine_trip", label: "Take a trip down", why: "Every level down pays better ore and raises the chance the roof comes in. You choose when to surface — that's the whole game.", href: "/marketplace/mining", cta: "Go down", gold: 250, events: ["mine_trip", "ore_mined"] },
@@ -128,7 +128,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 700, chest: "gold" },
     },
     {
-        id: "trade", name: "Trading", minLevel: 12, tint: "#7defd0",
+        id: "trade", name: "Trading", minLevel: 12, tint: "#7defd0", icon: "/images/guide/ch-trade.webp",
         blurb: "Members trade gear and pets directly.",
         steps: [
             { key: "trade_open", label: "Offer somebody a trade", why: "Gear and pets both move. You'll end up with duplicates of things somebody else needs, and vice versa.", href: "/marketplace/trade", cta: "Open trading", gold: 250, events: ["trade_propose", "trade_accept"] },
@@ -136,7 +136,7 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 500, chest: "gold" },
     },
     {
-        id: "store", name: "The Actual Shop", minLevel: 1, tint: "#ffe28a",
+        id: "store", name: "The Actual Shop", minLevel: 1, tint: "#ffe28a", icon: "/images/guide/ch-store.webp",
         blurb: "The part that happens in Montgomery.",
         steps: [
             { key: "store_notify", label: "Turn on notifications", why: "Boss fights, trade offers and restock alerts. It's the only way to hear about a raid before it's over.", href: "/marketplace/play", cta: "Enable", gold: 250, claim: "client", clientKey: "notifications" },

@@ -110,7 +110,7 @@ export async function getGuide(buyerId) {
         }));
         const complete = steps.every((s) => s.done);
         return {
-            id: c.id, name: c.name, blurb: c.blurb, tint: c.tint, minLevel: c.minLevel,
+            id: c.id, name: c.name, blurb: c.blurb, tint: c.tint, icon: c.icon, minLevel: c.minLevel,
             locked, steps, complete,
             doneCount: steps.filter((s) => s.done).length,
             reward: c.reward,
@@ -128,7 +128,7 @@ export async function getGuide(buyerId) {
 
     return {
         signedIn: true, level, chapters, paid,
-        current: current ? { chapter: current.id, name: current.name, tint: current.tint, step } : null,
+        current: current ? { chapter: current.id, name: current.name, tint: current.tint, icon: current.icon, index: chapters.indexOf(current) + 1, step, stepIndex: current.steps.findIndex((s) => !s.done) + 1, stepCount: current.steps.length } : null,
         nextLocked: nextLocked ? { name: nextLocked.name, minLevel: nextLocked.minLevel } : null,
         totals: {
             steps: chapters.flatMap((c) => c.steps).length,
