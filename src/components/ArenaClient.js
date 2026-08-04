@@ -90,10 +90,11 @@ function Recap({ bout, busy, onClose }) {
     useScrollLock(true);   // the page behind must not scroll out from under the modal
     const up = r?.rankUp || null;
     const tint = up ? up.color : r?.rank?.color || (bout.won ? "#ffd75e" : "#ff6f7d");
-    const [shown, setShown] = useState(r ? r.rungFrom : 0);
+    // Counts DOWN, because a better place is a smaller number.
+    const [shown, setShown] = useState(r ? r.posFrom : 0);
     useEffect(() => {
-        if (!r || shown >= r.rungTo) return undefined;
-        const t = setTimeout(() => setShown((n) => n + 1), 520);
+        if (!r || shown <= r.posTo) return undefined;
+        const t = setTimeout(() => setShown((n) => n - 1), 380);
         return () => clearTimeout(t);
     }, [r, shown]);
 
@@ -124,13 +125,13 @@ function Recap({ bout, busy, onClose }) {
 
                 {/* THE CLIMB — the number that was missing. */}
                 <div className="ar-climb">
-                    <span className="ar-climb-lab">Rung</span>
+                    <span className="ar-climb-lab">Place</span>
                     <span className="ar-climb-num">
-                        <i className="was">{r.rungFrom}</i>
-                        {r.rungTo !== r.rungFrom ? <i className="arrow" aria-hidden="true" /> : null}
-                        {r.rungTo !== r.rungFrom ? <i className="now">{shown}</i> : null}
+                        <i className="was">#{r.posFrom}</i>
+                        {r.posTo !== r.posFrom ? <i className="arrow" aria-hidden="true" /> : null}
+                        {r.posTo !== r.posFrom ? <i className="now">#{shown}</i> : null}
                     </span>
-                    <span className="ar-climb-of">of {r.ladderSize}</span>
+                    <span className="ar-climb-of">of {r.size}</span>
                 </div>
 
                 {up ? (
@@ -164,7 +165,7 @@ function Recap({ bout, busy, onClose }) {
                         </>
                     ) : <span className="ar-recap-none"><i>No purse</i><b>the rung holds</b></span>}
                     <span><i>Streak</i><b>{r.streak}{r.streak > 0 && r.streak >= r.bestStreak ? " · best" : ""}</b></span>
-                    <span><i>Still above you</i><b>{r.remaining}</b></span>
+                    <span><i>Still above you</i><b>{Math.max(0, r.posTo - 1)}</b></span>
                 </div>
 
                 <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
@@ -298,11 +299,13 @@ export default function ArenaClient({ initial }) {
     }
 
     // ── THE LADDER ──
-    const next = st.next;
     return (
         <section className="card ar">
-            {/* THE BADGE. "0 of 83" is a fact; a rank is something you tell people, and a band you can see
-                yourself approaching is the reason to take the third fight of the day. */}
+            {/* what happened while you were asleep */}
+            {st.away?.length ? (
+                <AwayReport rows={st.away} onClose={() => act("seen")} />
+            ) : null}
+
             <div className="ar-badge" style={{ "--rank": st.rank?.color || "#9aa0a6" }}>
                 {st.rank?.icon ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -312,93 +315,107 @@ export default function ArenaClient({ initial }) {
                     <span className="ar-badge-kick">The Arena</span>
                     <b className="ar-rankname">{st.rank?.name}</b>
                     <span className="ar-standing">
-                        {st.rung > 0
-                            ? <>Above <b>{st.rung}</b> of the pack&rsquo;s {st.ladderSize}</>
-                            : <>Unranked &mdash; {st.ladderSize} fighters above you</>}
+                        <b>#{st.position}</b> of {st.size} · best <b>#{st.stats.best}</b>
                     </span>
-                    {st.rank?.next ? (
-                        <>
-                            <span className="ar-tonext">
-                                <i style={{ width: `${Math.min(100, (st.rank.into / st.rank.span) * 100)}%` }} />
-                            </span>
-                            <span className="ar-tonext-label">
-                                {Math.max(0, st.rank.span - st.rank.into)} more to <b>{st.rank.next.name}</b>
-                            </span>
-                        </>
-                    ) : <span className="ar-tonext-label">Top of the pack. There is no rank above this.</span>}
+                    <span className="ar-tonext-label">
+                        {st.fightsLeft} of {st.fightsPerDay} challenges left today
+                    </span>
                 </div>
             </div>
 
-            <div className="ar-stats">
-                <span><b>{st.stats.wins}</b> wins</span>
-                <span><b>{st.stats.losses}</b> losses</span>
-                <span><b>{st.stats.streak}</b> streak</span>
-                <span><b>{st.fightsLeft}</b> fights left today</span>
-            </div>
-
-            {st.cleared ? (
-                <div className="ar-cleared">
-                    <b>You have beaten the whole pack.</b>
-                    <p>There is nobody above you. Come back when somebody gears up.</p>
-                </div>
-            ) : next ? (
-                <div className="ar-next">
-                    <span className="ar-next-kicker">Rung {st.rung + 1} · next up</span>
-                    <div className="ar-next-row">
-                        <div className="ar-portrait is-big">
-                            {next.sprite ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={next.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
-                            ) : <span className="ar-noface" aria-hidden="true" />}
-                        </div>
-                        <div className="ar-next-body">
-                            <b>{next.name}</b>
-                            <span className="ar-next-meta">Level {next.level} · {next.vigour} vigour · {next.might} per swing</span>
-                            <span className="ar-next-tell">{next.tell}</span>
-                        </div>
-                    </div>
-                    <div className="ar-next-foot">
-                        <span className="ar-prize">+{money(next.reward.gold)} gold · +{money(next.reward.xp)} XP{next.reward.chest ? ` · ${next.reward.chest} chest` : ""}</span>
-                        <button type="button" className="ar-btn" disabled={busy || st.fightsLeft <= 0} onClick={() => act("start")}>
-                            {st.fightsLeft <= 0 ? "No fights left today" : "Step up"}
-                        </button>
-                    </div>
-                </div>
-            ) : null}
-
-            {st.upcoming?.length > 1 ? (
-                <div className="ar-up">
-                    <span className="ar-up-head">Above them</span>
-                    {st.upcoming.slice(1).map((o) => (
-                        <div key={`${o.rung}-${o.name}`} className="ar-up-row">
-                            <span className="ar-up-rung">{o.rung + 1}</span>
-                            <div className="ar-portrait is-tiny">
-                                {o.sprite ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={o.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
-                                ) : <span className="ar-noface" aria-hidden="true" />}
-                            </div>
-                            <span className="ar-up-name">{o.name}</span>
-                            <span className="ar-up-lvl">Lv {o.level}</span>
-                        </div>
+            {/* the podium — the reason to hold a spot overnight */}
+            <div className="ar-podium">
+                <span className="ar-podium-lab">Top three at the end of the day take a chest</span>
+                <div className="ar-podium-row">
+                    {st.podium?.map((p) => (
+                        <span key={p.place} className={`ar-podium-slot is-${p.chest}`}>
+                            <i>#{p.place}</i>{p.chest}
+                        </span>
                     ))}
                 </div>
-            ) : null}
+            </div>
+
+            {/* WHO YOU CAN TAKE A SPOT FROM */}
+            <div className="ar-targets">
+                <span className="ar-up-head">Challenge for a spot</span>
+                {st.targets?.length ? st.targets.map((o) => (
+                    <div key={o.id} className="ar-target">
+                        <span className="ar-target-pos">#{o.position}</span>
+                        <div className="ar-portrait is-tiny">
+                            {o.sprite ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={o.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
+                            ) : <span className="ar-noface" aria-hidden="true" />}
+                        </div>
+                        <div className="ar-target-body">
+                            <b>{o.name}</b>
+                            <em>Lv {o.level} · {o.vigour} vigour · {o.tell}</em>
+                        </div>
+                        <div className="ar-target-go">
+                            <span className="ar-prize">+{money(o.reward.gold)}</span>
+                            <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
+                                onClick={() => act("start", { target: o.id })}>
+                                {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
+                            </button>
+                        </div>
+                    </div>
+                )) : (
+                    <p className="ar-none">Nobody above you within reach. You are at the top of the Den.</p>
+                )}
+            </div>
 
             {st.board?.length ? (
                 <div className="ar-board">
-                    <span className="ar-up-head">Highest climbers</span>
+                    <span className="ar-up-head">The top of the Den</span>
                     {st.board.map((r) => (
-                        <div key={r.place} className="ar-up-row">
-                            <span className="ar-up-rung">{r.place}</span>
-                            <span className="ar-up-name">{r.name}</span>
-                            <span className="ar-up-lvl">rung {r.rung}</span>
+                        <div key={r.position} className={`ar-up-row${r.you ? " is-you" : ""}`}>
+                            <span className="ar-up-rung">#{r.position}</span>
+                            <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
+                            <span className="ar-up-lvl">Lv {r.level}</span>
                         </div>
                     ))}
                 </div>
             ) : null}
             <Styles />
         </section>
+    );
+}
+
+// ── WHAT HAPPENED WHILE YOU WERE AWAY ────────────────────────────────────────────────────────────────────────
+// You get fought while you are asleep. Without this a member simply finds their place changed and no
+// explanation anywhere in the game — so this is shown once, on the visit after it happened, and dismissing it
+// stamps last_seen_at.
+function AwayReport({ rows, onClose }) {
+    useScrollLock(true);
+    return (
+        <Portal>
+            <div className="ar-away" role="dialog" aria-modal="true">
+                <div className="ar-away-card">
+                    <span className="ar-recap-kick">While you were away</span>
+                    <b className="ar-recap-title">{rows.length} bout{rows.length === 1 ? "" : "s"}</b>
+                    <div className="ar-away-list">
+                        {rows.map((r, i) => (
+                            <div key={i} className={`ar-away-row ${r.won ? "is-win" : "is-loss"}`}>
+                                <div className="ar-portrait is-tiny">
+                                    {r.them.sprite ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={r.them.sprite} alt="" draggable="false" />
+                                    ) : <span className="ar-noface" aria-hidden="true" />}
+                                </div>
+                                <span className="ar-away-text">
+                                    <b>{r.them.name}</b>
+                                    <em>{r.defending
+                                        ? (r.won ? "challenged you and lost" : "took your spot")
+                                        : (r.won ? "you took their spot" : "you challenged and lost")}</em>
+                                </span>
+                                <span className="ar-away-pos">#{r.myPos}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <button type="button" className="ar-btn ar-recap-go" onClick={onClose}>Got it</button>
+                </div>
+            </div>
+        </Portal>
     );
 }
 
@@ -640,6 +657,46 @@ function Styles() {
             .ar-err { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
                 font-size: 12px; font-weight: 800; color: #ffd0a0;
                 background: rgba(255,160,80,0.12); border: 1px solid rgba(255,160,80,0.4); }
+            .ar-btn.is-sm { padding: 8px 14px; font-size: 0.8rem; }
+            .ar-podium { margin: 12px 0 14px; padding: 11px 13px; border-radius: 13px;
+                background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.3); }
+            .ar-podium-lab { font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #cdb894; }
+            .ar-podium-row { display: flex; gap: 7px; margin-top: 7px; }
+            .ar-podium-slot { flex: 1; text-align: center; padding: 7px 4px; border-radius: 9px; font-size: 11px;
+                font-weight: 900; text-transform: capitalize; background: rgba(0,0,0,0.3); border: 1px solid; }
+            .ar-podium-slot i { display: block; font-style: normal; font-size: 13px; }
+            .ar-podium-slot.is-gold { color: #ffd75e; border-color: rgba(255,215,94,0.55); }
+            .ar-podium-slot.is-iron { color: #cfd6dd; border-color: rgba(207,214,221,0.45); }
+            .ar-podium-slot.is-wooden { color: #c39b6a; border-color: rgba(195,155,106,0.45); }
+
+            .ar-targets { display: grid; gap: 7px; margin-bottom: 16px; }
+            .ar-target { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
+                padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,111,125,0.28); }
+            .ar-target-pos { font-size: 12px; font-weight: 900; color: #ffb0b8; font-variant-numeric: tabular-nums; }
+            .ar-target-body { min-width: 0; }
+            .ar-target-body b { display: block; font-size: 13px; color: #e9eef3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-target-body em { display: block; font-style: normal; font-size: 10.5px; color: #8a939d;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-target-go { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+            .ar-none { font-size: 12.5px; color: #8a939d; }
+            .ar-up-row.is-you { border: 1px solid rgba(255,215,94,0.45); background: rgba(255,215,94,0.08); }
+
+            .ar-away { position: fixed; inset: 0; z-index: 10100; display: grid; place-items: center; padding: 18px;
+                background: rgba(6,4,10,0.86); backdrop-filter: blur(4px); overflow-y: auto; }
+            .ar-away-card { width: min(390px, 100%); max-height: 92dvh; overflow-y: auto; padding: 22px 20px 18px;
+                border-radius: 20px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
+                border: 2px solid #6f5a9c; box-shadow: 0 24px 70px rgba(0,0,0,0.8);
+                animation: arPop .4s cubic-bezier(.2,1.5,.35,1) both; }
+            .ar-away-list { display: grid; gap: 6px; margin: 13px 0 15px; }
+            .ar-away-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
+                padding: 8px 11px; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05);
+                border-left: 3px solid transparent; }
+            .ar-away-row.is-win { border-left-color: #7ce8a4; }
+            .ar-away-row.is-loss { border-left-color: #ff6f7d; }
+            .ar-away-text b { display: block; font-size: 12.5px; color: #e9eef3; }
+            .ar-away-text em { font-style: normal; font-size: 11px; color: #9a8fb5; }
+            .ar-away-pos { font-size: 12px; font-weight: 900; color: #cdb894; font-variant-numeric: tabular-nums; }
+
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             .ar-line { font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }

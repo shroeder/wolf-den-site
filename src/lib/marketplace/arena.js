@@ -17,7 +17,14 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 export const ARENA_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
 
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
-export const FIGHTS_PER_DAY = 3;
+// Ten, not three. Three was set when the ladder was a bottom-up grind and every fight was progress; on a
+// CHALLENGE ladder you are picking opponents who can actually beat you, so losing one shouldn't cost a third of
+// your day.
+export const FIGHTS_PER_DAY = 10;
+
+// How far above you you're allowed to reach. Wide enough that there is always somebody worth fighting, narrow
+// enough that the top of the Den can't be taken from the bottom in an afternoon.
+export const CHALLENGE_REACH = 8;
 
 // Same shape as a delve: what you bring is your level and what you are wearing. Reusing the curve deliberately
 // — a member who knows roughly how tough they are underground should not have to learn a second scale here.
@@ -167,7 +174,46 @@ export async function arenaPower(buyerId) {
 
 async function arenaRow(buyerId) {
     await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    return db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    let row = await db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    // ── SEEDING ──────────────────────────────────────────────────────────────────────────────────────────
+    // You join the ladder WHERE YOUR POWER PUTS YOU, not at the bottom. Entering at the bottom is what made
+    // the first three fights of a geared member a waste of a day: eighty opponents who cannot beat them,
+    // three at a time. Everybody at or below the slot shuffles down one to make room.
+    if (row && row.position == null) {
+        const me = await arenaPower(buyerId);
+        const ladder = await ladderFor(buyerId);
+        const stronger = ladder.filter((o) => o.power > me.vigour + me.might * 4).length;
+        const slot = stronger + 1;
+        await db.query(`UPDATE mkt_arena SET position = position + 1 WHERE position >= $1`, [slot]).catch(() => {});
+        await db.query(`UPDATE mkt_arena SET position = $2, best_position = $2 WHERE buyer_id = $1`, [buyerId, slot]).catch(() => {});
+        row = await db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    }
+    return row;
+}
+
+// Everybody who holds a position, in order, with the profile bits the board needs.
+async function standings() {
+    const rows = await db.query(
+        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
+                b.alias, b.display_name, b.avatar_sprite_url
+           FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
+          WHERE a.position IS NOT NULL ORDER BY a.position ASC`
+    ).catch(() => []);
+    if (!rows.length) return [];
+    const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
+    const stats = await getEquippedStatsForMembers(rows.map((r) => r.buyer_id)).catch(() => new Map());
+    return rows.map((r) => {
+        const level = levelForXp(Number(r.xp) || 0).level;
+        const gearPower = Object.values(stats.get(r.buyer_id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+        return {
+            id: r.buyer_id, position: r.position,
+            name: r.display_name || r.alias || "A member",
+            sprite: r.avatar_sprite_url || null,
+            level, wins: r.wins, losses: r.losses,
+            vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
+            tell: tendency(r.buyer_id).tell,
+        };
+    });
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
 const saveBout = (buyerId, bout) =>
@@ -175,43 +221,93 @@ const saveBout = (buyerId, bout) =>
 
 // What a win at a given rung is worth. Climbing has to pay more than grinding the bottom, or the ladder is
 // decoration on a farming loop.
-const winGold = (rung) => 60 + rung * 14;
-const winXp = (rung) => 25 + rung * 7;
-const chestAt = (rung) => ((rung + 1) % 5 === 0 ? (rung >= 14 ? "gold" : "iron") : null);
-
 export async function getArenaState(buyerId) {
     if (!ARENA_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await arenaRow(buyerId);
-    const [me, ladder] = await Promise.all([arenaPower(buyerId), ladderFor(buyerId)]);
+    const [me, board] = await Promise.all([arenaPower(buyerId), standings()]);
     const used = fightsUsed(row);
-    const rung = Math.min(Number(row?.rung) || 0, Math.max(0, ladder.length));
-    const next = ladder[rung] || null;
-    // The bout is returned EVEN WHEN IT IS OVER. Dropping it the instant somebody fell meant the client
-    // snapped back to the ladder mid-swing: the killing blow, the result card and the rank-up were all
-    // unreachable code. It is cleared by the Back-to-the-ladder tap (clearBout), which is what that verb is
-    // for. startBout still refuses to deal a new one while an UNFINISHED bout is on the row.
+    const pos = Number(row?.position) || board.length;
     const bout = row?.bout_json || null;
+
+    // WHO YOU MAY CHALLENGE. Everyone above you, within reach — so every fight on offer is one you could
+    // plausibly lose, which is the only kind worth spending an attempt on.
+    const targets = board
+        .filter((o) => o.id !== buyerId && o.position < pos && o.position >= pos - CHALLENGE_REACH)
+        .sort((x, y) => y.position - x.position)
+        .map((o) => ({ ...o, reward: winReward(pos, o.position) }));
 
     return {
         unlocked: true,
-        me: { ...me, name: "You" },
-        rung, ladderSize: ladder.length,
-        rank: rankFor(rung, ladder.length),
-        cleared: rung >= ladder.length && ladder.length > 0,
-        fightsLeft: Math.max(0, FIGHTS_PER_DAY - used),
+        me: { ...me, name: "You", position: pos },
+        position: pos, size: board.length,
+        rank: rankFor(Math.max(0, board.length - pos), board.length),
+        fightsLeft: Math.max(0, FIGHTS_PER_DAY - used), fightsPerDay: FIGHTS_PER_DAY,
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
             streak: Number(row?.streak) || 0, bestStreak: Number(row?.best_streak) || 0,
-            bestRung: Number(row?.best_rung) || 0,
+            best: Number(row?.best_position) || pos,
         },
-        // The rung you're on, plus a peek at who is above — the ladder is more motivating when you can see it.
-        next: next ? { ...next, tell: tendency(next.id).tell, reward: { gold: winGold(rung), xp: winXp(rung), chest: chestAt(rung) } } : null,
-        upcoming: ladder.slice(rung, rung + 6).map((o, i) => ({
-            name: o.name, sprite: o.sprite, level: o.level, power: o.power, rung: rung + i,
-        })),
-        beaten: ladder.slice(Math.max(0, rung - 3), rung).map((o) => ({ name: o.name, sprite: o.sprite, level: o.level })),
+        targets,
+        // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
+        board: board.slice(0, 10).map((o) => ({ position: o.position, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
+        podium: PODIUM,
         bout: bout ? publicBout(bout) : null,
+        away: await awayReport(buyerId, row),
     };
+}
+
+// What a win is worth: reaching further up pays more, and taking a top spot pays most.
+function winReward(myPos, theirPos) {
+    const climb = Math.max(1, myPos - theirPos);
+    const height = Math.max(1, 40 - theirPos);          // being near the top is worth more
+    return { gold: 60 + climb * 18 + height * 4, xp: 25 + climb * 8 + height * 2 };
+}
+
+// The three chests handed out at the end of each day.
+export const PODIUM = [
+    { place: 1, chest: "gold" },
+    { place: 2, chest: "iron" },
+    { place: 3, chest: "wooden" },
+];
+
+// ── WHAT HAPPENED WHILE YOU WERE AWAY ────────────────────────────────────────────────────────────────────────
+// The arena is asynchronous: you are challenged while you are asleep. Without this a member just finds their
+// position changed and no explanation anywhere in the game. Everything since they last looked.
+async function awayReport(buyerId, row) {
+    const since = row?.last_seen_at || null;
+    const rows = await db.query(
+        `SELECT ab.challenger_id, ab.defender_id, ab.challenger_won, ab.challenger_pos, ab.defender_pos, ab.rounds, ab.created_at,
+                bc.display_name AS c_name, bc.alias AS c_alias, bc.avatar_sprite_url AS c_sprite,
+                bd.display_name AS d_name, bd.alias AS d_alias, bd.avatar_sprite_url AS d_sprite
+           FROM mkt_arena_bout ab
+           JOIN mkt_buyer bc ON bc.id = ab.challenger_id
+           JOIN mkt_buyer bd ON bd.id = ab.defender_id
+          WHERE (ab.challenger_id = $1 OR ab.defender_id = $1)
+            AND ($2::timestamptz IS NULL OR ab.created_at > $2)
+          ORDER BY ab.created_at DESC LIMIT 12`,
+        [buyerId, since]
+    ).catch(() => []);
+    if (!rows.length) return null;
+    return rows.map((r) => {
+        const defending = String(r.defender_id) === String(buyerId);
+        const them = defending
+            ? { name: r.c_name || r.c_alias, sprite: r.c_sprite }
+            : { name: r.d_name || r.d_alias, sprite: r.d_sprite };
+        return {
+            defending,
+            them,
+            won: defending ? !r.challenger_won : r.challenger_won,
+            myPos: defending ? r.defender_pos : r.challenger_pos,
+            rounds: r.rounds,
+        };
+    });
+}
+
+/** Mark the away report read, so it is shown once and not on every visit. */
+export async function seenArena(buyerId) {
+    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    await db.query(`UPDATE mkt_arena SET last_seen_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
 // The client never sees the opponent's next pick — only what has already happened.
@@ -224,22 +320,24 @@ function publicBout(b) {
     };
 }
 
-export async function startBout(buyerId) {
+export async function startBout(buyerId, targetId = null) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over) return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
     if (fightsUsed(row) >= FIGHTS_PER_DAY) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
 
-    const [me, ladder] = await Promise.all([arenaPower(buyerId), ladderFor(buyerId)]);
-    const rung = Math.min(Number(row?.rung) || 0, Math.max(0, ladder.length));
-    const foe = ladder[rung];
-    if (!foe) return { ok: false, error: "ladder_cleared", ...(await getArenaState(buyerId)) };
+    const [me, board] = await Promise.all([arenaPower(buyerId), standings()]);
+    const pos = Number(row?.position) || board.length;
+    // The target must be ABOVE you and within reach — checked here and not just hidden in the UI, because the
+    // list is the only thing stopping somebody POSTing their way to first place.
+    const foe = board.find((o) => o.id === targetId && o.position < pos && o.position >= pos - CHALLENGE_REACH);
+    if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
 
+    const t = tendency(foe.id);
     const bout = {
-        rung, ladderSize: ladder.length,
-        foe: { id: foe.id, name: foe.name, sprite: foe.sprite, flip: foe.flip, level: foe.level, might: foe.might },
-        tell: tendency(foe.id).tell,
-        w: tendency(foe.id).w,
+        myPos: pos, foePos: foe.position, size: board.length,
+        foe: { id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level, might: foe.might },
+        tell: t.tell, w: t.w,
         might: me.might, foeMight: foe.might,
         hp: me.vigour, maxHp: me.vigour,
         foeHp: foe.vigour, foeMaxHp: foe.vigour,
@@ -252,7 +350,7 @@ export async function startBout(buyerId) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(bout)]
     ).catch(() => {});
-    await trackActivity(buyerId, "arena_start", { rung, foe: foe.id }).catch(() => {});
+    await trackActivity(buyerId, "arena_start", { pos, target: foe.id }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -303,43 +401,45 @@ export async function fightRound(buyerId, stance) {
 
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
+    const myPos = b.myPos, foePos = b.foePos;
     let reward = null;
+
+    // ── TAKING THE SPOT ──────────────────────────────────────────────────────────────────────────────────
+    // Beat somebody above you and you SWAP positions with them. That is the whole point of a challenge
+    // ladder: standing is something you take off a specific person, not a counter that only goes up.
     if (won) {
-        const gold = winGold(b.rung), xp = winXp(b.rung), chest = chestAt(b.rung);
-        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
-        await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { rung: b.rung, foe: b.foe.id } }).catch(() => {});
+        const r = winReward(myPos, foePos);
+        reward = { gold: r.gold, xp: r.xp };
+        // Both writes are guarded on the position still being what we believed it was, so two bouts resolving at
+        // once can't leave two people holding the same rung.
+        await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [b.foe.id, myPos, foePos]).catch(() => {});
+        await db.query(`UPDATE mkt_arena SET position = $2, best_position = LEAST(COALESCE(best_position, $2), $2) WHERE buyer_id = $1 AND position = $3`, [buyerId, foePos, myPos]).catch(() => {});
+        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, r.gold]).catch(() => null);
+        await logCoin(buyerId, r.gold, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
-        await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
-        if (chest) await addChests(buyerId, { [chest]: 1 }, { source: "arena" }).catch(() => {});
-        reward = { gold, xp, chest };
+        await awardXp(buyerId, "arena_win", { points: r.xp, gold: 0 }).catch(() => {});
     }
     b.reward = reward;
-    // ── THE RECAP ────────────────────────────────────────────────────────────────────────────────────────
-    // Everything that changed, worked out HERE where the before and the after are both known for certain.
-    // Without it the result card said "you beat Miles, +74 gold" and nothing else — your rung moved, your rank
-    // bar moved, your streak moved, and the next opponent got harder, so winning read like sliding backwards.
-    const size = b.ladderSize || 0;
-    const rungFrom = b.rung;
-    const rungTo = b.rung + (won ? 1 : 0);
-    const wasRank = rankFor(rungFrom, size);
-    const nowRank = rankFor(rungTo, size);
+
+    const size = b.size || 0;
+    const posFrom = myPos;
+    const posTo = won ? foePos : myPos;
+    // Rank bands read off how many of the pack you are ABOVE, so position 1 of 84 is Alpha.
+    const wasRank = rankFor(Math.max(0, size - posFrom), size);
+    const nowRank = rankFor(Math.max(0, size - posTo), size);
     b.rankUp = won && nowRank.key !== wasRank.key ? { from: wasRank.name, to: nowRank.name, icon: nowRank.icon, color: nowRank.color } : null;
     const streakNow = won ? (Number(row?.streak) || 0) + 1 : 0;
     b.recap = {
         won, foe: b.foe, reward,
-        rungFrom, rungTo, ladderSize: size,
+        posFrom, posTo, size,
         rank: { name: nowRank.name, icon: nowRank.icon, color: nowRank.color, into: nowRank.into, span: nowRank.span, next: nowRank.next?.name || null },
         rankUp: b.rankUp,
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
         rounds: (b.log || []).length,
-        // What is waiting on the new rung, so "what changed" includes what comes next.
-        remaining: Math.max(0, size - rungTo),
     };
-    // A loss costs the attempt and the streak, and nothing else. It never sends you back down a rung — the
-    // ladder is something you climb, not something that can push you off.
+
     await db.query(
         `UPDATE mkt_arena SET bout_json = $2::jsonb,
-            rung = rung + $3, best_rung = GREATEST(best_rung, rung + $3),
             wins = wins + $3, losses = losses + $4,
             streak = CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END,
             best_streak = GREATEST(best_streak, CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END),
@@ -347,8 +447,44 @@ async function finishBout(buyerId, row, b, won) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1]
     ).catch(() => {});
-    await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { rung: b.rung, foe: b.foe.id }).catch(() => {});
-    return { ok: true, finished: { won, rung: b.rung, foe: b.foe, reward, rankUp: b.rankUp }, ...(await getArenaState(buyerId)) };
+
+    // Recorded from BOTH sides. The defender was asleep; this is the only way they ever find out.
+    await db.query(
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, challenger_won, challenger_pos, defender_pos, rounds)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [buyerId, b.foe.id, won, posTo, won ? myPos : foePos, (b.log || []).length]
+    ).catch(() => {});
+
+    await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { from: posFrom, to: posTo, foe: b.foe.id }).catch(() => {});
+    return { ok: true, finished: { won, reward, rankUp: b.rankUp }, ...(await getArenaState(buyerId)) };
+}
+
+// ── THE PODIUM ───────────────────────────────────────────────────────────────────────────────────────────────
+// First, second and third at the end of the day take a gold, iron and wooden chest. Idempotent per day via
+// prize_day, so running the cron twice cannot pay twice.
+export async function payArenaPodium() {
+    const day = await db.queryOne(`SELECT ${DAY}::text AS d`).catch(() => null);
+    if (!day?.d) return { ok: false, error: "no_day" };
+    const top = await db.query(
+        `SELECT a.buyer_id, a.position FROM mkt_arena a
+          WHERE a.position IS NOT NULL AND a.position <= 3
+            AND (a.prize_day IS DISTINCT FROM ${DAY}) ORDER BY a.position ASC`
+    ).catch(() => []);
+    const paid = [];
+    for (const r of top) {
+        const spec = PODIUM.find((x) => x.place === r.position);
+        if (!spec) continue;
+        // Claim the day FIRST and only pay if the claim took, so a second run finds nothing to do.
+        const claimed = await db.queryOne(
+            `UPDATE mkt_arena SET prize_day = ${DAY} WHERE buyer_id = $1 AND (prize_day IS DISTINCT FROM ${DAY}) RETURNING buyer_id`,
+            [r.buyer_id]
+        ).catch(() => null);
+        if (!claimed) continue;
+        await addChests(r.buyer_id, { [spec.chest]: 1 }, { source: "arena_podium" }).catch(() => {});
+        await trackActivity(r.buyer_id, "arena_podium", { place: r.position, chest: spec.chest }).catch(() => {});
+        paid.push({ buyerId: r.buyer_id, place: r.position, chest: spec.chest });
+    }
+    return { ok: true, day: day.d, paid };
 }
 
 /** Clear a finished bout so the ladder comes back. */
@@ -356,17 +492,4 @@ export async function clearBout(buyerId) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     await saveBout(buyerId, null);
     return { ok: true, ...(await getArenaState(buyerId)) };
-}
-
-/** The standings board — who has climbed highest. */
-export async function arenaBoard(limit = 10) {
-    const rows = await db.query(
-        `SELECT a.best_rung, a.best_streak, a.wins, b.display_name, b.alias, b.avatar_sprite_url
-           FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
-          WHERE a.best_rung > 0 ORDER BY a.best_rung DESC, a.best_streak DESC LIMIT $1`, [limit]
-    ).catch(() => []);
-    return rows.map((r, i) => ({
-        place: i + 1, name: r.display_name || r.alias || "A member",
-        sprite: r.avatar_sprite_url || null, rung: r.best_rung, streak: r.best_streak, wins: r.wins,
-    }));
 }

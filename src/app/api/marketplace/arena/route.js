@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { arenaBoard, clearBout, fightRound, getArenaState, startBout } from "@/lib/marketplace/arena.js";
+import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -16,8 +16,7 @@ export async function GET(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer?.id) return noStore({ unlocked: false }, { status: 200 });
-            const [state, board] = await Promise.all([getArenaState(buyer.id), arenaBoard().catch(() => [])]);
-            return noStore({ ...state, board });
+            return noStore(await getArenaState(buyer.id));
         } catch (error) {
             return internalError(error, { event: "arena.get.failure" });
         }
@@ -31,7 +30,8 @@ export async function POST(request) {
             if (!buyer?.id) return noStore({ error: "unauthorized" }, { status: 401 });
             const b = await request.json().catch(() => ({}));
             switch (String(b?.action || "")) {
-                case "start": return noStore(await startBout(buyer.id));
+                case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
+                case "seen": return noStore(await seenArena(buyer.id));
                 case "stance": return noStore(await fightRound(buyer.id, String(b?.stance || "")));
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });

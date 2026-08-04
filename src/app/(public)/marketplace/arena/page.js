@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import ArenaClient from "@/components/ArenaClient";
-import { arenaBoard, getArenaState } from "@/lib/marketplace/arena.js";
+import { getArenaState } from "@/lib/marketplace/arena.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +19,9 @@ export default async function ArenaPage() {
     // contract the Kitchen, the Mine and the Dungeons all used before they opened.
     if (!state?.unlocked) redirect("/marketplace/town");
 
-    const board = await arenaBoard().catch(() => []);
     return (
         <div className="stack reveal">
-            <ArenaClient initial={{ ...state, board }} />
+            <ArenaClient initial={state} />
         </div>
     );
 }
