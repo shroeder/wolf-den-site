@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 
-import { attackBoss } from "@/lib/marketplace/boss.js";
+import { attackBoss, unleashBoss } from "@/lib/marketplace/boss.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -18,7 +18,10 @@ export async function POST(request) {
         try {
             const buyer = await getAuthenticatedBuyer().catch(() => null);
             if (!buyer) return noStore({ error: "unauthorized" }, { status: 401 });
-            const result = await attackBoss(buyer.id);
+            // `all` spends every ready strike in one tap. The single-swing path stays for anything that
+            // still wants one hit at a time.
+            const body = await request.json().catch(() => ({}));
+            const result = body?.all ? await unleashBoss(buyer.id) : await attackBoss(buyer.id);
             if (result.error === "unauthorized") return noStore(result, { status: 401 });
             if (result.ok) {
                 after(async () => {

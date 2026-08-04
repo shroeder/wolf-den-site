@@ -1190,6 +1190,38 @@ export async function attackBoss(buyerId) {
     return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
+// ── UNLEASH EVERYTHING ───────────────────────────────────────────────────────────────────────────────────────
+// One tap spends every strike you have ready. It does NOT multiply a single swing by N — it genuinely swings N
+// times, because almost everything interesting about a strike is per-hit: the crit is rolled fresh, signatures
+// key off the hit INDEX, the first-hit pet burst only fires on swing zero, and the swing slot is reserved
+// atomically one at a time. Multiplying would quietly delete all of that and hand out a wrong number besides.
+//
+// Stops the moment the boss dies or the strikes run out, so the last swing of a kill is never wasted.
+export async function unleashBoss(buyerId, max = 25) {
+    if (!buyerId) return { error: "unauthorized" };
+    const hits = [];
+    let last = null;
+    for (let i = 0; i < max; i += 1) {
+        const r = await attackBoss(buyerId);
+        if (r?.error) {
+            // The first swing failing is a real error; failing later just means we ran out mid-flurry.
+            if (!hits.length) return r;
+            break;
+        }
+        last = r;
+        hits.push({ damage: r.damage, crit: r.crit, ability: r.ability, proc: r.proc });
+        if (r.defeated || r.attacksLeft <= 0) break;
+    }
+    if (!hits.length) return { error: "no_attacks_left", attacksLeft: 0 };
+    return {
+        ...last,
+        hits,
+        strikes: hits.length,
+        damage: hits.reduce((n, h) => n + h.damage, 0),
+        crits: hits.filter((h) => h.crit).length,
+    };
+}
+
 // ===== CHEER — hype up the hero currently on stage during a boss fight =====
 // You get CHEERS_PER_DAY cheers a day. A cheer deals a little bonus damage credited to the CHEERED hero (so it
 // helps the raid and their tickets), and earns YOU a bit of XP + coin. Equipped gear can roll bonus procs

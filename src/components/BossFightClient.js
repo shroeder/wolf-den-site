@@ -128,17 +128,28 @@ export default function BossFightClient() {
         if (busy || !data?.you || data.you.attacksLeft <= 0) return;
         setBusy(true);
         try {
-            const r = await fetch("/api/marketplace/boss/attack", { method: "POST" }).catch(() => null);
+            // ALL of them. One tap spends every strike you have ready — the server genuinely swings that many
+            // times (fresh crit rolls, per-index signatures, first-hit pet bursts) rather than multiplying one.
+            const r = await fetch("/api/marketplace/boss/attack", {
+                method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ all: true }),
+            }).catch(() => null);
             const res = r ? await r.json().catch(() => null) : null;
             if (!res || res.error) {
                 if (res?.error === "no_attacks_left") setData((d) => ({ ...d, you: { ...d.you, attacksLeft: 0 } }));
                 await load();
                 return;
             }
-            // Dopamine: name the ability, throw the big number.
-            setBurst({ ability: res.ability, damage: res.damage, crit: res.crit, proc: res.proc, key: floatId.current++ });
-            setTimeout(() => setBurst(null), 1500);
-            popDamage(res.damage, res.crit);
+            // THE FLURRY. A single "2,700,669" says nothing about having spent three strikes, so each swing
+            // throws its OWN number in sequence and the burst names how many landed. The individual hits are
+            // real per-swing damage from the server, not the total split three ways.
+            const swings = res.hits?.length ? res.hits : [{ damage: res.damage, crit: res.crit }];
+            swings.forEach((h, i) => setTimeout(() => popDamage(h.damage, h.crit), i * 260));
+            setBurst({
+                ability: res.ability, damage: res.damage, crit: res.crit, proc: res.proc,
+                strikes: swings.length, crits: res.crits || swings.filter((h) => h.crit).length,
+                key: floatId.current++,
+            });
+            setTimeout(() => setBurst(null), 1500 + swings.length * 260);
             setXpFlash(true);
             setTimeout(() => setXpFlash(false), 1400);
             // Let the site-wide watchers react live: refresh the reward nudge + fire a level-up celebration
@@ -241,6 +252,15 @@ export default function BossFightClient() {
                 {burst ? (
                     <div className={`boss-burst${burst.crit ? " is-crit" : ""}`} key={burst.key}>
                         {burst.proc ? <div className="boss-burst-proc">⚡ {burst.proc}!</div> : null}
+                        {/* Say how many landed. A single total gives no sign that three strikes were spent. */}
+                        {burst.strikes > 1 ? (
+                            <div className="boss-burst-flurry">
+                                {Array.from({ length: Math.min(burst.strikes, 12) }).map((_, i) => (
+                                    <i key={i} style={{ animationDelay: `${i * 0.09}s` }} />
+                                ))}
+                                <span>{burst.strikes}× STRIKE{burst.crits > 0 ? ` · ${burst.crits} crit` : ""}</span>
+                            </div>
+                        ) : null}
                         <div className="boss-burst-name">{burst.crit ? "💥 " : ""}{burst.ability}{burst.crit ? " 💥" : ""}</div>
                         <div className="boss-burst-dmg">-{burst.damage.toLocaleString()}</div>
                     </div>
@@ -285,7 +305,7 @@ export default function BossFightClient() {
                         </div>
                     ) : you.attacksLeft > 0 ? (
                         <button type="button" className="btn-gold boss2-attack" onClick={attack} disabled={busy}>
-                            {busy ? "Unleashing…" : you.attacksLeft > 1 ? `⚔️ Unleash a strike · ${you.attacksLeft} ready` : "⚔️ Unleash your daily strike"}
+                            {busy ? "Unleashing…" : you.attacksLeft > 1 ? `⚔️ Unleash all ${you.attacksLeft} strikes` : "⚔️ Unleash your daily strike"}
                         </button>
                     ) : (
                         <div className="boss2-spent">🕒 Strike used — your avatar keeps auto-attacking. Come back tomorrow for another.</div>

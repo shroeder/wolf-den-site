@@ -9621,6 +9621,15 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .boss-burst-name { font-weight: 800; font-size: clamp(1.1rem, 4.5vw, 2rem); color: #ffd75e; text-shadow: 0 2px 10px #000, 0 0 20px rgba(255,180,60,0.7); letter-spacing: 0.02em; text-align: center; }
 .boss-burst-proc { font-weight: 900; font-size: clamp(0.95rem, 4vw, 1.6rem); color: #6bf0ff; text-transform: uppercase; letter-spacing: 0.06em; text-shadow: 0 2px 10px #000, 0 0 18px rgba(80,220,255,0.9); text-align: center; animation: boss-proc-pop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1); }
 @keyframes boss-proc-pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+/* THE FLURRY — one pip per strike spent, lighting up in sequence, so a single big total can't be mistaken
+   for a single swing. Capped at 12 pips; the count beside them is always the truth. */
+.boss-burst-flurry { display: flex; align-items: center; justify-content: center; gap: 5px; margin-bottom: 6px; }
+.boss-burst-flurry i { width: 10px; height: 10px; border-radius: 2px; transform: rotate(45deg);
+    background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 0 10px rgba(255,176,32,0.9);
+    animation: bossPip .45s cubic-bezier(.2,1.6,.35,1) both; }
+@keyframes bossPip { from { opacity: 0; transform: rotate(45deg) scale(.2) } to { opacity: 1; transform: rotate(45deg) scale(1) } }
+.boss-burst-flurry span { margin-left: 6px; font-size: 0.8rem; font-weight: 900; letter-spacing: .1em;
+    color: #ffe28a; text-shadow: 0 2px 8px #000; }
 .boss-burst-dmg { font-weight: 900; font-size: clamp(2.4rem, 11vw, 5rem); color: #fff; text-shadow: 0 3px 14px #000, 0 0 28px rgba(255,120,60,0.85); line-height: 1; }
 .boss-burst.is-crit .boss-burst-dmg { color: #ff5a5a; }
 .boss-burst.is-crit .boss-burst-name { color: #ff8a5a; }
