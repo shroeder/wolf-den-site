@@ -484,6 +484,39 @@ async function finishBout(buyerId, row, b, won) {
     return { ok: true, finished: { won, reward, rankUp: b.rankUp }, ...(await getArenaState(buyerId)) };
 }
 
+// ── SEEDING THE LADDER ───────────────────────────────────────────────────────────────────────────────────────
+// Rebuild every position from power, using the SAME calculation the game fights with. This exists because the
+// first seed was done by a throwaway script that re-implemented gearPower from the items catalog and quietly
+// left out forge enhancements — 198 stat points across 19 members, which put 10 of 84 people in the wrong
+// order. Anything that needs to know how strong somebody is has to ask the same function the arena asks.
+//
+// Run it at launch, and any time the ladder needs flattening back to merit.
+export async function seedArenaLadder() {
+    const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
+    const members = await db.query(`SELECT id, alias, COALESCE(xp,0) AS xp FROM mkt_buyer WHERE COALESCE(xp,0) > 0`).catch(() => []);
+    if (!members.length) return { ok: false, error: "no_members" };
+    const stats = await getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map());
+    const ranked = members
+        .map((m) => {
+            const level = levelForXp(Number(m.xp) || 0).level;
+            const gearPower = Object.values(stats.get(m.id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+            return { id: m.id, alias: m.alias, power: powerOf(level, gearPower) };
+        })
+        .sort((a, b) => b.power - a.power || String(a.alias).localeCompare(String(b.alias)));
+
+    // Park everyone negative first: position carries a unique index, so reassigning in place collides mid-flight.
+    await db.query(`UPDATE mkt_arena SET position = -position WHERE position > 0`).catch(() => {});
+    for (let i = 0; i < ranked.length; i += 1) {
+        await db.query(
+            `INSERT INTO mkt_arena (buyer_id, position, best_position) VALUES ($1, $2, $2)
+             ON CONFLICT (buyer_id) DO UPDATE SET position = $2, best_position = $2`,
+            [ranked[i].id, i + 1]
+        ).catch(() => {});
+    }
+    await db.query(`UPDATE mkt_arena SET position = NULL WHERE position < 0`).catch(() => {});
+    return { ok: true, seeded: ranked.length, top: ranked.slice(0, 5).map((r) => r.alias) };
+}
+
 // ── THE PODIUM ───────────────────────────────────────────────────────────────────────────────────────────────
 // First, second and third at the end of the day take a gold, iron and wooden chest. Idempotent per day via
 // prize_day, so running the cron twice cannot pay twice.
