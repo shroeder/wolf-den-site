@@ -55,7 +55,7 @@ export default function DelveClient({ initial }) {
     return (
         <section className="card delve-wrap">
             <div className="delve-top">
-                <span className="delve-title">Dungeon Delves</span>
+                <span className="delve-title">Dungeons</span>
                 <span className="delve-sub">owner preview · level {state.level}</span>
             </div>
             {msg ? <div className="delve-msg">{msg}</div> : null}
@@ -90,7 +90,7 @@ export default function DelveClient({ initial }) {
 }
 
 const ERRORS = {
-    locked: "Delves aren't open yet.",
+    locked: "The dungeons aren't open yet.",
     level_locked: "You aren't deep enough into the Den for that one yet.",
     already_today: "You've already run that dungeon today. Back tomorrow.",
     run_in_progress: "You're already in a dungeon — finish it first.",

@@ -69,9 +69,9 @@ export const QUEST_TEMPLATES = [
 
     // ── Delve quests. ownerOnly for exactly as long as the dungeons are — eligibleTemplates filters these out
     // for everyone else, so they can never be rolled for a member who cannot open the page.
-    { key: "delve_floors", label: "Clear 5 dungeon floors", metric: "delve_floor", target: 5, gold: 150, ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
-    { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, chest: "wooden", ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
-    { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, chest: "wooden", ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
+    { key: "delve_floors", label: "Clear 5 dungeon floors", metric: "delve_floor", target: 5, gold: 150, ownerOnly: true, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
+    { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, chest: "wooden", ownerOnly: true, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
+    { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, chest: "wooden", ownerOnly: true, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

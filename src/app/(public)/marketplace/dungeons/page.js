@@ -6,13 +6,13 @@ import { getDelveState } from "@/lib/marketplace/delves.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-    title: "Dungeon Delves | The Wolf Den",
+    title: "Dungeons | The Wolf Den",
     description: "Ten floors down, and something waiting at the bottom.",
 };
 
 export default async function DelvesPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/delves");
+    if (!buyer) redirect("/marketplace/login?returnTo=/marketplace/dungeons");
 
     const state = await getDelveState(buyer.id);
     // OWNER-GATED while in development — a non-owner goes to the town rather than being shown an empty page,
