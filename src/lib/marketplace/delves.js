@@ -63,50 +63,54 @@ async function delveRow(buyerId) {
 // first, then traps) rather than appending fights at the end — so the guarantee never shows up as five brawls
 // in a row at the bottom.
 function dealFloors(dungeon) {
-    const pool = eventsFor(dungeon.id);
-    const total = pool.reduce((n, e) => n + e.weight, 0);
-    const draw = () => {
+    const pool = [...eventsFor(dungeon.id)];
+
+    // WITHOUT REPLACEMENT. The first cut drew independently each floor and only blocked ADJACENT repeats, which
+    // sounds fine and isn't: with 26 events over 9 draws the birthday problem bites hard, and 79% of runs
+    // contained the same encounter twice — "A Farmer's Strongbox" three times in one descent reads as a bug,
+    // not as randomness. Each event is now removed from the bag once drawn, so all nine floors are distinct.
+    // The decks are 26 deep against 9 floors, so there is no risk of running dry.
+    const bag = pool.map((e) => ({ e, w: e.weight }));
+    const drawOnce = () => {
+        const total = bag.reduce((n, b) => n + b.w, 0);
+        if (total <= 0 || !bag.length) return null;
         let r = Math.random() * total;
-        for (const e of pool) { r -= e.weight; if (r <= 0) return e; }
-        return pool[pool.length - 1];
+        for (let i = 0; i < bag.length; i += 1) {
+            r -= bag[i].w;
+            if (r <= 0) return bag.splice(i, 1)[0].e;
+        }
+        return bag.splice(bag.length - 1, 1)[0].e;
     };
 
     const floors = [];
     for (let i = 0; i < DELVE_FLOORS - 1; i += 1) {
-        // No two identical events back to back — the deck is big enough that a repeat reads as a bug.
-        let e = draw();
-        for (let guard = 0; guard < 6 && floors.length && e.id === floors[floors.length - 1].event.id; guard += 1) e = draw();
+        const e = drawOnce();
+        if (!e) break;
         floors.push({ n: i + 1, event: e, done: false });
     }
 
     const isFight = (f) => f.event.kind === KIND.fight || f.event.kind === KIND.mimic;
-    const fights = pool.filter((e) => e.kind === KIND.fight);
-    // The boss counts toward MIN_FIGHTS, so floors 1..9 only need MIN_FIGHTS - 1 between them.
+    // Replacement fights must also be ones this run has not used, or the guarantee reintroduces the duplicates
+    // the bag just removed.
+    const spareFights = bag.filter((b) => b.e.kind === KIND.fight).map((b) => b.e);
     let need = (MIN_FIGHTS - 1) - floors.filter(isFight).length;
     if (need > 0) {
         // Preference ORDER, then everything else. Converting only the four "least interesting" kinds looked
-        // tidy and silently broke the guarantee on ~2.7% of runs (measured over 8,000 deals): a hand full of
-        // chests, merchants and shrines simply had nothing in the preferred list left to convert. The last
-        // pass is unconditional, so the promise cannot fail — it just prefers to eat a quiet floor first.
+        // tidy and silently broke the guarantee on ~2.7% of runs: a hand full of chests, merchants and shrines
+        // simply had nothing in the preferred list left to convert. The last pass is unconditional.
         const order = [KIND.rest, KIND.puzzle, KIND.trap, KIND.cache, KIND.well, KIND.shrine, KIND.merchant, KIND.chest];
         const passes = [...order.map((k) => (f) => f.event.kind === k), (f) => !isFight(f)];
         for (const match of passes) {
             for (const f of floors) {
-                if (need <= 0) break;
+                if (need <= 0 || !spareFights.length) break;
                 if (!match(f)) continue;
-                f.event = pick(fights);
+                // Never convert a RARE find into a brawl — that is the one floor nobody wants to lose.
+                if (f.event.rare) continue;
+                f.event = spareFights.splice(Math.floor(Math.random() * spareFights.length), 1)[0];
                 need -= 1;
             }
-            if (need <= 0) break;
+            if (need <= 0 || !spareFights.length) break;
         }
-    }
-
-    // Dedupe AFTER the swap: the fight conversion above can put two identical fights side by side, and the
-    // original draw-time guard ran before it ever happened.
-    for (let i = 1; i < floors.length; i += 1) {
-        if (floors[i].event.id !== floors[i - 1].event.id) continue;
-        const alt = (isFight(floors[i]) ? fights : pool).filter((e) => e.id !== floors[i].event.id);
-        if (alt.length) floors[i].event = pick(alt);
     }
 
     floors.push({ n: DELVE_FLOORS, event: { id: "boss", kind: KIND.boss, title: dungeon.boss.name, text: dungeon.boss.blurb }, done: false });

@@ -14,20 +14,8 @@ export const DELVE_FLOORS = 10;
 // when the deck is dealt, not by rerolling encounters mid-run (see dealFloors).
 export const MIN_FIGHTS = 5;
 
-// Encounter KINDS. `fight` is the only one that can kill you; the rest are texture, reward or a gamble.
-export const KIND = {
-    fight: "fight",       // a foe: trade blows, take damage, win loot
-    boss: "boss",         // the tenth floor, always
-    chest: "chest",       // free loot
-    mimic: "mimic",       // looks like a chest, bites: a fight you didn't choose
-    merchant: "merchant", // spend gold on a potion or a trinket
-    well: "well",         // gamble: toss a coin for a blessing or a curse
-    shrine: "shrine",     // heal, or trade health for reward
-    trap: "trap",         // flat damage, no fight
-    rest: "rest",         // a quiet floor: small heal
-    cache: "cache",       // gold
-    puzzle: "puzzle",     // a choice with two outcomes
-};
+export { KIND } from "@/lib/marketplace/delve-kinds.js";
+export { DECKS, EVENTS, eventsFor } from "@/lib/marketplace/delve-events.js";
 
 // ── THE FOUR DUNGEONS ────────────────────────────────────────────────────────────────────────────────────────
 // `tint` drives the UI accents; `bg` is the generated backdrop; every foe and event carries its own sprite key
@@ -121,95 +109,6 @@ export const DUNGEONS = [
     },
 ];
 export const dungeonById = (id) => DUNGEONS.find((d) => d.id === id) || null;
-
-// ── THE EVENT DECK ───────────────────────────────────────────────────────────────────────────────────────────
-// Fifty-odd non-boss events, each with its own flavour, so ten floors never read the same twice and four
-// dungeons don't share a script. `only` scopes an event to one dungeon; everything else is shared texture that
-// re-skins per theme via the dungeon's own palette.
-//
-// `weight` is relative within the pool for that dungeon. Fights are weighted heavily because MIN_FIGHTS has to
-// be reachable without the dealer having to force them in.
-const E = (id, kind, title, text, extra = {}) => ({ id, kind, title, text, weight: 10, ...extra });
-
-export const EVENTS = [
-    // ── FIGHTS (shared shape, foe picked from the dungeon's own bestiary) ──
-    E("f_ambush", KIND.fight, "Ambush", "It was waiting in the dark and it moves first.", { weight: 34 }),
-    E("f_block", KIND.fight, "Blocked Passage", "Something big is in the way, and it is not moving.", { weight: 30 }),
-    E("f_pack", KIND.fight, "A Pack of Them", "One would be a nuisance. There are several.", { weight: 22, dmgMult: 1.25, lootMult: 1.4 }),
-    E("f_wounded", KIND.fight, "Wounded Beast", "It is already hurt. That makes it worse, not better.", { weight: 18, hpMult: 0.6, dmgMult: 1.3 }),
-    E("f_elite", KIND.fight, "Something Older", "Bigger than the rest, and it has been down here longer.", { weight: 12, hpMult: 1.6, dmgMult: 1.2, lootMult: 2 }),
-    E("f_guard", KIND.fight, "The Doorkeeper", "It guards a door you were going to walk through anyway.", { weight: 16, lootMult: 1.3 }),
-
-    // ── MIMICS — a chest that is a fight. The whole point is that it looks identical until you open it. ──
-    E("m_chest", KIND.mimic, "A Chest, Unattended", "Sitting in the middle of the floor. Nobody leaves a chest in the middle of a floor.", { weight: 9, dmgMult: 1.3 }),
-    E("m_hoard", KIND.mimic, "Too Good To Be True", "Gold spilling out of the lid. Far too much of it.", { weight: 6, dmgMult: 1.5, lootMult: 1.8 }),
-
-    // ── CHESTS ──
-    E("c_plain", KIND.chest, "A Strongbox", "Iron-bound and left behind. The hinges give easily.", { weight: 20 }),
-    E("c_buried", KIND.chest, "Half-Buried Casket", "You'd have walked past it if the corner hadn't caught the light.", { weight: 14 }),
-    E("c_ornate", KIND.chest, "An Ornate Coffer", "Someone cared about this one.", { weight: 8, lootMult: 1.6 }),
-    E("c_cracked", KIND.chest, "Cracked Open Already", "Someone got here first. They left in a hurry, and left some of it.", { weight: 12, lootMult: 0.6 }),
-
-    // ── CACHES (gold) ──
-    E("g_purse", KIND.cache, "A Dropped Purse", "Still tied. Whoever dropped it did not come back for it.", { weight: 18 }),
-    E("g_vein", KIND.cache, "Coin in the Silt", "Scattered across the floor like someone ran with their hands full.", { weight: 14 }),
-    E("g_tribute", KIND.cache, "A Tribute Pile", "Stacked neatly. Left as an offering to something.", { weight: 9, lootMult: 1.8 }),
-
-    // ── MERCHANTS ──
-    E("v_wanderer", KIND.merchant, "A Wanderer", "Someone else is down here, and they are willing to trade.", { weight: 14 }),
-    E("v_hermit", KIND.merchant, "The Hermit", "He has lived here longer than the dungeon has had a name.", { weight: 9 }),
-    E("v_ghostshop", KIND.merchant, "A Shop That Shouldn't Be", "A counter, a lamp, and a shopkeeper who does not blink.", { weight: 6 }),
-
-    // ── SHRINES — heal, or bargain health for reward ──
-    E("s_font", KIND.shrine, "A Cracked Font", "Still trickling. It smells clean, which down here is remarkable.", { weight: 14 }),
-    E("s_altar", KIND.shrine, "A Bloodied Altar", "It wants something from you before it gives anything back.", { weight: 10, bargain: true }),
-    E("s_statue", KIND.shrine, "A Kneeling Statue", "Its hands are cupped. Something is expected.", { weight: 9, bargain: true }),
-
-    // ── WELLS — pure gamble ──
-    E("w_wishing", KIND.well, "A Wishing Well", "Deep, dark, and it has swallowed a lot of coins.", { weight: 12 }),
-    E("w_mirror", KIND.well, "A Still Pool", "Your reflection is a beat behind you.", { weight: 8 }),
-
-    // ── TRAPS — damage, no fight ──
-    E("t_dart", KIND.trap, "Dart Holes", "You notice them a fraction after you should have.", { weight: 14 }),
-    E("t_floor", KIND.trap, "The Floor Gives", "One step is not like the others.", { weight: 12 }),
-    E("t_gas", KIND.trap, "Bad Air", "Sweet-smelling, which is the worst sign.", { weight: 10 }),
-    E("t_ceiling", KIND.trap, "Falling Stone", "The ceiling has been waiting a long time to do that.", { weight: 9 }),
-
-    // ── REST ──
-    E("r_camp", KIND.rest, "An Old Camp", "Cold ashes, a bedroll, no body. You take a moment.", { weight: 12 }),
-    E("r_quiet", KIND.rest, "A Quiet Stretch", "Nothing happens. It is almost worse.", { weight: 14 }),
-    E("r_spring", KIND.rest, "A Warm Spring", "Steam, and for once it isn't something breathing.", { weight: 9 }),
-
-    // ── PUZZLES — a real choice with two outcomes ──
-    E("p_doors", KIND.puzzle, "Two Doors", "One is warm to the touch. One is not.", { weight: 11 }),
-    E("p_lever", KIND.puzzle, "An Unmarked Lever", "It could be drainage. It could be the ceiling.", { weight: 10 }),
-    E("p_bridge", KIND.puzzle, "A Rotten Bridge", "Cross it, or take the long way round and lose the light.", { weight: 9 }),
-    E("p_riddle", KIND.puzzle, "Words Cut Into Stone", "A question, and space beneath it for an answer.", { weight: 8 }),
-
-    // ── DUNGEON-SPECIFIC COLOUR ──
-    E("h_roots", KIND.trap, "Grasping Roots", "The orchard is still alive down here, and it is not friendly.", { only: "hollow", weight: 14 }),
-    E("h_burrow", KIND.chest, "A Hoarder's Burrow", "Something has been dragging shiny things down here for years.", { only: "hollow", weight: 12, lootMult: 1.4 }),
-    E("h_hive", KIND.fight, "Broken Hive", "You put a boot through it before you saw it.", { only: "hollow", weight: 16, dmgMult: 1.2 }),
-    E("h_cellar", KIND.rest, "The Old Cellar", "Cider barrels, most of them burst. One of them isn't.", { only: "hollow", weight: 10 }),
-
-    E("k_bilge", KIND.trap, "Rising Bilge", "The water is at your knees, and it wasn't a minute ago.", { only: "sunken", weight: 14 }),
-    E("k_strongroom", KIND.chest, "The Strongroom", "The door was already open. That should worry you more than it does.", { only: "sunken", weight: 11, lootMult: 1.5 }),
-    E("k_ledger", KIND.puzzle, "A Waterlogged Ledger", "Someone recorded what was stored here. Some of it is still legible.", { only: "sunken", weight: 9 }),
-    E("k_current", KIND.fight, "Something in the Current", "It circles once before it comes at you.", { only: "sunken", weight: 16 }),
-
-    E("e_vent", KIND.trap, "A Steam Vent", "It goes off on a schedule. You learn the schedule the hard way.", { only: "ember", weight: 14 }),
-    E("e_forge", KIND.merchant, "An Abandoned Forge", "Still hot. Someone has left tools, and a price list.", { only: "ember", weight: 11 }),
-    E("e_crucible", KIND.shrine, "The Crucible", "Put your hand in and it will give you something. It will also take something.", { only: "ember", weight: 10, bargain: true }),
-    E("e_flow", KIND.fight, "Out of the Magma", "It rises out of the flow without hurrying.", { only: "ember", weight: 16 }),
-
-    E("a_stair", KIND.puzzle, "A Stair That Loops", "You have climbed this flight before. Twice.", { only: "astral", weight: 12 }),
-    E("a_orrery", KIND.chest, "A Broken Orrery", "The planets came off. They are worth a great deal.", { only: "astral", weight: 11, lootMult: 1.6 }),
-    E("a_window", KIND.well, "A Window With No Outside", "You can throw something through it. You will not get it back. Probably.", { only: "astral", weight: 10 }),
-    E("a_echo", KIND.fight, "Your Own Shape", "It is wearing your face and it is not doing it well.", { only: "astral", weight: 16, dmgMult: 1.2, lootMult: 1.5 }),
-];
-
-/** The event pool a given dungeon draws from: shared events plus its own. */
-export const eventsFor = (dungeonId) => EVENTS.filter((e) => !e.only || e.only === dungeonId);
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Bought with gold, permanent, and deliberately few. Each one changes how a run FEELS rather than adding a
