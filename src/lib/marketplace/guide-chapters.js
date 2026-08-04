@@ -148,7 +148,7 @@ export const GUIDE_CHAPTERS = [
         id: "store", name: "The Actual Shop", minLevel: 1, tint: "#ffe28a", icon: "/images/guide/ch-store.webp",
         blurb: "The part that happens in Montgomery.",
         steps: [
-            { key: "store_notify", label: "Turn on notifications", why: "Boss fights, trade offers and restock alerts. It's the only way to hear about a raid before it's over.", href: "/marketplace/play", cta: "Enable", gold: 250, claim: "client", clientKey: "notifications" },
+            { key: "store_notify", label: "Turn on notifications", why: "Boss fights, trade offers and restock alerts. It's the only way to hear about a raid before it's over — and the Den only raids for a few hours.", href: "/marketplace/notifications", cta: "Turn them on", gold: 250, verify: "push" },
             { key: "store_wishlist", label: "Tell us what you're hunting", why: "Add a card to Looking For and we message you when one lands in the case. It costs nothing and it works.", href: "/looking-for", cta: "Add a card", gold: 250, verify: "wishlist" },
             { key: "store_buy", label: "Buy something in store", why: "Real purchases pay XP and gold in here, every time, automatically. Being a customer is worth something.", href: "/shop", cta: "See the shop", gold: 500, verify: "purchase" },
         ],

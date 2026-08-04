@@ -25,7 +25,7 @@ async function trueSteps(buyerId, steps) {
     if (!steps.length) return new Set();
     const wanted = [...new Set(steps.flatMap((s) => s.events || []))];
     const needs = (v) => steps.some((s) => s.verify === v);
-    const [events, avatar, wish, purchase] = await Promise.all([
+    const [events, avatar, wish, push, purchase] = await Promise.all([
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
@@ -38,6 +38,18 @@ async function trueSteps(buyerId, steps) {
         needs("wishlist")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_want WHERE buyer_id = $1 LIMIT 1`, [buyerId]).catch(() => null)
             : null,
+        // A LIVE browser push subscription. This step used to be client-claimed — the only one in the book you
+        // were trusted on — which meant 25 members who already had notifications on were asked to turn them on
+        // forever, and the strip cheerfully told them they were "in the right place" on a page with no toggle.
+        // The subscription is right there in mkt_web_push and can just be looked at.
+        //
+        // created_at is load-bearing: the VAPID keypair rotated on 2026-07-25 and every subscription older than
+        // that is signed for the old key, so the push service 403s it. Four members are in exactly that state —
+        // they believe notifications are on and nothing can reach them. Counting a dead subscription as done
+        // would quietly bless that; this way the guide walks them back to re-enable it.
+        needs("push")
+            ? db.queryOne(`SELECT 1 AS x FROM mkt_web_push WHERE buyer_id = $1 AND created_at >= '2026-07-25' LIMIT 1`, [buyerId]).catch(() => null)
+            : null,
         // purchase_spend / purchase_flat / first_purchase are how an in-store sale reaches a member's account.
         needs("purchase")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_xp_event WHERE buyer_id = $1 AND action IN ('purchase_spend','purchase_flat','first_purchase') LIMIT 1`, [buyerId]).catch(() => null)
@@ -49,6 +61,7 @@ async function trueSteps(buyerId, steps) {
         if (s.events?.some((e) => seen.has(e))) out.add(s.key);
         else if (s.verify === "avatar" && avatar) out.add(s.key);
         else if (s.verify === "wishlist" && wish) out.add(s.key);
+        else if (s.verify === "push" && push) out.add(s.key);
         else if (s.verify === "purchase" && purchase) out.add(s.key);
     }
     return out;
