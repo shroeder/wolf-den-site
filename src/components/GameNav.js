@@ -60,6 +60,7 @@ const renderBigIcon = (l) => <NavIcon l={l} size={28} big />;
 // CATEGORIZED grid menu of everything. Mounted once in the marketplace layout; self-hides on non-game pages.
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
+    { href: "/marketplace/guide", emoji: "🧭", label: "Guide" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
     { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
