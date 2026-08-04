@@ -19,7 +19,7 @@ export const GAME_EXTRA_PATHS = [
     "/marketplace/u/", "/marketplace/fishing", "/marketplace/rewards", "/marketplace/farm",
     "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm",
     "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining",
-    "/marketplace/dungeons", "/marketplace/blacksmith", "/marketplace/events", "/marketplace/notifications",
+    "/marketplace/dungeons", "/marketplace/arena", "/marketplace/blacksmith", "/marketplace/events", "/marketplace/notifications",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

@@ -110,6 +110,18 @@ export default function GameNav() {
         return () => { dead = true; };
     }, [pathname]);
 
+    // The Arena, same contract as the Mine and the Dungeons: ask the server, never guess. A non-owner simply
+    // has no Arena entry while it is still owner-gated.
+    const [arena, setArena] = useState(false);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/arena", { cache: "no-store", credentials: "same-origin" })
+            .then((r) => r.json())
+            .then((d) => { if (!dead && d?.unlocked) setArena(true); })
+            .catch(() => { /* no arena, no menu entry */ });
+        return () => { dead = true; };
+    }, [pathname]);
+
     // Delves, same contract as the Mine: ask the server, never guess. A non-owner simply has no Delves entry.
     const [delves, setDelves] = useState(false);
     useEffect(() => {
@@ -162,7 +174,8 @@ export default function GameNav() {
         ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
-        ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : [])];
+        ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
+        ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
     const [chests, setChests] = useState(0);
@@ -291,6 +304,7 @@ export default function GameNav() {
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
+            ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Climb the pack" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
