@@ -9,7 +9,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
-import { partName } from "@/lib/marketplace/forge-parts.js";
+import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
@@ -446,6 +446,36 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
         try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, run.banked.frags, "wooden"); } catch { /* best-effort */ }
     }
 
+    // ── DRESS THE HAUL ───────────────────────────────────────────────────────────────────────────────────
+    // The wrap card used to list gear as a name in a coloured box, which is the least interesting way to tell
+    // somebody a dungeon just handed them a legendary. Every piece has painted art and a real stat line
+    // already; they were simply never asked for. Resolved HERE, once, so the client renders what it is given.
+    const gearOut = [];
+    if ((run.banked.gear || []).length) {
+        try {
+            const [{ itemSpriteMap }, { itemById, describeStats }] = await Promise.all([
+                import("@/lib/marketplace/item-sprites.js"),
+                import("@/lib/marketplace/items.js"),
+            ]);
+            const sprites = await itemSpriteMap().catch(() => ({}));
+            for (const g of run.banked.gear) {
+                const it = itemById(g.id);
+                gearOut.push({
+                    ...g,
+                    sprite: sprites[g.id] || null,
+                    slot: it?.slot || g.slot || null,
+                    stats: it?.stats ? describeStats(it.stats) : null,
+                    flavor: it?.flavor || null,
+                });
+            }
+        } catch { gearOut.push(...run.banked.gear); }
+    }
+    // Chest art is a settings blob keyed by tier — the same pictures the rewards screen uses.
+    let chestArt = {};
+    if (chests.length) {
+        try { const { getChestArt } = await import("@/lib/marketplace/chest-art.js"); chestArt = await getChestArt().catch(() => ({})); } catch { /* names still read fine */ }
+    }
+
     const floorsDone = run.floors.filter((f) => f.done).length;
     const stats = await db.queryOne(
         `UPDATE mkt_delve
@@ -489,9 +519,10 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
         ok: true,
         finished: {
             died, cleared, fled, floor: run.floor, gold: totalGold, xp: totalXp, bonusGold, bonusXp, chests,
-            parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n, name: partName(Number(tier)) })),
+            parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n, name: partName(Number(tier)), sprite: partSprite(Number(tier)) })),
             frags: run.banked.frags || 0,
-            gear: run.banked.gear || [],
+            gear: gearOut,
+            chestArt,
         },
         ...(await state(buyerId)),
     };
