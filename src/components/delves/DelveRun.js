@@ -66,7 +66,9 @@ const REWARD_ART = {
     gold: "/images/spin/prizes/coins-big.png",
     xp: "/images/spin/prizes/xp-orb.png",
     potion: "/images/delves/ev-potion.webp",
+    frags: "/images/sailing/fragment-wooden.png",
 };
+const RARITY_COLOR = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1", ascendant: "#ff7a3c", eternal: "#ff5cc8" };
 const CHEST_ART = {
     wooden: "/images/spin/prizes/chest-wood.png",
     iron: "/images/spin/prizes/chest-wood.png",
@@ -144,6 +146,8 @@ export default function DelveRun({ run, busy, onAct }) {
         result.gold ? { k: "gold", art: REWARD_ART.gold, text: `+${result.gold.toLocaleString()} gold` } : null,
         result.xp ? { k: "xp", art: REWARD_ART.xp, text: `+${result.xp.toLocaleString()} XP` } : null,
         result.chest ? { k: "chest", art: CHEST_ART[result.chest] || CHEST_ART.wooden, text: `${result.chest} chest` } : null,
+        result.parts ? { k: "parts", art: null, text: `${result.parts.n}× ${result.parts.name}` } : null,
+        result.frags ? { k: "frags", art: REWARD_ART.frags, text: `${result.frags} shards` } : null,
         result.potion ? { k: "potion", art: REWARD_ART.potion, text: `+${result.potion} potion${result.potion === 1 ? "" : "s"}` } : null,
         result.healed ? { k: "heal", art: REWARD_ART.potion, text: `+${result.healed} health` } : null,
         result.damage ? { k: "dmg", art: null, text: `-${result.damage} health` } : null,
@@ -197,6 +201,11 @@ export default function DelveRun({ run, busy, onAct }) {
                 {result ? (
                     <div className={`dlr-payoff is-${result.tone}`}>
                         <b>{result.title}</b>
+                        {result.gear ? (
+                            <span className="dlr-gear" style={{ "--rar": RARITY_COLOR[result.gear.rarity] || "#4aa3ff" }}>
+                                <em>{result.gear.rarity}</em>{result.gear.name}
+                            </span>
+                        ) : null}
                         {chips.length ? (
                             <div className="dlr-chips">
                                 {chips.map((c) => (
@@ -369,6 +378,15 @@ export default function DelveRun({ run, busy, onAct }) {
                 .dlr-chip img { width: 20px; height: 20px; object-fit: contain; }
                 .dlr-chip.is-heal { color: #8bf0b4; border-color: rgba(139,240,180,0.5); }
                 .dlr-chip.is-dmg { color: #ff8f9a; border-color: rgba(255,143,154,0.5); padding-left: 10px; }
+                .dlr-chip.is-parts { padding-left: 10px; color: #cfd6dd; border-color: rgba(207,214,221,0.45); }
+                /* Gear is the rarest thing a fight can drop, so it gets its own rarity-coloured banner rather
+                   than a chip in a row of chips. */
+                .dlr-gear { display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; padding: 5px 13px;
+                    border-radius: 999px; font-size: 13px; font-weight: 900; color: #fff; background: rgba(10,6,16,0.82);
+                    border: 1px solid var(--rar); box-shadow: 0 0 22px -4px var(--rar);
+                    animation: dlrChip .45s cubic-bezier(.2,1.5,.35,1) .1s both; }
+                .dlr-gear em { font-style: normal; font-size: 9.5px; font-weight: 900; letter-spacing: .1em;
+                    text-transform: uppercase; color: var(--rar); }
                 @keyframes dlrChip { from { opacity: 0; transform: translateY(8px) scale(.8); } to { opacity: 1; transform: none; } }
 
                 .dlr-you { display: flex; align-items: center; gap: 10px; margin: 11px 0; }

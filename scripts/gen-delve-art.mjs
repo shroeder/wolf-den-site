@@ -40,7 +40,11 @@ const ART = {
     "foe-warren-mother": [`${FOE} An enormous matriarch badger-beast far too large for its tunnels, grey-black striped fur matted with earth, heavy clawed forelimbs, milky blind eyes, low and wide.`, "boss"],
     "foe-drowned-warden": [`${FOE} A drowned armoured vault guard, waterlogged plate armour crusted with barnacles and green weed, a heavy iron vault key on a chain around its neck, dark water pouring from its helm.`, "boss"],
     "foe-cinder-tyrant": [`${FOE} A towering blacksmith-shaped colossus of blackened iron and cooling magma, cracks of white-hot light across its chest, one arm ending in a forge hammer, wreathed in heat shimmer.`, "boss"],
-    "foe-hollow-star": [`${FOE} A tall faceless humanoid figure made of night sky, its body a window onto stars and violet nebula, a hollow ring of light where a head should be, trailing motes.`, "boss"],
+    // The head has been the whole problem. "A hollow ring of light" came back as a solid gold oval with a dark
+    // middle (an avocado), and describing the ring harder just got a flat outlined halo with a doodle in it — a
+    // thin rim of light cannot survive a house style built on bold dark outlines. So there is no ring: the head
+    // is a smooth featureless VOID with one star in it, which is the same idea and cannot be drawn as an object.
+    "foe-hollow-star": [`${FOE} A tall faceless humanoid figure whose whole body is a window onto deep space — dark violet and midnight blue with stars and nebula inside it, ragged trailing hem. Its head is a smooth featureless SILHOUETTE with absolutely no face: no eyes, no mouth, no mask, no helmet, no halo and no ring — just an unbroken dark head shape filled with the same starfield as the body, with ONE single bright white star burning in the middle of it. Nothing floats above or around the head.`, "boss"],
 
     // ── hollow warren foes ──
     "foe-rootrat": [`${FOE} A wiry rat the size of a dog with root-like whiskers and bark-flecked fur, hunched and twitching.`, "foe"],

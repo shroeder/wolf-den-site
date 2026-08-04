@@ -8,6 +8,8 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
+import { addParts } from "@/lib/marketplace/crafting.js";
+import { partName } from "@/lib/marketplace/forge-parts.js";
 import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
@@ -434,6 +436,15 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
         for (const t of chests) counts[t] = (counts[t] || 0) + 1;
         await addChests(buyerId, counts, { source: "delve" }).catch(() => {});
     }
+    // Salvage and shards are handed over HERE, with everything else, so dying still pays them out — the whole
+    // deal of this dungeon is that what you banked is yours whether you walked out or were carried.
+    const parts = run.banked.parts || {};
+    for (const [tier, n] of Object.entries(parts)) {
+        if (n > 0) await addParts(buyerId, Number(tier), n).catch(() => {});
+    }
+    if (run.banked.frags > 0) {
+        try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, run.banked.frags, "wooden"); } catch { /* best-effort */ }
+    }
 
     const floorsDone = run.floors.filter((f) => f.done).length;
     const stats = await db.queryOne(
@@ -476,7 +487,12 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
 
     return {
         ok: true,
-        finished: { died, cleared, fled, floor: run.floor, gold: totalGold, xp: totalXp, bonusGold, bonusXp, chests },
+        finished: {
+            died, cleared, fled, floor: run.floor, gold: totalGold, xp: totalXp, bonusGold, bonusXp, chests,
+            parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n, name: partName(Number(tier)) })),
+            frags: run.banked.frags || 0,
+            gear: run.banked.gear || [],
+        },
         ...(await state(buyerId)),
     };
 }

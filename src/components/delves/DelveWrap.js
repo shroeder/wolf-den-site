@@ -10,7 +10,7 @@
 export default function DelveWrap({ finished, onClose }) {
     // TWO endings now. "You turned back" went with the retreat button: it ended the run and paid exactly what
     // dying pays, so it was a button whose only function was to stop playing.
-    const { cleared, died, floor, gold, xp, bonusGold, bonusXp, chests = [] } = finished;
+    const { cleared, died, floor, gold, xp, bonusGold, bonusXp, chests = [], parts = [], frags = 0, gear = [] } = finished;
     const tone = cleared ? "is-clear" : "is-dead";
     const title = cleared ? "The way is clear" : "You fell";
     const line = cleared
@@ -36,7 +36,16 @@ export default function DelveWrap({ finished, onClose }) {
                     <div className="dlw-row"><span>Gold</span><b>{gold.toLocaleString()}</b></div>
                     <div className="dlw-row"><span>XP</span><b>{xp.toLocaleString()}</b></div>
                     {chests.length ? <div className="dlw-row"><span>Chests</span><b>{chests.length}</b></div> : null}
+                    {parts.map((p) => <div key={p.tier} className="dlw-row"><span>{p.name}</span><b>{p.n}</b></div>)}
+                    {frags ? <div className="dlw-row"><span>Chest shards</span><b>{frags}</b></div> : null}
                 </div>
+                {/* Gear is named, not counted. A line reading "Gear 1" is the least interesting way to tell
+                    someone the dungeon just handed them a legendary. */}
+                {gear.length ? (
+                    <div className="dlw-gear">
+                        {gear.map((g, i) => <span key={i} className={`dlw-gear-row is-${g.rarity}`}>{g.name}</span>)}
+                    </div>
+                ) : null}
                 {/* Called out separately so the completion purse reads as the reward for finishing rather than
                     disappearing into the total. */}
                 {cleared && (bonusGold || bonusXp) ? (
@@ -71,6 +80,11 @@ export default function DelveWrap({ finished, onClose }) {
                     background: rgba(255,255,255,0.05); font-size: 0.85rem; }
                 .dlw-row span { color: #a99fc4; }
                 .dlw-row b { color: #ffd75e; font-variant-numeric: tabular-nums; }
+                .dlw-gear { display: grid; gap: 5px; margin-bottom: 12px; }
+                .dlw-gear-row { padding: 8px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 900; color: #fff;
+                    background: rgba(255,255,255,0.05); border: 1px solid currentColor; }
+                .dlw-gear-row.is-rare { color: #4aa3ff; } .dlw-gear-row.is-epic { color: #b061ff; }
+                .dlw-gear-row.is-legendary { color: #ffb020; } .dlw-gear-row.is-mythic { color: #33e0a1; }
                 .dlw-bonus { margin: 0 0 13px; font-size: 0.76rem; line-height: 1.45; color: #cdb894; }
                 .dlw-bonus b { color: #ffe28a; }
             `}</style>

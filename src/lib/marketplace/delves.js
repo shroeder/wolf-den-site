@@ -10,7 +10,8 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
-    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, foeForFloor, potionCount, potionHealFrac, wardCut,
+    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, FIGHT_DROPS, foeForFloor,
+    potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 
@@ -86,10 +87,7 @@ function dealFloors(dungeon) {
     for (let i = 0; i < DELVE_FLOORS - 1; i += 1) {
         const e = drawOnce();
         if (!e) break;
-        // The foe is picked HERE, not when you step in, so the floor can show you a shape in the dark before
-        // you commit. A silhouette the fight then contradicts would be worse than no silhouette at all.
-        const foeId = (e.kind === KIND.fight) ? pick(dungeon.foes).id : null;
-        floors.push({ n: i + 1, event: e, foeId, done: false });
+        floors.push({ n: i + 1, event: e, done: false });
     }
 
     const isFight = (f) => f.event.kind === KIND.fight || f.event.kind === KIND.mimic;
@@ -110,11 +108,22 @@ function dealFloors(dungeon) {
                 // Never convert a RARE find into a brawl — that is the one floor nobody wants to lose.
                 if (f.event.rare) continue;
                 f.event = spareFights.splice(Math.floor(Math.random() * spareFights.length), 1)[0];
-                f.foeId = pick(dungeon.foes).id;
                 need -= 1;
             }
             if (need <= 0 || !spareFights.length) break;
         }
+    }
+
+    // ── WHO YOU ACTUALLY MEET ────────────────────────────────────────────────────────────────────────────
+    // Foes are dealt in a FINAL pass, from a shuffled bag that refills only once it is empty, so a roster of
+    // four cannot put the same creature in front of you three times in one descent. Picking independently per
+    // floor felt random and wasn't: with four foes over five fights, two-thirds of runs contained a triple.
+    // (This is also why it happens after the conversion pass — converted floors are fights too.)
+    let roster = [];
+    for (const f of floors) {
+        if (f.event.kind !== KIND.fight) continue;
+        if (!roster.length) roster = dungeon.foes.map((x) => x.id).sort(() => Math.random() - 0.5);
+        f.foeId = roster.pop();
     }
 
     floors.push({ n: DELVE_FLOORS, event: { id: "boss", kind: KIND.boss, title: dungeon.boss.name, text: dungeon.boss.blurb }, done: false });
@@ -289,11 +298,73 @@ const settle = async (buyerId, run, result) => {
     await saveRun(buyerId, run);
     return { ok: true, ...(await getDelveState(buyerId)) };
 };
-const bank = (run, { gold = 0, xp = 0, chest = null } = {}) => {
+const bank = (run, { gold = 0, xp = 0, chest = null, parts = null, frags = 0, gear = null } = {}) => {
     run.banked.gold += gold;
     run.banked.xp += xp;
     if (chest) run.banked.chests.push(chest);
+    // Parts and fragments are BANKED like everything else and handed over at the surface, so dying still pays
+    // them out. Gear is the exception — it is granted the moment it drops, because the whole point of a gear
+    // drop is the card that shows you what you got.
+    if (parts) { run.banked.parts = run.banked.parts || {}; run.banked.parts[parts.tier] = (run.banked.parts[parts.tier] || 0) + parts.n; }
+    if (frags) run.banked.frags = (run.banked.frags || 0) + frags;
+    if (gear) { run.banked.gear = run.banked.gear || []; run.banked.gear.push(gear); }
 };
+
+// ── THE KILL TABLE ───────────────────────────────────────────────────────────────────────────────────────────
+// Rolled once per felled foe. Every line is independent, so a very good kill can pay several at once — which is
+// the point: the memorable fight is the one that dropped three things, and it can only exist if they are not
+// mutually exclusive. `mult` is the event's lootMult, so a fight the deck calls dangerous is also richer.
+async function rollFightLoot(buyerId, run, d, { mult = 1, boss = false } = {}) {
+    const L = d.loot;
+    const got = { parts: null, frags: 0, potion: 0, chest: null, gear: null };
+    const hit = (p) => Math.random() < Math.min(0.75, p * mult);
+
+    if (boss || hit(FIGHT_DROPS.parts)) {
+        const tier = randInt(L.parts[0], L.parts[1]);
+        const n = boss ? randInt(2, 3) : 1;
+        got.parts = { tier, n };
+        bank(run, { parts: got.parts });
+    }
+    if (hit(FIGHT_DROPS.frags)) { got.frags = randInt(L.frags[0], L.frags[1]); bank(run, { frags: got.frags }); }
+    // A potion lands in your hand NOW, not at the surface — it is only worth anything while you are still down
+    // here, and finding one at 40% health is the best thing this dungeon can do to you.
+    if (hit(FIGHT_DROPS.potion)) { got.potion = 1; run.potions += 1; }
+    if (boss || hit(FIGHT_DROPS.chest)) { got.chest = boss ? L.bigChest : L.chest; bank(run, { chest: got.chest }); }
+
+    // GEAR. Granted immediately so the result card can show the real piece, and recorded on the run so the wrap
+    // can list it. The general drop pool only — the Depths sets belong to the mine, which is the feature built
+    // to hand them out.
+    if (Math.random() < (boss ? L.gearOdds * 4 : L.gearOdds * mult)) {
+        try {
+            const [{ randomDropPool }, { grantItem }] = await Promise.all([
+                import("@/lib/marketplace/items.js"),
+                import("@/lib/marketplace/inventory.js"),
+            ]);
+            // Never hand back a piece already in the bag — a "drop" that is a duplicate is worse than nothing.
+            const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
+            const rarity = pick(L.gear);
+            const pool = randomDropPool((i) => i.rarity === rarity && !owned.has(i.id));
+            if (pool.length) {
+                const it = pick(pool);
+                await grantItem(buyerId, it.id, "delve").catch(() => {});
+                got.gear = { id: it.id, name: it.name, rarity: it.rarity, icon: it.icon || null, slot: it.slot || null };
+                bank(run, { gear: got.gear });
+            }
+        } catch { /* a missing gear drop must never cost you the kill */ }
+    }
+    return got;
+}
+
+// The one-line summary a drop deserves in the log, and the chips the result card shows.
+function lootLine(got, partName) {
+    const bits = [];
+    if (got.parts) bits.push(`${got.parts.n}x ${partName(got.parts.tier)}`);
+    if (got.frags) bits.push(`${got.frags} fragments`);
+    if (got.potion) bits.push("a potion");
+    if (got.chest) bits.push(`a ${got.chest} chest`);
+    if (got.gear) bits.push(got.gear.name);
+    return bits;
+}
 
 // ── RESOLVING A FLOOR ────────────────────────────────────────────────────────────────────────────────────────
 // One entry point for "I acted on the floor I'm standing on". Fights are a single exchange per tap so a foe
@@ -342,15 +413,25 @@ export async function delveAct(buyerId, action, choice = null) {
             const gold = Math.round(randInt(d.goldPer[0], d.goldPer[1]) * (ev.lootMult || 1));
             const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
             bank(run, { gold, xp });
-            lines.push(`${run.foe.name} falls. +${gold} gold, +${xp} XP.`);
+            const isBoss = ev.kind === KIND.boss;
+            const got = await rollFightLoot(buyerId, run, d, { mult: ev.lootMult || 1, boss: isBoss });
+            const { partName } = await import("@/lib/marketplace/forge-parts.js");
+            const extras = lootLine(got, partName);
+            lines.push(`${run.foe.name} falls. +${gold} gold, +${xp} XP${extras.length ? `, ${extras.join(", ")}` : ""}.`);
             const felled = run.foe;
             run.foe = null;
             run.log.push({ floor: run.floor, kind: "fight", text: lines.join(" ") });
             return settle(buyerId, run, {
-                tone: ev.kind === KIND.boss ? "boss" : "win",
-                title: ev.kind === KIND.boss ? `${felled.name} falls` : `${felled.name} is down`,
-                line: ev.kind === KIND.boss ? "The dungeon is quiet. Take what it owes you." : "It does not get up.",
-                art: felled.sprite, gold, xp,
+                tone: isBoss ? "boss" : got.gear ? "rare" : "win",
+                title: isBoss ? `${felled.name} falls` : `${felled.name} is down`,
+                line: got.gear
+                    ? `It was carrying something. ${got.gear.name}.`
+                    : isBoss ? "The dungeon is quiet. Take what it owes you." : "It does not get up.",
+                art: felled.sprite,
+                gold, xp,
+                chest: got.chest, potion: got.potion,
+                parts: got.parts ? { ...got.parts, name: partName(got.parts.tier) } : null,
+                frags: got.frags, gear: got.gear,
             });
         }
         // It swings back.

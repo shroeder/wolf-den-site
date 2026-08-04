@@ -55,6 +55,7 @@ export const DUNGEONS = [
         id: "hollow", name: "The Hollow Warren", minLevel: 10, tint: "#8fd08a",
         blurb: "A collapsed badger warren under the old orchard. Cramped, damp, and full of things that bite.",
         bg: "/images/delves/bg-hollow.webp",
+        loot: { parts: [1, 2], chest: "wooden", bigChest: "iron", frags: [3, 5], gear: ["rare"], gearOdds: 0.06 },
         foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [10, 18],
         boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.webp",
             blurb: "Something far too large for these tunnels, and it has been waiting." },
@@ -69,6 +70,7 @@ export const DUNGEONS = [
         id: "sunken", name: "The Sunken Vault", minLevel: 20, tint: "#5ad0d0",
         blurb: "A flooded treasury beneath the docks. The water is cold, the gold is real, and so is what guards it.",
         bg: "/images/delves/bg-sunken.webp",
+        loot: { parts: [2, 3], chest: "iron", bigChest: "gold", frags: [4, 7], gear: ["rare", "epic"], gearOdds: 0.07 },
         foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [16, 28],
         boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.webp",
             blurb: "It still wears the vault key on a chain. It has not let go in a very long time." },
@@ -83,6 +85,7 @@ export const DUNGEONS = [
         id: "ember", name: "The Ember Deep", minLevel: 30, tint: "#ff9f1c",
         blurb: "A magma seam the miners broke into and sealed again. Whatever they sealed in is still burning.",
         bg: "/images/delves/bg-ember.webp",
+        loot: { parts: [3, 4], chest: "iron", bigChest: "gold", frags: [6, 10], gear: ["epic"], gearOdds: 0.08 },
         foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [26, 42],
         boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.webp",
             blurb: "It was a smith once. Now it is the forge." },
@@ -97,6 +100,7 @@ export const DUNGEONS = [
         id: "astral", name: "The Astral Spire", minLevel: 50, tint: "#b98cff",
         blurb: "A tower that is only there on some nights. Ten floors up is the same as ten floors down.",
         bg: "/images/delves/bg-astral.webp",
+        loot: { parts: [4, 5], chest: "gold", bigChest: "gold", frags: [8, 14], gear: ["epic", "legendary"], gearOdds: 0.09 },
         foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [40, 66],
         boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.webp",
             blurb: "It has no face, and it is looking at you." },
@@ -109,6 +113,22 @@ export const DUNGEONS = [
     },
 ];
 export const dungeonById = (id) => DUNGEONS.find((d) => d.id === id) || null;
+
+// ── WHAT A FIGHT IS WORTH ────────────────────────────────────────────────────────────────────────────────────
+// Killing something used to pay gold and XP and nothing else, which made every fight in the dungeon the same
+// fight with different art — you already have gold, and XP arrives on its own from everything else in the game.
+// A kill now rolls a real table. Nothing here is guaranteed except on the boss, and the odds ride the event's
+// own `lootMult`, so the encounters written as dangerous ("A Mated Pair", "The Old One") are also the ones worth
+// picking a fight with.
+//
+// Expected haul over a five-fight run in the Warren: ~1 forge part roll, ~0.7 fragment drops, ~0.5 potions,
+// ~0.3 chests and a bit under a 1-in-3 shot at a piece of gear. The boss pays a chest and parts outright.
+export const FIGHT_DROPS = {
+    parts: 0.22,     // salvage for the Forge
+    frags: 0.14,     // chest fragments for the docks
+    potion: 0.10,    // the resource that actually decides a run
+    chest: 0.06,     // a whole loot chest
+};
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Bought with gold, permanent, and deliberately few. Each one changes how a run FEELS rather than adding a
