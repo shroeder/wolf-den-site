@@ -8029,6 +8029,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     flex-wrap: wrap;
 }
 
+/* Route links out of the admin hub. Screens on their own URLs are unfindable without them. */
+.mkt-admin-links {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.85rem;
+}
+
 .mkt-admin-list {
     list-style: none;
     margin: 1rem 0 0;

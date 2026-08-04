@@ -77,6 +77,13 @@ export default function MarketplaceAdminClient({ admin, applications, vendors })
                     </button>
                 </div>
                 {error ? <p className="muted">{error}</p> : null}
+                {/* Admin screens that live on their own routes. Without a link here they exist but are
+                    unfindable — you have to already know the URL, which is the same as not shipping them. */}
+                <div className="mkt-admin-links">
+                    <Link href="/marketplace/admin/survey" className="pill">Survey results</Link>
+                    <Link href="/marketplace/admin/boss" className="pill">Boss admin</Link>
+                    <Link href="/marketplace/admin/players" className="pill">Player roster</Link>
+                </div>
             </section>
 
             <section className="card">
