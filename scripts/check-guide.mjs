@@ -100,6 +100,13 @@ for (const ch of CHAPTERS) {
         if (!(s.gold > 0)) problems.push(`${ch.id}/${s.key}: pays nothing`);
     }
     if (!ch.reward?.gold) problems.push(`${ch.id}: chapter has no purse`);
+    // THE GUIDE ONLY EVER CONTAINS SHIPPED, PUBLIC FEATURES. An owner-gated or in-development chapter would
+    // hand the owner a step for something nobody else can reach, and the play-screen strip — which hides
+    // precisely when there is nothing left to do — would come back for them alone, pointing at a door that is
+    // still locked. Stage unreleased work in the CHANGELOG, which has an ownerOnly flag for exactly this.
+    for (const k of ["ownerOnly", "hidden", "gate", "dev"]) {
+        if (k in ch) problems.push(`${ch.id}: has \`${k}\` — the guide must only contain launched, public features`);
+    }
     // The emblem is the chapter's whole visual identity in the path; a missing one is a broken image in the
     // middle of the guide, which is exactly the sort of thing nobody notices until a member screenshots it.
     if (!ch.icon) problems.push(`${ch.id}: no emblem`);
