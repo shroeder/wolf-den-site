@@ -1166,6 +1166,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.82rem" }}>You can only fish once the boat is under way or moored at the island.</p>
                     )}
                     <a className="btn-ghost" href="/marketplace/fishing" style={{ display: "block", textAlign: "center", marginTop: 14, padding: "11px", textDecoration: "none" }}>📖 Fishing Log &amp; records</a>
+                    {/* The fleet + excavation boards. Sits with the fishing log because both are the same kind
+                        of thing: the standing you're playing against, readable while the boat is docked. */}
+                    <a className="btn-ghost" href="/marketplace/sailing/boards" style={{ display: "block", textAlign: "center", marginTop: 8, padding: "11px", textDecoration: "none" }}>Fleet &amp; Excavation boards</a>
 
                     {/* THE RAIL'S TRACKS — fishing's first real progression. Each buys a different KIND of
                         fishing (more / rarer / more treasure / safer) so they don't collapse into one obvious

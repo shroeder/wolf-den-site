@@ -527,6 +527,96 @@ function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
     return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l) + Math.max(0, rd);
 }
 
+// ── THE BOARDS ───────────────────────────────────────────────────────────────────────────────────────────────
+// Two leaderboards, asked for by a member in the survey: whose boat is the biggest, and who has dug the most
+// out of the sand. Everything they need is already on mkt_sailing, so this is one query per board and no new
+// state to keep in step.
+//
+// The FLEET board ranks BOAT LEVEL — the sum of the five upgrade tracks — because that is what the boat you can
+// see on screen actually is. Voyages break ties, so between two identical hulls the one that has been out more
+// places higher.
+//
+// The DIG board ranks CHEST POINTS, not chests forged. Points are tier-weighted (a mythic chest is worth four
+// times a wooden one), so ranking on the raw count would make a hundred wooden chests beat twenty-five mythic
+// ones — a board that rewards grinding the shallowest possible dig, which is the opposite of what digging is
+// for. Forged count still shows, as the human-readable number next to it.
+//
+// Both boards exclude members who have never done the thing: a wall of zeroes is not a leaderboard.
+const BOARD_LIMIT = 25;
+export async function sailingBoards(viewerId = null) {
+    const [fleet, dig] = await Promise.all([
+        db.query(
+            `SELECT s.buyer_id,
+                    COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                    (1 + GREATEST(s.speed_level,0) + GREATEST(s.luck_level,0) + GREATEST(s.rarity_level,0)
+                       + GREATEST(s.find_level,0) + GREATEST(s.raid_level,0))::int AS level,
+                    COALESCE(s.voyages_completed, 0)::int AS voyages,
+                    COALESCE(s.raids_won, 0)::int AS raids
+               FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
+              WHERE COALESCE(s.voyages_completed, 0) > 0
+                 OR COALESCE(s.speed_level,0) + COALESCE(s.luck_level,0) + COALESCE(s.rarity_level,0)
+                  + COALESCE(s.find_level,0) + COALESCE(s.raid_level,0) > 0
+              ORDER BY level DESC, voyages DESC
+              LIMIT $1`, [BOARD_LIMIT]
+        ).catch(() => []),
+        db.query(
+            `SELECT s.buyer_id,
+                    COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                    COALESCE(s.chest_points, 0)::int AS points,
+                    COALESCE(s.chests_forged, 0)::int AS forged
+               FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
+              WHERE COALESCE(s.chest_points, 0) > 0
+              ORDER BY points DESC, forged DESC
+              LIMIT $1`, [BOARD_LIMIT]
+        ).catch(() => []),
+    ]);
+    const mark = (rows, extra) => rows.map((r, i) => ({
+        place: i + 1,
+        who: r.who || "Member",
+        alias: r.alias || null,
+        you: viewerId ? String(r.buyer_id) === String(viewerId) : false,
+        ...extra(r),
+    }));
+    const boards = {
+        fleet: mark(fleet, (r) => ({ level: r.level, voyages: r.voyages, raids: r.raids, art: boatArt(r.level) })),
+        dig: mark(dig, (r) => ({ points: r.points, forged: r.forged })),
+    };
+
+    // WHERE YOU PLACED, if you didn't make the visible top. A board that can't tell you your own position is a
+    // wall of other people's names — and "you're 41st" is the number that makes someone want to climb.
+    const me = { fleet: null, dig: null };
+    if (viewerId && !boards.fleet.some((r) => r.you)) me.fleet = await placeOf(viewerId, "fleet");
+    if (viewerId && !boards.dig.some((r) => r.you)) me.dig = await placeOf(viewerId, "dig");
+    return { ...boards, me };
+}
+
+// One member's standing on a board. RANK() over the same ordering the board uses, so the number it reports can
+// never disagree with the list above it.
+async function placeOf(viewerId, board) {
+    const lvl = `(1 + GREATEST(s.speed_level,0) + GREATEST(s.luck_level,0) + GREATEST(s.rarity_level,0)
+                   + GREATEST(s.find_level,0) + GREATEST(s.raid_level,0))`;
+    const sql = board === "fleet"
+        ? `WITH r AS (
+               SELECT s.buyer_id, ${lvl}::int AS level, COALESCE(s.voyages_completed,0)::int AS voyages,
+                      RANK() OVER (ORDER BY ${lvl} DESC, COALESCE(s.voyages_completed,0) DESC) AS place
+                 FROM mkt_sailing s
+                WHERE COALESCE(s.voyages_completed,0) > 0 OR ${lvl} > 1)
+           SELECT place::int, level, voyages FROM r WHERE buyer_id = $1`
+        : `WITH r AS (
+               SELECT s.buyer_id, COALESCE(s.chest_points,0)::int AS points, COALESCE(s.chests_forged,0)::int AS forged,
+                      RANK() OVER (ORDER BY COALESCE(s.chest_points,0) DESC, COALESCE(s.chests_forged,0) DESC) AS place
+                 FROM mkt_sailing s
+                WHERE COALESCE(s.chest_points,0) > 0)
+           SELECT place::int, points, forged FROM r WHERE buyer_id = $1`;
+    const row = await db.queryOne(sql, [viewerId]).catch(() => null);
+    if (!row) return null;
+    const who = await db.queryOne(`SELECT COALESCE(NULLIF(display_name, ''), alias) AS who FROM mkt_buyer WHERE id = $1`, [viewerId]).catch(() => null);
+    const base = { place: Number(row.place), who: who?.who || "You", you: true };
+    return board === "fleet"
+        ? { ...base, level: row.level, voyages: row.voyages, art: boatArt(row.level) }
+        : { ...base, points: row.points, forged: row.forged };
+}
+
 // --- dig board -----------------------------------------------------------------------------------------
 function randInt(n) { return Math.floor(Math.random() * n); }
 function weightedPickW(weights) {
