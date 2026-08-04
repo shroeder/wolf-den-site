@@ -1783,9 +1783,26 @@ export async function rechargeWind(buyerId) {
     // Nothing meaningful left to shave → DON'T charge (guards the "took my gold, did nothing" case).
     if (remainingMs <= 90 * 1000) return { ok: false, error: "almost_there", ...(await getSailingState(buyerId)) };
     const cost = windRechargeCost(row?.wind_recharges || 0); // escalates: each extra tailwind this voyage costs double
-    if (cost > 0 && (state.gold || 0) < cost) {
-        return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+
+    // BUYING A TAILWIND HAS NEVER WORKED. The affordability check read `state.gold`, and `state` is
+    // decorate(row) over a mkt_sailing row — gold lives on mkt_buyer and decorate has never set it. So the
+    // value was always `undefined`, `(undefined || 0)` was always 0, `0 < cost` was always true, and every
+    // player who tried to catch an extra tailwind was told they were broke no matter what they held. Reported
+    // in Den chat by Teegs ("it tells me I don't have enough gold but I in fact have plenty").
+    //
+    // The spend is also the guarded atomic UPDATE every other purchase in this file already uses. The old one
+    // was `GREATEST(0, gold - cost)` with no `gold >= cost` in the WHERE — which clamps at zero instead of
+    // refusing, so once the check above was fixed a double-tap could still have shaved two hours for the price
+    // of one. Charge first, then shave; refund if the shave turns out to be impossible.
+    let paid = null;
+    if (cost > 0) {
+        paid = await db.queryOne(
+            `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`,
+            [buyerId, cost]
+        ).catch(() => null);
+        if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
     }
+
     // Shave up to an hour, but never more than what's left — so it ALWAYS produces a real, visible jump.
     const shaveMs = Math.min(remainingMs, 60 * 60 * 1000);
     const updated = await db.queryOne(
@@ -1795,10 +1812,14 @@ export async function rechargeWind(buyerId) {
           RETURNING returns_at`,
         [buyerId, shaveMs]
     ).catch(() => null);
-    if (!updated) return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
+    if (!updated) {
+        // Lost the race (arrived, or started digging between the two writes) — give the gold straight back
+        // rather than charging for a tailwind that never blew.
+        if (paid) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, cost]).catch(() => {});
+        return { ok: false, error: "unavailable", ...(await getSailingState(buyerId)) };
+    }
     if (cost > 0) {
-        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2) WHERE id = $1`, [buyerId, cost]).catch(() => {});
-        await logCoin(buyerId, -cost, "cooldown_skip", { meta: { kind: "wind_recharge" } }).catch(() => {});
+        await logCoin(buyerId, -cost, "cooldown_skip", { meta: { kind: "wind_recharge" }, balanceAfter: paid?.gold }).catch(() => {});
     }
     await trackActivity(buyerId, "cooldown_skip", { kind: "wind_recharge", cost }).catch(() => {});
     return { ok: true, spent: cost, shavedMinutes: Math.round(shaveMs / 60000), ...(await getSailingState(buyerId)) };
