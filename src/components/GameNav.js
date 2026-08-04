@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+import { isGamePath } from "@/lib/marketplace/game-paths.js";
 import { useEffect, useState } from "react";
 import { FaDharmachakra } from "react-icons/fa6";
 
@@ -82,8 +84,8 @@ const LINKS = [
 
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
-// Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining", "/marketplace/dungeons"];
+// The game-path list lives in lib/marketplace/game-paths.js so the nav and the Pathfinder strip can never
+// disagree about what counts as being in the game.
 
 export default function GameNav() {
     const pathname = usePathname() || "";
@@ -160,7 +162,7 @@ export default function GameNav() {
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : [])];
-    const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
+    const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
     const [chests, setChests] = useState(0);
     const [consumables, setConsumables] = useState(0); // unused potions/treats/relics — the Gear badge counts these too

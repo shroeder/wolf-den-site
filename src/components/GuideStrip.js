@@ -1,75 +1,135 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-// ── ONE LINE, ON THE HOME SCREEN ─────────────────────────────────────────────────────────────────────────────
-// What to do next, and a link that goes there. It replaced a fifteen-row checklist that sat on the play page
-// until you finished it and then vanished — fifteen rows of systems you have never heard of IS the overwhelm,
-// and a guide that disappears is a game that stops explaining itself forever. When there is nothing open left
-// it points at the guide instead of going away.
+import { isGamePath } from "@/lib/marketplace/game-paths.js";
+
+// ── THE GUIDE, EVERYWHERE ────────────────────────────────────────────────────────────────────────────────────
+// Mounted once in the marketplace layout, so it follows you into every room of the game rather than living on
+// the home screen and abandoning you the moment you walk somewhere. It self-hides outside the game (the shop,
+// vendor and admin surfaces) using the same path list the nav uses, so a new area can never keep the nav and
+// silently lose the guide.
 //
-// EVERY RULE HERE IS GLOBAL, ON PURPOSE. The whole card is a <Link>, and styled-jsx does not add its
-// `jsx-<hash>` scope class to a custom component — only to DOM elements. The first cut of this used a scoped
-// `.gs { display: grid; padding; border; background; }` on that <Link>, so the card had NO box: it rendered as
-// "NEXT · THE TOWNTake a town quest+200" jammed into one line of bare text, while the <span> children inside it
-// stayed perfectly styled. The `gs-` prefix is unique to this component, so going global costs nothing.
-export default function GuideStrip() {
-    const [g, setG] = useState(null);
+// IT KNOWS WHERE YOU ARE STANDING. If you're already on the page the current step points at, it stops being a
+// signpost and becomes a prompt: "You're in the right place — plant your first crop." That single state is the
+// difference between a link you followed and a guide that came with you.
+//
+// EVERY RULE HERE IS GLOBAL, ON PURPOSE. The card is a <Link>, and styled-jsx does not add its `jsx-<hash>`
+// scope class to a custom component — only to DOM elements. A scoped `.gs` on that <Link> is why this once
+// rendered as "NEXT · THE TOWNTake a town quest+200" in bare text with no box at all. `npm run check:styled-jsx`
+// fails the build if that comes back.
 
-    useEffect(() => {
-        let alive = true;
-        fetch("/api/marketplace/guide", { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : null))
-            .then((d) => { if (alive) setG(d); })
-            .catch(() => {});
-        return () => { alive = false; };
+// One shared read across mounts — navigating between game pages remounts this constantly and the answer does
+// not change in the half-second it takes to move rooms.
+let memo = { at: 0, data: null };
+const TTL = 10_000;
+
+export default function GuideStrip() {
+    const pathname = usePathname() || "";
+    const [g, setG] = useState(memo.data);
+
+    const load = useCallback(async (force = false) => {
+        if (!force && memo.data && Date.now() - memo.at < TTL) { setG(memo.data); return; }
+        const d = await fetch("/api/marketplace/guide", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        if (d) { memo = { at: Date.now(), data: d }; setG(d); }
     }, []);
 
-    if (!g?.signedIn) return null;
-    const step = g.current?.step || null;
-    const pct = g.totals?.steps ? Math.round((g.totals.doneSteps / g.totals.steps) * 100) : 0;
+    const onGame = isGamePath(pathname);
+    // The guide page shows all of this in full; a strip above it would just be the same sentence twice.
+    const show = onGame && pathname !== "/marketplace/guide";
+    const step = g?.current?.step || null;
+    const here = Boolean(step && (pathname === step.href || pathname.startsWith(`${step.href}/`)));
 
-    return (
-        <Link className="gs" href={step ? step.href : "/marketplace/guide"} style={{ "--tint": g.current?.tint || "#ffd75e" }}>
+    useEffect(() => { if (show) load(); }, [show, pathname, load]);
+
+    // Coming back to the tab is the commonest moment for a step to have just become true.
+    useEffect(() => {
+        if (!show) return undefined;
+        const onVis = () => { if (document.visibilityState === "visible") load(true); };
+        document.addEventListener("visibilitychange", onVis);
+        return () => document.removeEventListener("visibilitychange", onVis);
+    }, [show, load]);
+
+    // Only poll while you are standing ON the step's page — that is the one place a tick is imminent, and
+    // watching it complete under you is the whole payoff. Everywhere else this costs nothing.
+    useEffect(() => {
+        if (!show || !here) return undefined;
+        const t = setInterval(() => load(true), 20_000);
+        return () => clearInterval(t);
+    }, [show, here, load]);
+
+    if (!show || !g?.signedIn) return null;
+    const pct = g.totals?.steps ? Math.round((g.totals.doneSteps / g.totals.steps) * 100) : 0;
+    const tint = g.current?.tint || "#ffd75e";
+
+    const body = (
+        <>
             {g.current?.icon ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="gs-emblem" src={g.current.icon} alt="" draggable="false" />
             ) : <span className="gs-emblem" />}
-
             <span className="gs-body">
-                <span className="gs-kicker">{step ? `Next · ${g.current.name}` : "The Pathfinder"}</span>
+                <span className="gs-kicker">
+                    {!step ? "The Pathfinder" : here ? "You're in the right place" : `Next · ${g.current.name}`}
+                </span>
                 <b className="gs-label">{step ? step.label : "You know the place"}</b>
                 <span className="gs-bar" aria-hidden="true"><i style={{ width: `${pct}%` }} /></span>
             </span>
-
             <span className="gs-right">
                 {step ? <span className="gs-pay">+{Number(step.gold).toLocaleString()}</span> : null}
-                <span className="gs-chev" aria-hidden="true" />
+                {here ? null : <span className="gs-chev" aria-hidden="true" />}
             </span>
+        </>
+    );
 
-            <style jsx global>{`
-                .gs { display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; align-items: center; gap: 12px;
-                    padding: 12px 14px; margin-bottom: 12px; border-radius: 15px; text-decoration: none;
-                    background: linear-gradient(148deg, color-mix(in srgb, var(--tint) 24%, transparent), rgba(255,255,255,0.03) 62%), rgba(12,10,16,0.6);
-                    border: 1px solid color-mix(in srgb, var(--tint) 45%, transparent);
-                    box-shadow: 0 10px 26px -16px var(--tint); transition: transform .13s ease; }
-                .gs:active { transform: scale(0.988); }
-                .gs-emblem { width: 46px; height: 46px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
-                .gs-body { min-width: 0; }
-                .gs-kicker { display: block; font-size: 9.5px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase;
-                    color: color-mix(in srgb, var(--tint) 80%, white); }
-                .gs-label { display: block; margin-top: 2px; font-size: 0.98rem; font-weight: 900; color: #fff; line-height: 1.25;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .gs-bar { display: block; height: 3px; margin-top: 7px; border-radius: 2px; background: rgba(255,255,255,0.12); overflow: hidden; }
-                .gs-bar > i { display: block; height: 100%; border-radius: 2px; background: color-mix(in srgb, var(--tint) 85%, white);
-                    transition: width .6s cubic-bezier(.2,.8,.3,1); }
-                .gs-right { display: flex; align-items: center; gap: 9px; }
-                .gs-pay { font-size: 12px; font-weight: 900; color: #ffd75e; white-space: nowrap; }
-                /* Drawn, not typed — a > glyph renders differently on every platform and an arrow emoji is out. */
-                .gs-chev { width: 8px; height: 8px; border-top: 2px solid rgba(255,255,255,0.75);
-                    border-right: 2px solid rgba(255,255,255,0.75); transform: rotate(45deg); }
-            `}</style>
+    // On the step's own page there is nowhere to send you, so it isn't a link — it's a note.
+    if (here) {
+        return (
+            <div className="gs is-here" style={{ "--tint": tint }}>
+                {body}
+                <Styles />
+            </div>
+        );
+    }
+    return (
+        <Link className="gs" href={step ? step.href : "/marketplace/guide"} style={{ "--tint": tint }}>
+            {body}
+            <Styles />
         </Link>
+    );
+}
+
+function Styles() {
+    return (
+        <style jsx global>{`
+            .gs { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 11px;
+                padding: 9px 13px; margin: 0 auto 10px; max-width: 1100px; border-radius: 14px; text-decoration: none;
+                background: linear-gradient(148deg, color-mix(in srgb, var(--tint) 22%, transparent), rgba(255,255,255,0.03) 62%), rgba(12,10,16,0.66);
+                border: 1px solid color-mix(in srgb, var(--tint) 42%, transparent);
+                box-shadow: 0 8px 22px -16px var(--tint); transition: transform .13s ease; }
+            a.gs:active { transform: scale(0.99); }
+            /* Standing on the step's page: greener, calmer, and not a link. */
+            .gs.is-here { border-color: rgba(124,232,164,0.55);
+                background: linear-gradient(148deg, rgba(124,232,164,0.16), rgba(255,255,255,0.03) 62%), rgba(12,10,16,0.66); }
+            .gs.is-here .gs-kicker { color: #8bf0b4; }
+            .gs-emblem { width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
+            .gs-body { min-width: 0; }
+            .gs-kicker { display: block; font-size: 9px; font-weight: 900; letter-spacing: .13em; text-transform: uppercase;
+                color: color-mix(in srgb, var(--tint) 80%, white); }
+            .gs-label { display: block; margin-top: 2px; font-size: 0.9rem; font-weight: 900; color: #fff; line-height: 1.25;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .gs-bar { display: block; height: 3px; margin-top: 6px; border-radius: 2px; background: rgba(255,255,255,0.12); overflow: hidden; }
+            .gs-bar > i { display: block; height: 100%; border-radius: 2px; background: color-mix(in srgb, var(--tint) 85%, white);
+                transition: width .6s cubic-bezier(.2,.8,.3,1); }
+            .gs.is-here .gs-bar > i { background: #7ce8a4; }
+            .gs-right { display: flex; align-items: center; gap: 9px; }
+            .gs-pay { font-size: 11.5px; font-weight: 900; color: #ffd75e; white-space: nowrap; }
+            /* Drawn, not typed — a > glyph renders differently on every platform and an arrow emoji is out. */
+            .gs-chev { width: 7px; height: 7px; border-top: 2px solid rgba(255,255,255,0.75);
+                border-right: 2px solid rgba(255,255,255,0.75); transform: rotate(45deg); }
+        `}</style>
     );
 }

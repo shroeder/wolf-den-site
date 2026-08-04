@@ -2,7 +2,6 @@ import Link from "next/link";
 import { FaDharmachakra } from "react-icons/fa6";
 
 import GameHubStats from "@/components/GameHubStats";
-import GuideStrip from "@/components/GuideStrip";
 import HelmetSprite from "@/components/HelmetSprite";
 import RaidDefenseReport from "@/components/RaidDefenseReport";
 import ReferralInvite from "@/components/ReferralInvite";
@@ -50,9 +49,6 @@ export default async function GamePlayHub({ searchParams }) {
     return (
         <div className="stack reveal game-hub">
             <ViewPing event="view_game_hub" />
-            {/* One line: what to do next, and a link that goes there. This was a fifteen-row checklist that
-                sat here until you finished it and then vanished — see GuideStrip for why that was backwards. */}
-            {buyer ? <GuideStrip /> : null}
             {buyer ? <RaidDefenseReport /> : null}
             {buyer ? <SpinNudge /> : null}
             <section className="card game-hub-hero">
