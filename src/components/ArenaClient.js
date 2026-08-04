@@ -58,6 +58,7 @@ function Fighter({ f, hp, maxHp, mirrored, hurt }) {
 
 export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
+    const [rankUp, setRankUp] = useState(null);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
     const prev = useRef({ hp: null, foeHp: null });
@@ -72,6 +73,8 @@ export default function ArenaClient({ initial }) {
                 body: JSON.stringify({ action, ...extra }),
             }).then((x) => x.json()).catch(() => null);
             if (r?.unlocked) setSt(r);
+            // Crossing a band is the biggest thing that happens in here, so it gets the whole screen.
+            if (r?.finished?.rankUp) { setRankUp(r.finished.rankUp); blip("win"); }
         } finally { setBusy(false); }
     }, [busy]);
 
@@ -109,7 +112,7 @@ export default function ArenaClient({ initial }) {
                         {bout.won && bout.reward ? (
                             <p>+{money(bout.reward.gold)} gold · +{money(bout.reward.xp)} XP{bout.reward.chest ? ` · a ${bout.reward.chest} chest` : ""}</p>
                         ) : <p>The rung holds. Your attempts reset tomorrow.</p>}
-                        <button type="button" className="dlv-btn" disabled={busy} onClick={() => act("dismiss")}>Back to the ladder</button>
+                        <button type="button" className="ar-btn" disabled={busy} onClick={() => act("dismiss")}>Back to the ladder</button>
                     </div>
                 ) : (
                     <div className="ar-stances">
@@ -139,12 +142,32 @@ export default function ArenaClient({ initial }) {
     const next = st.next;
     return (
         <section className="card ar">
-            <div className="ar-head">
-                <div>
-                    <h2 className="ar-title">The Arena</h2>
-                    <p className="ar-sub">The pack, weakest to strongest. Start at the bottom and climb.</p>
+            {/* THE BADGE. "0 of 83" is a fact; a rank is something you tell people, and a band you can see
+                yourself approaching is the reason to take the third fight of the day. */}
+            <div className="ar-badge" style={{ "--rank": st.rank?.color || "#9aa0a6" }}>
+                {st.rank?.icon ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="ar-insignia" src={st.rank.icon} alt="" draggable="false" />
+                ) : null}
+                <div className="ar-badge-body">
+                    <span className="ar-badge-kick">The Arena</span>
+                    <b className="ar-rankname">{st.rank?.name}</b>
+                    <span className="ar-standing">
+                        {st.rung > 0
+                            ? <>Above <b>{st.rung}</b> of the pack&rsquo;s {st.ladderSize}</>
+                            : <>Unranked &mdash; {st.ladderSize} fighters above you</>}
+                    </span>
+                    {st.rank?.next ? (
+                        <>
+                            <span className="ar-tonext">
+                                <i style={{ width: `${Math.min(100, (st.rank.into / st.rank.span) * 100)}%` }} />
+                            </span>
+                            <span className="ar-tonext-label">
+                                {Math.max(0, st.rank.span - st.rank.into)} more to <b>{st.rank.next.name}</b>
+                            </span>
+                        </>
+                    ) : <span className="ar-tonext-label">Top of the pack. There is no rank above this.</span>}
                 </div>
-                <div className="ar-rung"><b>{st.rung}</b><span>of {st.ladderSize}</span></div>
             </div>
 
             <div className="ar-stats">
@@ -177,7 +200,7 @@ export default function ArenaClient({ initial }) {
                     </div>
                     <div className="ar-next-foot">
                         <span className="ar-prize">+{money(next.reward.gold)} gold · +{money(next.reward.xp)} XP{next.reward.chest ? ` · ${next.reward.chest} chest` : ""}</span>
-                        <button type="button" className="dlv-btn" disabled={busy || st.fightsLeft <= 0} onClick={() => act("start")}>
+                        <button type="button" className="ar-btn" disabled={busy || st.fightsLeft <= 0} onClick={() => act("start")}>
                             {st.fightsLeft <= 0 ? "No fights left today" : "Step up"}
                         </button>
                     </div>
@@ -203,6 +226,22 @@ export default function ArenaClient({ initial }) {
                 </div>
             ) : null}
 
+            {rankUp ? (
+                <div className="ar-rankup" role="dialog" aria-modal="true" onClick={() => setRankUp(null)} style={{ "--rank": rankUp.color }}>
+                    <div className="ar-rankup-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="ar-rays" aria-hidden="true">
+                            {Array.from({ length: 24 }).map((_, i) => <span key={i} style={{ "--a": `${i * 15}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />)}
+                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="ar-rankup-art" src={rankUp.icon} alt="" draggable="false" />
+                        <span className="ar-rankup-kick">Rank up</span>
+                        <b className="ar-rankup-name">{rankUp.to}</b>
+                        <p className="ar-rankup-from">You were {rankUp.from}. Not any more.</p>
+                        <button type="button" className="ar-btn" onClick={() => setRankUp(null)}>Good</button>
+                    </div>
+                </div>
+            ) : null}
+
             {st.board?.length ? (
                 <div className="ar-board">
                     <span className="ar-up-head">Highest climbers</span>
@@ -223,12 +262,60 @@ export default function ArenaClient({ initial }) {
 function Styles() {
     return (
         <style jsx global>{`
-            .ar-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-            .ar-title { margin: 0; font-size: 1.3rem; font-weight: 900; color: #ffb0b8; }
-            .ar-sub { margin: 3px 0 0; font-size: 12.5px; color: #9aa2ab; }
-            .ar-rung { flex: 0 0 auto; text-align: right; }
-            .ar-rung b { display: block; font-size: 1.6rem; font-weight: 900; color: #fff; line-height: 1; }
-            .ar-rung span { font-size: 10.5px; color: #7f8790; }
+            /* ── the rank badge ── */
+            .ar-badge { display: flex; align-items: center; gap: 15px; padding: 15px 16px; border-radius: 17px;
+                background: linear-gradient(145deg, color-mix(in srgb, var(--rank) 24%, transparent), rgba(255,255,255,0.02) 66%), rgba(10,8,14,0.5);
+                border: 1px solid color-mix(in srgb, var(--rank) 50%, transparent);
+                box-shadow: 0 14px 34px -20px var(--rank); }
+            .ar-insignia { flex: 0 0 auto; width: 78px; height: 78px; object-fit: contain;
+                filter: drop-shadow(0 4px 14px color-mix(in srgb, var(--rank) 60%, transparent));
+                animation: arBadgeIn .5s cubic-bezier(.2,1.4,.35,1) both; }
+            @keyframes arBadgeIn { from { opacity: 0; transform: scale(.7) rotate(-8deg) } to { opacity: 1; transform: none } }
+            .ar-badge-body { min-width: 0; flex: 1; }
+            .ar-badge-kick { font-size: 9.5px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; color: #8a939d; }
+            .ar-rankname { display: block; margin: 1px 0 3px; font-size: 1.5rem; font-weight: 900; line-height: 1.05;
+                color: color-mix(in srgb, var(--rank) 72%, white); text-shadow: 0 0 26px color-mix(in srgb, var(--rank) 55%, transparent); }
+            .ar-standing { display: block; font-size: 12px; color: #a4adb7; }
+            .ar-standing b { color: #fff; font-variant-numeric: tabular-nums; }
+            .ar-tonext { display: block; height: 6px; margin: 9px 0 5px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.45); }
+            .ar-tonext > i { display: block; height: 100%; border-radius: 999px; background: var(--rank);
+                box-shadow: 0 0 12px -2px var(--rank); transition: width .7s cubic-bezier(.2,.8,.3,1); }
+            .ar-tonext-label { display: block; font-size: 11px; color: #8a939d; }
+            .ar-tonext-label b { color: color-mix(in srgb, var(--rank) 70%, white); }
+
+            /* ── the buttons ── */
+            /* Their own, not .dlv-btn: that class lives inside DelveClient's scoped <style jsx>, so borrowing
+               it here produced a bare browser-default button in the middle of the screen. */
+            .ar-btn { padding: 12px 22px; border-radius: 12px; border: none; cursor: pointer;
+                font-size: 0.95rem; font-weight: 900; color: #2a0d10;
+                background: linear-gradient(180deg, #ffc4ca, #ff6f7d);
+                box-shadow: 0 4px 0 #b3414f, 0 10px 26px -10px rgba(255,111,125,0.95);
+                transition: transform .12s ease; }
+            .ar-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b3414f; }
+            .ar-btn:disabled { opacity: .5; box-shadow: none; }
+
+            /* ── rank-up ── */
+            .ar-rankup { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px;
+                background: rgba(6,4,10,0.88); backdrop-filter: blur(4px); }
+            .ar-rankup-card { position: relative; overflow: hidden; width: min(360px, 100%); padding: 26px 22px 20px;
+                border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
+                border: 2px solid var(--rank); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 70px -10px var(--rank);
+                animation: arPop .45s cubic-bezier(.2,1.5,.35,1) both; }
+            @keyframes arPop { from { opacity: 0; transform: scale(.82) translateY(16px) } to { opacity: 1; transform: none } }
+            .ar-rays { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+            .ar-rays span { position: absolute; width: 3px; height: 52px; border-radius: 2px; transform-origin: 50% 0;
+                background: linear-gradient(var(--rank), transparent); animation: arRay 1.5s cubic-bezier(.15,.7,.3,1) both; }
+            @keyframes arRay { from { opacity: 1; transform: rotate(var(--a)) translateY(0) scaleY(.4) }
+                to { opacity: 0; transform: rotate(var(--a)) translateY(-190px) scaleY(1) } }
+            .ar-rankup-art { position: relative; width: 116px; height: 116px; object-fit: contain;
+                filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--rank) 70%, transparent));
+                animation: arRise .7s cubic-bezier(.2,1.35,.35,1) both; }
+            @keyframes arRise { from { opacity: 0; transform: scale(.4) translateY(26px) rotate(-12deg) } to { opacity: 1; transform: none } }
+            .ar-rankup-kick { display: block; margin-top: 8px; font-size: 10px; font-weight: 900; letter-spacing: .22em;
+                text-transform: uppercase; color: #8a939d; }
+            .ar-rankup-name { display: block; margin: 2px 0 6px; font-size: 2rem; font-weight: 900; line-height: 1.05;
+                color: color-mix(in srgb, var(--rank) 74%, white); text-shadow: 0 0 34px color-mix(in srgb, var(--rank) 60%, transparent); }
+            .ar-rankup-from { margin: 0 0 16px; font-size: 12.5px; color: #a99fc4; }
             .ar-stats { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0 14px; font-size: 11.5px; color: #8a939d; }
             .ar-stats b { color: #ffd75e; font-variant-numeric: tabular-nums; }
 

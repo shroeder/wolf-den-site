@@ -27,6 +27,40 @@ const powerOf = (level, gearPower) => arenaVigour(level, gearPower) + arenaMight
 
 const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
+// ── RANKS ────────────────────────────────────────────────────────────────────────────────────────────────────
+// A rung number is a fact; a RANK is something you tell people. "I'm 34 of 83" says nothing at a glance, and
+// climbing from 33 to 34 feels like nothing at all — so the ladder is cut into seven named bands, and crossing
+// one is an event the game stops to celebrate.
+//
+// The thresholds are FRACTIONS of the ladder, not fixed rungs. The pack grows every week; a rank that means
+// "top fifth of the Den" keeps meaning that, where "rung 60" would quietly get easier every time somebody joins.
+export const RANKS = [
+    { key: "stray", name: "Stray", at: 0.00, color: "#9aa0a6" },
+    { key: "cub", name: "Cub", at: 0.12, color: "#7ed57e" },
+    { key: "runner", name: "Runner", at: 0.28, color: "#6fd0ff" },
+    { key: "hunter", name: "Hunter", at: 0.45, color: "#b98cff" },
+    { key: "fang", name: "Fang", at: 0.62, color: "#ff9f1c" },
+    { key: "warleader", name: "Warleader", at: 0.80, color: "#ff6f7d" },
+    { key: "alpha", name: "Alpha", at: 0.95, color: "#ffd75e" },
+];
+export function rankFor(rung, size) {
+    const frac = size > 0 ? rung / size : 0;
+    let i = 0;
+    for (let k = 0; k < RANKS.length; k += 1) if (frac >= RANKS[k].at) i = k;
+    const next = RANKS[i + 1] || null;
+    const floor = Math.ceil(RANKS[i].at * size);
+    const ceil = next ? Math.ceil(next.at * size) : size;
+    return {
+        ...RANKS[i], index: i,
+        icon: `/images/arena/rank-${RANKS[i].key}.webp`,
+        next: next ? { ...next, icon: `/images/arena/rank-${next.key}.webp`, atRung: ceil } : null,
+        // How far through this band you are, so the badge can carry a bar rather than just a word.
+        into: Math.max(0, rung - floor), span: Math.max(1, ceil - floor),
+        // Standing, stated the way a person would say it.
+        beat: rung, of: size,
+    };
+}
+
 // ── STANCES ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Rock-paper-scissors with teeth, and the reason this is a game rather than a stat comparison. A pure
 // power-versus-power bout would mean the ladder is just a list of people you cannot beat yet; reading your
@@ -152,6 +186,7 @@ export async function getArenaState(buyerId) {
         unlocked: true,
         me: { ...me, name: "You" },
         rung, ladderSize: ladder.length,
+        rank: rankFor(rung, ladder.length),
         cleared: rung >= ladder.length && ladder.length > 0,
         fightsLeft: Math.max(0, FIGHTS_PER_DAY - used),
         stats: {
@@ -173,7 +208,7 @@ export async function getArenaState(buyerId) {
 function publicBout(b) {
     return {
         foe: b.foe, round: b.round, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
-        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell,
+        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         reward: b.reward || null,
     };
 }
@@ -190,7 +225,7 @@ export async function startBout(buyerId) {
     if (!foe) return { ok: false, error: "ladder_cleared", ...(await getArenaState(buyerId)) };
 
     const bout = {
-        rung,
+        rung, ladderSize: ladder.length,
         foe: { id: foe.id, name: foe.name, sprite: foe.sprite, flip: foe.flip, level: foe.level, might: foe.might },
         tell: tendency(foe.id).tell,
         w: tendency(foe.id).w,
@@ -268,6 +303,11 @@ async function finishBout(buyerId, row, b, won) {
         reward = { gold, xp, chest };
     }
     b.reward = reward;
+    // Did that win cross a band? Worked out here, where both the before and after are known for certain.
+    const size = b.ladderSize || 0;
+    const wasRank = rankFor(b.rung, size);
+    const nowRank = rankFor(b.rung + (won ? 1 : 0), size);
+    b.rankUp = won && nowRank.key !== wasRank.key ? { from: wasRank.name, to: nowRank.name, icon: nowRank.icon, color: nowRank.color } : null;
     // A loss costs the attempt and the streak, and nothing else. It never sends you back down a rung — the
     // ladder is something you climb, not something that can push you off.
     await db.query(
@@ -281,7 +321,7 @@ async function finishBout(buyerId, row, b, won) {
         [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1]
     ).catch(() => {});
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { rung: b.rung, foe: b.foe.id }).catch(() => {});
-    return { ok: true, finished: { won, rung: b.rung, foe: b.foe, reward }, ...(await getArenaState(buyerId)) };
+    return { ok: true, finished: { won, rung: b.rung, foe: b.foe, reward, rankUp: b.rankUp }, ...(await getArenaState(buyerId)) };
 }
 
 /** Clear a finished bout so the ladder comes back. */
