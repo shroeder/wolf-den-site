@@ -83,14 +83,69 @@ const ART = {
     "ev-death": [`${OBJ} A cracked adventurer's helm lying on its side with a snapped sword blade beside it, dust settling.`, "icon"],
     "ev-retreat": [`${OBJ} A lit brass hand-lantern with a rope coil beside it, warm safe light, pointing back the way you came.`, "icon"],
 
+    // ── PER-DUNGEON encounter icons ─────────────────────────────────────────────────────────────────────────
+    // One chest icon shared by all four decks quietly undid the theming the decks exist for: a Warren chest is
+    // a farmer strongbox in the dirt, a Spire chest is a display case in a starfield. 8 kinds x 4 dungeons.
+    "ev-hollow-chest": [`${OBJ} A muddy iron-bound wooden strongbox half-sunk in dark earth, pale tree roots growing over the lid.`, "icon"],
+    "ev-hollow-cache": [`${OBJ} A spilled leather purse of coins in dark soil, a few acorns and a gold ring among them.`, "icon"],
+    "ev-hollow-merchant": [`${OBJ} A forager blanket laid on packed earth with bundled herbs, clay jars and a hooded lantern. No people.`, "icon"],
+    "ev-hollow-shrine": [`${OBJ} A mossy standing stone with a worn hollow at its top holding clear rainwater, ferns at its base.`, "icon"],
+    "ev-hollow-well": [`${OBJ} A flooded earthen shaft ringed with tree roots, black water below, a coin glinting on the rim.`, "icon"],
+    "ev-hollow-trap": [`${OBJ} A snarl of thick grasping tree roots sprung across a burrow mouth like a snare, soil falling from them.`, "icon"],
+    "ev-hollow-rest": [`${OBJ} A thick bed of green moss in a root hollow with a burst cider barrel beside it.`, "icon"],
+    "ev-hollow-puzzle": [`${OBJ} Two dark burrow mouths side by side in an earthen wall, roots framing each, one breathing faint warm mist.`, "icon"],
+
+    "ev-sunken-chest": [`${OBJ} A barnacle-crusted iron deposit box, its door hanging open, seawater draining from the seams.`, "icon"],
+    "ev-sunken-cache": [`${OBJ} Gold and silver coins scattered across wet stone flags under shallow rippling water.`, "icon"],
+    "ev-sunken-merchant": [`${OBJ} A salvor crate-top stall on a dry ledge: rope, a brass diving lamp, bottles and a ledger. No people.`, "icon"],
+    "ev-sunken-shrine": [`${OBJ} A carved stone basin of perfectly clear water set into a verdigris-streaked vault wall.`, "icon"],
+    "ev-sunken-well": [`${OBJ} A round iron drain grate set in a flooded stone floor, coins visible glinting through the bars.`, "icon"],
+    "ev-sunken-trap": [`${OBJ} A burst stone wall seam with dark water jetting through it across cracked flagstones.`, "icon"],
+    "ev-sunken-rest": [`${OBJ} A dry stone ledge above the waterline with a lit brass lantern and a coiled rope.`, "icon"],
+    "ev-sunken-puzzle": [`${OBJ} A heavy vault door with four brass combination dials and a waterlogged note pinned beside it.`, "icon"],
+
+    "ev-ember-chest": [`${OBJ} A soot-blackened smith tool chest with brass fittings, lid open on neatly slotted tools, glowing faintly from within.`, "icon"],
+    "ev-ember-cache": [`${OBJ} A stack of poured metal ingots stamped with a maker mark, glowing dull orange at the edges.`, "icon"],
+    "ev-ember-merchant": [`${OBJ} A scrapper anvil-side stall: tongs, half-finished blades and a slate price list, lit by forge glow. No people.`, "icon"],
+    "ev-ember-shrine": [`${OBJ} A stone quenching trough of dark water beside a worn iron anvil, steam rising off the surface.`, "icon"],
+    "ev-ember-well": [`${OBJ} A deep slag pit shaft in cracked basalt with molten orange glow far below.`, "icon"],
+    "ev-ember-trap": [`${OBJ} A cracked floor vent blasting a jet of white steam, glowing magma visible in the fissure.`, "icon"],
+    "ev-ember-rest": [`${OBJ} A worker shift bunk with a folded blanket, a cold stove and a tin mug.`, "icon"],
+    "ev-ember-puzzle": [`${OBJ} A bank of eight iron levers on a scorched control panel with a burned-away chart above them.`, "icon"],
+
+    "ev-astral-chest": [`${OBJ} A glass display case on a pale stone plinth, its lid ajar, violet starlight spilling out.`, "icon"],
+    "ev-astral-cache": [`${OBJ} Coins and small bright objects floating in a slow cluster, weightless, trailing violet motes.`, "icon"],
+    "ev-astral-merchant": [`${OBJ} A pilgrim folding counter of pale wood with star-charts, an astrolabe and a hanging lamp. No people.`, "icon"],
+    "ev-astral-shrine": [`${OBJ} A shallow round font of perfectly still liquid light on a carved pale plinth.`, "icon"],
+    "ev-astral-well": [`${OBJ} A square window frame in a pale stone wall opening onto deep starfield with no room behind it.`, "icon"],
+    "ev-astral-trap": [`${OBJ} A flight of pale stone stairs shearing away mid-air, steps tumbling into a violet void.`, "icon"],
+    "ev-astral-rest": [`${OBJ} A warm pale stone bench in a quiet alcove, faint silver light pooling on it.`, "icon"],
+    "ev-astral-puzzle": [`${OBJ} Three narrow stone doors crowded onto a wall too narrow to hold three doors, violet light at their seams.`, "icon"],
+
+    // ── RARE FINDS ── the 1-in-13 floors. Each gets its own picture, because these are the only floors anyone
+    // tells someone else about and a generic strongbox would waste them. Scenes, not cutouts: the reward is a room.
+    "rare-seedvault": [`${SCENE} A small dry stone chamber sealed inside a mass of tree roots, shelves of ancient labelled seed jars glowing faintly gold, untouched dust.`, "rare"],
+    "rare-kinghoard": [`${SCENE} An earthen chamber heaped with generations of stolen bright things — coins, rings, cutlery, glass — piled to the ceiling, lit warm gold.`, "rare"],
+    "rare-orchardheart": [`${SCENE} The interior of an enormous split tree root, hollow and dry, its walls glowing amber, something bright resting at the centre.`, "rare"],
+    "rare-reserve": [`${SCENE} A hidden bank reserve room behind an open vault door, gold bars stacked in neat rows on dry stone above the flood line, cold teal light.`, "rare"],
+    "rare-wreck": [`${SCENE} A sunken cargo barge broken open under dark water, spilled crates of treasure lit by shafts of pale light from above.`, "rare"],
+    "rare-directors": [`${SCENE} A flooded bank office: a heavy desk, a portrait, an open private safe glinting with gold, verdigris and teal light.`, "rare"],
+    "rare-mastervault": [`${SCENE} A master smith private locker room deep in a forge: finished masterwork blades and tools racked on the walls, orange forge light.`, "rare"],
+    "rare-heartseam": [`${SCENE} A vast seam of glowing molten gold ore running through black basalt, brilliant and dangerous, the reason the mine was dug.`, "rare"],
+    "rare-firstforge": [`${SCENE} An ancient primordial forge older than the mine around it, a huge stone anvil and hearth still burning white-hot after centuries.`, "rare"],
+    "rare-observatory": [`${SCENE} A circular observatory room open to a violet starfield, a great brass telescope and floating orrery rings, silver light.`, "rare"],
+    "rare-corehall": [`${SCENE} An enormous hollow at the centre of a tower, filled with everything ever lost in it — coins, relics, doors, stairs — all slowly falling upward.`, "rare"],
+    "rare-beforeroom": [`${SCENE} A warm furnished room that predates the tower around it: a made bed, a lit fire, a laid table, impossibly ordinary and clearly ancient.`, "rare"],
+
     // ── upgrade track icons ──
     "track-flask": [`${OBJ} An oversized ornate healing flask with a wide belly and brass fittings, deep red liquid, engraved rune on the glass.`, "icon"],
     "track-satchel": [`${OBJ} An open leather adventurer's satchel with three glowing red potion flasks tucked into its loops.`, "icon"],
     "track-ward": [`${OBJ} A heavy travelling cloak with a silver clasp, faint blue protective runes glowing along its hem, hanging as if worn.`, "icon"],
 };
 
-const SIZE = { scene: "1536x1024", boss: "1024x1024", foe: "1024x1024", icon: "1024x1024" };
-const PX = { scene: 1024, boss: 512, foe: 448, icon: 256 };
+const SIZE = { scene: "1536x1024", rare: "1024x1024", boss: "1024x1024", foe: "1024x1024", icon: "1024x1024" };
+// Rare finds are SCENES rather than cutouts — the reward is a whole room, so they get more pixels than an icon.
+const PX = { scene: 1024, rare: 420, boss: 512, foe: 448, icon: 256 };
 
 async function generate(prompt, kind) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -101,7 +156,7 @@ async function generate(prompt, kind) {
                 body: JSON.stringify({
                     model: "gpt-image-1", prompt, size: SIZE[kind], quality: "low", n: 1,
                     // Scenes are meant to be opaque plates; everything else must key out cleanly.
-                    ...(kind === "scene" ? {} : { background: "transparent" }),
+                    ...(kind === "scene" || kind === "rare" ? {} : { background: "transparent" }),
                 }),
             });
             if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 140)}`);

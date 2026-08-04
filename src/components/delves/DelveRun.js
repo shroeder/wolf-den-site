@@ -7,18 +7,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // underneath is what you have already done. You never see what is ahead — the ten floors are dealt server-side
 // at the door and only the current one is ever sent, so nothing but the boss is predictable.
 
-const EVENT_ART = {
-    chest: "/images/delves/ev-chest.png",
-    mimic: "/images/delves/foe-mimic.png",
-    merchant: "/images/delves/ev-merchant.png",
-    well: "/images/delves/ev-well.png",
-    shrine: "/images/delves/ev-shrine.png",
-    trap: "/images/delves/ev-trap.png",
-    rest: "/images/delves/ev-rest.png",
-    cache: "/images/delves/ev-cache.png",
-    puzzle: "/images/delves/ev-puzzle.png",
-};
-
 function Img({ src, className, alt = "" }) {
     if (!src) return null;
     // eslint-disable-next-line @next/next/no-img-element
@@ -123,7 +111,8 @@ export default function DelveRun({ run, busy, onAct }) {
     const cur = run.current;
     const fighting = Boolean(run.foe);
     const awaiting = run.awaiting;
-    const art = fighting ? run.foe.sprite : (awaiting?.art || EVENT_ART[cur?.kind] || null);
+    // The art path comes from the SERVER with the floor (encounterArt), so the client never guesses a filename.
+    const art = fighting ? run.foe.sprite : (awaiting?.art || cur?.art || null);
 
     return (
         <div className="dlr" style={{ "--tint": run.tint }}>
@@ -143,7 +132,8 @@ export default function DelveRun({ run, busy, onAct }) {
                         <span key={i} className={`dlr-pip${i + 1 < run.floor ? " is-done" : ""}${i + 1 === run.floor ? " is-now" : ""}${i + 1 === run.floors ? " is-boss" : ""}`} />
                     ))}
                 </div>
-                {art ? <Img src={art} className={`dlr-art${fighting ? " is-foe" : ""}`} alt="" /> : null}
+                {art ? <Img src={art} className={`dlr-art${fighting ? " is-foe" : ""}${cur?.rare && !fighting ? " is-rare" : ""}`} alt="" /> : null}
+                {cur?.rare && !fighting ? <span className="dlr-rare-tag">RARE FIND</span> : null}
                 {fighting ? (
                     <div className="dlr-foe">
                         <b>{run.foe.name}</b>
@@ -255,6 +245,12 @@ export default function DelveRun({ run, busy, onAct }) {
                 .dlr-pip.is-boss.is-done { background: #ff6f7d; }
                 .dlr-art { position: relative; z-index: 1; width: 46%; max-height: 72%; object-fit: contain;
                     filter: drop-shadow(0 8px 20px rgba(0,0,0,0.65)); animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both; }
+                .dlr-art.is-rare { animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrRare 1.8s ease-in-out .4s infinite alternate; }
+                @keyframes dlrRare { from { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 10px rgba(255,215,94,.6)); }
+                    to { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 28px rgba(255,215,94,1)); } }
+                .dlr-rare-tag { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 3;
+                    padding: 3px 11px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .12em;
+                    color: #2a1c00; background: linear-gradient(180deg, #ffe9a8, #f0c14b); box-shadow: 0 0 22px rgba(255,200,70,.75); }
                 .dlr-art.is-foe { animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrBreathe 2.6s ease-in-out 0.4s infinite alternate; }
                 @keyframes dlrIn { from { opacity: 0; transform: scale(.8) translateY(10px); } to { opacity: 1; transform: none; } }
                 @keyframes dlrBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }

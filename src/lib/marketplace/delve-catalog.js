@@ -144,3 +144,24 @@ export const POTION_BASE_COUNT = 3;     // before Wider Satchel
 export const potionHealFrac = (flaskLv = 0) => POTION_BASE_HEAL + Math.max(0, flaskLv) * 0.03;
 export const potionCount = (satchelLv = 0) => POTION_BASE_COUNT + Math.max(0, satchelLv);
 export const wardCut = (wardLv = 0) => Math.min(0.10, Math.max(0, wardLv) * 0.025);
+
+// ── ENCOUNTER ART ────────────────────────────────────────────────────────────────────────────────────────────
+// Art is resolved SERVER-side and sent with the floor, so the client never has to guess a filename that might
+// not exist. Two rules, in order:
+//
+//   1. A RARE find has its own picture. These are the 1-in-13 moments; showing the same strongbox you have seen
+//      thirty times would waste the only floor anyone tells someone else about.
+//   2. Everything else gets its DUNGEON's version of that kind — ev-hollow-chest, ev-astral-chest. A Warren
+//      chest is a farmer's box in the dirt and a Spire chest is a display case in a starfield; one shared icon
+//      across all four decks quietly undid the theming the decks exist for.
+export function encounterArt(dungeonId, event) {
+    if (!event) return null;
+    if (event.art) return `/images/delves/${event.art}.png`;
+    // A mimic must look EXACTLY like that dungeon's chest until it bites — that is the entire joke. So it
+    // borrows the chest icon rather than having one of its own, and only becomes the mimic sprite once the
+    // fight starts (the run sends run.foe.sprite from then on).
+    if (event.kind === "mimic") return `/images/delves/ev-${dungeonId}-chest.png`;
+    // Fights use the foe's own sprite, which the run supplies; everything else is this dungeon's version.
+    if (event.kind === "fight" || event.kind === "boss") return null;
+    return `/images/delves/ev-${dungeonId}-${event.kind}.png`;
+}

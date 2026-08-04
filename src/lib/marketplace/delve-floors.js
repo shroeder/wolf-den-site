@@ -8,7 +8,7 @@ import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
-import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById } from "@/lib/marketplace/delve-catalog.js";
+import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
 // Split out of delves.js purely for size: that file owns the run (start, state, strike, potion) and this one
@@ -179,8 +179,7 @@ function buildOffer(run, d, ev) {
     const idx = ev.kind === KIND.shrine && ev.bargain
         ? [0, 1][Math.floor(Math.random() * 2)]
         : Math.floor(Math.random() * pool.length);
-    const art = { [KIND.merchant]: "ev-merchant", [KIND.well]: "ev-well", [KIND.shrine]: "ev-shrine", [KIND.puzzle]: "ev-puzzle" }[kind];
-    return { kind: ev.kind, title: ev.title, text: ev.text, art: `/images/delves/${art}.png`, options: pool[idx] };
+    return { kind: ev.kind, title: ev.title, text: ev.text, art: encounterArt(d.id, ev), options: pool[idx] };
 }
 
 // ── ADVANCE ──────────────────────────────────────────────────────────────────────────────────────────────────

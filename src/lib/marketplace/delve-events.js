@@ -53,9 +53,9 @@ const HOLLOW = [
     E("hw_snare", KIND.puzzle, "A Poacher's Snare Line", "Old wire, still set, and something is hanging in it.", { weight: 9 }),
 
     // ── RARE ──
-    E("hw_seedvault", KIND.chest, "The Seed Vault", "A dry stone chamber the roots grew around and never broke into. Nobody has been in here.", { weight: 2, rare: true, lootMult: 5 }),
-    E("hw_kinghoard", KIND.cache, "The Warren King's Hoard", "Generations of stolen brightness, heaped in one chamber.", { weight: 1, rare: true, lootMult: 7 }),
-    E("hw_orchardheart", KIND.chest, "The Orchard's Heart", "The oldest root, split open and hollow. Nothing has ever been inside it.", { weight: 2, rare: true, lootMult: 6 }),
+    E("hw_seedvault", KIND.chest, "The Seed Vault", "A dry stone chamber the roots grew around and never broke into. Nobody has been in here.", { weight: 2, rare: true, art: "rare-seedvault", lootMult: 5 }),
+    E("hw_kinghoard", KIND.cache, "The Warren King's Hoard", "Generations of stolen brightness, heaped in one chamber.", { weight: 1, rare: true, art: "rare-kinghoard", lootMult: 7 }),
+    E("hw_orchardheart", KIND.chest, "The Orchard's Heart", "The oldest root, split open and hollow. Nothing has ever been inside it.", { weight: 2, rare: true, art: "rare-orchardheart", lootMult: 6 }),
 
     E("hw_scrabble", KIND.fight, "Scrabbling Behind You", "You have been followed for two floors. It has stopped pretending.", { weight: 24 }),
     E("hw_territory", KIND.fight, "Marked Territory", "The scratches on the wall are chest height. Whatever made them is not.", { weight: 22 }),
@@ -122,9 +122,9 @@ const SUNKEN = [
     E("sv_keys", KIND.puzzle, "A Ring of Keys", "Forty of them. Two doors.", { weight: 9 }),
 
     // ── RARE ──
-    E("sv_reserve", KIND.chest, "The Reserve Room", "Behind the strongroom, behind another door, is the room they never listed.", { weight: 2, rare: true, lootMult: 5 }),
-    E("sv_wreck", KIND.cache, "The Sunk Barge", "The shipment that never arrived, still in its crates, under the floor.", { weight: 1, rare: true, lootMult: 7 }),
-    E("sv_directors", KIND.chest, "The Director's Office", "A room off the ledger hall that no ledger mentions.", { weight: 2, rare: true, lootMult: 6 }),
+    E("sv_reserve", KIND.chest, "The Reserve Room", "Behind the strongroom, behind another door, is the room they never listed.", { weight: 2, rare: true, art: "rare-reserve", lootMult: 5 }),
+    E("sv_wreck", KIND.cache, "The Sunk Barge", "The shipment that never arrived, still in its crates, under the floor.", { weight: 1, rare: true, art: "rare-wreck", lootMult: 7 }),
+    E("sv_directors", KIND.chest, "The Director's Office", "A room off the ledger hall that no ledger mentions.", { weight: 2, rare: true, art: "rare-directors", lootMult: 6 }),
 
     E("sv_below", KIND.fight, "From Below", "The water goes still, which is the last warning you get.", { weight: 24 }),
     E("sv_stair", KIND.fight, "On the Stair", "Coming down as you go up, and unwilling to discuss it.", { weight: 22 }),
@@ -191,9 +191,9 @@ const EMBER = [
     E("ed_moulds", KIND.puzzle, "A Row of Moulds", "Still full, still cooling. One of them is not a tool.", { weight: 9 }),
 
     // ── RARE ──
-    E("ed_mastervault", KIND.chest, "The Master's Locker", "Whoever ran this forge kept their own work behind a door nobody else had a key for.", { weight: 2, rare: true, lootMult: 5 }),
-    E("ed_heartseam", KIND.cache, "The Heart Seam", "The reason they dug here. The reason they sealed it.", { weight: 1, rare: true, lootMult: 7 }),
-    E("ed_firstforge", KIND.chest, "The First Forge", "Older than the mine. Whoever built the rest built this first.", { weight: 2, rare: true, lootMult: 6 }),
+    E("ed_mastervault", KIND.chest, "The Master's Locker", "Whoever ran this forge kept their own work behind a door nobody else had a key for.", { weight: 2, rare: true, art: "rare-mastervault", lootMult: 5 }),
+    E("ed_heartseam", KIND.cache, "The Heart Seam", "The reason they dug here. The reason they sealed it.", { weight: 1, rare: true, art: "rare-heartseam", lootMult: 7 }),
+    E("ed_firstforge", KIND.chest, "The First Forge", "Older than the mine. Whoever built the rest built this first.", { weight: 2, rare: true, art: "rare-firstforge", lootMult: 6 }),
 
     E("ed_pour", KIND.fight, "It Comes Out of the Pour", "The channel bulges. Something climbs out of it.", { weight: 24 }),
     E("ed_catwalk", KIND.fight, "On the Catwalk", "Narrow footing, a long drop, and company.", { weight: 22 }),
@@ -260,9 +260,9 @@ const ASTRAL = [
     E("as_riddle", KIND.puzzle, "Words Cut Into Stone", "A question, and space beneath it for an answer.", { weight: 9 }),
 
     // ── RARE ──
-    E("as_observatory", KIND.chest, "The Observatory", "A room the stairs do not lead to, which you have found anyway.", { weight: 2, rare: true, lootMult: 5 }),
-    E("as_corehall", KIND.cache, "The Hollow at the Centre", "Everything the Spire has ever taken, in one place, still falling.", { weight: 1, rare: true, lootMult: 7 }),
-    E("as_beforeroom", KIND.chest, "The Room From Before", "Furnished, lived in, and older than the tower it is inside.", { weight: 2, rare: true, lootMult: 6 }),
+    E("as_observatory", KIND.chest, "The Observatory", "A room the stairs do not lead to, which you have found anyway.", { weight: 2, rare: true, art: "rare-observatory", lootMult: 5 }),
+    E("as_corehall", KIND.cache, "The Hollow at the Centre", "Everything the Spire has ever taken, in one place, still falling.", { weight: 1, rare: true, art: "rare-corehall", lootMult: 7 }),
+    E("as_beforeroom", KIND.chest, "The Room From Before", "Furnished, lived in, and older than the tower it is inside.", { weight: 2, rare: true, art: "rare-beforeroom", lootMult: 6 }),
 
     E("as_behind", KIND.fight, "It Was Behind You", "It has been behind you since floor two.", { weight: 24 }),
     E("as_doorway", KIND.fight, "In the Doorway", "Filling it. Not moving. Waiting for you to decide.", { weight: 22 }),

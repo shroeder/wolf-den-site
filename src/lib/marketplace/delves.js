@@ -10,7 +10,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
-    delveMight, delveVigour, dungeonById, eventsFor, potionCount, potionHealFrac, wardCut,
+    delveMight, delveVigour, dungeonById, encounterArt, eventsFor, potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 
@@ -193,7 +193,12 @@ function publicRun(run) {
         banked: run.banked,
         foe: run.foe || null,
         // The floor you are standing on, resolved or not.
-        current: cur ? { n: cur.n, kind: cur.event.kind, title: cur.event.title, text: cur.event.text, done: Boolean(cur.done), outcome: cur.outcome || null } : null,
+        current: cur ? {
+            n: cur.n, kind: cur.event.kind, title: cur.event.title, text: cur.event.text,
+            done: Boolean(cur.done), outcome: cur.outcome || null,
+            rare: Boolean(cur.event.rare),
+            art: encounterArt(run.dungeonId, cur.event),
+        } : null,
         log: run.log || [],
         awaiting: run.awaiting || null,   // a choice the floor is waiting on
         potionsUsed: run.potionsUsed || 0,
