@@ -12,6 +12,7 @@
     "app:publish": "node scripts/publish-app.mjs",
     "app:publish:market": "node scripts/publish-app.mjs --app market",
     "lint:undef": "eslint . -c eslint.undef.mjs --no-config-lookup",
+    "check:guide": "node scripts/check-guide.mjs",
     "check:art": "node scripts/check-image-paths.mjs"
   },
   "keywords": [],

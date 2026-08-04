@@ -29,8 +29,11 @@ async function trueSteps(buyerId, steps) {
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
+        // avatar_updated_at, NOT avatar_config. A config row is written at signup — 83 of 84 members have one
+        // and only 43 have ever touched it — so keying off it made "make the hero look like you" a step that
+        // ticked itself before you had done anything. setAvatarConfig is what stamps avatar_updated_at.
         needs("avatar")
-            ? db.queryOne(`SELECT 1 AS x FROM mkt_buyer WHERE id = $1 AND (avatar_config IS NOT NULL OR avatar_sprite_url IS NOT NULL)`, [buyerId]).catch(() => null)
+            ? db.queryOne(`SELECT 1 AS x FROM mkt_buyer WHERE id = $1 AND avatar_updated_at IS NOT NULL`, [buyerId]).catch(() => null)
             : null,
         needs("wishlist")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_want WHERE buyer_id = $1 LIMIT 1`, [buyerId]).catch(() => null)
