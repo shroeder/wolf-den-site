@@ -58,20 +58,29 @@ export async function saveResponse(buyerId, { favorite, least, wish } = {}) {
 
 /** Tallies for the admin read-out: how many picked each system as their favorite / least favorite. */
 export async function surveyResults() {
-    const [fav, lst, notes, total] = await Promise.all([
+    // EVERY response, named, with the answer in full. Tallies tell you the shape of the room; they cannot tell
+    // you that the two people who put the Mine last both voted hours after it launched, or that the Kitchen's
+    // net of -2 is four people disliking it and two loving it rather than mild indifference. Both readings come
+    // out of the same rows, so both are served — and the free-text is NOT truncated here: a wish clipped to a
+    // preview is a wish you have to go to the database to actually read.
+    const [fav, lst, all, total] = await Promise.all([
         db.query(`SELECT favorite AS k, COUNT(*)::int AS n FROM mkt_survey_response WHERE favorite IS NOT NULL GROUP BY favorite`).catch(() => []),
         db.query(`SELECT least AS k, COUNT(*)::int AS n FROM mkt_survey_response WHERE least IS NOT NULL GROUP BY least`).catch(() => []),
-        db.query(`SELECT b.display_name, b.alias, s.wish, s.updated_at FROM mkt_survey_response s
-                    JOIN mkt_buyer b ON b.id = s.buyer_id
-                   WHERE s.wish IS NOT NULL AND s.wish <> '' ORDER BY s.updated_at DESC LIMIT 100`).catch(() => []),
+        db.query(`SELECT COALESCE(b.display_name, b.alias, split_part(b.email, '@', 1)) AS name,
+                         s.favorite, s.least, s.wish, s.updated_at
+                    FROM mkt_survey_response s JOIN mkt_buyer b ON b.id = s.buyer_id
+                   ORDER BY s.updated_at DESC LIMIT 500`).catch(() => []),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_survey_response`).catch(() => null),
     ]);
+    const notes = all.filter((r) => r.wish && r.wish.trim());
     const byKey = (rows) => Object.fromEntries(rows.map((r) => [r.k, r.n]));
     const f = byKey(fav), l = byKey(lst);
     return {
         responses: total?.n || 0,
         systems: SYSTEMS.map((s) => ({ ...s, favorite: f[s.key] || 0, least: l[s.key] || 0, net: (f[s.key] || 0) - (l[s.key] || 0) }))
             .sort((a, b) => b.net - a.net || b.favorite - a.favorite),
-        wishes: notes.map((r) => ({ name: r.display_name || r.alias || "Member", wish: r.wish, at: r.updated_at })),
+        wishes: notes.map((r) => ({ name: r.name || "Member", wish: r.wish, favorite: r.favorite, least: r.least, at: r.updated_at })),
+        // Every response, newest first — who said what, so a tally can always be traced back to people.
+        responsesList: all.map((r) => ({ name: r.name || "Member", favorite: r.favorite, least: r.least, wish: r.wish || null, at: r.updated_at })),
     };
 }
