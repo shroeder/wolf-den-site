@@ -10,7 +10,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
-    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, potionCount, potionHealFrac, wardCut,
+    delveMight, delveVigour, dungeonById, encounterArt, encounterBg, eventsFor, foeForFloor, potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 
@@ -122,8 +122,8 @@ function dealFloors(dungeon) {
 }
 
 /** A foe for a fight floor. HP is a multiple of YOUR attack, so a fight is ~3 exchanges whatever you're wearing. */
-function makeFoe(dungeon, event, might, foeId = null) {
-    const base = dungeon.foes.find((f) => f.id === foeId) || pick(dungeon.foes);
+function makeFoe(dungeon, event, might, floor = null) {
+    const base = foeForFloor(dungeon, floor) || dungeon.foes[0];
     const hp = Math.max(1, Math.round(might * dungeon.foeX * (event.hpMult || 1)));
     return {
         id: base.id, name: event.kind === KIND.mimic ? "Mimic" : base.name,
@@ -209,7 +209,7 @@ function publicRun(run) {
             // mimic keeps its chest picture, because being wrong about that is the entire encounter.
             art: encounterArt(run.dungeonId, cur.event) || (
                 cur.event.kind === KIND.boss ? d?.boss?.sprite
-                    : (d?.foes || []).find((f) => f.id === cur.foeId)?.sprite || d?.foes?.[0]?.sprite || null
+                    : foeForFloor(d, cur)?.sprite || null
             ),
             silhouette: !cur.done && (cur.event.kind === KIND.fight || cur.event.kind === KIND.boss),
         } : null,
@@ -378,7 +378,7 @@ export async function delveAct(buyerId, action, choice = null) {
                 const bossHp = Math.max(1, Math.round(run.might * d.bossX));
                 run.foe = ev.kind === KIND.boss
                     ? { id: d.boss.id, name: d.boss.name, sprite: d.boss.sprite, hp: bossHp, maxHp: bossHp, dmg: d.boss.dmg, boss: true }
-                    : makeFoe(d, ev, run.might, floor.foeId);
+                    : makeFoe(d, ev, run.might, floor);
                 floor.done = true;
                 run.log.push({ floor: run.floor, kind: "meet", text: ev.kind === KIND.mimic ? "The chest opens itself. It has teeth." : `${run.foe.name} blocks the way.` });
                 // A mimic gets the jump on you — that's the cost of it having looked like treasure.

@@ -154,6 +154,21 @@ export const wardCut = (wardLv = 0) => Math.min(0.10, Math.max(0, wardLv) * 0.02
 //   2. Everything else gets its DUNGEON's version of that kind — ev-hollow-chest, ev-astral-chest. A Warren
 //      chest is a farmer's box in the dirt and a Spire chest is a display case in a starfield; one shared icon
 //      across all four decks quietly undid the theming the decks exist for.
+// ── WHICH FOE IS ON THIS FLOOR ───────────────────────────────────────────────────────────────────────────────
+// ONE resolver, because two of them is how a rat's shadow turned into a grub. The floor stores `foeId` when the
+// run is dealt so the stage can tease a silhouette before you commit — but the tease and the fight were reading
+// it through separate expressions with separate fallbacks: the silhouette fell back to `foes[0]` and the fight
+// fell back to `pick(foes)`. Any floor without a stored id (a run dealt before ids existed) therefore showed
+// one creature and produced another.
+//
+// The fallback is now derived from the FLOOR NUMBER, which both callers have and neither can disagree about.
+export function foeForFloor(dungeon, floor) {
+    const foes = dungeon?.foes || [];
+    if (!foes.length) return null;
+    const stored = floor?.foeId ? foes.find((f) => f.id === floor.foeId) : null;
+    return stored || foes[(Math.max(1, Number(floor?.n) || 1) - 1) % foes.length];
+}
+
 // ── THE ROOM YOU ARE STANDING IN ─────────────────────────────────────────────────────────────────────────────
 // A backdrop per DUNGEON per KIND. Ten floors used to share one plate, so the run read as one room with the
 // camera nudged around it — a merchant, a trap and the boss all standing in the same corridor. The room now
