@@ -1,0 +1,141 @@
+"use client";
+
+// ── THE HALL ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Pick a dungeon, or spend gold on the three things that change how a run feels. A locked dungeon still shows
+// its art and its boss — you should be able to see what you are working toward, not a grey box with a padlock.
+
+const money = (n) => Number(n || 0).toLocaleString();
+
+function Img({ src, className, alt = "" }) {
+    if (!src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} className={className} alt={alt} draggable="false" loading="lazy" />;
+}
+
+export default function DelveHall({ state, busy, onAct }) {
+    const { dungeons = [], tracks = [], potions, stats, gold } = state;
+    return (
+        <>
+            <div className="dlv-hall">
+                {dungeons.map((d) => {
+                    const locked = !d.unlocked;
+                    const spent = d.runToday;
+                    return (
+                        <div key={d.id} className={`dlv-card${locked ? " is-locked" : ""}`} style={{ "--tint": d.tint }}>
+                            <div className="dlv-card-art">
+                                <Img src={d.bg} className="dlv-card-bg" />
+                                <Img src={d.boss.sprite} className="dlv-card-boss" alt={d.boss.name} />
+                                <span className="dlv-card-scrim" aria-hidden="true" />
+                                <span className="dlv-card-floors">{d.floors} floors</span>
+                            </div>
+                            <div className="dlv-card-body">
+                                <b className="dlv-card-name">{d.name}</b>
+                                <p className="dlv-card-blurb">{d.blurb}</p>
+                                <div className="dlv-card-foot">
+                                    <span className="dlv-card-boss-name">Guarded by {d.boss.name}</span>
+                                    {locked ? (
+                                        <span className="dlv-card-gate">Unlocks at level {d.minLevel}</span>
+                                    ) : spent ? (
+                                        <span className="dlv-card-gate is-done">Run today — back tomorrow</span>
+                                    ) : (
+                                        <button type="button" className="dlv-btn" disabled={busy}
+                                            onClick={() => onAct("start", { dungeon: d.id })}>
+                                            Descend
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* What you carry in. Shown here rather than only mid-run, because it's what the upgrades below buy. */}
+            <div className="dlv-kit">
+                <Img src="/images/delves/ev-potion.png" className="dlv-kit-ico" />
+                <span>You go in with <b>{potions?.count} potions</b>, each restoring <b>{potions?.healPct}%</b> of your health.</span>
+            </div>
+
+            <div className="dlv-upgrades">
+                <div className="dlv-sec-head">Provisions <span className="muted">· {money(gold)} gold</span></div>
+                {tracks.map((t) => (
+                    <div key={t.key} className={`dlv-track${t.maxed ? " is-maxed" : ""}`}>
+                        <Img src={t.icon} className="dlv-track-ico" />
+                        <div className="dlv-track-body">
+                            <div className="dlv-track-top">
+                                <b>{t.name}</b>
+                                <span className="muted">Lv {t.level}/{t.max}</span>
+                            </div>
+                            <div className="dlv-track-desc">{t.desc}</div>
+                            <div className="dlv-track-eff">
+                                <span>{t.now}</span>
+                                {t.next ? <><span className="dlv-track-arrow" aria-hidden="true">→</span><b>{t.next}</b></> : null}
+                            </div>
+                        </div>
+                        {t.maxed
+                            ? <span className="dlv-track-max">MAX</span>
+                            : <button type="button" className="dlv-btn is-ghost dlv-track-buy" disabled={busy || gold < t.cost}
+                                onClick={() => onAct("upgrade", { track: t.key })}>
+                                {money(t.cost)}
+                            </button>}
+                    </div>
+                ))}
+            </div>
+
+            {stats?.started ? (
+                <div className="dlv-stats">
+                    <span><b>{stats.started}</b> runs</span>
+                    <span><b>{stats.cleared}</b> cleared</span>
+                    <span><b>{stats.bosses}</b> bosses</span>
+                    <span><b>{stats.floors}</b> floors</span>
+                    <span><b>{stats.died}</b> deaths</span>
+                </div>
+            ) : null}
+
+            <style jsx>{`
+                .dlv-hall { display: grid; gap: 12px; }
+                @media (min-width: 700px) { .dlv-hall { grid-template-columns: 1fr 1fr; } }
+                .dlv-card { border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.03);
+                    border: 1px solid color-mix(in srgb, var(--tint) 40%, transparent); }
+                .dlv-card.is-locked { opacity: 0.62; }
+                .dlv-card-art { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; }
+                .dlv-card-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+                .dlv-card-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.1), rgba(10,6,16,0.82)); }
+                .dlv-card-boss { position: relative; z-index: 1; width: 44%; max-height: 82%; object-fit: contain;
+                    filter: drop-shadow(0 6px 16px rgba(0,0,0,0.6)); }
+                .dlv-card-floors { position: absolute; top: 8px; right: 9px; z-index: 2; padding: 3px 8px; border-radius: 999px;
+                    font-size: 10.5px; font-weight: 900; color: #120e1a; background: color-mix(in srgb, var(--tint) 85%, white); }
+                .dlv-card-body { padding: 11px 13px 13px; }
+                .dlv-card-name { display: block; font-size: 1rem; color: color-mix(in srgb, var(--tint) 70%, white); }
+                .dlv-card-blurb { margin: 4px 0 9px; font-size: 12px; line-height: 1.45; color: #9aa2ab; }
+                .dlv-card-foot { display: grid; gap: 7px; }
+                .dlv-card-boss-name { font-size: 11px; font-weight: 800; color: #bda9d8; }
+                .dlv-card-gate { padding: 9px; border-radius: 11px; text-align: center; font-size: 12px; font-weight: 800;
+                    color: #9aa2ab; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+                .dlv-card-gate.is-done { color: #7cffb2; border-color: rgba(124,255,178,0.3); background: rgba(124,255,178,0.08); }
+
+                .dlv-kit { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; padding: 10px 12px; border-radius: 12px;
+                    font-size: 12.5px; color: #cdd3d8; background: rgba(185,140,255,0.08); border: 1px solid rgba(185,140,255,0.28); }
+                .dlv-kit-ico { width: 26px; height: 26px; object-fit: contain; }
+                .dlv-kit b { color: #e0ceff; }
+
+                .dlv-sec-head { margin: 16px 0 8px; font-size: 12.5px; font-weight: 900; color: #d9c2ff; }
+                .dlv-upgrades { display: grid; gap: 8px; }
+                .dlv-track { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px;
+                    padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); }
+                .dlv-track.is-maxed { border-color: rgba(255,215,94,0.35); background: rgba(255,215,94,0.07); }
+                .dlv-track-ico { width: 34px; height: 34px; object-fit: contain; }
+                .dlv-track-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+                .dlv-track-desc { font-size: 11px; color: #9aa2ab; margin-top: 1px; }
+                .dlv-track-eff { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; color: #bda9d8; }
+                .dlv-track-arrow { color: #6f6486; }
+                .dlv-track-buy { width: auto; padding: 9px 14px; font-size: 0.82rem; }
+                .dlv-track-max { font-size: 10.5px; font-weight: 900; color: #ffd75e; letter-spacing: .08em; }
+
+                .dlv-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding-top: 11px;
+                    border-top: 1px solid rgba(255,255,255,0.08); font-size: 11.5px; color: #9aa2ab; }
+                .dlv-stats b { color: #d9c2ff; }
+            `}</style>
+        </>
+    );
+}

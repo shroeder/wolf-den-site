@@ -66,6 +66,12 @@ export const QUEST_TEMPLATES = [
     { key: "mine_crack_three", label: "Crack open 3 seams", metric: "seam_crack", target: 3, gold: 240, chest: "wooden", area: "/marketplace/mining", cta: "Go swing a pick" },
     { key: "mine_smelt", label: "Pour a smelt at the furnace", metric: "ore_smelt", target: 1, gold: 130, area: "/marketplace/mining", cta: "Work the heat" },
     { key: "mine_smelt_three", label: "Pour 3 smelts", metric: "ore_smelt", target: 3, gold: 250, area: "/marketplace/mining", cta: "Work the heat" },
+
+    // ── Delve quests. ownerOnly for exactly as long as the dungeons are — eligibleTemplates filters these out
+    // for everyone else, so they can never be rolled for a member who cannot open the page.
+    { key: "delve_floors", label: "Clear 5 dungeon floors", metric: "delve_floor", target: 5, gold: 150, ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
+    { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, chest: "wooden", ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
+    { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, chest: "wooden", ownerOnly: true, area: "/marketplace/delves", cta: "Go delving" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));

@@ -97,6 +97,9 @@ export const TOWN_BUILDINGS = [
 // building being quietly absent from the list.
 export const GATED_BUILDINGS = [
     { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86 },
+    // gate: "owner" is load-bearing — the filter below is `b.gate !== "owner" || isOwner(...)`, so an entry
+    // WITHOUT it is shown to everybody. The Kitchen has none because the Kitchen is public now.
+    { id: "delves", emoji: "🗝️", label: "Dungeon Delves", href: "/marketplace/delves", x: 30, gate: "owner" },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.

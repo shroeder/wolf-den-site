@@ -33,7 +33,7 @@ const NAV_SPRITE = {
     "/marketplace/track": "rewards", "/marketplace/badges": "badges", "/marketplace/leaderboard": "ranks",
     "/marketplace/invite": "invite", "/marketplace/friends": "friends", "/marketplace/inbox": "inbox",
     "/marketplace/play": "home", "/marketplace/customize": "customize", "/marketplace/profile": "profile",
-    "/marketplace/fishing": "fishing", "/marketplace/mining": "mining",
+    "/marketplace/fishing": "fishing", "/marketplace/mining": "mining", "/marketplace/delves": "delves",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -82,7 +82,7 @@ const LINKS = [
 const isOn = (pathname, href) => pathname === href || pathname.startsWith(`${href}/`);
 
 // Paths that are part of the game shell but aren't their own nav destination — keep the menu visible on them.
-const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining"];
+const EXTRA_GAME_PATHS = ["/marketplace/u/", "/marketplace/fishing", "/marketplace/badges", "/marketplace/rewards", "/marketplace/farm", "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm", "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining", "/marketplace/delves"];
 
 export default function GameNav() {
     const pathname = usePathname() || "";
@@ -103,6 +103,17 @@ export default function GameNav() {
             .then((r) => r.json())
             .then((d) => { if (!dead && d?.unlocked) setMine(true); })
             .catch(() => { /* no mine, no menu entry */ });
+        return () => { dead = true; };
+    }, [pathname]);
+
+    // Delves, same contract as the Mine: ask the server, never guess. A non-owner simply has no Delves entry.
+    const [delves, setDelves] = useState(false);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/delves", { cache: "no-store", credentials: "same-origin" })
+            .then((r) => r.json())
+            .then((d) => { if (!dead && d?.unlocked) setDelves(true); })
+            .catch(() => { /* no delves, no menu entry */ });
         return () => { dead = true; };
     }, [pathname]);
     // Every failure mode here looks identical to "you're not the owner" — a dropped request, a cached reply from
@@ -146,7 +157,8 @@ export default function GameNav() {
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
         ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
-        ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : [])];
+        ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
+        ...(delves ? [{ href: "/marketplace/delves", emoji: "🗝️", label: "Delves" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || EXTRA_GAME_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 
     const [chests, setChests] = useState(0);
@@ -274,6 +286,7 @@ export default function GameNav() {
             // the side of the screen and a new entry appended to the end of it is, in practice, invisible.
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
+            ...(delves ? [{ href: "/marketplace/delves", emoji: "🗝️", label: "Dungeon Delves", sub: "Ten floors down" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
