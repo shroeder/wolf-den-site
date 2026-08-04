@@ -77,7 +77,7 @@ const QUEST_POOL = {
         { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 120 },
         { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 240 },
     ] },
-    delver_deep: { ownerOnly: true, emoji: "🗝️", variants: [
+    delver_deep: { emoji: "🗝️", variants: [
         { label: "Into the Dungeon", desc: "Clear 6 dungeon floors", target: 6, gold: 150 },
         { label: "All the Way Down", desc: "Clear 15 dungeon floors", target: 15, gold: 300 },
     ] },

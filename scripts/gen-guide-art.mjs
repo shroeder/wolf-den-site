@@ -35,6 +35,7 @@ const ART = {
     "ch-forge": E("a blacksmith's anvil with a hammer resting on it and three bright orange sparks"),
     "ch-deco": E("a small potted flowering plant beside a tiny painted garden fence post and a hanging lantern"),
     "ch-mine": E("a crossed pickaxe and lantern over a chunk of rock with a glowing amber ore seam"),
+    "ch-dungeons": E("a heavy arched dungeon doorway in dark stone with an iron portcullis half raised and a torch burning beside it"),
     "ch-trade": E("two open hands exchanging a gold coin above a small balance scale"),
     "ch-store": E("a paper shopping bag with a trading card and a gold coin peeking out of the top"),
 };

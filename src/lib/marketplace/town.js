@@ -99,7 +99,7 @@ export const GATED_BUILDINGS = [
     { id: "kitchen", emoji: "🍳", label: "The Kitchen", href: "/marketplace/cooking", x: 86 },
     // gate: "owner" is load-bearing — the filter below is `b.gate !== "owner" || isOwner(...)`, so an entry
     // WITHOUT it is shown to everybody. The Kitchen has none because the Kitchen is public now.
-    { id: "delves", emoji: "🗝️", label: "Dungeons", href: "/marketplace/dungeons", x: 30, gate: "owner" },
+    { id: "delves", emoji: "🗝️", label: "Dungeons", href: "/marketplace/dungeons", x: 30 },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.

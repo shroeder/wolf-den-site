@@ -128,6 +128,15 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 700, chest: "gold" },
     },
     {
+        id: "dungeons", name: "The Dungeons", icon: "/images/guide/ch-dungeons.webp", minLevel: 10, tint: "#b98cff",
+        blurb: "Ten floors down, and one run a day at each.",
+        steps: [
+            { key: "delve_run", label: "Walk into a dungeon", why: "Ten floors, one encounter each, and a boss at the bottom. Your health and your swing come off your level and the gear you are wearing, so this is the first place a good loadout really shows.", href: "/marketplace/dungeons", cta: "Descend", gold: 250, events: ["delve_start"] },
+            { key: "delve_boss", label: "Fell a dungeon boss", why: "Reach floor ten and the thing waiting there pays a purse, a chest and parts on top of everything you carried down. Die on the way and you still keep the lot — there is no way to lose what you already banked.", href: "/marketplace/dungeons", cta: "Go and kill it", gold: 400, events: ["delve_clear"] },
+        ],
+        reward: { gold: 700, chest: "gold" },
+    },
+    {
         id: "trade", name: "Trading", minLevel: 12, tint: "#7defd0", icon: "/images/guide/ch-trade.webp",
         blurb: "Members trade gear and pets directly.",
         steps: [

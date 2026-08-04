@@ -56,7 +56,7 @@ export default function DelveClient({ initial }) {
         <section className="card delve-wrap">
             <div className="delve-top">
                 <span className="delve-title">Dungeons</span>
-                <span className="delve-sub">owner preview · level {state.level}</span>
+                <span className="delve-sub">level {state.level}</span>
             </div>
             {msg ? <div className="delve-msg">{msg}</div> : null}
 

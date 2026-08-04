@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
@@ -19,9 +18,10 @@ import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/del
 // Ten floors, one encounter each, a boss at the bottom. You bring HP and potions; you leave with whatever you
 // banked, alive or not. Four dungeons gated on level, each runnable once a day.
 //
-// OWNER-GATED while it's built out. Every read and write goes through DELVES_UNLOCKED — one switch to open it,
-// exactly as the mine did.
-export const DELVES_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
+// PUBLIC since 2026-08-04. Every read and write still goes through DELVES_UNLOCKED, so this stays the one
+// switch — exactly as the mine did. The first dungeon gates itself at level 10 anyway, so opening it up does
+// not drop a level-2 member into something that will kill them.
+export const DELVES_UNLOCKED = (buyerId) => Boolean(buyerId);
 
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
