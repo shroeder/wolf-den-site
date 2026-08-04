@@ -149,14 +149,20 @@ export async function arenaPower(buyerId) {
         import("@/lib/marketplace/inventory.js"),
     ]);
     const [me, bySlot] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // avatar_sprite_url is in here because the bout draws YOU as well as them, and without it the player's
+        // own corner of the ring was an empty circle.
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp, avatar_sprite_url, display_name, alias FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine.
         getEquippedIds(buyerId).catch(() => ({})),
     ]);
     const level = levelForXp(Number(me?.xp) || 0).level;
     const stats = sumItemStats(Object.values(bySlot || {}));
     const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
-    return { level, gearPower, vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower) };
+    return {
+        level, gearPower, vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
+        sprite: me?.avatar_sprite_url || null,
+        name: me?.display_name || me?.alias || "You",
+    };
 }
 
 async function arenaRow(buyerId) {

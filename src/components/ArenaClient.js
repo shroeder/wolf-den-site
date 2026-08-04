@@ -13,6 +13,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const money = (n) => Number(n || 0).toLocaleString();
 
+const STANCE_ART = {
+    strike: "/images/arena/stance-strike.webp",
+    guard: "/images/arena/stance-guard.webp",
+    feint: "/images/arena/stance-feint.webp",
+};
 const STANCES = [
     { key: "strike", label: "Strike", hint: "Beats a feint. Loses to a guard." },
     { key: "guard", label: "Guard", hint: "Beats a strike. Loses to a feint." },
@@ -39,19 +44,20 @@ function blip(kind) {
     } catch { /* audio is a bonus */ }
 }
 
-function Fighter({ f, hp, maxHp, mirrored, hurt }) {
+// A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
+function Fighter({ f, hp, maxHp, mirrored, hurt, lunge }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
     return (
-        <div className={`ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}`}>
-            <div className="ar-portrait">
-                {f?.sprite ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={f.sprite} alt="" draggable="false" style={mirrored ? { transform: "scaleX(-1)" } : undefined} />
-                ) : <span className="ar-noface" aria-hidden="true" />}
+        <div className={`ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`}>
+            <div className="ar-plate">
+                <b className="ar-fname">{f?.name}</b>
+                <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
+                <em className="ar-hpnum">{Math.max(0, hp)} / {maxHp}</em>
             </div>
-            <b className="ar-fname">{f?.name}</b>
-            <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
-            <em className="ar-hpnum">{Math.max(0, hp)} / {maxHp}</em>
+            {f?.sprite ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="ar-hero" src={f.sprite} alt="" draggable="false" style={mirrored ? { transform: "scaleX(-1)" } : undefined} />
+            ) : <span className="ar-hero ar-noface" aria-hidden="true" />}
         </div>
     );
 }
@@ -61,7 +67,8 @@ export default function ArenaClient({ initial }) {
     const [rankUp, setRankUp] = useState(null);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
-    const prev = useRef({ hp: null, foeHp: null });
+    const [clash, setClash] = useState(null);   // the two stances that just met
+    const prev = useRef({ hp: null, foeHp: null, round: null });
     const logEnd = useRef(null);
 
     const act = useCallback(async (action, extra = {}) => {
@@ -86,10 +93,15 @@ export default function ArenaClient({ initial }) {
         const p = prev.current;
         if (p.hp != null && bout.hp < p.hp) { setShake(2); blip("hurt"); }
         else if (p.foeHp != null && bout.foeHp < p.foeHp) { setShake(1); blip("hit"); }
+        // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
+        // a line of grey log text under the buttons.
+        const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
+        if (last && last.round !== p.round) setClash({ you: last.you, them: last.them });
         if (bout.over && bout.won) blip("win");
-        prev.current = { hp: bout.hp, foeHp: bout.foeHp };
+        prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: last ? last.round : null };
         const t = setTimeout(() => setShake(0), 320);
-        return () => clearTimeout(t);
+        const t2 = setTimeout(() => setClash(null), 1150);
+        return () => { clearTimeout(t); clearTimeout(t2); };
     }, [bout]);
     useEffect(() => { logEnd.current?.scrollIntoView?.({ block: "nearest" }); }, [bout?.log?.length]);
 
@@ -99,11 +111,26 @@ export default function ArenaClient({ initial }) {
     if (bout) {
         return (
             <section className="card ar">
-                <div className={`ar-stage${shake ? ` is-shake-${shake}` : ""}`}>
-                    <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} />
-                    <span className="ar-vs">vs</span>
-                    <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} />
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
+                    <span className="ar-ring-scrim" aria-hidden="true" />
+                    <span className="ar-round">Round {bout.round}</span>
+                    <div className="ar-floor">
+                        <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1} />
+                        <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2} />
+                    </div>
+                    {clash ? (
+                        <div className="ar-clash" aria-hidden="true">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="ar-clash-icon is-you" src={STANCE_ART[clash.you]} alt="" />
+                            <span className="ar-clash-spark" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="ar-clash-icon is-them" src={STANCE_ART[clash.them]} alt="" />
+                        </div>
+                    ) : null}
                 </div>
+                {bout.log?.length ? <p className="ar-beat">{bout.log[bout.log.length - 1].text}</p> : null}
                 <p className="ar-tell"><b>Their tell:</b> {bout.tell}</p>
 
                 {bout.over ? (
@@ -119,6 +146,8 @@ export default function ArenaClient({ initial }) {
                         {STANCES.map((s) => (
                             <button key={s.key} type="button" className={`ar-stance is-${s.key}`} disabled={busy}
                                 onClick={() => act("stance", { stance: s.key })}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={STANCE_ART[s.key]} alt="" draggable="false" />
                                 <b>{s.label}</b><em>{s.hint}</em>
                             </button>
                         ))}
@@ -347,24 +376,71 @@ function Styles() {
             .ar-up-name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 800; color: #d6dde4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .ar-up-lvl { font-size: 11px; color: #8a939d; white-space: nowrap; }
 
-            /* ── the bout ── */
-            .ar-stage { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 10px; padding: 16px 8px 4px; }
-            .ar-stage.is-shake-1 { animation: arShake .2s ease-out; }
-            .ar-stage.is-shake-2 { animation: arShake .28s ease-out; }
-            @keyframes arShake { 0%,100% { transform: translate(0,0) } 30% { transform: translate(-5px,2px) } 65% { transform: translate(5px,-2px) } }
-            .ar-fighter { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-            .ar-fighter.is-hurt .ar-portrait { border-color: #ff6f7d; box-shadow: 0 0 22px -4px #ff6f7d; }
-            .ar-vs { align-self: center; font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: #6f7883; }
-            .ar-fname { font-size: 12.5px; font-weight: 900; color: #e9eef3; text-align: center; }
-            .ar-hp { display: block; width: 100%; max-width: 130px; height: 8px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.5); }
+            /* ── the ring ── */
+            .ar-ring { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10;
+                border: 1px solid rgba(255,190,110,0.3); }
+            .ar-ring.is-shake-1 { animation: arShake .2s ease-out; }
+            .ar-ring.is-shake-2 { animation: arShake .3s ease-out; }
+            @keyframes arShake { 0%,100% { transform: translate(0,0) } 28% { transform: translate(-6px,3px) } 62% { transform: translate(6px,-3px) } }
+            .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+            .ar-ring-scrim { position: absolute; inset: 0;
+                background: radial-gradient(78% 62% at 50% 62%, transparent, rgba(10,6,4,0.72)); }
+            .ar-round { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); z-index: 3;
+                font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: #ffe0b0;
+                text-shadow: 0 2px 8px #000; }
+            /* Both fighters stand on the same line of sand, facing each other. */
+            .ar-floor { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr;
+                align-items: end; padding: 0 4% 7%; }
+            .ar-fighter { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+            .ar-hero { width: min(100%, 132px); max-height: 62%; object-fit: contain;
+                filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
+                animation: arBreathe 2.8s ease-in-out infinite alternate; }
+            @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
+            .ar-fighter.is-foe .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
+            @keyframes arBreatheFoe { from { transform: scaleX(-1) translateY(0) } to { transform: scaleX(-1) translateY(-5px) } }
+            /* Landing a blow leans you in; taking one rocks you back and flashes red. */
+            .ar-fighter.is-lunge .ar-hero { animation: arLunge .3s ease-out; }
+            @keyframes arLunge { 0%,100% { transform: translateX(0) } 50% { transform: translateX(14px) } }
+            .ar-fighter.is-foe.is-lunge .ar-hero { animation: arLungeFoe .3s ease-out; }
+            @keyframes arLungeFoe { 0%,100% { transform: scaleX(-1) translateX(0) } 50% { transform: scaleX(-1) translateX(14px) } }
+            .ar-fighter.is-hurt .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 16px #ff4d5e) brightness(1.5); }
+            /* Shared with the ladder's 30px portraits, so it stays proportional; only the RING placeholder
+               gets a fixed size. Sizing this in px broke the little rows above the fold. */
+            .ar-noface { width: 60%; height: 60%; border-radius: 50%; background: rgba(255,255,255,0.12); }
+            .ar-hero.ar-noface { width: 96px; height: 96px; }
+
+            .ar-plate { width: min(100%, 150px); text-align: center; }
+            .ar-fname { display: block; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-hp { display: block; height: 8px; margin: 4px 0 2px; border-radius: 999px; overflow: hidden;
+                background: rgba(0,0,0,0.62); border: 1px solid rgba(0,0,0,0.5); }
             .ar-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #4ad07f, #7ce8a4); transition: width .35s ease; }
             .ar-fighter.is-foe .ar-hp > i { background: linear-gradient(90deg, #ff6f7d, #ffb0b8); }
-            .ar-hpnum { font-size: 10px; font-style: normal; color: #8a939d; font-variant-numeric: tabular-nums; }
+            .ar-hpnum { font-size: 10px; font-style: normal; color: #e8dcc8; text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; }
+
+            /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
+            .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
+            .ar-clash-icon { position: absolute; width: 60px; height: 60px; object-fit: contain;
+                filter: drop-shadow(0 3px 10px rgba(0,0,0,0.8)); }
+            .ar-clash-icon.is-you { animation: arThrowL .95s cubic-bezier(.2,.9,.3,1) both; }
+            .ar-clash-icon.is-them { animation: arThrowR .95s cubic-bezier(.2,.9,.3,1) both; transform: scaleX(-1); }
+            @keyframes arThrowL { 0% { opacity: 0; transform: translateX(-90px) scale(.6) } 34% { opacity: 1; transform: translateX(-26px) scale(1.1) }
+                72% { opacity: 1; transform: translateX(-26px) scale(1) } 100% { opacity: 0; transform: translateX(-26px) scale(.9) } }
+            @keyframes arThrowR { 0% { opacity: 0; transform: scaleX(-1) translateX(-90px) scale(.6) } 34% { opacity: 1; transform: scaleX(-1) translateX(-26px) scale(1.1) }
+                72% { opacity: 1; transform: scaleX(-1) translateX(-26px) scale(1) } 100% { opacity: 0; transform: scaleX(-1) translateX(-26px) scale(.9) } }
+            .ar-clash-spark { position: absolute; width: 78px; height: 78px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,240,190,0.95), rgba(255,180,60,0.35) 45%, transparent 70%);
+                animation: arSpark .5s ease-out .3s both; }
+            @keyframes arSpark { 0% { opacity: 0; transform: scale(.3) } 40% { opacity: 1; transform: scale(1.15) } 100% { opacity: 0; transform: scale(1.5) } }
+
+            .ar-beat { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: #e4d9c6; text-align: center; }
+
             .ar-tell { margin: 10px 0 12px; font-size: 12px; color: #cbb; text-align: center; }
             .ar-tell b { color: #ffd0a0; }
 
             .ar-stances { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-            .ar-stance { padding: 12px 8px; border-radius: 13px; cursor: pointer; text-align: center;
+            .ar-stance img { width: 34px; height: 34px; object-fit: contain; margin: 0 auto 4px; display: block; }
+            .ar-stance { padding: 11px 8px 12px; border-radius: 13px; cursor: pointer; text-align: center;
                 background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.13); }
             .ar-stance:disabled { opacity: .55; }
             .ar-stance b { display: block; font-size: 0.9rem; font-weight: 900; color: #fff; }
