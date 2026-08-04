@@ -8,28 +8,25 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 
 // Farm LIKES — a positive-only, three-tier "rate a friend's farm" system. Rating is a like, not a score:
-// Like 👍 < Love ❤️ < Admire ⭐. One persistent rating row per (rater → owner), so a farm's tally stays
-// "how many people love this farm" and never inflates into "how many clicks".
+// Like 👍 < Love ❤️ < Admire ⭐.
 //
-// You can rate the same person AGAIN each day (mig311). Previously a rating paid out once per person ever, so
-// once you'd been round everyone your three daily charges were dead weight — revising paid nothing, and there
-// was no reason to go and admire a friend's farm a second time. Now: once per person per store-local day.
-// (Changing your mind on someone you already rated today still costs a charge and still pays nothing — that's
-// a revision, not a fresh visit.)
+// One persistent rating row per (rater → owner), so a farm's tally stays "how many people love this farm" and
+// never inflates into "how many clicks".
+//
+// You may rate the same person again each DAY (mig311), and at most once per person per store-local day — so
+// the three you get have to be spread across three different farms. Changing your mind on someone you already
+// rated today still costs a charge and pays nothing: that is a revision, not a fresh visit.
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
-// HOW MANY FARMS YOU MAY VISIT, AND HOW MANY PAY.
+// THREE A DAY, ONE PER PERSON — so the three have to be SPREAD.
 //
-// This was 3 a day, full stop. Once you had been round everyone, three charges was not "a limit", it was the
-// whole system switched off — you could show love to three farms and then the feature was over until tomorrow,
-// which is exactly backwards for something whose entire point is going and appreciating people's work.
+// Both halves of that are deliberate. One vote per person per day is what makes this a reason to go and look
+// at three different farms instead of clicking the same one three times, and three a day is the ceiling that
+// keeps the XP honest: these two awards were already trimmed 35% for being 5.5% of all XP in the game.
 //
-// So the two things it was conflating are now separate. You may RATE twenty farms a day; only the first three
-// PAY XP. The cap that mattered was never the visiting, it was the XP: these two awards were already trimmed
-// 35% for being 5.5% of all XP in the game, and simply raising the charge count would have multiplied that by
-// seven on both sides of every rating. An unpaid rating still counts for the farm's tally and its rank, which
-// is the part you actually came to give.
-const RATES_PER_DAY = 20;      // ratings you may give per day
-const PAID_RATES_PER_DAY = 3;  // ...of which this many pay XP (to BOTH sides)
+// This briefly shipped at 20/day with only the first three paying XP. That was a misread — the ask was to keep
+// voting for the same farm on later days, which the per-day reset already allowed; it was never for a bigger
+// daily budget. Back to three.
+const RATES_PER_DAY = 3; // votes a day, at most one per person — so they must be spread across three farms
 // What a repeat visit pays, against a first-ever rating of that person. Held under 1 on purpose: these two
 // awards were trimmed 35% for being 5.5% of all XP in the game, and making them repeatable every day pushes
 // straight back through that ceiling. Set to 1 for full parity — it's the only number that decides this.
@@ -61,11 +58,7 @@ async function rateCharge(buyerId) {
     const used = b?.farm_rate_used || 0;
     const bonus = b?.farm_rate_bonus || 0; // Kindness Token consumable — extra rating charges today
     const allowance = RATES_PER_DAY + bonus;
-    // paidLeft is what the UI shows as "worth XP"; `left` is how many more you may give at all.
-    return {
-        used, allowance, left: Math.max(0, allowance - used),
-        paidAllowance: PAID_RATES_PER_DAY, paidLeft: Math.max(0, PAID_RATES_PER_DAY - used),
-    };
+    return { used, allowance, left: Math.max(0, allowance - used) };
 }
 
 // Aggregate counts of a farm's likes, by tier + total, plus the viewer's own current rating.
@@ -139,7 +132,7 @@ export async function farmRatingBits(ownerId, viewerId) {
             ...summary,
             canRate: Boolean(viewerId) && !own,
             isOwn: own,
-            charge, // { used, allowance, left, paidAllowance, paidLeft } or null on your own farm
+            charge, // { used, allowance, left } or null on your own farm
             standings, // { score, place, ranked, toNext }
         },
     };
@@ -195,22 +188,17 @@ export async function rateFarm(raterId, ownerId, tier) {
             const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
             return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
         }
-        // `slot` returns farm_rate_used AFTER the increment, so it is this rating's ordinal for the day —
-        // no extra column needed to know whether it lands inside the paid window.
-        const paysXp = Number(slot.farm_rate_used) <= PAID_RATES_PER_DAY;
-        const raterXp = paysXp ? Math.max(1, Math.round(meta.raterXp * REPEAT_XP_MULT)) : 0;
-        const ownerXp = paysXp ? Math.max(1, Math.round(meta.ownerXp * REPEAT_XP_MULT)) : 0;
+        const raterXp = Math.max(1, Math.round(meta.raterXp * REPEAT_XP_MULT));
+        const ownerXp = Math.max(1, Math.round(meta.ownerXp * REPEAT_XP_MULT));
         // gold: 0 is load-bearing on BOTH — awardXp pays gold 1:1 with points otherwise, and this is now a
         // repeatable daily action rather than a once-per-person one.
-        if (paysXp) {
-            await awardXp(raterId, "farm_rate_give", { points: raterXp, gold: 0 }).catch(() => {});
-            await awardXp(ownerId, "farm_rate_get", { points: ownerXp, gold: 0 }).catch(() => {});
-        }
-        await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, repeat: true, paid: paysXp }).catch(() => {});
+        await awardXp(raterId, "farm_rate_give", { points: raterXp, gold: 0 }).catch(() => {});
+        await awardXp(ownerId, "farm_rate_get", { points: ownerXp, gold: 0 }).catch(() => {});
+        await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, repeat: true }).catch(() => {});
         await bumpQuestProgress(raterId, "farm_rate", 1).catch(() => {}); // the daily "rate a friend's farm" quest
         await syncEarnedBadges(ownerId).catch(() => {});
         const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-        return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, paidXp: paysXp, ...summary, charge };
+        return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, ...summary, charge };
     }
 
     if (existing) {
@@ -275,12 +263,9 @@ export async function rateFarm(raterId, ownerId, tier) {
             seedFound = await dropSeedFrom(raterId, "green_thumb").catch(() => null);
         }
     } catch { /* a seed is a bonus; never fail the rating */ }
-    const paysXp = Number(slot.farm_rate_used) <= PAID_RATES_PER_DAY;
-    if (paysXp) {
-        await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
-        await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
-    }
-    await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t, paid: paysXp }).catch(() => {});
+    await awardXp(raterId, "farm_rate_give", { points: meta.raterXp, gold: 0 }).catch(() => {});
+    await awardXp(ownerId, "farm_rate_get", { points: meta.ownerXp, gold: 0 }).catch(() => {});
+    await trackActivity(raterId, "farm_rate", { owner: ownerId, tier: t }).catch(() => {});
     // Earned cosmetic: the "Kindred Spirit" border for a generous rater at 10 distinct farms rated (the row
     // was inserted just above, so this count includes it). Idempotent grant into mkt_cosmetic_unlock.
     const given = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE rater_id = $1`, [raterId]).catch(() => null);
@@ -289,7 +274,7 @@ export async function rateFarm(raterId, ownerId, tier) {
     await syncEarnedBadges(ownerId).catch(() => {}); // Well-Liked / Adored — the OWNER just received a rating
 
     const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: paysXp ? meta.raterXp : 0, paidXp: paysXp, seedFound, ...summary, charge };
+    return { ok: true, changed: true, isNew: true, myTier: t, xpGained: meta.raterXp, seedFound, ...summary, charge };
 }
 
 // "N people rated your farm" welcome-back recap. Returns every unseen (new or revised) rating on your farm, plus

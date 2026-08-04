@@ -575,7 +575,7 @@ export default function FarmClient({ initial, viewingAlias }) {
         // "admire them again" is by definition tapping the same tier you last gave — this guard used to
         // swallow exactly that tap and never reach the server.
         if (R.myTier === tier && R.ratedToday) return;
-        if ((R.charge?.left ?? 0) <= 0) { setRateNote(`You've rated ${R.charge?.allowance ?? 20} farms today — that's the daily limit. Back tomorrow.`); return; } // new, repeat OR change all need a charge
+        if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new, repeat OR change all need a charge
         setRateBusy(true);
         setRateNote(null);
         const r = await post({ action: "rate", tier, owner: farm.owner?.alias });
@@ -1887,11 +1887,6 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
     const { byTier = { 1: 0, 2: 0, 3: 0 }, myTier = null, canRate = false, charge = null, ratedToday = false } = rating || {};
     const left = charge?.left ?? 0;
     const allowance = charge?.allowance ?? 3;
-    // Only the first few ratings a day pay XP; the rest still count for the farm's tally and its place on the
-    // board. Twenty dots would be nonsense, so the dots now track the PAID window and the plain count carries
-    // the rest.
-    const paidLeft = charge?.paidLeft ?? 0;
-    const paidAllowance = charge?.paidAllowance ?? 3;
     const totalLove = (byTier[1] || 0) + (byTier[2] || 0) + (byTier[3] || 0);
     const card = { borderRadius: 16, padding: "13px 15px", border: "1px solid rgba(255,215,94,0.26)", background: "linear-gradient(155deg, rgba(255,215,94,0.11), rgba(255,111,174,0.06) 62%, rgba(255,255,255,0.02))", boxShadow: "0 6px 22px rgba(0,0,0,0.28)" };
     const tallyPills = (
@@ -1925,12 +1920,7 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                 {/* You can come back tomorrow — say so, rather than leaving three live-looking buttons that
                     would only spend a charge to change your mind. */}
                 {ratedToday ? <span className="muted" style={{ fontSize: 11.5 }}>· rated today, again tomorrow</span> : null}
-                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7 }}>
-                    {paidLeft > 0
-                        ? <ChargeDots left={paidLeft} allowance={paidAllowance} />
-                        : <span className="muted" style={{ fontSize: 10.5, fontWeight: 800 }}>XP done for today</span>}
-                    <span className="muted" style={{ fontSize: 11, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{left}/{allowance} left</span>
-                </span>
+                <span style={{ marginLeft: "auto" }}><ChargeDots left={left} allowance={allowance} /></span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {RATE_TIER_UI.map((t) => {
@@ -1944,8 +1934,7 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                         <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active}
                             title={spentToday ? `${t.label} — given today, come back tomorrow`
                                 : left <= 0 ? "No ratings left today"
-                                    : paidLeft <= 0 ? `${t.label} this farm — counts toward their rank (no XP left today)`
-                                        : active ? `${t.label} again` : `${t.label} this farm`}
+                                    : active ? `${t.label} again` : `${t.label} this farm`}
                             style={{ position: "relative", overflow: "visible", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "11px 6px 8px", borderRadius: 14, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.45 : 1, WebkitTapHighlightColor: "transparent",
                                 border: `1.5px solid ${active ? t.color : "rgba(255,255,255,0.12)"}`, color: "inherit",
                                 background: active ? `radial-gradient(120% 100% at 50% 0%, ${t.color}30, ${t.color}0f)` : "rgba(255,255,255,0.03)",
