@@ -17,8 +17,9 @@ import { enableWebPush, isWebPushSupported } from "@/lib/web-push-client";
 // <Link> compiled to `.gs.jsx-abc` and matched nothing: the card lost its box, its padding and its background
 // while its <span> children stayed perfectly styled, and it rendered as a line of naked text.
 //
-// Every rule below that lands on a <Link> is therefore written with :global(). They are all `gd-`-prefixed and
-// unique to this file, so leaking them out of the component's scope costs nothing.
+// Every rule that lands on a <Link> therefore lives in the <style jsx global> block at the bottom of this
+// file. They are all `gd-`-prefixed and unique to it, so leaving the component's scope costs nothing.
+// `npm run check:styled-jsx` fails the build if a scoped rule is ever aimed at a custom component again.
 
 const money = (n) => Number(n || 0).toLocaleString();
 
@@ -122,13 +123,47 @@ export default function GuideClient() {
                 <div className="gd-hero-text">
                     <span className="gd-eyebrow">The Pathfinder</span>
                     <h1 className="gd-h1">Your way through the Den</h1>
-                    <p className="gd-lede">One thing at a time, in the order that makes sense. Nothing to memorise — play, and it ticks itself off.</p>
+                    <p className="gd-lede">The Wolf Den is a real card shop in Montgomery, and this is its game. Play it however you like — the guide just makes sure you never miss anything.</p>
                     <div className="gd-stats">
                         <span><b>{totals.doneChapters}</b> of {totals.chapters} chapters</span>
-                        <span><b>{money(g.level)}</b> level</span>
+                        <span>Level <b>{g.level}</b></span>
                     </div>
                 </div>
                 <Ring done={totals.doneSteps} total={totals.steps} />
+            </section>
+
+            {/* ── WHY ANY OF THIS EXISTS ──
+                A guide that opens with "step 1: plant a crop" answers the wrong question. The first thing a new
+                member needs is what the whole thing is FOR — and the answer is unusual enough to be worth
+                saying plainly: the prize at the end of it is a real object on a real shelf. */}
+            <section className="card gd-point">
+                <h2 className="gd-point-title">What this is</h2>
+                <div className="gd-beats">
+                    <div className="gd-beat">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/guide/ch-hero.webp" alt="" draggable="false" />
+                        <div>
+                            <b>Play however you like</b>
+                            <p>Farm, fish, sail, cook, mine, fight, decorate. There is no wrong order and nothing you can permanently miss.</p>
+                        </div>
+                    </div>
+                    <div className="gd-beat">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/guide/ch-boss.webp" alt="" draggable="false" />
+                        <div>
+                            <b>The whole Den fights one boss</b>
+                            <p>Every hit you land banks raffle tickets, and good gear and pets keep banking more for every day the boss stays up.</p>
+                        </div>
+                    </div>
+                    <div className="gd-beat is-prize">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/guide/ch-store.webp" alt="" draggable="false" />
+                        <div>
+                            <b>The prize is a real thing</b>
+                            <p>When the boss falls the raffle draws a winner, and they collect an actual item off the Wolf Den&rsquo;s shelves. That is what all of this is for.</p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             {/* ── what to do right now ── */}
@@ -254,6 +289,23 @@ export default function GuideClient() {
                 .gd-ring-num { position: relative; text-align: center; line-height: 1; }
                 .gd-ring-num b { display: block; font-size: 1.4rem; font-weight: 900; color: #fff; }
                 .gd-ring-num span { font-size: 10.5px; color: #8a939d; }
+
+                /* ── the point ── */
+                .gd-point-title { margin: 0 0 12px; font-size: 0.82rem; font-weight: 900; letter-spacing: .14em;
+                    text-transform: uppercase; color: #8a939d; }
+                .gd-beats { display: grid; gap: 10px; }
+                @media (min-width: 760px) { .gd-beats { grid-template-columns: repeat(3, 1fr); } }
+                .gd-beat { display: flex; align-items: flex-start; gap: 12px; padding: 12px 13px; border-radius: 13px;
+                    background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); }
+                .gd-beat img { flex: 0 0 auto; width: 40px; height: 40px; object-fit: contain;
+                    filter: drop-shadow(0 3px 8px rgba(0,0,0,0.5)); }
+                .gd-beat b { display: block; font-size: 13px; color: #e9eef3; }
+                .gd-beat p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.55; color: #8f98a3; }
+                /* The payoff beat is the one that has to land, so it gets the gold. */
+                .gd-beat.is-prize { background: linear-gradient(140deg, rgba(255,176,32,0.15), rgba(255,255,255,0.02) 70%);
+                    border-color: rgba(255,215,94,0.4); }
+                .gd-beat.is-prize b { color: #ffe28a; }
+                .gd-beat.is-prize p { color: #cdb894; }
 
                 /* ── the one thing to do now ── */
                 .gd-now { position: relative; overflow: hidden;

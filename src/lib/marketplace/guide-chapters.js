@@ -78,7 +78,7 @@ export const GUIDE_CHAPTERS = [
         steps: [
             { key: "town_pet", label: "Pet somebody else's animal", why: "Everyone's hero and pets stand in the plaza. Petting one pays you both, and it's the fastest way to meet the rest of the Den.", href: "/marketplace/town", cta: "Go to town", gold: 200, events: ["pet_other"] },
             { key: "town_rate", label: "Rate a farm", why: "Three ratings a day, one per person. Farms rank against each other on the total, so a visit is worth something to whoever built it.", href: "/marketplace/town", cta: "Visit a farm", gold: 200, events: ["farm_rate"] },
-            { key: "town_quest", label: "Take a town quest", why: "The Quartermaster posts five a day, the same five for everyone. They're small jobs you were going to do anyway, paid.", href: "/marketplace/town", cta: "See the quests", gold: 200, events: ["town_quest"] },
+            { key: "town_quest", label: "Finish a town quest", why: "You don't sign up for these. The Quartermaster posts five a day — the same five for everyone — and they're jobs you were going to do anyway. Do one, then collect the gold off him.", href: "/marketplace/town", cta: "See the board", gold: 200, events: ["town_quest"] },
         ],
         reward: { gold: 500, chest: "iron" },
     },
