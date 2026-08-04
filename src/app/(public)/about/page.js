@@ -12,7 +12,7 @@ const TOWNS = "Montgomery, New Prague, Lonsdale, Faribault, Northfield, Jordan, 
 
 const FAQS = [
     { q: "Where is The Wolf Den located?", a: `${ADDRESS} — a real storefront in downtown Montgomery.` },
-    { q: "What are your hours?", a: "Open Thursday–Sunday: Thursday & Friday 3–9 PM, Saturday 10 AM–9 PM, and Sunday 10 AM–3 PM. Closed Monday–Wednesday." },
+    { q: "What are your hours?", a: "Open Thursday–Sunday: Thursday & Friday 3–9 PM, Saturday 10 AM–9 PM, and Sunday 10 AM–5 PM. Closed Monday–Wednesday." },
     { q: "Do you sell Pokémon cards?", a: "Yes — Elite Trainer Boxes, booster boxes and bundles, sleeved boosters, Pokémon Center products, singles, and accessories." },
     { q: "Do you sell Magic: The Gathering?", a: "Yes — play boosters, collector products, Commander decks, bundles and prerelease kits, singles, sealed, and accessories." },
     { q: "Do you buy or trade cards?", a: "Yes — cash or store credit on qualifying Pokémon, Magic, and select collectibles. Bring them in or ask us." },
@@ -143,7 +143,7 @@ export default function AboutPage() {
                 <div className="grid two-col about-visit">
                     <div>
                         <p><strong>Address</strong><br />{ADDRESS}</p>
-                        <p><strong>Hours</strong><br />Thu &amp; Fri 3–9 PM · Sat 10 AM–9 PM · Sun 10 AM–3 PM<br /><span className="muted">Closed Mon–Wed</span></p>
+                        <p><strong>Hours</strong><br />Thu &amp; Fri 3–9 PM · Sat 10 AM–9 PM · Sun 10 AM–5 PM<br /><span className="muted">Closed Mon–Wed</span></p>
                     </div>
                     <div>
                         <p><strong>Phone</strong><br /><a href={`tel:${PHONE_TEL}`} className="text-link">{PHONE}</a></p>

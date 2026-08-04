@@ -115,7 +115,7 @@ const localBusinessSchema = {
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Thursday", opens: "15:00", closes: "21:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Friday", opens: "15:00", closes: "21:00" },
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "10:00", closes: "21:00" },
-        { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "10:00", closes: "15:00" },
+        { "@type": "OpeningHoursSpecification", dayOfWeek: "Sunday", opens: "10:00", closes: "17:00" },
     ],
     sameAs: [
         "https://discord.gg/Pad8U2KVsD",

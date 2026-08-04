@@ -1,11 +1,11 @@
 // Canonical Wolf Den store hours (Central Time, America/Chicago). Single source of truth so the Town — and
 // anything else — can reflect whether the shop is physically OPEN right now. Hours per the current schedule:
-// Thu & Fri 3–9 PM · Sat 10 AM–9 PM · Sun 10 AM–3 PM (closed Mon–Wed).
+// Thu & Fri 3–9 PM · Sat 10 AM–9 PM · Sun 10 AM–5 PM (closed Mon–Wed).
 const TZ = "America/Chicago";
 
 // [openMinute, closeMinute] minutes-since-midnight, keyed by weekday (0=Sun … 6=Sat). Missing = closed.
 const HOURS = {
-    0: [600, 900],    // Sun 10:00 AM – 3:00 PM
+    0: [600, 1020],   // Sun 10:00 AM – 5:00 PM
     4: [900, 1260],   // Thu 3:00 PM – 9:00 PM
     5: [900, 1260],   // Fri 3:00 PM – 9:00 PM
     6: [600, 1260],   // Sat 10:00 AM – 9:00 PM

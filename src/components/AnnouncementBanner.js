@@ -24,7 +24,7 @@ export default function AnnouncementBanner() {
         <div className="opening-banner" role="region" aria-label="Store announcement">
             <p className="opening-banner-text">
                 <strong>New hours!</strong> Open <strong>Thursday&ndash;Sunday</strong> &mdash;
-                Thu &amp; Fri <strong>3&ndash;9 PM</strong> · Sat <strong>10 AM&ndash;9 PM</strong> · Sun <strong>10 AM&ndash;3 PM</strong>.
+                Thu &amp; Fri <strong>3&ndash;9 PM</strong> · Sat <strong>10 AM&ndash;9 PM</strong> · Sun <strong>10 AM&ndash;5 PM</strong>.
             </p>
         </div>
     );
