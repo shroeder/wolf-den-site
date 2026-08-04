@@ -63,53 +63,124 @@ export async function offerChoice(ctx, run, d, floor, action, choice) {
 }
 
 // The offer itself. Costs and payouts scale off the dungeon, so a Spire merchant is not selling Warren prices.
+//
+// VARIANTS, not one offer per kind. The first cut gave every merchant the same three buttons and every well the
+// same two, which meant that after one run you knew exactly what a merchant floor was worth and the choice
+// stopped being a choice. Each kind now draws from a small pool, so "a merchant" is a question rather than a
+// vending machine — and the pick is stored on the run, so reloading cannot shop for a better one.
+//
+// Every gamble is honest about its odds in the label. A blind coin flip is not an interesting decision; a
+// stated 55% with a real downside is.
 function buildOffer(run, d, ev) {
     const g = (mult) => Math.round(((d.goldPer[0] + d.goldPer[1]) / 2) * mult);
     const x = (mult) => Math.round(((d.xpPer[0] + d.xpPer[1]) / 2) * mult);
-    switch (ev.kind) {
-        case KIND.merchant:
-            return {
-                kind: ev.kind, title: ev.title, text: ev.text, art: "/images/delves/ev-merchant.png",
-                options: [
-                    { key: "potion", label: "Buy a potion", cost: g(2), result: { potion: 1 } },
-                    { key: "relic", label: "Buy whatever is under the cloth", cost: g(4), result: { xp: x(3), chest: d.minLevel >= 30 ? "gold" : "iron" } },
-                    { key: "leave", label: "Keep your coin", result: { nothing: true } },
-                ],
-            };
-        case KIND.well:
-            return {
-                kind: ev.kind, title: ev.title, text: ev.text, art: "/images/delves/ev-well.png",
-                options: [
-                    // Better than even, but the downside is real enough to hesitate over.
-                    { key: "toss", label: "Toss in a coin", cost: g(1), gamble: { chance: 0.62, win: { gold: g(4), xp: x(2) }, lose: { nothing: true } } },
-                    { key: "drink", label: "Drink from it", gamble: { chance: 0.55, win: { heal: 0.35 }, lose: { damage: 0.14 } } },
-                    { key: "leave", label: "Leave it be", result: { nothing: true } },
-                ],
-            };
-        case KIND.shrine:
-            return {
-                kind: ev.kind, title: ev.title, text: ev.text, art: "/images/delves/ev-shrine.png",
-                options: ev.bargain
-                    ? [
-                        { key: "offer", label: "Offer your blood", hpCost: Math.round(run.maxHp * 0.15), result: { gold: g(3), xp: x(3) } },
-                        { key: "pray", label: "Just pray", result: { heal: 0.2 } },
-                        { key: "leave", label: "Walk on", result: { nothing: true } },
-                    ]
-                    : [
-                        { key: "drink", label: "Drink deep", result: { heal: 0.4 } },
-                        { key: "fill", label: "Fill a flask instead", result: { potion: 1 } },
-                        { key: "leave", label: "Walk on", result: { nothing: true } },
-                    ],
-            };
-        default: // puzzle
-            return {
-                kind: KIND.puzzle, title: ev.title, text: ev.text, art: "/images/delves/ev-puzzle.png",
-                options: [
-                    { key: "bold", label: "Take the risky way", gamble: { chance: 0.55, win: { gold: g(3), xp: x(2) }, lose: { damage: 0.16 } } },
-                    { key: "safe", label: "Take the long way", result: { xp: x(1) } },
-                ],
-            };
-    }
+    const bigChest = d.minLevel >= 30 ? "gold" : "iron";
+    const smallChest = d.minLevel >= 30 ? "iron" : "wooden";
+    const leave = { key: "leave", label: "Walk on", result: { nothing: true } };
+
+    const POOLS = {
+        [KIND.merchant]: [
+            [
+                { key: "potion", label: "Buy a potion", cost: g(2), result: { potion: 1 } },
+                { key: "relic", label: "Buy whatever is under the cloth", cost: g(4), result: { xp: x(3), chest: bigChest } },
+                { key: "leave", label: "Keep your coin", result: { nothing: true } },
+            ],
+            [
+                { key: "two", label: "Buy two potions, cheaper together", cost: g(3.4), result: { potion: 2 } },
+                { key: "map", label: "Buy a torn map page", cost: g(2), result: { gold: g(4), xp: x(1) } },
+                { key: "leave", label: "Keep your coin", result: { nothing: true } },
+            ],
+            [
+                // A merchant who only deals in risk. The 50% is stated plainly on the button.
+                { key: "gamble", label: "Buy the sealed box (50% — could be anything)", cost: g(3),
+                    gamble: { chance: 0.5, win: { chest: bigChest, xp: x(3) }, lose: { nothing: true } } },
+                { key: "potion", label: "Buy a potion instead", cost: g(2), result: { potion: 1 } },
+                { key: "leave", label: "Keep your coin", result: { nothing: true } },
+            ],
+            [
+                { key: "trade", label: "Trade blood for stock — he does not want coin", hpCost: Math.round(run.maxHp * 0.12), result: { potion: 2, xp: x(2) } },
+                { key: "buy", label: "Insist on paying in gold", cost: g(5), result: { potion: 2, xp: x(2) } },
+                { key: "leave", label: "Back away slowly", result: { nothing: true } },
+            ],
+        ],
+        [KIND.well]: [
+            [
+                { key: "toss", label: "Toss in a coin (62% — a real return)", cost: g(1),
+                    gamble: { chance: 0.62, win: { gold: g(4), xp: x(2) }, lose: { nothing: true } } },
+                { key: "drink", label: "Drink from it (55% — heals, or hurts)",
+                    gamble: { chance: 0.55, win: { heal: 0.35 }, lose: { damage: 0.14 } } },
+                { key: "leave", label: "Leave it be", result: { nothing: true } },
+            ],
+            [
+                { key: "deep", label: "Reach right down into it (40% — but it pays)",
+                    gamble: { chance: 0.40, win: { chest: bigChest, gold: g(3) }, lose: { damage: 0.20 } } },
+                { key: "coin", label: "Just toss a coin in (70%)", cost: g(1.5),
+                    gamble: { chance: 0.70, win: { gold: g(3), xp: x(1) }, lose: { nothing: true } } },
+                { key: "leave", label: "Leave it be", result: { nothing: true } },
+            ],
+            [
+                { key: "wish", label: "Make a wish (60% — for a flask)", cost: g(2),
+                    gamble: { chance: 0.60, win: { potion: 2 }, lose: { damage: 0.10 } } },
+                { key: "listen", label: "Listen at the rim", result: { xp: x(1) } },
+                { key: "leave", label: "Leave it be", result: { nothing: true } },
+            ],
+        ],
+        [KIND.shrine]: [
+            [
+                { key: "offer", label: "Offer your blood", hpCost: Math.round(run.maxHp * 0.15), result: { gold: g(3), xp: x(3) } },
+                { key: "pray", label: "Just pray", result: { heal: 0.2 } },
+                leave,
+            ],
+            [
+                { key: "bleed", label: "Give it more than it asked", hpCost: Math.round(run.maxHp * 0.25), result: { gold: g(5), xp: x(4), chest: smallChest } },
+                { key: "token", label: "Leave a coin instead", cost: g(2), result: { heal: 0.25 } },
+                leave,
+            ],
+            [
+                { key: "drink", label: "Drink deep", result: { heal: 0.4 } },
+                { key: "fill", label: "Fill a flask instead", result: { potion: 1 } },
+                leave,
+            ],
+            [
+                { key: "bathe", label: "Bathe in it (65% — it is very cold)",
+                    gamble: { chance: 0.65, win: { heal: 0.55 }, lose: { damage: 0.12 } } },
+                { key: "sip", label: "A careful sip", result: { heal: 0.18 } },
+                leave,
+            ],
+        ],
+        [KIND.puzzle]: [
+            [
+                { key: "bold", label: "Take the risky way (55%)",
+                    gamble: { chance: 0.55, win: { gold: g(3), xp: x(2) }, lose: { damage: 0.16 } } },
+                { key: "safe", label: "Take the long way", result: { xp: x(1) } },
+            ],
+            [
+                { key: "force", label: "Force it open (45% — and it may bite)",
+                    gamble: { chance: 0.45, win: { chest: smallChest, gold: g(2) }, lose: { damage: 0.18 } } },
+                { key: "study", label: "Study it properly first", result: { xp: x(2) } },
+            ],
+            [
+                { key: "answer", label: "Answer it (70%)",
+                    gamble: { chance: 0.70, win: { xp: x(4), gold: g(2) }, lose: { damage: 0.10 } } },
+                { key: "silent", label: "Say nothing and move on", result: { nothing: true } },
+            ],
+            [
+                { key: "swap", label: "Take the offered trade — a potion for coin", cost: g(2), result: { potion: 1 } },
+                { key: "gamble", label: "Put a potion in instead (60% — doubles it back)",
+                    gamble: { chance: 0.60, win: { potion: 2, xp: x(2) }, lose: { nothing: true } } },
+                { key: "safe", label: "Take the long way", result: { xp: x(1) } },
+            ],
+        ],
+    };
+
+    const kind = POOLS[ev.kind] ? ev.kind : KIND.puzzle;
+    // A shrine flagged `bargain` in the catalog should read as one — bias it to the blood-price variants.
+    const pool = POOLS[kind];
+    const idx = ev.kind === KIND.shrine && ev.bargain
+        ? [0, 1][Math.floor(Math.random() * 2)]
+        : Math.floor(Math.random() * pool.length);
+    const art = { [KIND.merchant]: "ev-merchant", [KIND.well]: "ev-well", [KIND.shrine]: "ev-shrine", [KIND.puzzle]: "ev-puzzle" }[kind];
+    return { kind: ev.kind, title: ev.title, text: ev.text, art: `/images/delves/${art}.png`, options: pool[idx] };
 }
 
 // ── ADVANCE ──────────────────────────────────────────────────────────────────────────────────────────────────

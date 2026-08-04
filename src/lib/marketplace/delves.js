@@ -10,7 +10,7 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import {
     DELVE_FLOORS, DELVE_TRACKS, DUNGEONS, KIND, MIN_FIGHTS,
-    dungeonById, eventsFor, potionCount, potionHealFrac, wardCut,
+    delveMight, delveVigour, dungeonById, eventsFor, potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
 
@@ -26,6 +26,27 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// ── WHAT YOU BRING DOWN THERE ────────────────────────────────────────────────────────────────────────────────
+// Your health and your swing are both read off your LEVEL and your EQUIPPED GEAR, so a delve rewards the
+// loadout you built rather than handing everyone the same body. `gearPower` is the plain sum of every stat on
+// what you are wearing — one number, deliberately, because a delve is not the boss fight and does not need to
+// care which stat is which.
+export async function delverPower(buyerId) {
+    const [{ sumItemStats }, { getEquippedIds }] = await Promise.all([
+        import("@/lib/marketplace/items.js"),
+        import("@/lib/marketplace/inventory.js"),
+    ]);
+    const [me, bySlot] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine here.
+        getEquippedIds(buyerId).catch(() => ({})),
+    ]);
+    const level = levelForXp(Number(me?.xp) || 0).level;
+    const stats = sumItemStats(Object.values(bySlot || {}));
+    const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
+    return { level, gearPower, vigour: delveVigour(level, gearPower), might: delveMight(level, gearPower) };
+}
 
 async function delveRow(buyerId) {
     await db.query(`INSERT INTO mkt_delve (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
@@ -92,10 +113,10 @@ function dealFloors(dungeon) {
     return floors;
 }
 
-/** A foe for a fight floor, scaled by the event's own multipliers. */
-function makeFoe(dungeon, event) {
+/** A foe for a fight floor. HP is a multiple of YOUR attack, so a fight is ~3 exchanges whatever you're wearing. */
+function makeFoe(dungeon, event, might) {
     const base = pick(dungeon.foes);
-    const hp = Math.round(dungeon.hp * 0.42 * (event.hpMult || 1));
+    const hp = Math.max(1, Math.round(might * dungeon.foeX * (event.hpMult || 1)));
     return {
         id: base.id, name: event.kind === KIND.mimic ? "Mimic" : base.name,
         sprite: event.kind === KIND.mimic ? "/images/delves/foe-mimic.png" : base.sprite,
@@ -107,11 +128,12 @@ function makeFoe(dungeon, event) {
 // ── STATE ────────────────────────────────────────────────────────────────────────────────────────────────────
 export async function getDelveState(buyerId) {
     if (!DELVES_UNLOCKED(buyerId)) return { unlocked: false };
-    const [row, me] = await Promise.all([
+    const [row, me, power] = await Promise.all([
         delveRow(buyerId),
         db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        delverPower(buyerId),
     ]);
-    const level = levelForXp(Number(me?.xp) || 0).level;
+    const level = power.level;
     const runs = row?.runs_json || {};
     const today = row?.today;
 
@@ -130,6 +152,8 @@ export async function getDelveState(buyerId) {
         dungeons,
         run: row?.run_json ? publicRun(row.run_json) : null,
         potions: { count: potionCount(row?.satchel_level), healPct: Math.round(potionHealFrac(row?.flask_level) * 100) },
+        // What you'd walk in with right now — shown in the hall so better gear is visibly worth wearing.
+        power,
         tracks: Object.entries(DELVE_TRACKS).map(([key, t]) => {
             const lv = Number(row?.[t.col]) || 0;
             return {
@@ -179,20 +203,26 @@ export async function startDelve(buyerId, dungeonId) {
     const d = dungeonById(dungeonId);
     if (!d) return { ok: false, error: "bad_dungeon" };
     const row = await delveRow(buyerId);
+    // Only an UNFINISHED run blocks you. Dying stamps over:true, so a death in the Warren does not stop you
+    // walking into the Vault five seconds later — and you walk in on FULL health, because vigour is read fresh
+    // at every door. Each dungeon is its own once-a-day, so a bad run costs you that dungeon and nothing else.
     if (row?.run_json && !row.run_json.over) return { ok: false, error: "run_in_progress", ...(await getDelveState(buyerId)) };
 
-    const me = await db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const level = levelForXp(Number(me?.xp) || 0).level;
-    if (level < d.minLevel) return { ok: false, error: "level_locked", ...(await getDelveState(buyerId)) };
+    const power = await delverPower(buyerId);
+    if (power.level < d.minLevel) return { ok: false, error: "level_locked", ...(await getDelveState(buyerId)) };
 
     const runs = row?.runs_json || {};
     if (runs[d.id] === row?.today) return { ok: false, error: "already_today", ...(await getDelveState(buyerId)) };
 
-    const maxHp = d.hp;
+    // Health and swing are FROZEN at the door. Re-reading them mid-run would let you swap gear between floors
+    // to heal yourself, and a delve you can re-equip your way out of is not a delve.
+    const maxHp = power.vigour;
     const run = {
         dungeonId: d.id,
         floor: 1,
         hp: maxHp, maxHp,
+        might: power.might,
+        gearPower: power.gearPower,
         potions: potionCount(row?.satchel_level),
         potionHeal: potionHealFrac(row?.flask_level),
         ward: wardCut(row?.ward_level),
@@ -260,7 +290,7 @@ export async function delveAct(buyerId, action, choice = null) {
     // ── STRIKE — one exchange in an active fight ──
     if (action === "strike") {
         if (!run.foe) return { ok: false, error: "no_fight", ...(await getDelveState(buyerId)) };
-        const you = randInt(Math.round(run.maxHp * 0.14), Math.round(run.maxHp * 0.24));
+        const you = randInt(Math.round(run.might * 0.75), Math.round(run.might * 1.35));
         run.foe.hp = Math.max(0, run.foe.hp - you);
         const lines = [`You hit ${run.foe.name} for ${you}.`];
         if (run.foe.hp <= 0) {
@@ -292,9 +322,10 @@ export async function delveAct(buyerId, action, choice = null) {
         case KIND.mimic:
         case KIND.boss: {
             if (!run.foe) {
+                const bossHp = Math.max(1, Math.round(run.might * d.bossX));
                 run.foe = ev.kind === KIND.boss
-                    ? { id: d.boss.id, name: d.boss.name, sprite: d.boss.sprite, hp: d.boss.hp, maxHp: d.boss.hp, dmg: d.boss.dmg, boss: true }
-                    : makeFoe(d, ev);
+                    ? { id: d.boss.id, name: d.boss.name, sprite: d.boss.sprite, hp: bossHp, maxHp: bossHp, dmg: d.boss.dmg, boss: true }
+                    : makeFoe(d, ev, run.might);
                 floor.done = true;
                 run.log.push({ floor: run.floor, kind: "meet", text: ev.kind === KIND.mimic ? "The chest opens itself. It has teeth." : `${run.foe.name} blocks the way.` });
                 // A mimic gets the jump on you — that's the cost of it having looked like treasure.

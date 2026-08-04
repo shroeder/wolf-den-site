@@ -32,28 +32,43 @@ export const KIND = {
 // ── THE FOUR DUNGEONS ────────────────────────────────────────────────────────────────────────────────────────
 // `tint` drives the UI accents; `bg` is the generated backdrop; every foe and event carries its own sprite key
 // so nothing falls back to an emoji. Difficulty rises with the gate: deeper dungeons hit harder and pay better.
-// ── THE NUMBERS, AND WHY THEY ARE THESE NUMBERS ──────────────────────────────────────────────────────────────
-// Tuned by simulating 6,000 runs a dungeon (4 fights, 3 traps, a boss, drinking below 45% health):
+// ── YOUR VIGOUR AND YOUR MIGHT ───────────────────────────────────────────────────────────────────────────────
+// You do not have a fixed pool of health down here — you bring what your LEVEL and your EQUIPPED GEAR are
+// worth. Gear that was only ever a boss-damage number now decides whether you survive floor seven, which is
+// the point: a delve should reward the loadout you built.
 //
-//                      un-upgraded    fully upgraded
-//   Hollow Warren           5%              0%
-//   Sunken Vault           11%              0%
-//   Ember Deep             28%              0%
-//   Astral Spire           43%              0%
+//   lv10 / 22 gear ->  94 hp, 16 attack        lv30 / 170 gear -> 220 hp, 41 attack
+//   lv20 / 106 gear -> 162 hp, 30 attack       lv55 / 240 gear -> 313 hp, 60 attack
+export const delveVigour = (level = 1, gearPower = 0) => Math.round(60 + level * 2.2 + gearPower * 0.55);
+export const delveMight = (level = 1, gearPower = 0) => Math.round(9 + level * 0.45 + gearPower * 0.11);
+
+// ── HOW THE DUNGEONS ARE TUNED, AND WHY ──────────────────────────────────────────────────────────────────────
+// Foe and boss HP are MULTIPLES OF YOUR ATTACK (foeX / bossX), so a fight is roughly the same number of
+// exchanges for everyone. Foe DAMAGE is absolute, so the reward for gear is that the same hit is a smaller
+// slice of you.
 //
-// The zeroes are deliberate, and worth being explicit about because a search for numbers that keep the Spire
-// dangerous at full upgrades found none: the upgrades hand you 7 potions healing 92% each, which is 644% of
-// your health against a run that deals about 200%. No damage numbers survive that. The choice was either to
-// make a maxed run risky — which forces certain death on a new one — or to let the upgrades mean what they say.
-// They mean what they say. The risk lives in the run you have not paid for yet, and the deepest dungeon is a
-// coin flip until you do.
+// That split matters more than it looks. The first cut used long attrition fights and behaved as a STEP, not a
+// curve: whether you win was decided by a DPS-to-HP ratio, variance averaged out over fifteen exchanges, and
+// every tuning attempt produced 100% death or 0% with nothing between. Short fights put luck back in.
+//
+// Simulated 5,000 runs per cell (weak / mid / strong gear for that gate):
+//
+//                  no upgrades        half upgrades       fully upgraded
+//   Hollow          93 /  0 /  0       1 /  0 /  0         0 /  0 /  0
+//   Sunken         100 / 90 /  2      58 /  0 /  0         0 /  0 /  0
+//   Ember          100 /100 / 97     100 / 43 /  1        18 /  0 /  0
+//   Astral         100 /100 /100     100 / 87 / 51        43 /  1 /  0
+//
+// Upgrades roughly HALVE the danger rather than erasing it — the ceilings below were cut for exactly that
+// reason. Walking into the Spire un-upgraded in poor gear is meant to be hopeless; that is what the other
+// three dungeons and the provisions shop are for.
 export const DUNGEONS = [
     {
         id: "hollow", name: "The Hollow Warren", minLevel: 10, tint: "#8fd08a",
         blurb: "A collapsed badger warren under the old orchard. Cramped, damp, and full of things that bite.",
         bg: "/images/delves/bg-hollow.png",
-        hp: 100, dmg: [10, 16], goldPer: [18, 34], xpPer: [10, 18],
-        boss: { id: "hollow_boss", name: "The Warren Mother", hp: 140, dmg: [14, 22], sprite: "/images/delves/foe-warren-mother.png",
+        foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [10, 18],
+        boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.png",
             blurb: "Something far too large for these tunnels, and it has been waiting." },
         foes: [
             { id: "rootrat", name: "Root Rat", sprite: "/images/delves/foe-rootrat.png" },
@@ -66,8 +81,8 @@ export const DUNGEONS = [
         id: "sunken", name: "The Sunken Vault", minLevel: 20, tint: "#5ad0d0",
         blurb: "A flooded treasury beneath the docks. The water is cold, the gold is real, and so is what guards it.",
         bg: "/images/delves/bg-sunken.png",
-        hp: 130, dmg: [13, 21], goldPer: [30, 55], xpPer: [16, 28],
-        boss: { id: "sunken_boss", name: "The Drowned Warden", hp: 182, dmg: [18, 29], sprite: "/images/delves/foe-drowned-warden.png",
+        foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [16, 28],
+        boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.png",
             blurb: "It still wears the vault key on a chain. It has not let go in a very long time." },
         foes: [
             { id: "eelhound", name: "Eelhound", sprite: "/images/delves/foe-eelhound.png" },
@@ -80,8 +95,8 @@ export const DUNGEONS = [
         id: "ember", name: "The Ember Deep", minLevel: 30, tint: "#ff9f1c",
         blurb: "A magma seam the miners broke into and sealed again. Whatever they sealed in is still burning.",
         bg: "/images/delves/bg-ember.png",
-        hp: 170, dmg: [17, 27], goldPer: [48, 82], xpPer: [26, 42],
-        boss: { id: "ember_boss", name: "The Cinder Tyrant", hp: 272, dmg: [24, 37], sprite: "/images/delves/foe-cinder-tyrant.png",
+        foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [26, 42],
+        boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.png",
             blurb: "It was a smith once. Now it is the forge." },
         foes: [
             { id: "emberling", name: "Emberling", sprite: "/images/delves/foe-emberling.png" },
@@ -94,8 +109,8 @@ export const DUNGEONS = [
         id: "astral", name: "The Astral Spire", minLevel: 50, tint: "#b98cff",
         blurb: "A tower that is only there on some nights. Ten floors up is the same as ten floors down.",
         bg: "/images/delves/bg-astral.png",
-        hp: 220, dmg: [24, 37], goldPer: [75, 130], xpPer: [40, 66],
-        boss: { id: "astral_boss", name: "The Hollow Star", hp: 308, dmg: [35, 53], sprite: "/images/delves/foe-hollow-star.png",
+        foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [40, 66],
+        boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.png",
             blurb: "It has no face, and it is looking at you." },
         foes: [
             { id: "voidmoth", name: "Void Moth", sprite: "/images/delves/foe-voidmoth.png" },
@@ -199,31 +214,34 @@ export const eventsFor = (dungeonId) => EVENTS.filter((e) => !e.only || e.only =
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Bought with gold, permanent, and deliberately few. Each one changes how a run FEELS rather than adding a
 // number to a sheet: more healing, more attempts at healing, or less to heal from.
+// The ceilings are DELIBERATELY LOW. The first cut allowed 7 potions healing 92% each — 644% of your health
+// against a run that deals about 250% — and every dungeon fell to 0% death the moment you finished upgrading.
+// A maxed player should be safer, not immortal, so the whole pool now tops out near 360% and upgrades roughly
+// halve the danger instead of deleting it.
 export const DELVE_TRACKS = {
     flask: {
-        col: "flask_level", max: 8, name: "Deeper Flask", icon: "/images/delves/track-flask.png",
+        col: "flask_level", max: 4, name: "Deeper Flask", icon: "/images/delves/track-flask.png",
         desc: "Each potion restores more of your health.",
-        // 60% base, +4 points a level → 92% at max. Never 100: a potion should not be a reset button.
-        fmt: (lv) => `${60 + lv * 4}% healed`,
-        cost: (lv) => 900 + lv * 700,
+        // 60% base, +3 points a level → 72% at max. Never near 100: a potion is a lifeline, not a reset button.
+        fmt: (lv) => `${60 + lv * 3}% healed`,
+        cost: (lv) => 1200 + lv * 1100,
     },
     satchel: {
-        col: "satchel_level", max: 4, name: "Wider Satchel", icon: "/images/delves/track-satchel.png",
+        col: "satchel_level", max: 2, name: "Wider Satchel", icon: "/images/delves/track-satchel.png",
         desc: "Carry another potion in with you.",
         fmt: (lv) => `${3 + lv} potion${3 + lv === 1 ? "" : "s"}`,
-        cost: (lv) => 1400 + lv * 1200,
+        cost: (lv) => 2600 + lv * 2400,
     },
     ward: {
-        col: "ward_level", max: 6, name: "Warded Cloak", icon: "/images/delves/track-ward.png",
+        col: "ward_level", max: 4, name: "Warded Cloak", icon: "/images/delves/track-ward.png",
         desc: "Take less damage from everything down there.",
-        // 3% a level, capped at 18% — enough to feel, never enough to trivialise a boss.
-        fmt: (lv) => `−${lv * 3}% damage taken`,
-        cost: (lv) => 1100 + lv * 900,
+        fmt: (lv) => `-${(lv * 2.5).toFixed(1).replace(/\.0$/, "")}% damage taken`,
+        cost: (lv) => 1500 + lv * 1300,
     },
 };
 
 export const POTION_BASE_HEAL = 0.60;   // 60% of max HP, before Deeper Flask
 export const POTION_BASE_COUNT = 3;     // before Wider Satchel
-export const potionHealFrac = (flaskLv = 0) => POTION_BASE_HEAL + Math.max(0, flaskLv) * 0.04;
+export const potionHealFrac = (flaskLv = 0) => POTION_BASE_HEAL + Math.max(0, flaskLv) * 0.03;
 export const potionCount = (satchelLv = 0) => POTION_BASE_COUNT + Math.max(0, satchelLv);
-export const wardCut = (wardLv = 0) => Math.min(0.18, Math.max(0, wardLv) * 0.03);
+export const wardCut = (wardLv = 0) => Math.min(0.10, Math.max(0, wardLv) * 0.025);
