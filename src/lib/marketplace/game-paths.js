@@ -11,7 +11,7 @@ export const GAME_NAV_PATHS = [
     "/marketplace/boss", "/marketplace/sailing", "/marketplace/spin", "/marketplace/pets",
     "/marketplace/inventory", "/marketplace/store", "/marketplace/sets", "/marketplace/quests",
     "/marketplace/track", "/marketplace/badges", "/marketplace/leaderboard", "/marketplace/bounties",
-    "/marketplace/invite", "/marketplace/creations", "/marketplace/credit",
+    "/marketplace/invite", "/marketplace/creations", "/marketplace/credit", "/marketplace/changelog",
 ];
 
 // Part of the game shell but not their own nav entry.

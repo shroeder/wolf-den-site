@@ -64,6 +64,7 @@ const renderBigIcon = (l) => <NavIcon l={l} size={28} big />;
 const LINKS = [
     { href: "/marketplace/play", emoji: "🎮", label: "Home" },
     { href: "/marketplace/guide", emoji: "🧭", label: "Guide" },
+    { href: "/marketplace/changelog", emoji: "📜", label: "What's New" },
     { href: "/marketplace/profile", emoji: "👤", label: "Profile" },
     { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize" },
     { href: "/marketplace/boss", emoji: "⚔️", label: "Boss" },
