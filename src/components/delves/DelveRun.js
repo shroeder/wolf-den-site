@@ -223,14 +223,20 @@ export default function DelveRun({ run, busy, onAct }) {
 
             {/* ── what's happening ── */}
             <div className="dlr-card">
-                <b className="dlr-card-title">{result ? result.title : (awaiting?.title || cur?.title)}</b>
-                <p className="dlr-card-text">{result ? result.line : (awaiting?.text || cur?.text)}</p>
+                {/* Same priority as the stage: result, then the thing hitting you, then the question, then the
+                    floor. The card and the picture must never be describing different floors. */}
+                <b className="dlr-card-title">{result ? result.title : fighting ? run.foe.name : (awaiting?.title || cur?.title)}</b>
+                <p className="dlr-card-text">{result ? result.line : fighting ? cur?.text : (awaiting?.text || cur?.text)}</p>
 
                 {result ? (
                     <div className="dlr-actions is-single">
                         <button type="button" className="dlv-btn" disabled={busy} onClick={() => onAct("onward")}>
                             {run.floor >= run.floors ? "Take what it owes you" : "Onward"}
                         </button>
+                    </div>
+                ) : fighting ? (
+                    <div className="dlr-actions is-single">
+                        <button type="button" className="dlv-btn is-danger" disabled={busy} onClick={() => onAct("strike")}>Strike</button>
                     </div>
                 ) : awaiting ? (
                     <div className="dlr-options">
@@ -244,10 +250,6 @@ export default function DelveRun({ run, busy, onAct }) {
                                 {o.hpCost ? <em className="is-blood">{o.hpCost} health</em> : null}
                             </button>
                         ))}
-                    </div>
-                ) : fighting ? (
-                    <div className="dlr-actions is-single">
-                        <button type="button" className="dlv-btn is-danger" disabled={busy} onClick={() => onAct("strike")}>Strike</button>
                     </div>
                 ) : (
                     <div className="dlr-actions is-single">

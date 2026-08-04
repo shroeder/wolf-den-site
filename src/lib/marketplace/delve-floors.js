@@ -35,6 +35,10 @@ export async function offerChoice(ctx, run, d, floor, action, choice) {
     const { buyerId, saveRun, hurt, bank, finishRun, settle, state } = ctx;
     const ev = floor.event;
     if (action === "enter" || !run.awaiting) {
+        // A resolved floor has nothing left to ask. Without this, a second `choose` arriving after the first
+        // one cleared `awaiting` falls into this branch and builds a FRESH offer on a floor that has already
+        // paid out — a free re-roll, and a stale offer left sitting on the run.
+        if (floor.done) return { ok: true, ...(await state(buyerId)) };
         const built = buildOffer(run, d, ev);
         run.awaiting = built.offer;
         run.rolls = built.rolls;
@@ -391,7 +395,13 @@ export async function advanceFloor(ctx, run, { outcome = null } = {}) {
     const wasBoss = floor?.event?.kind === KIND.boss;
     if (wasBoss || run.floor >= DELVE_FLOORS) return finishRun(buyerId, run, { cleared: wasBoss });
     run.floor += 1;
+    // Everything that belonged to the floor you just left dies with it. `awaiting` used to survive the walk:
+    // an unresolved merchant offer from floor three was still on the run when floor four dealt a fight, and the
+    // client — which checks `awaiting` before `foe` — drew the Bloated Grub on the stage and the trapper's
+    // prices in the card underneath. Two floors on screen at once.
     run.foe = null;
+    run.awaiting = null;
+    run.rolls = null;
     await saveRun(buyerId, run);
     return { ok: true, ...(await state(buyerId)) };
 }

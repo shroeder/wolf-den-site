@@ -214,7 +214,9 @@ function publicRun(run) {
             silhouette: !cur.done && (cur.event.kind === KIND.fight || cur.event.kind === KIND.boss),
         } : null,
         log: run.log || [],
-        awaiting: run.awaiting || null,   // a choice the floor is waiting on
+        // A choice the CURRENT floor is waiting on. Belt and braces on top of advanceFloor clearing it: a live
+        // foe or a pending result means this floor is not asking you anything, whatever is left on the run.
+        awaiting: (!run.foe && !run.result && run.awaiting) ? run.awaiting : null,
         // THE BEAT. A floor used to resolve and advance in the same reply, so the only trace of what just
         // happened was a line of grey text in a log — the "no clear juicy conclusion to each encounter"
         // complaint, exactly. The floor now STOPS on its result and waits for you to walk on, which is the one

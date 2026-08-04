@@ -576,7 +576,8 @@ export async function sendTownChat(buyerId, body) {
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
-    bumpTownQuest(buyerId, "social", 1).catch(() => {});
+    // Chatting pays NOTHING. It used to tick a "send 5 chats" daily, which turned the Den's global feed into
+    // five identical wolf emoji from whoever wanted the 80 gold. See the note in town-quests.js.
     return { ok: true };
 }
 

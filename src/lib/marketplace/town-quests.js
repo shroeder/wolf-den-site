@@ -19,9 +19,10 @@ const QUEST_POOL = {
         { label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 150 },
         { label: "Hold the Line", desc: "Land 30 hits on a town raid", target: 30, gold: 280 },
     ] },
-    social: { emoji: "💬", variants: [
-        { label: "Good Neighbor", desc: "Send 5 chats or emotes in town", target: 5, gold: 80 },
-    ] },
+    // NO CHAT QUEST. "Send 5 chats or emotes in town" paid 80 gold for five keystrokes and the Den chat filled
+    // up with people posting the same wolf emoji five times in a row to clear it. A daily that rewards VOLUME of
+    // talking buys spam, not conversation — there is no target number that doesn't. If social ever comes back it
+    // has to reward something you can't grind (being replied to, being thanked), not message count.
     civic: { emoji: "🏗️", variants: [
         { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100 },
         { label: "Town Benefactor", desc: "Chip in to the plaza fund 3 times", target: 3, gold: 240 },
