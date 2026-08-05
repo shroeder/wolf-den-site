@@ -226,6 +226,17 @@ export const SCENES = {
         note: "One of each new archetype — rend, flurry, drain, sunder, riposte — on the ladder card layout.",
         state: () => baseState({ me: { ...ME, abilities: NEW_KIND_ABILITIES } }),
     },
+    newbout: {
+        label: "Fight w/ new kinds",
+        note: "A bout whose kit is rend / flurry / drain / sunder — so each new effect can be cast and watched.",
+        state: () => baseState({
+            me: { ...ME, abilities: NEW_KIND_ABILITIES },
+            bout: makeBout({
+                cd: {},
+                me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, speed: 29 },
+            }),
+        }),
+    },
     ladder: {
         label: "Ladder",
         note: "The screen you land on. Rank badge, your kit, podium, who you can challenge.",
