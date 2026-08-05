@@ -258,6 +258,20 @@ export async function getArenaState(buyerId) {
     const pos = Number(row?.position) || board.length;
     const bout = row?.bout_json || null;
 
+    // ── HEAL A STALE BOUT ON READ ────────────────────────────────────────────────────────────────────────
+    // A bout freezes its abilities into bout_json at the start, so a fight already running when the kit
+    // format changes keeps the OLD shape until it ends. Healing this only inside fightRound was not enough:
+    // the fight SCREEN reads through here, so a player looking at their skills saw last week's format —
+    // sentence effects and the gear's sprite instead of the move's — until they happened to take a beat.
+    // `kit` is already loaded above, so this costs nothing.
+    if (bout && !bout.over && kit?.abilities?.length) {
+        const stale = (bout.me?.abilities || []).some((a) => !a.effect || typeof a.effect !== "object" || !a.sprite?.includes("/skill-"));
+        if (stale) {
+            bout.me.abilities = (bout.me.abilities || []).map((a) => kit.abilities.find((f) => f.id === a.id) || a);
+            await saveBout(buyerId, bout).catch(() => {});
+        }
+    }
+
     // WHO YOU MAY CHALLENGE. Everyone above you, within reach — so every fight on offer is one you could
     // plausibly lose, which is the only kind worth spending an attempt on.
     const targets = board
