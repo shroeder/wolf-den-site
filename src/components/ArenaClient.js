@@ -184,8 +184,14 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 
 // ── THE BODY ─────────────────────────────────────────────────────────────────────────────────────────────────
 // The fighter itself, standing on the sand. Nothing here reads state — it only acts.
-function FighterBody({ f, mirrored, hurt, lunge, down, wind = 0, brace = false, dim = false }) {
-    const cls = `ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
+// `mirrored` and `foe` are SEPARATE, and conflating them is what broke the stage flip. One is a drawing
+// question — which way is this sprite facing — and the other is a game question — which of these two is the
+// opponent. They used to be the same class, which was fine while the enemy was always the flipped one. After
+// the flip to the Final Fantasy arrangement (party right, enemy left) it meant `is-foe` marked YOU, so the
+// cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
+function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false }) {
+    const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
+        + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
         + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`;
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
@@ -807,7 +813,7 @@ export default function ArenaClient({ initial }) {
                         {/* THE FOE STANDS LEFT AND YOU STAND RIGHT — the Final Fantasy arrangement. The
                             `mirrored` flag moved with them: it drives the horizontal flip, and it is the
                             right-hand fighter who has to be facing left. */}
-                        <FighterBody f={bout.foe} hurt={shake === 1} lunge={shake >= 2}
+                        <FighterBody f={bout.foe} foe hurt={shake === 1} lunge={shake >= 2}
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
                             brace={yourTurn && Boolean(pending)} />
@@ -1448,9 +1454,11 @@ function Styles() {
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
             /* PARTY RIGHT, ENEMY LEFT. The enemy is smaller and stands further up the sand — the two cues
                together read as distance; equal size on one baseline reads as two of the same thing. */
-            .ar-floor > .ar-fighter:first-of-type { left: -3%; z-index: 2; width: 47%; bottom: 8%; }
-            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 3; width: 54%; bottom: 0; }
-            .ar-floor > .ar-fighter:first-of-type .ar-shadow { width: min(70%, 120px); height: 13px; }
+            /* Addressed by WHO, not by DOM order. The enemy stands left, smaller and further up the sand;
+               you stand right, nearer and larger. Two cues for depth — size alone reads as a mistake. */
+            .ar-floor > .ar-fighter.is-foe { left: -3%; z-index: 2; width: 47%; bottom: 9%; }
+            .ar-floor > .ar-fighter.is-mirror { right: -3%; z-index: 3; width: 54%; bottom: 0; }
+            .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
             .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(-9%); }
@@ -1458,9 +1466,9 @@ function Styles() {
             .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
             .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
             .ar-ring.is-on-you .ar-fighter.is-foe { opacity: .28; filter: saturate(.35); }
-            .ar-ring.is-on-them .ar-fighter:not(.is-foe) { opacity: .28; filter: saturate(.35); }
+            .ar-ring.is-on-them .ar-fighter.is-mirror { opacity: .28; filter: saturate(.35); }
             /* The one casting stands up out of the frame a little. */
-            .ar-ring.is-on-you .ar-fighter:not(.is-foe) .ar-hero,
+            .ar-ring.is-on-you .ar-fighter.is-mirror .ar-hero,
             .ar-ring.is-on-them .ar-fighter.is-foe .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 26px var(--el, rgba(255,215,94,0.8))); }
             .ar-ring-scrim { transition: background .35s ease; }
             .ar-fighter { transition: opacity .35s ease, filter .35s ease; }
@@ -1488,7 +1496,7 @@ function Styles() {
                 filter: drop-shadow(0 10px 16px rgba(0,0,0,0.7));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
-            .ar-fighter.is-foe .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
+            .ar-fighter.is-mirror .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreatheFoe { from { transform: scaleX(-1) translateY(0) } to { transform: scaleX(-1) translateY(-5px) } }
             /* ── THE TELEGRAPH ── the acting fighter draws back for exactly as long as the ring takes to close,
                so the wind-up and the countdown are the same event. There was nothing tying the circle to the
@@ -1499,7 +1507,7 @@ function Styles() {
                 0% { transform: translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
                 100% { transform: translateX(-18px) rotate(-9deg) scale(1.06);
                     filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 20px rgba(255,215,94,0.9)); } }
-            .ar-fighter.is-foe.is-wind .ar-hero { animation: arWindFoe var(--wind, 1.4s) cubic-bezier(.35,0,.65,1) both; }
+            .ar-fighter.is-mirror.is-wind .ar-hero { animation: arWindFoe var(--wind, 1.4s) cubic-bezier(.35,0,.65,1) both; }
             @keyframes arWindFoe {
                 0% { transform: scaleX(-1) translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
                 100% { transform: scaleX(-1) translateX(-18px) rotate(-9deg) scale(1.06);
@@ -1507,7 +1515,7 @@ function Styles() {
             /* Whoever is being aimed at hunches — it reads as "this is coming at me" without pulling focus. */
             .ar-fighter.is-brace .ar-hero { animation: arBrace .45s ease-out both; }
             @keyframes arBrace { to { transform: translateY(4px) scale(.96) } }
-            .ar-fighter.is-foe.is-brace .ar-hero { animation: arBraceFoe .45s ease-out both; }
+            .ar-fighter.is-mirror.is-brace .ar-hero { animation: arBraceFoe .45s ease-out both; }
             @keyframes arBraceFoe { to { transform: scaleX(-1) translateY(4px) scale(.96) } }
             /* ── CONTACT ── landing a blow drives you INTO them and back; taking one rocks you away from it.
                The old version nudged 14px and returned, which at this size was barely perceptible — the whole
@@ -1517,7 +1525,7 @@ function Styles() {
                 0% { transform: translateX(0) scale(1) }
                 28% { transform: translateX(34px) scale(1.06) }
                 100% { transform: translateX(0) scale(1) } }
-            .ar-fighter.is-foe.is-lunge .ar-hero { animation: arLungeFoe .34s cubic-bezier(.2,.9,.3,1); }
+            .ar-fighter.is-mirror.is-lunge .ar-hero { animation: arLungeFoe .34s cubic-bezier(.2,.9,.3,1); }
             @keyframes arLungeFoe {
                 0% { transform: scaleX(-1) translateX(0) scale(1) }
                 28% { transform: scaleX(-1) translateX(34px) scale(1.06) }
@@ -1529,7 +1537,7 @@ function Styles() {
                 0% { transform: translateX(0) rotate(0deg) }
                 22% { transform: translateX(-22px) rotate(-5deg) }
                 100% { transform: translateX(0) rotate(0deg) } }
-            .ar-fighter.is-foe.is-hurt .ar-hero { animation: arRecoilFoe .36s cubic-bezier(.2,.9,.3,1); }
+            .ar-fighter.is-mirror.is-hurt .ar-hero { animation: arRecoilFoe .36s cubic-bezier(.2,.9,.3,1); }
             @keyframes arRecoilFoe {
                 0% { transform: scaleX(-1) translateX(0) rotate(0deg) }
                 22% { transform: scaleX(-1) translateX(-22px) rotate(-5deg) }
@@ -1615,7 +1623,7 @@ function Styles() {
                teleported to a summary. */
             .ar-fighter.is-down .ar-hero { animation: arDown .6s cubic-bezier(.4,0,.6,1) both; }
             @keyframes arDown { to { transform: translateY(16px) rotate(-16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
-            .ar-fighter.is-foe.is-down .ar-hero { animation: arDownFoe .6s cubic-bezier(.4,0,.6,1) both; }
+            .ar-fighter.is-mirror.is-down .ar-hero { animation: arDownFoe .6s cubic-bezier(.4,0,.6,1) both; }
             @keyframes arDownFoe { to { transform: scaleX(-1) translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
             .ar-verdict { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
                 align-content: center; gap: 12px; pointer-events: none; }
@@ -2014,8 +2022,11 @@ function Styles() {
             .ar-mute.is-off { color: #7f8790; }
             .ar-mute::after { content: ""; position: absolute; inset: -6px; }
 
-            .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
-                display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
+            .ar-focus { position: relative; z-index: 15; flex: 0 0 auto; padding: 5px 10px;
+                display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; pointer-events: none;
+                background: linear-gradient(180deg, transparent, rgba(6,4,8,0.72) 45%);
+                overflow-x: auto; scrollbar-width: none; }
+            .ar-focus::-webkit-scrollbar { display: none; }
             .ar-focus .ar-cdchip { pointer-events: auto; }
             /* padding:0 and appearance:none are load-bearing. These were <span>s; making them buttons handed
                them the UA default padding of 1px 6px, which ate 12 of the 30px and shoved every sprite off
@@ -2043,7 +2054,8 @@ function Styles() {
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
 
             /* ── THEIR KIT ── same rail, their side, smaller. Readable, not actionable. */
-            .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+            .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
+                padding-left: 6px; }
             .ar-theirs-lab { font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .14em;
                 text-transform: uppercase; color: #7f8790; margin-right: 1px; }
             .ar-theirchip { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
