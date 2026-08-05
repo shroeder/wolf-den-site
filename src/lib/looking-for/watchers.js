@@ -186,6 +186,23 @@ export async function attachWatcherEmail(watcherId, email) {
  * Attach a signed-in marketplace account to the watcher: use the account's (already-verified) email
  * and turn alerts on immediately — no double opt-in. Also records buyer_id for provenance.
  */
+// Link this device's wishlist to a signed-in member WITHOUT touching alerts.
+//
+// A watcher row is created per device, and its buyer_id was only ever set by attachWatcherAccount — which
+// runs when you press "Turn on alerts", and which also sets email_verified. So a member who just used the
+// list without opting into alerts had their cards saved against an account-less row: 100 watchers on the
+// server, only 18 carrying a buyer_id, 1,078 cards saved and just 13 members with anything the rest of the
+// site could see. That is why the Collector badge read 0/25 for somebody with 59 cards on their list.
+//
+// This sets buyer_id and NOTHING else. email_verified is the alerts switch and stays exactly as it was —
+// linking a list must never quietly sign somebody up for email.
+export async function linkWatcherToBuyer(watcherId, buyerId) {
+    if (!watcherId || !buyerId) return;
+    await db
+        .query(`UPDATE card_watchers SET buyer_id = $2, updated_at = NOW() WHERE id = $1 AND buyer_id IS DISTINCT FROM $2`, [watcherId, buyerId])
+        .catch(() => {});
+}
+
 export async function attachWatcherAccount(watcherId, buyer) {
     await db.query(
         `UPDATE card_watchers SET

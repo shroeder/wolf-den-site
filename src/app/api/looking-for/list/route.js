@@ -8,6 +8,7 @@ import {
     MAX_WATCHLIST_QUANTITY,
     addWatchlistItem,
     getOrCreateWatcher,
+    linkWatcherToBuyer,
     getWatchlist,
     removeWatchlistItem,
     setWatchlistItemQuantity,
@@ -44,6 +45,10 @@ export async function GET(request) {
         try {
             const cookieStore = await cookies();
             const watcher = await getOrCreateWatcher(cookieStore);
+            // Claim this device's list for whoever is signed in. Reading the page is enough — the list is
+            // already theirs, the server just never wrote down whose it was.
+            const buyer = await getAuthenticatedBuyer().catch(() => null);
+            if (buyer) await linkWatcherToBuyer(watcher.id, buyer.id);
 
             return NextResponse.json(await buildListResponse(watcher));
         } catch (error) {
@@ -73,7 +78,10 @@ export async function POST(request) {
             // If a signed-in marketplace member added this, credit their one-time "first Looking For card"
             // onboarding milestone (the rewards checklist links here, so adding a card completes it).
             const buyer = await getAuthenticatedBuyer().catch(() => null);
-            if (buyer) await awardOnce(buyer.id, "first_wishlist", { cardId }).catch(() => {});
+            if (buyer) {
+                await linkWatcherToBuyer(watcher.id, buyer.id);
+                await awardOnce(buyer.id, "first_wishlist", { cardId }).catch(() => {});
+            }
 
             return NextResponse.json(await buildListResponse(watcher), { status: 201 });
         } catch (error) {

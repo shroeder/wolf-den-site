@@ -15,8 +15,14 @@ const BIG_HIT_DOLLARS = 100;
 // be attributed (returns quietly). Never throws — attribution must never break sale processing.
 async function attributeMysteryPull({ order, cardId }) {
     try {
-        const customerId = order?.customer_id || null;
-        if (!customerId) return; // anonymous walk-in — nothing to attribute to
+        // 169 mystery-bag sales went through this and attributed exactly ZERO of them, because it only
+        // looked at order.customer_id. When a cashier attaches a customer at the terminal, Square hangs them
+        // off the TENDER (and the payment) — which is why the ordinary purchase-XP path, which reads
+        // payment.customer_id, has credited 45 members from the same orders while this credited nobody.
+        const customerId = order?.customer_id
+            || (order?.tenders || []).map((t) => t?.customer_id).find(Boolean)
+            || null;
+        if (!customerId) return; // genuinely anonymous walk-in — nothing to attribute to
         const customer = await getSquareCustomerById(customerId).catch(() => null);
         const buyerId = await resolveBuyerId({
             squareCustomerId: customerId,
