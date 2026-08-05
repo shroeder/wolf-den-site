@@ -79,7 +79,7 @@ export const MAX_TRACK = 5;
 //   Larder    — the dish costs you NOTHING
 export const COOK_TRACKS = {
     heat:   { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "pct", name: "Heat",      icon: "/images/cooking/track-heat.png",   desc: "Chance the dish comes out one tier better than the recipe." },
-    season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance of a second helping — the same dish, twice." },
+    season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance the dish pays out TWICE — double whatever it makes." },
     // "boost", not "pct": the other three are ROLLS the card labels "Chance", and Big Pot is not a roll —
     // every level is felt on every cook. Labelling it "Chance 30%" would have read as a 30%% shot at nothing.
     batch:  { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "Every dish comes out bigger — more of whatever it makes." },
