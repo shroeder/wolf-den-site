@@ -226,7 +226,7 @@ export default function ArenaClient({ initial }) {
         // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
         // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
-        const GRADE_LABEL = { perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
+        const GRADE_LABEL = { flawless: "FLAWLESS", perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
         if (last && bout.log.length !== p.round) setClash({ grade: last.grade, label: GRADE_LABEL[last.grade] || "" });
         if (bout.over && bout.won) blip("win");
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
@@ -743,6 +743,12 @@ function Styles() {
             .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; }
             .ar-grade span { font-size: 1.6rem; font-weight: 900; letter-spacing: .1em;
                 animation: arGrade .85s cubic-bezier(.2,1.4,.35,1) both; text-shadow: 0 3px 14px #000; }
+            /* The best grade in the game gets the biggest moment — bigger, whiter, and it lands with a kick. */
+            .ar-grade.is-flawless span { color: #fff6cc; font-size: 2.1rem; letter-spacing: .14em;
+                text-shadow: 0 3px 14px #000, 0 0 26px #fff0a8, 0 0 54px rgba(255,200,70,.95);
+                animation: arFlawless .5s cubic-bezier(.2,1.5,.35,1) both; }
+            @keyframes arFlawless { from { transform: scale(.55) rotate(-4deg); opacity: 0 }
+                60% { transform: scale(1.12) rotate(1deg); opacity: 1 } to { transform: none; opacity: 1 } }
             .ar-grade.is-perfect span { color: #ffe28a; text-shadow: 0 3px 14px #000, 0 0 32px rgba(255,200,70,.95); }
             .ar-grade.is-great span { color: #8bf0b4; }
             .ar-grade.is-good span { color: #cbd3dc; }
@@ -947,9 +953,10 @@ function Styles() {
             .ar-prompt b { font-weight: 900; }
             .ar-prompt.is-atk { color: #ffd75e; }
             .ar-prompt.is-def { color: #6fd0ff; }
-            /* Over whoever is acting: their half when you swing, yours when they do. */
-            .ar-ringslot.is-you { left: 50%; }
-            .ar-ringslot.is-them { right: 50%; }
+            /* The slot spans the WHOLE floor. It used to be half-width, positioned over the acting fighter —
+               which made it the hit area as well as the artwork, so half of every tap aimed at the middle of
+               the fight silently did nothing. TimingRing now draws itself over whoever is acting and takes
+               taps from anywhere. */
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }

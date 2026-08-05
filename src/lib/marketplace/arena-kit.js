@@ -142,10 +142,16 @@ export function ringMsFor(foeGearPower = 0) {
 // Cutting the ring from 1700ms to 1150 without touching these took an ok player from 98% to 83% in an even
 // fight and a good one from 67% to 40% against strong gear. Widened to hold the intended curve at the new
 // speed — a window measured in tens of milliseconds is a reflex test, not a decision.
+// FLAWLESS is CARVED OUT of the old PERFECT band rather than stacked on top of it. Bolting a strictly better
+// tier above perfect and nudging the boundaries out was worth measuring: it took an expert from 70% to 99%
+// against the top of the Den, which flattens the one part of the ladder that is supposed to be hard. So the
+// outer edge of perfect is unchanged at 0.10 and its payout drops to make room — the .10 band as a whole is
+// worth what it always was, and the top slice is a callout you have to actually nail.
 export const GRADES = [
-    { key: "perfect", within: 0.10, atk: 1.6, def: 0.75, focus: 3, label: "PERFECT" },
-    { key: "great", within: 0.21, atk: 1.3, def: 0.50, focus: 2, label: "Great" },
-    { key: "good", within: 0.40, atk: 1.0, def: 0.28, focus: 1, label: "Good" },
+    { key: "flawless", within: 0.05, atk: 1.75, def: 0.82, focus: 4, label: "FLAWLESS" },
+    { key: "perfect", within: 0.10, atk: 1.45, def: 0.70, focus: 3, label: "Perfect" },
+    { key: "great", within: 0.21, atk: 1.30, def: 0.50, focus: 2, label: "Great" },
+    { key: "good", within: 0.40, atk: 1.00, def: 0.28, focus: 1, label: "Good" },
     { key: "miss", within: Infinity, atk: 0.45, def: 0.0, focus: 0, label: "Missed" },
 ];
 
@@ -163,10 +169,10 @@ export const GRADES = [
 // Measured at exactly the constants below — 4,000 bouts a cell, timing error in ms, win rate / bout length:
 //
 //   hand                even        +30% gear      +65% gear     top of the Den
-//   expert  (±60ms)   100%  9.2b   100%  10.8b   100%  10.1b     71%  9.4b
-//   good   (±110ms)   100%  9.6b    96%  11.3b    72%  10.5b     10%  8.1b
-//   ok     (±170ms)    98% 10.2b    66%  11.6b    27%  10.0b      0%  6.5b
-//   sloppy (±260ms)    68% 10.8b    11%  10.4b     2%   8.3b      0%  5.4b
+//   expert  (±60ms)   100%  8.9b   100%  10.5b   100%   9.8b     73%  9.5b
+//   good   (±110ms)   100%  9.6b    95%  11.4b    75%  10.5b     11%  8.2b
+//   ok     (±170ms)    98% 10.2b    67%  11.6b    29%  10.0b      0%  6.6b
+//   sloppy (±260ms)    67% 10.9b    11%  10.4b     2%   8.4b      0%  5.4b
 //
 // An even fight is decided by your hands. A gear gap is decided by both. The top of the Den is a coin flip
 // for someone genuinely excellent and out of reach for everyone else — which is what a first place should be.
