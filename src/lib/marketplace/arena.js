@@ -199,7 +199,7 @@ async function arenaRow(buyerId) {
 // Everybody who holds a position, in order, with the profile bits the board needs.
 async function standings() {
     const rows = await db.query(
-        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, a.toll, COALESCE(b.xp,0) AS xp,
+        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
                 b.alias, b.display_name, b.avatar_sprite_url
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
           WHERE a.position IS NOT NULL ORDER BY a.position ASC`
@@ -216,7 +216,6 @@ async function standings() {
             sprite: r.avatar_sprite_url || null,
             level, wins: r.wins, losses: r.losses,
             vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
-            toll: Number(r.toll) || 0,
         };
     });
 }
@@ -239,13 +238,11 @@ export async function getArenaState(buyerId) {
     const targets = board
         .filter((o) => o.id !== buyerId && o.position < pos && o.position >= pos - CHALLENGE_REACH)
         .sort((x, y) => y.position - x.position)
-        .map((o) => ({ ...o, reward: winReward(pos, o.position), stake: Number(o.toll) || 0 }));
+        .map((o) => ({ ...o, reward: winReward(pos, o.position) }));
 
     return {
         unlocked: true,
         me: { ...me, name: "You", position: pos, element: kit.element, abilities: kit.abilities },
-        toll: Number(row?.toll) || 0,
-        purse: Number(row?.purse) || 0,
         position: pos, size: board.length,
         rank: rankFor(Math.max(0, board.length - pos), board.length),
         fightsLeft: Math.max(0, FIGHTS_PER_DAY - used), fightsPerDay: FIGHTS_PER_DAY,
@@ -320,7 +317,7 @@ function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         focus: b.focus, focusMax: FOCUS_MAX, ringMs: b.ringMs, clash: b.clash,
-        me: b.me, shield: b.shield, surge: b.surge, stake: b.stake,
+        me: b.me, shield: b.shield, surge: b.surge,
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
@@ -339,19 +336,10 @@ export async function startBout(buyerId, targetId = null) {
     const foe = board.find((o) => o.id === targetId && o.position < pos && o.position >= pos - CHALLENGE_REACH);
     if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
 
-    // ── THE STAKE ── the defender's own asking price, taken up front and atomically. A challenge you cannot
-    // afford is refused before anything else happens.
-    const stake = Math.max(0, Number(foe.toll) || 0);
-    if (stake > 0) {
-        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, stake]).catch(() => null);
-        if (!paid) return { ok: false, error: "not_enough_gold", ...(await getArenaState(buyerId)) };
-        await logCoin(buyerId, -stake, "arena_stake", { balanceAfter: paid.gold, meta: { target: foe.id, toll: stake } }).catch(() => {});
-    }
-
     const [me, foeKit] = await Promise.all([kitFor(buyerId), kitFor(foe.id)]);
     const clash = elementClash(me.element, foeKit.element);
     const bout = {
-        myPos: pos, foePos: foe.position, size: board.length, stake,
+        myPos: pos, foePos: foe.position, size: board.length,
         foe: {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
@@ -373,7 +361,7 @@ export async function startBout(buyerId, targetId = null) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(bout)]
     ).catch(() => {});
-    await trackActivity(buyerId, "arena_start", { pos, target: foe.id, stake }).catch(() => {});
+    await trackActivity(buyerId, "arena_start", { pos, target: foe.id }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -457,14 +445,6 @@ export async function fightRound(buyerId, off = 1, abilityId = null) {
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
-/** Name your price. What it costs anyone to challenge you — and what you keep when they fail. */
-export async function setToll(buyerId, gold) {
-    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    const t = Math.max(0, Math.min(25000, Math.floor(Number(gold) || 0)));
-    await db.query(`UPDATE mkt_arena SET toll = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, t]).catch(() => {});
-    return { ok: true, ...(await getArenaState(buyerId)) };
-}
-
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
     const myPos = b.myPos, foePos = b.foePos;
@@ -499,27 +479,11 @@ async function finishBout(buyerId, row, b, won) {
             // Whatever happened, never leave anybody parked on a negative rung.
             if (!swapped) await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [buyerId, myPos, -myPos]).catch(() => {});
         }
-        // ── WIN: YOUR STAKE BACK, AND NOT A COIN MORE ────────────────────────────────────────────────────
-        // This paid stake × 2 — "your stake back plus their toll" — but the defender never staked anything, so
-        // that second half was minted out of nothing. And a win SWAPS your positions, which drops your opponent
-        // below you and lets them challenge straight back. Two people alternating at a 5,000 toll would have
-        // conjured 5,000 gold a win, ten wins a day each, forever. Same shape as the awardXp gold landmine.
-        //
-        // The toll is now strictly zero-sum: the loser's gold moves to the winner and none is created. What you
-        // actually win is the position and the win reward — which is what the ladder was ever about.
-        const back = r.gold + (b.stake || 0);
+        const back = r.gold;
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back]).catch(() => null);
-        reward.stakeBack = b.stake || 0;
         await logCoin(buyerId, back, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
-        // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
+        // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
         await awardXp(buyerId, "arena_win", { points: r.xp, gold: 0 }).catch(() => {});
-    }
-    // ── THE DEFENDER'S PURSE ── they never staked anything, so they can only gain. A challenge that fails
-    // pays them the challenger's toll: the champion's income is other people's ambition.
-    if (!won && (b.stake || 0) > 0) {
-        const dg = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [b.foe.id, b.stake]).catch(() => null);
-        await logCoin(b.foe.id, b.stake, "arena_toll", { balanceAfter: dg?.gold, meta: { from: buyerId } }).catch(() => {});
-        await db.query(`UPDATE mkt_arena SET purse = purse + $2 WHERE buyer_id = $1`, [b.foe.id, b.stake]).catch(() => {});
     }
     b.reward = reward;
 
@@ -541,7 +505,6 @@ async function finishBout(buyerId, row, b, won) {
         rankUp: b.rankUp,
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
         rounds: b.beat || (b.log || []).length,
-        stake: b.stake || 0,
     };
 
     await db.query(

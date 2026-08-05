@@ -156,9 +156,6 @@ function Recap({ bout, busy, onClose }) {
                             <span><i>Gold</i><b>+{money(r.reward.gold)}</b></span>
                             <span><i>XP</i><b>+{money(r.reward.xp)}</b></span>
                             {r.reward.chest ? <span><i>Chest</i><b>{r.reward.chest}</b></span> : null}
-                            {r.reward.stakeBack > 0 ? (
-                                <span><i>Stake back</i><b>{money(r.reward.stakeBack)}</b></span>
-                            ) : null}
                         </>
                     ) : <span className="ar-recap-none"><i>No purse</i><b>the rung holds</b></span>}
                     <span><i>Streak</i><b>{r.streak}{r.streak > 0 && r.streak >= r.bestStreak ? " · best" : ""}</b></span>
@@ -416,24 +413,6 @@ export default function ArenaClient({ initial }) {
                 </div>
             </div>
 
-            {/* YOUR PRICE — what it costs anyone to come at you, and what you keep when they fail. The person
-                in first place earns from other people's ambition; this is that lever. */}
-            <div className="ar-toll">
-                <span className="ar-up-head">Your toll</span>
-                <p className="ar-toll-note">
-                    What a challenger pays to face you. Beat them and you keep it — you never stake anything yourself.
-                    {st.purse > 0 ? <> You&rsquo;ve taken <b>{money(st.purse)}</b> defending.</> : null}
-                </p>
-                <div className="ar-toll-row">
-                    {[0, 250, 750, 2000, 5000].map((v) => (
-                        <button key={v} type="button" className={`ar-tollopt${st.toll === v ? " is-on" : ""}`}
-                            disabled={busy} onClick={() => act("toll", { gold: v })}>
-                            {v === 0 ? "Free" : money(v)}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             {/* the podium — the reason to hold a spot overnight */}
             <div className="ar-podium">
                 <span className="ar-podium-lab">Top three at the end of the day take a chest</span>
@@ -464,7 +443,6 @@ export default function ArenaClient({ initial }) {
                         </div>
                         <div className="ar-target-go">
                             <span className="ar-prize">+{money(o.reward.gold)}</span>
-                            {o.stake > 0 ? <span className="ar-stake">costs {money(o.stake)}</span> : null}
                             <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
                                 onClick={() => act("start", { target: o.id })}>
                                 {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
@@ -844,16 +822,9 @@ function Styles() {
             .ar-turn { margin: 10px 0 0; font-size: 12px; text-align: center; color: #cbd3dc; }
 
             .ar-ability.is-static { cursor: default; }
-            .ar-mykit, .ar-toll { margin-bottom: 22px; display: grid; gap: 11px; }
+            .ar-mykit { margin-bottom: 22px; display: grid; gap: 11px; }
             .ar-el { font-style: normal; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 9.5px;
                 color: var(--el); border: 1px solid color-mix(in srgb, var(--el) 55%, transparent); text-transform: capitalize; }
-            .ar-toll-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: #8a939d; }
-            .ar-toll-note b { color: #ffd75e; }
-            .ar-toll-row { display: flex; flex-wrap: wrap; gap: 6px; }
-            .ar-tollopt { padding: 7px 13px; border-radius: 10px; cursor: pointer; font-size: 11.5px; font-weight: 900;
-                color: #cbd3dc; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); }
-            .ar-tollopt.is-on { color: #241500; background: linear-gradient(180deg, #ffe08a, #ffb020); border-color: transparent; }
-            .ar-stake { font-size: 10px; color: #ff9f9f; }
 
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
