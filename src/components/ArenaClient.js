@@ -8,7 +8,7 @@ import {
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
-import SpriteFx, { hasSheet } from "@/components/arena/SpriteFx";
+import ArenaFx from "@/components/arena/ArenaFx";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
@@ -361,6 +361,16 @@ export default function ArenaClient({ initial }) {
     const logEnd = useRef(null);
     const ringRef = useRef(null);
     const [ringH, setRingH] = useState(null);
+    // The spell layer, driven imperatively. React state is the wrong tool for "play this burst now" — by the
+    // time a re-render lands, the moment has gone.
+    const fxRef = useRef(null);
+    // Shake is applied to the PANEL so the fighters, the bars and the deck all move together. Shaking only
+    // the canvas moves the magic and leaves the world still, which reads as a rendering fault.
+    const shakeRef = useRef(null);
+    const onShake = useCallback((x, y) => {
+        const el = shakeRef.current;
+        if (el) el.style.transform = x || y ? `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)` : "";
+    }, []);
 
     // The stored mute preference, read after mount so the server and client markup agree.
     useEffect(() => { setMuteOn(isMuted()); }, []);
@@ -600,10 +610,10 @@ export default function ArenaClient({ initial }) {
         const c = mineCast || theirCast;
         if (!c) return undefined;
         if (theirCast) castSound(c.kind, c.element);
-        setFx({ key: `cast-${bout.beat}-${c.name}`, kind: c.kind || "strike", element: c.element,
-            side: mineCast ? "left" : "right", crit: false, charge: true });
-        const t = setTimeout(() => setFx(null), 900);
-        return () => clearTimeout(t);
+        // A gathering on the CASTER at reduced power — the wind-up half of cause and effect.
+        fxRef.current?.play({ kind: "surge", element: c.element,
+            side: mineCast ? "you" : "them", power: 0.55, crit: false });
+        return undefined;
     }, [pending?.ability, pending?.command, castDone, reading, bout?.turn, bout?.beat]);
 
     // Particles fire off the RESOLVED beat, same as the damage number — so an effect can never play for a
@@ -622,18 +632,20 @@ export default function ArenaClient({ initial }) {
                 : l.grade === "guard" ? "ward"
                     : l.grade === "item" ? "heal"
                         : thrown || "strike";
-        setFx({
-            key: bout.log.length,
+        // Who it HAPPENED TO. A ward, a surge and a drink are things you do to yourself; a blow and the burn
+        // it left behind land on the other one.
+        const onSelf = ["ward", "heal", "surge", "guard"].includes(kind);
+        const target = onSelf ? "you" : (mineNow || l.grade === "burn") ? "them" : "you";
+        // Scale the spectacle by how much of the target's bar it actually took, so a graze and a
+        // fight-ender are not the same picture.
+        const pool = target === "you" ? bout.maxHp : bout.foeMaxHp;
+        const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
+        fxRef.current?.play({
             kind,
             element: mineNow ? bout.me?.element : bout.foe?.element,
-            // The burst goes on whoever it HAPPENED TO. A ward, a guard and a poultice are all things you do
-            // to yourself; a blow lands on the other one.
-            // Where it HAPPENED, not who caused it: a ward/heal/surge is on you, a burn tick is on them.
-            side: ["ward", "heal", "surge"].includes(kind) ? "left" : (mineNow || l.grade === "burn") ? "right" : "left",
-            crit: Boolean(l.crit),
+            side: target, power, crit: Boolean(l.crit),
         });
-        const t = setTimeout(() => setFx(null), 900);
-        return () => clearTimeout(t);
+        return undefined;
     }, [bout?.log?.length]);
 
     // ── THE NUMBERS ── off the blow that actually landed, on the fighter that took it. A blocked or healed
@@ -644,11 +656,12 @@ export default function ArenaClient({ initial }) {
         if (!l) return undefined;
         const pops = [];
         if (l.damage > 0) {
-            pops.push({ side: l.who === "you" ? "right" : "left", n: l.damage, kind: l.crit ? "crit" : "dmg" });
+            // You are on the RIGHT now, so a blow YOU land floats over the left-hand foe.
+            pops.push({ side: l.who === "you" ? "left" : "right", n: l.damage, kind: l.crit ? "crit" : "dmg" });
         }
-        if (l.blocked > 0) pops.push({ side: "left", n: l.blocked, kind: "block", at: 120 });
-        if (l.healed > 0) pops.push({ side: "left", n: l.healed, kind: "heal" });
-        if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
+        if (l.blocked > 0) pops.push({ side: "right", n: l.blocked, kind: "block", at: 120 });
+        if (l.healed > 0) pops.push({ side: "right", n: l.healed, kind: "heal" });
+        if (l.soaked > 0) pops.push({ side: "right", n: l.soaked, kind: "ward", at: 60 });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
         const t = setTimeout(() => setPop(null), 1000);
@@ -693,6 +706,8 @@ export default function ArenaClient({ initial }) {
                     className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
                     + `${stop ? " is-stop" : ""}`
                     + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
+                    {/* The engine writes this node's transform; the panel follows it. */}
+                    <span ref={shakeRef} className="ar-quake" aria-hidden="true" />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
@@ -779,24 +794,27 @@ export default function ArenaClient({ initial }) {
 
                     {/* ── THE BARS ── outside the stage, so the camera never touches them. */}
                     <div className="ar-bars">
-                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
-                            active={yourTurn} shield={bout.shield || 0} />
+                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
+                            foe active={!yourTurn && !bout.over} />
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
                         </span>
-                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                            foe active={!yourTurn && !bout.over} />
+                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
+                            active={yourTurn} shield={bout.shield || 0} />
                     </div>
 
                     <div className="ar-floor">
-                        <FighterBody f={st.me} hurt={shake >= 2} lunge={shake === 1}
-                            down={bout.over && !bout.won}
-                            wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
-                            brace={!bout.over && bout.turn === "them" && blockReady} />
-                        <FighterBody f={bout.foe} mirrored hurt={shake === 1} lunge={shake >= 2}
+                        {/* THE FOE STANDS LEFT AND YOU STAND RIGHT — the Final Fantasy arrangement. The
+                            `mirrored` flag moved with them: it drives the horizontal flip, and it is the
+                            right-hand fighter who has to be facing left. */}
+                        <FighterBody f={bout.foe} hurt={shake === 1} lunge={shake >= 2}
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
                             brace={yourTurn && Boolean(pending)} />
+                        <FighterBody f={st.me} mirrored hurt={shake >= 2} lunge={shake === 1}
+                            down={bout.over && !bout.won}
+                            wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
+                            brace={!bout.over && bout.turn === "them" && blockReady} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -823,14 +841,11 @@ export default function ArenaClient({ initial }) {
                         )) : null}
 
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
-                        {/* Painted sheet where one exists for this kind; the generated-shape layer otherwise,
-                            so a new archetype is never left with no effect at all. */}
-                        {fx ? (
-                            hasSheet(fx.kind)
-                                ? <SpriteFx key={fx.key} kind={fx.kind} side={fx.side} crit={fx.crit} charge={fx.charge} />
-                                : <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
-                        ) : null}
                     </div>
+
+                    {/* ── THE SPELL LAYER ── full-screen additive canvas, FF6-style: the sprites stay put and
+                        the SCREEN does the work. */}
+                    <ArenaFx ref={fxRef} onShake={onShake} />
 
                     {/* WHAT'S READY. Cooldowns, guard and surge live ON the field — combat state, not page
                         furniture. Focus was a single pool that made every skill interchangeable and could lock
@@ -1340,8 +1355,9 @@ function Styles() {
                 display: flex; flex-direction: column;
                 background: linear-gradient(180deg, #150f0c 0%, #1e1410 52%, #33210f 100%);
                 border: 1px solid rgba(255,190,110,0.3); }
-            .ar-ring.is-shake-1 { animation: arShake .2s ease-out; }
-            .ar-ring.is-shake-2 { animation: arShake .3s ease-out; }
+            /* Shake is one decaying impulse per hit from the canvas engine, scaled by damage — a graze and a
+               fight-ender no longer shake identically. .ar-quake is the node whose transform it writes. */
+            .ar-quake { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
             @keyframes arShake { 0%,100% { transform: translate(0,0) } 28% { transform: translate(-6px,3px) } 62% { transform: translate(6px,-3px) } }
             /* ── FRAMING ── the background is an arena whose lit sand oval sits in the bottom third of the
                image. Centred, that oval landed off the bottom of a portrait panel and both fighters ended up
@@ -1430,17 +1446,17 @@ function Styles() {
                still reads underneath. Wider than this and they crowd; narrower and they are back to being two
                small figures with an empty arena between them. */
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
-            .ar-floor > .ar-fighter:first-of-type { left: -3%; z-index: 3; }
-            /* Smaller AND standing further up the sand — the two cues together read as distance. Equal size on
-               the same baseline just reads as two of the same thing. */
-            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 2; width: 47%; bottom: 8%; }
-            .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
+            /* PARTY RIGHT, ENEMY LEFT. The enemy is smaller and stands further up the sand — the two cues
+               together read as distance; equal size on one baseline reads as two of the same thing. */
+            .ar-floor > .ar-fighter:first-of-type { left: -3%; z-index: 2; width: 47%; bottom: 8%; }
+            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 3; width: 54%; bottom: 0; }
+            .ar-floor > .ar-fighter:first-of-type .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
-            .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(9%); }
-            .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(-9%); }
-            .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
-            .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(-9%); }
+            .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(9%); }
+            .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
             .ar-ring.is-on-you .ar-fighter.is-foe { opacity: .28; filter: saturate(.35); }
             .ar-ring.is-on-them .ar-fighter:not(.is-foe) { opacity: .28; filter: saturate(.35); }
             /* The one casting stands up out of the frame a little. */

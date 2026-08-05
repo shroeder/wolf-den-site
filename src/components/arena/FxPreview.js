@@ -1,77 +1,95 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import SpriteFx from "@/components/arena/SpriteFx";
+import ArenaFx from "@/components/arena/ArenaFx";
 
-// ── THE VFX BENCH ────────────────────────────────────────────────────────────────────────────────────────────
-// Every effect, playing at the size it plays at in a real bout, over the real arena plate, side by side.
+// ── THE SPELL BENCH ──────────────────────────────────────────────────────────────────────────────────────────
+// Every effect, at the size and in the place it plays, over the real arena plate — on a loop, with its name on
+// screen. Enemy left, you right, as in the ring.
 //
-// This exists because "do the effects look good" is not answerable by the checks that were being run. Reading
-// the DOM tells you WHICH sheet is mounted, which is correctness, not quality; and watching one skill in a
-// filmstrip tells you about that skill. Neither one catches an eight-frame sequence that steps unevenly, an
-// effect that is invisible against warm sand, or one that plays so small it reads as a smudge.
-//
-// Looping on a fixed cadence so a screenshot at any moment catches every effect at the SAME point in its own
-// animation — which is what makes ten of them comparable in one picture.
-const KINDS = ["strike", "flurry", "spell", "execute", "rend", "drain", "sunder", "ward", "surge", "riposte", "gamble"];
-const CYCLE = 1400;
+// This exists because "do the effects look good" cannot be answered by the checks that kept being run: reading
+// the DOM tells you WHICH effect mounted, which is correctness rather than quality, and screenshotting a live
+// bout races a half-second animation and mostly catches the gap between two of them. One panel, one effect at
+// a time, announced — and holdable with ?only= so a single spell can be stared at.
+const ELEMENTS = ["fire", "water", "earth", "storm", "light", "shadow"];
+const KINDS = ["hit", "flurry", "execute", "rend", "drain", "sunder", "ward", "surge", "riposte", "gamble", "heal"];
+const ON_SELF = new Set(["ward", "surge", "heal"]);
+
+// The six affinities first — they are the loudest thing in the game — then the eleven move shapes.
+const REEL = [
+    ...ELEMENTS.map((el) => ({ label: `spell · ${el}`, spec: { kind: "spell", element: el, side: "them", power: 1.4 } })),
+    ...KINDS.map((k) => ({
+        label: k,
+        spec: { kind: k, element: "fire", side: ON_SELF.has(k) ? "you" : "them", power: 1.2 },
+    })),
+    { label: "critical hit", spec: { kind: "hit", element: "light", side: "them", power: 1.8, crit: true } },
+];
+
+const EVERY = 1600;
 
 export default function FxPreview() {
-    const [n, setN] = useState(0);
-    // ?frame=N PAUSES every effect on frame N. Racing a 560ms animation with a screenshot is not a test —
-    // it caught the blank held state after the animation finished and reported "nothing renders" for all
-    // eleven. A negative animation-delay seeks; paused holds. Deterministic, and comparable across effects.
-    const [frame, setFrame] = useState(null);
+    const fx = useRef(null);
+    const shake = useRef(null);
+    const [i, setI] = useState(0);
+    const [only, setOnly] = useState(null);
+
     useEffect(() => {
-        const q = new URLSearchParams(window.location.search);
-        const f = q.get("seek");
-        if (f !== null) { setFrame(Math.max(0, Math.min(1200, Number(f) || 0))); return undefined; }
-        const t = setInterval(() => setN((x) => x + 1), CYCLE);
-        return () => clearInterval(t);
+        const o = new URLSearchParams(window.location.search).get("only");
+        if (!o) return;
+        const idx = REEL.findIndex((r) => r.label.includes(o));
+        if (idx >= 0) setOnly(idx);
     }, []);
+
+    useEffect(() => {
+        const n = only ?? i;
+        const t = setTimeout(() => fx.current?.play(REEL[n].spec), 120);
+        const loop = setInterval(() => {
+            if (only !== null) fx.current?.play(REEL[only].spec);
+            else setI((x) => (x + 1) % REEL.length);
+        }, EVERY);
+        return () => { clearTimeout(t); clearInterval(loop); };
+    }, [i, only]);
+
+    const cur = REEL[only ?? i];
+
     return (
-        <div className={`fxb${frame !== null ? " is-paused" : ""}`}
-            style={frame !== null ? { "--seek": `-${frame}ms` } : undefined}>
-            {KINDS.map((k) => (
-                <div key={k} className="fxb-cell">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="fxb-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
-                    <span className="fxb-scrim" aria-hidden="true" />
-                    {/* A stand-in for a fighter, so an effect is judged against a body rather than empty sand. */}
-                    <span className="fxb-body" aria-hidden="true" />
-                    <SpriteFx key={`${k}-${n}-${frame ?? "live"}`} kind={k} side="right" />
-                    <b className="fxb-lab">{k}</b>
-                </div>
-            ))}
+        <div className="fxb">
+            <div className="fxb-ring" ref={shake}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="fxb-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
+                <span className="fxb-scrim" aria-hidden="true" />
+                {/* Stand-ins on the ground line, so an effect is judged against bodies rather than empty sand. */}
+                <span className="fxb-body is-foe" aria-hidden="true" />
+                <span className="fxb-body is-you" aria-hidden="true" />
+                <ArenaFx ref={fx} onShake={(x, y) => {
+                    const el = shake.current;
+                    if (el) el.style.transform = x || y ? `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)` : "";
+                }} />
+                <b className="fxb-lab">{cur.label}</b>
+            </div>
+            <p className="fxb-help">cycling every {EVERY}ms · <code>?only=fire</code> holds one</p>
             <style jsx global>{`
-                /* CELL SIZE MATTERS AND THE FIRST VERSION GOT IT WRONG. At 150x190 a cell was smaller than
-                   the 210px effect it was supposed to be showing, and .sfx is only 52% of its parent — so
-                   most of every effect fell outside the cell and was cut off by overflow:hidden. Seven of
-                   eleven effects looked "invisible" and the sheets were fine; the BENCH was broken.
-                   These now match the real ring's proportions (~310 wide), so what is shown here is what
-                   plays in a bout. */
-                .fxb { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 10px; padding: 10px; }
-                .fxb-cell { position: relative; height: 330px; border-radius: 12px; overflow: hidden;
-                    border: 1px solid rgba(255,190,110,0.3); background: #150f0c; }
+                .fxb { padding: 12px; max-width: 460px; margin: 0 auto; }
+                /* The real ring's proportions, so what is shown here is what plays in a bout. */
+                .fxb-ring { position: relative; height: 560px; border-radius: 16px; overflow: hidden;
+                    border: 1px solid rgba(255,190,110,0.3);
+                    background: linear-gradient(180deg,#150f0c,#1e1410 52%,#33210f); }
                 .fxb-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
                     object-position: 38% 100%; transform: scale(1.25); transform-origin: 50% 100%; }
                 .fxb-scrim { position: absolute; inset: 0;
-                    background: radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.18), transparent 72%),
-                                radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.5)); }
-                .fxb-body { position: absolute; right: 20%; bottom: 6%; width: 92px; height: 150px;
-                    border-radius: 40% 40% 22% 22%; background: linear-gradient(180deg, #6b5330, #2a2018);
-                    box-shadow: 0 8px 14px rgba(0,0,0,.6); }
-                /* Seek-and-hold, so a screenshot lands on a KNOWN frame instead of racing a 560ms animation
-                   — which is how "nothing renders" got reported for all eleven when the capture simply
-                   landed after they had finished. */
-                /* Targets .sfx-art — the effect is a single <img> moved by transforms now, not a stepped
-                   background. Left pointing at the old markup this matched nothing and the bench went back
-                   to racing a half-second animation, which is how it reported "nothing renders" twice. */
-                .fxb.is-paused .sfx-art { animation-play-state: paused !important;
-                    animation-delay: var(--seek) !important; }
-                .fxb-lab { position: absolute; left: 7px; top: 6px; z-index: 30; font-size: 10px; font-weight: 900;
-                    letter-spacing: .14em; text-transform: uppercase; color: #ffe0b0; text-shadow: 0 2px 6px #000; }
+                    background: radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,.18), transparent 72%),
+                                radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,.5)); }
+                .fxb-body { position: absolute; bottom: 22%; width: 96px; height: 156px; z-index: 2;
+                    border-radius: 42% 42% 20% 20%;
+                    background: linear-gradient(180deg,#6b5330,#2a2018);
+                    box-shadow: 0 10px 18px rgba(0,0,0,.6); }
+                .fxb-body.is-foe { left: 14%; transform: scale(.86); }
+                .fxb-body.is-you { right: 12%; }
+                .fxb-lab { position: absolute; left: 10px; top: 8px; z-index: 30; font-size: 12px; font-weight: 900;
+                    letter-spacing: .16em; text-transform: uppercase; color: #ffe0b0; text-shadow: 0 2px 8px #000; }
+                .fxb-help { margin: 8px 2px 0; font-size: 11px; color: #7f8790; }
+                .fxb-help code { color: #ffd75e; }
             `}</style>
         </div>
     );
