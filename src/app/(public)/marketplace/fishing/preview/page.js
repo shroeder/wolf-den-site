@@ -13,10 +13,10 @@ export const metadata = { title: "Fishing preview", robots: { index: false, foll
 // The real shape, taken from fishing.js: an ARRAY over the whole species table, each entry carrying whether
 // you have caught it. Guessing an object keyed by id is what made the first version of this preview 500.
 const LOG = [
-    { id: "sardine", name: "Sardine", emoji: "🐟", rarity: "common", lb: 0.5, gold: 4, odds: 6, caught: 8, best: 0.5 },
-    { id: "perch", name: "Silver Perch", emoji: "🐠", rarity: "common", lb: 3, gold: 7, odds: 8, caught: 8, best: 2.8 },
-    { id: "mackerel", name: "Mackerel", emoji: "🐟", rarity: "common", lb: 6, gold: 9, odds: 9, caught: 6, best: 5.5 },
-    { id: "marlin", name: "Blue Marlin", emoji: "🗡️", rarity: "legendary", lb: 400, gold: 900, odds: 300, caught: 0, best: null },
+    { id: "fish_anglerfish", name: "Sardine", emoji: "🐟", rarity: "common", lb: 0.5, gold: 4, odds: 6, caught: 8, best: 0.5 },
+    { id: "fish_cockle", name: "Silver Perch", emoji: "🐟", rarity: "common", lb: 3, gold: 7, odds: 8, caught: 8, best: 2.8 },
+    { id: "fish_coelacanth", name: "Mackerel", emoji: "🐟", rarity: "common", lb: 6, gold: 9, odds: 9, caught: 6, best: 5.5 },
+    { id: "fish_crab", name: "Blue Marlin", emoji: "🐟", rarity: "legendary", lb: 400, gold: 900, odds: 0.2, caught: 0, best: null },
 ];
 
 const base = (over = {}) => ({
