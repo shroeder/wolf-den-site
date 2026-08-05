@@ -158,25 +158,36 @@ export function makeBout(over = {}) {
     };
 }
 
+// Recap fixtures on the VP contract. These carried posFrom/posTo/rank, which the move to Victory Points
+// removed — and because the Recap component gated on `recap.rank`, the lab could not have shown the bug.
 const RECAP_WIN = {
-    won: true, foe: FOE, reward: { gold: 214, xp: 89 },
-    posFrom: 12, posTo: 8, size: 84,
-    rank: { name: "Hunter", icon: "/images/arena/rank-hunter.webp", color: "#b98cff", into: 13, span: 14, next: "Fang" },
-    rankUp: null, streak: 3, bestStreak: 5, rounds: 9,
+    won: true, foe: FOE, reward: { gold: 214, xp: 89, vp: 96, laurels: 121 },
+    vpGain: 96, vpFrom: 1040, vpTo: 1136, rankTo: 9, size: 84,
+    npcTier: null, npcUnlocked: false,
+    feats: [
+        { id: "clinical", name: "Clinical", laurels: 45, vp: 8, color: "#6fd0ff", blurb: "Won inside six rounds." },
+    ],
+    streak: 3, bestStreak: 5, rounds: 6,
 };
 
 const RECAP_RANKUP = {
-    ...RECAP_WIN, posFrom: 12, posTo: 6,
-    rank: { name: "Fang", icon: "/images/arena/rank-fang.webp", color: "#ff9f1c", into: 2, span: 15, next: "Warleader" },
-    rankUp: { from: "Hunter", to: "Fang", icon: "/images/arena/rank-fang.webp", color: "#ff9f1c" },
-    reward: { gold: 306, xp: 121 }, streak: 4, bestStreak: 5, rounds: 11,
+    ...RECAP_WIN,
+    reward: { gold: 306, xp: 121, vp: 168, laurels: 256 },
+    vpGain: 168, vpFrom: 1040, vpTo: 1208, rankTo: 6,
+    npcTier: 14, npcUnlocked: true,
+    feats: [
+        { id: "comeback", name: "Comeback", laurels: 70, vp: 15, color: "#ff9f1c", blurb: "Won from under a fifth of your vigour." },
+        { id: "giantkiller", name: "Giant-Killer", laurels: 65, vp: 15, color: "#b061ff", blurb: "Beat a loadout a quarter stronger than yours." },
+        { id: "devastating", name: "Devastating", laurels: 35, vp: 5, color: "#ffd75e", blurb: "Landed three or more critical hits." },
+    ],
+    streak: 4, rounds: 11,
 };
 
 const RECAP_LOSS = {
-    won: false, foe: FOE, reward: null,
-    posFrom: 12, posTo: 12, size: 84,
-    rank: { name: "Hunter", icon: "/images/arena/rank-hunter.webp", color: "#b98cff", into: 9, span: 14, next: "Fang" },
-    rankUp: null, streak: 0, bestStreak: 5, rounds: 7,
+    won: false, foe: FOE, reward: { gold: 0, xp: 0, vp: 0, laurels: 38 },
+    vpGain: 0, vpFrom: 1040, vpTo: 1040, rankTo: 12, size: 84,
+    npcTier: null, npcUnlocked: false, feats: [],
+    streak: 0, bestStreak: 5, rounds: 7,
 };
 
 const MY_POWER = 340;

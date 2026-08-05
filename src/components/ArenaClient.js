@@ -206,45 +206,61 @@ function FighterBody({ f, mirrored, hurt, lunge, down, wind = 0, brace = false, 
 // and the rung counts UP in front of you rather than being a number you are expected to have memorised.
 // Nothing in here may throw. A crash while this is mounted leaves the portaled overlay on screen with the
 // body scroll-locked underneath it and no button anywhere — which is exactly the dark screen you get stuck on.
+// ── WHAT JUST HAPPENED ───────────────────────────────────────────────────────────────────────────────────────
+// The end of a bout is the payoff for ten rounds of decisions, and it was a line of text and a button — this
+// component gated on `recap.rank`, a field the move to Victory Points deleted, so every fight since has fallen
+// through to the bare stub. Nothing about the fight itself has EVER been reported: you were told you won and
+// nothing about how.
+//
+// Three things, in the order you care about them:
+//   THE POINTS   — the number that moved your standing, counting up, plus where it left you.
+//   THE FEATS    — named things you did, which is the only place performance is ever acknowledged.
+//   THE FIGHT    — damage dealt and taken, your biggest blow, crits, what your guard actually stopped.
+// Nothing in here may throw: a crash while this is mounted leaves a scroll-locked overlay with no way off it.
 function Recap({ bout, busy, onClose }) {
-    const r = bout?.recap && bout.recap.rank ? bout.recap : null;
-    useScrollLock(true);   // the page behind must not scroll out from under the modal
-    const up = r?.rankUp || null;
-    const tint = up ? up.color : r?.rank?.color || (bout.won ? "#ffd75e" : "#ff6f7d");
-    // Counts DOWN, because a better place is a smaller number.
-    const [shown, setShown] = useState(r ? r.posFrom : 0);
-    useEffect(() => {
-        if (!r || shown <= r.posTo) return undefined;
-        const t = setTimeout(() => setShown((n) => n - 1), 380);
-        return () => clearTimeout(t);
-    }, [r, shown]);
+    const r = bout?.recap || null;
+    useScrollLock(true);
+    const won = Boolean(bout?.won);
+    const tint = won ? "#ffd75e" : "#ff6f7d";
 
-    // A bout finished before the recap existed still has to be dismissable.
-    if (!r) {
-        return (
-            <div className={`ar-result ${bout.won ? "is-win" : "is-loss"}`}>
-                <b>{bout.won ? `You beat ${bout.foe.name}` : `${bout.foe.name} put you down`}</b>
-                <button type="button" className="ar-btn" disabled={busy} onClick={onClose}>Back to the ladder</button>
-            </div>
-        );
-    }
-    const pct = r.rank.span ? Math.min(100, (r.rank.into / r.rank.span) * 100) : 0;
+    // ── THE POINTS, COUNTING UP ── a number that lands already-final is just a receipt.
+    const gain = Number(r?.vpGain) || 0;
+    const [shown, setShown] = useState(0);
+    useEffect(() => {
+        if (!gain) return undefined;
+        const step = Math.max(1, Math.round(gain / 18));
+        const t = setInterval(() => setShown((n) => (n + step >= gain ? gain : n + step)), 45);
+        return () => clearInterval(t);
+    }, [gain]);
+    useEffect(() => { if (gain && shown === gain) Sfx.tick(4); }, [shown, gain]);
+
+    // ── THE FIGHT, READ OFF THE LOG ── these are facts about what you just did, and none of them have ever
+    // been shown anywhere. The log is the only record and it scrolls away under the deck.
+    const tally = (() => {
+        const log = bout?.log || [];
+        let dealt = 0, taken = 0, blocked = 0, crits = 0, healed = 0;
+        let best = { n: 0, name: null };
+        for (const l of log) {
+            const mine = l.who === "you";
+            if (mine && l.damage > 0) {
+                dealt += l.damage;
+                if (l.damage > best.n) best = { n: l.damage, name: l.ability || (l.grade === "burn" ? "Burn" : "Strike") };
+            }
+            if (!mine && l.damage > 0) taken += l.damage;
+            blocked += (l.blocked || 0) + (l.soaked || 0);
+            if (mine && l.crit) crits += 1;
+            healed += l.healed || 0;
+        }
+        return { dealt, taken, blocked, crits, healed, best };
+    })();
+
+    const feats = Array.isArray(r?.feats) ? r.feats : [];
+    const reward = r?.reward || bout?.reward || null;
 
     return (
         <Portal>
-        {/* Tapping the backdrop leaves. Twice now this screen has ended up as a dark sheet with the card
-            missing or off-view and LITERALLY nothing to press — the failure mode of a modal whose only exit
-            lives inside the thing that failed. The backdrop and the corner button are outside the card on
-            purpose, so they survive anything going wrong inside it. */}
-        {/* ── POSITIONED INLINE, ON PURPOSE ──────────────────────────────────────────────────────────────
-            This overlay has landed halfway down the document with no way to reach it more than once. Every
-            time, the cause was the LAYOUT arriving from a class — a stylesheet that hadn't applied to a node
-            portaled into <body>, or a rule edited out from under it. An overlay whose entire job is "cover the
-            viewport" should not be able to fail at that because a class didn't land, so the six properties
-            that make it a modal are inline and the class is left holding only decoration.
-            Belt and braces: useScrollLock pins the body while this is open, so if it were ever laid out in the
-            document flow again it would be unreachable — inline styles make that impossible rather than
-            unlikely. */}
+        {/* The backdrop and the corner button live OUTSIDE the card on purpose, so they survive anything
+            going wrong inside it. This screen has twice been a dark sheet with nothing to press. */}
         <div className="ar-recap" role="dialog" aria-modal="true"
             style={{
                 "--tint": tint,
@@ -257,63 +273,66 @@ function Recap({ bout, busy, onClose }) {
                 aria-label="Back to the ladder">Close</button>
             <div className="ar-recap-card" onClick={(e) => e.stopPropagation()}>
                 <div className="ar-rays" aria-hidden="true">
-                    {Array.from({ length: up ? 24 : 14 }).map((_, i) => (
-                        <span key={i} style={{ "--a": `${i * (360 / (up ? 24 : 14))}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />
+                    {Array.from({ length: won ? 24 : 12 }).map((_, i) => (
+                        <span key={i} style={{ "--a": `${i * (360 / (won ? 24 : 12))}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />
                     ))}
                 </div>
 
-                <span className="ar-recap-kick">{bout.won ? "Victory" : "Defeated"}</span>
-                <b className="ar-recap-title">{bout.won ? `You beat ${r.foe.name}` : `${r.foe.name} put you down`}</b>
-                <p className="ar-recap-sub">{r.rounds} round{r.rounds === 1 ? "" : "s"} in the ring</p>
+                <span className="ar-recap-kick">{won ? "Victory" : "Defeated"}</span>
+                <b className="ar-recap-title">
+                    {won ? `You beat ${bout?.foe?.name || "them"}` : `${bout?.foe?.name || "They"} put you down`}
+                </b>
+                <p className="ar-recap-sub">
+                    {r?.rounds || bout?.beat || 0} round{(r?.rounds || 0) === 1 ? "" : "s"} in the ring
+                    {r?.npcTier ? ` · Gauntlet tier ${r.npcTier}` : ""}
+                </p>
 
-                {/* THE CLIMB — the number that was missing. */}
-                <div className="ar-climb">
-                    <span className="ar-climb-lab">Place</span>
-                    <span className="ar-climb-num">
-                        <i className="was">#{r.posFrom}</i>
-                        {r.posTo !== r.posFrom ? <i className="arrow" aria-hidden="true" /> : null}
-                        {r.posTo !== r.posFrom ? <i className="now">#{shown}</i> : null}
-                    </span>
-                    <span className="ar-climb-of">of {r.size}</span>
+                {/* THE POINTS. */}
+                <div className="ar-vp">
+                    <span className="ar-vp-num">+{money(shown)}</span>
+                    <span className="ar-vp-lab">Victory Points</span>
+                    {r?.rankTo ? <em className="ar-vp-rank">now #{r.rankTo} of {r.size}</em> : null}
                 </div>
 
-                {up ? (
-                    <div className="ar-recap-rankup">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={up.icon} alt="" draggable="false" />
-                        <div>
-                            <span>Rank up</span>
-                            <b>{up.to}</b>
-                            <em>You were {up.from}.</em>
-                        </div>
+                {r?.npcUnlocked ? (
+                    <div className="ar-unlock">Tier {r.npcTier + 1} unlocked</div>
+                ) : null}
+
+                {/* THE FEATS — the only place the game ever says HOW you fought. */}
+                {feats.length ? (
+                    <div className="ar-feats">
+                        {feats.map((f) => (
+                            <span key={f.id} className="ar-feat" style={{ "--el": f.color || "#ffd75e" }}>
+                                <b>{f.name}</b>
+                                <em>{f.blurb}</em>
+                                <u>+{f.laurels}<i>laurels</i></u>
+                            </span>
+                        ))}
                     </div>
-                ) : (
-                    <div className="ar-recap-rank">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={r.rank.icon} alt="" draggable="false" />
-                        <div>
-                            <b>{r.rank.name}</b>
-                            <span className="ar-recap-bar"><i style={{ width: `${pct}%` }} /></span>
-                            <em>{r.rank.next ? `${Math.max(0, r.rank.span - r.rank.into)} more to ${r.rank.next}` : "Top of the pack."}</em>
-                        </div>
-                    </div>
-                )}
+                ) : null}
+
+                {/* THE FIGHT. */}
+                <div className="ar-tally">
+                    <span><i>Damage dealt</i><b>{money(tally.dealt)}</b></span>
+                    <span><i>Damage taken</i><b>{money(tally.taken)}</b></span>
+                    {tally.best.n > 0 ? <span><i>Biggest blow</i><b>{tally.best.name} · {money(tally.best.n)}</b></span> : null}
+                    {tally.blocked > 0 ? <span><i>Turned aside</i><b>{money(tally.blocked)}</b></span> : null}
+                    {tally.crits > 0 ? <span><i>Criticals</i><b>{tally.crits}</b></span> : null}
+                    {tally.healed > 0 ? <span><i>Vigour recovered</i><b>{money(tally.healed)}</b></span> : null}
+                </div>
 
                 <div className="ar-recap-rows">
-                    {r.reward ? (
-                        <>
-                            <span><i>Gold</i><b>+{money(r.reward.gold)}</b></span>
-                            <span><i>XP</i><b>+{money(r.reward.xp)}</b></span>
-                            {r.reward.chest ? <span><i>Chest</i><b>{r.reward.chest}</b></span> : null}
-                        </>
-                    ) : <span className="ar-recap-none"><i>No purse</i><b>the rung holds</b></span>}
-                    <span><i>Streak</i><b>{r.streak}{r.streak > 0 && r.streak >= r.bestStreak ? " · best" : ""}</b></span>
-                    <span><i>Still above you</i><b>{Math.max(0, r.posTo - 1)}</b></span>
+                    {reward?.laurels ? <span><i>Laurels</i><b>+{money(reward.laurels)}</b></span> : null}
+                    {reward?.gold ? <span><i>Gold</i><b>+{money(reward.gold)}</b></span> : null}
+                    {reward?.xp ? <span><i>XP</i><b>+{money(reward.xp)}</b></span> : null}
+                    <span><i>Streak</i><b>{r?.streak || 0}{(r?.streak || 0) > 0 && r.streak >= (r.bestStreak || 0) ? " · best" : ""}</b></span>
                 </div>
 
-                <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
-                    {bout.won ? "Next fighter" : "Back to the ladder"}
-                </button>
+                <div className="ar-recap-foot">
+                    <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
+                        {won ? "Next fight" : "Back to the ladder"}
+                    </button>
+                </div>
             </div>
         </div>
         </Portal>
@@ -593,17 +612,24 @@ export default function ArenaClient({ initial }) {
         const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
         if (!l) return undefined;
         const mineNow = l.who === "you";
-        const kind = l.grade === "ward" ? "ward"
-            : l.grade === "guard" ? "ward"
-                : l.grade === "item" ? "heal"
-                    : (mineNow && bout.me?.abilities?.find((a) => a.name === l.ability)?.kind) || "strike";
+        // Look the move up on WHOEVER THREW IT. This used to read `mineNow && bout.me.abilities...`, which
+        // short-circuits to false on their beat — so every enemy spell, bleed and flurry played the same
+        // generic impact, and half the fight had no visual identity at all.
+        const caster = mineNow ? bout.me?.abilities : bout.foe?.abilities;
+        const thrown = l.ability ? (caster || []).find((a) => a.name === l.ability)?.kind : null;
+        const kind = l.grade === "burn" ? "rend"
+            : l.grade === "ward" ? (l.kind === "riposte" ? "riposte" : "ward")
+                : l.grade === "guard" ? "ward"
+                    : l.grade === "item" ? "heal"
+                        : thrown || "strike";
         setFx({
             key: bout.log.length,
             kind,
             element: mineNow ? bout.me?.element : bout.foe?.element,
             // The burst goes on whoever it HAPPENED TO. A ward, a guard and a poultice are all things you do
             // to yourself; a blow lands on the other one.
-            side: ["ward", "heal"].includes(kind) || !mineNow ? "left" : "right",
+            // Where it HAPPENED, not who caused it: a ward/heal/surge is on you, a burn tick is on them.
+            side: ["ward", "heal", "surge"].includes(kind) ? "left" : (mineNow || l.grade === "burn") ? "right" : "left",
             crit: Boolean(l.crit),
         });
         const t = setTimeout(() => setFx(null), 900);
@@ -801,7 +827,7 @@ export default function ArenaClient({ initial }) {
                             so a new archetype is never left with no effect at all. */}
                         {fx ? (
                             hasSheet(fx.kind)
-                                ? <SpriteFx key={fx.key} kind={fx.kind} side={fx.side} crit={fx.crit} />
+                                ? <SpriteFx key={fx.key} kind={fx.kind} side={fx.side} crit={fx.crit} charge={fx.charge} />
                                 : <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
                         ) : null}
                     </div>
@@ -1644,13 +1670,54 @@ function Styles() {
                 background: rgba(0,0,0,0.5); }
             .ar-recap-bar > i { display: block; height: 100%; background: var(--tint); transition: width .8s cubic-bezier(.2,.8,.3,1); }
 
+            /* ── THE POINTS ── the number the whole bout was for. */
+            .ar-vp { position: relative; display: grid; justify-items: center; gap: 1px; margin: 2px 0 14px; }
+            .ar-vp-num { font-size: 2.6rem; font-weight: 900; line-height: 1; letter-spacing: -0.02em;
+                color: color-mix(in srgb, var(--tint) 78%, white); font-variant-numeric: tabular-nums;
+                text-shadow: 0 0 30px color-mix(in srgb, var(--tint) 60%, transparent); }
+            .ar-vp-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .22em; text-transform: uppercase;
+                color: #8a7fae; }
+            .ar-vp-rank { font-style: normal; margin-top: 4px; font-size: 12px; color: #c9d2db; }
+            .ar-unlock { position: relative; margin: 0 0 13px; padding: 7px 12px; border-radius: 10px;
+                font-size: 12px; font-weight: 900; color: #8bf0b4;
+                background: rgba(139,240,180,0.12); border: 1px solid rgba(139,240,180,0.45); }
+
+            /* ── THE FEATS ── named, so they are worth telling somebody about. */
+            .ar-feats { position: relative; display: grid; gap: 6px; margin-bottom: 13px; }
+            .ar-feat { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px;
+                text-align: left; padding: 8px 11px; border-radius: 11px;
+                background: linear-gradient(100deg, color-mix(in srgb, var(--el) 20%, transparent), rgba(255,255,255,0.03) 70%);
+                border: 1px solid color-mix(in srgb, var(--el) 50%, transparent);
+                animation: arCardIn .4s cubic-bezier(.2,1.5,.35,1) both; }
+            .ar-feat b { font-size: 13px; color: var(--el); }
+            .ar-feat em { grid-column: 1; font-style: normal; font-size: 10.5px; line-height: 1.3; color: #9aa2ab; }
+            .ar-feat u { grid-row: 1 / span 2; grid-column: 2; text-decoration: none; text-align: right;
+                font-size: 14px; font-weight: 900; color: var(--el); }
+            .ar-feat u i { display: block; font-style: normal; font-size: 8px; letter-spacing: .12em;
+                text-transform: uppercase; opacity: .7; }
+
+            /* ── THE FIGHT ── what actually happened, which has never been reported anywhere. */
+            .ar-tally { position: relative; display: grid; gap: 3px; margin-bottom: 13px; padding: 9px 11px;
+                border-radius: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
+            .ar-tally > span { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+                font-size: 11.5px; }
+            .ar-tally i { font-style: normal; color: #8a939d; }
+            .ar-tally b { color: #e9eef3; font-variant-numeric: tabular-nums; text-align: right; }
+
             .ar-recap-rows { position: relative; display: grid; gap: 5px; margin-bottom: 15px; }
             .ar-recap-rows > span { display: flex; align-items: center; justify-content: space-between;
                 padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,0.05); font-size: 0.85rem; }
             .ar-recap-rows i { font-style: normal; color: #a99fc4; }
             .ar-recap-rows b { color: #ffd75e; font-variant-numeric: tabular-nums; text-transform: capitalize; }
             .ar-recap-none b { color: #a99fc4; }
-            .ar-recap-go { position: relative; width: 100%; }
+            /* STICKY. The recap grew a feats block and a fight tally, and on a 667px phone the card now
+               scrolls — which put "Next fight", the only thing you actually want to press, below the fold
+               inside the modal. Pinned to the bottom of the scroll box so it is always reachable, with a
+               solid backing so the content does not read through it. */
+            .ar-recap-go { position: sticky; bottom: -1px; width: 100%; z-index: 3; }
+            .ar-recap-card { padding-bottom: 0; }
+            .ar-recap-foot { position: sticky; bottom: -1px; z-index: 3; padding: 10px 0 14px;
+                background: linear-gradient(180deg, transparent, #14101a 34%, #14101a); }
 
             .ar-err { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
                 font-size: 12px; font-weight: 800; color: #ffd0a0;

@@ -45,14 +45,15 @@ const SHEETS = {
 
 export const hasSheet = (kind) => Boolean(SHEETS[kind]);
 
-export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false }) {
+export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false, charge = false }) {
     const sheet = SHEETS[kind];
     if (!sheet) return null;
     // Things you do to YOURSELF (a ward, a surge, a drink) belong over your own body; things you do to THEM
     // belong where the two of you meet, which is inboard of centre rather than in the middle of a half.
     const onSelf = kind === "ward" || kind === "surge" || kind === "heal" || kind === "guard";
     return (
-        <span className={`sfx is-${side}${crit ? " is-crit" : ""}${onSelf ? " is-self" : ""}`} aria-hidden="true">
+        <span className={`sfx is-${side}${crit ? " is-crit" : ""}${onSelf ? " is-self" : ""}${charge ? " is-charge" : ""}`}
+            aria-hidden="true">
             <i style={{ backgroundImage: `url(${sheet})`, width: `${size}px`, height: `${size}px` }} />
             <style jsx>{`
                 /* Anchored low and inboard — where two fighters standing on sand actually make contact —
@@ -84,6 +85,14 @@ export default function SpriteFx({ kind = "hit", side = "right", size = 210, cri
                 /* A crit gets a bigger, brighter, slightly slower version of the same effect. */
                 .sfx.is-crit > i { transform: scale(1.35); filter: brightness(1.35) saturate(1.2);
                     animation-duration: ${Math.round(DUR * 1.15)}ms; }
+                /* ── THE CHARGE ── a cast and its impact used the same sheet at the same size, so every skill
+                   flashed the identical effect twice: once over the caster, once over the target, reading as
+                   a stutter rather than as cause and effect. The wind-up is now smaller, dimmer and slower —
+                   power GATHERING — and only the blow that lands plays at full size. */
+                .sfx.is-charge { align-items: center; padding-bottom: 0; }
+                .sfx.is-charge > i { transform: scale(.58); opacity: .8;
+                    filter: brightness(.85) saturate(1.3) blur(.4px);
+                    animation-duration: ${Math.round(DUR * 1.7)}ms; }
             `}</style>
         </span>
     );
