@@ -1340,8 +1340,12 @@ function Styles() {
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
             .ar-focus .ar-cdchip { pointer-events: auto; }
-            .ar-cdchip { position: relative; width: 30px; height: 30px; border-radius: 9px; display: grid;
-                place-items: center; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
+            /* padding:0 and appearance:none are load-bearing. These were <span>s; making them buttons handed
+               them the UA default padding of 1px 6px, which ate 12 of the 30px and shoved every sprite off
+               centre inside its own box. */
+            .ar-cdchip { position: relative; width: 30px; height: 30px; padding: 0; appearance: none;
+                -webkit-appearance: none; border-radius: 9px; display: grid; place-items: center;
+                background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
             .ar-cdchip img { width: 22px; height: 22px; object-fit: contain; opacity: .34; filter: grayscale(1); }
             .ar-cdchip.is-ready { border-color: color-mix(in srgb, var(--el) 65%, transparent);
                 box-shadow: 0 0 12px -3px var(--el); }
