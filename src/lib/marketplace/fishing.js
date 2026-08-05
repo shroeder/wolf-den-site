@@ -651,6 +651,14 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
             SET fish_state = $2::jsonb,
                 fish_casts = CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
                                   THEN COALESCE(fish_casts, 0) + 1 ELSE 1 END,
+                -- fish_recharges MUST roll over here too. This statement stamped fish_day forward while
+                -- leaving yesterday's paid recharges sitting in the row, so the moment you cast on a new day
+                -- they became "today's" recharges: a one-off purchase of N casts turned into +N casts EVERY
+                -- day, forever, and rechargeCost() kept reading the same stale count so the price never fell
+                -- back to 100 either. Caught by GrayKitsune, who bought 4 and had 14 casts the next day
+                -- without spending. The recharge purchase below always got this right; the cast never did.
+                fish_recharges = CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                                      THEN COALESCE(fish_recharges, 0) ELSE 0 END,
                 fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
                 updated_at = NOW()
           WHERE buyer_id = $1 AND fish_state IS NULL
