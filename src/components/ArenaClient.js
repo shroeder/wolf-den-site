@@ -61,6 +61,31 @@ function blip(kind) {
     } catch { /* audio is a bonus */ }
 }
 
+// One ability, said in as few words as possible: the number that matters, big, then the exceptions as chips.
+// Four cards of near-identical paragraph — three of them opening with the same twenty words — is not something
+// anybody reads in the middle of a fight.
+function SkillFace({ ab, left = 0 }) {
+    const e = ab.effect || {};
+    return (
+        <span className="sk">
+            <span className="sk-top">
+                <b className="sk-name">{ab.name}</b>
+                <span className={`sk-cd${left ? "" : " is-ready"}`}>{left ? `Ready in ${left}` : "Ready"}</span>
+            </span>
+            <span className="sk-head">
+                <strong>{e.head}</strong>
+                {e.sub ? <em>{e.sub}</em> : null}
+            </span>
+            {e.tags?.length ? (
+                <span className="sk-tags">
+                    {e.tags.map((t) => <i key={t.t} className={`sk-tag is-${t.k}`}>{t.t}</i>)}
+                </span>
+            ) : null}
+            <span className="sk-foot">{ab.from} · cools {ab.cooldown || 0} turns</span>
+        </span>
+    );
+}
+
 // A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
 function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false, element = null }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
@@ -321,6 +346,7 @@ export default function ArenaClient({ initial }) {
         const abilities = bout.me?.abilities || [];
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
+        const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar">
                 <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}`}>
@@ -339,6 +365,12 @@ export default function ArenaClient({ initial }) {
                         ) : null}
                         {bout.underdog > 1 ? (
                             <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
+                        ) : null}
+                        {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here. */}
+                        {bout.beat <= 1 && bout.opener ? (
+                            <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
+                                {bout.opener === "you" ? "You're faster — you open" : `${bout.foe.name} is faster — they open`}
+                            </span>
                         ) : null}
                     </div>
 
@@ -465,9 +497,30 @@ export default function ArenaClient({ initial }) {
                     {!bout.over ? (
                         <div className="ar-deck">
                             {bout.turn === "them" ? (
-                                <p className="ar-prompt is-def">
-                                    {reading ? <>Read it — <b>{bout.incoming?.name || "a heavy swing"}</b></> : <>Time your <b>block</b></>}
-                                </p>
+                                <>
+                                    <p className="ar-prompt is-def">
+                                        {reading ? <>Read it — <b>{bout.incoming?.name || "a heavy swing"}</b></> : <>Time your <b>block</b></>}
+                                    </p>
+                                    {/* Wards are playable HERE, against the blow you can see coming — and they
+                                        don't cost you the beat, you still block afterwards. */}
+                                    {reading && wards.length ? (
+                                        <div className="ar-wards">
+                                            {wards.map((w) => {
+                                                const wl = bout.cd?.[w.id] || 0;
+                                                return (
+                                                    <button key={w.id} type="button"
+                                                        className={`ar-ward${wl ? " is-poor" : ""}`}
+                                                        disabled={Boolean(wl) || busy}
+                                                        onClick={() => act("beat", { command: "defend", ability: w.id })}>
+                                                        <GiShield aria-hidden="true" />
+                                                        <span>{w.name}</span>
+                                                        <u>{wl ? `Ready in ${wl}` : "Brace"}</u>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : null}
+                                </>
                             ) : pending ? (
                                 <p className="ar-prompt is-atk">{pending.label} — time it</p>
                             ) : menu === "skill" ? (
@@ -485,16 +538,7 @@ export default function ArenaClient({ initial }) {
                                                     // eslint-disable-next-line @next/next/no-img-element
                                                     <img className="ar-pick-art" src={ab.sprite} alt="" draggable="false" />
                                                 ) : <span className="ar-pick-art ar-pick-none"><GiSwordWound /></span>}
-                                                <span className="ar-pick-body">
-                                                    <b>{ab.name}</b>
-                                                    {/* What it DOES. The blurb is flavour and told you nothing
-                                                        about whether it was worth the cooldown. */}
-                                                    <em>{ab.effect || ab.blurb}</em>
-                                                    <i>{ab.from}</i>
-                                                </span>
-                                                <u className="ar-pick-cost">
-                                                    {left ? `${left} turn${left === 1 ? "" : "s"}` : `${ab.cooldown || 0}t cd`}
-                                                </u>
+                                                <SkillFace ab={ab} left={left} />
                                             </button>
                                         );
                                     })}
@@ -608,11 +652,8 @@ export default function ArenaClient({ initial }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="ar-ability-art" src={ab.sprite} alt="" draggable="false" />
                                 ) : null}
-                                <b>{ab.name}</b>
+                                <SkillFace ab={ab} />
                             </span>
-                            <em>{ab.effect || ab.blurb}</em>
-                            {ab.effect && ab.blurb ? <em className="ar-ability-flavour">&ldquo;{ab.blurb}&rdquo;</em> : null}
-                            <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.cooldown || 0}-turn cooldown</u></span>
                         </div>
                     ))}
                 </div>
@@ -1126,6 +1167,33 @@ function Styles() {
             .ar-prompt b { font-weight: 900; }
             .ar-prompt.is-atk { color: #ffd75e; }
             .ar-prompt.is-def { color: #6fd0ff; }
+
+            /* ── A SKILL, SAID SHORT ── */
+            .sk { display: grid; gap: 3px; min-width: 0; flex: 1; text-align: left; }
+            .sk-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+            .sk-name { font-size: 13px; color: #fff; }
+            .sk-cd { font-size: 9.5px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #7f8790; }
+            .sk-cd.is-ready { color: #8bf0b4; }
+            .sk-head { display: flex; align-items: baseline; gap: 6px; }
+            .sk-head strong { font-size: 19px; font-weight: 900; letter-spacing: -0.02em; color: #ffd75e;
+                text-shadow: 0 0 16px rgba(255,215,94,0.35); }
+            .sk-head em { font-style: normal; font-size: 10.5px; color: #9aa2ab; }
+            .sk-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+            .sk-tag { font-style: normal; font-size: 9.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+                border: 1px solid currentColor; }
+            .sk-tag.is-good { color: #8bf0b4; }
+            .sk-tag.is-bad { color: #ff9f9f; }
+            .sk-tag.is-el { color: #b061ff; }
+            .sk-foot { font-size: 9px; color: #6f767e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+            /* ── BRACE ── defensive skills, offered while you read their move. */
+            .ar-wards { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 4px; }
+            .ar-ward { display: flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 10px;
+                cursor: pointer; font-size: 11.5px; font-weight: 800; color: #cfe8ff;
+                background: rgba(111,208,255,0.1); border: 1px solid rgba(111,208,255,0.45); }
+            .ar-ward :global(svg) { width: 15px; height: 15px; }
+            .ar-ward u { text-decoration: none; font-size: 9.5px; font-weight: 900; color: #6fd0ff; }
+            .ar-ward.is-poor { opacity: .4; cursor: default; }
 
             /* ── THE WARNING ── deliberately not shaped like the ring. Defending has to look like a different
                job than attacking, or it reads as another turn of your own. */

@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buildKit, elementClash, gradeFor, ringMsFor, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL } from "@/lib/marketplace/arena-kit.js";
+import { buildKit, elementClash, gradeFor, ringMsFor, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -193,8 +193,10 @@ async function kitFor(buyerId) {
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
     const art = await itemSpriteMap().catch(() => ({}));
     for (const a of kit.abilities) a.sprite = a.itemId ? art[a.itemId] || null : null;
+    const stats = sumItemStats(ids) || {};
     return {
         level, gearPower,
+        speed: speedOf(level, Number(stats.ferocity) || 0),
         vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
         element: kit.element, abilities: kit.abilities,
         ringMs: ringMsFor(gearPower),
@@ -340,7 +342,7 @@ export async function seenArena(buyerId) {
 function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
-        cd: b.cd || {}, ringMs: b.ringMs, clash: b.clash,
+        cd: b.cd || {}, ringMs: b.ringMs, clash: b.clash, opener: b.opener || "you",
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
         incoming: b.incoming || null,
         // Blocking is strictly more work than swinging — you have to read the move first — so the window is
@@ -371,8 +373,9 @@ export async function startBout(buyerId, targetId = null) {
         foe: {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
+            speed: foeKit.speed,
         },
-        me: { element: me.element, abilities: me.abilities, might: me.might },
+        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
         ringMs: foeKit.ringMs,                   // THEIR gear decides how hard your window is
@@ -380,7 +383,10 @@ export async function startBout(buyerId, targetId = null) {
         foeHp: foeKit.vigour, foeMaxHp: foeKit.vigour,
         cd: {},                                  // abilityId -> turns before it can be used again
         items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
-        turn: "you",                             // beats alternate; you play both of them
+        // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
+        // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
+        turn: me.speed >= foeKit.speed ? "you" : "them",
+        opener: me.speed >= foeKit.speed ? "you" : "them",
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
     };
@@ -428,6 +434,22 @@ export async function fightRound(buyerId, opts = {}) {
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
     const cool = (n) => { for (const k of Object.keys(b.cd)) b.cd[k] = Math.max(0, (b.cd[k] || 0) - n); };
+
+    // ── DEFENSIVE SKILL ── played during their wind-up, and it does NOT consume the beat: you still block.
+    // Wards were only usable on your own turn, which meant spending a swing to brace for a blow you could see
+    // coming — the one moment the ability is actually for was the one moment you couldn't use it.
+    if (!mine && command === "defend") {
+        const ward = (b.me.abilities || []).find((x2) => x2.id === opts.abilityId && x2.defensive);
+        if (!ward) return { ok: false, error: "no_ability", ...(await getArenaState(buyerId)) };
+        if ((b.cd[ward.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
+        b.cd[ward.id] = ward.cooldown || 0;
+        const soak = Math.round(b.maxHp * 0.18);
+        b.shield += soak;
+        b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0,
+            text: `${ward.name} — braced for ${soak}.`, ability: ward.name });
+        await saveBout(buyerId, b);
+        return { ok: true, ...(await getArenaState(buyerId)) };
+    }
 
     if (mine && (command === "guard" || command === "item")) {
         // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.

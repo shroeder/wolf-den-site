@@ -90,24 +90,39 @@ const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 
 const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
 
-function effectText(kind, power, element) {
+// A sentence per ability meant four cards of near-identical paragraph, and three of them opened with the same
+// twenty words. Nobody reads that mid-fight. An ability is a HEADLINE and a couple of TAGS instead — the
+// number you care about, big, and the exceptions as chips you can scan.
+//
+// `head`  the one figure that matters, or the whole effect when there is no damage
+// `tags`  {t: text, k: kind} — kind drives the colour, so a downside can never look like an upside
+function effectOf(kind, power, element) {
     const el = element ? ELEMENTS[element]?.label || element : null;
     switch (kind) {
         case "strike":
-            return `${x(power)} a normal swing. Timing counts for half again as much on a strike — nail it and it lands far above anything else you own.`;
+            return { head: x(power), sub: "damage", tags: [{ t: "Timing counts double", k: "good" }] };
         case "spell":
-            return `${x(power * SPELL_POWER_TAX)} a normal swing — less raw power, but it cuts ${Math.round(SPELL_PIERCE * 100)}% of their guard`
-                + `${el ? ` and answers on its own ${el} rather than your overall affinity` : ""}.`;
+            return {
+                head: x(power * SPELL_POWER_TAX), sub: "damage",
+                tags: [
+                    { t: `Cuts ${Math.round(SPELL_PIERCE * 100)}% guard`, k: "good" },
+                    ...(el ? [{ t: `Own ${el}`, k: "el" }] : []),
+                    { t: "Less raw power", k: "bad" },
+                ],
+            };
         case "execute":
-            return `${x(power)} a normal swing, and ${x(power * EXECUTE_MULT)} once they are under ${Math.round(EXECUTE_UNDER * 100)}% vigour. A finisher.`;
+            return {
+                head: x(power), sub: "damage",
+                tags: [{ t: `${x(power * EXECUTE_MULT)} under ${Math.round(EXECUTE_UNDER * 100)}% vigour`, k: "good" }],
+            };
         case "gamble":
-            return `A coin flip: ${x(power * 2)} a normal swing, or nothing at all.`;
+            return { head: x(power * 2), sub: "damage", tags: [{ t: "Coin flip — or nothing", k: "bad" }] };
         case "surge":
-            return `No damage. Your next ${SURGE_SWINGS} swings hit ${Math.round(SURGE_MULT * 100)}% harder.`;
+            return { head: `+${Math.round(SURGE_MULT * 100)}%`, sub: `on your next ${SURGE_SWINGS} swings`, tags: [{ t: "No damage", k: "bad" }] };
         case "ward":
-            return `No damage. Braces you — soaks ${Math.round(WARD_SOAK * 100)}% of your vigour off what lands next.`;
+            return { head: `${Math.round(WARD_SOAK * 100)}%`, sub: "of your vigour soaked", tags: [{ t: "Use it on their turn", k: "good" }, { t: "No damage", k: "bad" }] };
         default:
-            return `${x(power)} a normal swing.`;
+            return { head: x(power), sub: "damage", tags: [] };
     }
 }
 
@@ -147,7 +162,9 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
             cooldown: a.cd,
-            effect: effectText(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element),
+            effect: effectOf(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element),
+            // Wards are the defensive half — playable on THEIR beat instead of costing you a swing.
+            defensive: a.kind === "ward",
             power: Math.round(a.power * scale * 100) / 100,
             blurb: a.blurb,
             element: elementOf[id] || itemElement(id) || element,
@@ -163,7 +180,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
         kit.push({
             id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
             cooldown: 0, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
-            effect: effectText("strike", 1.9, element),
+            effect: effectOf("strike", 1.9, element), defensive: false,
         });
     }
     return { element, abilities: kit };
@@ -271,3 +288,10 @@ export const BATTLE_ITEMS = [
 // outright and settles you enough to gain Focus. It is the honest answer to a bout going badly, and the reason
 // the command menu is a decision rather than four ways to press attack.
 export const GUARD_SOAK = 0.30;     // of your max vigour, absorbed from what comes next
+
+// ── SPEED ────────────────────────────────────────────────────────────────────────────────────────────────────
+// Who opens the bout was hard-coded to the challenger, which made Ferocity — a stat that until now only fed
+// 24/7 passive boss damage — worth nothing in here. It decides initiative now: the faster fighter takes the
+// first beat, and on a tie the challenger keeps it. Landing the opening blow in a ten-beat fight is a real
+// edge, so there is finally a reason to build for it.
+export const speedOf = (level = 1, ferocity = 0) => Math.round(10 + level * 0.3 + ferocity * 0.5);
