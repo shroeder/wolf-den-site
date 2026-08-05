@@ -6,7 +6,6 @@ import { GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSpellBook, GiSw
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
-import TimingRing from "@/components/arena/TimingRing";
 import { BATTLE_ITEMS, BEATS } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
@@ -345,6 +344,24 @@ export default function ArenaClient({ initial }) {
         return () => clearTimeout(t);
     }, [pending?.ability, pending?.command, bout?.turn, bout?.beat]);
 
+    // ── THE BEAT RESOLVES ITSELF ── nothing to tap any more, so a committed command fires as soon as its
+    // cinematic has finished. A skill gets the full cast first; a plain attack goes straight away.
+    useEffect(() => {
+        if (!pending || !bout || bout.over || bout.turn !== "you" || busy) return undefined;
+        if (pending.command === "skill" && !castDone) return undefined;
+        const p2 = pending;
+        setPending(null); setMenu(null);
+        act("beat", { command: p2.command, ability: p2.ability || null });
+        return undefined;
+    }, [pending, castDone, bout?.turn, bout?.over, busy, act]);
+
+    // Their beat plays its telegraph and then lands on its own.
+    useEffect(() => {
+        if (!bout || bout.over || bout.turn !== "them" || !blockReady || busy) return undefined;
+        const t = setTimeout(() => act("beat", { command: "block" }), 140);
+        return () => clearTimeout(t);
+    }, [bout?.turn, bout?.beat, bout?.over, blockReady, busy, act]);
+
     // ── READ IT FIRST ── their beat opens with a beat of nothing but the warning: who is coming and with
     // what. Defending used to start the instant your own swing resolved, with an identical ring and no idea
     // what it was for, which is exactly why it felt like a second attack of your own rather than a defence.
@@ -408,7 +425,7 @@ export default function ArenaClient({ initial }) {
     // rather than a fight.
     if (bout) {
         const yourTurn = !bout.over && bout.turn === "you";
-        const ringUp = !bout.over && ((bout.turn === "them" && blockReady) || (Boolean(pending) && castDone));
+        // The timing ring is gone: a beat is decided by the command you choose and the gear behind it.
         const reading = !bout.over && bout.turn === "them" && !blockReady;   // the warning is on screen
         // A landed blow of yours that was genuinely well timed gets the whole pane to itself for a moment.
         const lastLog = bout.log?.length ? bout.log[bout.log.length - 1] : null;
@@ -520,29 +537,9 @@ export default function ArenaClient({ initial }) {
                             </span>
                         ) : null}
 
-                        {/* Over THEM when you swing, over YOU when they do — and only once you have
-                            committed. Absolutely positioned, so it does not take a column in this grid. */}
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
                         {fx ? (
                             <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
-                        ) : null}
-
-                        {ringUp ? (
-                            <div className={`ar-ringslot is-${bout.turn}`}>
-                                <TimingRing
-                                    key={`${bout.beat}-${bout.turn}-${pending?.command || "block"}`}
-                                    ringMs={yourTurn ? (bout.ringMs || 1150) : (bout.defRingMs || 1600)}
-                                    tone={yourTurn ? "attack" : "defend"}
-                                    label={yourTurn ? (pending?.short || "Strike") : "Block"}
-                                    onResult={(off) => {
-                                        const p = pending;
-                                        setPending(null); setMenu(null);
-                                        act("beat", yourTurn
-                                            ? { command: p?.command || "attack", off, ability: p?.ability || null }
-                                            : { command: "block", off });
-                                    }}
-                                />
-                            </div>
                         ) : null}
                     </div>
 
@@ -615,7 +612,7 @@ export default function ArenaClient({ initial }) {
                             {bout.turn === "them" ? (
                                 <>
                                     <p className="ar-prompt is-def">
-                                        {reading ? <>Read it — <b>{bout.incoming?.name || "a heavy swing"}</b></> : <>Time your <b>block</b></>}
+                                        {reading ? <><b>{bout.incoming?.name || "a heavy swing"}</b> — incoming</> : <>You brace&hellip;</>}
                                     </p>
                                     {/* Wards are playable HERE, against the blow you can see coming — and they
                                         don't cost you the beat, you still block afterwards. */}
@@ -638,7 +635,7 @@ export default function ArenaClient({ initial }) {
                                     ) : null}
                                 </>
                             ) : pending ? (
-                                <p className="ar-prompt is-atk">{pending.label} — time it</p>
+                                <p className="ar-prompt is-atk">{pending.label}&hellip;</p>
                             ) : menu === "skill" ? (
                                 <div className="ar-sub">
                                     {abilities.map((ab) => {
@@ -1247,9 +1244,6 @@ function Styles() {
             .ar-clash.is-bad { color: #ff9f9f; }
             .ar-underdog { margin: 5px 0 0; font-size: 12px; font-weight: 900; text-align: center; color: #ffd75e;
                 letter-spacing: .02em; text-shadow: 0 0 14px rgba(255,215,94,0.35); }
-            /* Lives inside the floor, so it covers exactly the ground the fighters stand on and can never sit
-               over the command deck. */
-            .ar-ringslot { position: absolute; inset: 0; z-index: 20; --tr: clamp(96px, 24vw, 152px); }
 
             /* ── THE COMMAND DECK ───────────────────────────────────────────────────────────────────────────
                Four commands across the bottom of the panel, JRPG-style. Two of them raise the timing ring and

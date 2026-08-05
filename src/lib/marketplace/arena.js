@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buildKit, elementClash, gradeFor, ringMsFor, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
+import { buildKit, elementClash, ringMsFor, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -264,12 +264,28 @@ export async function getArenaState(buyerId) {
     // the fight SCREEN reads through here, so a player looking at their skills saw last week's format —
     // sentence effects and the gear's sprite instead of the move's — until they happened to take a beat.
     // `kit` is already loaded above, so this costs nothing.
-    if (bout && !bout.over && kit?.abilities?.length) {
-        const stale = (bout.me?.abilities || []).some((a) => !a.effect || typeof a.effect !== "object" || !a.sprite?.includes("/skill-"));
-        if (stale) {
+    if (bout && !bout.over) {
+        const isStale = (list) => (list || []).some((a) => !a.effect || typeof a.effect !== "object" || !a.sprite?.includes("/skill-"));
+        let healed = false;
+        if (kit?.abilities?.length && isStale(bout.me?.abilities)) {
             bout.me.abilities = (bout.me.abilities || []).map((a) => kit.abilities.find((f) => f.id === a.id) || a);
-            await saveBout(buyerId, bout).catch(() => {});
+            healed = true;
         }
+        // THEIR kit is a snapshot too, and it was never healed — which is why an incoming move still showed
+        // the ring or cape it came from instead of the move's own emblem, and why the telegraph had nothing
+        // to build a cast out of.
+        if (bout.foe?.id && isStale(bout.foe?.abilities)) {
+            const foeKit = await kitFor(bout.foe.id).catch(() => null);
+            if (foeKit?.abilities?.length) {
+                bout.foe.abilities = (bout.foe.abilities || []).map((a) => foeKit.abilities.find((f) => f.id === a.id) || a);
+                if (bout.incoming?.isAbility) {
+                    const live = foeKit.abilities.find((f) => f.name === bout.incoming.name);
+                    if (live) bout.incoming = { ...bout.incoming, sprite: live.sprite, kind: live.kind, element: live.element };
+                }
+                healed = true;
+            }
+        }
+        if (healed) await saveBout(buyerId, bout).catch(() => {});
     }
 
     // WHO YOU MAY CHALLENGE. Everyone above you, within reach — so every fight on offer is one you could
@@ -451,8 +467,17 @@ export async function fightRound(buyerId, opts = {}) {
 
     const mine = b.turn === "you";
     const command = String(opts.command || (mine ? "attack" : "block"));
-    const offset = Math.min(1, Math.abs(Number(opts.off) ?? 1));
-    const grade = gradeFor(offset);
+    // ── NO TIMING ────────────────────────────────────────────────────────────────────────────────────
+    // The closing ring is gone. A beat is decided by the COMMAND you pick and the gear behind it, not by
+    // whether your thumb landed inside a 90ms window — which is a different game than the one the loadout,
+    // the elements and the cooldowns were built for.
+    //
+    // The grade multipliers it used to produce are replaced by flat constants tuned to what an average hand
+    // was actually getting, so nothing about the balance moves: attacks land at what a "great" tap paid, and
+    // a plain block turns aside what an average block did. Guard, wards and the field kit are the defensive
+    // levers now, and they are choices rather than reflexes.
+    const ATTACK = 1.15;   // was ATTACK, which averaged ~1.15 across a real spread of taps
+    const BLOCK = 0.34;    // was BLOCK, which averaged ~0.34
     const hit = (m) => randInt(Math.round(m * 0.85), Math.round(m * 1.18));
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
@@ -518,7 +543,7 @@ export async function fightRound(buyerId, opts = {}) {
         // They now pull in different directions, without adding raw power:
         //   strike — timing counts for more. Your hands decide it.
         //   spell  — answers on its OWN element and cuts guard. Your build decides it.
-        let gradeAtk = grade.atk;
+        let gradeAtk = ATTACK;
         let pierce = 1;
         let clashMult = b.clash?.mult || 1;
         if (ability) {
@@ -532,7 +557,7 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
-                gradeAtk = 1 + (grade.atk - 1) * 1.45;
+                gradeAtk = 1 + (ATTACK - 1) * 1.45;
             }
             if (ability.kind === "spell") {
                 // Its own affinity against theirs, not the bout-wide one — so what you attuned this specific
@@ -555,8 +580,8 @@ export async function fightRound(buyerId, opts = {}) {
             : 0;
         const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
         b.foeHp = Math.max(0, b.foeHp - dmg);
-        b.log.push({ beat: b.beat, who: "you", grade: grade.key, damage: dmg,
-            text: dmg > 0 ? `${grade.label}${note} — ${dmg}.` : `${grade.label}${note}.`,
+        b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg,
+            text: dmg > 0 ? `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")} — ${dmg}.` : `${ability ? ability.name : "You strike"}.`,
             ability: ability?.name || null });
         b.turn = "them";
     } else {
@@ -569,12 +594,12 @@ export async function fightRound(buyerId, opts = {}) {
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back));
-        // Your timing is a BLOCK: grade.def is how much of it you turned aside. A guard soaks what's left.
-        const blocked = Math.round(raw * grade.def);
+        // Your timing is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
+        const blocked = Math.round(raw * BLOCK);
         let through = Math.max(0, raw - blocked);
         if (b.shield > 0) { const soak = Math.min(b.shield, through); b.shield -= soak; through -= soak; }
         b.hp = Math.max(0, b.hp - through);
-        b.log.push({ beat: b.beat, who: "them", grade: grade.key, damage: through,
+        b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through,
             text: theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
                 : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
