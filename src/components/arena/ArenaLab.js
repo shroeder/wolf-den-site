@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import ArenaClient from "@/components/ArenaClient";
-import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS, elementClash } from "@/lib/marketplace/arena-kit.js";
+import { npcAbilities, npcFor } from "@/lib/marketplace/arena-npc.js";
+import { boutLaurels, featsFor, vpFor } from "@/lib/marketplace/arena-rewards.js";
 import { baseState, makeBout, SCENES, SCENE_KEYS } from "@/components/arena/arena-lab-fixtures.js";
 
 // ── THE ARENA LAB ────────────────────────────────────────────────────────────────────────────────────────────
@@ -123,14 +125,23 @@ function makeServer(initial) {
         if (b.foeHp <= 0 || b.hp <= 0) {
             const won = b.foeHp <= 0 && b.hp > 0;
             b.over = true; b.won = won;
-            b.reward = won ? { gold: 214, xp: 89 } : null;
+            const myPower = b.myPower || st.me.power;
+            const theirPower = b.theirPower || 300;
+            const { feats, laurels: fl, vp: fv } = featsFor(b);
+            const vp = vpFor({ won, myPower, theirPower }) + (won ? fv : 0);
+            const laurels = boutLaurels({ won, myPower, theirPower }) + fl;
+            b.reward = { gold: won ? Math.round(40 + theirPower * 0.9) : 0, xp: won ? Math.round(18 + theirPower * 0.4) : 0, vp, laurels, feats };
             b.recap = {
-                won, foe: b.foe, reward: b.reward,
-                posFrom: 12, posTo: won ? 11 : 12, size: 84,
-                rank: { name: "Hunter", icon: "/images/arena/rank-hunter.webp", color: "#b98cff", into: won ? 10 : 9, span: 14, next: "Fang" },
-                rankUp: null, streak: won ? 4 : 0, bestStreak: 5, rounds: b.beat,
+                won, foe: b.foe, reward: b.reward, feats,
+                vpGain: vp, vpFrom: st.vp, vpTo: st.vp + vp,
+                rankTo: won ? 11 : 12, size: 84,
+                npcTier: b.npcTier || null,
+                npcUnlocked: Boolean(won && b.npcTier && b.npcTier > (st.stats?.npcBest || 0)),
+                streak: won ? 4 : 0, bestStreak: 5, rounds: b.beat,
             };
-            st.position = won ? 11 : 12;
+            st.vp += vp;
+            st.laurels += laurels;
+            if (won && b.npcTier) st.stats = { ...st.stats, npcBest: Math.max(st.stats.npcBest || 0, b.npcTier) };
         }
         return { ok: true, ...st };
     }
@@ -138,13 +149,34 @@ function makeServer(initial) {
     return async function handle(body) {
         const action = String(body?.action || "");
         if (action === "start") {
-            const target = st.targets.find((t) => t.id === body.target) || st.targets[0];
+            // The same fork the real startBout takes: a member, or a tier out of the Gauntlet.
+            const tier = typeof body.target === "string" && body.target.startsWith("npc:") ? Number(body.target.slice(4)) : 0;
+            const base = SCENES.turn.state().bout.foe;
+            let foe;
+            let theirPower;
+            if (tier > 0) {
+                const n = npcFor(tier);
+                foe = {
+                    ...base, id: n.id, name: n.name, sprite: n.sprite, level: null, npc: true, tier,
+                    element: n.element, abilities: npcAbilities(tier), might: n.might, gearPower: n.gearPower,
+                    speed: n.speed, fortune: n.fortune, vigour: n.vigour,
+                };
+                theirPower = n.gearPower;
+            } else {
+                const t = st.targets.find((x) => x.id === body.target) || st.targets[0];
+                foe = { ...base, id: t.id, name: t.name, sprite: t.sprite, level: t.level, vigour: t.vigour };
+                theirPower = t.power;
+            }
             st.bout = makeBout({
                 beat: 1, turn: "you", hp: st.me.vigour, maxHp: st.me.vigour,
-                foeHp: target.vigour, foeMaxHp: target.vigour,
-                cd: {}, log: [], shield: 0, surge: 0,
+                foeHp: foe.vigour, foeMaxHp: foe.vigour,
+                cd: {}, log: [], shield: 0, surge: 0, bleed: null, sunder: 0, riposte: 0,
                 items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
-                foe: { ...SCENES.turn.state().bout.foe, id: target.id, name: target.name, sprite: target.sprite, level: target.level },
+                foe,
+                // Computed, not hard-coded: the fixture used to announce "Their Water smothers your Fire"
+                // over an Earth opponent, which makes the affinity system impossible to verify in here.
+                clash: elementClash(st.me.element, foe.element),
+                myPower: st.me.power, theirPower, npcTier: tier,
             });
             st.bout.incoming = null;
             st.fightsLeft = Math.max(0, st.fightsLeft - 1);

@@ -10,6 +10,8 @@ import {
     buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
 } from "@/lib/marketplace/arena-kit.js";
+import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
+import { ARMOURY, boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -31,9 +33,10 @@ const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // your day.
 export const FIGHTS_PER_DAY = 10;
 
-// How far above you you're allowed to reach. Wide enough that there is always somebody worth fighting, narrow
-// enough that the top of the Den can't be taken from the bottom in an afternoon.
-export const CHALLENGE_REACH = 8;
+// CHALLENGE_REACH is gone. It capped how far ABOVE you you could reach, which only made sense while winning
+// swapped positions; it is also what produced the dead end at the top ("Nobody above you within reach"). You
+// may challenge anyone now. The Gauntlet has its own reach — see NPC_REACH — because those tiers are a
+// progression rather than a peer group.
 
 // Same shape as a delve: what you bring is your level and what you are wearing. Reusing the curve deliberately
 // — a member who knows roughly how tough they are underground should not have to learn a second scale here.
@@ -226,25 +229,34 @@ async function arenaRow(buyerId) {
     return row;
 }
 
-// Everybody who holds a position, in order, with the profile bits the board needs.
+// THE LEADERBOARD — everyone, ordered by Victory Points earned.
+//
+// This used to order by `position`, a rung you SWAPPED with whoever you beat. That is why the top of the
+// ladder was a dead end (nobody above you to fight) and why you could not fight downward either — winning
+// would have moved you DOWN to the loser's rung. Ordering by an accrued total removes both problems and the
+// whole unique-index parking-space dance that swapping needed.
 async function standings() {
     const rows = await db.query(
-        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
+        `SELECT a.buyer_id, a.vp, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
                 b.alias, b.display_name, b.avatar_sprite_url
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
-          WHERE a.position IS NOT NULL ORDER BY a.position ASC`
+          WHERE COALESCE(b.xp,0) > 0
+          ORDER BY a.vp DESC, a.wins DESC, b.alias ASC`
     ).catch(() => []);
     if (!rows.length) return [];
     const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
     const stats = await getEquippedStatsForMembers(rows.map((r) => r.buyer_id)).catch(() => new Map());
-    return rows.map((r) => {
+    return rows.map((r, i) => {
         const level = levelForXp(Number(r.xp) || 0).level;
         const gearPower = Object.values(stats.get(r.buyer_id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
         return {
-            id: r.buyer_id, position: r.position,
+            id: r.buyer_id,
+            rank: i + 1,                       // derived from the ordering, not stored
+            vp: Number(r.vp) || 0,
             name: r.display_name || r.alias || "A member",
             sprite: r.avatar_sprite_url || null,
-            level, wins: r.wins, losses: r.losses,
+            level, gearPower, wins: r.wins, losses: r.losses,
+            power: powerOf(level, gearPower),
             vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
         };
     });
@@ -293,27 +305,46 @@ export async function getArenaState(buyerId) {
         if (healed) await saveBout(buyerId, bout).catch(() => {});
     }
 
-    // WHO YOU MAY CHALLENGE. Everyone above you, within reach — so every fight on offer is one you could
-    // plausibly lose, which is the only kind worth spending an attempt on.
+    // WHO YOU MAY CHALLENGE — EVERYONE. There is no reach window and no "must be above you" any more. The
+    // old rule produced the dead end at the top of the ladder ("Nobody above you within reach. You are at the
+    // top of the Den.") and it existed only because winning SWAPPED positions, which made fighting downward
+    // self-harming. Points are accrued now, so a fight can never cost you rank and any opponent is fair game.
+    const myPower = powerOf(me.level, me.gearPower);
     const targets = board
-        .filter((o) => o.id !== buyerId && o.position < pos && o.position >= pos - CHALLENGE_REACH)
-        .sort((x, y) => y.position - x.position)
-        .map((o) => ({ ...o, reward: winReward(pos, o.position) }));
+        .filter((o) => o.id !== buyerId)
+        .map((o) => ({ ...o, reward: { vp: vpPreview(myPower, o.power), laurels: boutLaurels({ won: true, myPower, theirPower: o.power }) } }))
+        // Hardest first: the interesting fight should be the one you see, not the safest one.
+        .sort((x, y) => y.power - x.power);
 
+    // THE GAUNTLET — endless NPC challengers, so there is always something to fight even when the Den is
+    // asleep and always something harder to aspire to.
+    const npcBest = Number(row?.npc_best) || 0;
+    const gauntlet = npcOffer(npcBest).map((n) => ({
+        ...n,
+        beaten: n.tier <= npcBest,
+        reward: { vp: vpPreview(myPower, n.gearPower), laurels: boutLaurels({ won: true, myPower, theirPower: n.gearPower }) },
+    }));
+
+    const myRank = (board.findIndex((o) => o.id === buyerId) + 1) || board.length;
+    const myVp = Number(row?.vp) || 0;
     return {
         unlocked: true,
-        me: { ...me, name: "You", position: pos, element: kit.element, abilities: kit.abilities },
-        position: pos, size: board.length,
-        rank: rankFor(Math.max(0, board.length - pos), board.length),
+        me: { ...me, name: "You", rank: myRank, vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
+        rank: myRank, size: board.length,
+        vp: myVp, laurels: Number(row?.laurels) || 0,
+        band: rankFor(Math.max(0, board.length - myRank), board.length),
         fightsLeft: Math.max(0, FIGHTS_PER_DAY - used), fightsPerDay: FIGHTS_PER_DAY,
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
             streak: Number(row?.streak) || 0, bestStreak: Number(row?.best_streak) || 0,
-            best: Number(row?.best_position) || pos,
+            bestVp: Number(row?.best_vp) || myVp,
+            npcBest,
         },
         targets,
+        gauntlet,
+        armoury: ARMOURY,
         // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
-        board: board.slice(0, 10).map((o) => ({ position: o.position, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
+        board: board.slice(0, 10).map((o) => ({ rank: o.rank, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
         podium: PODIUM,
         bout: bout ? publicBout(bout) : null,
         away: await awayReport(buyerId, row),
@@ -397,17 +428,42 @@ export async function startBout(buyerId, targetId = null) {
     if (fightsUsed(row) >= FIGHTS_PER_DAY) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
 
     const board = await standings();
-    const pos = Number(row?.position) || board.length;
-    // Enforced here, not just hidden in the UI — the list is the only thing stopping a POST to first place.
-    const foe = board.find((o) => o.id === targetId && o.position < pos && o.position >= pos - CHALLENGE_REACH);
-    if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+    const me = await kitFor(buyerId);
+    const myPower = powerOf(me.level, me.gearPower);
 
-    const [me, foeKit] = await Promise.all([kitFor(buyerId), kitFor(foe.id)]);
+    // ── WHO ARE WE FIGHTING ──────────────────────────────────────────────────────────────────────────────
+    // A member, or a tier out of the Gauntlet. Both resolve to the same shape so the engine below needs no
+    // idea which it is. There is no reach check any more: points are accrued, not swapped, so no opponent is
+    // off limits and the target list is a convenience rather than the only thing holding the rules up.
+    const npcTier = typeof targetId === "string" && targetId.startsWith("npc:") ? Number(targetId.slice(4)) : 0;
+    let foe = null;
+    let foeKit = null;
+    if (npcTier > 0) {
+        // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
+        // tier 900 for points on day one.
+        const bestTier = Number(row?.npc_best) || 0;
+        if (!Number.isFinite(npcTier) || npcTier < 1 || npcTier > bestTier + NPC_REACH) {
+            return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+        }
+        const n = npcFor(npcTier);
+        foe = n;
+        // An NPC's kit is drawn from the same archetype catalog members use, so it fights with real named
+        // moves rather than a bare swing — scaled by tier, and seeded off the tier so a given tier always
+        // brings the same two moves and can be planned against.
+        foeKit = { ...n, abilities: npcAbilities(npcTier), vigour: n.vigour };
+    } else {
+        foe = board.find((o) => o.id === targetId);
+        if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+        foeKit = await kitFor(foe.id);
+    }
+
     const clash = elementClash(me.element, foeKit.element);
+    const theirPower = npcTier > 0 ? foe.gearPower : foe.power;
     const bout = {
-        myPos: pos, foePos: foe.position, size: board.length,
+        myPower, theirPower, npcTier, size: board.length,
         foe: {
-            id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level,
+            id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
+            npc: Boolean(npcTier), tier: npcTier || null,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed, fortune: foeKit.fortune,
         },
@@ -437,7 +493,7 @@ export async function startBout(buyerId, targetId = null) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(bout)]
     ).catch(() => {});
-    await trackActivity(buyerId, "arena_start", { pos, target: foe.id }).catch(() => {});
+    await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -737,93 +793,102 @@ export async function fightRound(buyerId, opts = {}) {
 
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
-    const myPos = b.myPos, foePos = b.foePos;
-    let reward = null;
 
-    // ── TAKING THE SPOT ──────────────────────────────────────────────────────────────────────────────────
-    // Beat somebody above you and you SWAP positions with them. That is the whole point of a challenge
-    // ladder: standing is something you take off a specific person, not a counter that only goes up.
-    let swapped = false;
+    // ── WHAT THE BOUT PAID ───────────────────────────────────────────────────────────────────────────────
+    // No position swap. Standing is an accrued TOTAL now, so winning adds and losing subtracts nothing —
+    // which is the whole reason you may challenge anyone, above you, below you, or out of the Gauntlet.
+    //
+    // The swap this replaces was the most fragile code in the feature: `position` carries a unique index, so
+    // it had to park the challenger on the NEGATIVE of their own rung mid-flight to avoid violating it, and
+    // the first cut of that wrapped both writes in .catch(() => {}) and failed in total silence — you won,
+    // the recap said 12 → 11, and the ladder never moved. Ordering by an integer needs none of it.
+    const myPower = b.myPower || 1;
+    const theirPower = b.theirPower || 1;
+    const baseVp = vpFor({ won, myPower, theirPower });
+    const baseLaurels = boutLaurels({ won, myPower, theirPower });
+    const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
+    const vp = baseVp + (won ? featVp : 0);
+    const laurels = baseLaurels + featLaurels;
+
+    // Gold and XP still pay on a win, unchanged — this sits on top rather than replacing them.
+    let reward = null;
     if (won) {
-        const r = winReward(myPos, foePos);
-        reward = { gold: r.gold, xp: r.xp };
-        // ── THE SWAP, VIA A PARKING SPACE ────────────────────────────────────────────────────────────────
-        // position carries a UNIQUE INDEX, so moving the loser onto your place while you are still standing on
-        // it violates it immediately — Postgres checks a unique index per row, not at end of statement, and a
-        // plain unique INDEX cannot be deferred. The first cut did exactly that and wrapped both writes in
-        // `.catch(() => {})`, so NEITHER landed and it failed in total silence: you won, the recap said 12 → 11,
-        // and the ladder never moved.
-        //
-        // So the challenger parks on the negative of their own position first. Negative-of-position is unique
-        // per rung, so two swaps resolving at once cannot collide in the parking space either.
-        const parked = await db.queryOne(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3 RETURNING buyer_id`, [buyerId, -myPos, myPos]).catch(() => null);
-        if (parked) {
-            const moved = await db.queryOne(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3 RETURNING buyer_id`, [b.foe.id, myPos, foePos]).catch(() => null);
-            if (moved) {
-                const took = await db.queryOne(
-                    `UPDATE mkt_arena SET position = $2, best_position = LEAST(COALESCE(best_position, $2), $2)
-                      WHERE buyer_id = $1 AND position = $3 RETURNING position`, [buyerId, foePos, -myPos]
-                ).catch(() => null);
-                swapped = Boolean(took);
-            }
-            // Whatever happened, never leave anybody parked on a negative rung.
-            if (!swapped) await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [buyerId, myPos, -myPos]).catch(() => {});
-        }
-        const back = r.gold;
-        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back]).catch(() => null);
-        await logCoin(buyerId, back, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
+        const gold = Math.round(40 + theirPower * 0.9);
+        const xp = Math.round(18 + theirPower * 0.4);
+        reward = { gold, xp, vp, laurels, feats };
+        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
+        await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
-        await awardXp(buyerId, "arena_win", { points: r.xp, gold: 0 }).catch(() => {});
+        await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
+    } else {
+        reward = { gold: 0, xp: 0, vp: 0, laurels, feats: [] };
     }
     b.reward = reward;
 
-    const size = b.size || 0;
-    const posFrom = myPos;
-    // Read the position BACK rather than assuming the swap worked. The recap is the only thing telling somebody
-    // what changed; it has to report what actually happened, not what was intended.
-    const after = await db.queryOne(`SELECT position FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
-    const posTo = Number(after?.position) || (won && swapped ? foePos : myPos);
-    // Rank bands read off how many of the pack you are ABOVE, so position 1 of 84 is Alpha.
-    const wasRank = rankFor(Math.max(0, size - posFrom), size);
-    const nowRank = rankFor(Math.max(0, size - posTo), size);
-    b.rankUp = won && nowRank.key !== wasRank.key ? { from: wasRank.name, to: nowRank.name, icon: nowRank.icon, color: nowRank.color } : null;
+    const vpBefore = Number(row?.vp) || 0;
+    const vpAfter = vpBefore + vp;
     const streakNow = won ? (Number(row?.streak) || 0) + 1 : 0;
-    b.recap = {
-        won, foe: b.foe, reward,
-        posFrom, posTo, size,
-        rank: { name: nowRank.name, icon: nowRank.icon, color: nowRank.color, into: nowRank.into, span: nowRank.span, next: nowRank.next?.name || null },
-        rankUp: b.rankUp,
-        streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
-        rounds: b.beat || (b.log || []).length,
-    };
+
+    // A Gauntlet win moves the high-water mark, which is what unlocks the next tiers.
+    const npcTier = Number(b.npcTier) || 0;
+    const npcBest = won && npcTier > 0 ? Math.max(Number(row?.npc_best) || 0, npcTier) : (Number(row?.npc_best) || 0);
 
     await db.query(
         `UPDATE mkt_arena SET bout_json = $2::jsonb,
             wins = wins + $3, losses = losses + $4,
+            vp = vp + $5, best_vp = GREATEST(best_vp, vp + $5),
+            laurels = laurels + $6, laurels_earned = laurels_earned + $6,
+            npc_best = GREATEST(npc_best, $7),
             streak = CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END,
             best_streak = GREATEST(best_streak, CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END),
             updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1]
+        [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1, vp, laurels, npcBest]
     ).catch((e) => {
         // Never silent. This write losing is how a won fight comes back as an unfinished one.
         console.error("arena.finish.persist_failed", buyerId, e?.message || e);
     });
 
-    // Recorded from BOTH sides. The defender was asleep; this is the only way they ever find out.
+    // Where that leaves you on the board. Read BACK rather than assumed — the recap is the only thing telling
+    // somebody what changed, so it has to report what actually happened.
+    const after = await db.queryOne(
+        `SELECT (SELECT COUNT(*) + 1 FROM mkt_arena x JOIN mkt_buyer xb ON xb.id = x.buyer_id
+                  WHERE COALESCE(xb.xp,0) > 0 AND x.vp > a.vp) AS rank,
+                (SELECT COUNT(*) FROM mkt_arena y JOIN mkt_buyer yb ON yb.id = y.buyer_id WHERE COALESCE(yb.xp,0) > 0) AS size,
+                a.vp
+           FROM mkt_arena a WHERE a.buyer_id = $1`, [buyerId]
+    ).catch(() => null);
+    const size = Number(after?.size) || b.size || 0;
+    const rankTo = Number(after?.rank) || 0;
+
+    b.recap = {
+        won, foe: b.foe, reward, feats,
+        vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
+        rankTo, size,
+        npcTier: npcTier || null,
+        npcUnlocked: won && npcTier > 0 && npcTier > (Number(row?.npc_best) || 0),
+        streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
+        rounds: b.beat || (b.log || []).length,
+    };
+    b.rankUp = null;
+
+    // Recorded from BOTH sides. A defender was asleep; this is the only way they ever find out. An NPC has no
+    // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
     await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, challenger_won, challenger_pos, defender_pos, rounds)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [buyerId, b.foe.id, won, posTo, won && swapped ? myPos : foePos, (b.log || []).length]
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+        [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
+            JSON.stringify(feats.map((f) => f.id))]
     ).catch(() => {});
 
-    await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { from: posFrom, to: posTo, foe: b.foe.id }).catch(() => {});
+    await trackActivity(buyerId, won ? "arena_win" : "arena_loss",
+        { foe: b.foe.id, vp, laurels, npcTier: npcTier || null, feats: feats.map((f) => f.id) }).catch(() => {});
 
     // getArenaState RE-READS the bout out of the database, so if that write above lost for any reason it would
     // hand back the un-finished bout and quietly erase a fight the player had already won — a modal flashing
     // up and then a screen with no way off it. The bout we just resolved is the truth; say so explicitly.
     const state = await getArenaState(buyerId);
-    return { ok: true, finished: { won, reward, rankUp: b.rankUp }, ...state, bout: publicBout(b) };
+    return { ok: true, finished: { won, reward, feats }, ...state, bout: publicBout(b) };
 }
 
 // ── SEEDING THE LADDER ───────────────────────────────────────────────────────────────────────────────────────
@@ -870,14 +935,19 @@ export async function payArenaPodium() {
     if (!ARENA_PUBLIC) return { ok: true, skipped: "arena_not_public", paid: [] };
     const day = await db.queryOne(`SELECT ${DAY}::text AS d`).catch(() => null);
     if (!day?.d) return { ok: false, error: "no_day" };
+    // BY VICTORY POINTS, not by `position`. That column stopped being authoritative when the ladder moved to
+    // an accrued total, so this would have quietly kept paying the top three of a frozen, retired ordering —
+    // a nightly cron handing out real chests to the wrong people, silently, forever.
     const top = await db.query(
-        `SELECT a.buyer_id, a.position FROM mkt_arena a
-          WHERE a.position IS NOT NULL AND a.position <= 3
-            AND (a.prize_day IS DISTINCT FROM ${DAY}) ORDER BY a.position ASC`
+        `SELECT a.buyer_id, ROW_NUMBER() OVER (ORDER BY a.vp DESC, a.wins DESC) AS place
+           FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
+          WHERE COALESCE(b.xp,0) > 0 AND a.vp > 0
+            AND (a.prize_day IS DISTINCT FROM ${DAY})
+          ORDER BY a.vp DESC, a.wins DESC LIMIT 3`
     ).catch(() => []);
     const paid = [];
     for (const r of top) {
-        const spec = PODIUM.find((x) => x.place === r.position);
+        const spec = PODIUM.find((x) => x.place === Number(r.place));
         if (!spec) continue;
         // Claim the day FIRST and only pay if the claim took, so a second run finds nothing to do.
         const claimed = await db.queryOne(
@@ -886,8 +956,8 @@ export async function payArenaPodium() {
         ).catch(() => null);
         if (!claimed) continue;
         await addChests(r.buyer_id, { [spec.chest]: 1 }, { source: "arena_podium" }).catch(() => {});
-        await trackActivity(r.buyer_id, "arena_podium", { place: r.position, chest: spec.chest }).catch(() => {});
-        paid.push({ buyerId: r.buyer_id, place: r.position, chest: spec.chest });
+        await trackActivity(r.buyer_id, "arena_podium", { place: Number(r.place), chest: spec.chest }).catch(() => {});
+        paid.push({ buyerId: r.buyer_id, place: Number(r.place), chest: spec.chest });
     }
     return { ok: true, day: day.d, paid };
 }

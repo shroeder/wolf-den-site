@@ -161,12 +161,12 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
     return (
         <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
             + `${healing ? " is-healing" : ""}`}>
-            <b className="ar-fname">
-                {f?.name}
+            <span className="ar-namerow">
+                <b className="ar-fname">{f?.name}</b>
                 {element ? (
                     <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
                 ) : null}
-            </b>
+            </span>
             <span className="ar-hp">
                 <u className="ar-hp-ghost" style={{ width: `${Math.max(ghost, frac) * 100}%` }} />
                 <i style={{ width: `${frac * 100}%` }} />
@@ -701,7 +701,7 @@ export default function ArenaClient({ initial }) {
                         {bout.clash?.note ? (
                             <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
                                 onClick={() => setWheel((w) => !w)}>
-                                {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "\u2212"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}% <u>why?</u>
+                                {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "\u2212"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}%{" "}<u>why?</u>
                             </button>
                         ) : null}
                         {bout.underdog > 1 ? (
@@ -1022,19 +1022,20 @@ export default function ArenaClient({ initial }) {
                 <AwayReport rows={st.away} onClose={() => act("seen")} />
             ) : null}
 
-            <div className="ar-badge" style={{ "--rank": st.rank?.color || "#9aa0a6" }}>
-                {st.rank?.icon ? (
+            <div className="ar-badge" style={{ "--rank": st.band?.color || "#9aa0a6" }}>
+                {st.band?.icon ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img className="ar-insignia" src={st.rank.icon} alt="" draggable="false" />
+                    <img className="ar-insignia" src={st.band.icon} alt="" draggable="false" />
                 ) : null}
                 <div className="ar-badge-body">
                     <span className="ar-badge-kick">The Arena</span>
-                    <b className="ar-rankname">{st.rank?.name}</b>
+                    <b className="ar-rankname">{st.band?.name}</b>
                     <span className="ar-standing">
-                        <b>#{st.position}</b> of {st.size} · best <b>#{st.stats.best}</b>
+                        <b>#{st.rank}</b> of {st.size} · <b>{money(st.vp)}</b> VP
                     </span>
                     <span className="ar-tonext-label">
                         {st.fightsLeft} of {st.fightsPerDay} challenges left today
+                        {st.laurels ? <> · <b>{money(st.laurels)}</b> laurels</> : null}
                     </span>
                 </div>
             </div>
@@ -1072,12 +1073,42 @@ export default function ArenaClient({ initial }) {
                 </div>
             </div>
 
-            {/* WHO YOU CAN TAKE A SPOT FROM */}
+            {/* THE GAUNTLET — endless NPC tiers. Always something to fight when the Den is asleep, and
+                always something harder to aspire to. */}
+            {st.gauntlet?.length ? (
+                <div className="ar-targets ar-gaunt">
+                    <span className="ar-up-head">The Gauntlet — best tier {st.stats?.npcBest || 0}</span>
+                    {st.gauntlet.map((n) => (
+                        <div key={n.id} className={`ar-target is-npc${n.beaten ? " is-beaten" : ""}`}
+                            style={{ "--el": n.color }}>
+                            <span className="ar-target-pos">T{n.tier}</span>
+                            <div className="ar-portrait is-npc">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={n.sprite} alt="" draggable="false" />
+                            </div>
+                            <div className="ar-target-body">
+                                <b>{n.name}{n.beaten ? <i className="ar-beat-tick"> ✓</i> : null}</b>
+                                <em>{n.blurb} · {n.vigour} vigour</em>
+                            </div>
+                            <div className="ar-target-go">
+                                <span className="ar-prize">+{money(n.reward.vp)} VP</span>
+                                <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
+                                    onClick={() => { unlock(); Sfx.ui(); act("start", { target: n.id }); }}>
+                                    {st.fightsLeft <= 0 ? "Spent" : n.beaten ? "Again" : "Fight"}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+
+            {/* WHO YOU CAN CHALLENGE — everyone. No reach window: points are accrued, so a fight can never
+                cost you rank and there is no such thing as an opponent who is off limits. */}
             <div className="ar-targets">
-                <span className="ar-up-head">Challenge for a spot</span>
+                <span className="ar-up-head">Challenge anyone</span>
                 {st.targets?.length ? st.targets.map((o) => (
                     <div key={o.id} className="ar-target">
-                        <span className="ar-target-pos">#{o.position}</span>
+                        <span className="ar-target-pos">#{o.rank}</span>
                         <div className="ar-portrait is-tiny">
                             {o.sprite ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -1091,10 +1122,10 @@ export default function ArenaClient({ initial }) {
                                 with a trailing separator and nothing after it. Their record is real, free
                                 (standings already selects it) and the thing you actually want to know about
                                 somebody before you spend one of ten daily challenges on them. */}
-                            <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L</em>
+                            <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L · {money(o.vp)} VP</em>
                         </div>
                         <div className="ar-target-go">
-                            <span className="ar-prize">+{money(o.reward.gold)}</span>
+                            <span className="ar-prize">+{money(o.reward.vp)} VP</span>
                             <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
                                 onClick={() => act("start", { target: o.id })}>
                                 {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
@@ -1102,7 +1133,7 @@ export default function ArenaClient({ initial }) {
                         </div>
                     </div>
                 )) : (
-                    <p className="ar-none">Nobody above you within reach. You are at the top of the Den.</p>
+                    <p className="ar-none">Nobody else has entered the arena yet — the Gauntlet is above.</p>
                 )}
             </div>
 
@@ -1110,10 +1141,10 @@ export default function ArenaClient({ initial }) {
                 <div className="ar-board">
                     <span className="ar-up-head">The top of the Den</span>
                     {st.board.map((r) => (
-                        <div key={r.position} className={`ar-up-row${r.you ? " is-you" : ""}`}>
-                            <span className="ar-up-rung">#{r.position}</span>
+                        <div key={r.rank} className={`ar-up-row${r.you ? " is-you" : ""}`}>
+                            <span className="ar-up-rung">#{r.rank}</span>
                             <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
-                            <span className="ar-up-lvl">Lv {r.level}</span>
+                            <span className="ar-up-lvl">{money(r.vp)} VP</span>
                         </div>
                     ))}
                 </div>
@@ -1471,8 +1502,13 @@ function Styles() {
             .ar-bar { min-width: 0; transition: opacity .3s ease; opacity: .62; }
             .ar-bar.is-active { opacity: 1; }
             .ar-bar.is-foe { text-align: right; }
-            .ar-fname { display: block; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            /* The chip must not be inside the ellipsis, or a long name eats the affinity — which is the one
+               thing on the plate you need before choosing a move. */
+            .ar-namerow { display: flex; align-items: center; gap: 5px; min-width: 0; }
+            .ar-bar.is-foe .ar-namerow { justify-content: flex-end; }
+            .ar-fname { font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+            .ar-el-chip { flex: 0 0 auto; }
             .ar-hp { position: relative; display: block; height: 11px; margin: 4px 0 2px; border-radius: 999px;
                 overflow: hidden; background: rgba(0,0,0,0.68); border: 1px solid rgba(0,0,0,0.55);
                 box-shadow: inset 0 1px 3px rgba(0,0,0,0.7); }
@@ -1660,6 +1696,21 @@ function Styles() {
             .ar-target-go { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
             .ar-none { font-size: 12.5px; color: #8a939d; }
             .ar-up-row.is-you { border: 1px solid rgba(255,215,94,0.45); background: rgba(255,215,94,0.08); }
+
+            /* THE GAUNTLET — visually its own ladder, tinted by band so a Titan does not read like a
+               Straw Dummy in a list. */
+            .ar-gaunt .ar-target { border-color: color-mix(in srgb, var(--el) 45%, transparent);
+                background: linear-gradient(100deg, color-mix(in srgb, var(--el) 12%, transparent), rgba(255,255,255,0.03) 60%); }
+            .ar-gaunt .ar-target.is-beaten { opacity: .62; }
+            .ar-gaunt .ar-target-pos { color: var(--el); font-size: 11px; }
+            .ar-gaunt .ar-portrait { border-color: color-mix(in srgb, var(--el) 50%, transparent); }
+            .ar-beat-tick { font-style: normal; color: #8bf0b4; }
+            /* A full-body NPC in a 30px circle is a dark smudge, and the band art is the whole point of the
+               Gauntlet reading as a ladder of increasingly alarming things. */
+            .ar-portrait.is-npc { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 12px;
+                border: 1px solid color-mix(in srgb, var(--el) 50%, transparent);
+                background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--el) 22%, transparent), rgba(8,6,12,0.9)); }
+            .ar-portrait.is-npc img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
 
             .ar-away { position: fixed; inset: 0; z-index: 10100; display: grid; place-items: center; padding: 18px;
                 background: rgba(6,4,10,0.86); backdrop-filter: blur(4px); overflow-y: auto; }

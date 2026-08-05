@@ -1,5 +1,8 @@
 "use client";
 
+import { npcOffer } from "@/lib/marketplace/arena-npc.js";
+import { vpPreview, boutLaurels } from "@/lib/marketplace/arena-rewards.js";
+
 // ── THE ARENA LAB: FIXTURES ──────────────────────────────────────────────────────────────────────────────────
 // DEV ONLY. Handcrafted arena state in exactly the shape `getArenaState` / `publicBout` hand to the client, so
 // the real ArenaClient can be mounted against it with no database, no auth, no live opponent and — crucially —
@@ -176,24 +179,26 @@ const RECAP_LOSS = {
     rankUp: null, streak: 0, bestStreak: 5, rounds: 7,
 };
 
+const MY_POWER = 340;
+
 const TARGETS = [
-    { id: "foe-1", position: 11, name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34, wins: 22, losses: 9, vigour: 241, might: 27, reward: { gold: 214, xp: 89 } },
-    { id: "foe-2", position: 9, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, wins: 31, losses: 14, vigour: 258, might: 29, reward: { gold: 286, xp: 111 } },
-    { id: "foe-3", position: 6, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, wins: 44, losses: 12, vigour: 279, might: 32, reward: { gold: 394, xp: 149 } },
-    { id: "foe-4", position: 4, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, wins: 51, losses: 18, vigour: 296, might: 34, reward: { gold: 466, xp: 173 } },
-];
+    { id: "foe-1", rank: 11, vp: 980, power: 300, name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34, wins: 22, losses: 9, vigour: 241, might: 27 },
+    { id: "foe-2", rank: 9, vp: 1240, power: 372, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, wins: 31, losses: 14, vigour: 258, might: 29 },
+    { id: "foe-3", rank: 6, vp: 1810, power: 448, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, wins: 44, losses: 12, vigour: 279, might: 32 },
+    { id: "foe-4", rank: 4, vp: 2260, power: 520, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, wins: 51, losses: 18, vigour: 296, might: 34 },
+].map((t) => ({ ...t, reward: { vp: vpPreview(MY_POWER, t.power), laurels: boutLaurels({ won: true, myPower: MY_POWER, theirPower: t.power }) } }));
 
 const BOARD = [
-    { position: 1, name: "Ivo Karras", sprite: FOE_SPRITE, level: 47, you: false },
-    { position: 2, name: "Mira Ostrowski", sprite: YOU_SPRITE, level: 45, you: false },
-    { position: 3, name: "Dane Feathers", sprite: FOE_SPRITE, level: 44, you: false },
-    { position: 4, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, you: false },
-    { position: 5, name: "Ozzy Tran", sprite: FOE_SPRITE, level: 40, you: false },
-    { position: 6, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, you: false },
-    { position: 7, name: "Bex Amado", sprite: YOU_SPRITE, level: 38, you: false },
-    { position: 8, name: "Cal Rutherford", sprite: FOE_SPRITE, level: 37, you: false },
-    { position: 9, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, you: false },
-    { position: 10, name: "Wren Sotelo", sprite: FOE_SPRITE, level: 35, you: false },
+    { rank: 1, vp: 5120, name: "Ivo Karras", sprite: FOE_SPRITE, level: 47, you: false },
+    { rank: 2, vp: 4480, name: "Mira Ostrowski", sprite: YOU_SPRITE, level: 45, you: false },
+    { rank: 3, vp: 3960, name: "Dane Feathers", sprite: FOE_SPRITE, level: 44, you: false },
+    { rank: 4, vp: 2260, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, you: false },
+    { rank: 5, vp: 2040, name: "Ozzy Tran", sprite: FOE_SPRITE, level: 40, you: false },
+    { rank: 6, vp: 1810, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, you: false },
+    { rank: 7, vp: 1520, name: "Bex Amado", sprite: YOU_SPRITE, level: 38, you: false },
+    { rank: 8, vp: 1390, name: "Cal Rutherford", sprite: FOE_SPRITE, level: 37, you: false },
+    { rank: 9, vp: 1240, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, you: false },
+    { rank: 10, vp: 1105, name: "Wren Sotelo", sprite: FOE_SPRITE, level: 35, you: false },
 ];
 
 const AWAY = [
@@ -205,12 +210,18 @@ const AWAY = [
 export function baseState(extra = {}) {
     return {
         unlocked: true,
-        me: ME,
-        position: 12, size: 84,
-        rank: RANK_HUNTER,
+        me: { ...ME, rank: 12, vp: 1040, power: MY_POWER },
+        rank: 12, size: 84,
+        vp: 1040, laurels: 640,
+        band: RANK_HUNTER,
         fightsLeft: 7, fightsPerDay: 10,
-        stats: { wins: 34, losses: 19, streak: 3, bestStreak: 5, best: 8 },
+        stats: { wins: 34, losses: 19, streak: 3, bestStreak: 5, bestVp: 1040, npcBest: 11 },
         targets: TARGETS,
+        // The Gauntlet, straight from the real catalog so the lab cannot drift from what the server offers.
+        gauntlet: npcOffer(11).map((n) => ({
+            ...n, beaten: n.tier <= 11,
+            reward: { vp: vpPreview(MY_POWER, n.gearPower), laurels: boutLaurels({ won: true, myPower: MY_POWER, theirPower: n.gearPower }) },
+        })),
         board: BOARD,
         podium: [{ place: 1, chest: "gold" }, { place: 2, chest: "iron" }, { place: 3, chest: "wooden" }],
         bout: null,
