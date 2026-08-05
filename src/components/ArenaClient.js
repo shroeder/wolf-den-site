@@ -174,7 +174,22 @@ function Recap({ bout, busy, onClose }) {
             missing or off-view and LITERALLY nothing to press — the failure mode of a modal whose only exit
             lives inside the thing that failed. The backdrop and the corner button are outside the card on
             purpose, so they survive anything going wrong inside it. */}
-        <div className="ar-recap" role="dialog" aria-modal="true" style={{ "--tint": tint }}
+        {/* ── POSITIONED INLINE, ON PURPOSE ──────────────────────────────────────────────────────────────
+            This overlay has landed halfway down the document with no way to reach it more than once. Every
+            time, the cause was the LAYOUT arriving from a class — a stylesheet that hadn't applied to a node
+            portaled into <body>, or a rule edited out from under it. An overlay whose entire job is "cover the
+            viewport" should not be able to fail at that because a class didn't land, so the six properties
+            that make it a modal are inline and the class is left holding only decoration.
+            Belt and braces: useScrollLock pins the body while this is open, so if it were ever laid out in the
+            document flow again it would be unreachable — inline styles make that impossible rather than
+            unlikely. */}
+        <div className="ar-recap" role="dialog" aria-modal="true"
+            style={{
+                "--tint": tint,
+                position: "fixed", inset: 0, zIndex: 10100,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                padding: 18, overflowY: "auto",
+            }}
             onClick={() => { if (!busy) onClose(); }}>
             <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
                 aria-label="Back to the ladder">Close</button>

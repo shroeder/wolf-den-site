@@ -941,16 +941,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             ) : null}
 
-            {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
-
-            {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
-
-            {farm.rating ? (
-                <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
-            ) : null}
-
-            <FarmDirectory current={viewingAlias} />
-
             {/* Four farm areas: Garden (crops) · Outside (pasture) · Inside (barn) · Art (your creations).
                 Art is a real VIEW now, not a button that opened a sheet on top of the farm — a modal over a
                 tab row reads as an interruption, while the other three swap the panel underneath. Same tab,
@@ -989,6 +979,11 @@ export default function FarmClient({ initial, viewingAlias }) {
 
             {/* The scene — the backdrop is a single image shown at full height; the field is as wide as the image,
                 so you can scroll sideways to see the WHOLE painting (it's wider than the viewport). */}
+            {/* ── THE FARM ITSELF COMES FIRST ────────────────────────────────────────────────────────────────
+                The rank badge, the bounty list, the love bar and the farm directory used to sit ABOVE the
+                scene, which meant two full screens of reading before you could see your own farm. They are
+                all status — things you check — while the scene is the thing you came to use. Status now sits
+                underneath it, and folds away. */}
             <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
@@ -1180,6 +1175,16 @@ export default function FarmClient({ initial, viewingAlias }) {
             {!fullscreen ? (
                 <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>{sceneControls}</div>
             ) : null}
+
+            <details className="farm-status">
+                <summary>Farm status &amp; bounties</summary>
+                {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+                {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
+                {farm.rating ? (
+                    <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
+                ) : null}
+                <FarmDirectory current={viewingAlias} />
+            </details>
 
             {bgOpen ? <FarmBgCreator bg={farm.customBg} draft={farm.customBgDraft} busy={bgBusy} onAct={bgAct} onClose={() => setBgOpen(false)} /> : null}
 

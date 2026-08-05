@@ -12550,3 +12550,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-size: 0.92rem; font-weight: 900; color: #08131f;
     background: linear-gradient(180deg, #7fc4ff, #3d8ce0); box-shadow: 0 4px 16px rgba(61,140,224,0.35); }
 .eqcmp-go:disabled { filter: grayscale(0.5) brightness(0.85); cursor: default; }
+
+/* Farm status, folded. The rank, bounties, love bar and directory are things you CHECK; the farm itself is
+   what you came to use, and it used to sit two screens below all of them. */
+.farm-status { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; background: rgba(255,255,255,0.03); padding: 0 12px; }
+.farm-status > summary { cursor: pointer; padding: 12px 0; font-weight: 800; font-size: 0.95rem; color: #e7dcc4; list-style: none; }
+.farm-status > summary::-webkit-details-marker { display: none; }
+.farm-status > summary::after { content: " ▾"; color: #8a939d; }
+.farm-status[open] > summary::after { content: " ▴"; }
+.farm-status > *:not(summary) { margin-bottom: 10px; }
