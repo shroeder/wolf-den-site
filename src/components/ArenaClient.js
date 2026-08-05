@@ -66,7 +66,12 @@ function blip(kind) {
 // Four cards of near-identical paragraph — three of them opening with the same twenty words — is not something
 // anybody reads in the middle of a fight.
 function SkillFace({ ab, left = 0 }) {
-    const e = ab.effect || {};
+    // A bout freezes its abilities into bout_json at the start, so a fight already running when the effect
+    // format changed carries the OLD shape — and the card rendered its headline as nothing at all. Never let
+    // this be blank: fall back through a string effect to the flavour blurb.
+    const raw = ab.effect;
+    const e = raw && typeof raw === "object" ? raw
+        : { head: typeof raw === "string" && raw ? raw : (ab.blurb || "Damage"), sub: "", tags: [] };
     return (
         <span className="sk">
             <span className="sk-top">
@@ -1256,6 +1261,10 @@ function Styles() {
             .sk-head { display: flex; align-items: baseline; gap: 6px; }
             .sk-head strong { font-size: 19px; font-weight: 900; letter-spacing: -0.02em; color: #ffd75e;
                 text-shadow: 0 0 16px rgba(255,215,94,0.35); }
+            /* A fallback sentence is prose, not a number — don't blow it up to headline size. */
+            .sk-head strong:not(:only-child), .sk-head strong { line-height: 1.15; }
+            .sk-head:has(strong:only-child) strong { font-size: 12px; font-weight: 700; color: #b6bec7;
+                text-shadow: none; }
             .sk-head em { font-style: normal; font-size: 10.5px; color: #9aa2ab; }
             .sk-tags { display: flex; flex-wrap: wrap; gap: 4px; }
             .sk-tag { font-style: normal; font-size: 9.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;

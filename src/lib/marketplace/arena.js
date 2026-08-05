@@ -426,6 +426,16 @@ export async function fightRound(buyerId, opts = {}) {
     const b = row?.bout_json;
     if (!b || b.over) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
 
+    // Abilities are frozen into the bout at the start. A fight already in progress when the kit format
+    // changes would otherwise render a half-empty card for the rest of the bout, so re-derive the live kit
+    // onto the running bout before anything reads it.
+    if ((b.me?.abilities || []).some((a) => !a.effect || typeof a.effect !== "object")) {
+        const fresh = await kitFor(buyerId).catch(() => null);
+        if (fresh?.abilities?.length) {
+            b.me.abilities = b.me.abilities.map((a) => fresh.abilities.find((f) => f.id === a.id) || a);
+        }
+    }
+
     const mine = b.turn === "you";
     const command = String(opts.command || (mine ? "attack" : "block"));
     const offset = Math.min(1, Math.abs(Number(opts.off) ?? 1));
