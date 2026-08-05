@@ -196,6 +196,9 @@ async function kitFor(buyerId) {
     return {
         level, gearPower,
         speed: speedOf(level, Number(stats.ferocity) || 0),
+        // Fortune already means "luck" everywhere else in the Den; in here it is what moves your crit chance,
+        // so the dial sits on the gear you built rather than on anything you do in the moment.
+        fortune: Number(stats.fortune) || 0,
         vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
         element: kit.element, abilities: kit.abilities,
     };
@@ -373,7 +376,9 @@ function publicBout(b) {
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you",
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
         incoming: b.incoming || null,
-        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
+        // `tell` was published here and read on the ladder row, but nothing has ever assigned it — a leftover
+        // of the rock-paper-scissors build, where the opponent's next stance was printed for you to counter.
+        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
     };
@@ -398,9 +403,9 @@ export async function startBout(buyerId, targetId = null) {
         foe: {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            speed: foeKit.speed,
+            speed: foeKit.speed, fortune: foeKit.fortune,
         },
-        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed },
+        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed, fortune: me.fortune },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
         hp: me.vigour, maxHp: me.vigour,
@@ -414,6 +419,11 @@ export async function startBout(buyerId, targetId = null) {
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
     };
+    // A FOE WHO WINS INITIATIVE MUST STILL TELEGRAPH. `incoming` was only ever filled in at the end of a
+    // resolved beat, so when their speed took the first one there was nothing to publish — the warning card
+    // fell back to "a heavy swing" for a move that might have been a mythic spell, and the whole read-it-first
+    // contract was broken on the one beat you had no information at all.
+    if (bout.turn === "them") bout.incoming = pickIncoming(bout);
     await db.query(
         `UPDATE mkt_arena SET bout_json = $2::jsonb, fights_day = ${DAY},
             fights_today = CASE WHEN fights_day = ${DAY} THEN fights_today + 1 ELSE 1 END, updated_at = NOW()
@@ -474,6 +484,27 @@ export async function fightRound(buyerId, opts = {}) {
     const ATTACK = 1.15;   // was ATTACK, which averaged ~1.15 across a real spread of taps
     const BLOCK = 0.34;    // was BLOCK, which averaged ~0.34
     const hit = (m) => randInt(Math.round(m * 0.85), Math.round(m * 1.18));
+
+    // ── CRITS ────────────────────────────────────────────────────────────────────────────────────────────
+    // Removing the timing ring took the last source of variance a player could feel. Every blow became the
+    // same blow, and — because the whole visual reward layer was keyed to the timing grades "flawless" and
+    // "perfect" — the screen flash, the oversized damage number and the bigger particle burst all became
+    // unreachable code. There was juice built for a moment that could no longer happen.
+    //
+    // A crit restores that moment without restoring the reflex test: it is a roll, it is announced, and it is
+    // worth enough to change how a bout is going. FORTUNE is what moves it — a stat that already means "luck"
+    // everywhere else in the Den — so the dial is on the gear rather than on the thumb.
+    // BOTH SIDES CRIT. Giving them only to the attacker would have been a straight, unsimulated buff to
+    // whoever brings the fight — and this is a ladder where every member is on both sides of it, so a rule
+    // that only applies when you are the challenger is not a rule, it is a bias. The defender's chance comes
+    // off their own gear's Fortune exactly as yours does.
+    const CRIT_BASE = 0.12;
+    const CRIT_PER_FORTUNE = 0.0035;
+    const CRIT_CAP = 0.38;
+    const CRIT_MULT = 1.8;
+    const critFor = (fortune) => Math.min(CRIT_CAP, CRIT_BASE + (Number(fortune) || 0) * CRIT_PER_FORTUNE);
+    const critChance = critFor(b.me?.fortune);
+    const foeCritChance = critFor(b.foe?.fortune);
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
     const cool = (n) => { for (const k of Object.keys(b.cd)) b.cd[k] = Math.max(0, (b.cd[k] || 0) - n); };
@@ -488,7 +519,7 @@ export async function fightRound(buyerId, opts = {}) {
         b.cd[ward.id] = ward.cooldown || 0;
         const soak = Math.round(b.maxHp * 0.18);
         b.shield += soak;
-        b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0,
+        b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, soaked: soak,
             text: `${ward.name} — braced for ${soak}.`, ability: ward.name });
         await saveBout(buyerId, b);
         return { ok: true, ...(await getArenaState(buyerId)) };
@@ -500,22 +531,23 @@ export async function fightRound(buyerId, opts = {}) {
             const soak = Math.round(b.maxHp * GUARD_SOAK);
             b.shield += soak;
             cool(GUARD_COOL);
-            b.log.push({ beat: b.beat, who: "you", grade: "guard", damage: 0,
+            b.log.push({ beat: b.beat, who: "you", grade: "guard", damage: 0, soaked: soak,
                 text: `You set your guard — bracing ${soak}, and everything cools a turn faster.` });
         } else {
             const it = BATTLE_ITEMS.find((x) => x.id === opts.itemId);
             if (!it || (b.items[it.id] || 0) <= 0) return { ok: false, error: "no_item", ...(await getArenaState(buyerId)) };
             b.items[it.id] -= 1;
             let text;
+            let healed = 0;
             if (it.kind === "heal") {
-                const healed = Math.min(b.maxHp - b.hp, Math.round(b.maxHp * it.amount));
+                healed = Math.min(b.maxHp - b.hp, Math.round(b.maxHp * it.amount));
                 b.hp += healed;
                 text = healed > 0 ? `${it.name} — ${healed} vigour back.` : `${it.name} — already whole.`;
             } else {
                 b.cd = {};
                 text = `${it.name} — every skill is ready.`;
             }
-            b.log.push({ beat: b.beat, who: "you", grade: "item", damage: 0, text, item: it.id });
+            b.log.push({ beat: b.beat, who: "you", grade: "item", damage: 0, healed, text, item: it.id });
         }
         b.turn = "them";
     } else if (mine) {
@@ -570,13 +602,18 @@ export async function fightRound(buyerId, opts = {}) {
         // Their gear defends them too. Without this the attacker always lands full and the better loadout
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
         const guard = foeGrade(b.foe.gearPower || 0).def * pierce;
+        // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
+        // would be the loudest possible way to say nothing happened.
+        const crit = power > 0 && Math.random() < critChance;
         const raw = power > 0
-            ? hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1)
+            ? hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1) * (crit ? CRIT_MULT : 1)
             : 0;
         const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
         b.foeHp = Math.max(0, b.foeHp - dmg);
-        b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg,
-            text: dmg > 0 ? `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")} — ${dmg}.` : `${ability ? ability.name : "You strike"}.`,
+        b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg, crit,
+            text: dmg > 0
+                ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")} — ${dmg}.`
+                : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`,
             ability: ability?.name || null });
         b.turn = "them";
     } else {
@@ -588,16 +625,20 @@ export async function fightRound(buyerId, opts = {}) {
         const power = incoming.power || 1;
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
-        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back));
-        // Your timing is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
+        const foeCrit = Math.random() < foeCritChance;
+        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back * (foeCrit ? CRIT_MULT : 1)));
+        // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
         const blocked = Math.round(raw * BLOCK);
         let through = Math.max(0, raw - blocked);
-        if (b.shield > 0) { const soak = Math.min(b.shield, through); b.shield -= soak; through -= soak; }
+        let soaked = 0;
+        if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
         b.hp = Math.max(0, b.hp - through);
-        b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through,
-            text: theirAbility
+        // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
+        // which meant the entire payoff of guarding and warding was a line of grey text under the buttons.
+        b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
+            text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}`,
             ability: theirAbility?.name || null });
         b.turn = "you";
         b.incoming = null;

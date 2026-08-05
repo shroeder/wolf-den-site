@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSpellBook, GiSwordWound } from "react-icons/gi";
+import {
+    GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+} from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
+import {
+    duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
+} from "@/components/arena/arena-audio.js";
 import { BATTLE_ITEMS, BEATS } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
@@ -37,42 +42,43 @@ const money = (n) => Number(n || 0).toLocaleString();
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
 const TELEGRAPH_MS = 1100;
 
-// How long a cast holds the screen before the ring appears. The declaration, the spotlight and the effect all
-// play inside this window — the timing game only starts once the spectacle is finished, so the two never
-// compete for your attention.
+// How long a cast holds the screen before the blow lands. The declaration, the spotlight and the effect all
+// play inside this window.
 const CAST_MS = 1250;
+
+// ── ANTICIPATION ─────────────────────────────────────────────────────────────────────────────────────────────
+// Every command now has a WIND-UP: the fighter commits, draws back, and only then does the server resolve it.
+// Before this, a plain Attack posted the instant you tapped and the reply repainted the bar — so the single
+// most-pressed button in the game had no animation at all. You did not see a swing, you saw a number change.
+//
+// Anticipation is not decoration. It is the half of a hit that tells you a hit is coming, and without it the
+// impact has nothing to land against. Lengths are per command: a swing is quick, a skill earns its cinematic.
+const WINDUP = { attack: 420, skill: CAST_MS, guard: 300, item: 420 };
+
+// How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
+// own result and their incoming telegraph from being on screen at the same time — which they were, in the same
+// hundred pixels, on every single exchange.
+const RESULT_MS = 900;
+
+// The freeze on contact. Every fighting game made since Street Fighter II holds both fighters still for a few
+// frames at the moment of impact; it is most of why a hit reads as a hit rather than a position change.
+const HITSTOP_MS = 110;
 
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
 };
 
-// A short tone per outcome — built inline, no assets.
-function blip(kind) {
-    try {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return;
-        const a = new AC();
-        // A voice per ARCHETYPE, so a spell and a hammer-blow are told apart with your eyes shut. Cheap
-        // synthesis rather than assets: the arena had exactly three sounds and a cast made none of them.
-        const VOICE = {
-            win: [523, 659, 880], hit: [420, 300], hurt: [180, 120],
-            strike: [520, 380], spell: [660, 880, 990], execute: [300, 200, 140],
-            gamble: [440, 620, 440], surge: [392, 523, 659], ward: [260, 330],
-            guard: [240, 300], item: [600, 760], incoming: [220, 170], cast: [480, 600],
-        };
-        const notes = VOICE[kind] || [330, 300];
-        notes.forEach((f, i) => {
-            const t = a.currentTime + i * 0.06;
-            const o = a.createOscillator(), g = a.createGain();
-            o.type = kind === "hurt" || kind === "execute" || kind === "incoming" ? "sawtooth"
-                : kind === "spell" || kind === "surge" ? "sine" : "triangle";
-            o.frequency.setValueAtTime(f, t);
-            g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(0.15, t + 0.012);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
-            o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.22);
-        });
-    } catch { /* audio is a bonus */ }
+// The sound of a cast, by archetype — so a spell and a hammer-blow are told apart with your eyes shut.
+// The synthesis itself lives in arena-audio.js; this is only the mapping from a move to its voice.
+function castSound(kind, element) {
+    switch (kind) {
+        case "spell": return Sfx.spell(element);
+        case "execute": return Sfx.execute();
+        case "gamble": return Sfx.gamble();
+        case "surge": return Sfx.surge();
+        case "ward": return Sfx.ward();
+        default: return Sfx.strike();
+    }
 }
 
 // One ability, said in as few words as possible: the number that matters, big, then the exceptions as chips.
@@ -105,42 +111,75 @@ function SkillFace({ ab, left = 0 }) {
     );
 }
 
-// A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
-function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false, element = null }) {
-    const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
+// ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────────────────
+// A fighter's name, affinity and vigour, in a band that NEVER moves. This used to be stacked on top of the
+// hero inside the stage — which meant the camera push-in during a cast scaled and slid it too, so on every
+// single skill the two name plates drifted across each other and printed one name on top of the other. A HUD
+// that reads the state of the fight cannot be part of the shot.
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0 }) {
+    const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
     // IS the feedback — a bar that just jumps tells you the number changed but never how much it cost.
     const [ghost, setGhost] = useState(frac);
+    // A HEAL should read as a heal, not as the bar quietly being longer than it was.
+    const [healing, setHealing] = useState(false);
+    const prevFrac = useRef(frac);
     useEffect(() => {
+        if (frac > prevFrac.current) {
+            setHealing(true);
+            const h = setTimeout(() => setHealing(false), 620);
+            prevFrac.current = frac;
+            setGhost(frac);
+            return () => clearTimeout(h);
+        }
+        prevFrac.current = frac;
         if (frac >= ghost) { setGhost(frac); return undefined; }
-        const t = setTimeout(() => setGhost(frac), 340);
+        const t = setTimeout(() => setGhost(frac), 360);
         return () => clearTimeout(t);
     }, [frac, ghost]);
-    // The wind-up runs for exactly as long as the ring takes to close, so a fighter drawing back IS the
-    // countdown. Watch them, not the circle, and the timing still makes sense.
+
+    // Under a quarter is the danger band: the bar goes red and breathes, so you feel the fight turning before
+    // you have read a number. It is also the threshold Execute fires under, so the two agree.
+    const danger = frac > 0 && frac <= 0.35;
+    const shieldPct = maxHp ? Math.min(1, shield / maxHp) * 100 : 0;
+
+    return (
+        <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
+            + `${healing ? " is-healing" : ""}`}>
+            <b className="ar-fname">
+                {f?.name}
+                {element ? (
+                    <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
+                ) : null}
+            </b>
+            <span className="ar-hp">
+                <u className="ar-hp-ghost" style={{ width: `${Math.max(ghost, frac) * 100}%` }} />
+                <i style={{ width: `${frac * 100}%` }} />
+                {/* A ward sits ON the bar as the slab of blue it will eat before your vigour does. It was a
+                    chip of text elsewhere on screen, which is not where you are looking when a blow lands. */}
+                {shieldPct > 0 ? <s className="ar-hp-shield" style={{ left: `${frac * 100}%`, width: `${shieldPct}%` }} /> : null}
+            </span>
+            <em className="ar-hpnum">
+                {Math.max(0, hp)}<span>/{maxHp}</span>
+                {shield > 0 ? <u>+{shield}</u> : null}
+            </em>
+        </div>
+    );
+}
+
+// ── THE BODY ─────────────────────────────────────────────────────────────────────────────────────────────────
+// The fighter itself, standing on the sand. Nothing here reads state — it only acts.
+function FighterBody({ f, mirrored, hurt, lunge, down, wind = 0, brace = false, dim = false }) {
     const cls = `ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
-        + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}`;
+        + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`;
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
-            <div className="ar-plate">
-                <b className="ar-fname">
-                    {f?.name}
-                    {/* Whose element is whose. The clash banner was announcing a result off two facts that
-                        appeared nowhere on screen. */}
-                    {element ? (
-                        <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
-                    ) : null}
-                </b>
-                <span className="ar-hp">
-                    <u className="ar-hp-ghost" style={{ width: `${Math.max(ghost, frac) * 100}%` }} />
-                    <i style={{ width: `${frac * 100}%` }} />
-                </span>
-                <em className="ar-hpnum">{Math.max(0, hp)} / {maxHp}</em>
-            </div>
+            {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
+            <span className="ar-shadow" aria-hidden="true" />
             {f?.sprite ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="ar-hero" src={f.sprite} alt="" draggable="false" style={mirrored ? { transform: "scaleX(-1)" } : undefined} />
+                <img className="ar-hero" src={f.sprite} alt="" draggable="false" />
             ) : <span className="ar-hero ar-noface" aria-hidden="true" />}
         </div>
     );
@@ -275,13 +314,21 @@ export default function ArenaClient({ initial }) {
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [wheel, setWheel] = useState(false);    // the element-wheel explainer
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
-    const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the ring may start
+    const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
-    const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
+    const [pending, setPending] = useState(null); // the command you committed to, mid wind-up
     const [clash, setClash] = useState(null);
     const [err, setErr] = useState(null);
+    const [stop, setStop] = useState(false);      // hit-stop: the whole stage freezes for a moment on contact
+    const [reading, setReading] = useState(false);// their move is named on screen and you are reading it
+    const [muteOn, setMuteOn] = useState(false);
     const prev = useRef({ hp: null, foeHp: null, round: null });
+    const resultAtRef = useRef(0);
+    const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
+
+    // The stored mute preference, read after mount so the server and client markup agree.
+    useEffect(() => { setMuteOn(isMuted()); }, []);
 
     // Every action goes through here, and it now says so when one fails. A tap that silently does nothing is
     // the worst outcome available: somebody sat on a finished bout tapping "Back to the ladder" with no
@@ -310,47 +357,86 @@ export default function ArenaClient({ initial }) {
             }
             // The rank-up used to be its own overlay on a timer, stacked behind the result card. It lives
             // INSIDE the recap now — one modal, not two in sequence — so all that is left is the sting.
-            if (r?.finished?.rankUp) setTimeout(() => blip("win"), 900);
+            if (r?.finished?.rankUp) setTimeout(() => Sfx.rankUp(), 1500);
         } finally { setBusy(false); }
     }, [busy]);
 
     const bout = st?.bout || null;
+
+    // ── THE MUSIC ── it runs for exactly as long as a bout does, and its INTENSITY is your vigour. Losing is
+    // audible before it is legible: the hats come in, then the tremolo strings, while you are still reading
+    // the bar. Stopping on unmount matters as much as starting — a battle theme that follows you back to the
+    // ladder is the single most irritating bug a game can ship.
+    useEffect(() => {
+        if (!bout || bout.over) { stopMusic(); return undefined; }
+        startMusic();
+        return () => stopMusic();
+    }, [Boolean(bout), bout?.over]);
+    useEffect(() => {
+        if (!bout || !bout.maxHp) return;
+        // Full vigour is a calm 0.3; on your last legs it is 1.
+        setIntensity(0.3 + (1 - Math.max(0, Math.min(1, bout.hp / bout.maxHp))) * 0.7);
+    }, [bout?.hp, bout?.maxHp, bout]);
+
     // Juice is derived by DIFFING the server's reply, never fired from the click — so a number can never float
     // for a hit the server did not deal.
     useEffect(() => {
-        if (!bout) { prev.current = { hp: null, foeHp: null }; return; }
+        if (!bout) { prev.current = { hp: null, foeHp: null, round: null }; return undefined; }
         const p = prev.current;
-        if (p.hp != null && bout.hp < p.hp) {
-            setShake(2); blip("hurt");
-            try { navigator.vibrate?.([0, 30, 40, 22]); } catch { /* no haptics */ }
-        } else if (p.foeHp != null && bout.foeHp < p.foeHp) {
-            setShake(1); blip("hit");
-            // The buzz scales with what you took off them, so a big hit is felt as well as read.
-            const bite = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.18));
-            try { navigator.vibrate?.(Math.round(10 + bite * 34)); } catch { /* no haptics */ }
-        }
-        // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
-        // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
-        // Defending is a different act and deserves different words — "PERFECT" over a block you barely got
-        // a hand to told you the timing was good but never what you actually did.
-        // The grade words went with the timing ring. What's worth calling out now is the MOVE and what it
-        // cost them — a beat has no execution score to report any more.
-        if (last && bout.log.length !== p.round) {
+        const isNew = last && bout.log.length !== p.round;
+        const crit = Boolean(last?.crit);
+
+        if (p.hp != null && bout.hp < p.hp) {
+            // YOU TOOK IT. Weight is the fraction of your whole bar this blow cost, which is what decides how
+            // hard everything hits: the shake, the buzz, and how low and long the sound is.
+            const w = Math.min(1, (p.hp - bout.hp) / Math.max(1, bout.maxHp * 0.22));
+            setShake(2 + (w > 0.7 ? 1 : 0));
+            setStop(true);
+            Sfx.hurt(w);
+            Haptic.hurt(w);
+            duck(0.35, 0.2);
+        } else if (p.foeHp != null && bout.foeHp < p.foeHp) {
+            // YOU LANDED IT.
+            const w = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.22));
+            setShake(1 + (crit || w > 0.7 ? 1 : 0));
+            setStop(true);
+            if (crit) { Sfx.crit(w); Haptic.crit(); duck(0.5, 0.3); }
+            else { Sfx.impact(w); Haptic.hit(w); }
+        } else if (isNew && last.grade === "ward") { Sfx.ward(); Haptic.cast(); }
+        else if (isNew && last.grade === "guard") { Sfx.guard(); Haptic.cast(); }
+        else if (isNew && last.grade === "item") { (last.item === "poultice" ? Sfx.heal : Sfx.refresh)(); Haptic.cast(); }
+        else if (isNew && last.damage === 0) { Sfx.block(0.4); }
+
+        // SHOW the exchange. The MOVE, named, across the middle. The damage number is NOT repeated here — it
+        // has its own floater over the fighter that took it, and printing both put two numbers on top of each
+        // other a few pixels apart, which read as a rendering fault rather than emphasis.
+        if (isNew) {
             setClash({
-                grade: last.grade,
-                // A beat logged as theirs is one you were BLOCKING — your timing, their swing.
-                label: last.damage > 0 ? `${last.damage}` : "",
+                grade: crit ? "crit" : last.grade,
                 move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
+                crit,
             });
+            setResultAt(Date.now());
         }
-        if (bout.over && bout.won) blip("win");
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
-        const t = setTimeout(() => setShake(0), 320);
-        const t2 = setTimeout(() => setClash(null), 1150);
-        return () => { clearTimeout(t); clearTimeout(t2); };
+        const t = setTimeout(() => setShake(0), 360);
+        const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
+        const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
+        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); };
     }, [bout]);
+
+    // The end of a bout is its loudest moment, and it was a three-note blip.
+    useEffect(() => {
+        if (!bout?.over) return undefined;
+        Sfx.ko();
+        Haptic.ko();
+        const t = setTimeout(() => {
+            if (bout.won) { Sfx.victory(); Haptic.win(); } else { Sfx.defeat(); Haptic.lose(); }
+        }, 700);
+        return () => clearTimeout(t);
+    }, [bout?.over, bout?.won]);
     // scrollIntoView walks UP the tree and scrolls whatever ancestor it must — including the window, which
     // is why tapping a command yanked the page down and left half the fight off screen. Scroll the log's own
     // box and nothing else. Same trap the dungeon log hit.
@@ -359,71 +445,73 @@ export default function ArenaClient({ initial }) {
         if (box) box.scrollTop = box.scrollHeight;
     }, [bout?.log?.length]);
 
-    // ── THE CAST ── committing a skill takes the screen for a moment before it asks you for anything: the
-    // camera pushes in, the move is named, its effect goes off. Only then does the ring appear. Declaring a
-    // skill at the same time as demanding a tap meant the spectacle was something you had to ignore in order
-    // to play well, which is the opposite of the point.
+    // ── ONE OWNER FOR YOUR WHOLE BEAT ────────────────────────────────────────────────────────────────────
+    // Committing a command starts a WIND-UP, and the blow lands when it finishes. Every command goes through
+    // here, not just skills: the two effects this replaces sent a skill down a 1250ms cinematic and every
+    // other command straight to the network on the same tick, which is why Attack — the button you press more
+    // than all the others combined — had no animation whatsoever.
     useEffect(() => {
-        if (bout?.turn !== "you" || pending?.command !== "skill") { setCastDone(true); return undefined; }
-        setCastDone(false);
+        if (!pending || !bout || bout.over || bout.turn !== "you") { setCastDone(true); return undefined; }
         const p2 = pending;
-        // The cinematic plays, THEN the blow lands — one owner for the whole sequence, so there is no window
-        // where another effect can resolve the beat out from under it.
+        const ms = WINDUP[p2.command] ?? 380;
+        setCastDone(p2.command !== "skill");
+
+        // The swing itself is heard at the start of the wind-up, not at the end — the sound of something being
+        // drawn back is the cue that a blow is coming.
+        if (p2.command === "skill") {
+            const ab = (bout.me?.abilities || []).find((a) => a.id === p2.ability);
+            castSound(ab?.kind, ab?.element);
+        } else if (p2.command === "attack") Sfx.whoosh();
+        Haptic.cast();
+
         const t = setTimeout(() => {
             setCastDone(true);
             setPending(null); setMenu(null);
-            act("beat", { command: "skill", ability: p2.ability });
-        }, CAST_MS);
+            act("beat", { command: p2.command, ability: p2.ability || null, item: p2.item || null });
+        }, ms);
         return () => clearTimeout(t);
-    }, [pending?.ability, pending?.command, bout?.turn, bout?.beat]);
+    }, [pending, bout?.turn, bout?.beat, bout?.over]);
 
-    // ── THE BEAT RESOLVES ITSELF ── nothing to tap any more, so a committed command fires as soon as its
-    // cinematic has finished. A skill gets the full cast first; a plain attack goes straight away.
-    // A SKILL IS NOT RESOLVED HERE. Both this and the cast timer run after the same render, and `castDone`
-    // in this closure is still the PREVIOUS value — true — so a skill fired instantly and the cinematic never
-    // got a frame. The cast timer owns firing the skill; this only handles commands with nothing to watch.
+    // ── THEIR BEAT, IN THREE PARTS ───────────────────────────────────────────────────────────────────────
+    // result → telegraph → blow. The middle step used to begin the instant your own swing resolved, so their
+    // warning card and your result banner were on screen together, overlapping, every exchange. Holding the
+    // result for RESULT_MS first is the whole fix: one thing is being said at a time.
     useEffect(() => {
-        if (!pending || pending.command === "skill" || !bout || bout.over || bout.turn !== "you" || busy) return undefined;
-        const p2 = pending;
-        setPending(null); setMenu(null);
-        act("beat", { command: p2.command, ability: p2.ability || null });
-        return undefined;
-    }, [pending, bout?.turn, bout?.over, busy, act]);
+        if (!bout || bout.over || bout.turn !== "them") { setBlockReady(true); setReading(false); return undefined; }
+        setBlockReady(false);
+        setReading(false);
+        const t1 = setTimeout(() => {
+            setReading(true);
+            Sfx.warn();
+            Haptic.warn();
+        }, RESULT_MS);
+        const t2 = setTimeout(() => setBlockReady(true), RESULT_MS + TELEGRAPH_MS);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, [bout?.beat, bout?.turn, bout?.over]);
 
-    // Their beat plays its telegraph and then lands on its own.
+    // Their blow lands once you have had the telegraph to read.
     useEffect(() => {
         if (!bout || bout.over || bout.turn !== "them" || !blockReady || busy) return undefined;
         const t = setTimeout(() => act("beat", { command: "block" }), 140);
         return () => clearTimeout(t);
     }, [bout?.turn, bout?.beat, bout?.over, blockReady, busy, act]);
 
-    // ── READ IT FIRST ── their beat opens with a beat of nothing but the warning: who is coming and with
-    // what. Defending used to start the instant your own swing resolved, with an identical ring and no idea
-    // what it was for, which is exactly why it felt like a second attack of your own rather than a defence.
-    useEffect(() => {
-        if (!bout || bout.over || bout.turn !== "them") { setBlockReady(true); return undefined; }
-        setBlockReady(false);
-        const t = setTimeout(() => setBlockReady(true), TELEGRAPH_MS);
-        return () => clearTimeout(t);
-    }, [bout?.beat, bout?.turn, bout?.over]);
-
-    // THE CAST'S OWN EFFECT — fired while the camera is on whoever is casting, before any ring. This one is
-    // pure spectacle (the damage still resolves later, off the server), so it is keyed to the declaration
-    // rather than to a log entry.
+    // THE CAST'S OWN EFFECT — fired while the camera is on whoever is casting, before the blow. Pure
+    // spectacle (the damage still resolves later, off the server), so it is keyed to the declaration rather
+    // than to a log entry. The SOUND is not fired here: it belongs to the start of the wind-up, where the
+    // gesture begins, and playing it in both places double-struck every cast.
     useEffect(() => {
         const mineCast = bout?.turn === "you" && pending?.command === "skill" && !castDone
             ? (bout.me?.abilities || []).find((a) => a.id === pending.ability) : null;
-        const theirCast = bout?.turn === "them" && !blockReady && bout?.incoming?.isAbility ? bout.incoming : null;
+        const theirCast = bout?.turn === "them" && reading && bout?.incoming?.isAbility ? bout.incoming : null;
         const c = mineCast || theirCast;
         if (!c) return undefined;
+        if (theirCast) castSound(c.kind, c.element);
         setFx({ key: `cast-${bout.beat}-${c.name}`, kind: c.kind || "strike", element: c.element,
-            side: mineCast ? "left" : "right", crit: false });
-        // The cast is the loudest moment in the fight and it was silent.
-        blip(mineCast ? (c.kind || "strike") : "incoming");
-        try { navigator.vibrate?.(mineCast ? [0, 14, 22, 26] : [0, 26, 30, 14]); } catch { /* no haptics */ }
+            side: mineCast ? "left" : "right", crit: false, charge: true });
         const t = setTimeout(() => setFx(null), 900);
         return () => clearTimeout(t);
-    }, [pending?.ability, pending?.command, castDone, blockReady, bout?.turn, bout?.beat]);
+    }, [pending?.ability, pending?.command, castDone, reading, bout?.turn, bout?.beat]);
 
     // Particles fire off the RESOLVED beat, same as the damage number — so an effect can never play for a
     // hit the server did not deal.
@@ -432,24 +520,38 @@ export default function ArenaClient({ initial }) {
         if (!l) return undefined;
         const mineNow = l.who === "you";
         const kind = l.grade === "ward" ? "ward"
-            : (mineNow && bout.me?.abilities?.find((a) => a.name === l.ability)?.kind) || "strike";
+            : l.grade === "guard" ? "ward"
+                : l.grade === "item" ? "heal"
+                    : (mineNow && bout.me?.abilities?.find((a) => a.name === l.ability)?.kind) || "strike";
         setFx({
             key: bout.log.length,
             kind,
             element: mineNow ? bout.me?.element : bout.foe?.element,
-            side: kind === "ward" || !mineNow ? "left" : "right",
-            crit: l.grade === "flawless" || l.grade === "perfect",
+            // The burst goes on whoever it HAPPENED TO. A ward, a guard and a poultice are all things you do
+            // to yourself; a blow lands on the other one.
+            side: ["ward", "heal"].includes(kind) || !mineNow ? "left" : "right",
+            crit: Boolean(l.crit),
         });
         const t = setTimeout(() => setFx(null), 900);
         return () => clearTimeout(t);
     }, [bout?.log?.length]);
 
-    // A number, off the blow that actually landed, on the side that took it.
+    // ── THE NUMBERS ── off the blow that actually landed, on the fighter that took it. A blocked or healed
+    // amount is a number too: "you turned aside 9" was buried in grey log text under the buttons, so the one
+    // thing your defensive choices actually bought you was the one thing never shown on the field.
     useEffect(() => {
         const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
-        if (!l || !(l.damage > 0)) return undefined;
-        setPop({ id: bout.log.length, side: l.who === "you" ? "right" : "left", n: l.damage, grade: l.grade });
-        const t = setTimeout(() => setPop(null), 950);
+        if (!l) return undefined;
+        const pops = [];
+        if (l.damage > 0) {
+            pops.push({ side: l.who === "you" ? "right" : "left", n: l.damage, kind: l.crit ? "crit" : "dmg" });
+        }
+        if (l.blocked > 0) pops.push({ side: "left", n: l.blocked, kind: "block", at: 120 });
+        if (l.healed > 0) pops.push({ side: "left", n: l.healed, kind: "heal" });
+        if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
+        if (!pops.length) return undefined;
+        setPop({ id: bout.log.length, items: pops });
+        const t = setTimeout(() => setPop(null), 1000);
         return () => clearTimeout(t);
     }, [bout?.log?.length]);
 
@@ -463,11 +565,15 @@ export default function ArenaClient({ initial }) {
     // rather than a fight.
     if (bout) {
         const yourTurn = !bout.over && bout.turn === "you";
-        // The timing ring is gone: a beat is decided by the command you choose and the gear behind it.
-        const reading = !bout.over && bout.turn === "them" && !blockReady;   // the warning is on screen
-        // A landed blow of yours that was genuinely well timed gets the whole pane to itself for a moment.
+        // A CRIT takes the whole pane for a moment. This used to test for grade "flawless"/"perfect" — timing
+        // grades that stopped existing when the ring was removed — so the screen flash, the oversized number
+        // and the bigger particle burst were all unreachable code. Crits are rolled on the server now and the
+        // blow itself says whether it was one.
         const lastLog = bout.log?.length ? bout.log[bout.log.length - 1] : null;
-        const bigHit = lastLog?.who === "you" && (lastLog.grade === "flawless" || lastLog.grade === "perfect") && lastLog.damage > 0;
+        const bigHit = Boolean(lastLog?.crit) && lastLog.damage > 0;
+        // A crit of THEIRS flashes on your side of the ring and in their colour, or the biggest hit you have
+        // ever taken would be celebrated in gold over the fighter who dealt it.
+        const critTheirs = bigHit && lastLog.who === "them";
         // The move you just committed to, declared and lit BEFORE the ring — a skill announcing itself after
         // it has already resolved is a receipt, not a moment.
         const abilities = bout.me?.abilities || [];
@@ -482,15 +588,40 @@ export default function ArenaClient({ initial }) {
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}`
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
+                    + `${stop ? " is-stop" : ""}`
                     + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
+                    {/* ── AMBIENT ── dust turning in the light over the sand. A turn-based fight spends most of
+                        its life waiting for you to decide, and with nothing moving at all the ring read as a
+                        screenshot rather than a place — filmed, it was eleven straight frames of two people
+                        standing perfectly still. Nine spans on long staggered loops fix that for nothing. */}
+                    <span className="ar-dust" aria-hidden="true">
+                        {Array.from({ length: 9 }).map((_, i) => (
+                            <i key={i} style={{
+                                left: `${8 + i * 10.5}%`,
+                                "--dy": `${-70 - (i % 4) * 30}px`,
+                                "--dx": `${(i % 3) * 14 - 14}px`,
+                                animationDuration: `${7 + (i % 5) * 2.4}s`,
+                                animationDelay: `${-(i * 1.7)}s`,
+                                opacity: 0.18 + (i % 3) * 0.12,
+                            }} />
+                        ))}
+                    </span>
 
                     {/* Everything that used to sit in paragraphs under the panel, now a strip across the top. */}
                     <div className="ar-hud">
                         <span className="ar-round">Round {bout.beat}</span>
+                        {/* A fight with music needs a way to turn the music off, on the fight screen, without
+                            hunting for it. The choice is remembered across bouts. */}
+                        <button type="button" className={`ar-mute${muteOn ? " is-off" : ""}`}
+                            aria-label={muteOn ? "Turn sound on" : "Turn sound off"}
+                            aria-pressed={muteOn}
+                            onClick={() => { const n = !muteOn; setMuteOn(n); setMuted(n); if (!n) { unlock(); Sfx.ui(); } }}>
+                            {muteOn ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+                        </button>
                         {bout.clash?.note ? (
                             <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
                                 onClick={() => setWheel((w) => !w)}>
@@ -544,17 +675,26 @@ export default function ArenaClient({ initial }) {
                         );
                     })() : null}
 
+                    {/* ── THE BARS ── outside the stage, so the camera never touches them. */}
+                    <div className="ar-bars">
+                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
+                            active={yourTurn} shield={bout.shield || 0} />
+                        <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
+                            {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
+                        </span>
+                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
+                            foe active={!yourTurn && !bout.over} />
+                    </div>
+
                     <div className="ar-floor">
-                        <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
+                        <FighterBody f={st.me} hurt={shake >= 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
-                            wind={yourTurn && pending ? CAST_MS : 0}
-                            brace={!bout.over && bout.turn === "them"}
-                            element={bout.me?.element || null} />
-                        <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
+                            wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
+                            brace={!bout.over && bout.turn === "them" && blockReady} />
+                        <FighterBody f={bout.foe} mirrored hurt={shake === 1} lunge={shake >= 2}
                             down={bout.over && bout.won}
-                            wind={!bout.over && bout.turn === "them" ? TELEGRAPH_MS : 0}
-                            brace={yourTurn && Boolean(pending)}
-                            element={bout.foe?.element || null} />
+                            wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
+                            brace={yourTurn && Boolean(pending)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -569,11 +709,16 @@ export default function ArenaClient({ initial }) {
                             </div>
                         ) : null}
 
-                        {pop ? (
-                            <span key={pop.id} className={`ar-pop is-${pop.side} is-${pop.grade}`} aria-hidden="true">
-                                &minus;{pop.n}
+                        {pop ? pop.items.map((it, i) => (
+                            <span key={`${pop.id}-${it.kind}-${i}`}
+                                className={`ar-pop is-${it.side} is-${it.kind}`}
+                                style={it.at ? { animationDelay: `${it.at}ms` } : undefined}
+                                aria-hidden="true">
+                                {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" ? "" : "−"}
+                                {it.n}
+                                {it.kind === "block" ? <u>blocked</u> : it.kind === "ward" ? <u>soaked</u> : null}
                             </span>
-                        ) : null}
+                        )) : null}
 
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
                         {fx ? (
@@ -615,8 +760,31 @@ export default function ArenaClient({ initial }) {
                                     </button>
                                 );
                             })}
-                            {bout.shield > 0 ? <span className="ar-buff is-ward">Braced {bout.shield}</span> : null}
                             {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened &times;{bout.surge}</span> : null}
+
+                            {/* ── WHAT THEY ARE CARRYING ──────────────────────────────────────────────────
+                                You could see your own four moves and nothing at all of theirs, so every blow
+                                that was not a plain swing arrived as a surprise. In a fight against another
+                                member the two sides should be readable to the same standard.
+                                These are deliberately NOT shown as cooldowns. A defender is asleep; the server
+                                picks their move at random from this list rather than running a rotation, so
+                                there is no cooldown to show and inventing one would be a lie you could plan
+                                around. What is true is the SET — this is what can come at you. */}
+                            {bout.foe?.abilities?.length ? (
+                                <span className="ar-theirs">
+                                    <i className="ar-theirs-lab">Theirs</i>
+                                    {bout.foe.abilities.map((ab) => (
+                                        <span key={ab.id} className="ar-theirchip"
+                                            style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
+                                            title={`${ab.name} — ${ab.from}`}>
+                                            {ab.sprite ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={ab.sprite} alt="" draggable="false" />
+                                            ) : null}
+                                        </span>
+                                    ))}
+                                </span>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -631,12 +799,14 @@ export default function ArenaClient({ initial }) {
                         </div>
                     ) : null}
 
-                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
-                        execution is legible instead of being buried in a log line. */}
+                    {/* The MOVE that just landed, named across the ring. The damage is deliberately NOT
+                        repeated here — it floats over the fighter that took it, and printing it in both places
+                        put two copies of the same number a few pixels apart, which read as a rendering fault. */}
                     {clash ? (
-                        <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}`} aria-hidden="true">
+                        <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}${clash.crit ? " is-crit" : ""}`}
+                            aria-hidden="true">
+                            {clash.crit ? <b className="ar-critword">Critical</b> : null}
                             <em className="ar-move">{clash.move}</em>
-                            <span>{clash.label}</span>
                         </div>
                     ) : null}
 
@@ -704,7 +874,7 @@ export default function ArenaClient({ initial }) {
                                         return (
                                             <button key={it.id} type="button" className={`ar-pick${left ? "" : " is-poor"}`}
                                                 style={{ "--el": "#8bf0b4" }} disabled={!left || busy}
-                                                onClick={() => { setMenu(null); act("beat", { command: "item", item: it.id }); }}>
+                                                onClick={() => { unlock(); setMenu(null); setPending({ command: "item", item: it.id, label: it.name }); }}>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img className="ar-pick-art" src={it.sprite} alt="" draggable="false" />
                                                 <span className="ar-pick-body">
@@ -723,19 +893,19 @@ export default function ArenaClient({ initial }) {
                             ) : (
                                 <div className="ar-cmds">
                                     <button type="button" className="ar-cmd is-atk" disabled={busy}
-                                        onClick={() => setPending({ command: "attack", label: "Attack", short: "Strike" })}>
+                                        onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "attack", label: "Attack", short: "Strike" }); }}>
                                         <GiCrossedSwords aria-hidden="true" /><span>Attack</span>
                                     </button>
                                     <button type="button" className="ar-cmd is-skill" disabled={busy || !abilities.length}
-                                        onClick={() => setMenu("skill")}>
+                                        onClick={() => { unlock(); Sfx.ui(); setMenu("skill"); }}>
                                         <GiSpellBook aria-hidden="true" /><span>Skill</span>
                                     </button>
                                     <button type="button" className="ar-cmd is-guard" disabled={busy}
-                                        onClick={() => act("beat", { command: "guard" })}>
+                                        onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
                                         <GiShield aria-hidden="true" /><span>Guard</span>
                                     </button>
                                     <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
-                                        onClick={() => setMenu("item")}>
+                                        onClick={() => { unlock(); Sfx.ui(); setMenu("item"); }}>
                                         <GiKnapsack aria-hidden="true" /><span>Item</span>
                                     </button>
                                 </div>
@@ -836,7 +1006,12 @@ export default function ArenaClient({ initial }) {
                         </div>
                         <div className="ar-target-body">
                             <b>{o.name}</b>
-                            <em>Lv {o.level} · {o.vigour} vigour · {o.tell}</em>
+                            {/* This said "Lv 34 · 241 vigour · {o.tell}" — and `tell` is never set by the
+                                server, on this row or anywhere else, so every opponent on the ladder rendered
+                                with a trailing separator and nothing after it. Their record is real, free
+                                (standings already selects it) and the thing you actually want to know about
+                                somebody before you spend one of ten daily challenges on them. */}
+                            <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L</em>
                         </div>
                         <div className="ar-target-go">
                             <span className="ar-prize">+{money(o.reward.gold)}</span>
@@ -947,8 +1122,17 @@ function Styles() {
             .ar-rankup-card { position: relative; overflow: hidden; width: min(360px, 100%); padding: 26px 22px 20px;
                 border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid var(--rank); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 70px -10px var(--rank);
-                animation: arPop .45s cubic-bezier(.2,1.5,.35,1) both; }
-            @keyframes arPop { from { opacity: 0; transform: scale(.82) translateY(16px) } to { opacity: 1; transform: none } }
+                animation: arCardIn .45s cubic-bezier(.2,1.5,.35,1) both; }
+            /* ── NAME THIS ONE THING ONLY ────────────────────────────────────────────────────────────────
+               This was called arPop, and so was the DAMAGE NUMBER's keyframe 460 lines further down.
+               @keyframes are global by name and the last definition wins outright, so every card here was
+               silently animating on the damage number's curve — which ends at opacity 0, 46px in the air.
+               With fill-mode "both" they held that final frame, so the victory recap, the rank-up and the
+               away report were invisible: a dark backdrop with nothing on it.
+               That is the "dark sheet with the card missing and LITERALLY nothing to press" this file has
+               apologised for twice. The Close button and the inline position:fixed were both added as
+               workarounds for it. This is the cause. */
+            @keyframes arCardIn { from { opacity: 0; transform: scale(.82) translateY(16px) } to { opacity: 1; transform: none } }
             .ar-rays { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
             .ar-rays span { position: absolute; width: 3px; height: 52px; border-radius: 2px; transform-origin: 50% 0;
                 background: linear-gradient(var(--rank), transparent); animation: arRay 1.5s cubic-bezier(.15,.7,.3,1) both; }
@@ -995,16 +1179,50 @@ function Styles() {
             .ar-up-lvl { font-size: 11px; color: #8a939d; white-space: nowrap; }
 
             /* ── the ring ── */
+            /* The gradient is a FALLBACK, not decoration: until the background image lands the stage is
+               otherwise pure black, which is what the first frames of every filmed bout looked like. A warm
+               dark floor means a slow load degrades to "dim arena" rather than "broken". */
             .ar-ring { position: relative; border-radius: 16px; overflow: hidden;
                 height: min(74vh, 640px); min-height: 420px;
                 display: flex; flex-direction: column;
+                background: linear-gradient(180deg, #150f0c 0%, #1e1410 52%, #33210f 100%);
                 border: 1px solid rgba(255,190,110,0.3); }
             .ar-ring.is-shake-1 { animation: arShake .2s ease-out; }
             .ar-ring.is-shake-2 { animation: arShake .3s ease-out; }
             @keyframes arShake { 0%,100% { transform: translate(0,0) } 28% { transform: translate(-6px,3px) } 62% { transform: translate(6px,-3px) } }
-            .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+            /* ── FRAMING ── the background is an arena whose lit sand oval sits in the bottom third of the
+               image. Centred, that oval landed off the bottom of a portrait panel and both fighters ended up
+               standing against the STANDS — which is why they read as cut-outs pasted on a wall. Biasing the
+               crop downward puts the sand under their feet, where a fight happens. */
+            /* The panel is PORTRAIT and the painting is landscape, so object-fit: cover crops a narrow vertical
+               slice — and the centre slice of this particular arena is its darkest part, which is how the
+               stage ended up looking like a black rectangle with two men in it. Biased left and scaled up so
+               the lit sand sits under their feet and the arches read above them. */
+            .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+                object-position: 38% 100%; transform: scale(1.25); transform-origin: 50% 100%; }
+            /* Two washes, not one: a vignette that pushes the eye to the middle, and a warm floor glow that
+               makes the sand read as lit ground rather than more brown. Kept LIGHT — the first cut of this
+               stacked a scrim, a bottom gradient and a crop that between them turned a rather good painting
+               of an arena into a black rectangle. The background is the only thing telling you where you are. */
             .ar-ring-scrim { position: absolute; inset: 0;
-                background: radial-gradient(78% 62% at 50% 62%, transparent, rgba(10,6,4,0.72)); }
+                background:
+                    radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.18), transparent 72%),
+                    radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.5)); }
+            /* ── DUST ── the only thing on screen while a turn-based fight waits for you. */
+            .ar-dust { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+            .ar-dust i { position: absolute; bottom: 16%; width: 3px; height: 3px; border-radius: 50%;
+                background: #ffe0b0; filter: blur(.4px);
+                animation-name: arDust; animation-timing-function: linear; animation-iteration-count: infinite; }
+            @keyframes arDust {
+                0% { transform: translate(0, 0) scale(.6); opacity: 0 }
+                18% { opacity: 1 }
+                80% { opacity: .5 }
+                100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0 } }
+
+            /* Just enough of a floor band for the deck to sit against. */
+            .ar-ring::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26%;
+                z-index: 1; pointer-events: none;
+                background: linear-gradient(180deg, transparent, rgba(8,5,4,0.42) 70%, rgba(6,4,3,0.62)); }
             .ar-hud { position: relative; z-index: 5; flex: 0 0 auto; padding: 8px 8px 0; display: flex;
                 align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; pointer-events: none; }
             .ar-round { font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
@@ -1039,9 +1257,25 @@ function Styles() {
             /* Both fighters stand on the same line of sand, facing each other. */
             /* Takes every pixel the other bands don't want. min-height:0 is load-bearing — without it a flex item
                refuses to shrink below its content and the deck gets pushed off the bottom. */
+            /* ── STAGING, WITH DEPTH ─────────────────────────────────────────────────────────────────────
+               Two equal columns is the obvious layout and it is the wrong one. A member sprite is SQUARE, so
+               object-fit: contain in a half-width column draws it at half the panel wide and half the panel
+               TALL — on a phone that is a 145px character marooned in a 349px stage, which is exactly why the
+               ring read as mostly empty arena wall.
+               So the fighters are placed rather than gridded: each is wider than half, they overlap slightly
+               in the middle, and the opponent sits a little smaller and a little further up the sand. That
+               reads as distance rather than as a mistake, and it buys both of them about 45% more size. */
             .ar-floor { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
-                display: grid; grid-template-columns: 1fr 1fr; align-items: end; padding: 4px 4% 0;
                 transition: transform .45s cubic-bezier(.2,.9,.3,1); }
+            /* Sized so the two of them meet near the middle without occluding each other, and so the lit sand
+               still reads underneath. Wider than this and they crowd; narrower and they are back to being two
+               small figures with an empty arena between them. */
+            .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
+            .ar-floor > .ar-fighter:first-of-type { left: -3%; z-index: 3; }
+            /* Smaller AND standing further up the sand — the two cues together read as distance. Equal size on
+               the same baseline just reads as two of the same thing. */
+            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 2; width: 47%; bottom: 8%; }
+            .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
             .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(9%); }
@@ -1055,14 +1289,28 @@ function Styles() {
             .ar-ring.is-on-them .ar-fighter.is-foe .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 26px var(--el, rgba(255,215,94,0.8))); }
             .ar-ring-scrim { transition: background .35s ease; }
             .ar-fighter { transition: opacity .35s ease, filter .35s ease; }
-            .ar-fighter { position: relative; height: 100%; display: flex; flex-direction: column;
-                align-items: center; justify-content: flex-end; gap: 6px; min-height: 0; }
+            .ar-fighter { display: flex; flex-direction: column;
+                align-items: center; justify-content: flex-end; min-height: 0; }
+            .ar-fighter.is-dim { opacity: .3; filter: saturate(.4); }
+            /* ── THE CONTACT SHADOW ── the one thing that puts a fighter ON the sand. Without it both heroes
+               float in front of the background wall, which is exactly how the ring read: two cut-outs pasted
+               onto a photograph rather than two people standing in a place. */
+            .ar-shadow { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+                width: min(74%, 150px); height: 16px; border-radius: 50%; pointer-events: none;
+                background: radial-gradient(ellipse at center, rgba(0,0,0,0.62), transparent 70%);
+                animation: arShadowBreathe 2.8s ease-in-out infinite alternate; }
+            @keyframes arShadowBreathe { from { opacity: .95; transform: translateX(-50%) scale(1) }
+                to { opacity: .72; transform: translateX(-50%) scale(.9) } }
             /* The old value, holding for a beat before it slides down to meet the new one. */
             .ar-hp-ghost { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit;
                 background: rgba(255,120,140,0.55); transition: width .38s cubic-bezier(.4,0,.2,1); }
             .ar-hp > i { position: relative; z-index: 2; }
-            .ar-hero { width: min(100%, 210px); min-height: 0; flex: 1 1 auto; object-fit: contain; object-position: bottom;
-                filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
+            /* BIGGER, AND LOWER. These were capped at 210px inside a stage most of the panel tall, so both
+               fighters sat as small figures floating in the middle of an empty wall with a vast dead band
+               above and below them. A fight should fill its frame. */
+            .ar-hero { width: 100%; height: 100%; min-height: 0; object-fit: contain;
+                object-position: bottom center;
+                filter: drop-shadow(0 10px 16px rgba(0,0,0,0.7));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
             .ar-fighter.is-foe .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
@@ -1086,25 +1334,73 @@ function Styles() {
             @keyframes arBrace { to { transform: translateY(4px) scale(.96) } }
             .ar-fighter.is-foe.is-brace .ar-hero { animation: arBraceFoe .45s ease-out both; }
             @keyframes arBraceFoe { to { transform: scaleX(-1) translateY(4px) scale(.96) } }
-            /* Landing a blow leans you in; taking one rocks you back and flashes red. */
-            .ar-fighter.is-lunge .ar-hero { animation: arLunge .3s ease-out; }
-            @keyframes arLunge { 0%,100% { transform: translateX(0) } 50% { transform: translateX(14px) } }
-            .ar-fighter.is-foe.is-lunge .ar-hero { animation: arLungeFoe .3s ease-out; }
-            @keyframes arLungeFoe { 0%,100% { transform: scaleX(-1) translateX(0) } 50% { transform: scaleX(-1) translateX(14px) } }
-            .ar-fighter.is-hurt .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 16px #ff4d5e) brightness(1.5); }
+            /* ── CONTACT ── landing a blow drives you INTO them and back; taking one rocks you away from it.
+               The old version nudged 14px and returned, which at this size was barely perceptible — the whole
+               of "you hit them" was a number changing. A step-in with a scale-up sells the weight. */
+            .ar-fighter.is-lunge .ar-hero { animation: arLunge .34s cubic-bezier(.2,.9,.3,1); }
+            @keyframes arLunge {
+                0% { transform: translateX(0) scale(1) }
+                28% { transform: translateX(34px) scale(1.06) }
+                100% { transform: translateX(0) scale(1) } }
+            .ar-fighter.is-foe.is-lunge .ar-hero { animation: arLungeFoe .34s cubic-bezier(.2,.9,.3,1); }
+            @keyframes arLungeFoe {
+                0% { transform: scaleX(-1) translateX(0) scale(1) }
+                28% { transform: scaleX(-1) translateX(34px) scale(1.06) }
+                100% { transform: scaleX(-1) translateX(0) scale(1) } }
+            /* Taking one: knocked back, tipped, and washed red. */
+            .ar-fighter.is-hurt .ar-hero { animation: arRecoil .36s cubic-bezier(.2,.9,.3,1);
+                filter: drop-shadow(0 10px 16px rgba(0,0,0,0.7)) drop-shadow(0 0 18px #ff4d5e) brightness(1.6); }
+            @keyframes arRecoil {
+                0% { transform: translateX(0) rotate(0deg) }
+                22% { transform: translateX(-22px) rotate(-5deg) }
+                100% { transform: translateX(0) rotate(0deg) } }
+            .ar-fighter.is-foe.is-hurt .ar-hero { animation: arRecoilFoe .36s cubic-bezier(.2,.9,.3,1); }
+            @keyframes arRecoilFoe {
+                0% { transform: scaleX(-1) translateX(0) rotate(0deg) }
+                22% { transform: scaleX(-1) translateX(-22px) rotate(-5deg) }
+                100% { transform: scaleX(-1) translateX(0) rotate(0deg) } }
             /* Shared with the ladder's 30px portraits, so it stays proportional; only the RING placeholder
                gets a fixed size. Sizing this in px broke the little rows above the fold. */
             .ar-noface { width: 60%; height: 60%; border-radius: 50%; background: rgba(255,255,255,0.12); }
             .ar-hero.ar-noface { width: 96px; height: 96px; }
 
-            .ar-plate { width: min(100%, 150px); text-align: center; }
+            /* ── THE BAR BAND ── fixed at the top of the ring, never scaled, never slid. */
+            .ar-bars { position: relative; z-index: 6; flex: 0 0 auto; display: grid;
+                grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; padding: 4px 10px 2px; }
+            .ar-bar { min-width: 0; transition: opacity .3s ease; opacity: .62; }
+            .ar-bar.is-active { opacity: 1; }
+            .ar-bar.is-foe { text-align: right; }
             .ar-fname { display: block; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .ar-hp { position: relative; display: block; height: 9px; margin: 4px 0 2px; border-radius: 999px;
-                overflow: hidden; background: rgba(0,0,0,0.62); border: 1px solid rgba(0,0,0,0.5); }
-            .ar-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #4ad07f, #7ce8a4); transition: width .35s ease; }
-            .ar-fighter.is-foe .ar-hp > i { background: linear-gradient(90deg, #ff6f7d, #ffb0b8); }
-            .ar-hpnum { font-size: 10px; font-style: normal; color: #e8dcc8; text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; }
+            .ar-hp { position: relative; display: block; height: 11px; margin: 4px 0 2px; border-radius: 999px;
+                overflow: hidden; background: rgba(0,0,0,0.68); border: 1px solid rgba(0,0,0,0.55);
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.7); }
+            .ar-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #4ad07f, #7ce8a4);
+                transition: width .35s cubic-bezier(.2,.8,.3,1); }
+            .ar-bar.is-foe .ar-hp > i { background: linear-gradient(90deg, #ff6f7d, #ffb0b8); }
+            /* The ward, sitting on the bar as the slab it will eat before your vigour does. */
+            .ar-hp-shield { position: absolute; top: 0; bottom: 0; z-index: 3; text-decoration: none;
+                background: repeating-linear-gradient(115deg, rgba(111,208,255,.95) 0 4px, rgba(111,208,255,.6) 4px 8px);
+                transition: left .35s ease, width .35s ease; }
+            /* ── THE DANGER BAND ── under a third and the bar goes red and breathes. You feel the fight
+               turning before you have read a number, which is the whole job of a health bar. */
+            .ar-bar.is-danger .ar-hp > i { background: linear-gradient(90deg, #ff3b4e, #ff8f9a);
+                animation: arDanger .7s ease-in-out infinite alternate; }
+            @keyframes arDanger { from { filter: brightness(1) } to { filter: brightness(1.55) } }
+            .ar-bar.is-danger .ar-hp { box-shadow: inset 0 1px 3px rgba(0,0,0,.7), 0 0 14px -2px rgba(255,60,80,.9); }
+            /* A heal flashes the bar so it reads as vigour coming back rather than a number being different. */
+            .ar-bar.is-healing .ar-hp > i { animation: arHealFlash .6s ease-out; }
+            @keyframes arHealFlash { 0% { filter: brightness(2.4) saturate(.4) } 100% { filter: none } }
+            .ar-hpnum { display: block; font-size: 10px; font-style: normal; color: #e8dcc8;
+                text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; font-weight: 800; }
+            .ar-hpnum span { opacity: .55; font-weight: 600; }
+            .ar-hpnum u { text-decoration: none; margin-left: 5px; color: #6fd0ff; }
+            /* Whose beat it is, said plainly, between the two bars. */
+            .ar-turnmark { align-self: center; font-size: 8.5px; font-weight: 900; letter-spacing: .12em;
+                text-transform: uppercase; white-space: nowrap; padding: 3px 8px; border-radius: 999px;
+                background: rgba(8,6,10,0.7); border: 1px solid rgba(255,255,255,0.16); }
+            .ar-turnmark.is-you { color: #ffd75e; border-color: rgba(255,215,94,.55); }
+            .ar-turnmark.is-them { color: #6fd0ff; border-color: rgba(111,208,255,.5); }
 
             /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
             .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
@@ -1188,7 +1484,7 @@ function Styles() {
             .ar-recap-card { position: relative; overflow: hidden; width: min(390px, 100%); max-height: 92dvh; overflow-y: auto; padding: 24px 22px 18px;
                 border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid var(--tint); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 66px -12px var(--tint);
-                animation: arPop .42s cubic-bezier(.2,1.5,.35,1) both; }
+                animation: arCardIn .42s cubic-bezier(.2,1.5,.35,1) both; }
             .ar-recap-kick { position: relative; font-size: 10px; font-weight: 900; letter-spacing: .22em;
                 text-transform: uppercase; color: color-mix(in srgb, var(--tint) 80%, white); }
             .ar-recap-title { position: relative; display: block; margin: 4px 0 2px; font-size: 1.25rem; font-weight: 900; color: #fff; }
@@ -1266,7 +1562,7 @@ function Styles() {
             .ar-away-card { width: min(390px, 100%); max-height: 92dvh; overflow-y: auto; padding: 22px 20px 18px;
                 border-radius: 20px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid #6f5a9c; box-shadow: 0 24px 70px rgba(0,0,0,0.8);
-                animation: arPop .4s cubic-bezier(.2,1.5,.35,1) both; }
+                animation: arCardIn .4s cubic-bezier(.2,1.5,.35,1) both; }
             .ar-away-list { display: grid; gap: 6px; margin: 13px 0 15px; }
             .ar-away-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
                 padding: 8px 11px; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05);
@@ -1403,23 +1699,66 @@ function Styles() {
                 text-transform: uppercase; color: #6fd0ff; }
             .ar-incoming-body b { font-size: 15px; color: #fff; line-height: 1.15; }
 
-            /* ── THE NUMBER ── the payoff, on the fighter that took it. */
-            .ar-pop { position: absolute; top: 34%; z-index: 21; font-size: 1.5rem; font-weight: 900;
-                letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000;
-                animation: arPop .95s cubic-bezier(.2,1,.3,1) both; }
-            .ar-pop.is-right { right: 16%; color: #ffd75e; }
-            .ar-pop.is-left { left: 16%; color: #ff8f9a; }
-            .ar-pop.is-flawless { font-size: 2.3rem; color: #fff6cc; text-shadow: 0 3px 12px #000, 0 0 30px #ffe28a; }
-            .ar-pop.is-perfect { font-size: 2rem; }
+            /* ── THE NUMBERS ── the payoff, over the fighter it happened to.
+               These used to sit at top:34% of a floor box that is most of the panel tall, while the fighters
+               stand at its BOTTOM — so every damage number floated in empty sky near the HP bars, a couple of
+               hundred pixels from the thing it described. They are anchored to the fighters now. */
+            .ar-pop { position: absolute; bottom: 34%; z-index: 21; font-size: 1.7rem; font-weight: 900;
+                letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
+                font-variant-numeric: tabular-nums;
+                animation: arPop 1s cubic-bezier(.2,1,.3,1) both; }
+            .ar-pop.is-right { right: 18%; }
+            .ar-pop.is-left { left: 18%; }
+            .ar-pop.is-dmg { color: #ffd75e; }
+            .ar-pop.is-left.is-dmg { color: #ff8f9a; }
+            /* A crit is the biggest number in the game and it should look like it. */
+            .ar-pop.is-crit { font-size: 2.7rem; color: #fff6cc;
+                text-shadow: 0 3px 12px #000, 0 0 26px #ffe28a, 0 0 60px rgba(255,190,60,.95);
+                animation: arPopCrit 1.15s cubic-bezier(.2,1.1,.3,1) both; }
+            /* The half of the exchange your defensive choices actually bought you. Smaller, cooler, offset —
+               it must never be mistaken for damage you took. */
+            .ar-pop.is-block, .ar-pop.is-ward { font-size: 1rem; color: #9fdcff; bottom: 46%; }
+            .ar-pop.is-heal { font-size: 1.5rem; color: #8bf0b4; text-shadow: 0 3px 12px #000, 0 0 22px rgba(139,240,180,.7); }
+            .ar-pop u { display: block; text-decoration: none; font-size: 8.5px; font-weight: 900;
+                letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
             @keyframes arPop { from { opacity: 0; transform: translateY(14px) scale(.7) }
                 25% { opacity: 1; transform: translateY(-6px) scale(1.12) }
-                to { opacity: 0; transform: translateY(-46px) scale(1) } }
+                to { opacity: 0; transform: translateY(-52px) scale(1) } }
+            @keyframes arPopCrit { from { opacity: 0; transform: translateY(10px) scale(.4) rotate(-8deg) }
+                18% { opacity: 1; transform: translateY(-10px) scale(1.35) rotate(2deg) }
+                34% { transform: translateY(-10px) scale(1.08) rotate(0deg) }
+                to { opacity: 0; transform: translateY(-64px) scale(1) } }
 
-            /* A well-timed hit takes the whole pane for a moment. */
+            /* ── HIT-STOP ── both fighters hold still for a few frames at the moment of contact. It is most of
+               why a blow reads as a blow rather than a position change, and it costs one class. */
+            .ar-ring.is-stop .ar-floor { transform: scale(1.03); }
+            .ar-ring.is-stop .ar-hero { animation-play-state: paused !important; }
+
+            /* A crit takes the whole pane for a moment. */
             .ar-ring.is-crit::after { content: ""; position: absolute; inset: 0; z-index: 18; pointer-events: none;
-                background: radial-gradient(60% 50% at 72% 55%, rgba(255,231,150,0.5), transparent 70%);
-                animation: arCrit .42s ease-out both; }
-            @keyframes arCrit { from { opacity: 1 } to { opacity: 0 } }
+                background: radial-gradient(70% 60% at 72% 58%, rgba(255,231,150,0.62), transparent 72%);
+                animation: arCrit .5s ease-out both; }
+            @keyframes arCrit { from { opacity: 1 } 30% { opacity: .8 } to { opacity: 0 } }
+            /* Theirs: your side of the ring, and red. */
+            .ar-ring.is-crit-theirs::after {
+                background: radial-gradient(70% 60% at 28% 58%, rgba(255,90,110,0.6), transparent 72%); }
+            .ar-grade.is-theirs.is-crit .ar-critword, .ar-grade.is-theirs.is-crit .ar-move { color: #ffd0d6;
+                text-shadow: 0 2px 10px #000, 0 0 26px rgba(255,80,100,.95); }
+            .ar-critword { display: block; font-size: 11px; font-weight: 900; letter-spacing: .3em;
+                text-transform: uppercase; color: #fff6cc;
+                text-shadow: 0 2px 10px #000, 0 0 24px rgba(255,200,70,.95);
+                animation: arCritWord .5s cubic-bezier(.2,1.6,.35,1) both; }
+            @keyframes arCritWord { from { opacity: 0; transform: scale(.4) } to { opacity: 1; transform: none } }
+            .ar-grade.is-crit .ar-move { font-size: 1.25rem; color: #fff6cc;
+                text-shadow: 0 2px 10px #000, 0 0 30px rgba(255,200,70,.9); }
+
+            /* ── THE MUTE ── a fight with music needs an off switch on the fight screen. */
+            .ar-mute { position: absolute; top: 7px; right: 8px; z-index: 26; width: 28px; height: 28px;
+                padding: 0; appearance: none; -webkit-appearance: none; border-radius: 9px; cursor: pointer;
+                display: grid; place-items: center; pointer-events: auto;
+                color: #ffe0b0; background: rgba(8,6,10,0.62); border: 1px solid rgba(255,255,255,0.18); }
+            .ar-mute :global(svg) { width: 15px; height: 15px; }
+            .ar-mute.is-off { color: #7f8790; }
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
@@ -1447,6 +1786,14 @@ function Styles() {
             .ar-buff { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 999px; }
             .ar-buff.is-ward { color: #6fd0ff; border: 1px solid rgba(111,208,255,.5); }
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
+
+            /* ── THEIR KIT ── same rail, their side, smaller. Readable, not actionable. */
+            .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+            .ar-theirs-lab { font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .14em;
+                text-transform: uppercase; color: #7f8790; margin-right: 1px; }
+            .ar-theirchip { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
+                background: rgba(0,0,0,0.45); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
+            .ar-theirchip img { width: 15px; height: 15px; object-fit: contain; opacity: .85; }
 
             .ar-kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 9px; }
             .ar-ability { text-align: left; padding: 11px 13px; border-radius: 12px; cursor: pointer;

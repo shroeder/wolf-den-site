@@ -87,6 +87,9 @@ const SURGE_MULT = 0.35;        // arena.js: surge multiplier is 1.35
 const SURGE_SWINGS = 2;         // arena.js: b.surge = 2
 const EXECUTE_MULT = 1.5;       // arena.js: power *= 1.5 under the threshold
 const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
+// arena.js: a strike's gradeAtk is 1 + (ATTACK - 1) * 1.45 against a baseline of ATTACK = 1.15, so the edge
+// a strike carries over any other kind of the same power is 1.2175 / 1.15.
+const STRIKE_EDGE = (1 + (1.15 - 1) * 1.45) / 1.15 - 1;
 
 const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
 
@@ -100,7 +103,10 @@ function effectOf(kind, power, element) {
     const el = element ? ELEMENTS[element]?.label || element : null;
     switch (kind) {
         case "strike":
-            return { head: x(power), sub: "damage", tags: [{ t: "Timing counts double", k: "good" }] };
+            // "Timing counts double" described the closing ring, which no longer exists — the card was selling
+            // a mechanic the game removed. What a strike actually does is take the flat attack bonus and
+            // amplify it (arena.js: gradeAtk = 1 + (ATTACK - 1) * 1.45), which is a real if modest edge.
+            return { head: x(power), sub: "damage", tags: [{ t: `+${Math.round(STRIKE_EDGE * 100)}% on top`, k: "good" }] };
         case "spell":
             return {
                 head: x(power * SPELL_POWER_TAX), sub: "damage",
