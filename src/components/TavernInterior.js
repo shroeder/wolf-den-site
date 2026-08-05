@@ -38,13 +38,6 @@ const LORE = [
     "Cook out back does a crab that'll make you weep. Don't tell her I said so, she's insufferable enough.",
     "We've weathered raids, a flood, and one very determined goat. Tavern's still standing.",
     "Best seat's by the fire, but nobody'll fight you for it. That's the Den for you.",
-    // ── The Hudson business ──────────────────────────────────────────────────────────────────────────────
-    // The stockade is public and permanent, so the tavern talks about it — this is how the pack processes it.
-    "You'll have seen the lad in the stockade out there. Hudson. Found a crack in the world and squeezed through it 'til it split.",
-    "*sets down the rag* Hudson. Aye. Weren't the taking that soured folk — it were that he kept at it after he knew.",
-    "They stripped every coin of it back off him. Every scrap. Cleanest bit of justice I've seen in this town.",
-    "Funny thing about cheating a whole pack — you don't beat them, you just stop being one of them. Hudson learned that the slow way.",
-    "Throw fruit at him if it pleases you, most do. But he'll be marked long after the fruit's washed off — that's the part that lasts.",
 ];
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));

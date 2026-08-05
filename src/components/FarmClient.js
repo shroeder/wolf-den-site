@@ -1095,7 +1095,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                         {pets.map((pet, i) => {
                             if (view === "garden" || petView(i) !== view) return null; // pets live in Outside / Inside, split by index
                             const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
-                            const canTap = farm.canPet && !pet.petted;
+                            const canTap = farm.canPet && !pet.petted && !pet.maxed;
                             return (
                                 <button
                                     key={pet.id}
@@ -2576,8 +2576,16 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                         </div>
                     ) : null}
 
-                    {/* Pet action (own farm only) — shared daily budget, rechargeable for gold */}
-                    {canPet ? (
+                    {/* Pet action (own farm only) — shared daily budget, rechargeable for gold.
+                        A Lv5 pet is skipped entirely: petting it spent one of your daily charges to teach it
+                        nothing, and the treats below would have been destroyed for the same nothing. */}
+                    {canPet && pet.maxed ? (
+                        <div style={{ marginTop: 8, textAlign: "center", padding: "10px 8px", borderRadius: 10,
+                            background: "rgba(255,215,94,0.08)", border: "1px solid rgba(255,215,94,0.35)", color: "#ffd75e", fontWeight: 700 }}>
+                            Max level — save your pettings and treats for another pet
+                        </div>
+                    ) : null}
+                    {canPet && !pet.maxed ? (
                         <div style={{ marginTop: 4 }}>
                             {pet.petted ? (
                                 <div style={{ textAlign: "center", padding: "8px 0 2px", color: "#ff9ec2", fontWeight: 600 }}>{mine ? "❤️ Petted today — come back tomorrow" : "❤️ You petted this pet — spread the love!"}</div>
@@ -2610,7 +2618,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                     ) : null}
 
                     {/* Feed a treat you own */}
-                    {canPet && treats.length ? (
+                    {canPet && !pet.maxed && treats.length ? (
                         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
                             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{mine ? "🍖 Feed a treat" : `🍖 Feed a treat 💛 — a gift to ${ownerName || "them"} (earns you a little too)`}</div>
                             {pet.maxed ? (
@@ -2629,7 +2637,7 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                     ) : null}
 
                     {/* Buy treats + store-credit CTA (own farm) */}
-                    {canPet && treatShop.length ? (
+                    {canPet && !pet.maxed && treatShop.length ? (
                         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                                 <span style={{ fontSize: 12, fontWeight: 700 }}>🛒 Buy treats</span>

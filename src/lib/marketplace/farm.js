@@ -396,6 +396,13 @@ export async function petPet(petterId, petId, ownerId = null) {
     const ownerState = await petsState(petOwner).catch(() => null);
     if (!ownerState || !(ownerState.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
 
+    // A pet at Lv5 has nothing left to gain, so petting it burned one of your daily charges to teach it
+     // nothing. Refused outright rather than quietly wasting the charge.
+    const petXpRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [petOwner, petId]).catch(() => null);
+    if (petLevelInfo(Number(petXpRow?.xp) || 0, collectibleById(petId)?.rarity).maxed) {
+        return { ok: false, error: "pet_maxed" };
+    }
+
     const budget = await pettingBudget(petterId);
     // Separate pools: your OWN pets vs OTHER members' pets (3 each per day).
     const col = own ? "pet_farm_used" : "pet_farm_used_others";

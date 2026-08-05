@@ -242,6 +242,13 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         }
         if (!petId) return { ok: false, error: "no_pet_equipped" };
         const petName = collectibleById(petId)?.name || "your pet";
+        // Checked BEFORE the treat is spent. A pet at Lv5 cannot gain anything, and this consumed the item
+        // first and asked afterwards — so feeding a maxed pet quietly destroyed a treat for nothing.
+        const { petLevelInfo } = await import("@/lib/marketplace/pet-level.js");
+        const lvlRow = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
+        if (petLevelInfo(Number(lvlRow?.xp) || 0, collectibleById(petId)?.rarity).maxed) {
+            return { ok: false, error: "pet_maxed", message: `${petName} is already at max level.` };
+        }
         const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [buyerId, id]).catch(() => null);
         if (!dec) return { ok: false, error: "none_owned" };
         let res;
