@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSpellBook, GiSwordWound } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
+import SkillFx from "@/components/arena/SkillFx";
 import TimingRing from "@/components/arena/TimingRing";
 import { BATTLE_ITEMS, BEATS } from "@/lib/marketplace/arena-kit.js";
 
@@ -89,6 +90,15 @@ function SkillFace({ ab, left = 0 }) {
 // A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
 function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false, element = null }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
+    // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
+    // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
+    // IS the feedback — a bar that just jumps tells you the number changed but never how much it cost.
+    const [ghost, setGhost] = useState(frac);
+    useEffect(() => {
+        if (frac >= ghost) { setGhost(frac); return undefined; }
+        const t = setTimeout(() => setGhost(frac), 340);
+        return () => clearTimeout(t);
+    }, [frac, ghost]);
     // The wind-up runs for exactly as long as the ring takes to close, so a fighter drawing back IS the
     // countdown. Watch them, not the circle, and the timing still makes sense.
     const cls = `ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
@@ -104,7 +114,10 @@ function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = 
                         <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
                     ) : null}
                 </b>
-                <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
+                <span className="ar-hp">
+                    <u className="ar-hp-ghost" style={{ width: `${Math.max(ghost, frac) * 100}%` }} />
+                    <i style={{ width: `${frac * 100}%` }} />
+                </span>
                 <em className="ar-hpnum">{Math.max(0, hp)} / {maxHp}</em>
             </div>
             {f?.sprite ? (
@@ -228,6 +241,7 @@ export default function ArenaClient({ initial }) {
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [wheel, setWheel] = useState(false);    // the element-wheel explainer
+    const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
     const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
     const [clash, setClash] = useState(null);
@@ -319,6 +333,25 @@ export default function ArenaClient({ initial }) {
         return () => clearTimeout(t);
     }, [bout?.beat, bout?.turn, bout?.over]);
 
+    // Particles fire off the RESOLVED beat, same as the damage number — so an effect can never play for a
+    // hit the server did not deal.
+    useEffect(() => {
+        const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
+        if (!l) return undefined;
+        const mineNow = l.who === "you";
+        const kind = l.grade === "ward" ? "ward"
+            : (mineNow && bout.me?.abilities?.find((a) => a.name === l.ability)?.kind) || "strike";
+        setFx({
+            key: bout.log.length,
+            kind,
+            element: mineNow ? bout.me?.element : bout.foe?.element,
+            side: kind === "ward" || !mineNow ? "left" : "right",
+            crit: l.grade === "flawless" || l.grade === "perfect",
+        });
+        const t = setTimeout(() => setFx(null), 900);
+        return () => clearTimeout(t);
+    }, [bout?.log?.length]);
+
     // A number, off the blow that actually landed, on the side that took it.
     useEffect(() => {
         const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
@@ -343,13 +376,18 @@ export default function ArenaClient({ initial }) {
         // A landed blow of yours that was genuinely well timed gets the whole pane to itself for a moment.
         const lastLog = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const bigHit = lastLog?.who === "you" && (lastLog.grade === "flawless" || lastLog.grade === "perfect") && lastLog.damage > 0;
+        // The move you just committed to, declared and lit BEFORE the ring — a skill announcing itself after
+        // it has already resolved is a receipt, not a moment.
+        const casting = yourTurn && pending?.command === "skill"
+            ? (abilities.find((a) => a.id === pending.ability) || null)
+            : null;
         const abilities = bout.me?.abilities || [];
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}`}>
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}${casting ? " is-casting" : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
@@ -394,6 +432,18 @@ export default function ArenaClient({ initial }) {
                         </div>
                     ) : null}
 
+                    {/* THE DECLARATION. Name, art and element, centre screen, at the moment of the cast. */}
+                    {casting ? (
+                        <div className="ar-declare" style={{ "--el": ELEMENT_COLOR[casting.element] || "#ffd75e" }}>
+                            {casting.sprite ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={casting.sprite} alt="" draggable="false" />
+                            ) : null}
+                            <b>{casting.name}</b>
+                            <em>{casting.from}</em>
+                        </div>
+                    ) : null}
+
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
@@ -427,6 +477,11 @@ export default function ArenaClient({ initial }) {
 
                         {/* Over THEM when you swing, over YOU when they do — and only once you have
                             committed. Absolutely positioned, so it does not take a column in this grid. */}
+                        {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
+                        {fx ? (
+                            <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
+                        ) : null}
+
                         {ringUp ? (
                             <div className={`ar-ringslot is-${bout.turn}`}>
                                 <TimingRing
@@ -889,9 +944,20 @@ function Styles() {
             /* Takes every pixel the other bands don't want. min-height:0 is load-bearing — without it a flex item
                refuses to shrink below its content and the deck gets pushed off the bottom. */
             .ar-floor { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
-                display: grid; grid-template-columns: 1fr 1fr; align-items: end; padding: 4px 4% 0; }
+                display: grid; grid-template-columns: 1fr 1fr; align-items: end; padding: 4px 4% 0;
+                transition: transform .45s cubic-bezier(.2,.9,.3,1); }
+            /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
+            .ar-ring.is-casting .ar-floor { transform: scale(1.14) translateX(6%); }
+            .ar-ring.is-casting .ar-ring-scrim { background: radial-gradient(46% 40% at 26% 58%, transparent, rgba(6,4,10,0.86)); }
+            .ar-ring.is-casting .ar-fighter.is-foe { opacity: .35; filter: saturate(.4); }
+            .ar-ring-scrim { transition: background .35s ease; }
+            .ar-fighter { transition: opacity .35s ease, filter .35s ease; }
             .ar-fighter { position: relative; height: 100%; display: flex; flex-direction: column;
                 align-items: center; justify-content: flex-end; gap: 6px; min-height: 0; }
+            /* The old value, holding for a beat before it slides down to meet the new one. */
+            .ar-hp-ghost { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit;
+                background: rgba(255,120,140,0.55); transition: width .38s cubic-bezier(.4,0,.2,1); }
+            .ar-hp > i { position: relative; z-index: 2; }
             .ar-hero { width: min(100%, 210px); min-height: 0; flex: 1 1 auto; object-fit: contain; object-position: bottom;
                 filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
@@ -931,8 +997,8 @@ function Styles() {
             .ar-plate { width: min(100%, 150px); text-align: center; }
             .ar-fname { display: block; font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .ar-hp { display: block; height: 8px; margin: 4px 0 2px; border-radius: 999px; overflow: hidden;
-                background: rgba(0,0,0,0.62); border: 1px solid rgba(0,0,0,0.5); }
+            .ar-hp { position: relative; display: block; height: 9px; margin: 4px 0 2px; border-radius: 999px;
+                overflow: hidden; background: rgba(0,0,0,0.62); border: 1px solid rgba(0,0,0,0.5); }
             .ar-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #4ad07f, #7ce8a4); transition: width .35s ease; }
             .ar-fighter.is-foe .ar-hp > i { background: linear-gradient(90deg, #ff6f7d, #ffb0b8); }
             .ar-hpnum { font-size: 10px; font-style: normal; color: #e8dcc8; text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; }
@@ -1167,6 +1233,19 @@ function Styles() {
             .ar-prompt b { font-weight: 900; }
             .ar-prompt.is-atk { color: #ffd75e; }
             .ar-prompt.is-def { color: #6fd0ff; }
+
+            /* ── THE DECLARATION ── */
+            .ar-declare { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 23;
+                display: grid; justify-items: center; gap: 2px; pointer-events: none; text-align: center;
+                animation: arDeclare .4s cubic-bezier(.2,1.5,.35,1) both; }
+            .ar-declare img { width: 46px; height: 46px; object-fit: contain;
+                filter: drop-shadow(0 0 18px var(--el)) drop-shadow(0 4px 10px rgba(0,0,0,0.8)); }
+            .ar-declare b { font-size: 1.4rem; font-weight: 900; letter-spacing: .03em; color: #fff;
+                text-shadow: 0 2px 12px #000, 0 0 26px var(--el); }
+            .ar-declare em { font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+                color: var(--el); text-shadow: 0 2px 8px #000; }
+            @keyframes arDeclare { from { opacity: 0; transform: translate(-50%, -50%) scale(.7) }
+                to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
 
             /* ── A SKILL, SAID SHORT ── */
             .sk { display: grid; gap: 3px; min-width: 0; flex: 1; text-align: left; }

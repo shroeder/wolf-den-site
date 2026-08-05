@@ -1201,11 +1201,15 @@ export async function unleashBoss(buyerId, max = 25) {
     if (!buyerId) return { error: "unauthorized" };
     const hits = [];
     let last = null;
+    let stoppedEarly = null;
     for (let i = 0; i < max; i += 1) {
         const r = await attackBoss(buyerId);
         if (r?.error) {
-            // The first swing failing is a real error; failing later just means we ran out mid-flurry.
+            // The first swing failing is a real error; failing later means the flurry was cut short — and
+            // that used to happen in total silence, so "I spent three strikes and it hit once" had nothing
+            // anywhere to explain it. The reason now travels back with the result.
             if (!hits.length) return r;
+            stoppedEarly = r.error;
             break;
         }
         last = r;
@@ -1217,6 +1221,7 @@ export async function unleashBoss(buyerId, max = 25) {
         ...last,
         hits,
         strikes: hits.length,
+        stoppedEarly,          // null, or why the flurry ended before your strikes ran out
         damage: hits.reduce((n, h) => n + h.damage, 0),
         crits: hits.filter((h) => h.crit).length,
     };
