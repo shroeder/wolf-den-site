@@ -662,12 +662,12 @@ export default function ArenaClient({ initial }) {
         if (!l) return undefined;
         const pops = [];
         if (l.damage > 0) {
-            // You are on the RIGHT now, so a blow YOU land floats over the left-hand foe.
-            pops.push({ side: l.who === "you" ? "left" : "right", n: l.damage, kind: l.crit ? "crit" : "dmg" });
+            // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
+            pops.push({ side: l.who === "you" ? "right" : "left", n: l.damage, kind: l.crit ? "crit" : "dmg" });
         }
-        if (l.blocked > 0) pops.push({ side: "right", n: l.blocked, kind: "block", at: 120 });
-        if (l.healed > 0) pops.push({ side: "right", n: l.healed, kind: "heal" });
-        if (l.soaked > 0) pops.push({ side: "right", n: l.soaked, kind: "ward", at: 60 });
+        if (l.blocked > 0) pops.push({ side: "left", n: l.blocked, kind: "block", at: 120 });
+        if (l.healed > 0) pops.push({ side: "left", n: l.healed, kind: "heal" });
+        if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
         const t = setTimeout(() => setPop(null), 1000);
@@ -800,27 +800,29 @@ export default function ArenaClient({ initial }) {
 
                     {/* ── THE BARS ── outside the stage, so the camera never touches them. */}
                     <div className="ar-bars">
-                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                            foe active={!yourTurn && !bout.over} />
+                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
+                            active={yourTurn} shield={bout.shield || 0} />
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
                         </span>
-                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
-                            active={yourTurn} shield={bout.shield || 0} />
+                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
+                            foe active={!yourTurn && !bout.over} />
                     </div>
 
                     <div className="ar-floor">
-                        {/* THE FOE STANDS LEFT AND YOU STAND RIGHT — the Final Fantasy arrangement. The
-                            `mirrored` flag moved with them: it drives the horizontal flip, and it is the
-                            right-hand fighter who has to be facing left. */}
-                        <FighterBody f={bout.foe} foe hurt={shake === 1} lunge={shake >= 2}
-                            down={bout.over && bout.won}
-                            wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
-                            brace={yourTurn && Boolean(pending)} />
-                        <FighterBody f={st.me} mirrored hurt={shake >= 2} lunge={shake === 1}
+                        {/* YOUR HERO IS ALWAYS ON THE LEFT. Sprites are drawn facing right, so you need no
+                            flip and the opponent gets `mirrored` to turn and face you. `mirrored` and `foe`
+                            are separate flags — one is which way a drawing points, the other is which
+                            fighter is the opponent — so the arrangement is stated rather than implied by
+                            DOM order, which is what made the last flip go wrong. */}
+                        <FighterBody f={st.me} hurt={shake >= 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
                             wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
                             brace={!bout.over && bout.turn === "them" && blockReady} />
+                        <FighterBody f={bout.foe} foe mirrored hurt={shake === 1} lunge={shake >= 2}
+                            down={bout.over && bout.won}
+                            wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
+                            brace={yourTurn && Boolean(pending)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -1454,21 +1456,21 @@ function Styles() {
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
             /* PARTY RIGHT, ENEMY LEFT. The enemy is smaller and stands further up the sand — the two cues
                together read as distance; equal size on one baseline reads as two of the same thing. */
-            /* Addressed by WHO, not by DOM order. The enemy stands left, smaller and further up the sand;
-               you stand right, nearer and larger. Two cues for depth — size alone reads as a mistake. */
-            .ar-floor > .ar-fighter.is-foe { left: -3%; z-index: 2; width: 47%; bottom: 9%; }
-            .ar-floor > .ar-fighter.is-mirror { right: -3%; z-index: 3; width: 54%; bottom: 0; }
+            /* Addressed by WHO, not by DOM order. YOU stand left, nearer and larger; the opponent stands
+               right, smaller and further up the sand. Two cues for depth — size alone reads as a mistake. */
+            .ar-floor > .ar-fighter:not(.is-foe) { left: -3%; z-index: 3; width: 54%; bottom: 0; }
+            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 2; width: 47%; bottom: 9%; }
             .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
-            .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(-9%); }
-            .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(9%); }
-            .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
-            .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(9%); }
+            .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(-9%); }
+            .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
             .ar-ring.is-on-you .ar-fighter.is-foe { opacity: .28; filter: saturate(.35); }
-            .ar-ring.is-on-them .ar-fighter.is-mirror { opacity: .28; filter: saturate(.35); }
+            .ar-ring.is-on-them .ar-fighter:not(.is-foe) { opacity: .28; filter: saturate(.35); }
             /* The one casting stands up out of the frame a little. */
-            .ar-ring.is-on-you .ar-fighter.is-mirror .ar-hero,
+            .ar-ring.is-on-you .ar-fighter:not(.is-foe) .ar-hero,
             .ar-ring.is-on-them .ar-fighter.is-foe .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 26px var(--el, rgba(255,215,94,0.8))); }
             .ar-ring-scrim { transition: background .35s ease; }
             .ar-fighter { transition: opacity .35s ease, filter .35s ease; }

@@ -6,7 +6,7 @@ import ArenaFx from "@/components/arena/ArenaFx";
 
 // ── THE SPELL BENCH ──────────────────────────────────────────────────────────────────────────────────────────
 // Every effect, at the size and in the place it plays, over the real arena plate — on a loop, with its name on
-// screen. Enemy left, you right, as in the ring.
+// screen. You on the left, opponent on the right, as in the ring.
 //
 // This exists because "do the effects look good" cannot be answered by the checks that kept being run: reading
 // the DOM tells you WHICH effect mounted, which is correctness rather than quality, and screenshotting a live
@@ -59,9 +59,10 @@ export default function FxPreview() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="fxb-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                 <span className="fxb-scrim" aria-hidden="true" />
-                {/* Stand-ins on the ground line, so an effect is judged against bodies rather than empty sand. */}
-                <span className="fxb-body is-foe" aria-hidden="true" />
+                {/* Stand-ins on the ground line, so an effect is judged against bodies rather than empty sand.
+                    You left, opponent right — the ring's arrangement. */}
                 <span className="fxb-body is-you" aria-hidden="true" />
+                <span className="fxb-body is-foe" aria-hidden="true" />
                 <ArenaFx ref={fx} onShake={(x, y) => {
                     const el = shake.current;
                     if (el) el.style.transform = x || y ? `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)` : "";
@@ -84,8 +85,8 @@ export default function FxPreview() {
                     border-radius: 42% 42% 20% 20%;
                     background: linear-gradient(180deg,#6b5330,#2a2018);
                     box-shadow: 0 10px 18px rgba(0,0,0,.6); }
-                .fxb-body.is-foe { left: 14%; transform: scale(.86); }
-                .fxb-body.is-you { right: 12%; }
+                .fxb-body.is-you { left: 12%; }
+                .fxb-body.is-foe { right: 14%; transform: scale(.86); }
                 .fxb-lab { position: absolute; left: 10px; top: 8px; z-index: 30; font-size: 12px; font-weight: 900;
                     letter-spacing: .16em; text-transform: uppercase; color: #ffe0b0; text-shadow: 0 2px 8px #000; }
                 .fxb-help { margin: 8px 2px 0; font-size: 11px; color: #7f8790; }

@@ -80,8 +80,9 @@ class Fx {
     // Anchor points. The stage is two fighters on a ground line; effects are aimed at one of them or at the
     // whole field, which is all FF6 ever needs.
     anchor(side) {
-        // Party on the RIGHT, enemies on the LEFT — the FF6 arrangement.
-        const x = side === "you" ? this.w * 0.72 : this.w * 0.28;
+        // YOUR HERO IS ALWAYS ON THE LEFT, the opponent on the right. Effects are aimed at whoever the beat
+        // happened to, so this is the single place the arrangement is encoded for the spell layer.
+        const x = side === "you" ? this.w * 0.28 : this.w * 0.72;
         return { x, y: this.h * 0.62 };
     }
 
