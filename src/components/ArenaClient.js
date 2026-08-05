@@ -38,6 +38,11 @@ const money = (n) => Number(n || 0).toLocaleString();
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
 const TELEGRAPH_MS = 1100;
 
+// How long a cast holds the screen before the ring appears. The declaration, the spotlight and the effect all
+// play inside this window — the timing game only starts once the spectacle is finished, so the two never
+// compete for your attention.
+const CAST_MS = 1250;
+
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
 };
@@ -247,6 +252,7 @@ export default function ArenaClient({ initial }) {
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [wheel, setWheel] = useState(false);    // the element-wheel explainer
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
+    const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the ring may start
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
     const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
     const [clash, setClash] = useState(null);
@@ -328,6 +334,17 @@ export default function ArenaClient({ initial }) {
         if (box) box.scrollTop = box.scrollHeight;
     }, [bout?.log?.length]);
 
+    // ── THE CAST ── committing a skill takes the screen for a moment before it asks you for anything: the
+    // camera pushes in, the move is named, its effect goes off. Only then does the ring appear. Declaring a
+    // skill at the same time as demanding a tap meant the spectacle was something you had to ignore in order
+    // to play well, which is the opposite of the point.
+    useEffect(() => {
+        if (bout?.turn !== "you" || pending?.command !== "skill") { setCastDone(true); return undefined; }
+        setCastDone(false);
+        const t = setTimeout(() => setCastDone(true), CAST_MS);
+        return () => clearTimeout(t);
+    }, [pending?.ability, pending?.command, bout?.turn, bout?.beat]);
+
     // ── READ IT FIRST ── their beat opens with a beat of nothing but the warning: who is coming and with
     // what. Defending used to start the instant your own swing resolved, with an identical ring and no idea
     // what it was for, which is exactly why it felt like a second attack of your own rather than a defence.
@@ -337,6 +354,21 @@ export default function ArenaClient({ initial }) {
         const t = setTimeout(() => setBlockReady(true), TELEGRAPH_MS);
         return () => clearTimeout(t);
     }, [bout?.beat, bout?.turn, bout?.over]);
+
+    // THE CAST'S OWN EFFECT — fired while the camera is on whoever is casting, before any ring. This one is
+    // pure spectacle (the damage still resolves later, off the server), so it is keyed to the declaration
+    // rather than to a log entry.
+    useEffect(() => {
+        const mineCast = bout?.turn === "you" && pending?.command === "skill" && !castDone
+            ? (bout.me?.abilities || []).find((a) => a.id === pending.ability) : null;
+        const theirCast = bout?.turn === "them" && !blockReady && bout?.incoming?.isAbility ? bout.incoming : null;
+        const c = mineCast || theirCast;
+        if (!c) return undefined;
+        setFx({ key: `cast-${bout.beat}-${c.name}`, kind: c.kind || "strike", element: c.element,
+            side: mineCast ? "left" : "right", crit: false });
+        const t = setTimeout(() => setFx(null), 900);
+        return () => clearTimeout(t);
+    }, [pending?.ability, pending?.command, castDone, blockReady, bout?.turn, bout?.beat]);
 
     // Particles fire off the RESOLVED beat, same as the damage number — so an effect can never play for a
     // hit the server did not deal.
@@ -376,7 +408,7 @@ export default function ArenaClient({ initial }) {
     // rather than a fight.
     if (bout) {
         const yourTurn = !bout.over && bout.turn === "you";
-        const ringUp = !bout.over && ((bout.turn === "them" && blockReady) || Boolean(pending));
+        const ringUp = !bout.over && ((bout.turn === "them" && blockReady) || (Boolean(pending) && castDone));
         const reading = !bout.over && bout.turn === "them" && !blockReady;   // the warning is on screen
         // A landed blow of yours that was genuinely well timed gets the whole pane to itself for a moment.
         const lastLog = bout.log?.length ? bout.log[bout.log.length - 1] : null;
@@ -384,15 +416,19 @@ export default function ArenaClient({ initial }) {
         // The move you just committed to, declared and lit BEFORE the ring — a skill announcing itself after
         // it has already resolved is a receipt, not a moment.
         const abilities = bout.me?.abilities || [];
-        const casting = yourTurn && pending?.command === "skill"
+        const casting = yourTurn && pending?.command === "skill" && !castDone
             ? (abilities.find((a) => a.id === pending.ability) || null)
             : null;
+        // Their cast gets the same treatment — the telegraph window IS their cinematic, so a skill coming at
+        // you is as legible as one you throw.
+        const foeCasting = reading && bout.incoming?.isAbility ? bout.incoming : null;
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}${casting ? " is-casting" : ""}`}>
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}`
+                    + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
@@ -438,16 +474,20 @@ export default function ArenaClient({ initial }) {
                     ) : null}
 
                     {/* THE DECLARATION. Name, art and element, centre screen, at the moment of the cast. */}
-                    {casting ? (
-                        <div className="ar-declare" style={{ "--el": ELEMENT_COLOR[casting.element] || "#ffd75e" }}>
-                            {casting.sprite ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={casting.sprite} alt="" draggable="false" />
-                            ) : null}
-                            <b>{casting.name}</b>
-                            <em>{casting.from}</em>
-                        </div>
-                    ) : null}
+                    {casting || foeCasting ? (() => {
+                        const c = casting || foeCasting;
+                        return (
+                            <div className={`ar-declare${foeCasting ? " is-theirs" : ""}`}
+                                style={{ "--el": ELEMENT_COLOR[c.element] || (foeCasting ? "#6fd0ff" : "#ffd75e") }}>
+                                {c.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={c.sprite} alt="" draggable="false" />
+                                ) : null}
+                                <b>{c.name}</b>
+                                <em>{foeCasting ? bout.foe.name : c.from}</em>
+                            </div>
+                        );
+                    })() : null}
 
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
@@ -968,9 +1008,16 @@ function Styles() {
                 display: grid; grid-template-columns: 1fr 1fr; align-items: end; padding: 4px 4% 0;
                 transition: transform .45s cubic-bezier(.2,.9,.3,1); }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
-            .ar-ring.is-casting .ar-floor { transform: scale(1.14) translateX(6%); }
-            .ar-ring.is-casting .ar-ring-scrim { background: radial-gradient(46% 40% at 26% 58%, transparent, rgba(6,4,10,0.86)); }
-            .ar-ring.is-casting .ar-fighter.is-foe { opacity: .35; filter: saturate(.4); }
+/* The camera pushes toward whoever is casting and everything else falls away. */
+            .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(9%); }
+            .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(-9%); }
+            .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
+            .ar-ring.is-on-you .ar-fighter.is-foe { opacity: .28; filter: saturate(.35); }
+            .ar-ring.is-on-them .ar-fighter:not(.is-foe) { opacity: .28; filter: saturate(.35); }
+            /* The one casting stands up out of the frame a little. */
+            .ar-ring.is-on-you .ar-fighter:not(.is-foe) .ar-hero,
+            .ar-ring.is-on-them .ar-fighter.is-foe .ar-hero { filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 26px var(--el, rgba(255,215,94,0.8))); }
             .ar-ring-scrim { transition: background .35s ease; }
             .ar-fighter { transition: opacity .35s ease, filter .35s ease; }
             .ar-fighter { position: relative; height: 100%; display: flex; flex-direction: column;
@@ -1265,6 +1312,11 @@ function Styles() {
                 text-shadow: 0 2px 12px #000, 0 0 26px var(--el); }
             .ar-declare em { font-style: normal; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
                 color: var(--el); text-shadow: 0 2px 8px #000; }
+            /* Theirs sits on their side of the ring, so you never mistake an incoming move for one of yours. */
+            .ar-declare.is-theirs { left: auto; right: 6%; transform: translate(0, -50%); }
+            @keyframes arDeclareTheirs { from { opacity: 0; transform: translate(0, -50%) scale(.7) }
+                to { opacity: 1; transform: translate(0, -50%) scale(1) } }
+            .ar-declare.is-theirs { animation-name: arDeclareTheirs; }
             @keyframes arDeclare { from { opacity: 0; transform: translate(-50%, -50%) scale(.7) }
                 to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
 
