@@ -252,8 +252,7 @@ export default function ArenaClient({ initial }) {
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${menu ? " is-menu" : ""}`}
-                    style={{ "--deck": bout.over ? "0px" : menu ? "0px" : (pending || bout.turn === "them") ? "44px" : "78px" }}>
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
@@ -278,6 +277,25 @@ export default function ArenaClient({ initial }) {
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" ? bout.ringMs : 0}
                             brace={yourTurn && Boolean(pending)} />
+                        {/* Over THEM when you swing, over YOU when they do — and only once you have
+                            committed. Absolutely positioned, so it does not take a column in this grid. */}
+                        {ringUp ? (
+                            <div className={`ar-ringslot is-${bout.turn}`}>
+                                <TimingRing
+                                    key={`${bout.beat}-${bout.turn}-${pending?.command || "block"}`}
+                                    ringMs={bout.ringMs || 1150}
+                                    tone={yourTurn ? "attack" : "defend"}
+                                    label={yourTurn ? (pending?.short || "Strike") : "Block"}
+                                    onResult={(off) => {
+                                        const p = pending;
+                                        setPending(null); setMenu(null);
+                                        act("beat", yourTurn
+                                            ? { command: p?.command || "attack", off, ability: p?.ability || null }
+                                            : { command: "block", off });
+                                    }}
+                                />
+                            </div>
+                        ) : null}
                     </div>
 
                     {/* Focus, guard and surge live ON the field — they are combat state, not page furniture. */}
@@ -298,25 +316,6 @@ export default function ArenaClient({ initial }) {
                     {bout.over ? (
                         <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
                             <b>{bout.won ? "Down" : "You fall"}</b>
-                        </div>
-                    ) : null}
-
-                    {/* Over THEM when you swing, over YOU when they do — and only once you have committed. */}
-                    {ringUp ? (
-                        <div className={`ar-ringslot is-${bout.turn}`}>
-                            <TimingRing
-                                key={`${bout.beat}-${bout.turn}-${pending?.command || "block"}`}
-                                ringMs={bout.ringMs || 1150}
-                                tone={yourTurn ? "attack" : "defend"}
-                                label={yourTurn ? (pending?.short || "Strike") : "Block"}
-                                onResult={(off) => {
-                                    const p = pending;
-                                    setPending(null); setMenu(null);
-                                    act("beat", yourTurn
-                                        ? { command: p?.command || "attack", off, ability: p?.ability || null }
-                                        : { command: "block", off });
-                                }}
-                            />
                         </div>
                     ) : null}
 
@@ -666,7 +665,9 @@ function Styles() {
             .ar-up-lvl { font-size: 11px; color: #8a939d; white-space: nowrap; }
 
             /* ── the ring ── */
-            .ar-ring { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 4 / 3;
+            .ar-ring { position: relative; border-radius: 16px; overflow: hidden;
+                height: min(74vh, 640px); min-height: 420px;
+                display: flex; flex-direction: column;
                 border: 1px solid rgba(255,190,110,0.3); }
             .ar-ring.is-shake-1 { animation: arShake .2s ease-out; }
             .ar-ring.is-shake-2 { animation: arShake .3s ease-out; }
@@ -674,7 +675,7 @@ function Styles() {
             .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
             .ar-ring-scrim { position: absolute; inset: 0;
                 background: radial-gradient(78% 62% at 50% 62%, transparent, rgba(10,6,4,0.72)); }
-            .ar-hud { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 5; display: flex;
+            .ar-hud { position: relative; z-index: 5; flex: 0 0 auto; padding: 8px 8px 0; display: flex;
                 align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; pointer-events: none; }
             .ar-round { font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
                 color: #ffe0b0; text-shadow: 0 2px 8px #000; }
@@ -686,10 +687,13 @@ function Styles() {
             .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
             .ar-tag.is-under { color: #ffd75e; border-color: rgba(255,215,94,.5); }
             /* Both fighters stand on the same line of sand, facing each other. */
-            .ar-floor { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr;
-                align-items: end; padding: 6% 4% 33%; }
-            .ar-fighter { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-            .ar-hero { width: min(100%, 172px); max-height: 70%; object-fit: contain;
+            /* Takes every pixel the other bands don't want. min-height:0 is load-bearing — without it a flex item
+               refuses to shrink below its content and the deck gets pushed off the bottom. */
+            .ar-floor { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
+                display: grid; grid-template-columns: 1fr 1fr; align-items: end; padding: 4px 4% 0; }
+            .ar-fighter { position: relative; height: 100%; display: flex; flex-direction: column;
+                align-items: center; justify-content: flex-end; gap: 6px; min-height: 0; }
+            .ar-hero { width: min(100%, 210px); min-height: 0; flex: 1 1 auto; object-fit: contain; object-position: bottom;
                 filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
@@ -762,8 +766,8 @@ function Styles() {
             .ar-verdict.is-loss b { color: #ffb0b8; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,80,100,.8); }
             @keyframes arVerdict { from { opacity: 0; transform: scale(1.7) } to { opacity: 1; transform: scale(1) } }
 
-            .ar-beat { position: absolute; left: 10px; right: 10px; bottom: calc(var(--deck, 78px) + 8px); z-index: 5;
-                margin: 0; font-size: 12px; line-height: 1.4; color: #e4d9c6; text-align: center;
+            .ar-beat { position: relative; z-index: 5; flex: 0 0 auto; padding: 5px 10px 0; margin: 0;
+                font-size: 12px; line-height: 1.4; color: #e4d9c6; text-align: center;
                 text-shadow: 0 2px 8px #000; pointer-events: none; }
 
             .ar-tell { margin: 10px 0 12px; font-size: 12px; color: #cbb; text-align: center; }
@@ -889,13 +893,14 @@ function Styles() {
             .ar-clash.is-bad { color: #ff9f9f; }
             .ar-underdog { margin: 5px 0 0; font-size: 12px; font-weight: 900; text-align: center; color: #ffd75e;
                 letter-spacing: .02em; text-shadow: 0 0 14px rgba(255,215,94,0.35); }
-            .ar-ringslot { position: absolute; inset: 0; bottom: var(--deck, 78px); z-index: 20;
-                --tr: clamp(96px, 24vw, 152px); }
+            /* Lives inside the floor, so it covers exactly the ground the fighters stand on and can never sit
+               over the command deck. */
+            .ar-ringslot { position: absolute; inset: 0; z-index: 20; --tr: clamp(96px, 24vw, 152px); }
 
             /* ── THE COMMAND DECK ───────────────────────────────────────────────────────────────────────────
                Four commands across the bottom of the panel, JRPG-style. Two of them raise the timing ring and
                two spend the turn outright, which is what makes it a decision rather than four ways to attack. */
-            .ar-deck { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; padding: 8px;
+            .ar-deck { position: relative; z-index: 8; flex: 0 0 auto; padding: 8px;
                 background: linear-gradient(180deg, transparent, rgba(6,4,8,0.82) 38%, rgba(6,4,8,0.95));
                 border-top: 1px solid rgba(255,190,110,0.16); }
             .ar-cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -914,7 +919,7 @@ function Styles() {
             .ar-cmd.is-item { --cmd: #8bf0b4; }
 
             /* A submenu replaces the deck in place — you are still looking at the fight, not a new screen. */
-            .ar-sub { display: grid; gap: 5px; max-height: 40vh; overflow-y: auto; }
+            .ar-sub { display: grid; gap: 5px; max-height: min(46vh, 300px); overflow-y: auto; }
             .ar-pick { display: flex; align-items: center; gap: 9px; text-align: left; width: 100%;
                 padding: 6px 9px 6px 6px; border-radius: 11px; cursor: pointer;
                 background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
@@ -942,14 +947,11 @@ function Styles() {
             .ar-prompt b { font-weight: 900; }
             .ar-prompt.is-atk { color: #ffd75e; }
             .ar-prompt.is-def { color: #6fd0ff; }
-            /* An open submenu owns the bottom half of the panel, so the field furniture gets out of its way
-               rather than showing through it. */
-            .ar-ring.is-menu .ar-focus, .ar-ring.is-menu .ar-beat { opacity: 0; }
             /* Over whoever is acting: their half when you swing, yours when they do. */
             .ar-ringslot.is-you { left: 50%; }
             .ar-ringslot.is-them { right: 50%; }
 
-            .ar-focus { position: absolute; left: 10px; right: 10px; bottom: calc(var(--deck, 78px) + 30px); z-index: 5;
+            .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
             .ar-focus-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #8a939d; }
             .ar-focus-bar { display: flex; gap: 3px; }
