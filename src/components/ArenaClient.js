@@ -383,10 +383,10 @@ export default function ArenaClient({ initial }) {
         const bigHit = lastLog?.who === "you" && (lastLog.grade === "flawless" || lastLog.grade === "perfect") && lastLog.damage > 0;
         // The move you just committed to, declared and lit BEFORE the ring — a skill announcing itself after
         // it has already resolved is a receipt, not a moment.
+        const abilities = bout.me?.abilities || [];
         const casting = yourTurn && pending?.command === "skill"
             ? (abilities.find((a) => a.id === pending.ability) || null)
             : null;
-        const abilities = bout.me?.abilities || [];
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         const wards = abilities.filter((a) => a.defensive);
