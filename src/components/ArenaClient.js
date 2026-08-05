@@ -6,7 +6,7 @@ import { GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSpellBook, GiSw
 
 import useScrollLock from "@/lib/useScrollLock";
 import TimingRing from "@/components/arena/TimingRing";
-import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS, BEATS } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -62,7 +62,7 @@ function blip(kind) {
 }
 
 // A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
-function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false }) {
+function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false, element = null }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
     // The wind-up runs for exactly as long as the ring takes to close, so a fighter drawing back IS the
     // countdown. Watch them, not the circle, and the timing still makes sense.
@@ -71,7 +71,14 @@ function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = 
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             <div className="ar-plate">
-                <b className="ar-fname">{f?.name}</b>
+                <b className="ar-fname">
+                    {f?.name}
+                    {/* Whose element is whose. The clash banner was announcing a result off two facts that
+                        appeared nowhere on screen. */}
+                    {element ? (
+                        <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
+                    ) : null}
+                </b>
                 <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
                 <em className="ar-hpnum">{Math.max(0, hp)} / {maxHp}</em>
             </div>
@@ -186,6 +193,7 @@ export default function ArenaClient({ initial }) {
     const [shake, setShake] = useState(0);
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
+    const [wheel, setWheel] = useState(false);    // the element-wheel explainer
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
     const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
     const [clash, setClash] = useState(null);
@@ -296,24 +304,49 @@ export default function ArenaClient({ initial }) {
 
                     {/* Everything that used to sit in paragraphs under the panel, now a strip across the top. */}
                     <div className="ar-hud">
-                        <span className="ar-round">Beat {bout.beat}</span>
+                        <span className="ar-round">Round {bout.beat}</span>
                         {bout.clash?.note ? (
-                            <span className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}>{bout.clash.note}</span>
+                            <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
+                                onClick={() => setWheel((w) => !w)}>
+                                {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "\u2212"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}% <u>why?</u>
+                            </button>
                         ) : null}
                         {bout.underdog > 1 ? (
                             <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
                         ) : null}
                     </div>
 
+                    {wheel ? (
+                        <div className="ar-wheel" role="dialog" aria-label="Element wheel">
+                            <b>Every element beats two others</b>
+                            <div className="ar-wheel-rows">
+                                {Object.entries(BEATS).map(([el, beats]) => (
+                                    <span key={el} className={`ar-wheel-row${el === bout.me?.element ? " is-you" : ""}${el === bout.foe?.element ? " is-foe" : ""}`}>
+                                        <i style={{ "--el": ELEMENT_COLOR[el] || "#9aa0a6" }}>{el}</i>
+                                        <em>beats</em>
+                                        {beats.map((b2) => <i key={b2} style={{ "--el": ELEMENT_COLOR[b2] || "#9aa0a6" }}>{b2}</i>)}
+                                    </span>
+                                ))}
+                            </div>
+                            <em className="ar-wheel-foot">
+                                Answering their affinity is worth {Math.round(0.25 * 100)}% either way. Your element is
+                                whatever most of your gear carries — re-attune a piece at the Forge to change it.
+                            </em>
+                            <button type="button" className="ar-back" onClick={() => setWheel(false)}>Close</button>
+                        </div>
+                    ) : null}
+
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
                             wind={yourTurn && pending ? bout.ringMs : 0}
-                            brace={!bout.over && bout.turn === "them"} />
+                            brace={!bout.over && bout.turn === "them"}
+                            element={bout.me?.element || null} />
                         <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" ? TELEGRAPH_MS + (bout.defRingMs || 1600) : 0}
-                            brace={yourTurn && Boolean(pending)} />
+                            brace={yourTurn && Boolean(pending)}
+                            element={bout.foe?.element || null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -746,6 +779,26 @@ function Styles() {
             .ar-tag.is-good { color: #8bf0b4; border-color: rgba(139,240,180,.45); }
             .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
             .ar-tag.is-under { color: #ffd75e; border-color: rgba(255,215,94,.5); }
+            .ar-hud .ar-tag { pointer-events: auto; cursor: pointer; }
+            .ar-tag u { text-decoration: none; opacity: .65; }
+            .ar-el-chip { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+                font-size: 8.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
+                color: var(--el); border: 1px solid color-mix(in srgb, var(--el) 55%, transparent); }
+
+            /* ── THE RULE ── one tap off the banner that announces the result. */
+            .ar-wheel { position: absolute; inset: 8px 8px auto; z-index: 24; padding: 12px 13px; border-radius: 14px;
+                background: rgba(8,6,10,0.95); border: 1px solid rgba(255,190,110,0.4);
+                box-shadow: 0 20px 50px -18px #000; display: grid; gap: 8px; }
+            .ar-wheel > b { font-size: 12px; color: #fff; }
+            .ar-wheel-rows { display: grid; gap: 4px; }
+            .ar-wheel-row { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+            .ar-wheel-row i { font-style: normal; font-size: 9.5px; font-weight: 900; text-transform: uppercase;
+                letter-spacing: .06em; color: var(--el); padding: 1px 7px; border-radius: 999px;
+                border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
+            .ar-wheel-row em { font-style: normal; font-size: 9.5px; color: #7f8790; }
+            .ar-wheel-row.is-you > i:first-child { box-shadow: 0 0 0 1px #fff inset; }
+            .ar-wheel-row.is-foe > i:first-child { box-shadow: 0 0 0 1px #ff9f9f inset; }
+            .ar-wheel-foot { font-style: normal; font-size: 10.5px; line-height: 1.45; color: #9aa2ab; }
             /* Both fighters stand on the same line of sand, facing each other. */
             /* Takes every pixel the other bands don't want. min-height:0 is load-bearing — without it a flex item
                refuses to shrink below its content and the deck gets pushed off the bottom. */

@@ -23,7 +23,9 @@ const rankOf = (id) => RANK[itemById(id)?.rarity] ?? 0;
 // A build-level triangle, NOT the per-round guessing that just got deleted. You can see your opponent's
 // affinity before you challenge and re-attune at the Forge to answer it — so it is a decision you make with
 // your gold and your loadout, in advance, rather than a coin flip in the moment.
-const BEATS = {
+// Exported so the fight screen can SHOW the wheel. "Earth overcomes Light" is a conclusion; without the
+// rule in front of you there is no way to know why, or to plan a re-attune around it.
+export const BEATS = {
     fire: ["earth", "shadow"],
     water: ["fire", "earth"],
     earth: ["storm", "light"],
@@ -35,8 +37,9 @@ export const ELEMENT_EDGE = 0.25;   // damage swing when your affinity answers t
 
 export function elementClash(mine, theirs) {
     if (!mine || !theirs || mine === theirs) return { mult: 1, note: null };
-    if (BEATS[mine]?.includes(theirs)) return { mult: 1 + ELEMENT_EDGE, note: `${ELEMENTS[mine]?.label} overcomes ${ELEMENTS[theirs]?.label}` };
-    if (BEATS[theirs]?.includes(mine)) return { mult: 1 - ELEMENT_EDGE, note: `${ELEMENTS[theirs]?.label} smothers your ${ELEMENTS[mine]?.label}` };
+    // "Earth overcomes Light" never said whose Earth or whose Light. Possessives, always.
+    if (BEATS[mine]?.includes(theirs)) return { mult: 1 + ELEMENT_EDGE, note: `Your ${ELEMENTS[mine]?.label} overcomes their ${ELEMENTS[theirs]?.label}` };
+    if (BEATS[theirs]?.includes(mine)) return { mult: 1 - ELEMENT_EDGE, note: `Their ${ELEMENTS[theirs]?.label} smothers your ${ELEMENTS[mine]?.label}` };
     return { mult: 1, note: null };
 }
 
