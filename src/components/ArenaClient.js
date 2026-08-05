@@ -487,7 +487,9 @@ export default function ArenaClient({ initial }) {
                                                 ) : <span className="ar-pick-art ar-pick-none"><GiSwordWound /></span>}
                                                 <span className="ar-pick-body">
                                                     <b>{ab.name}</b>
-                                                    <em>{ab.blurb}</em>
+                                                    {/* What it DOES. The blurb is flavour and told you nothing
+                                                        about whether it was worth the cooldown. */}
+                                                    <em>{ab.effect || ab.blurb}</em>
                                                     <i>{ab.from}</i>
                                                 </span>
                                                 <u className="ar-pick-cost">
@@ -608,7 +610,8 @@ export default function ArenaClient({ initial }) {
                                 ) : null}
                                 <b>{ab.name}</b>
                             </span>
-                            <em>{ab.blurb}</em>
+                            <em>{ab.effect || ab.blurb}</em>
+                            {ab.effect && ab.blurb ? <em className="ar-ability-flavour">&ldquo;{ab.blurb}&rdquo;</em> : null}
                             <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.cooldown || 0}-turn cooldown</u></span>
                         </div>
                     ))}
@@ -1109,7 +1112,7 @@ function Styles() {
             .ar-pick-none :global(svg) { width: 24px; height: 24px; }
             .ar-pick-body { min-width: 0; flex: 1; display: grid; }
             .ar-pick-body b { font-size: 12.5px; color: #fff; }
-            .ar-pick-body em { font-style: normal; font-size: 10.5px; line-height: 1.3; color: #9aa2ab; }
+            .ar-pick-body em { font-style: normal; font-size: 10.5px; line-height: 1.35; color: #b6bec7; }
             .ar-pick-body i { font-style: normal; font-size: 9.5px; color: #7f8790;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .ar-pick-cost { flex: 0 0 auto; text-decoration: none; font-size: 12px; font-weight: 900; color: var(--el); }
@@ -1187,6 +1190,7 @@ function Styles() {
             .ar-ability-art { flex: 0 0 auto; width: 26px; height: 26px; object-fit: contain;
                 filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
             .ar-ability em { display: block; font-style: normal; font-size: 10.5px; line-height: 1.35; color: #9aa2ab; margin-top: 2px; }
+            .ar-ability-flavour { font-style: italic !important; color: #7f8790 !important; }
             .ar-ability-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 9.5px; }
             /* The item it came from is ALWAYS shown — an ability you can't trace to a piece of gear is magic,
                and you cannot build toward magic. */

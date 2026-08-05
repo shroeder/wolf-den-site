@@ -74,6 +74,43 @@ const ARCHETYPE = {
 // Rarity is the dial: the same signature on an eternal hits harder than on a legendary.
 const TIER_SCALE = [1, 1, 1, 1, 1.12, 1.24, 1.36];
 
+// The blurb on an ability is flavour — "A committed opener." That tells you the mood and nothing else, so
+// there was no way to know whether a skill was worth its cooldown without using it and watching the log.
+//
+// This writes the mechanics out from the SAME constants the engine applies, so the description cannot drift
+// away from the behaviour. Every number below is read off arena.js's resolution, including the trades: a
+// spell really is multiplied by 0.88 in exchange for cutting guard, so that is what it says.
+const SPELL_POWER_TAX = 0.88;   // arena.js: power *= 0.88 for the guard cut
+const SPELL_PIERCE = 0.40;      // arena.js: guard *= 0.6
+const WARD_SOAK = 0.18;         // arena.js: shield += maxHp * 0.18
+const SURGE_MULT = 0.35;        // arena.js: surge multiplier is 1.35
+const SURGE_SWINGS = 2;         // arena.js: b.surge = 2
+const EXECUTE_MULT = 1.5;       // arena.js: power *= 1.5 under the threshold
+const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
+
+const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
+
+function effectText(kind, power, element) {
+    const el = element ? ELEMENTS[element]?.label || element : null;
+    switch (kind) {
+        case "strike":
+            return `${x(power)} a normal swing. Timing counts for half again as much on a strike — nail it and it lands far above anything else you own.`;
+        case "spell":
+            return `${x(power * SPELL_POWER_TAX)} a normal swing — less raw power, but it cuts ${Math.round(SPELL_PIERCE * 100)}% of their guard`
+                + `${el ? ` and answers on its own ${el} rather than your overall affinity` : ""}.`;
+        case "execute":
+            return `${x(power)} a normal swing, and ${x(power * EXECUTE_MULT)} once they are under ${Math.round(EXECUTE_UNDER * 100)}% vigour. A finisher.`;
+        case "gamble":
+            return `A coin flip: ${x(power * 2)} a normal swing, or nothing at all.`;
+        case "surge":
+            return `No damage. Your next ${SURGE_SWINGS} swings hit ${Math.round(SURGE_MULT * 100)}% harder.`;
+        case "ward":
+            return `No damage. Braces you — soaks ${Math.round(WARD_SOAK * 100)}% of your vigour off what lands next.`;
+        default:
+            return `${x(power)} a normal swing.`;
+    }
+}
+
 /**
  * The kit a loadout fights with.
  *
@@ -110,6 +147,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
             cooldown: a.cd,
+            effect: effectText(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element),
             power: Math.round(a.power * scale * 100) / 100,
             blurb: a.blurb,
             element: elementOf[id] || itemElement(id) || element,
@@ -125,6 +163,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
         kit.push({
             id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
             cooldown: 0, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
+            effect: effectText("strike", 1.9, element),
         });
     }
     return { element, abilities: kit };
