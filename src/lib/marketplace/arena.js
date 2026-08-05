@@ -6,7 +6,10 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
+import {
+    buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
+    DRAIN_SHARE, REND_TURNS, REND_PER_TURN, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
+} from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -375,6 +378,9 @@ function publicBout(b) {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you",
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
+        // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
+        // things the server knew about and the player could only infer from the log.
+        bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
         incoming: b.incoming || null,
         // `tell` was published here and read on the ladder row, but nothing has ever assigned it — a leftover
         // of the rock-paper-scissors build, where the opponent's next stance was printed for you to counter.
@@ -418,6 +424,7 @@ export async function startBout(buyerId, targetId = null) {
         opener: me.speed >= foeKit.speed ? "you" : "them",
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
+        bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back
     };
     // A FOE WHO WINS INITIATIVE MUST STILL TELEGRAPH. `incoming` was only ever filled in at the end of a
     // resolved beat, so when their speed took the first one there was nothing to publish — the warning card
@@ -517,10 +524,19 @@ export async function fightRound(buyerId, opts = {}) {
         if (!ward) return { ok: false, error: "no_ability", ...(await getArenaState(buyerId)) };
         if ((b.cd[ward.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
         b.cd[ward.id] = ward.cooldown || 0;
+        // A RIPOSTE is the other defensive answer: it does not soak anything, it sends their blow back. That
+        // makes the defensive slot a real choice — eat less, or make them pay for swinging.
+        if (ward.kind === "riposte") {
+            b.riposte = RIPOSTE_SHARE;
+            b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0,
+                text: `${ward.name} — set to answer.`, ability: ward.name, kind: "riposte" });
+            await saveBout(buyerId, b);
+            return { ok: true, ...(await getArenaState(buyerId)) };
+        }
         const soak = Math.round(b.maxHp * 0.18);
         b.shield += soak;
         b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, soaked: soak,
-            text: `${ward.name} — braced for ${soak}.`, ability: ward.name });
+            text: `${ward.name} — braced for ${soak}.`, ability: ward.name, kind: "ward" });
         await saveBout(buyerId, b);
         return { ok: true, ...(await getArenaState(buyerId)) };
     }
@@ -560,6 +576,10 @@ export async function fightRound(buyerId, opts = {}) {
 
         let power = 1;
         let note = "";
+        let hits = 1;              // flurry lands more than once
+        let drain = 0;             // share of damage returned to you as vigour
+        let rend = false;          // leaves a burn behind
+        let sunder = false;        // strips their guard for a few turns
         // ── WHAT MAKES ONE SKILL DIFFERENT FROM ANOTHER ──────────────────────────────────────────────────
         // Using a skill has always mattered enormously — 4,000 bouts a cell says a good hand goes from 15% to
         // 95% against +30% gear with them, and bouts run 8.8 beats instead of 15. But STRIKE and SPELL were
@@ -595,24 +615,61 @@ export async function fightRound(buyerId, opts = {}) {
                 power *= 0.88;
                 if (c.note) note += ` — ${c.note}`;
             }
+            // ── THE FIVE THAT CHANGE THE SHAPE OF A BOUT ─────────────────────────────────────────────────
+            // Nine archetypes used to collapse into "one big hit", which is why a four-piece kit read as the
+            // same card four times. These do different things instead of bigger numbers.
+            if (ability.kind === "flurry") {
+                // Several small blows. Each rolls its own crit, so this is the kit's variance play — worth
+                // more the more Fortune you are carrying, and better than one big hit into a low guard.
+                hits = Math.max(1, ability.hits || 3);
+            }
+            if (ability.kind === "drain") drain = DRAIN_SHARE;
+            if (ability.kind === "rend") rend = true;
+            if (ability.kind === "sunder") sunder = true;
         }
         // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
         const surge = b.surge > 0 ? 1.35 : 1;
         if (b.surge > 0) b.surge -= 1;
         // Their gear defends them too. Without this the attacker always lands full and the better loadout
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
-        const guard = foeGrade(b.foe.gearPower || 0).def * pierce;
+        // Their guard, minus whatever a Sunder has already stripped off it.
+        const sundered = (b.sunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
+        const guard = foeGrade(b.foe.gearPower || 0).def * pierce * sundered;
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
-        const crit = power > 0 && Math.random() < critChance;
-        const raw = power > 0
-            ? hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1) * (crit ? CRIT_MULT : 1)
-            : 0;
-        const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
+        // EVERY blow of a flurry rolls separately, which is the whole point of it.
+        let dmg = 0;
+        let crit = false;
+        for (let i = 0; i < hits && power > 0; i += 1) {
+            const c = Math.random() < critChance;
+            if (c) crit = true;
+            const raw = hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1) * (c ? CRIT_MULT : 1);
+            dmg += Math.max(1, Math.round(raw - raw * guard));
+        }
         b.foeHp = Math.max(0, b.foeHp - dmg);
+
+        // What the move leaves behind.
+        let healed = 0;
+        if (drain > 0 && dmg > 0) {
+            healed = Math.min(b.maxHp - b.hp, Math.round(dmg * drain));
+            b.hp += healed;
+        }
+        if (rend && dmg > 0) {
+            // Stacks with itself rather than refreshing, so leaning on a burn kit is a real plan.
+            b.bleed = { turns: REND_TURNS, dmg: (b.bleed?.dmg || 0) + Math.max(1, Math.round(b.foeMaxHp * REND_PER_TURN)) };
+        }
+        if (sunder) b.sunder = SUNDER_TURNS;
+
+        const extra = [
+            healed > 0 ? `+${healed} back` : null,
+            rend && dmg > 0 ? `burning ${b.bleed.dmg}/turn` : null,
+            sunder ? `guard stripped` : null,
+            hits > 1 ? `${hits} hits` : null,
+        ].filter(Boolean).join(", ");
         b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg, crit,
+            hits, healed, kind: ability?.kind || "hit",
             text: dmg > 0
-                ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")} — ${dmg}.`
+                ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"} — ${dmg}${extra ? ` (${extra})` : ""}.`
                 : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`,
             ability: ability?.name || null });
         b.turn = "them";
@@ -635,11 +692,35 @@ export async function fightRound(buyerId, opts = {}) {
         b.hp = Math.max(0, b.hp - through);
         // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
         // which meant the entire payoff of guarding and warding was a line of grey text under the buttons.
+        // ── RIPOSTE ── their blow comes back at them. Resolved off what actually LANDED, so bracing first and
+        // then answering is a genuine two-move plan rather than a flat damage bonus.
+        let sent = 0;
+        if (b.riposte > 0 && through > 0) {
+            sent = Math.max(1, Math.round(through * b.riposte));
+            b.foeHp = Math.max(0, b.foeHp - sent);
+            b.riposte = 0;
+        }
         b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
+            riposted: sent,
             text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${sent ? ` ${sent} comes straight back.` : ""}`,
             ability: theirAbility?.name || null });
+
+        // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of
+        // their turn, so it reads as "time passing hurts them" rather than as extra damage on your own swing.
+        if (b.bleed?.turns > 0) {
+            const tick = Math.min(b.foeHp, b.bleed.dmg);
+            b.foeHp = Math.max(0, b.foeHp - tick);
+            b.bleed.turns -= 1;
+            if (tick > 0) {
+                b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "rend",
+                    text: `The burn takes another ${tick}.`, ability: null });
+            }
+            if (b.bleed.turns <= 0) b.bleed = null;
+        }
+        if (b.sunder > 0) b.sunder -= 1;
+
         b.turn = "you";
         b.incoming = null;
         b.beat += 1;

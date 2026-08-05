@@ -17,13 +17,21 @@ const ELEMENT_COLOR = {
 };
 
 // How many pieces, and which shape class, per archetype.
+// A kind you cannot tell apart from another kind with your eyes is not really a different kind. Every one of
+// the eleven archetypes gets its own shape, direction and motion, so a Flurry never looks like a Strike and a
+// Drain never looks like a Rend.
 const SHAPE = {
     strike: { n: 14, cls: "shard" },     // a scatter of blade shards
+    flurry: { n: 26, cls: "slash" },     // a rapid volley of thin slashes
     spell: { n: 18, cls: "mote" },       // slow orbiting motes
     execute: { n: 16, cls: "spike" },    // hard inward spikes
+    rend: { n: 20, cls: "cinder" },      // embers that fall and keep burning
+    drain: { n: 18, cls: "wisp" },       // wisps pulled back TOWARD you
+    sunder: { n: 16, cls: "crack" },     // armour fragments blown outward
     gamble: { n: 20, cls: "coin" },      // tumbling coins
     surge: { n: 16, cls: "ember" },      // embers rising off you
     ward: { n: 14, cls: "plate" },       // shield plates snapping into place
+    riposte: { n: 16, cls: "barb" },     // barbs turning around and going back
     basic: { n: 10, cls: "shard" },
 };
 
@@ -83,6 +91,34 @@ export default function SkillFx({ kind = "strike", element = null, side = "right
                     animation-name: fxTumble; }
                 .fx-p.is-ember { border-radius: 50%; animation-name: fxRise; animation-duration: .9s; }
                 .fx-p.is-plate { border-radius: 2px; width: 14px; height: 5px; animation-name: fxIn; }
+                /* FLURRY — thin fast slashes, many of them, over almost as soon as they start. */
+                .fx-p.is-slash { width: 22px; height: 2px; border-radius: 1px;
+                    animation-name: fxOut; animation-duration: .34s; }
+                /* REND — cinders that fall and linger, because the burn does too. */
+                .fx-p.is-cinder { width: 6px; height: 6px; border-radius: 50%;
+                    animation-name: fxFall; animation-duration: 1.1s; }
+                /* DRAIN — pulled back toward the caster rather than thrown away from the target. */
+                .fx-p.is-wisp { width: 7px; height: 7px; border-radius: 50%;
+                    animation-name: fxSiphon; animation-duration: .8s; }
+                /* SUNDER — hard angular chips of broken guard. */
+                .fx-p.is-crack { width: 11px; height: 4px; clip-path: polygon(0 0, 100% 40%, 80% 100%, 10% 60%);
+                    animation-name: fxOut; animation-duration: .5s; }
+                /* RIPOSTE — goes out, turns, and comes back. */
+                .fx-p.is-barb { width: 10px; height: 3px; clip-path: polygon(0 50%, 70% 0, 100% 50%, 70% 100%);
+                    animation-name: fxReturn; animation-duration: .7s; }
+
+                @keyframes fxFall {
+                    from { opacity: 1; transform: rotate(var(--a)) translateX(calc(var(--d) * .5)) translateY(-10px) scale(var(--s)); }
+                    60% { opacity: .9; }
+                    to { opacity: 0; transform: rotate(var(--a)) translateX(calc(var(--d) * .5)) translateY(44px) scale(.3); } }
+                @keyframes fxSiphon {
+                    from { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(var(--s)); }
+                    30% { opacity: 1; }
+                    to { opacity: 0; transform: rotate(var(--a)) translateX(0) scale(.2); } }
+                @keyframes fxReturn {
+                    0% { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(var(--s)); }
+                    45% { opacity: 1; transform: rotate(var(--a)) translateX(var(--d)) scale(var(--s)); }
+                    100% { opacity: 0; transform: rotate(calc(var(--a) + 180deg)) translateX(var(--d)) scale(.4); } }
 
                 @keyframes fxOut {
                     from { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(var(--s)); }

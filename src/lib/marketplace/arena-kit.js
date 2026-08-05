@@ -47,28 +47,66 @@ export function elementClash(mine, theirs) {
 // The signature catalog is written for the BOSS (conditional multipliers on a once-a-day strike), so its shapes
 // don't transfer literally. What transfers is the identity: the name, the item and the archetype. Each becomes
 // an arena move of the matching character.
+// ── ELEVEN KINDS, NOT THREE ──────────────────────────────────────────────────────────────────────────────────
+// Nine of the nineteen archetypes below used to map onto "strike", and strike, spell and execute were the same
+// code path with a different word on them: deal power × damage. So a four-piece kit read as
+//
+//     ×2.5 damage  ·  +6% on top
+//     ×2.1 damage  ·  +6% on top
+//     ×2   damage  ·  +6% on top
+//
+// — three cards that are the same skill with the numbers filed off, and no reason to pick one over another
+// beyond the biggest multiplier. That is a one-trick pony with four coats of paint.
+//
+// The fix is NOT more damage tiers. Every kind below changes the SHAPE of a bout rather than its size:
+// something that hits many times, something that keeps hurting after it lands, something that heals you,
+// something that opens their guard for the next move, something you play on THEIR turn. Damage is deliberately
+// held near parity across them so the choice is about what the fight needs, not which number is biggest.
+//
+//   strike   one committed blow
+//   flurry   several small blows — more rolls of the dice, so more crits
+//   spell    its own element, and it cuts guard
+//   execute  ordinary, until they are hurt
+//   rend     it keeps burning after it lands
+//   drain    what it takes off them, it gives to you
+//   sunder   opens their guard for everything that comes next
+//   ward     soaks the next blow
+//   surge    sharpens the next two
+//   riposte  played on THEIR beat: their blow comes back at them
+//   gamble   double, or nothing
 const ARCHETYPE = {
-    firstHitMult: { kind: "strike", cd: 3, power: 2.1, blurb: "A committed opener." },
-    eruptChance: { kind: "strike", cd: 3, power: 2.0, blurb: "Erupts on contact." },
-    critMult: { kind: "strike", cd: 3, power: 2.2, blurb: "Finds the seam." },
+    firstHitMult: { kind: "strike", cd: 3, power: 2.3, blurb: "A committed opener." },
+    critMult: { kind: "strike", cd: 3, power: 2.4, blurb: "Finds the seam." },
+    firstHitCrit: { kind: "strike", cd: 3, power: 2.4, blurb: "Opens on a crit." },
+    xpOnHit: { kind: "strike", cd: 2, power: 1.8, blurb: "Studied, precise." },
+
+    // "Erupts on contact" was a plain hit. It burns now, which is what erupting means.
+    eruptChance: { kind: "rend", cd: 3, power: 1.5, blurb: "Erupts, and keeps burning." },
+
+    // "Hits hardest while they're fresh", "your companion piles in", "more swings in you than there should
+    // be" — three signatures that are obviously about VOLUME and were all modelled as one big hit.
+    onslaught: { kind: "flurry", cd: 3, power: 0.95, hits: 3, blurb: "Hits hardest while they're fresh." },
+    beastbond: { kind: "flurry", cd: 3, power: 0.85, hits: 3, blurb: "Your companion piles in." },
+    extraStrikes: { kind: "flurry", cd: 4, power: 0.8, hits: 4, blurb: "More swings in you than there should be." },
+    ticketOnCrit: { kind: "flurry", cd: 2, power: 0.7, hits: 3, blurb: "Lucky. Repeatedly." },
+
+    // "Feeds on the fight" and "takes something with it" are both about TAKING, not about sharpening.
+    bloodlust: { kind: "drain", cd: 3, power: 1.9, blurb: "Feeds on the fight." },
+    goldOnHit: { kind: "drain", cd: 3, power: 1.7, blurb: "Takes something with it." },
+
+    // "Made for bigger things than you" — a giant-slayer breaks the armour rather than out-hitting it.
+    giantSlayer: { kind: "sunder", cd: 4, power: 1.6, blurb: "Made for bigger things than you." },
+
     opportunist: { kind: "execute", cd: 4, power: 2.4, blurb: "Hits far harder on a wounded foe." },
-    onslaught: { kind: "strike", cd: 3, power: 2.2, blurb: "Hits hardest while they're fresh." },
-    giantSlayer: { kind: "strike", cd: 4, power: 2.5, blurb: "Made for bigger things than you." },
-    vanguard: { kind: "surge", cd: 3, power: 1.0, blurb: "Sharpens your next two swings." },
     attuned: { kind: "spell", cd: 4, power: 2.3, blurb: "Channels your affinity." },
-    bloodlust: { kind: "surge", cd: 3, power: 1.0, blurb: "Feeds on the fight." },
-    packTactics: { kind: "ward", cd: 3, power: 1.0, blurb: "Braces you against the next blow." },
     overcharge: { kind: "spell", cd: 6, power: 3.2, blurb: "Discharges everything at once." },
+    vanguard: { kind: "surge", cd: 3, power: 1.0, blurb: "Sharpens your next two swings." },
+    packTactics: { kind: "ward", cd: 3, power: 1.0, blurb: "Braces you against the next blow." },
+
+    // "A banner nobody wants to fight under" is a threat, not a shield — so it answers back.
+    warbanner: { kind: "riposte", cd: 4, power: 1.0, blurb: "Nobody wants to fight under it." },
+
     highroller: { kind: "gamble", cd: 5, power: 3.0, blurb: "All of it, or none of it." },
-    beastbond: { kind: "surge", cd: 3, power: 1.0, blurb: "Your companion piles in." },
-    warbanner: { kind: "ward", cd: 4, power: 1.0, blurb: "A banner nobody wants to fight under." },
-    xpOnHit: { kind: "strike", cd: 2, power: 1.7, blurb: "Studied, precise." },
-    goldOnHit: { kind: "strike", cd: 2, power: 1.7, blurb: "Takes something with it." },
-    ticketOnCrit: { kind: "strike", cd: 2, power: 1.8, blurb: "Lucky." },
-    // These two carried no arena move at all, which quietly benched fourteen legendary and mythic pieces —
-    // six helms and eight belts/boots whose signature is written for the BOSS fight. They read across fine.
-    firstHitCrit: { kind: "strike", cd: 3, power: 2.2, blurb: "Opens on a crit." },
-    extraStrikes: { kind: "surge", cd: 3, power: 1.0, blurb: "More swings in you than there should be." },
 };
 
 // Rarity is the dial: the same signature on an eternal hits harder than on a legendary.
@@ -87,9 +125,15 @@ const SURGE_MULT = 0.35;        // arena.js: surge multiplier is 1.35
 const SURGE_SWINGS = 2;         // arena.js: b.surge = 2
 const EXECUTE_MULT = 1.5;       // arena.js: power *= 1.5 under the threshold
 const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
-// arena.js: a strike's gradeAtk is 1 + (ATTACK - 1) * 1.45 against a baseline of ATTACK = 1.15, so the edge
-// a strike carries over any other kind of the same power is 1.2175 / 1.15.
-const STRIKE_EDGE = (1 + (1.15 - 1) * 1.45) / 1.15 - 1;
+// ── THE NEW KINDS' CONSTANTS ─────────────────────────────────────────────────────────────────────────────────
+// Same contract as the block above: every number here is the one arena.js actually applies, so a card can
+// never drift away from the behaviour it is describing.
+export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
+export const REND_PER_TURN = 0.05;  // of their MAX vigour, per tick
+export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as vigour
+export const SUNDER_CUT = 0.35;     // of their guard, removed
+export const SUNDER_TURNS = 2;
+export const RIPOSTE_SHARE = 0.5;   // of their landed blow, sent back at them
 
 const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
 
@@ -99,36 +143,80 @@ const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$
 //
 // `head`  the one figure that matters, or the whole effect when there is no damage
 // `tags`  {t: text, k: kind} — kind drives the colour, so a downside can never look like an upside
-function effectOf(kind, power, element) {
+// ── HOW A SKILL IS DESCRIBED ─────────────────────────────────────────────────────────────────────────────────
+// One headline, one short sub, and AT MOST one tag. The previous version stacked up to three tags on a card
+// roughly 150px wide, which on a phone wrapped "on your next 2 swings" onto four lines and pushed the gear it
+// came from into an ellipsis. A skill you are choosing mid-fight has to be readable in about a second.
+//
+// `line` is the whole thing said as one sentence — used in the compact rail and the tooltip, where a headline
+// and a sub would be two things to read instead of one.
+function effectOf(kind, power, element, hits = 1) {
     const el = element ? ELEMENTS[element]?.label || element : null;
     switch (kind) {
         case "strike":
-            // "Timing counts double" described the closing ring, which no longer exists — the card was selling
-            // a mechanic the game removed. What a strike actually does is take the flat attack bonus and
-            // amplify it (arena.js: gradeAtk = 1 + (ATTACK - 1) * 1.45), which is a real if modest edge.
-            return { head: x(power), sub: "damage", tags: [{ t: `+${Math.round(STRIKE_EDGE * 100)}% on top`, k: "good" }] };
+            return { head: x(power), sub: "damage", line: `${x(power)} damage, one blow`, tags: [] };
+        case "flurry":
+            return {
+                head: `${hits}×`, sub: `${x(power)} hits`,
+                line: `${hits} hits of ${x(power)} — every one can crit`,
+                tags: [{ t: "More crit rolls", k: "good" }],
+            };
         case "spell":
             return {
                 head: x(power * SPELL_POWER_TAX), sub: "damage",
-                tags: [
-                    { t: `Cuts ${Math.round(SPELL_PIERCE * 100)}% guard`, k: "good" },
-                    ...(el ? [{ t: `Own ${el}`, k: "el" }] : []),
-                    { t: "Less raw power", k: "bad" },
-                ],
+                line: `${x(power * SPELL_POWER_TAX)} ${el || "elemental"} damage, cuts ${Math.round(SPELL_PIERCE * 100)}% guard`,
+                tags: [{ t: `Cuts ${Math.round(SPELL_PIERCE * 100)}% guard`, k: "good" }],
             };
         case "execute":
             return {
+                head: x(power * EXECUTE_MULT), sub: `under ${Math.round(EXECUTE_UNDER * 100)}%`,
+                line: `${x(power)} damage — ${x(power * EXECUTE_MULT)} if they are under ${Math.round(EXECUTE_UNDER * 100)}%`,
+                tags: [{ t: `${x(power)} otherwise`, k: "bad" }],
+            };
+        case "rend":
+            return {
+                head: `${Math.round(REND_PER_TURN * 100)}%`, sub: `a turn, ${REND_TURNS} turns`,
+                line: `Burns for ${REND_TURNS} more turns after it lands`,
+                tags: [{ t: "Stacks with itself", k: "good" }],
+            };
+        case "drain":
+            return {
                 head: x(power), sub: "damage",
-                tags: [{ t: `${x(power * EXECUTE_MULT)} under ${Math.round(EXECUTE_UNDER * 100)}% vigour`, k: "good" }],
+                line: `${x(power)} damage, and you keep ${Math.round(DRAIN_SHARE * 100)}% of it`,
+                tags: [{ t: `Heals ${Math.round(DRAIN_SHARE * 100)}% of it`, k: "good" }],
+            };
+        case "sunder":
+            return {
+                head: `−${Math.round(SUNDER_CUT * 100)}%`, sub: "their guard",
+                line: `${x(power)} damage and strips ${Math.round(SUNDER_CUT * 100)}% of their guard for ${SUNDER_TURNS} turns`,
+                tags: [{ t: `For ${SUNDER_TURNS} turns`, k: "good" }],
             };
         case "gamble":
-            return { head: x(power * 2), sub: "damage", tags: [{ t: "Coin flip — or nothing", k: "bad" }] };
+            return {
+                head: x(power * 2), sub: "or nothing",
+                line: `${x(power * 2)} damage on a coin flip, nothing on the other side`,
+                tags: [{ t: "Coin flip", k: "bad" }],
+            };
         case "surge":
-            return { head: `+${Math.round(SURGE_MULT * 100)}%`, sub: `on your next ${SURGE_SWINGS} swings`, tags: [{ t: "No damage", k: "bad" }] };
+            return {
+                head: `+${Math.round(SURGE_MULT * 100)}%`, sub: `next ${SURGE_SWINGS} swings`,
+                line: `+${Math.round(SURGE_MULT * 100)}% on your next ${SURGE_SWINGS} swings`,
+                tags: [{ t: "No damage", k: "bad" }],
+            };
         case "ward":
-            return { head: `${Math.round(WARD_SOAK * 100)}%`, sub: "of your vigour soaked", tags: [{ t: "Use it on their turn", k: "good" }, { t: "No damage", k: "bad" }] };
+            return {
+                head: `${Math.round(WARD_SOAK * 100)}%`, sub: "soaked",
+                line: `Soaks ${Math.round(WARD_SOAK * 100)}% of your vigour from the next blow`,
+                tags: [{ t: "On their turn", k: "good" }],
+            };
+        case "riposte":
+            return {
+                head: `${Math.round(RIPOSTE_SHARE * 100)}%`, sub: "sent back",
+                line: `Their next blow returns ${Math.round(RIPOSTE_SHARE * 100)}% of itself to them`,
+                tags: [{ t: "On their turn", k: "good" }],
+            };
         default:
-            return { head: x(power), sub: "damage", tags: [] };
+            return { head: x(power), sub: "damage", line: `${x(power)} damage`, tags: [] };
     }
 }
 
@@ -171,9 +259,10 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
             cooldown: a.cd,
-            effect: effectOf(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element),
-            // Wards are the defensive half — playable on THEIR beat instead of costing you a swing.
-            defensive: a.kind === "ward",
+            hits: a.hits || 1,
+            effect: effectOf(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element, a.hits || 1),
+            // Wards and ripostes are the defensive half — playable on THEIR beat instead of costing you a swing.
+            defensive: a.kind === "ward" || a.kind === "riposte",
             power: Math.round(a.power * scale * 100) / 100,
             blurb: a.blurb,
             element: elementOf[id] || itemElement(id) || element,
@@ -189,8 +278,8 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
         kit.push({
             id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
             sprite: "/images/arena/skill-firstHitMult.webp",
-            cooldown: 0, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
-            effect: effectOf("strike", 1.9, element), defensive: false,
+            cooldown: 0, power: 1.9, hits: 1, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
+            effect: effectOf("strike", 1.9, element, 1), defensive: false,
         });
     }
     return { element, abilities: kit };

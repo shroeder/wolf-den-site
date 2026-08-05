@@ -34,37 +34,64 @@ export const MY_ABILITIES = [
     {
         id: "ashfall_crown:overcharge", itemId: "ashfall_crown",
         sprite: "/images/arena/skill-overcharge.webp",
-        name: "Ashfall", from: "Ashfall Crown", kind: "spell", cooldown: 6, power: 4.35,
-        effect: {
-            head: "×3.83", sub: "damage",
-            tags: [{ t: "Cuts 40% guard", k: "good" }, { t: "Own Fire", k: "el" }, { t: "Less raw power", k: "bad" }],
-        },
+        name: "Ashfall", from: "Ashfall Crown", kind: "spell", cooldown: 6, power: 4.35, hits: 1,
+        effect: { head: "×3.83", sub: "damage", line: "×3.83 Fire damage, cuts 40% guard",
+            tags: [{ t: "Cuts 40% guard", k: "good" }] },
         defensive: false, blurb: "Discharges everything at once.", element: "fire", rarity: "mythic", rank: 4,
     },
     {
         id: "widowfang:opportunist", itemId: "widowfang",
         sprite: "/images/arena/skill-opportunist.webp",
-        name: "Widow's Mercy", from: "Widowfang", kind: "execute", cooldown: 4, power: 2.4,
-        effect: { head: "×2.4", sub: "damage", tags: [{ t: "×3.6 under 35% vigour", k: "good" }] },
+        name: "Widow's Mercy", from: "Widowfang", kind: "execute", cooldown: 4, power: 2.4, hits: 1,
+        effect: { head: "×3.6", sub: "under 35%", line: "×2.4 damage — ×3.6 if they are under 35%",
+            tags: [{ t: "×2.4 otherwise", k: "bad" }] },
         defensive: false, blurb: "Hits far harder on a wounded foe.", element: "shadow", rarity: "legendary", rank: 3,
     },
     {
         id: "warden_plate:packTactics", itemId: "warden_plate",
         sprite: "/images/arena/skill-packTactics.webp",
-        name: "Pack Wall", from: "Warden Plate", kind: "ward", cooldown: 3, power: 1,
-        effect: {
-            head: "18%", sub: "of your vigour soaked",
-            tags: [{ t: "Use it on their turn", k: "good" }, { t: "No damage", k: "bad" }],
-        },
+        name: "Pack Wall", from: "Warden Plate", kind: "ward", cooldown: 3, power: 1, hits: 1,
+        effect: { head: "18%", sub: "soaked", line: "Soaks 18% of your vigour from the next blow",
+            tags: [{ t: "On their turn", k: "good" }] },
         defensive: true, blurb: "Braces you against the next blow.", element: "earth", rarity: "epic", rank: 2,
     },
     {
         id: "gambler_ring:highroller", itemId: "gambler_ring",
         sprite: "/images/arena/skill-highroller.webp",
-        name: "Last Coin", from: "Gambler's Ring", kind: "gamble", cooldown: 5, power: 3,
-        effect: { head: "×6", sub: "damage", tags: [{ t: "Coin flip — or nothing", k: "bad" }] },
+        name: "Last Coin", from: "Gambler's Ring", kind: "gamble", cooldown: 5, power: 3, hits: 1,
+        effect: { head: "×6", sub: "or nothing", line: "×6 damage on a coin flip, nothing on the other side",
+            tags: [{ t: "Coin flip", k: "bad" }] },
         defensive: false, blurb: "All of it, or none of it.", element: "storm", rarity: "epic", rank: 2,
     },
+];
+
+// One of each NEW kind, so the lab shows the redesign rather than four variants of "deal damage".
+export const NEW_KIND_ABILITIES = [
+    { id: "emberfang:eruptChance", itemId: "emberfang", sprite: "/images/arena/skill-eruptChance.webp",
+        name: "Emberfang", from: "Emberfang Blade", kind: "rend", cooldown: 3, power: 1.5, hits: 1,
+        effect: { head: "5%", sub: "a turn, 3 turns", line: "Burns for 3 more turns after it lands",
+            tags: [{ t: "Stacks with itself", k: "good" }] },
+        defensive: false, blurb: "Erupts, and keeps burning.", element: "fire", rarity: "epic", rank: 2 },
+    { id: "packclaw:onslaught", itemId: "packclaw", sprite: "/images/arena/skill-onslaught.webp",
+        name: "Packclaw", from: "Packclaw Gauntlets", kind: "flurry", cooldown: 3, power: 0.95, hits: 3,
+        effect: { head: "3×", sub: "×0.95 hits", line: "3 hits of ×0.95 — every one can crit",
+            tags: [{ t: "More crit rolls", k: "good" }] },
+        defensive: false, blurb: "Hits hardest while they're fresh.", element: "storm", rarity: "epic", rank: 2 },
+    { id: "leechband:bloodlust", itemId: "leechband", sprite: "/images/arena/skill-bloodlust.webp",
+        name: "Bloodlust", from: "Leechband", kind: "drain", cooldown: 3, power: 1.9, hits: 1,
+        effect: { head: "×1.9", sub: "damage", line: "×1.9 damage, and you keep 50% of it",
+            tags: [{ t: "Heals 50% of it", k: "good" }] },
+        defensive: false, blurb: "Feeds on the fight.", element: "shadow", rarity: "legendary", rank: 3 },
+    { id: "giantsbane:giantSlayer", itemId: "giantsbane", sprite: "/images/arena/skill-giantSlayer.webp",
+        name: "Giantsbane", from: "Giantsbane Maul", kind: "sunder", cooldown: 4, power: 1.6, hits: 1,
+        effect: { head: "−35%", sub: "their guard", line: "×1.6 damage and strips 35% of their guard for 2 turns",
+            tags: [{ t: "For 2 turns", k: "good" }] },
+        defensive: false, blurb: "Made for bigger things than you.", element: "earth", rarity: "legendary", rank: 3 },
+    { id: "banner:warbanner", itemId: "banner", sprite: "/images/arena/skill-warbanner.webp",
+        name: "Warbanner", from: "Warbanner of the Den", kind: "riposte", cooldown: 4, power: 1, hits: 1,
+        effect: { head: "50%", sub: "sent back", line: "Their next blow returns 50% of itself to them",
+            tags: [{ t: "On their turn", k: "good" }] },
+        defensive: true, blurb: "Nobody wants to fight under it.", element: "light", rarity: "mythic", rank: 4 },
 ];
 
 export const FOE_ABILITIES = [
@@ -194,6 +221,11 @@ export function baseState(extra = {}) {
 
 // ── THE SCENES ───────────────────────────────────────────────────────────────────────────────────────────────
 export const SCENES = {
+    newkinds: {
+        label: "New skill kinds",
+        note: "One of each new archetype — rend, flurry, drain, sunder, riposte — on the ladder card layout.",
+        state: () => baseState({ me: { ...ME, abilities: NEW_KIND_ABILITIES } }),
+    },
     ladder: {
         label: "Ladder",
         note: "The screen you land on. Rank badge, your kit, podium, who you can challenge.",

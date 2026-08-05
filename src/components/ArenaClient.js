@@ -84,6 +84,19 @@ function castSound(kind, element) {
 // One ability, said in as few words as possible: the number that matters, big, then the exceptions as chips.
 // Four cards of near-identical paragraph — three of them opening with the same twenty words — is not something
 // anybody reads in the middle of a fight.
+// The LADDER's version of a skill: name, one sentence, and the gear it came from. No headline/sub split and
+// no tag stack — that layout was designed for a wide card and shipped onto a 375px phone.
+function SkillLine({ ab }) {
+    const e = ab.effect && typeof ab.effect === "object" ? ab.effect : null;
+    return (
+        <span className="sk">
+            <span className="sk-top"><b className="sk-name">{ab.name}</b></span>
+            <span className="sk-line">{e?.line || e?.head || ab.blurb || "Damage"}</span>
+            <span className="sk-foot">{ab.from} · cools {ab.cooldown || 0}</span>
+        </span>
+    );
+}
+
 function SkillFace({ ab, left = 0 }) {
     // A bout freezes its abilities into bout_json at the start, so a fight already running when the effect
     // format changed carries the OLD shape — and the card rendered its headline as nothing at all. Never let
@@ -1035,7 +1048,7 @@ export default function ArenaClient({ initial }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="ar-ability-art" src={ab.sprite} alt="" draggable="false" />
                                 ) : null}
-                                <SkillFace ab={ab} />
+                                <SkillLine ab={ab} />
                             </span>
                         </div>
                     ))}
@@ -1748,7 +1761,11 @@ function Styles() {
             /* ── A SKILL, SAID SHORT ── */
             .sk { display: grid; gap: 3px; min-width: 0; flex: 1; text-align: left; }
             .sk-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-            .sk-name { font-size: 13px; color: #fff; }
+            .sk-name { font-size: 13px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            /* The whole effect as one sentence — used on the ladder, where a headline plus a sub plus three
+               tags was three things to read and none of them fit. */
+            .sk-line { font-size: 11.5px; line-height: 1.4; color: #c9d2db; }
+            .sk-line b { color: #ffd75e; font-weight: 900; }
             .sk-cd { font-size: 9.5px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; color: #7f8790; }
             .sk-cd.is-ready { color: #8bf0b4; }
             .sk-head { display: flex; align-items: baseline; gap: 6px; }
@@ -1893,7 +1910,12 @@ function Styles() {
                 background: rgba(0,0,0,0.45); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
             .ar-theirchip img { width: 15px; height: 15px; object-fit: contain; opacity: .85; }
 
-            .ar-kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 9px; }
+            /* ONE COLUMN until there is genuinely room for two. The old minmax(140px, 1fr) put two cards side
+               by side on a 375px phone, which is where every wrap in that screenshot came from: a two-word
+               skill name broke over two lines, the effect broke over four, and the piece it came from was cut
+               to "Ring of Titans · cool…". A skill card has to be readable in about a second. */
+            .ar-kit { display: grid; grid-template-columns: 1fr; gap: 8px; }
+            @media (min-width: 620px) { .ar-kit { grid-template-columns: 1fr 1fr; } }
             .ar-ability { text-align: left; padding: 11px 13px; border-radius: 12px; cursor: pointer;
                 background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
             .ar-ability.is-armed { background: color-mix(in srgb, var(--el) 22%, transparent);
