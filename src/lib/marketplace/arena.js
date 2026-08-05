@@ -618,7 +618,10 @@ async function finishBout(buyerId, row, b, won) {
             updated_at = NOW()
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1]
-    ).catch(() => {});
+    ).catch((e) => {
+        // Never silent. This write losing is how a won fight comes back as an unfinished one.
+        console.error("arena.finish.persist_failed", buyerId, e?.message || e);
+    });
 
     // Recorded from BOTH sides. The defender was asleep; this is the only way they ever find out.
     await db.query(
@@ -628,7 +631,12 @@ async function finishBout(buyerId, row, b, won) {
     ).catch(() => {});
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss", { from: posFrom, to: posTo, foe: b.foe.id }).catch(() => {});
-    return { ok: true, finished: { won, reward, rankUp: b.rankUp }, ...(await getArenaState(buyerId)) };
+
+    // getArenaState RE-READS the bout out of the database, so if that write above lost for any reason it would
+    // hand back the un-finished bout and quietly erase a fight the player had already won — a modal flashing
+    // up and then a screen with no way off it. The bout we just resolved is the truth; say so explicitly.
+    const state = await getArenaState(buyerId);
+    return { ok: true, finished: { won, reward, rankUp: b.rankUp }, ...state, bout: publicBout(b) };
 }
 
 // ── SEEDING THE LADDER ───────────────────────────────────────────────────────────────────────────────────────

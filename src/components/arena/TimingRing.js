@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { GiShield, GiCrossedSwords } from "react-icons/gi";
+
 import { gradeFor } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE RING ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -119,6 +121,11 @@ export default function TimingRing({ ringMs, onResult, label, tone = "attack", s
                 {/* The tightest slice. If you land inside this, it's FLAWLESS — so the best grade in the game
                     is a thing you can aim at rather than a surprise. */}
                 <span className="tr-core" />
+                {/* Attacking and defending have to be told apart at a glance, and colour alone was doing all
+                    the work. A shield when it's coming at you, crossed blades when it's going out. */}
+                <span className="tr-glyph" aria-hidden="true">
+                    {tone === "defend" ? <GiShield /> : <GiCrossedSwords />}
+                </span>
                 <span ref={echoRef} className="tr-echo" />
                 <span ref={ringRef} className="tr-ring" />
                 <span ref={burstRef} className="tr-burst" />
@@ -178,6 +185,11 @@ export default function TimingRing({ ringMs, onResult, label, tone = "attack", s
                     from { opacity: .9; transform: scale(1); }
                     to { opacity: 0; transform: scale(.5); } }
 
+                .tr-glyph { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+                    display: grid; place-items: center; color: var(--c); opacity: .5; pointer-events: none; }
+                .tr-glyph :global(svg) { width: calc(var(--tr) * 0.44); height: calc(var(--tr) * 0.44);
+                    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.8)); }
+                .tr.is-near .tr-glyph { opacity: .95; }
                 .tr-label { position: absolute; bottom: 8%; font-size: 11px; font-weight: 900; letter-spacing: .14em;
                     text-transform: uppercase; color: #fff; text-shadow: 0 2px 8px #000; }
                 .tr-hint { position: absolute; bottom: 2%; font-size: 9.5px; letter-spacing: .1em;

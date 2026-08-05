@@ -95,8 +95,10 @@ function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = 
 // rung moved, your rank bar moved, your streak moved and the next opponent got harder. Winning therefore read
 // like sliding backwards, which is the exact opposite of what a ladder is for. This recaps every one of those,
 // and the rung counts UP in front of you rather than being a number you are expected to have memorised.
+// Nothing in here may throw. A crash while this is mounted leaves the portaled overlay on screen with the
+// body scroll-locked underneath it and no button anywhere — which is exactly the dark screen you get stuck on.
 function Recap({ bout, busy, onClose }) {
-    const r = bout.recap;
+    const r = bout?.recap && bout.recap.rank ? bout.recap : null;
     useScrollLock(true);   // the page behind must not scroll out from under the modal
     const up = r?.rankUp || null;
     const tint = up ? up.color : r?.rank?.color || (bout.won ? "#ffd75e" : "#ff6f7d");
@@ -206,6 +208,10 @@ export default function ArenaClient({ initial }) {
     // message, no spinner and no way out.
     const act = useCallback(async (action, extra = {}) => {
         if (busy) return;
+        // Leaving a finished bout happens IMMEDIATELY, before the network is involved. The result is already
+        // banked server-side, so there is no version of this where the player should wait — or, as happened,
+        // sit on a dark overlay with nothing to press.
+        if (action === "dismiss") setSt((p) => (p ? { ...p, bout: null } : p));
         setBusy(true); setErr(null);
         try {
             const r = await fetch("/api/marketplace/arena", {
@@ -213,7 +219,7 @@ export default function ArenaClient({ initial }) {
                 body: JSON.stringify({ action, ...extra }),
             }).then((x) => x.json()).catch(() => null);
 
-            if (r?.unlocked) setSt(r);
+            if (r?.unlocked && action !== "dismiss") setSt(r);
             else if (action === "dismiss") {
                 // LAST RESORT, and the important one. The bout is finished either way — the win is already
                 // banked server-side — so if the request fails there is no reason to hold somebody hostage on
@@ -239,13 +245,20 @@ export default function ArenaClient({ initial }) {
         // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
         // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
+        // Defending is a different act and deserves different words — "PERFECT" over a block you barely got
+        // a hand to told you the timing was good but never what you actually did.
         const GRADE_LABEL = { flawless: "FLAWLESS", perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
+        const BLOCK_LABEL = {
+            flawless: "FLAWLESS DEFENCE", perfect: "PERFECT BLOCK", great: "SOLID BLOCK",
+            good: "GLANCING BLOCK", miss: "WIDE OPEN",
+        };
         // The MOVE, then the grade — every action gets called out across the middle of the screen, which is
         // the whole reason a turn-based fight reads as a fight rather than a spreadsheet.
         if (last && bout.log.length !== p.round) {
             setClash({
                 grade: last.grade,
-                label: GRADE_LABEL[last.grade] || "",
+                // A beat logged as theirs is one you were BLOCKING — your timing, their swing.
+                label: (last.who === "them" ? BLOCK_LABEL : GRADE_LABEL)[last.grade] || "",
                 move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
             });
@@ -256,7 +269,13 @@ export default function ArenaClient({ initial }) {
         const t2 = setTimeout(() => setClash(null), 1150);
         return () => { clearTimeout(t); clearTimeout(t2); };
     }, [bout]);
-    useEffect(() => { logEnd.current?.scrollIntoView?.({ block: "nearest" }); }, [bout?.log?.length]);
+    // scrollIntoView walks UP the tree and scrolls whatever ancestor it must — including the window, which
+    // is why tapping a command yanked the page down and left half the fight off screen. Scroll the log's own
+    // box and nothing else. Same trap the dungeon log hit.
+    useEffect(() => {
+        const box = logEnd.current?.parentElement;
+        if (box) box.scrollTop = box.scrollHeight;
+    }, [bout?.log?.length]);
 
     // ── READ IT FIRST ── their beat opens with a beat of nothing but the warning: who is coming and with
     // what. Defending used to start the instant your own swing resolved, with an identical ring and no idea
