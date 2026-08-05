@@ -57,10 +57,14 @@ function blip(kind) {
 }
 
 // A fighter STANDING IN THE RING: plate above, the hero itself on the sand, breathing.
-function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down }) {
+function Fighter({ f, hp, maxHp, mirrored, hurt, lunge, down, wind = 0, brace = false }) {
     const frac = maxHp ? Math.max(0, hp / maxHp) : 0;
+    // The wind-up runs for exactly as long as the ring takes to close, so a fighter drawing back IS the
+    // countdown. Watch them, not the circle, and the timing still makes sense.
+    const cls = `ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
+        + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}`;
     return (
-        <div className={`ar-fighter${mirrored ? " is-foe" : ""}${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}${down ? " is-down" : ""}`}>
+        <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             <div className="ar-plate">
                 <b className="ar-fname">{f?.name}</b>
                 <span className="ar-hp"><i style={{ width: `${frac * 100}%` }} /></span>
@@ -239,12 +243,16 @@ export default function ArenaClient({ initial }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
-                    <span className="ar-round">Round {bout.round}</span>
+                    <span className="ar-round">Beat {bout.beat}</span>
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
-                            down={bout.over && !bout.won} />
+                            down={bout.over && !bout.won}
+                            wind={!bout.over && bout.turn === "you" ? bout.ringMs : 0}
+                            brace={!bout.over && bout.turn === "them"} />
                         <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
-                            down={bout.over && bout.won} />
+                            down={bout.over && bout.won}
+                            wind={!bout.over && bout.turn === "them" ? bout.ringMs : 0}
+                            brace={!bout.over && bout.turn === "you"} />
                     </div>
                     {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
                     {bout.over ? (
@@ -266,31 +274,6 @@ export default function ArenaClient({ initial }) {
                     ) : null}
                     {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
                         execution is legible instead of being buried in a log line. */}
-                    {clash ? (
-                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
-                            <span>{clash.label}</span>
-                        </div>
-                    ) : null}
-                    {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
-                    {bout.over ? (
-                        <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
-                            <b>{bout.won ? "Down" : "You fall"}</b>
-                        </div>
-                    ) : null}
-                    {/* Over THEM when you swing, over YOU when they do. */}
-                    {!bout.over ? (
-                        <div className={`ar-ringslot is-${bout.turn}`}>
-                            <TimingRing
-                                key={`${bout.beat}-${bout.turn}`}
-                                ringMs={bout.ringMs || 1400}
-                                tone={bout.turn === "you" ? "attack" : "defend"}
-                                label={bout.turn === "you" ? "Strike" : "Block"}
-                                onResult={(off) => { const a = armed; setArmed(null); act("beat", { off, ability: a }); }}
-                            />
-                        </div>
-                    ) : null}
-                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
-                        execution is legible instead of buried in a log line. */}
                     {clash ? (
                         <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
                             <span>{clash.label}</span>
@@ -598,7 +581,7 @@ function Styles() {
             .ar-up-lvl { font-size: 11px; color: #8a939d; white-space: nowrap; }
 
             /* ── the ring ── */
-            .ar-ring { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10;
+            .ar-ring { position: relative; border-radius: 16px; overflow: hidden; aspect-ratio: 4 / 3;
                 border: 1px solid rgba(255,190,110,0.3); }
             .ar-ring.is-shake-1 { animation: arShake .2s ease-out; }
             .ar-ring.is-shake-2 { animation: arShake .3s ease-out; }
@@ -613,12 +596,31 @@ function Styles() {
             .ar-floor { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr;
                 align-items: end; padding: 0 4% 7%; }
             .ar-fighter { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-            .ar-hero { width: min(100%, 132px); max-height: 62%; object-fit: contain;
+            .ar-hero { width: min(100%, 172px); max-height: 70%; object-fit: contain;
                 filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
                 animation: arBreathe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreathe { from { transform: translateY(0) } to { transform: translateY(-5px) } }
             .ar-fighter.is-foe .ar-hero { animation: arBreatheFoe 2.8s ease-in-out infinite alternate; }
             @keyframes arBreatheFoe { from { transform: scaleX(-1) translateY(0) } to { transform: scaleX(-1) translateY(-5px) } }
+            /* ── THE TELEGRAPH ── the acting fighter draws back for exactly as long as the ring takes to close,
+               so the wind-up and the countdown are the same event. There was nothing tying the circle to the
+               fight before this: the ring closed on its own while both fighters stood there breathing, so the
+               timing had no visible cause. Now you can watch the fighter instead and still hit the beat. */
+            .ar-fighter.is-wind .ar-hero { animation: arWind var(--wind, 1.4s) cubic-bezier(.35,0,.65,1) both; }
+            @keyframes arWind {
+                0% { transform: translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
+                100% { transform: translateX(-18px) rotate(-9deg) scale(1.06);
+                    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 20px rgba(255,215,94,0.9)); } }
+            .ar-fighter.is-foe.is-wind .ar-hero { animation: arWindFoe var(--wind, 1.4s) cubic-bezier(.35,0,.65,1) both; }
+            @keyframes arWindFoe {
+                0% { transform: scaleX(-1) translateX(0) rotate(0deg); filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)); }
+                100% { transform: scaleX(-1) translateX(-18px) rotate(-9deg) scale(1.06);
+                    filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65)) drop-shadow(0 0 20px rgba(111,208,255,0.9)); } }
+            /* Whoever is being aimed at hunches — it reads as "this is coming at me" without pulling focus. */
+            .ar-fighter.is-brace .ar-hero { animation: arBrace .45s ease-out both; }
+            @keyframes arBrace { to { transform: translateY(4px) scale(.96) } }
+            .ar-fighter.is-foe.is-brace .ar-hero { animation: arBraceFoe .45s ease-out both; }
+            @keyframes arBraceFoe { to { transform: scaleX(-1) translateY(4px) scale(.96) } }
             /* Landing a blow leans you in; taking one rocks you back and flashes red. */
             .ar-fighter.is-lunge .ar-hero { animation: arLunge .3s ease-out; }
             @keyframes arLunge { 0%,100% { transform: translateX(0) } 50% { transform: translateX(14px) } }
@@ -792,7 +794,7 @@ function Styles() {
             .ar-clash.is-bad { color: #ff9f9f; }
             .ar-underdog { margin: 5px 0 0; font-size: 12px; font-weight: 900; text-align: center; color: #ffd75e;
                 letter-spacing: .02em; text-shadow: 0 0 14px rgba(255,215,94,0.35); }
-            .ar-ringslot { position: absolute; inset: 0; z-index: 20; }
+            .ar-ringslot { position: absolute; inset: 0; z-index: 20; --tr: clamp(96px, 24vw, 152px); }
             /* Over whoever is acting: their half when you swing, yours when they do. */
             .ar-ringslot.is-you { left: 50%; }
             .ar-ringslot.is-them { right: 50%; }

@@ -317,7 +317,7 @@ function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         focus: b.focus, focusMax: FOCUS_MAX, ringMs: b.ringMs, clash: b.clash,
-        me: b.me, shield: b.shield, surge: b.surge,
+        me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1,
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
