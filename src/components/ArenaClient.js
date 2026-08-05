@@ -156,6 +156,9 @@ function Recap({ bout, busy, onClose }) {
                             <span><i>Gold</i><b>+{money(r.reward.gold)}</b></span>
                             <span><i>XP</i><b>+{money(r.reward.xp)}</b></span>
                             {r.reward.chest ? <span><i>Chest</i><b>{r.reward.chest}</b></span> : null}
+                            {r.reward.stakeBack > 0 ? (
+                                <span><i>Stake back</i><b>{money(r.reward.stakeBack)}</b></span>
+                            ) : null}
                         </>
                     ) : <span className="ar-recap-none"><i>No purse</i><b>the rung holds</b></span>}
                     <span><i>Streak</i><b>{r.streak}{r.streak > 0 && r.streak >= r.bestStreak ? " · best" : ""}</b></span>
@@ -460,7 +463,7 @@ export default function ArenaClient({ initial }) {
                             <em>Lv {o.level} · {o.vigour} vigour · {o.tell}</em>
                         </div>
                         <div className="ar-target-go">
-                            <span className="ar-prize">+{money(o.reward.gold + o.stake * 2)}</span>
+                            <span className="ar-prize">+{money(o.reward.gold)}</span>
                             {o.stake > 0 ? <span className="ar-stake">costs {money(o.stake)}</span> : null}
                             <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
                                 onClick={() => act("start", { target: o.id })}>

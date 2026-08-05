@@ -499,10 +499,17 @@ async function finishBout(buyerId, row, b, won) {
             // Whatever happened, never leave anybody parked on a negative rung.
             if (!swapped) await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [buyerId, myPos, -myPos]).catch(() => {});
         }
-        // Win and you take your stake back plus the toll you paid to get in.
-        const back = r.gold + (b.stake || 0) * 2;
+        // ── WIN: YOUR STAKE BACK, AND NOT A COIN MORE ────────────────────────────────────────────────────
+        // This paid stake × 2 — "your stake back plus their toll" — but the defender never staked anything, so
+        // that second half was minted out of nothing. And a win SWAPS your positions, which drops your opponent
+        // below you and lets them challenge straight back. Two people alternating at a 5,000 toll would have
+        // conjured 5,000 gold a win, ten wins a day each, forever. Same shape as the awardXp gold landmine.
+        //
+        // The toll is now strictly zero-sum: the loser's gold moves to the winner and none is created. What you
+        // actually win is the position and the win reward — which is what the ladder was ever about.
+        const back = r.gold + (b.stake || 0);
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back]).catch(() => null);
-        reward.stakeBack = (b.stake || 0) * 2;
+        reward.stakeBack = b.stake || 0;
         await logCoin(buyerId, back, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
         await awardXp(buyerId, "arena_win", { points: r.xp, gold: 0 }).catch(() => {});
