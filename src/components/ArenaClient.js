@@ -511,17 +511,33 @@ export default function ArenaClient({ initial }) {
                         you out of your own gear after one bad round; each skill keeps its own clock now. */}
                     {!bout.over ? (
                         <div className="ar-focus">
+                            {/* QUICK CAST. The rail already showed what was ready; making it tappable turns
+                                three taps (Skill, scroll, pick) into one for a move you already know. On their
+                                beat a ward here braces instead — the same shortcut for the defensive half. */}
                             {(bout.me?.abilities || []).map((ab) => {
                                 const left = bout.cd?.[ab.id] || 0;
+                                const canCast = !left && !busy && !bout.over
+                                    && (yourTurn ? !pending : (bout.turn === "them" && ab.defensive && reading));
+                                const fire = () => {
+                                    if (!canCast) return;
+                                    setMenu(null);
+                                    if (yourTurn) setPending({ command: "skill", ability: ab.id, label: ab.name, short: ab.name });
+                                    else act("beat", { command: "defend", ability: ab.id });
+                                };
                                 return (
-                                    <span key={ab.id} className={`ar-cdchip${left ? "" : " is-ready"}`}
-                                        style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}>
+                                    <button key={ab.id} type="button"
+                                        className={`ar-cdchip${left ? "" : " is-ready"}${canCast ? " is-live" : ""}`}
+                                        style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
+                                        disabled={!canCast}
+                                        title={left ? `${ab.name} — ready in ${left}` : ab.name}
+                                        aria-label={left ? `${ab.name}, ready in ${left} turns` : `Cast ${ab.name}`}
+                                        onClick={fire}>
                                         {ab.sprite ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={ab.sprite} alt="" draggable="false" />
                                         ) : null}
                                         {left ? <i>{left}</i> : null}
-                                    </span>
+                                    </button>
                                 );
                             })}
                             {bout.shield > 0 ? <span className="ar-buff is-ward">Braced {bout.shield}</span> : null}
@@ -1323,6 +1339,7 @@ function Styles() {
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
+            .ar-focus .ar-cdchip { pointer-events: auto; }
             .ar-cdchip { position: relative; width: 30px; height: 30px; border-radius: 9px; display: grid;
                 place-items: center; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
             .ar-cdchip img { width: 22px; height: 22px; object-fit: contain; opacity: .34; filter: grayscale(1); }
@@ -1331,6 +1348,14 @@ function Styles() {
             .ar-cdchip.is-ready img { opacity: 1; filter: none; }
             .ar-cdchip i { position: absolute; font-style: normal; font-size: 13px; font-weight: 900; color: #fff;
                 text-shadow: 0 2px 6px #000; }
+            /* Castable RIGHT NOW reads differently from merely off-cooldown — it is a button, so it should
+               look like one on the beat you can actually press it. */
+            .ar-cdchip.is-live { cursor: pointer; animation: arChipLive 1.6s ease-in-out infinite; }
+            .ar-cdchip.is-live:active { transform: scale(.92); }
+            @keyframes arChipLive {
+                0%, 100% { box-shadow: 0 0 12px -3px var(--el); }
+                50% { box-shadow: 0 0 20px -1px var(--el); } }
+            .ar-cdchip:disabled { cursor: default; }
             .ar-buff { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 999px; }
             .ar-buff.is-ward { color: #6fd0ff; border: 1px solid rgba(111,208,255,.5); }
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
