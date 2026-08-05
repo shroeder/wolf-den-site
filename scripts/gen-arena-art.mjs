@@ -26,12 +26,35 @@ fs.mkdirSync(OUT, { recursive: true });
 
 const STYLE = "Painterly cel-shaded 2D video-game art, bold clean dark outlines, chunky readable silhouette, high contrast, vibrant colors, soft inner shading, fantasy action-RPG style.";
 const CUTOUT = "ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. Nothing but the subject. No text, no words, no letters, no label, no logo, no watermark, no border.";
+const SKILL = `A single fantasy ABILITY ICON — an abstract magical emblem of a combat move, no character, no scenery, bold and readable at small size, centered and filling most of the frame. ${STYLE} ${CUTOUT}`;
 const OBJ = `A single fantasy ARENA item game icon, three-quarter view, centered and filling most of the frame. ${STYLE} ${CUTOUT}`;
 
 const ART = {
     // Unlabelled on purpose — the moment a bottle gets a paper label the model writes crooked nonsense on it.
     "item-poultice": [`${OBJ} A squat round field-medicine jar of thick amber glass with a cork stopper and a leather cord wound round its neck, filled with deep red liquid, a sprig of green herb tucked under the cord.`, "icon"],
     "arena-bg": [`A wide atmospheric fantasy COLOSSEUM INTERIOR background plate, empty of characters: a sunlit sand arena floor in the foreground, curved tiers of weathered honey-coloured stone seating rising behind, deep shadowed archways around the ring, colourful triangular pennants strung above, dust motes in warm low sunlight, deep perspective. Painterly cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting, fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`, "scene"],
+    // ── SKILL ICONS ── one per ARCHETYPE, so an ability is represented by the MOVE rather than by the ring
+    // or cape it happens to come from. Element colour is applied in CSS on top, so nineteen icons cover every
+    // affinity without nineteen more generations.
+    "skill-firstHitMult": [`${SKILL} a coiled fist wreathed in a shockwave, the opening blow of a duel.`, "icon"],
+    "skill-firstHitCrit": [`${SKILL} a cracked bullseye struck dead centre by a glowing spike.`, "icon"],
+    "skill-eruptChance": [`${SKILL} a burst of molten fire erupting upward from a cracked stone.`, "icon"],
+    "skill-critMult": [`${SKILL} a sword point piercing a glowing weak-point rune, sparks flying.`, "icon"],
+    "skill-opportunist": [`${SKILL} a curved dagger over a cracked skull, an execution mark.`, "icon"],
+    "skill-onslaught": [`${SKILL} three overlapping speed-blurred blades in a rushing charge.`, "icon"],
+    "skill-giantSlayer": [`${SKILL} a small blade driven into an enormous cracked stone gauntlet.`, "icon"],
+    "skill-vanguard": [`${SKILL} a banner-topped spear crossed with a rising golden arrow.`, "icon"],
+    "skill-attuned": [`${SKILL} a floating elemental orb ringed by orbiting runes.`, "icon"],
+    "skill-bloodlust": [`${SKILL} a snarling fanged maw wreathed in crimson smoke.`, "icon"],
+    "skill-packTactics": [`${SKILL} three interlocking wolf-head shields forming a wall.`, "icon"],
+    "skill-overcharge": [`${SKILL} a crystal overloading with lightning, cracks blazing white.`, "icon"],
+    "skill-highroller": [`${SKILL} two tumbling dice trailing golden sparks.`, "icon"],
+    "skill-beastbond": [`${SKILL} a glowing paw print overlapping a human handprint.`, "icon"],
+    "skill-warbanner": [`${SKILL} a tattered war banner on a spear, planted and glowing.`, "icon"],
+    "skill-xpOnHit": [`${SKILL} an open rune-lit tome with a star rising from its pages.`, "icon"],
+    "skill-goldOnHit": [`${SKILL} a coin purse bursting open mid-air, coins spilling.`, "icon"],
+    "skill-ticketOnCrit": [`${SKILL} a golden raffle ticket caught in a swirl of luck-sparks.`, "icon"],
+    "skill-extraStrikes": [`${SKILL} a winged boot kicking up a trail of afterimages.`, "icon"],
     "item-draught": [`${OBJ} A slender tapered vial of clear glass in a brass filigree cradle, filled with luminous electric-blue liquid giving off a few floating sparks, stoppered with a polished blue gem.`, "icon"],
 };
 

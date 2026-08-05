@@ -157,7 +157,10 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
         const scale = TIER_SCALE[rankOf(id)] || 1;
         abilities.push({
             id: `${id}:${key}`,
-            itemId: id,                      // so the screen can show the actual piece of gear's sprite
+            itemId: id,                      // the piece it came from, still named on every card
+            // The MOVE's own icon, not the gear's. A ring and a cape tell you nothing about what the ability
+            // does; nineteen archetype emblems do, and the element tint goes on top in CSS.
+            sprite: `/images/arena/skill-${key}.webp`,
             name: sig.label || item?.name || "Signature",
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
@@ -179,6 +182,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
     if (!kit.length) {
         kit.push({
             id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
+            sprite: "/images/arena/skill-firstHitMult.webp",
             cooldown: 0, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
             effect: effectOf("strike", 1.9, element), defensive: false,
         });

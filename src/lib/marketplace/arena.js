@@ -187,12 +187,11 @@ async function kitFor(buyerId) {
     const flat = {};
     for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
     const kit = buildKit(ids, sigsById(ids), flat);
-    // Each ability wears the art of the piece it came from. Nothing to generate — the gear already has sprites,
-    // and using them is the same argument as printing the item's name on the button: an ability has to be
-    // traceable to something you own and can go get more of.
+    // Abilities carry their own archetype emblem (set in buildKit). The piece they came from is still named
+    // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
     const art = await itemSpriteMap().catch(() => ({}));
-    for (const a of kit.abilities) a.sprite = a.itemId ? art[a.itemId] || null : null;
+    for (const a of kit.abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
     const stats = sumItemStats(ids) || {};
     return {
         level, gearPower,
