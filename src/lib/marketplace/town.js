@@ -30,13 +30,15 @@ import { setSetting } from "@/lib/settings.js";
 // chests unlock, prices drop further. Daily caps keep it a treat: one of each chest a day (the humble wooden
 // chest, three) so it's a habit, not a gold-dump.
 const MERCHANT_BASE_DISCOUNT = 0.05; // the merchant always undercuts the list price by at least this much
+// Halved across the board. A Gold chest at 6,000 was most of a day's income for one roll of a table you can
+// also earn from play, so the merchant read as a place you look at rather than a place you buy from.
 const MERCHANT_STOCK = [
-    { tier: "wooden", price: 500, minTier: 0, capPerDay: 3 },
-    { tier: "iron", price: 2000, minTier: 0, capPerDay: 1 },
-    { tier: "gold", price: 6000, minTier: 0, capPerDay: 1 },
+    { tier: "wooden", price: 250, minTier: 0, capPerDay: 3 },
+    { tier: "iron", price: 1000, minTier: 0, capPerDay: 1 },
+    { tier: "gold", price: 3000, minTier: 0, capPerDay: 1 },
     // The Trading Post unlocks ONE tier above Gold — a Mythic chest (at merchant tier 3). Nothing higher: the
     // Ascendant+ chests stay exclusive to real gameplay (boss/sailing/forge), not something you can just buy.
-    { tier: "mythic", price: 16000, minTier: 3, capPerDay: 1 },
+    { tier: "mythic", price: 8000, minTier: 3, capPerDay: 1 },
 ];
 function merchantWaresForTier(tier = 0, chestArt = {}, boughtToday = {}) {
     const disc = Math.min(0.45, MERCHANT_BASE_DISCOUNT + tier * 0.03); // deeper discount as the Trading Post levels
@@ -523,7 +525,9 @@ export async function buyMerchantChest(buyerId, tier) {
 // The Traveling Merchant's high-roller table: gamble 1,000 gold on a random piece of gear. Mostly low tiers,
 // with a rare shot at a Tier-4 (legendary) drop. Owner-gated during the build.
 const GAMBLE_COST = 1000;
-const GAMBLE_WEIGHTS = { common: 50, rare: 30, epic: 15, legendary: 5 }; // legendary = the rare Tier-4 jackpot
+// Tier 4 is meant to be the story you tell, not a 1-in-20. At 5% a thousand-gold table handed out a
+// legendary every twenty rolls, which is roughly one a week for anyone who visits the merchant daily.
+const GAMBLE_WEIGHTS = { common: 52, rare: 32, epic: 15, legendary: 1 }; // legendary = a 1% Tier-4 jackpot
 const RARITY_TIER = { common: 1, rare: 2, epic: 3, legendary: 4 };
 export async function gambleMerchantGear(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };

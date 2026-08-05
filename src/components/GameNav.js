@@ -102,11 +102,12 @@ export default function GameNav() {
     // The Mine is owner-gated while it's being built. Same contract as the Kitchen: ask the server, never guess,
     // and a non-owner simply has no Mine in the menu with nothing to see.
     const [mine, setMine] = useState(false);
+    const [mineTrips, setMineTrips] = useState(0);
     useEffect(() => {
         let dead = false;
         fetch("/api/marketplace/mining", { cache: "no-store", credentials: "same-origin" })
             .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) setMine(true); })
+            .then((d) => { if (!dead && d?.unlocked) { setMine(true); setMineTrips(Number(d?.trips?.left) || 0); } })
             .catch(() => { /* no mine, no menu entry */ });
         return () => { dead = true; };
     }, [pathname]);
@@ -114,22 +115,24 @@ export default function GameNav() {
     // The Arena, same contract as the Mine and the Dungeons: ask the server, never guess. A non-owner simply
     // has no Arena entry while it is still owner-gated.
     const [arena, setArena] = useState(false);
+    const [arenaFights, setArenaFights] = useState(0);
     useEffect(() => {
         let dead = false;
         fetch("/api/marketplace/arena", { cache: "no-store", credentials: "same-origin" })
             .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) setArena(true); })
+            .then((d) => { if (!dead && d?.unlocked) { setArena(true); setArenaFights(Number(d?.fightsLeft) || 0); } })
             .catch(() => { /* no arena, no menu entry */ });
         return () => { dead = true; };
     }, [pathname]);
 
     // Delves, same contract as the Mine: ask the server, never guess. A non-owner simply has no Delves entry.
     const [delves, setDelves] = useState(false);
+    const [delveRuns, setDelveRuns] = useState(0);
     useEffect(() => {
         let dead = false;
         fetch("/api/marketplace/delves", { cache: "no-store", credentials: "same-origin" })
             .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) setDelves(true); })
+            .then((d) => { if (!dead && d?.unlocked) { setDelves(true); setDelveRuns((d?.dungeons || []).filter((x) => x.unlocked && !x.runToday).length); } })
             .catch(() => { /* no delves, no menu entry */ });
         return () => { dead = true; };
     }, [pathname]);
@@ -279,6 +282,11 @@ export default function GameNav() {
                 ].filter(Boolean).join(" · "),
             };
         }
+        // The Mine, the Dungeons and the Arena all hand out a daily allowance and all three were silent about
+        // it — the only features in the menu with something waiting and no way to know from here.
+        if (href === "/marketplace/mining" && mineTrips > 0) return { badge: mineTrips, title: `${plural(mineTrips, "trip")} down the mine` };
+        if (href === "/marketplace/dungeons" && delveRuns > 0) return { badge: delveRuns, title: `${plural(delveRuns, "dungeon")} you haven't run today` };
+        if (href === "/marketplace/arena" && arenaFights > 0) return { badge: arenaFights, title: `${plural(arenaFights, "challenge")} left today` };
         if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };
         if (href === "/marketplace/blacksmith" && (featureClaims.forge || 0) > 0) return { badge: featureClaims.forge, title: `${plural(featureClaims.forge, "quest")} to claim` };
         // The Kitchen only nags you about DISHES you have every ingredient for — preps just make ingredients
