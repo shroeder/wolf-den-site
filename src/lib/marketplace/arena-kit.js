@@ -98,6 +98,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
         const scale = TIER_SCALE[rankOf(id)] || 1;
         abilities.push({
             id: `${id}:${key}`,
+            itemId: id,                      // so the screen can show the actual piece of gear's sprite
             name: sig.label || item?.name || "Signature",
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
@@ -115,7 +116,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
     // Nobody fights empty-handed. A loadout with no signature gear still gets one honest move.
     if (!kit.length) {
         kit.push({
-            id: "basic:focus", name: "Focused Blow", from: "your own hands", kind: "strike",
+            id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
             focus: 3, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
         });
     }
@@ -125,8 +126,8 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // ── THE RING ─────────────────────────────────────────────────────────────────────────────────────────────────
 // One closing ring, one window. Their GEAR decides how hard yours is — that is how a defender who is not
 // present still puts up a fight, and why better gear is genuinely more dangerous to face.
-export const RING_BASE_MS = 1700;   // a fresh, unequipped opponent
-export const RING_FLOOR_MS = 620;   // the very best gear in the Den
+export const RING_BASE_MS = 1150;   // a fresh, unequipped opponent
+export const RING_FLOOR_MS = 520;   // the very best gear in the Den
 export function ringMsFor(foeGearPower = 0) {
     const t = Math.max(0, Math.min(1, foeGearPower / 320));
     return Math.round(RING_BASE_MS - (RING_BASE_MS - RING_FLOOR_MS) * t);
@@ -137,10 +138,14 @@ export function ringMsFor(foeGearPower = 0) {
 // `def` is how much of an incoming blow you turn aside. A PERFECT block deliberately does NOT null the hit —
 // at def 1.0 a good player is simply immortal and gear stops mattering at all, which is the mirror image of the
 // problem this design was meant to solve.
+// The windows are FRACTIONS of the ring, so speeding the ring up shrinks every one of them in real time.
+// Cutting the ring from 1700ms to 1150 without touching these took an ok player from 98% to 83% in an even
+// fight and a good one from 67% to 40% against strong gear. Widened to hold the intended curve at the new
+// speed — a window measured in tens of milliseconds is a reflex test, not a decision.
 export const GRADES = [
-    { key: "perfect", within: 0.07, atk: 1.6, def: 0.75, focus: 3, label: "PERFECT" },
-    { key: "great", within: 0.16, atk: 1.3, def: 0.50, focus: 2, label: "Great" },
-    { key: "good", within: 0.32, atk: 1.0, def: 0.28, focus: 1, label: "Good" },
+    { key: "perfect", within: 0.10, atk: 1.6, def: 0.75, focus: 3, label: "PERFECT" },
+    { key: "great", within: 0.21, atk: 1.3, def: 0.50, focus: 2, label: "Great" },
+    { key: "good", within: 0.40, atk: 1.0, def: 0.28, focus: 1, label: "Good" },
     { key: "miss", within: Infinity, atk: 0.45, def: 0.0, focus: 0, label: "Missed" },
 ];
 
@@ -158,10 +163,10 @@ export const GRADES = [
 // Measured at exactly the constants below — 4,000 bouts a cell, timing error in ms, win rate / bout length:
 //
 //   hand                even        +30% gear      +65% gear     top of the Den
-//   expert  (±60ms)   100%  9.3b   100%  10.9b   100%  10.1b     45%  9.2b
-//   good   (±110ms)   100%  9.6b    94%  11.4b    67%  10.5b      6%  7.9b
-//   ok     (±170ms)    98% 10.2b    65%  11.6b    26%  10.0b      0%  6.3b
-//   sloppy (±260ms)    75% 10.8b    12%  10.5b     2%   8.4b      0%  5.2b
+//   expert  (±60ms)   100%  9.2b   100%  10.8b   100%  10.1b     71%  9.4b
+//   good   (±110ms)   100%  9.6b    96%  11.3b    72%  10.5b     10%  8.1b
+//   ok     (±170ms)    98% 10.2b    66%  11.6b    27%  10.0b      0%  6.5b
+//   sloppy (±260ms)    68% 10.8b    11%  10.4b     2%   8.3b      0%  5.4b
 //
 // An even fight is decided by your hands. A gear gap is decided by both. The top of the Den is a coin flip
 // for someone genuinely excellent and out of reach for everyone else — which is what a first place should be.
@@ -189,3 +194,21 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
 export const gradeFor = (off) => GRADES.find((g) => Math.abs(off) <= g.within) || GRADES[GRADES.length - 1];
 
 export const FOCUS_MAX = 12;
+
+// ── THE FIELD KIT ────────────────────────────────────────────────────────────────────────────────────────────
+// Both fighters get the same small kit every bout. It is deliberately NOT the consumable economy: these cost
+// nothing, they refresh each fight, and they vanish when it ends. That keeps the Items command from ever being
+// an empty menu, and it avoids the trap where the correct play is burning a 6,500-gold potion on a ladder
+// scrap. Using one spends your turn, which is the whole decision — drink, or swing.
+export const BATTLE_ITEMS = [
+    { id: "poultice", name: "Field Poultice", count: 2, sprite: "/images/arena/item-poultice.webp",
+        blurb: "Binds a wound. Restores a quarter of your vigour.", kind: "heal", amount: 0.25 },
+    { id: "draught", name: "Focus Draught", count: 1, sprite: "/images/arena/item-draught.webp",
+        blurb: "Clears your head. Five Focus, at once.", kind: "focus", amount: 5 },
+];
+
+// GUARD — no ring, no roll. You give up your swing and take a braced stance: it soaks a slice of the next blow
+// outright and settles you enough to gain Focus. It is the honest answer to a bout going badly, and the reason
+// the command menu is a decision rather than four ways to press attack.
+export const GUARD_SOAK = 0.30;     // of your max vigour, absorbed from what comes next
+export const GUARD_FOCUS = 4;

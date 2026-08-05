@@ -32,7 +32,12 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
                 case "seen": return noStore(await seenArena(buyer.id));
-                case "beat": return noStore(await fightRound(buyer.id, Number(b?.off), b?.ability ? String(b.ability) : null));
+                case "beat": return noStore(await fightRound(buyer.id, {
+                    command: b?.command ? String(b.command) : null,
+                    off: b?.off,
+                    abilityId: b?.ability ? String(b.ability) : null,
+                    itemId: b?.item ? String(b.item) : null,
+                }));
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }

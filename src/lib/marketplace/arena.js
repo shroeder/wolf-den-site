@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buildKit, elementClash, gradeFor, ringMsFor, FOCUS_MAX, SWING, PUNCH, underdogEdge } from "@/lib/marketplace/arena-kit.js";
+import { buildKit, elementClash, gradeFor, ringMsFor, FOCUS_MAX, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_FOCUS } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -169,6 +169,12 @@ async function kitFor(buyerId) {
     const flat = {};
     for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
     const kit = buildKit(ids, sigsById(ids), flat);
+    // Each ability wears the art of the piece it came from. Nothing to generate — the gear already has sprites,
+    // and using them is the same argument as printing the item's name on the button: an ability has to be
+    // traceable to something you own and can go get more of.
+    const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
+    const art = await itemSpriteMap().catch(() => ({}));
+    for (const a of kit.abilities) a.sprite = a.itemId ? art[a.itemId] || null : null;
     return {
         level, gearPower,
         vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
@@ -317,7 +323,7 @@ function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         focus: b.focus, focusMax: FOCUS_MAX, ringMs: b.ringMs, clash: b.clash,
-        me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1,
+        me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
@@ -351,6 +357,7 @@ export async function startBout(buyerId, targetId = null) {
         hp: me.vigour, maxHp: me.vigour,
         foeHp: foeKit.vigour, foeMaxHp: foeKit.vigour,
         focus: 0,
+        items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
         turn: "you",                             // beats alternate; you play both of them
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
@@ -373,20 +380,62 @@ export async function startBout(buyerId, targetId = null) {
  * The damage is computed HERE from your real stats — the client only ever reports its timing. It could lie
  * about that, and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
  */
-export async function fightRound(buyerId, off = 1, abilityId = null) {
+/**
+ * ONE COMMAND. The arena is turn-based, so a beat starts with a decision and only then asks for timing.
+ *
+ *   attack  — a plain swing. Free, and the ring decides how well it lands.
+ *   skill   — a gear ability. Costs Focus, which only good timing earns.
+ *   guard   — no ring at all. You give up the swing to brace and settle.
+ *   item    — no ring. Spend the turn on the field kit instead.
+ *   block   — their beat: the ring closes over you and your timing is the defence.
+ *
+ * Damage is computed HERE from real stats — the client only ever reports its timing. It could lie about that,
+ * and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
+ */
+export async function fightRound(buyerId, opts = {}) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
     if (!b || b.over) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
 
-    const offset = Math.min(1, Math.abs(Number(off) || 1));
+    const mine = b.turn === "you";
+    const command = String(opts.command || (mine ? "attack" : "block"));
+    const offset = Math.min(1, Math.abs(Number(opts.off) ?? 1));
     const grade = gradeFor(offset);
     const hit = (m) => randInt(Math.round(m * 0.85), Math.round(m * 1.18));
-    let line;
+    if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
 
-    if (b.turn === "you") {
+    if (mine && (command === "guard" || command === "item")) {
+        // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.
+        if (command === "guard") {
+            const soak = Math.round(b.maxHp * GUARD_SOAK);
+            b.shield += soak;
+            b.focus = Math.min(FOCUS_MAX, b.focus + GUARD_FOCUS);
+            b.log.push({ beat: b.beat, who: "you", grade: "guard", damage: 0,
+                text: `You set your guard — bracing ${soak}, and +${GUARD_FOCUS} Focus.` });
+        } else {
+            const it = BATTLE_ITEMS.find((x) => x.id === opts.itemId);
+            if (!it || (b.items[it.id] || 0) <= 0) return { ok: false, error: "no_item", ...(await getArenaState(buyerId)) };
+            b.items[it.id] -= 1;
+            let text;
+            if (it.kind === "heal") {
+                const healed = Math.min(b.maxHp - b.hp, Math.round(b.maxHp * it.amount));
+                b.hp += healed;
+                text = healed > 0 ? `${it.name} — ${healed} vigour back.` : `${it.name} — already whole.`;
+            } else {
+                const was = b.focus;
+                b.focus = Math.min(FOCUS_MAX, b.focus + it.amount);
+                text = `${it.name} — +${b.focus - was} Focus.`;
+            }
+            b.log.push({ beat: b.beat, who: "you", grade: "item", damage: 0, text, item: it.id });
+        }
+        b.turn = "them";
+    } else if (mine) {
         // ── YOUR SWING ── the ring closed over them.
-        const ability = abilityId ? (b.me.abilities || []).find((x) => x.id === abilityId) : null;
+        const ability = command === "skill" && opts.abilityId
+            ? (b.me.abilities || []).find((x) => x.id === opts.abilityId)
+            : null;
+        if (command === "skill" && !ability) return { ok: false, error: "no_ability", ...(await getArenaState(buyerId)) };
         if (ability && b.focus < ability.focus) return { ok: false, error: "not_enough_focus", ...(await getArenaState(buyerId)) };
 
         let power = 1;
@@ -412,8 +461,9 @@ export async function fightRound(buyerId, off = 1, abilityId = null) {
         const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
         b.foeHp = Math.max(0, b.foeHp - dmg);
         b.focus = Math.min(FOCUS_MAX, b.focus + grade.focus);
-        line = dmg > 0 ? `${grade.label}${note} — ${dmg}.` : `${grade.label}${note}.`;
-        b.log.push({ beat: b.beat, who: "you", grade: grade.key, damage: dmg, text: line, ability: ability?.name || null });
+        b.log.push({ beat: b.beat, who: "you", grade: grade.key, damage: dmg,
+            text: dmg > 0 ? `${grade.label}${note} — ${dmg}.` : `${grade.label}${note}.`,
+            ability: ability?.name || null });
         b.turn = "them";
     } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
@@ -426,16 +476,17 @@ export async function fightRound(buyerId, off = 1, abilityId = null) {
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back));
-        // Your timing is a BLOCK: grade.def is how much of it you turned aside. A ward soaks what's left.
+        // Your timing is a BLOCK: grade.def is how much of it you turned aside. A guard soaks what's left.
         const blocked = Math.round(raw * grade.def);
         let through = Math.max(0, raw - blocked);
         if (b.shield > 0) { const soak = Math.min(b.shield, through); b.shield -= soak; through -= soak; }
         b.hp = Math.max(0, b.hp - through);
         b.focus = Math.min(FOCUS_MAX, b.focus + grade.focus);
-        line = theirAbility
-            ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-            : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`;
-        b.log.push({ beat: b.beat, who: "them", grade: grade.key, damage: through, text: line, ability: theirAbility?.name || null });
+        b.log.push({ beat: b.beat, who: "them", grade: grade.key, damage: through,
+            text: theirAbility
+                ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
+            ability: theirAbility?.name || null });
         b.turn = "you";
         b.beat += 1;
     }

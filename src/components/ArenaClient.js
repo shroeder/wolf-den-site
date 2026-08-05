@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSpellBook, GiSwordWound } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
 import TimingRing from "@/components/arena/TimingRing";
+import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -179,7 +181,8 @@ export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
-    const [armed, setArmed] = useState(null);  // ability queued for the next beat
+    const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
+    const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
     const [clash, setClash] = useState(null);
     const [err, setErr] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
@@ -236,67 +239,49 @@ export default function ArenaClient({ initial }) {
     if (!st?.unlocked) return null;
 
     // ── THE BOUT ──
+    // Turn-based, and it looks it. A beat begins with a DECISION off a command deck — attack, skill, guard,
+    // item — and only the commands that need execution raise the ring. Everything the fight needs now lives
+    // inside the panel: both fighters, both vigour bars, Focus, the last beat and the deck itself. It used to
+    // be a picture on top with the controls stacked underneath it like a form, which is why it read as a page
+    // rather than a fight.
     if (bout) {
+        const yourTurn = !bout.over && bout.turn === "you";
+        const ringUp = !bout.over && (bout.turn === "them" || Boolean(pending));
+        const abilities = bout.me?.abilities || [];
+        const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
+        const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}`}>
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${menu ? " is-menu" : ""}`}
+                    style={{ "--deck": bout.over ? "0px" : menu ? "0px" : (pending || bout.turn === "them") ? "44px" : "78px" }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
-                    <span className="ar-round">Beat {bout.beat}</span>
+
+                    {/* Everything that used to sit in paragraphs under the panel, now a strip across the top. */}
+                    <div className="ar-hud">
+                        <span className="ar-round">Beat {bout.beat}</span>
+                        {bout.clash?.note ? (
+                            <span className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}>{bout.clash.note}</span>
+                        ) : null}
+                        {bout.underdog > 1 ? (
+                            <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
+                        ) : null}
+                    </div>
+
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
-                            wind={!bout.over && bout.turn === "you" ? bout.ringMs : 0}
+                            wind={yourTurn && pending ? bout.ringMs : 0}
                             brace={!bout.over && bout.turn === "them"} />
                         <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" ? bout.ringMs : 0}
-                            brace={!bout.over && bout.turn === "you"} />
+                            brace={yourTurn && Boolean(pending)} />
                     </div>
-                    {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
-                    {bout.over ? (
-                        <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
-                            <b>{bout.won ? "Down" : "You fall"}</b>
-                        </div>
-                    ) : null}
-                    {/* Over THEM when you swing, over YOU when they do. */}
+
+                    {/* Focus, guard and surge live ON the field — they are combat state, not page furniture. */}
                     {!bout.over ? (
-                        <div className={`ar-ringslot is-${bout.turn}`}>
-                            <TimingRing
-                                key={`${bout.beat}-${bout.turn}`}
-                                ringMs={bout.ringMs || 1400}
-                                tone={bout.turn === "you" ? "attack" : "defend"}
-                                label={bout.turn === "you" ? "Strike" : "Block"}
-                                onResult={(off) => { const a = armed; setArmed(null); act("beat", { off, ability: a }); }}
-                            />
-                        </div>
-                    ) : null}
-                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
-                        execution is legible instead of being buried in a log line. */}
-                    {clash ? (
-                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
-                            <span>{clash.label}</span>
-                        </div>
-                    ) : null}
-                </div>
-                {bout.log?.length ? <p className="ar-beat">{bout.log[bout.log.length - 1].text}</p> : null}
-                {/* Your affinity against theirs, settled before a blow lands — scoutable, and answerable at
-                    the Forge for gold. That is a decision you make with your loadout, not a guess in the moment. */}
-                {bout.clash?.note ? (
-                    <p className={`ar-clash ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}>{bout.clash.note}</p>
-                ) : null}
-
-                {/* If they badly outgear you, you hit harder for it. Say so — an unexplained damage bonus is
-                    indistinguishable from a bug, and this is the thing that makes the top of the ladder winnable. */}
-                {bout.underdog > 1 ? (
-                    <p className="ar-underdog">
-                        Outgunned — you swing {Math.round((bout.underdog - 1) * 100)}% harder for it
-                    </p>
-                ) : null}
-
-                {!bout.over ? (
-                    <>
                         <div className="ar-focus">
                             <span className="ar-focus-lab">Focus</span>
                             <span className="ar-focus-bar">
@@ -305,46 +290,134 @@ export default function ArenaClient({ initial }) {
                                 ))}
                             </span>
                             {bout.shield > 0 ? <span className="ar-buff is-ward">Braced {bout.shield}</span> : null}
-                            {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened ×{bout.surge}</span> : null}
+                            {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened &times;{bout.surge}</span> : null}
                         </div>
+                    ) : null}
 
-                        {/* Pick what to spend Focus on BEFORE the ring closes. Timing earns it, abilities burn
-                            it — so the spectacular moves are paid for with execution, not just owned. */}
-                        {bout.turn === "you" ? (
-                            <div className="ar-kit">
-                                {(bout.me?.abilities || []).map((ab) => {
-                                    const afford = bout.focus >= ab.focus;
-                                    const on = armed === ab.id;
-                                    return (
-                                        <button key={ab.id} type="button"
-                                            className={`ar-ability${on ? " is-armed" : ""}${afford ? "" : " is-poor"}`}
-                                            style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                            disabled={!afford || busy}
-                                            onClick={() => setArmed(on ? null : ab.id)}>
-                                            <b>{ab.name}</b>
-                                            <em>{ab.blurb}</em>
-                                            <span className="ar-ability-foot">
-                                                <i>{ab.from}</i><u>{ab.focus} focus</u>
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        ) : null}
+                    {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
+                    {bout.over ? (
+                        <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
+                            <b>{bout.won ? "Down" : "You fall"}</b>
+                        </div>
+                    ) : null}
 
-                        <p className="ar-turn">
-                            {bout.turn === "you"
-                                ? (armed ? "Time it — the armed ability fires on the beat" : "Time your strike")
-                                : `${bout.foe.name} is coming — time your block`}
-                        </p>
-                    </>
-                ) : null}
+                    {/* Over THEM when you swing, over YOU when they do — and only once you have committed. */}
+                    {ringUp ? (
+                        <div className={`ar-ringslot is-${bout.turn}`}>
+                            <TimingRing
+                                key={`${bout.beat}-${bout.turn}-${pending?.command || "block"}`}
+                                ringMs={bout.ringMs || 1150}
+                                tone={yourTurn ? "attack" : "defend"}
+                                label={yourTurn ? (pending?.short || "Strike") : "Block"}
+                                onResult={(off) => {
+                                    const p = pending;
+                                    setPending(null); setMenu(null);
+                                    act("beat", yourTurn
+                                        ? { command: p?.command || "attack", off, ability: p?.ability || null }
+                                        : { command: "block", off });
+                                }}
+                            />
+                        </div>
+                    ) : null}
+
+                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
+                        execution is legible instead of being buried in a log line. */}
+                    {clash ? (
+                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
+                            <span>{clash.label}</span>
+                        </div>
+                    ) : null}
+
+                    {last && !bout.over ? <p className="ar-beat">{last.text}</p> : null}
+
+                    {/* ── THE COMMAND DECK ── four commands, two of which raise the ring and two of which spend
+                        the turn outright. That is the decision: swing at them, or fix yourself and let them hit
+                        you once. A menu of four ways to attack would not be a decision at all. */}
+                    {!bout.over ? (
+                        <div className="ar-deck">
+                            {bout.turn === "them" ? (
+                                <p className="ar-prompt is-def"><b>{bout.foe.name}</b> is winding up — block it</p>
+                            ) : pending ? (
+                                <p className="ar-prompt is-atk">{pending.label} — time it</p>
+                            ) : menu === "skill" ? (
+                                <div className="ar-sub">
+                                    {abilities.map((ab) => {
+                                        const afford = bout.focus >= ab.focus;
+                                        return (
+                                            <button key={ab.id} type="button"
+                                                className={`ar-pick${afford ? "" : " is-poor"}`}
+                                                style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
+                                                disabled={!afford || busy}
+                                                onClick={() => setPending({ command: "skill", ability: ab.id, label: ab.name, short: ab.name })}>
+                                                {ab.sprite ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img className="ar-pick-art" src={ab.sprite} alt="" draggable="false" />
+                                                ) : <span className="ar-pick-art ar-pick-none"><GiSwordWound /></span>}
+                                                <span className="ar-pick-body">
+                                                    <b>{ab.name}</b>
+                                                    <em>{ab.blurb}</em>
+                                                    <i>{ab.from}</i>
+                                                </span>
+                                                <u className="ar-pick-cost">{ab.focus}</u>
+                                            </button>
+                                        );
+                                    })}
+                                    <button type="button" className="ar-back" onClick={() => setMenu(null)}>
+                                        <GiReturnArrow /> Back
+                                    </button>
+                                </div>
+                            ) : menu === "item" ? (
+                                <div className="ar-sub">
+                                    {BATTLE_ITEMS.map((it) => {
+                                        const left = bout.items?.[it.id] || 0;
+                                        return (
+                                            <button key={it.id} type="button" className={`ar-pick${left ? "" : " is-poor"}`}
+                                                style={{ "--el": "#8bf0b4" }} disabled={!left || busy}
+                                                onClick={() => { setMenu(null); act("beat", { command: "item", item: it.id }); }}>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img className="ar-pick-art" src={it.sprite} alt="" draggable="false" />
+                                                <span className="ar-pick-body">
+                                                    <b>{it.name}</b>
+                                                    <em>{it.blurb}</em>
+                                                    <i>Spends your turn</i>
+                                                </span>
+                                                <u className="ar-pick-cost">&times;{left}</u>
+                                            </button>
+                                        );
+                                    })}
+                                    <button type="button" className="ar-back" onClick={() => setMenu(null)}>
+                                        <GiReturnArrow /> Back
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="ar-cmds">
+                                    <button type="button" className="ar-cmd is-atk" disabled={busy}
+                                        onClick={() => setPending({ command: "attack", label: "Attack", short: "Strike" })}>
+                                        <GiCrossedSwords aria-hidden="true" /><span>Attack</span>
+                                    </button>
+                                    <button type="button" className="ar-cmd is-skill" disabled={busy || !abilities.length}
+                                        onClick={() => setMenu("skill")}>
+                                        <GiSpellBook aria-hidden="true" /><span>Skill</span>
+                                    </button>
+                                    <button type="button" className="ar-cmd is-guard" disabled={busy}
+                                        onClick={() => act("beat", { command: "guard" })}>
+                                        <GiShield aria-hidden="true" /><span>Guard</span>
+                                    </button>
+                                    <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
+                                        onClick={() => setMenu("item")}>
+                                        <GiKnapsack aria-hidden="true" /><span>Item</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+                </div>
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {bout.log?.length ? (
                     <div className="ar-log">
                         {bout.log.slice(-8).map((l, i) => (
-                            <div key={i} className="ar-line"><b>R{l.round}</b> {l.text}</div>
+                            <div key={i} className="ar-line"><b>{l.beat}</b> {l.text}</div>
                         ))}
                         <div ref={logEnd} />
                     </div>
@@ -388,7 +461,13 @@ export default function ArenaClient({ initial }) {
                 <div className="ar-kit">
                     {(st.me?.abilities || []).map((ab) => (
                         <div key={ab.id} className="ar-ability is-static" style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}>
-                            <b>{ab.name}</b>
+                            <span className="ar-ability-head">
+                                {ab.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="ar-ability-art" src={ab.sprite} alt="" draggable="false" />
+                                ) : null}
+                                <b>{ab.name}</b>
+                            </span>
                             <em>{ab.blurb}</em>
                             <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.focus} focus</u></span>
                         </div>
@@ -589,12 +668,20 @@ function Styles() {
             .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
             .ar-ring-scrim { position: absolute; inset: 0;
                 background: radial-gradient(78% 62% at 50% 62%, transparent, rgba(10,6,4,0.72)); }
-            .ar-round { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); z-index: 3;
-                font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: #ffe0b0;
-                text-shadow: 0 2px 8px #000; }
+            .ar-hud { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 5; display: flex;
+                align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+            .ar-round { font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
+                color: #ffe0b0; text-shadow: 0 2px 8px #000; }
+            /* The affinity read and the underdog bonus used to be paragraphs UNDER the panel, where they were
+               page copy rather than fight state. Same words, on the field, where they apply. */
+            .ar-tag { font-size: 9.5px; font-weight: 900; padding: 2px 8px; border-radius: 999px;
+                background: rgba(8,6,10,0.66); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(2px); }
+            .ar-tag.is-good { color: #8bf0b4; border-color: rgba(139,240,180,.45); }
+            .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
+            .ar-tag.is-under { color: #ffd75e; border-color: rgba(255,215,94,.5); }
             /* Both fighters stand on the same line of sand, facing each other. */
             .ar-floor { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: 1fr 1fr;
-                align-items: end; padding: 0 4% 7%; }
+                align-items: end; padding: 6% 4% 33%; }
             .ar-fighter { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; }
             .ar-hero { width: min(100%, 172px); max-height: 70%; object-fit: contain;
                 filter: drop-shadow(0 8px 14px rgba(0,0,0,0.65));
@@ -669,7 +756,9 @@ function Styles() {
             .ar-verdict.is-loss b { color: #ffb0b8; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,80,100,.8); }
             @keyframes arVerdict { from { opacity: 0; transform: scale(1.7) } to { opacity: 1; transform: scale(1) } }
 
-            .ar-beat { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: #e4d9c6; text-align: center; }
+            .ar-beat { position: absolute; left: 10px; right: 10px; bottom: calc(var(--deck, 78px) + 8px); z-index: 5;
+                margin: 0; font-size: 12px; line-height: 1.4; color: #e4d9c6; text-align: center;
+                text-shadow: 0 2px 8px #000; pointer-events: none; }
 
             .ar-tell { margin: 10px 0 12px; font-size: 12px; color: #cbb; text-align: center; }
             .ar-tell b { color: #ffd0a0; }
@@ -794,12 +883,68 @@ function Styles() {
             .ar-clash.is-bad { color: #ff9f9f; }
             .ar-underdog { margin: 5px 0 0; font-size: 12px; font-weight: 900; text-align: center; color: #ffd75e;
                 letter-spacing: .02em; text-shadow: 0 0 14px rgba(255,215,94,0.35); }
-            .ar-ringslot { position: absolute; inset: 0; z-index: 20; --tr: clamp(96px, 24vw, 152px); }
+            .ar-ringslot { position: absolute; inset: 0; bottom: var(--deck, 78px); z-index: 20;
+                --tr: clamp(96px, 24vw, 152px); }
+
+            /* ── THE COMMAND DECK ───────────────────────────────────────────────────────────────────────────
+               Four commands across the bottom of the panel, JRPG-style. Two of them raise the timing ring and
+               two spend the turn outright, which is what makes it a decision rather than four ways to attack. */
+            .ar-deck { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; padding: 8px;
+                background: linear-gradient(180deg, transparent, rgba(6,4,8,0.82) 38%, rgba(6,4,8,0.95));
+                border-top: 1px solid rgba(255,190,110,0.16); }
+            .ar-cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+            .ar-cmd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+                padding: 9px 4px; border-radius: 11px; cursor: pointer; font-size: 11px; font-weight: 900;
+                letter-spacing: .04em; color: #f3e8d6; background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.16); transition: transform .1s ease, background .1s ease; }
+            .ar-cmd :global(svg) { width: 20px; height: 20px; color: var(--cmd, #ffd75e); }
+            .ar-cmd:active { transform: translateY(1px); }
+            .ar-cmd:disabled { opacity: .35; cursor: default; }
+            .ar-cmd:not(:disabled):hover { background: color-mix(in srgb, var(--cmd) 20%, transparent);
+                border-color: color-mix(in srgb, var(--cmd) 55%, transparent); }
+            .ar-cmd.is-atk { --cmd: #ffd75e; }
+            .ar-cmd.is-skill { --cmd: #b061ff; }
+            .ar-cmd.is-guard { --cmd: #6fd0ff; }
+            .ar-cmd.is-item { --cmd: #8bf0b4; }
+
+            /* A submenu replaces the deck in place — you are still looking at the fight, not a new screen. */
+            .ar-sub { display: grid; gap: 5px; max-height: 40vh; overflow-y: auto; }
+            .ar-pick { display: flex; align-items: center; gap: 9px; text-align: left; width: 100%;
+                padding: 6px 9px 6px 6px; border-radius: 11px; cursor: pointer;
+                background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
+            .ar-pick:disabled, .ar-pick.is-poor { opacity: .38; cursor: default; }
+            .ar-pick:not(:disabled):hover { background: color-mix(in srgb, var(--el) 16%, transparent); }
+            /* Every ability wears the art of the gear it came from — the same argument as printing the item's
+               name on it. An ability you cannot trace to a thing you own is magic. */
+            .ar-pick-art { flex: 0 0 auto; width: 40px; height: 40px; object-fit: contain;
+                filter: drop-shadow(0 3px 6px rgba(0,0,0,0.6)); }
+            .ar-pick-none { display: grid; place-items: center; color: var(--el); }
+            .ar-pick-none :global(svg) { width: 24px; height: 24px; }
+            .ar-pick-body { min-width: 0; flex: 1; display: grid; }
+            .ar-pick-body b { font-size: 12.5px; color: #fff; }
+            .ar-pick-body em { font-style: normal; font-size: 10.5px; line-height: 1.3; color: #9aa2ab; }
+            .ar-pick-body i { font-style: normal; font-size: 9.5px; color: #7f8790;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-pick-cost { flex: 0 0 auto; text-decoration: none; font-size: 12px; font-weight: 900; color: var(--el); }
+            .ar-back { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px;
+                border-radius: 10px; cursor: pointer; font-size: 11px; font-weight: 900; color: #cbd3dc;
+                background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); }
+            .ar-back :global(svg) { width: 14px; height: 14px; }
+
+            .ar-prompt { margin: 0; padding: 10px 6px; text-align: center; font-size: 12.5px; font-weight: 800;
+                letter-spacing: .02em; }
+            .ar-prompt b { font-weight: 900; }
+            .ar-prompt.is-atk { color: #ffd75e; }
+            .ar-prompt.is-def { color: #6fd0ff; }
+            /* An open submenu owns the bottom half of the panel, so the field furniture gets out of its way
+               rather than showing through it. */
+            .ar-ring.is-menu .ar-focus, .ar-ring.is-menu .ar-beat { opacity: 0; }
             /* Over whoever is acting: their half when you swing, yours when they do. */
             .ar-ringslot.is-you { left: 50%; }
             .ar-ringslot.is-them { right: 50%; }
 
-            .ar-focus { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin: 12px 0 10px; }
+            .ar-focus { position: absolute; left: 10px; right: 10px; bottom: calc(var(--deck, 78px) + 30px); z-index: 5;
+                display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
             .ar-focus-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #8a939d; }
             .ar-focus-bar { display: flex; gap: 3px; }
             .ar-focus-bar i { width: 9px; height: 14px; border-radius: 2px; background: rgba(255,255,255,0.12); }
@@ -815,6 +960,9 @@ function Styles() {
                 border-color: var(--el); box-shadow: 0 0 18px -4px var(--el); }
             .ar-ability.is-poor { opacity: .4; cursor: default; }
             .ar-ability b { display: block; font-size: 12.5px; color: #fff; }
+            .ar-ability-head { display: flex; align-items: center; gap: 7px; }
+            .ar-ability-art { flex: 0 0 auto; width: 26px; height: 26px; object-fit: contain;
+                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
             .ar-ability em { display: block; font-style: normal; font-size: 10.5px; line-height: 1.35; color: #9aa2ab; margin-top: 2px; }
             .ar-ability-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 9.5px; }
             /* The item it came from is ALWAYS shown — an ability you can't trace to a piece of gear is magic,

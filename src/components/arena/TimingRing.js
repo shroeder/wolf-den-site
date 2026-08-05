@@ -41,9 +41,14 @@ export default function TimingRing({ ringMs, onResult, label, tone = "attack" })
             if (el) {
                 // Linear, so the closing speed is honest and learnable — an eased ring would arrive at a
                 // different rate than it looks like it will, which is exactly the wrong lesson to teach.
-                el.style.transform = `translate(-50%, -50%) scale(${Math.max(0.9, 2.6 - 1.6 * Math.min(p, 1.35))})`;
-                // Fades in over the first sliver rather than popping into existence at full size.
-                el.style.opacity = p > 1.3 ? "0" : p < 0.07 ? String(p / 0.07) : "1";
+                // No floor on the scale. It used to clamp at 0.9, which meant the ring reached its smallest
+                // size just past the line and then SAT there at full opacity for another third of the
+                // duration — a dead hang at the exact moment the beat was supposed to feel decided. It now
+                // keeps collapsing through the target and fades as it goes, so a miss looks like a miss.
+                el.style.transform = `translate(-50%, -50%) scale(${2.6 - 1.6 * p})`;
+                // Fades in over the first sliver rather than popping into existence at full size, and clears
+                // out quickly once it is past the line.
+                el.style.opacity = p < 0.07 ? String(p / 0.07) : p > 1 ? String(Math.max(0, 1 - (p - 1) * 6)) : "1";
             }
             const isNear = Math.abs(p - 1) <= 0.16;
             if (isNear !== near.current) {
@@ -52,7 +57,7 @@ export default function TimingRing({ ringMs, onResult, label, tone = "attack" })
             }
             // Overshoot a little past the line before calling it — tapping fractionally late is a grade, not a
             // disqualification, and cutting off exactly at 1 would make late taps impossible to register.
-            if (p >= 1.34) {
+            if (p >= 1.18) {
                 if (!done.current) { done.current = true; cb.current(1); }
                 return;
             }
