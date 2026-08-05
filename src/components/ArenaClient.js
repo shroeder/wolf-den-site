@@ -123,8 +123,15 @@ function Recap({ bout, busy, onClose }) {
 
     return (
         <Portal>
-        <div className="ar-recap" role="dialog" aria-modal="true" style={{ "--tint": tint }}>
-            <div className="ar-recap-card">
+        {/* Tapping the backdrop leaves. Twice now this screen has ended up as a dark sheet with the card
+            missing or off-view and LITERALLY nothing to press — the failure mode of a modal whose only exit
+            lives inside the thing that failed. The backdrop and the corner button are outside the card on
+            purpose, so they survive anything going wrong inside it. */}
+        <div className="ar-recap" role="dialog" aria-modal="true" style={{ "--tint": tint }}
+            onClick={() => { if (!busy) onClose(); }}>
+            <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
+                aria-label="Back to the ladder">Close</button>
+            <div className="ar-recap-card" onClick={(e) => e.stopPropagation()}>
                 <div className="ar-rays" aria-hidden="true">
                     {Array.from({ length: up ? 24 : 14 }).map((_, i) => (
                         <span key={i} style={{ "--a": `${i * (360 / (up ? 24 : 14))}deg`, animationDelay: `${(i % 6) * 0.05}s` }} />
@@ -434,6 +441,10 @@ export default function ArenaClient({ initial }) {
                     {bout.over ? (
                         <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
                             <b>{bout.won ? "Down" : "You fall"}</b>
+                            {/* Present whether or not the recap modal renders. A finished fight must always
+                                have a visible way back to the ladder somewhere on the screen. */}
+                            <button type="button" className="ar-btn is-sm" disabled={busy}
+                                onClick={() => act("dismiss")}>Back to the ladder</button>
                         </div>
                     ) : null}
 
@@ -917,7 +928,9 @@ function Styles() {
             @keyframes arDown { to { transform: translateY(16px) rotate(-16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
             .ar-fighter.is-foe.is-down .ar-hero { animation: arDownFoe .6s cubic-bezier(.4,0,.6,1) both; }
             @keyframes arDownFoe { to { transform: scaleX(-1) translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
-            .ar-verdict { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; pointer-events: none; }
+            .ar-verdict { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
+                align-content: center; gap: 12px; pointer-events: none; }
+            .ar-verdict .ar-btn { pointer-events: auto; }
             .ar-verdict b { font-size: 2.1rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
                 animation: arVerdict .55s cubic-bezier(.2,1.5,.35,1) .25s both; }
             .ar-verdict.is-win b { color: #ffe28a; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,190,60,.9); }
@@ -952,8 +965,13 @@ function Styles() {
             .ar-result p { margin: 6px 0 12px; font-size: 12.5px; color: #cbd3dc; }
 
             /* ── the recap ── */
-            .ar-recap { position: fixed; inset: 0; z-index: 10100; display: grid; place-items: center; padding: 18px;
-                background: rgba(6,4,10,0.86); backdrop-filter: blur(4px); overflow-y: auto; }
+            .ar-recap { position: fixed; inset: 0; z-index: 10100; display: flex; align-items: center;
+                justify-content: center; padding: 18px; background: rgba(6,4,10,0.86); backdrop-filter: blur(4px);
+                overflow-y: auto; }
+            /* Outside the card, so it is still there if the card is not. */
+            .ar-recap-x { position: fixed; top: calc(env(safe-area-inset-top) + 12px); right: 12px; z-index: 2;
+                padding: 8px 15px; border-radius: 999px; cursor: pointer; font-size: 12px; font-weight: 900;
+                color: #f3e8d6; background: rgba(20,16,26,0.9); border: 1px solid rgba(255,255,255,0.28); }
             .ar-recap-card { position: relative; overflow: hidden; width: min(390px, 100%); max-height: 92dvh; overflow-y: auto; padding: 24px 22px 18px;
                 border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid var(--tint); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 66px -12px var(--tint);
