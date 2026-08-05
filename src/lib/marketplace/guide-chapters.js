@@ -150,7 +150,11 @@ export const GUIDE_CHAPTERS = [
         steps: [
             { key: "store_notify", label: "Turn on notifications", why: "Boss fights, trade offers and restock alerts. It's the only way to hear about a raid before it's over — and the Den only raids for a few hours.", href: "/marketplace/notifications", cta: "Turn them on", gold: 250, verify: "push" },
             { key: "store_wishlist", label: "Tell us what you're hunting", why: "Add a card to Looking For and we message you when one lands in the case. It costs nothing and it works.", href: "/looking-for", cta: "Add a card", gold: 250, verify: "wishlist" },
-            { key: "store_buy", label: "Buy something in store", why: "Real purchases pay XP and gold in here, every time, automatically. Being a customer is worth something.", href: "/shop", cta: "See the shop", gold: 500, verify: "purchase" },
+            // NOT "buy something". Finishing the Pathfinder used to require a real purchase, which made the
+            // last step of a 33-step guide a paywall — you could do every single thing in the game and still be
+            // told you were not done until you spent money. The lesson (being a customer pays you in here) is
+            // worth teaching; charging for the last tick is not.
+            { key: "store_browse", label: "See what's in the case", why: "Have a look at what's in stock — new arrivals land most weeks. And whenever you do buy something, in store or here, it pays XP and gold into this account automatically. You never have to buy anything to finish this guide.", href: "/shop", cta: "Browse the shop", gold: 300, events: ["view_shop"], verify: "purchase" },
         ],
         reward: { gold: 800, chest: "gold" },
     },

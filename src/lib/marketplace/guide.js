@@ -56,6 +56,9 @@ async function trueSteps(buyerId, steps) {
             ? db.queryOne(`SELECT 1 AS x FROM mkt_web_push WHERE buyer_id = $1 AND created_at >= '2026-07-25' LIMIT 1`, [buyerId]).catch(() => null)
             : null,
         // purchase_spend / purchase_flat / first_purchase are how an in-store sale reaches a member's account.
+        // No step REQUIRES this any more — finishing the guide behind a purchase made the last tick a paywall.
+        // It survives as an alternate path so the members who had already bought something don't get demoted
+        // from finished to unfinished by the step being renamed.
         needs("purchase")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_xp_event WHERE buyer_id = $1 AND action IN ('purchase_spend','purchase_flat','first_purchase') LIMIT 1`, [buyerId]).catch(() => null)
             : null,
