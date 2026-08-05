@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
+import { clearBout, fightRound, getArenaState, seenArena, setToll, startBout } from "@/lib/marketplace/arena.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -32,7 +32,8 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
                 case "seen": return noStore(await seenArena(buyer.id));
-                case "stance": return noStore(await fightRound(buyer.id, String(b?.stance || "")));
+                case "beat": return noStore(await fightRound(buyer.id, Number(b?.off), b?.ability ? String(b.ability) : null));
+                case "toll": return noStore(await setToll(buyer.id, Number(b?.gold)));
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }

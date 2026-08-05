@@ -221,6 +221,15 @@ export const ITEM_SIGNATURES = {
 const ids = (equipped) => (Array.isArray(equipped) ? equipped : Object.values(equipped || {}));
 const sigsOn = (equipped) => ids(equipped).map((id) => (ITEM_SIGNATURES[id] ? { id, ...ITEM_SIGNATURES[id] } : null)).filter(Boolean);
 
+// The raw signature definitions for a set of items, keyed by item id. The ARENA needs the catalog itself —
+// its whole design is "your gear decides what you can do" — rather than the boss-shaped multiplier that
+// signatureHit returns, so it maps these archetypes into moves of its own (see arena-kit.js).
+export function sigsById(equipped) {
+    const out = {};
+    for (const id of ids(equipped)) if (ITEM_SIGNATURES[id]) out[id] = { id, ...ITEM_SIGNATURES[id] };
+    return out;
+}
+
 // Extra daily manual strikes from equipped signatures (summed).
 export function signatureStrikeBonus(equipped) {
     return sigsOn(equipped).reduce((n, s) => n + (s.extraStrikes || 0), 0);

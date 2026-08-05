@@ -6,6 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { buildKit, elementClash, gradeFor, ringMsFor, FOCUS_MAX, SWING, PUNCH, underdogEdge } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -73,57 +74,30 @@ export function rankFor(rung, size) {
     };
 }
 
-// ── STANCES ──────────────────────────────────────────────────────────────────────────────────────────────────
-// Rock-paper-scissors with teeth, and the reason this is a game rather than a stat comparison. A pure
-// power-versus-power bout would mean the ladder is just a list of people you cannot beat yet; reading your
-// opponent lets a weaker fighter take a rung off someone above them, which is the whole appeal of a ladder.
+// ── HOW A BOUT WORKS ─────────────────────────────────────────────────────────────────────────────────────────
+// Rock-paper-scissors is gone. It told you what the opponent would do, which made every round arithmetic, and
+// no amount of shuffling the odds fixes a decision that has one correct answer.
 //
-//   STRIKE beats FEINT   — they commit to nothing, you land clean
-//   GUARD  beats STRIKE  — you eat none of it and counter
-//   FEINT  beats GUARD   — they brace against a blow that never comes
-//   a mirror trades      — both graze
-export const STANCES = ["strike", "guard", "feint"];
-const BEATS = { strike: "feint", guard: "strike", feint: "guard" };
-export const STANCE_META = {
-    strike: { label: "Strike", desc: "Full damage — unless they're guarding." },
-    guard: { label: "Guard", desc: "Nothing lands, and you counter. Beaten by a feint." },
-    feint: { label: "Feint", desc: "Punishes a guard. Nothing against a strike." },
-};
-
-// ── HOW AN OPPONENT FIGHTS ───────────────────────────────────────────────────────────────────────────────────
-// A fixed STYLE per member, derived from a hash of their id, so a rival always fights the same way and learning
-// your neighbours is a real edge.
+// A bout is now YOUR EXECUTION against THEIR LOADOUT. Beats alternate: on yours a ring closes over them and you
+// strike; on theirs a ring closes over you and you brace. You are always the one playing — which is the only
+// honest way to run an asynchronous fight, because the other person is asleep and their gear is the opponent.
 //
-// The first cut read the style off their might-to-vigour ratio, which was measured and thrown away: both stats
-// scale almost proportionally off level and gear, so the ratio only moves from 1.50 at level 1 to 1.93 at level
-// 55. Every member in the Den landed in the same bucket. The tell would have printed the same sentence for all
-// 84 of them and the answer would always have been "strike" — a mechanic that looks like a read and is really a
-// button. Simulated over 3,000 bouts per cell, styles that actually differ are worth 27 points of win rate to a
-// player who reads them, and strike-spam into a patient fighter wins 18%.
-const STYLES = {
-    aggressive: { w: { strike: 0.55, guard: 0.18, feint: 0.27 }, tell: "Comes forward. Most of what they throw is a strike." },
-    patient: { w: { strike: 0.20, guard: 0.53, feint: 0.27 }, tell: "Waits behind a guard and makes you come to them." },
-    tricky: { w: { strike: 0.26, guard: 0.22, feint: 0.52 }, tell: "Deals in feints. Committing early gets punished." },
+// Their gear sets how hard your rings are. Their affinity decides whether your element bites or slides off.
+// Their signatures are the abilities coming back at you. A defender's skill IS their build.
+//
+// FOCUS is the constraint. Good timing earns it, abilities spend it — so the spectacular moves are paid for by
+// execution rather than handed out for owning the item.
+const AI_ABILITY_CHANCE = 0.45;      // how often the defender's kit answers with an ability rather than a swing
+
+// A defender is not present, so their timing is their GEAR: better loadouts brace and land more reliably. It
+// is deliberately capped below a good human — being outplayed by an absent opponent would feel like a cheat.
+const foeGrade = (gearPower) => {
+    const t = Math.max(0, Math.min(1, gearPower / 320));
+    const r = Math.random();
+    if (r < 0.15 + t * 0.35) return { atk: 1.3, def: 0.55 };
+    if (r < 0.55 + t * 0.3) return { atk: 1.0, def: 0.32 };
+    return { atk: 0.6, def: 0.12 };
 };
-const STYLE_KEYS = Object.keys(STYLES);
-// FNV-1a — the same stable hash the town quests rotate on.
-function hashStr(str) {
-    let h = 2166136261;
-    for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-    return h >>> 0;
-}
-const tendency = (id) => STYLES[STYLE_KEYS[hashStr(String(id)) % STYLE_KEYS.length]];
-
-// How hard a guard punishes a strike thrown into it. This is THE tuning dial: at 0.55 the downside of striking
-// was so much smaller than its upside that spamming strike beat playing well (90% vs 81%), which would have
-// made the whole stance system decorative. At 0.9 reading is worth 27 points over spamming.
-const COUNTER = 0.9;
-
-function pickStance(w) {
-    let r = Math.random();
-    for (const s of STANCES) { r -= w[s]; if (r <= 0) return s; }
-    return "feint";
-}
 
 // ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────────
 // Computed LIVE from everyone's power rather than frozen, so it re-sorts as the pack gears up. One query for
@@ -177,6 +151,32 @@ export async function arenaPower(buyerId) {
     };
 }
 
+// Everything a loadout brings to the ring: stats, affinity, abilities, and how hard their ring is to face.
+async function kitFor(buyerId) {
+    const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
+        import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/signatures.js"),
+        import("@/lib/marketplace/item-element.js"),
+    ]);
+    const { sumItemStats } = await import("@/lib/marketplace/items.js");
+    // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine here.
+    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
+    const ids = Object.values(bySlot || {}).filter(Boolean);
+    const me = await db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const level = levelForXp(Number(me?.xp) || 0).level;
+    const gearPower = Object.values(sumItemStats(ids) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+    const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
+    const flat = {};
+    for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
+    const kit = buildKit(ids, sigsById(ids), flat);
+    return {
+        level, gearPower,
+        vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
+        element: kit.element, abilities: kit.abilities,
+        ringMs: ringMsFor(gearPower),
+    };
+}
+
 async function arenaRow(buyerId) {
     await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     let row = await db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
@@ -199,7 +199,7 @@ async function arenaRow(buyerId) {
 // Everybody who holds a position, in order, with the profile bits the board needs.
 async function standings() {
     const rows = await db.query(
-        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
+        `SELECT a.buyer_id, a.position, a.wins, a.losses, a.best_streak, a.toll, COALESCE(b.xp,0) AS xp,
                 b.alias, b.display_name, b.avatar_sprite_url
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
           WHERE a.position IS NOT NULL ORDER BY a.position ASC`
@@ -216,7 +216,7 @@ async function standings() {
             sprite: r.avatar_sprite_url || null,
             level, wins: r.wins, losses: r.losses,
             vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
-            tell: tendency(r.buyer_id).tell,
+            toll: Number(r.toll) || 0,
         };
     });
 }
@@ -229,7 +229,7 @@ const saveBout = (buyerId, bout) =>
 export async function getArenaState(buyerId) {
     if (!ARENA_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await arenaRow(buyerId);
-    const [me, board] = await Promise.all([arenaPower(buyerId), standings()]);
+    const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
     const used = fightsUsed(row);
     const pos = Number(row?.position) || board.length;
     const bout = row?.bout_json || null;
@@ -239,11 +239,13 @@ export async function getArenaState(buyerId) {
     const targets = board
         .filter((o) => o.id !== buyerId && o.position < pos && o.position >= pos - CHALLENGE_REACH)
         .sort((x, y) => y.position - x.position)
-        .map((o) => ({ ...o, reward: winReward(pos, o.position) }));
+        .map((o) => ({ ...o, reward: winReward(pos, o.position), stake: Number(o.toll) || 0 }));
 
     return {
         unlocked: true,
-        me: { ...me, name: "You", position: pos },
+        me: { ...me, name: "You", position: pos, element: kit.element, abilities: kit.abilities },
+        toll: Number(row?.toll) || 0,
+        purse: Number(row?.purse) || 0,
         position: pos, size: board.length,
         rank: rankFor(Math.max(0, board.length - pos), board.length),
         fightsLeft: Math.max(0, FIGHTS_PER_DAY - used), fightsPerDay: FIGHTS_PER_DAY,
@@ -316,7 +318,9 @@ export async function seenArena(buyerId) {
 // The client never sees the opponent's next pick — only what has already happened.
 function publicBout(b) {
     return {
-        foe: b.foe, round: b.round, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
+        foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
+        focus: b.focus, focusMax: FOCUS_MAX, ringMs: b.ringMs, clash: b.clash,
+        me: b.me, shield: b.shield, surge: b.surge, stake: b.stake,
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
@@ -329,76 +333,135 @@ export async function startBout(buyerId, targetId = null) {
     if (row?.bout_json && !row.bout_json.over) return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
     if (fightsUsed(row) >= FIGHTS_PER_DAY) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
 
-    const [me, board] = await Promise.all([arenaPower(buyerId), standings()]);
+    const board = await standings();
     const pos = Number(row?.position) || board.length;
-    // The target must be ABOVE you and within reach — checked here and not just hidden in the UI, because the
-    // list is the only thing stopping somebody POSTing their way to first place.
+    // Enforced here, not just hidden in the UI — the list is the only thing stopping a POST to first place.
     const foe = board.find((o) => o.id === targetId && o.position < pos && o.position >= pos - CHALLENGE_REACH);
     if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
 
-    const t = tendency(foe.id);
+    // ── THE STAKE ── the defender's own asking price, taken up front and atomically. A challenge you cannot
+    // afford is refused before anything else happens.
+    const stake = Math.max(0, Number(foe.toll) || 0);
+    if (stake > 0) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, stake]).catch(() => null);
+        if (!paid) return { ok: false, error: "not_enough_gold", ...(await getArenaState(buyerId)) };
+        await logCoin(buyerId, -stake, "arena_stake", { balanceAfter: paid.gold, meta: { target: foe.id, toll: stake } }).catch(() => {});
+    }
+
+    const [me, foeKit] = await Promise.all([kitFor(buyerId), kitFor(foe.id)]);
+    const clash = elementClash(me.element, foeKit.element);
     const bout = {
-        myPos: pos, foePos: foe.position, size: board.length,
-        foe: { id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level, might: foe.might },
-        tell: t.tell, w: t.w,
-        might: me.might, foeMight: foe.might,
+        myPos: pos, foePos: foe.position, size: board.length, stake,
+        foe: {
+            id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level,
+            element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
+        },
+        me: { element: me.element, abilities: me.abilities, might: me.might },
+        clash,                                   // your affinity against theirs, decided before a blow lands
+        underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
+        ringMs: foeKit.ringMs,                   // THEIR gear decides how hard your window is
         hp: me.vigour, maxHp: me.vigour,
-        foeHp: foe.vigour, foeMaxHp: foe.vigour,
-        round: 1, log: [], over: false, won: false,
+        foeHp: foeKit.vigour, foeMaxHp: foeKit.vigour,
+        focus: 0,
+        turn: "you",                             // beats alternate; you play both of them
+        beat: 1, log: [], over: false, won: false,
+        shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
     };
-    // The day is claimed at the DOOR, not on victory — otherwise a loss costs nothing and you re-roll forever.
     await db.query(
         `UPDATE mkt_arena SET bout_json = $2::jsonb, fights_day = ${DAY},
             fights_today = CASE WHEN fights_day = ${DAY} THEN fights_today + 1 ELSE 1 END, updated_at = NOW()
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(bout)]
     ).catch(() => {});
-    await trackActivity(buyerId, "arena_start", { pos, target: foe.id }).catch(() => {});
+    await trackActivity(buyerId, "arena_start", { pos, target: foe.id, stake }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
 /** One exchange. Your stance against theirs, resolved on the server so the pick can't be read or replayed. */
-export async function fightRound(buyerId, stance) {
+/**
+ * ONE BEAT. The client reports how far off the line it landed (`off`, a fraction of the ring's duration) and,
+ * on your own beat, which ability you spent Focus on.
+ *
+ * The damage is computed HERE from your real stats — the client only ever reports its timing. It could lie
+ * about that, and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
+ */
+export async function fightRound(buyerId, off = 1, abilityId = null) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
-    if (!STANCES.includes(stance)) return { ok: false, error: "bad_stance" };
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
     if (!b || b.over) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
 
-    const theirs = pickStance(b.w);
-    const hit = (m) => randInt(Math.round(m * 0.78), Math.round(m * 1.28));
+    const offset = Math.min(1, Math.abs(Number(off) || 1));
+    const grade = gradeFor(offset);
+    const hit = (m) => randInt(Math.round(m * 0.85), Math.round(m * 1.18));
     let line;
-    if (stance === theirs) {
-        const a = Math.round(hit(b.might) * 0.3), d = Math.round(hit(b.foeMight) * 0.3);
-        b.foeHp -= a; b.hp -= d;
-        line = `Both ${STANCE_META[stance].label.toLowerCase()} — you trade. -${d} you, -${a} them.`;
-    } else if (BEATS[stance] === theirs) {
-        if (stance === "guard") {
-            const c = Math.round(hit(b.might) * COUNTER);
-            b.foeHp -= c;
-            line = `They struck into your guard. Nothing lands, and you counter for ${c}.`;
-        } else {
-            const a = hit(b.might);
-            b.foeHp -= a;
-            line = `Your ${STANCE_META[stance].label.toLowerCase()} beats their ${theirs} — ${a}.`;
+
+    if (b.turn === "you") {
+        // ── YOUR SWING ── the ring closed over them.
+        const ability = abilityId ? (b.me.abilities || []).find((x) => x.id === abilityId) : null;
+        if (ability && b.focus < ability.focus) return { ok: false, error: "not_enough_focus", ...(await getArenaState(buyerId)) };
+
+        let power = 1;
+        let note = "";
+        if (ability) {
+            b.focus -= ability.focus;
+            power = ability.power;
+            note = ` · ${ability.name}`;
+            if (ability.kind === "ward") { b.shield += Math.round(b.maxHp * 0.18); power = 0; note += " — braced"; }
+            if (ability.kind === "surge") { b.surge = 2; power = 0; note += " — sharpened"; }
+            if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
+            if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
         }
+        // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
+        const surge = b.surge > 0 ? 1.35 : 1;
+        if (b.surge > 0) b.surge -= 1;
+        // Their gear defends them too. Without this the attacker always lands full and the better loadout
+        // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
+        const guard = foeGrade(b.foe.gearPower || 0).def;
+        const raw = power > 0
+            ? hit(b.me.might * SWING) * grade.atk * power * surge * (b.clash?.mult || 1) * (b.underdog || 1)
+            : 0;
+        const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
+        b.foeHp = Math.max(0, b.foeHp - dmg);
+        b.focus = Math.min(FOCUS_MAX, b.focus + grade.focus);
+        line = dmg > 0 ? `${grade.label}${note} — ${dmg}.` : `${grade.label}${note}.`;
+        b.log.push({ beat: b.beat, who: "you", grade: grade.key, damage: dmg, text: line, ability: ability?.name || null });
+        b.turn = "them";
     } else {
-        if (theirs === "guard") {
-            const c = Math.round(hit(b.foeMight) * COUNTER);
-            b.hp -= c;
-            line = `You struck into their guard. They counter for ${c}.`;
-        } else {
-            const d = hit(b.foeMight);
-            b.hp -= d;
-            line = `Their ${theirs} beats your ${STANCE_META[stance].label.toLowerCase()} — ${d}.`;
-        }
+        // ── THEIR SWING ── the ring closed over you, and you were bracing.
+        const fg = foeGrade(b.foe.gearPower || 0);
+        // Their kit answers with an ability often enough that facing good gear feels like facing a person.
+        const theirAbility = (b.foe.abilities || []).length && Math.random() < AI_ABILITY_CHANCE
+            ? b.foe.abilities[Math.floor(Math.random() * b.foe.abilities.length)]
+            : null;
+        const power = theirAbility && ["strike", "spell", "execute"].includes(theirAbility.kind) ? theirAbility.power : 1;
+        // Their element against yours is the mirror of yours against theirs.
+        const back = 1 / (b.clash?.mult || 1);
+        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back));
+        // Your timing is a BLOCK: grade.def is how much of it you turned aside. A ward soaks what's left.
+        const blocked = Math.round(raw * grade.def);
+        let through = Math.max(0, raw - blocked);
+        if (b.shield > 0) { const soak = Math.min(b.shield, through); b.shield -= soak; through -= soak; }
+        b.hp = Math.max(0, b.hp - through);
+        b.focus = Math.min(FOCUS_MAX, b.focus + grade.focus);
+        line = theirAbility
+            ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
+            : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`;
+        b.log.push({ beat: b.beat, who: "them", grade: grade.key, damage: through, text: line, ability: theirAbility?.name || null });
+        b.turn = "you";
+        b.beat += 1;
     }
-    b.hp = Math.max(0, b.hp); b.foeHp = Math.max(0, b.foeHp);
-    b.log.push({ round: b.round, you: stance, them: theirs, text: line });
-    b.round += 1;
 
     if (b.foeHp <= 0 || b.hp <= 0) return finishBout(buyerId, row, b, b.foeHp <= 0 && b.hp > 0);
     await saveBout(buyerId, b);
+    return { ok: true, ...(await getArenaState(buyerId)) };
+}
+
+/** Name your price. What it costs anyone to challenge you — and what you keep when they fail. */
+export async function setToll(buyerId, gold) {
+    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
+    const t = Math.max(0, Math.min(25000, Math.floor(Number(gold) || 0)));
+    await db.query(`UPDATE mkt_arena SET toll = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, t]).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -436,10 +499,20 @@ async function finishBout(buyerId, row, b, won) {
             // Whatever happened, never leave anybody parked on a negative rung.
             if (!swapped) await db.query(`UPDATE mkt_arena SET position = $2 WHERE buyer_id = $1 AND position = $3`, [buyerId, myPos, -myPos]).catch(() => {});
         }
-        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, r.gold]).catch(() => null);
-        await logCoin(buyerId, r.gold, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
+        // Win and you take your stake back plus the toll you paid to get in.
+        const back = r.gold + (b.stake || 0) * 2;
+        const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, back]).catch(() => null);
+        reward.stakeBack = (b.stake || 0) * 2;
+        await logCoin(buyerId, back, "arena_win", { balanceAfter: g?.gold, meta: { from: myPos, to: foePos, foe: b.foe.id } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
         await awardXp(buyerId, "arena_win", { points: r.xp, gold: 0 }).catch(() => {});
+    }
+    // ── THE DEFENDER'S PURSE ── they never staked anything, so they can only gain. A challenge that fails
+    // pays them the challenger's toll: the champion's income is other people's ambition.
+    if (!won && (b.stake || 0) > 0) {
+        const dg = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [b.foe.id, b.stake]).catch(() => null);
+        await logCoin(b.foe.id, b.stake, "arena_toll", { balanceAfter: dg?.gold, meta: { from: buyerId } }).catch(() => {});
+        await db.query(`UPDATE mkt_arena SET purse = purse + $2 WHERE buyer_id = $1`, [b.foe.id, b.stake]).catch(() => {});
     }
     b.reward = reward;
 
@@ -460,7 +533,8 @@ async function finishBout(buyerId, row, b, won) {
         rank: { name: nowRank.name, icon: nowRank.icon, color: nowRank.color, into: nowRank.into, span: nowRank.span, next: nowRank.next?.name || null },
         rankUp: b.rankUp,
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
-        rounds: (b.log || []).length,
+        rounds: b.beat || (b.log || []).length,
+        stake: b.stake || 0,
     };
 
     await db.query(

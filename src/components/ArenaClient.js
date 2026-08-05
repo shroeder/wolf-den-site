@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import TimingRing from "@/components/arena/TimingRing";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -31,16 +32,9 @@ function Portal({ children }) {
 
 const money = (n) => Number(n || 0).toLocaleString();
 
-const STANCE_ART = {
-    strike: "/images/arena/stance-strike.webp",
-    guard: "/images/arena/stance-guard.webp",
-    feint: "/images/arena/stance-feint.webp",
+const ELEMENT_COLOR = {
+    fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
 };
-const STANCES = [
-    { key: "strike", label: "Strike", hint: "Beats a feint. Loses to a guard." },
-    { key: "guard", label: "Guard", hint: "Beats a strike. Loses to a feint." },
-    { key: "feint", label: "Feint", hint: "Beats a guard. Loses to a strike." },
-];
 
 // A short tone per outcome — built inline, no assets.
 function blip(kind) {
@@ -181,7 +175,8 @@ export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
-    const [clash, setClash] = useState(null);   // the two stances that just met
+    const [armed, setArmed] = useState(null);  // ability queued for the next beat
+    const [clash, setClash] = useState(null);
     const [err, setErr] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     const logEnd = useRef(null);
@@ -224,9 +219,10 @@ export default function ArenaClient({ initial }) {
         // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
         // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
-        if (last && last.round !== p.round) setClash({ you: last.you, them: last.them });
+        const GRADE_LABEL = { perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
+        if (last && bout.log.length !== p.round) setClash({ grade: last.grade, label: GRADE_LABEL[last.grade] || "" });
         if (bout.over && bout.won) blip("win");
-        prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: last ? last.round : null };
+        prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
         const t = setTimeout(() => setShake(0), 320);
         const t2 = setTimeout(() => setClash(null), 1150);
         return () => { clearTimeout(t); clearTimeout(t2); };
@@ -256,33 +252,110 @@ export default function ArenaClient({ initial }) {
                             <b>{bout.won ? "Down" : "You fall"}</b>
                         </div>
                     ) : null}
+                    {/* Over THEM when you swing, over YOU when they do. */}
+                    {!bout.over ? (
+                        <div className={`ar-ringslot is-${bout.turn}`}>
+                            <TimingRing
+                                key={`${bout.beat}-${bout.turn}`}
+                                ringMs={bout.ringMs || 1400}
+                                tone={bout.turn === "you" ? "attack" : "defend"}
+                                label={bout.turn === "you" ? "Strike" : "Block"}
+                                onResult={(off) => { const a = armed; setArmed(null); act("beat", { off, ability: a }); }}
+                            />
+                        </div>
+                    ) : null}
+                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
+                        execution is legible instead of being buried in a log line. */}
                     {clash ? (
-                        <div className="ar-clash" aria-hidden="true">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="ar-clash-icon is-you" src={STANCE_ART[clash.you]} alt="" />
-                            <span className="ar-clash-spark" />
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className="ar-clash-icon is-them" src={STANCE_ART[clash.them]} alt="" />
+                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
+                            <span>{clash.label}</span>
+                        </div>
+                    ) : null}
+                    {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
+                    {bout.over ? (
+                        <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
+                            <b>{bout.won ? "Down" : "You fall"}</b>
+                        </div>
+                    ) : null}
+                    {/* Over THEM when you swing, over YOU when they do. */}
+                    {!bout.over ? (
+                        <div className={`ar-ringslot is-${bout.turn}`}>
+                            <TimingRing
+                                key={`${bout.beat}-${bout.turn}`}
+                                ringMs={bout.ringMs || 1400}
+                                tone={bout.turn === "you" ? "attack" : "defend"}
+                                label={bout.turn === "you" ? "Strike" : "Block"}
+                                onResult={(off) => { const a = armed; setArmed(null); act("beat", { off, ability: a }); }}
+                            />
+                        </div>
+                    ) : null}
+                    {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
+                        execution is legible instead of buried in a log line. */}
+                    {clash ? (
+                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
+                            <span>{clash.label}</span>
                         </div>
                     ) : null}
                 </div>
                 {bout.log?.length ? <p className="ar-beat">{bout.log[bout.log.length - 1].text}</p> : null}
-                <p className="ar-tell"><b>Their tell:</b> {bout.tell}</p>
+                {/* Your affinity against theirs, settled before a blow lands — scoutable, and answerable at
+                    the Forge for gold. That is a decision you make with your loadout, not a guess in the moment. */}
+                {bout.clash?.note ? (
+                    <p className={`ar-clash ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}>{bout.clash.note}</p>
+                ) : null}
 
-                {bout.over ? (
-                    <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} />
-                ) : (
-                    <div className="ar-stances">
-                        {STANCES.map((s) => (
-                            <button key={s.key} type="button" className={`ar-stance is-${s.key}`} disabled={busy}
-                                onClick={() => act("stance", { stance: s.key })}>
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={STANCE_ART[s.key]} alt="" draggable="false" />
-                                <b>{s.label}</b><em>{s.hint}</em>
-                            </button>
-                        ))}
-                    </div>
-                )}
+                {/* If they badly outgear you, you hit harder for it. Say so — an unexplained damage bonus is
+                    indistinguishable from a bug, and this is the thing that makes the top of the ladder winnable. */}
+                {bout.underdog > 1 ? (
+                    <p className="ar-underdog">
+                        Outgunned — you swing {Math.round((bout.underdog - 1) * 100)}% harder for it
+                    </p>
+                ) : null}
+
+                {!bout.over ? (
+                    <>
+                        <div className="ar-focus">
+                            <span className="ar-focus-lab">Focus</span>
+                            <span className="ar-focus-bar">
+                                {Array.from({ length: bout.focusMax || 12 }).map((_, i) => (
+                                    <i key={i} className={i < bout.focus ? "is-on" : ""} />
+                                ))}
+                            </span>
+                            {bout.shield > 0 ? <span className="ar-buff is-ward">Braced {bout.shield}</span> : null}
+                            {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened ×{bout.surge}</span> : null}
+                        </div>
+
+                        {/* Pick what to spend Focus on BEFORE the ring closes. Timing earns it, abilities burn
+                            it — so the spectacular moves are paid for with execution, not just owned. */}
+                        {bout.turn === "you" ? (
+                            <div className="ar-kit">
+                                {(bout.me?.abilities || []).map((ab) => {
+                                    const afford = bout.focus >= ab.focus;
+                                    const on = armed === ab.id;
+                                    return (
+                                        <button key={ab.id} type="button"
+                                            className={`ar-ability${on ? " is-armed" : ""}${afford ? "" : " is-poor"}`}
+                                            style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
+                                            disabled={!afford || busy}
+                                            onClick={() => setArmed(on ? null : ab.id)}>
+                                            <b>{ab.name}</b>
+                                            <em>{ab.blurb}</em>
+                                            <span className="ar-ability-foot">
+                                                <i>{ab.from}</i><u>{ab.focus} focus</u>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+
+                        <p className="ar-turn">
+                            {bout.turn === "you"
+                                ? (armed ? "Time it — the armed ability fires on the beat" : "Time your strike")
+                                : `${bout.foe.name} is coming — time your block`}
+                        </p>
+                    </>
+                ) : null}
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {bout.log?.length ? (
@@ -323,6 +396,41 @@ export default function ArenaClient({ initial }) {
                 </div>
             </div>
 
+            {/* WHAT YOU FIGHT WITH — read straight off your gear, so the Forge and the ring are the same
+                conversation. Every ability names the piece it came from. */}
+            <div className="ar-mykit">
+                <span className="ar-up-head">
+                    Your kit{st.me?.element ? <em className="ar-el" style={{ "--el": ELEMENT_COLOR[st.me.element] }}>{st.me.element}</em> : null}
+                </span>
+                <div className="ar-kit">
+                    {(st.me?.abilities || []).map((ab) => (
+                        <div key={ab.id} className="ar-ability is-static" style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}>
+                            <b>{ab.name}</b>
+                            <em>{ab.blurb}</em>
+                            <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.focus} focus</u></span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* YOUR PRICE — what it costs anyone to come at you, and what you keep when they fail. The person
+                in first place earns from other people's ambition; this is that lever. */}
+            <div className="ar-toll">
+                <span className="ar-up-head">Your toll</span>
+                <p className="ar-toll-note">
+                    What a challenger pays to face you. Beat them and you keep it — you never stake anything yourself.
+                    {st.purse > 0 ? <> You&rsquo;ve taken <b>{money(st.purse)}</b> defending.</> : null}
+                </p>
+                <div className="ar-toll-row">
+                    {[0, 250, 750, 2000, 5000].map((v) => (
+                        <button key={v} type="button" className={`ar-tollopt${st.toll === v ? " is-on" : ""}`}
+                            disabled={busy} onClick={() => act("toll", { gold: v })}>
+                            {v === 0 ? "Free" : money(v)}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* the podium — the reason to hold a spot overnight */}
             <div className="ar-podium">
                 <span className="ar-podium-lab">Top three at the end of the day take a chest</span>
@@ -352,7 +460,8 @@ export default function ArenaClient({ initial }) {
                             <em>Lv {o.level} · {o.vigour} vigour · {o.tell}</em>
                         </div>
                         <div className="ar-target-go">
-                            <span className="ar-prize">+{money(o.reward.gold)}</span>
+                            <span className="ar-prize">+{money(o.reward.gold + o.stake * 2)}</span>
+                            {o.stake > 0 ? <span className="ar-stake">costs {money(o.stake)}</span> : null}
                             <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
                                 onClick={() => act("start", { target: o.id })}>
                                 {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
@@ -551,14 +660,14 @@ function Styles() {
 
             /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
             .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
-            .ar-clash-icon { position: absolute; width: 60px; height: 60px; object-fit: contain;
-                filter: drop-shadow(0 3px 10px rgba(0,0,0,0.8)); }
-            .ar-clash-icon.is-you { animation: arThrowL .95s cubic-bezier(.2,.9,.3,1) both; }
-            .ar-clash-icon.is-them { animation: arThrowR .95s cubic-bezier(.2,.9,.3,1) both; transform: scaleX(-1); }
-            @keyframes arThrowL { 0% { opacity: 0; transform: translateX(-90px) scale(.6) } 34% { opacity: 1; transform: translateX(-26px) scale(1.1) }
-                72% { opacity: 1; transform: translateX(-26px) scale(1) } 100% { opacity: 0; transform: translateX(-26px) scale(.9) } }
-            @keyframes arThrowR { 0% { opacity: 0; transform: scaleX(-1) translateX(-90px) scale(.6) } 34% { opacity: 1; transform: scaleX(-1) translateX(-26px) scale(1.1) }
-                72% { opacity: 1; transform: scaleX(-1) translateX(-26px) scale(1) } 100% { opacity: 0; transform: scaleX(-1) translateX(-26px) scale(.9) } }
+            .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; }
+            .ar-grade span { font-size: 1.6rem; font-weight: 900; letter-spacing: .1em;
+                animation: arGrade .85s cubic-bezier(.2,1.4,.35,1) both; text-shadow: 0 3px 14px #000; }
+            .ar-grade.is-perfect span { color: #ffe28a; text-shadow: 0 3px 14px #000, 0 0 32px rgba(255,200,70,.95); }
+            .ar-grade.is-great span { color: #8bf0b4; }
+            .ar-grade.is-good span { color: #cbd3dc; }
+            .ar-grade.is-miss span { color: #ff8f9a; }
+            @keyframes arGrade { 0% { opacity: 0; transform: scale(1.7) } 30% { opacity: 1; transform: scale(1) } 100% { opacity: 0; transform: scale(.95) translateY(-18px) } }
             .ar-clash-spark { position: absolute; width: 78px; height: 78px; border-radius: 50%;
                 background: radial-gradient(circle, rgba(255,240,190,0.95), rgba(255,180,60,0.35) 45%, transparent 70%);
                 animation: arSpark .5s ease-out .3s both; }
@@ -696,6 +805,52 @@ function Styles() {
             .ar-away-text b { display: block; font-size: 12.5px; color: #e9eef3; }
             .ar-away-text em { font-style: normal; font-size: 11px; color: #9a8fb5; }
             .ar-away-pos { font-size: 12px; font-weight: 900; color: #cdb894; font-variant-numeric: tabular-nums; }
+
+            .ar-clash { margin: 8px 0 0; font-size: 12.5px; font-weight: 800; text-align: center; }
+            .ar-clash.is-good { color: #8bf0b4; }
+            .ar-clash.is-bad { color: #ff9f9f; }
+            .ar-underdog { margin: 5px 0 0; font-size: 12px; font-weight: 900; text-align: center; color: #ffd75e;
+                letter-spacing: .02em; text-shadow: 0 0 14px rgba(255,215,94,0.35); }
+            .ar-ringslot { position: absolute; inset: 0; z-index: 20; }
+            /* Over whoever is acting: their half when you swing, yours when they do. */
+            .ar-ringslot.is-you { left: 50%; }
+            .ar-ringslot.is-them { right: 50%; }
+
+            .ar-focus { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin: 12px 0 10px; }
+            .ar-focus-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #8a939d; }
+            .ar-focus-bar { display: flex; gap: 3px; }
+            .ar-focus-bar i { width: 9px; height: 14px; border-radius: 2px; background: rgba(255,255,255,0.12); }
+            .ar-focus-bar i.is-on { background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 0 8px rgba(255,176,32,.8); }
+            .ar-buff { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 999px; }
+            .ar-buff.is-ward { color: #6fd0ff; border: 1px solid rgba(111,208,255,.5); }
+            .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
+
+            .ar-kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; }
+            .ar-ability { text-align: left; padding: 9px 11px; border-radius: 12px; cursor: pointer;
+                background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
+            .ar-ability.is-armed { background: color-mix(in srgb, var(--el) 22%, transparent);
+                border-color: var(--el); box-shadow: 0 0 18px -4px var(--el); }
+            .ar-ability.is-poor { opacity: .4; cursor: default; }
+            .ar-ability b { display: block; font-size: 12.5px; color: #fff; }
+            .ar-ability em { display: block; font-style: normal; font-size: 10.5px; line-height: 1.35; color: #9aa2ab; margin-top: 2px; }
+            .ar-ability-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 9.5px; }
+            /* The item it came from is ALWAYS shown — an ability you can't trace to a piece of gear is magic,
+               and you cannot build toward magic. */
+            .ar-ability-foot i { font-style: normal; color: #7f8790; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-ability-foot u { text-decoration: none; font-weight: 900; color: var(--el); white-space: nowrap; }
+            .ar-turn { margin: 10px 0 0; font-size: 12px; text-align: center; color: #cbd3dc; }
+
+            .ar-ability.is-static { cursor: default; }
+            .ar-mykit, .ar-toll { margin-bottom: 14px; display: grid; gap: 7px; }
+            .ar-el { font-style: normal; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 9.5px;
+                color: var(--el); border: 1px solid color-mix(in srgb, var(--el) 55%, transparent); text-transform: capitalize; }
+            .ar-toll-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: #8a939d; }
+            .ar-toll-note b { color: #ffd75e; }
+            .ar-toll-row { display: flex; flex-wrap: wrap; gap: 6px; }
+            .ar-tollopt { padding: 7px 13px; border-radius: 10px; cursor: pointer; font-size: 11.5px; font-weight: 900;
+                color: #cbd3dc; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); }
+            .ar-tollopt.is-on { color: #241500; background: linear-gradient(180deg, #ffe08a, #ffb020); border-color: transparent; }
+            .ar-stake { font-size: 10px; color: #ff9f9f; }
 
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
