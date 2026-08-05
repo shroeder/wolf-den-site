@@ -40,8 +40,13 @@ export const bandForTier = (tier) => {
 // Roughly geometric, so early tiers come quickly and the curve keeps its teeth forever without any single step
 // being a wall. Tuned so a mid-level member with decent gear sits somewhere around tier 12-20 — enough of a
 // ladder below them to feel earned, and a very long way still above.
-const BASE_POWER = 86;
-const GROWTH = 1.085;
+// GROWTH was 1.085, and simulated it is a CLIFF rather than a curve: 96.8% at tier 8, 58.1% at 11, 10.3% at
+// 14, 1.0% at 17. A player stalls dead around tier twelve and no amount of play moves them, because gear
+// grows far slower than 8.5% a tier. 4.5% keeps every tier meaningfully harder than the last while leaving
+// the ladder climbable as you gear up — and it is still unbounded, so "super super hard" still arrives, just
+// somewhere you can actually reach.
+const BASE_POWER = 82;
+const GROWTH = 1.045;
 
 export function npcPower(tier) {
     return Math.round(BASE_POWER * Math.pow(GROWTH, Math.max(1, tier) - 1));
@@ -128,7 +133,7 @@ export function npcAbilities(tier) {
  * never nothing to do), plus a REACH above your best — but the reach is generous rather than one-at-a-time,
  * because being told to grind tier 7 before you may look at tier 9 is the treadmill this is meant to replace.
  */
-export const NPC_REACH = 3;
+export const NPC_REACH = 5;
 export function npcOffer(bestTier = 0, count = 6) {
     const top = Math.max(1, bestTier + NPC_REACH);
     const out = [];

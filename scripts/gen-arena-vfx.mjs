@@ -49,6 +49,11 @@ const VFX = {
     sunder: `${SHEET} The effect: a heavy impact cracking outward into jagged white-gold shards of shattering armour plate, fragments flying apart, then dimming to dust. ${LOOK} ${BLACK}`,
     riposte: `${SHEET} The effect: a pale cyan shockwave ring expanding outward, reversing, and snapping back inward to a bright point, like a blow being returned. ${LOOK} ${BLACK}`,
     impact: `${SHEET} The effect: a sharp white-yellow impact flash with radiating spikes and a dust puff, expanding fast then dissipating. ${LOOK} ${BLACK}`,
+    // The four kinds still falling back to the generated-shape layer.
+    spell: `${SHEET} The effect: a rune circle igniting and rotating, throwing off arcane sparks, then collapsing inward into a bright violet flash. ${LOOK} ${BLACK}`,
+    ward: `${SHEET} The effect: interlocking translucent hexagonal shield plates snapping into place to form a curved barrier, flaring bright at the seams, then dimming. ${LOOK} ${BLACK}`,
+    surge: `${SHEET} The effect: golden power rising upward in a column of embers and light streaks, intensifying, then settling into a steady glow. ${LOOK} ${BLACK}`,
+    gamble: `${SHEET} The effect: golden coins and dice tumbling upward through the air trailing sparks, spinning, then scattering out of frame. ${LOOK} ${BLACK}`,
 };
 
 async function generate(prompt) {

@@ -23,18 +23,24 @@
 const FRAMES = 8;
 const DUR = 560;   // ms — about 14fps, which is the length of a hit anyway
 
-// Only the kinds that HAVE painted art. Everything else falls back to SkillFx, so adding an archetype never
-// leaves a skill with no effect at all.
+// Every one of the eleven kinds has painted art now. SkillFx is still the fallback, so a NEW archetype added
+// later is never left with no effect at all — but nothing in the game currently reaches it.
 const SHEETS = {
     rend: "/images/arena/vfx/rend-strip.webp",
     flurry: "/images/arena/vfx/flurry-strip.webp",
     drain: "/images/arena/vfx/drain-strip.webp",
     sunder: "/images/arena/vfx/sunder-strip.webp",
     riposte: "/images/arena/vfx/riposte-strip.webp",
+    spell: "/images/arena/vfx/spell-strip.webp",
+    ward: "/images/arena/vfx/ward-strip.webp",
+    surge: "/images/arena/vfx/surge-strip.webp",
+    gamble: "/images/arena/vfx/gamble-strip.webp",
     // A plain swing and a committed strike both land as an impact.
     strike: "/images/arena/vfx/impact-strip.webp",
     hit: "/images/arena/vfx/impact-strip.webp",
     execute: "/images/arena/vfx/impact-strip.webp",
+    guard: "/images/arena/vfx/ward-strip.webp",
+    heal: "/images/arena/vfx/surge-strip.webp",
 };
 
 export const hasSheet = (kind) => Boolean(SHEETS[kind]);
@@ -42,14 +48,23 @@ export const hasSheet = (kind) => Boolean(SHEETS[kind]);
 export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false }) {
     const sheet = SHEETS[kind];
     if (!sheet) return null;
+    // Things you do to YOURSELF (a ward, a surge, a drink) belong over your own body; things you do to THEM
+    // belong where the two of you meet, which is inboard of centre rather than in the middle of a half.
+    const onSelf = kind === "ward" || kind === "surge" || kind === "heal" || kind === "guard";
     return (
-        <span className={`sfx is-${side}${crit ? " is-crit" : ""}`} aria-hidden="true">
+        <span className={`sfx is-${side}${crit ? " is-crit" : ""}${onSelf ? " is-self" : ""}`} aria-hidden="true">
             <i style={{ backgroundImage: `url(${sheet})`, width: `${size}px`, height: `${size}px` }} />
             <style jsx>{`
+                /* Anchored low and inboard — where two fighters standing on sand actually make contact —
+                   rather than dead centre of a half, which put every impact in the same patch of sky. */
                 .sfx { position: absolute; top: 0; bottom: 0; width: 52%; z-index: 22;
-                    display: grid; place-items: center; pointer-events: none; }
-                .sfx.is-right { right: 0; }
-                .sfx.is-left { left: 0; }
+                    display: flex; align-items: flex-end; justify-content: center;
+                    padding-bottom: 12%; pointer-events: none; }
+                .sfx.is-right { right: 0; justify-content: flex-start; }
+                .sfx.is-left { left: 0; justify-content: flex-end; }
+                /* A thing you do to yourself sits over your own body, not at the meeting point. */
+                .sfx.is-self.is-right { justify-content: center; }
+                .sfx.is-self.is-left { justify-content: center; }
                 /* The strip itself. background-size 800% lays eight frames across the box; stepping
                    background-position from 0% to 100% in 8 steps walks them exactly once. */
                 .sfx > i {

@@ -1322,21 +1322,6 @@ function Styles() {
             /* ── LANDSCAPE PHONE ── a short, wide viewport leaves ~250px for the whole ring, so every band
                that is merely nice-to-have gives its pixels back to the stage. The fighters and the deck are
                what you cannot do without. */
-            @media (orientation: landscape) and (max-height: 480px) {
-                .ar-hud { padding: 4px 8px 0; gap: 4px; }
-                .ar-hud .ar-tag, .ar-round { font-size: 9px; }
-                .ar-bars { padding: 2px 10px 0; }
-                .ar-hpnum { font-size: 9px; }
-                .ar-focus { padding: 2px 10px 0; gap: 6px; }
-                .ar-cdchip { width: 32px; height: 32px; }
-                .ar-cdchip img { width: 21px; height: 21px; }
-                .ar-deck { min-height: 66px; padding: 4px 8px max(4px, env(safe-area-inset-bottom)); }
-                .ar-cmd { padding: 6px 4px; font-size: 10px; }
-                .ar-cmd :global(svg) { width: 16px; height: 16px; }
-                .ar-beat { display: none; }   /* the log line under the deck; the log itself is still below */
-                .ar-dust { display: none; }
-            }
-
             /* ── DUST ── the only thing on screen while a turn-based fight waits for you. */
             .ar-dust { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
             .ar-dust i { position: absolute; bottom: 16%; width: 3px; height: 3px; border-radius: 50%;
@@ -1999,6 +1984,40 @@ function Styles() {
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             .ar-line { font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
             .ar-line b { color: #6f6486; margin-right: 5px; }
+            /* ── LANDSCAPE PHONE ── LAST IN THE FILE ON PURPOSE. A media query adds no specificity, so
+               when this block sat higher up than the base .ar-deck / .ar-floor rules it was trying to
+               override, it lost every tie and did nothing at all: the stage still measured 16px. */
+            @media (orientation: landscape) and (max-height: 480px) {
+                /* A 390px-tall viewport has ~240px of ring once the site chrome is above it, and every band
+                   wanted its share — which left .ar-floor flexed down to SIXTEEN PIXELS and a stage with no
+                   visible fighters at all. So the stage is budgeted FIRST (min-height, non-shrinking) and
+                   everything else is cut to fit around it.
+                   Budget: hud 18 + bars 30 + floor 96 + rail 26 + deck 58 = 228 of 240. */
+                .ar-floor { flex: 1 0 auto; min-height: 96px; }
+                .ar-hud { padding: 2px 6px 0; gap: 4px; min-height: 0; }
+                .ar-round { display: none; }
+                .ar-hud .ar-tag { font-size: 8.5px; min-height: 20px; padding: 3px 7px; }
+                .ar-hud .ar-tag.is-under { display: none; }
+                .ar-mute { top: 3px; right: 4px; width: 26px; height: 26px; }
+                .ar-bars { padding: 1px 8px 0; gap: 6px; }
+                .ar-fname { font-size: 10px; }
+                .ar-hp { height: 8px; margin: 2px 0 1px; }
+                .ar-hpnum { font-size: 8.5px; }
+                .ar-turnmark { font-size: 7.5px; padding: 2px 6px; }
+                .ar-focus { padding: 1px 8px 0; gap: 5px; }
+                .ar-cdchip { width: 26px; height: 26px; }
+                .ar-cdchip img { width: 17px; height: 17px; }
+                .ar-theirs { display: none; }        /* their kit rail — readable, not actionable */
+                .ar-deck { min-height: 54px; padding: 3px 6px max(3px, env(safe-area-inset-bottom)); }
+                .ar-cmd { padding: 4px 3px; font-size: 9.5px; gap: 1px; }
+                .ar-cmd :global(svg) { width: 14px; height: 14px; }
+                .ar-beat { display: none; }          /* the log line; the log itself is still below the ring */
+                .ar-dust { display: none; }
+                /* The fighters get the reclaimed height. */
+                .ar-floor > .ar-fighter:first-of-type { left: 3%; width: 44%; }
+                .ar-floor > .ar-fighter.is-foe { right: 3%; width: 38%; bottom: 4%; }
+            }
+
         `}</style>
     );
 }

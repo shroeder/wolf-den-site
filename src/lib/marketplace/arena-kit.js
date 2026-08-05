@@ -95,16 +95,18 @@ const ARCHETYPE = {
     goldOnHit: { kind: "drain", cd: 3, power: 1.7, blurb: "Takes something with it." },
 
     // "Made for bigger things than you" — a giant-slayer breaks the armour rather than out-hitting it.
-    giantSlayer: { kind: "sunder", cd: 4, power: 1.6, blurb: "Made for bigger things than you." },
+    giantSlayer: { kind: "sunder", cd: 3, power: 2.05, blurb: "Made for bigger things than you." },
 
     opportunist: { kind: "execute", cd: 4, power: 2.4, blurb: "Hits far harder on a wounded foe." },
     attuned: { kind: "spell", cd: 4, power: 2.3, blurb: "Channels your affinity." },
     overcharge: { kind: "spell", cd: 6, power: 3.2, blurb: "Discharges everything at once." },
     vanguard: { kind: "surge", cd: 3, power: 1.0, blurb: "Sharpens your next two swings." },
-    packTactics: { kind: "ward", cd: 3, power: 1.0, blurb: "Braces you against the next blow." },
+    // NOTE: surge and the two defensive kinds deal no damage by design. That is fine in a mixed kit and
+    // catastrophic in a pure one — see scripts/sim-arena.mjs, which measures both.
+    packTactics: { kind: "ward", cd: 4, power: 1.0, blurb: "Braces you against the next blow." },
 
     // "A banner nobody wants to fight under" is a threat, not a shield — so it answers back.
-    warbanner: { kind: "riposte", cd: 4, power: 1.0, blurb: "Nobody wants to fight under it." },
+    warbanner: { kind: "riposte", cd: 5, power: 1.0, blurb: "Nobody wants to fight under it." },
 
     highroller: { kind: "gamble", cd: 5, power: 3.0, blurb: "All of it, or none of it." },
 };
@@ -120,20 +122,38 @@ const TIER_SCALE = [1, 1, 1, 1, 1.12, 1.24, 1.36];
 // spell really is multiplied by 0.88 in exchange for cutting guard, so that is what it says.
 const SPELL_POWER_TAX = 0.88;   // arena.js: power *= 0.88 for the guard cut
 const SPELL_PIERCE = 0.40;      // arena.js: guard *= 0.6
-const WARD_SOAK = 0.18;         // arena.js: shield += maxHp * 0.18
-const SURGE_MULT = 0.35;        // arena.js: surge multiplier is 1.35
-const SURGE_SWINGS = 2;         // arena.js: b.surge = 2
+// WARD_SOAK was 0.18 and a ward is played on THEIR beat, so it costs you nothing — which measured at 83% win
+// rate in a mixed kit, the strongest thing in the game by twenty-five points, for no decision at all. A free
+// action has to be small or it dominates. 0.12 on a longer cooldown keeps "brace against the blow you can see
+// coming" as the point of it without making the slot mandatory.
+export const WARD_SOAK = 0.09;         // arena.js: shield += maxHp * 0.12
+// SURGE was the opposite problem: 16%, the worst in the game. It cost a whole turn to gain 0.35 x 2 = 0.7 of
+// a turn's damage back, so casting it was arithmetically worse than swinging. +50% on THREE swings is 1.5
+// turns of damage for one turn spent, which is finally worth the tempo.
+const SURGE_MULT = 0.5;         // arena.js: surge multiplier is 1.5
+export const SURGE_SWINGS = 3;         // arena.js: b.surge = 3
 const EXECUTE_MULT = 1.5;       // arena.js: power *= 1.5 under the threshold
 const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 // ── THE NEW KINDS' CONSTANTS ─────────────────────────────────────────────────────────────────────────────────
 // Same contract as the block above: every number here is the one arena.js actually applies, so a card can
 // never drift away from the behaviour it is describing.
 export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
-export const REND_PER_TURN = 0.05;  // of their MAX vigour, per tick
+export const REND_PER_TURN = 0.045; // of their MAX vigour, per tick
+// A BLEED CAP. Simulated at 3,000 bouts a cell, an uncapped stacking burn won 83.8% and ended fights in 5.7
+// beats — every extra application added another full tick forever, so the correct play was "rend, rend, rend"
+// and the bout was over before any other kind got to matter. Three stacks is still the strongest damage-over-
+// time in the game; it is just no longer a runaway.
+export const REND_MAX_STACKS = 3;
 export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as vigour
-export const SUNDER_CUT = 0.35;     // of their guard, removed
-export const SUNDER_TURNS = 2;
-export const RIPOSTE_SHARE = 0.5;   // of their landed blow, sent back at them
+export const SUNDER_CUT = 0.4;      // of their guard, removed
+export const SUNDER_TURNS = 3;
+// Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.
+export const RIPOSTE_SHARE = 0.3;   // of their landed blow, sent back at them
+// A SHIELD CEILING. Wards and ripostes are played on THEIR beat and do not cost you a swing, so a loadout of
+// four defensive pieces got a fresh shield almost every enemy turn while still attacking every turn of its
+// own — 86.5% in simulation, the strongest kit in the game by a distance, for the least thought. Soaking is
+// capped as a fraction of your own vigour, so stacking wards has a ceiling and the fifth one is wasted.
+export const SHIELD_CAP = 0.45;     // of your max vigour, total, at any moment
 
 const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
 
@@ -177,7 +197,7 @@ function effectOf(kind, power, element, hits = 1) {
             return {
                 head: `${Math.round(REND_PER_TURN * 100)}%`, sub: `a turn, ${REND_TURNS} turns`,
                 line: `Burns for ${REND_TURNS} more turns after it lands`,
-                tags: [{ t: "Stacks with itself", k: "good" }],
+                tags: [{ t: `Stacks ${REND_MAX_STACKS}\u00d7`, k: "good" }],
             };
         case "drain":
             return {
@@ -292,7 +312,11 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // SWING scales both sides down so a bout runs about ten beats. PUNCH is the defender's extra bite, because you
 // get abilities and a guard and they get neither.
 export const SWING = 0.30;
-export const PUNCH = 2.3;
+// PUNCH is the absent defender's extra bite, set when the player's kit was much stronger than it is now:
+// "because you get abilities and a guard and they get neither". After capping the burn, the shield stack and
+// the free defensive plays, 2.3 over-corrected — a MIRROR MATCH measured at 39.4% for the present human,
+// which is the wrong way round. A player who is actually there, choosing, should edge an absent loadout.
+export const PUNCH = 2.12;
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
