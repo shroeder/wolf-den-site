@@ -92,11 +92,11 @@ const WHEELS = [
             // taken landed on it, which is a lot of wheel to watch for the price of a couple of harvests. It
             // pays more now and comes up far less; the weight it gave up is spread across the middle of the
             // list, where the wedges people actually want to land on live.
-            { label: "100 gold", sprite: "coins-small", weight: 18, kind: "gold", amount: 100 },
-            { label: "150 XP", sprite: "xp-orb", weight: 11, kind: "xp", amount: 150 },
+            { label: "250 gold", sprite: "coins-small", weight: 12, kind: "gold", amount: 250 },
+            { label: "350 XP", sprite: "xp-orb", weight: 10, kind: "xp", amount: 350 },
             { label: "Hearty Snack", sprite: "pet-treat", weight: 9, kind: "consumable", consumable: "treat_snack", n: 1 },
             { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
-            { label: "250 gold", sprite: "coins-big", weight: 13, kind: "gold", amount: 250 },
+            { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
             { label: "5 Fertilizer", sprite: "fertilizer", weight: 7, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
             { label: `4 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 8, kind: "fragment", n: 4, tierId: FRAGMENT_PRIZE_TIER },
             { label: "MINI WHEEL", sprite: "mini-wheel", weight: 6, tier: "bonus", kind: "mini_wheel" },
@@ -104,18 +104,18 @@ const WHEELS = [
             // either. Salvage parts are the thing every enhancer is short of, so this is the wedge that makes a
             // spin matter to someone who already has plenty of gold.
             { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 7, kind: "parts" },
-            { label: "400 XP", sprite: "xp-orb", weight: 6, kind: "xp", amount: 400 },
+            { label: "900 XP", sprite: "xp-orb", weight: 7, kind: "xp", amount: 900 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
             { label: "BONUS SPIN", sprite: "bonus-spin", weight: 8, tier: "bonus", kind: "respin" },
-            { label: "Wooden Chest", sprite: "chest-wood", weight: 7, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
+            { label: "Wooden Chest", sprite: "chest-wood", weight: 9, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             // A WEDGE, not a hidden roll. The wheel used to grant recipes at a flat 2.5% AFTER it had already
             // landed on something else - 401 spins a week made it one of the top three sources in the game, and
             // none of it was on the wheel you were watching. Now you can see it and land on it.
-            { label: "New Recipe", sprite: "recipe-scroll", weight: 2, rare: true, tier: "rare", kind: "recipe" },
+            { label: "New Recipe", sprite: "recipe-scroll", weight: 3, rare: true, tier: "rare", kind: "recipe" },
             { label: "BONUS GAME", sprite: "mystery-box", weight: 5, tier: "bonus", kind: "bonus_game" },
-            { label: "600 gold", sprite: "coins-big", weight: 5, rare: true, tier: "rare", kind: "gold", amount: 600 },
+            { label: "1,600 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1600 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
-            { label: "Gold Chest", sprite: "chest-gold", weight: 2, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
+            { label: "Gold Chest", sprite: "chest-gold", weight: 4, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
             { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT },
             { label: "MAJOR JACKPOT", sprite: "gem-jackpot", weight: 1, rare: true, jackpot: true, tier: "jackpot", kind: "major_jackpot" },
         ],

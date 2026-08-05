@@ -148,7 +148,12 @@ export default function HeatGame({ stack, furnace, onPour }) {
             cancelAnimationFrame(raf.current);
             setTimeout(() => onPour(dists.current), 620);
         } else {
-            setTimeout(() => { setPop(null); t0.current = 0; setPhase((p) => p + 1); }, 260);
+            // The marker used to be yanked back to its origin (t0 = 0) after a 260ms freeze, so every tap was
+            // followed by a dead beat and a line that teleported. Nothing else in the game does that — the
+            // arena ring and the forge both resolve on the frame you tap. The sweep now runs straight through
+            // to the next phase; only the grade pop is cleared, and on its own timer so it never gates play.
+            setPhase((p) => p + 1);
+            setTimeout(() => setPop(null), 420);
         }
     }, [done, onPour, strike]);
 

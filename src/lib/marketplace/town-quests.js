@@ -46,9 +46,12 @@ const QUEST_POOL = {
         { label: "Something for the Pot", desc: "Land 3 fish", target: 3, gold: 100 },
         { label: "Full Creel", desc: "Land 8 fish", target: 8, gold: 210 },
     ] },
+    // Digs are random PROCS during a voyage, not something you can decide to do — so these were written as if
+    // they were. Across 207 member-days the best anyone has ever managed is 8, and the average is 1.6, which
+    // made "dig 15" literally unachievable and "dig 6" a 95th-percentile day. Retuned to the real curve.
     voyage: { emoji: "⛵", variants: [
-        { label: "Weigh Anchor", desc: "Dig 6 times at sea", target: 6, gold: 120 },
-        { label: "Deep Water", desc: "Dig 15 times at sea", target: 15, gold: 250 },
+        { label: "Weigh Anchor", desc: "Dig 2 times at sea", target: 2, gold: 120 },
+        { label: "Deep Water", desc: "Dig 5 times at sea", target: 5, gold: 250 },
     ] },
     slayer: { emoji: "⚔️", variants: [
         { label: "Blood on the Blade", desc: "Strike the weekly boss 3 times", target: 3, gold: 130 },
