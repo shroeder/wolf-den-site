@@ -318,18 +318,13 @@ export default function ArenaClient({ initial }) {
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         // Defending is a different act and deserves different words — "PERFECT" over a block you barely got
         // a hand to told you the timing was good but never what you actually did.
-        const GRADE_LABEL = { flawless: "FLAWLESS", perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
-        const BLOCK_LABEL = {
-            flawless: "FLAWLESS DEFENCE", perfect: "PERFECT BLOCK", great: "SOLID BLOCK",
-            good: "GLANCING BLOCK", miss: "WIDE OPEN",
-        };
-        // The MOVE, then the grade — every action gets called out across the middle of the screen, which is
-        // the whole reason a turn-based fight reads as a fight rather than a spreadsheet.
+        // The grade words went with the timing ring. What's worth calling out now is the MOVE and what it
+        // cost them — a beat has no execution score to report any more.
         if (last && bout.log.length !== p.round) {
             setClash({
                 grade: last.grade,
                 // A beat logged as theirs is one you were BLOCKING — your timing, their swing.
-                label: (last.who === "them" ? BLOCK_LABEL : GRADE_LABEL)[last.grade] || "",
+                label: last.damage > 0 ? `${last.damage}` : "",
                 move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
                 mine: last.who === "you",
             });
@@ -524,12 +519,12 @@ export default function ArenaClient({ initial }) {
                     <div className="ar-floor">
                         <Fighter f={st.me} hp={bout.hp} maxHp={bout.maxHp} hurt={shake === 2} lunge={shake === 1}
                             down={bout.over && !bout.won}
-                            wind={yourTurn && pending ? bout.ringMs : 0}
+                            wind={yourTurn && pending ? CAST_MS : 0}
                             brace={!bout.over && bout.turn === "them"}
                             element={bout.me?.element || null} />
                         <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
                             down={bout.over && bout.won}
-                            wind={!bout.over && bout.turn === "them" ? TELEGRAPH_MS + (bout.defRingMs || 1600) : 0}
+                            wind={!bout.over && bout.turn === "them" ? TELEGRAPH_MS : 0}
                             brace={yourTurn && Boolean(pending)}
                             element={bout.foe?.element || null} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
@@ -1393,10 +1388,6 @@ function Styles() {
                 background: radial-gradient(60% 50% at 72% 55%, rgba(255,231,150,0.5), transparent 70%);
                 animation: arCrit .42s ease-out both; }
             @keyframes arCrit { from { opacity: 1 } to { opacity: 0 } }
-            /* The slot spans the WHOLE floor. It used to be half-width, positioned over the acting fighter —
-               which made it the hit area as well as the artwork, so half of every tap aimed at the middle of
-               the fight silently did nothing. TimingRing now draws itself over whoever is acting and takes
-               taps from anywhere. */
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }

@@ -190,72 +190,22 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
     return { element, abilities: kit };
 }
 
-// ── THE RING ─────────────────────────────────────────────────────────────────────────────────────────────────
-// One closing ring, one window. Their GEAR decides how hard yours is — that is how a defender who is not
-// present still puts up a fight, and why better gear is genuinely more dangerous to face.
-export const RING_BASE_MS = 1150;   // a fresh, unequipped opponent
-export const RING_FLOOR_MS = 520;   // the very best gear in the Den
-export function ringMsFor(foeGearPower = 0) {
-    const t = Math.max(0, Math.min(1, foeGearPower / 320));
-    return Math.round(RING_BASE_MS - (RING_BASE_MS - RING_FLOOR_MS) * t);
-}
-
-// How close to the line you landed → what it was worth. The window is generous at the edges and rewarding in
-// the middle, because a timing game that only pays on a 40ms window is a reflex test, not a decision.
-// `def` is how much of an incoming blow you turn aside. A PERFECT block deliberately does NOT null the hit —
-// at def 1.0 a good player is simply immortal and gear stops mattering at all, which is the mirror image of the
-// problem this design was meant to solve.
-// The windows are FRACTIONS of the ring, so speeding the ring up shrinks every one of them in real time.
-// Cutting the ring from 1700ms to 1150 without touching these took an ok player from 98% to 83% in an even
-// fight and a good one from 67% to 40% against strong gear. Widened to hold the intended curve at the new
-// speed — a window measured in tens of milliseconds is a reflex test, not a decision.
-// FLAWLESS is CARVED OUT of the old PERFECT band rather than stacked on top of it. Bolting a strictly better
-// tier above perfect and nudging the boundaries out was worth measuring: it took an expert from 70% to 99%
-// against the top of the Den, which flattens the one part of the ladder that is supposed to be hard. So the
-// outer edge of perfect is unchanged at 0.10 and its payout drops to make room — the .10 band as a whole is
-// worth what it always was, and the top slice is a callout you have to actually nail.
-export const GRADES = [
-    { key: "flawless", within: 0.05, atk: 1.75, def: 0.82, label: "FLAWLESS" },
-    { key: "perfect", within: 0.10, atk: 1.45, def: 0.70, label: "Perfect" },
-    { key: "great", within: 0.21, atk: 1.30, def: 0.50, label: "Great" },
-    { key: "good", within: 0.40, atk: 1.00, def: 0.28, label: "Good" },
-    { key: "miss", within: Infinity, atk: 0.45, def: 0.0, label: "Missed" },
-];
-
-// ── THE TUNING, AND WHERE IT CAME FROM ───────────────────────────────────────────────────────────────────────
-// Simulated 4,000 bouts a cell. The first cut had a swing at full Might and no mitigation on the defender's
-// side at all: bouts ended in TWO beats and every level of play won 100% of the time, which is not a game.
+// ── THE TUNING ───────────────────────────────────────────────────────────────────────────────────────────────
+// Simulated 4,000 bouts a cell to set these. The first cut swung at full Might with no mitigation on the
+// defender's side at all: bouts ended in TWO beats and every level of play won 100% of the time.
 //
-// SWING scales both sides down so a bout runs ~10 beats. PUNCH is the defender's extra bite, because you get
-// abilities and blocking and they get neither. And the defender's gear now BLOCKS — without that the attacker
-// always lands full and wins regardless.
-//
-// What matters is that a human's timing error is roughly constant in MILLISECONDS, while the ring gets faster
-// with the defender's gear. So the same hand is sloppier against better kit, all on its own:
-//
-// Measured at exactly the constants below — 4,000 bouts a cell, timing error in ms, win rate / bout length:
-//
-//   hand                even        +30% gear      +65% gear     top of the Den
-//   expert  (±60ms)   100%  8.9b   100%  10.5b   100%   9.8b     73%  9.5b
-//   good   (±110ms)   100%  9.6b    95%  11.4b    75%  10.5b     11%  8.2b
-//   ok     (±170ms)    98% 10.2b    67%  11.6b    29%  10.0b      0%  6.6b
-//   sloppy (±260ms)    67% 10.9b    11%  10.4b     2%   8.4b      0%  5.4b
-//
-// An even fight is decided by your hands. A gear gap is decided by both. The top of the Den is a coin flip
-// for someone genuinely excellent and out of reach for everyone else — which is what a first place should be.
+// SWING scales both sides down so a bout runs about ten beats. PUNCH is the defender's extra bite, because you
+// get abilities and a guard and they get neither.
 export const SWING = 0.30;
 export const PUNCH = 2.3;
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
-// Without this, a big enough gear gap is a WALL: simulated at the top of the ladder, a player with flawless
-// timing still won 0 bouts out of 4,000, because vigour scales with gear about five times faster than might
-// does. A ladder whose first place cannot be taken by anyone is not a ladder.
+// Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
+// single bout in 4,000, because vigour scales with gear about five times faster than might does. A first place
+// nobody can take is not a ladder.
 //
-// So the further above you they are, the harder you swing. It never makes you the favourite — it makes the
-// climb possible for someone who plays extremely well, which is the whole point of putting timing in the game.
-// The deadband matters as much as the slope. Helping from the first point of difference wiped out moderate
-// gear gaps entirely (a +30% opponent went from a real fight to a 99% win), which would have made gear
-// pointless in exactly the matchups people actually pick. Nothing happens until they are a third above you.
+// The DEADBAND matters as much as the slope. Helping from the first point of difference wiped out moderate gear
+// gaps entirely, which would have made gear pointless in exactly the matchups people actually pick.
 export const UNDERDOG_MAX = 0.9;
 export const UNDERDOG_DEADBAND = 0.35;
 export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
@@ -263,8 +213,12 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
     if (gap <= 0) return 1;
     return 1 + Math.min(UNDERDOG_MAX, gap * 0.75);
 }
-/** `off` is |how far from the line|, as a fraction of the ring's duration. */
-export const gradeFor = (off) => GRADES.find((g) => Math.abs(off) <= g.within) || GRADES[GRADES.length - 1];
+
+// ── NO TIMING ────────────────────────────────────────────────────────────────────────────────────────────────
+// The closing ring, its per-gear speed and the five timing GRADES all lived here. They are gone: a beat is
+// decided by the command you choose and the gear behind it, so there is nothing left to grade. arena.js
+// carries the two flat constants that replaced the grade multipliers, set to what an average hand was
+// actually landing, which is why removing the ring moved no balance.
 
 // ── COOLDOWNS, NOT FOCUS ─────────────────────────────────────────────────────────────────────────────────────
 // Focus was a pool you filled by timing well and spent on skills. It made every skill interchangeable — a

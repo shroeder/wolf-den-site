@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { buildKit, elementClash, ringMsFor, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
+import { buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -198,7 +198,6 @@ async function kitFor(buyerId) {
         speed: speedOf(level, Number(stats.ferocity) || 0),
         vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
         element: kit.element, abilities: kit.abilities,
-        ringMs: ringMsFor(gearPower),
     };
 }
 
@@ -371,12 +370,9 @@ export async function seenArena(buyerId) {
 function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
-        cd: b.cd || {}, ringMs: b.ringMs, clash: b.clash, opener: b.opener || "you",
+        cd: b.cd || {}, clash: b.clash, opener: b.opener || "you",
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
         incoming: b.incoming || null,
-        // Blocking is strictly more work than swinging — you have to read the move first — so the window is
-        // wider on their beat. Same grades, more time to make the call.
-        defRingMs: Math.round((b.ringMs || 1150) * 1.4),
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
@@ -407,7 +403,6 @@ export async function startBout(buyerId, targetId = null) {
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
-        ringMs: foeKit.ringMs,                   // THEIR gear decides how hard your window is
         hp: me.vigour, maxHp: me.vigour,
         foeHp: foeKit.vigour, foeMaxHp: foeKit.vigour,
         cd: {},                                  // abilityId -> turns before it can be used again
