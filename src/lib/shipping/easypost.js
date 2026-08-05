@@ -105,12 +105,49 @@ export function estimateParcelWeightOz(items) {
     return Math.min(1120, Math.max(1, Math.round(estimate)));
 }
 
-function buildParcel(items) {
+// ── WHAT WE ACTUALLY PUT IN THE BOX ──────────────────────────────────────────────────────────────────────────
+// Every order used to be quoted as the same 9x6x1 mailer at 3oz + 1oz an item, and the LABEL is bought against
+// that same shipment — so a plush or a sealed box went out on postage priced for a flat envelope and the
+// carrier billed the difference back to the shop. Shipping is supposed to be cost-neutral; under-declaring
+// made it a quiet loss on exactly the biggest orders.
+//
+// There is no weight or dimension data anywhere in the catalogue, so the only honest signal is the Square
+// CATEGORY, which every cart line already carries. Profiles below are keyed off the real category names in
+// stock (744 Pokemon Single Card, 43 Pokemon Sealed, 20 Accessories, 4 Plush, and so on).
+//
+// The parcel is the LARGEST profile in the cart, and the weight is the sum of the lines — a mailer of singles
+// stays a mailer, and one plush in with them makes it a box.
+const PROFILES = [
+    { key: "mailer", match: /single|^magic |^pokemon card|comic/i, oz: 1, l: 9, w: 6, h: 1, rank: 0 },
+    { key: "rigid", match: /art|painting|playmat/i, oz: 6, l: 12, w: 10, h: 1.5, rank: 1 },
+    { key: "small_box", match: /accessor|pack|drink|food/i, oz: 4, l: 9, w: 7, h: 3, rank: 2 },
+    { key: "box", match: /sealed|box|bundle|tin|figure|plush/i, oz: 12, l: 12, w: 9, h: 5, rank: 3 },
+];
+const DEFAULT_PROFILE = PROFILES[0];
+
+function profileFor(item) {
+    const label = `${item?.categoryName || ""} ${item?.name || ""}`;
+    // Biggest match wins for a single line too — "Pokemon Sealed" contains "sealed" and must not read as a single.
+    let best = null;
+    for (const p of PROFILES) if (p.match.test(label) && (!best || p.rank > best.rank)) best = p;
+    return best || DEFAULT_PROFILE;
+}
+
+export function buildParcel(items) {
+    const lines = items || [];
+    let biggest = DEFAULT_PROFILE;
+    let oz = Number(process.env.EASYPOST_PARCEL_BASE_OZ);
+    oz = Number.isFinite(oz) && oz > 0 ? oz : 3;   // packaging itself
+    for (const it of lines) {
+        const p = profileFor(it);
+        if (p.rank > biggest.rank) biggest = p;
+        oz += p.oz * Math.max(1, Number(it?.quantity || 1));
+    }
     return {
-        weight: estimateParcelWeightOz(items), // ounces
-        length: Number(process.env.EASYPOST_PARCEL_LENGTH_IN) || 9,
-        width: Number(process.env.EASYPOST_PARCEL_WIDTH_IN) || 6,
-        height: Number(process.env.EASYPOST_PARCEL_HEIGHT_IN) || 1,
+        weight: Math.min(1120, Math.max(1, Math.round(oz))),
+        length: Number(process.env.EASYPOST_PARCEL_LENGTH_IN) || biggest.l,
+        width: Number(process.env.EASYPOST_PARCEL_WIDTH_IN) || biggest.w,
+        height: Number(process.env.EASYPOST_PARCEL_HEIGHT_IN) || biggest.h,
     };
 }
 
