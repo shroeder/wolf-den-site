@@ -232,7 +232,16 @@ export default function ArenaClient({ initial }) {
         // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const GRADE_LABEL = { flawless: "FLAWLESS", perfect: "PERFECT", great: "GREAT", good: "GOOD", miss: "MISSED" };
-        if (last && bout.log.length !== p.round) setClash({ grade: last.grade, label: GRADE_LABEL[last.grade] || "" });
+        // The MOVE, then the grade — every action gets called out across the middle of the screen, which is
+        // the whole reason a turn-based fight reads as a fight rather than a spreadsheet.
+        if (last && bout.log.length !== p.round) {
+            setClash({
+                grade: last.grade,
+                label: GRADE_LABEL[last.grade] || "",
+                move: last.ability || (last.who === "you" ? "Strike" : `${bout.foe.name}'s swing`),
+                mine: last.who === "you",
+            });
+        }
         if (bout.over && bout.won) blip("win");
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
         const t = setTimeout(() => setShake(0), 320);
@@ -370,7 +379,8 @@ export default function ArenaClient({ initial }) {
                     {/* A landed beat throws its grade across the ring — PERFECT, Great, Good, Missed — so
                         execution is legible instead of being buried in a log line. */}
                     {clash ? (
-                        <div className={`ar-grade is-${clash.grade}`} aria-hidden="true">
+                        <div className={`ar-grade is-${clash.grade}${clash.mine ? "" : " is-theirs"}`} aria-hidden="true">
+                            <em className="ar-move">{clash.move}</em>
                             <span>{clash.label}</span>
                         </div>
                     ) : null}
@@ -790,7 +800,15 @@ function Styles() {
 
             /* THE CLASH — the two stances that just met, thrown at each other with a spark between them. */
             .ar-clash { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; pointer-events: none; }
-            .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; }
+            .ar-grade { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; align-content: center;
+                gap: 2px; pointer-events: none; }
+            /* The move, named, across the middle — announced before the grade lands under it. */
+            .ar-move { font-style: normal; font-size: 1rem; font-weight: 900; letter-spacing: .06em;
+                text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px #000, 0 0 22px rgba(255,215,94,.8);
+                animation: arMove .45s cubic-bezier(.2,1.4,.35,1) both; text-align: center; padding: 0 8%; }
+            .ar-grade.is-theirs .ar-move { color: #cfe8ff; text-shadow: 0 2px 10px #000, 0 0 22px rgba(111,208,255,.8); }
+            @keyframes arMove { from { opacity: 0; transform: translateY(-10px) scale(.9) }
+                to { opacity: 1; transform: none } }
             .ar-grade span { font-size: 1.6rem; font-weight: 900; letter-spacing: .1em;
                 animation: arGrade .85s cubic-bezier(.2,1.4,.35,1) both; text-shadow: 0 3px 14px #000; }
             /* The best grade in the game gets the biggest moment — bigger, whiter, and it lands with a kick. */

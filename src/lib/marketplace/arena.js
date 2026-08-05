@@ -462,6 +462,19 @@ export async function fightRound(buyerId, opts = {}) {
 
         let power = 1;
         let note = "";
+        // ── WHAT MAKES ONE SKILL DIFFERENT FROM ANOTHER ──────────────────────────────────────────────────
+        // Using a skill has always mattered enormously — 4,000 bouts a cell says a good hand goes from 15% to
+        // 95% against +30% gear with them, and bouts run 8.8 beats instead of 15. But STRIKE and SPELL were
+        // the same code path with a different word on them, and ability.element was never read at all: the
+        // elemental clash is fixed at the start of the bout off your overall affinity, so a fire spell and a
+        // shadow spell did exactly the same thing. Six kinds, and only four of them did anything.
+        //
+        // They now pull in different directions, without adding raw power:
+        //   strike — timing counts for more. Your hands decide it.
+        //   spell  — answers on its OWN element and cuts guard. Your build decides it.
+        let gradeAtk = grade.atk;
+        let pierce = 1;
+        let clashMult = b.clash?.mult || 1;
         if (ability) {
             b.focus -= ability.focus;
             power = ability.power;
@@ -470,15 +483,29 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "surge") { b.surge = 2; power = 0; note += " — sharpened"; }
             if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
+            if (ability.kind === "strike") {
+                // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
+                // more so than any other kind. High variance, paid for with execution rather than power.
+                gradeAtk = 1 + (grade.atk - 1) * 1.45;
+            }
+            if (ability.kind === "spell") {
+                // Its own affinity against theirs, not the bout-wide one — so what you attuned this specific
+                // piece to at the Forge is a real decision. And magic cuts guard, paid for in raw power.
+                const c = elementClash(ability.element, b.foe.element);
+                clashMult = c.mult;
+                pierce = 0.6;
+                power *= 0.88;
+                if (c.note) note += ` — ${c.note}`;
+            }
         }
         // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
         const surge = b.surge > 0 ? 1.35 : 1;
         if (b.surge > 0) b.surge -= 1;
         // Their gear defends them too. Without this the attacker always lands full and the better loadout
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
-        const guard = foeGrade(b.foe.gearPower || 0).def;
+        const guard = foeGrade(b.foe.gearPower || 0).def * pierce;
         const raw = power > 0
-            ? hit(b.me.might * SWING) * grade.atk * power * surge * (b.clash?.mult || 1) * (b.underdog || 1)
+            ? hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1)
             : 0;
         const dmg = raw > 0 ? Math.max(1, Math.round(raw - raw * guard)) : 0;
         b.foeHp = Math.max(0, b.foeHp - dmg);
