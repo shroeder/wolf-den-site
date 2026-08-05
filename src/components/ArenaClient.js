@@ -326,9 +326,12 @@ export default function ArenaClient({ initial }) {
     const resultAtRef = useRef(0);
     const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
+    const ringRef = useRef(null);
+    const [ringH, setRingH] = useState(null);
 
     // The stored mute preference, read after mount so the server and client markup agree.
     useEffect(() => { setMuteOn(isMuted()); }, []);
+
 
     // Every action goes through here, and it now says so when one fails. A tap that silently does nothing is
     // the worst outcome available: somebody sat on a finished bout tapping "Back to the ladder" with no
@@ -362,6 +365,63 @@ export default function ArenaClient({ initial }) {
     }, [busy]);
 
     const bout = st?.bout || null;
+
+    // ── FIT THE FIGHT ON THE PHONE ───────────────────────────────────────────────────────────────────────
+    // The ring was sized `min(74vh, 640px)`, which is a fraction of the WHOLE viewport — and this page puts
+    // an announcement banner, the site nav and a tab strip above it, about 226px of chrome. Measured on real
+    // device sizes with that chrome present, the command deck fell BELOW THE FOLD on every phone smaller than
+    // a Pixel 7: iPhone SE by 52px, small Android by 33px, iPhone 14 by 6px. You had to scroll down, mid-bout,
+    // to reach Attack. Most people play on a phone, so that is most people.
+    //
+    // So it is measured rather than assumed: scroll the ring up to where it will actually sit, then size it to
+    // whatever is left below that. Re-run on resize and orientation change, because both move the answer.
+    useEffect(() => {
+        if (!bout) { setRingH(null); return undefined; }
+        let raf = 0;
+        // The site's nav is STICKY, so scrolling the ring to y=0 parks its first row underneath it — which
+        // clipped "Round 4" and the affinity banner clean off the top. Measure whatever is pinned up there
+        // rather than hard-coding a number, because the banner above the nav comes and goes.
+        const stickyBottom = () => {
+            let worst = 0;
+            for (const el of document.body.querySelectorAll("header, nav, [class*='sticky'], [class*='Sticky']")) {
+                const pos = getComputedStyle(el).position;
+                if (pos !== "fixed" && pos !== "sticky") continue;
+                const r = el.getBoundingClientRect();
+                if (r.top <= 4 && r.height > 0 && r.bottom > worst) worst = r.bottom;
+            }
+            return worst;
+        };
+        const fit = () => {
+            const el = ringRef.current;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top;
+            // 10px of breathing room so the deck is never flush against the bottom edge (or a home indicator).
+            const avail = window.innerHeight - Math.max(top, 0) - 10;
+            // Cap at the desktop size, floor low enough that a LANDSCAPE phone still fits — a 340px minimum
+            // was a guess, and on 844x390 with a 132px sticky nav there are only 248px to be had, so the
+            // "minimum" was itself pushing the deck off the bottom by 81px.
+            setRingH(Math.round(Math.max(240, Math.min(640, avail))));
+        };
+        // Put the fight on screen first, THEN measure — otherwise we size against wherever the page happened
+        // to be scrolled and get a different (wrong) answer every time.
+        const place = () => {
+            const el = ringRef.current;
+            if (!el) return;
+            const pad = stickyBottom();
+            const y = window.scrollY + el.getBoundingClientRect().top - pad - 6;
+            window.scrollTo({ top: Math.max(0, y), behavior: "auto" });
+        };
+        place();
+        raf = requestAnimationFrame(() => requestAnimationFrame(() => { place(); fit(); }));
+        const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); };
+        window.addEventListener("resize", onResize);
+        window.addEventListener("orientationchange", onResize);
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener("resize", onResize);
+            window.removeEventListener("orientationchange", onResize);
+        };
+    }, [Boolean(bout)]);
 
     // ── THE MUSIC ── it runs for exactly as long as a bout does, and its INTENSITY is your vigour. Losing is
     // audible before it is legible: the hats come in, then the tremolo strings, while you are still reading
@@ -588,7 +648,9 @@ export default function ArenaClient({ initial }) {
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
+                <div ref={ringRef}
+                    style={ringH ? { height: `${ringH}px`, minHeight: 0 } : undefined}
+                    className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
                     + `${stop ? " is-stop" : ""}`
                     + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1208,6 +1270,24 @@ function Styles() {
                 background:
                     radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.18), transparent 72%),
                     radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.5)); }
+            /* ── LANDSCAPE PHONE ── a short, wide viewport leaves ~250px for the whole ring, so every band
+               that is merely nice-to-have gives its pixels back to the stage. The fighters and the deck are
+               what you cannot do without. */
+            @media (orientation: landscape) and (max-height: 480px) {
+                .ar-hud { padding: 4px 8px 0; gap: 4px; }
+                .ar-hud .ar-tag, .ar-round { font-size: 9px; }
+                .ar-bars { padding: 2px 10px 0; }
+                .ar-hpnum { font-size: 9px; }
+                .ar-focus { padding: 2px 10px 0; gap: 6px; }
+                .ar-cdchip { width: 32px; height: 32px; }
+                .ar-cdchip img { width: 21px; height: 21px; }
+                .ar-deck { min-height: 66px; padding: 4px 8px max(4px, env(safe-area-inset-bottom)); }
+                .ar-cmd { padding: 6px 4px; font-size: 10px; }
+                .ar-cmd :global(svg) { width: 16px; height: 16px; }
+                .ar-beat { display: none; }   /* the log line under the deck; the log itself is still below */
+                .ar-dust { display: none; }
+            }
+
             /* ── DUST ── the only thing on screen while a turn-based fight waits for you. */
             .ar-dust { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
             .ar-dust i { position: absolute; bottom: 16%; width: 3px; height: 3px; border-radius: 50%;
@@ -1234,7 +1314,10 @@ function Styles() {
             .ar-tag.is-good { color: #8bf0b4; border-color: rgba(139,240,180,.45); }
             .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
             .ar-tag.is-under { color: #ffd75e; border-color: rgba(255,215,94,.5); }
-            .ar-hud .ar-tag { pointer-events: auto; cursor: pointer; }
+            .ar-hud .ar-tag { pointer-events: auto; cursor: pointer; min-height: 28px; padding: 6px 10px;
+                display: inline-flex; align-items: center; }
+            .ar-hud .ar-tag::after { content: ""; position: absolute; inset: -7px; }
+            .ar-hud .ar-tag { position: relative; }
             .ar-tag u { text-decoration: none; opacity: .65; }
             .ar-el-chip { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
                 font-size: 8.5px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase;
@@ -1533,7 +1616,8 @@ function Styles() {
             .ar-err { margin: 10px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
                 font-size: 12px; font-weight: 800; color: #ffd0a0;
                 background: rgba(255,160,80,0.12); border: 1px solid rgba(255,160,80,0.4); }
-            .ar-btn.is-sm { padding: 8px 14px; font-size: 0.8rem; }
+            /* 31px measured on an iPhone SE. This is the button the entire ladder exists to make you press. */
+            .ar-btn.is-sm { padding: 11px 16px; font-size: 0.8rem; min-height: 40px; }
             .ar-podium { margin: 12px 0 14px; padding: 11px 13px; border-radius: 13px;
                 background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.3); }
             .ar-podium-lab { font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #cdb894; }
@@ -1551,8 +1635,10 @@ function Styles() {
             .ar-target-pos { font-size: 12px; font-weight: 900; color: #ffb0b8; font-variant-numeric: tabular-nums; }
             .ar-target-body { min-width: 0; }
             .ar-target-body b { display: block; font-size: 13px; color: #e9eef3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .ar-target-body em { display: block; font-style: normal; font-size: 10.5px; color: #8a939d;
-                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            /* Was clipped to a single nowrap line, which on a 375px phone ate the win-loss record entirely —
+               "Lv 34 · 241 vigour · 4…". It wraps now; two short lines beat one truncated one. */
+            .ar-target-body em { display: block; font-style: normal; font-size: 10.5px; line-height: 1.35;
+                color: #8a939d; }
             .ar-target-go { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
             .ar-none { font-size: 12.5px; color: #8a939d; }
             .ar-up-row.is-you { border: 1px solid rgba(255,215,94,0.45); background: rgba(255,215,94,0.08); }
@@ -1586,6 +1672,7 @@ function Styles() {
                and a submenu — and because the panel is a flex column, every swap resized the fighters' half
                and the whole scene jumped. The deck now reserves its own height and the stage never moves. */
             .ar-deck { position: relative; z-index: 8; flex: 0 0 auto; min-height: 86px;
+                padding-bottom: max(8px, env(safe-area-inset-bottom));
                 display: flex; flex-direction: column; justify-content: center; padding: 8px;
                 background: linear-gradient(180deg, transparent, rgba(6,4,8,0.82) 38%, rgba(6,4,8,0.95));
                 border-top: 1px solid rgba(255,190,110,0.16); }
@@ -1597,8 +1684,12 @@ function Styles() {
             .ar-cmd :global(svg) { width: 20px; height: 20px; color: var(--cmd, #ffd75e); }
             .ar-cmd:active { transform: translateY(1px); }
             .ar-cmd:disabled { opacity: .35; cursor: default; }
-            .ar-cmd:not(:disabled):hover { background: color-mix(in srgb, var(--cmd) 20%, transparent);
-                border-color: color-mix(in srgb, var(--cmd) 55%, transparent); }
+            /* hover ONLY where a pointer can actually hover. On touch, :hover latches after a tap and the
+               command keeps looking armed long after the beat resolved. */
+            @media (hover: hover) {
+                .ar-cmd:not(:disabled):hover { background: color-mix(in srgb, var(--cmd) 20%, transparent);
+                    border-color: color-mix(in srgb, var(--cmd) 55%, transparent); }
+            }
             .ar-cmd.is-atk { --cmd: #ffd75e; }
             .ar-cmd.is-skill { --cmd: #b061ff; }
             .ar-cmd.is-guard { --cmd: #6fd0ff; }
@@ -1610,7 +1701,9 @@ function Styles() {
                 padding: 6px 9px 6px 6px; border-radius: 11px; cursor: pointer;
                 background: rgba(255,255,255,0.05); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
             .ar-pick:disabled, .ar-pick.is-poor { opacity: .38; cursor: default; }
-            .ar-pick:not(:disabled):hover { background: color-mix(in srgb, var(--el) 16%, transparent); }
+            @media (hover: hover) {
+                .ar-pick:not(:disabled):hover { background: color-mix(in srgb, var(--el) 16%, transparent); }
+            }
             /* Every ability wears the art of the gear it came from — the same argument as printing the item's
                name on it. An ability you cannot trace to a thing you own is magic. */
             .ar-pick-art { flex: 0 0 auto; width: 40px; height: 40px; object-fit: contain;
@@ -1753,12 +1846,16 @@ function Styles() {
                 text-shadow: 0 2px 10px #000, 0 0 30px rgba(255,200,70,.9); }
 
             /* ── THE MUTE ── a fight with music needs an off switch on the fight screen. */
-            .ar-mute { position: absolute; top: 7px; right: 8px; z-index: 26; width: 28px; height: 28px;
+            /* ── TOUCH TARGETS ── measured at 28x28, well under the 44px every mobile guideline asks for.
+               The box stays small so it does not shout on a crowded HUD; the HIT AREA is grown past it with a
+               transparent ::after, which is the standard way to have both. */
+            .ar-mute { position: absolute; top: 7px; right: 8px; z-index: 26; width: 34px; height: 34px;
                 padding: 0; appearance: none; -webkit-appearance: none; border-radius: 9px; cursor: pointer;
                 display: grid; place-items: center; pointer-events: auto;
                 color: #ffe0b0; background: rgba(8,6,10,0.62); border: 1px solid rgba(255,255,255,0.18); }
-            .ar-mute :global(svg) { width: 15px; height: 15px; }
+            .ar-mute :global(svg) { width: 16px; height: 16px; }
             .ar-mute.is-off { color: #7f8790; }
+            .ar-mute::after { content: ""; position: absolute; inset: -6px; }
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
@@ -1766,10 +1863,11 @@ function Styles() {
             /* padding:0 and appearance:none are load-bearing. These were <span>s; making them buttons handed
                them the UA default padding of 1px 6px, which ate 12 of the 30px and shoved every sprite off
                centre inside its own box. */
-            .ar-cdchip { position: relative; width: 30px; height: 30px; padding: 0; appearance: none;
+            .ar-cdchip { position: relative; width: 38px; height: 38px; padding: 0; appearance: none;
                 -webkit-appearance: none; border-radius: 9px; display: grid; place-items: center;
                 background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
-            .ar-cdchip img { width: 22px; height: 22px; object-fit: contain; opacity: .34; filter: grayscale(1); }
+            .ar-cdchip img { width: 26px; height: 26px; object-fit: contain; opacity: .34; filter: grayscale(1); }
+            .ar-cdchip::after { content: ""; position: absolute; inset: -4px; }
             .ar-cdchip.is-ready { border-color: color-mix(in srgb, var(--el) 65%, transparent);
                 box-shadow: 0 0 12px -3px var(--el); }
             .ar-cdchip.is-ready img { opacity: 1; filter: none; }
