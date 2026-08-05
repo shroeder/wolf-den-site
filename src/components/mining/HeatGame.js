@@ -152,6 +152,10 @@ export default function HeatGame({ stack, furnace, onPour }) {
             // followed by a dead beat and a line that teleported. Nothing else in the game does that — the
             // arena ring and the forge both resolve on the frame you tap. The sweep now runs straight through
             // to the next phase; only the grade pop is cleared, and on its own timer so it never gates play.
+            // Re-anchor the sweep so the next pour starts from the LEFT edge. Clearing t0 makes the loop
+            // stamp it again on its very next frame — the reset happens without the 260ms freeze that used to
+            // sit in front of it, so the bar restarts cleanly instead of appearing to teleport.
+            t0.current = 0;
             setPhase((p) => p + 1);
             setTimeout(() => setPop(null), 420);
         }

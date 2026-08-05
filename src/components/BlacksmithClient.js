@@ -839,6 +839,16 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
         lastStrikeAt.current = now;
         const dist = Math.abs(markerRef.current - 0.5);
         const g = gradeFor(dist);
+        // FEEDBACK ON THE STRIKE ITSELF. The SFX map existed but only ever fired on the RESULT — so the
+        // minigame you actually play was silent and dead in the hand, and every hammer blow felt identical
+        // whether you nailed it or missed by a mile. The hammer should tell you before the tally does.
+        try { SFX[g.key]?.(); } catch { /* audio is a bonus */ }
+        try {
+            navigator.vibrate?.(g.key === "pixel" ? [0, 18, 28, 18, 28, 26]
+                : g.key === "perfect" ? [0, 16, 26, 22]
+                    : g.key === "great" ? 22
+                        : g.key === "miss" ? 9 : 14);
+        } catch { /* no haptics */ }
         hitsRef.current[g.key] = (hitsRef.current[g.key] || 0) + 1; // tally this strike's tier
         let keepCombo = g.score >= 2; // Great+ keeps the combo; Good & Miss reset it
         let saved = false;
