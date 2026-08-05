@@ -206,7 +206,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // document, and the tools sat at the very bottom of the longest section where nobody found them.
     // Stations give the ship space: each is a short panel about one thing, and the same tab idiom the farm
     // already uses (Garden / Outside / Inside) so it needs no learning.
+    // ?station=rail|dig|helm — so another screen can link straight to the thing it is talking about. The Rail
+    // (fishing upgrades AND the cast recharge) lives in here as a tab, which means the Fishing page had no way
+    // to point at it: it could only say "go to Sailing" and hope.
     const [station, setStation] = useState("helm"); // the boat-forms gallery is collapsed by default
+    useEffect(() => {
+        const want = new URLSearchParams(window.location.search).get("station");
+        if (want && ["helm", "dig", "rail"].includes(want)) setStation(want);
+    }, []);
     const [toolFx, setToolFx] = useState(null); // { emoji, name, k } — flashes when a dig tool procs
     const [procFx, setProcFx] = useState(null); // { emoji, left, top, k } — the burst on the triggering tile
     const [sensePing, setSensePing] = useState(null); // { r, c, k } — the tile currently rippling a scan pulse

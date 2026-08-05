@@ -468,7 +468,11 @@ export async function startBout(buyerId, targetId = null) {
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed, fortune: foeKit.fortune,
         },
-        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed, fortune: me.fortune },
+        // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
+        // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
+        // "anything >= 0" and it fired on EVERY win — including beating a Straw Dummy.
+        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
+            fortune: me.fortune, gearPower: me.gearPower, level: me.level },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
         hp: me.vigour, maxHp: me.vigour,

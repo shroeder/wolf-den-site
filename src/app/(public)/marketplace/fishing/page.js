@@ -23,5 +23,7 @@ export default async function FishingPage() {
     const state = await getSailingState(buyer.id).catch(() => null);
     if (!state?.fishing) return notFound();
 
-    return <FishingHome fishing={state.fishing} />;
+    // gold and status ride along so this screen can OFFER the recharge and describe the boat, instead of
+    // being a log with one dead-looking link off it.
+    return <FishingHome fishing={state.fishing} gold={state.gold || 0} status={state.status || null} />;
 }

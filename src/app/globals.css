@@ -12381,6 +12381,20 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .fishhome-go em { font-style: normal; font-weight: 700; opacity: 0.72; }
 /* No casts left / not at sea — still a link, but it stops competing with the boards for attention. */
 .fishhome-go.is-quiet { color: #d8cfbb; background: rgba(255,255,255,0.05); border-color: #2f3641; box-shadow: none; font-weight: 700; }
+/* The recharge is a BUTTON now, not a link, so it needs the same shape and to be honestly disabled. */
+.fishhome-go:disabled { cursor: default; }
+.fishhome-go.is-quiet:disabled { opacity: 0.75; }
+.fishhome-note { margin: -6px 0 12px; text-align: center; font-size: 0.78rem; color: #9aa2ab; }
+.fishhome-err { margin: -6px 0 12px; text-align: center; font-size: 0.8rem; font-weight: 800; color: #ffd0a0; }
+/* ── WHERE ELSE TO GO ── this screen had one outbound link and it looked disabled once your casts were
+   spent, so running out of casts meant running out of road. */
+.fishhome-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 18px; }
+.fishhome-nav a { display: grid; gap: 2px; padding: 11px 13px; border-radius: 14px; text-decoration: none;
+    background: rgba(255,255,255,0.045); border: 1px solid #2f3641; transition: background .15s ease, border-color .15s ease; }
+.fishhome-nav a:hover { background: rgba(255,255,255,0.08); border-color: #4a5464; }
+.fishhome-nav b { font-size: 0.9rem; color: #e9eef3; }
+.fishhome-nav em { font-style: normal; font-size: 0.74rem; line-height: 1.3; color: #8a939d; }
+@media (max-width: 380px) { .fishhome-nav { grid-template-columns: 1fr; } }
 /* The log renders inside the page rather than a modal, so drop the modal's own chrome. */
 .fishhome .fish-log { max-height: none; height: auto; }
 /* Your weight against your previous best and the species ceiling. */

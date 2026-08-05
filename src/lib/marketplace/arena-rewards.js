@@ -72,7 +72,13 @@ export const FEATS = [
     {
         id: "giantkiller", name: "Giant-Killer", laurels: 65, vp: 15, color: "#b061ff",
         blurb: "Beat a loadout a quarter stronger than yours.",
-        test: (b) => b.won && (b.foe?.gearPower || 0) >= (b.me?.gearPower || 0) * 1.25,
+        // Belt and braces after this fired on a Straw Dummy: require a real number on BOTH sides, so a
+        // missing field can never read as "infinitely stronger than you" again.
+        test: (b) => {
+            const mine = Number(b.me?.gearPower) || 0;
+            const theirs = Number(b.foe?.gearPower) || 0;
+            return b.won && mine > 0 && theirs >= mine * 1.25;
+        },
     },
     {
         id: "clinical", name: "Clinical", laurels: 45, vp: 8, color: "#6fd0ff",

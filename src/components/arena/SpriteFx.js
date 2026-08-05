@@ -1,121 +1,149 @@
 "use client";
 
 // ── PAINTED VFX ──────────────────────────────────────────────────────────────────────────────────────────────
-// An 8-frame sprite strip played with CSS steps(). One <span>, one background-position animation, no canvas,
-// no library, no per-frame JavaScript — the compositor does all of it.
+// ONE crisp image per effect, moved by CSS. Deliberately NOT a sprite sheet.
 //
-// WHY THIS EXISTS ALONGSIDE SkillFx. SkillFx builds effects out of coloured DOM shapes, which is genuinely
-// free and scales to any new archetype without art. What it cannot do is look PAINTED: a diamond is a diamond
-// however you tween it, so every skill came out as the same scatter in a different hue. These are real drawn
-// effects — fire that gutters, blades that trail, ribbons that siphon inward.
+// WHY NOT A SPRITE SHEET — I tried, three generations and a normalisation pass deep, and it does not work with
+// an image model. The model draws each cell independently: it does not hold an anchor, a scale or a silhouette
+// across a row. Played back, the effect DRIFTS sideways and pulses in size, which reads exactly like a texture
+// sliding behind a window rather than like an animation — and rescaling a ~173px crop up into a 210px box
+// blurs it on top. That is not a tuning problem. Frame-to-frame coherence is the one thing the generator
+// cannot give, and no amount of prompting or post-processing puts it back.
 //
-// WHY THE SHEETS ARE GENERATED ON BLACK. Asking an image model for transparency around fire gives you a hard
-// keyed edge; asking for black and deriving alpha from BRIGHTNESS keeps every soft ember soft. The alpha is
-// baked in at generation time rather than blended at runtime — mix-blend-mode: screen was the first attempt
-// and it does not survive this DOM, because .ar-floor and .ar-ring both create stacking contexts that isolate
-// the blend and leave the effect playing inside an opaque black rectangle.
-// It also means there is no cutout edge anywhere, so the white-halo problem the house rule about outlines,
-// sticker rims and drop shadows exists to prevent cannot occur here.
+// What the model IS excellent at is a single striking image. So each effect is its best frame at full 256px
+// (scripts/extract-arena-vfx-peak.mjs) and the MOTION is CSS transforms. That is coherent by construction —
+// the same pixels, moving — crisp, because 256px art drawn at ~210px is a DOWNSCALE rather than an upscale,
+// tiny at 8-27kb each, and free on a phone: transform and opacity are the two things a compositor animates
+// without touching layout or paint.
 //
-// Sheets are 8 frames × 192px in one row (see scripts/gen-arena-vfx.mjs). A single row is deliberate: a 4×2
-// grid would need two step animations on two axes to stay in sync, and one row needs one.
+// Each kind gets its OWN gesture, because that is where the identity lives now: a flurry stutters across, a
+// drain is pulled inward, a rend climbs, a sunder blows apart. One technique, eleven different movements.
 
-const FRAMES = 8;
-const DUR = 560;   // ms — about 14fps, which is the length of a hit anyway
+// Durations are LITERALS in the CSS below, not interpolated. styled-jsx did not parse `${DUR}ms` inside the
+// `animation` shorthand — getComputedStyle reported animation-duration: 0s, so every effect skipped straight
+// to its final keyframe (opacity 0) and nothing rendered at all. Kept here for reference only.
+const DUR = 520;
 
-// Every one of the eleven kinds has painted art now. SkillFx is still the fallback, so a NEW archetype added
-// later is never left with no effect at all — but nothing in the game currently reaches it.
-const SHEETS = {
-    rend: "/images/arena/vfx/rend-strip.webp",
-    flurry: "/images/arena/vfx/flurry-strip.webp",
-    drain: "/images/arena/vfx/drain-strip.webp",
-    sunder: "/images/arena/vfx/sunder-strip.webp",
-    riposte: "/images/arena/vfx/riposte-strip.webp",
-    spell: "/images/arena/vfx/spell-strip.webp",
-    ward: "/images/arena/vfx/ward-strip.webp",
-    // surge and gamble are DELIBERATELY absent. Both came back from the generator twice as a big soft glow
-    // wash, which blocks badly under compression and reads as a yellow smear over the fighter rather than as
-    // rising power or tumbling coins — verified on the bench at ?fx=1&frame=3. SkillFx draws both of those
-    // well from shapes (embers rising, coins tumbling) with no artifacts at all, so they use it.
-    // Painted art where it is better; generated shapes where they are. Not everything wants to be a photo.
-    // A plain swing and a committed strike both land as an impact.
-    strike: "/images/arena/vfx/impact-strip.webp",
-    hit: "/images/arena/vfx/impact-strip.webp",
-    execute: "/images/arena/vfx/impact-strip.webp",
-    guard: "/images/arena/vfx/ward-strip.webp",
+// The peak frame of each generated effect. `surge` and `gamble` are deliberately absent — both came back from
+// the generator twice as a soft glow wash that blocks badly under compression and reads as a yellow smear over
+// the fighter. SkillFx draws rising embers and tumbling coins better, from shapes, with no artifacts at all.
+const ART = {
+    rend: "/images/arena/vfx/rend-peak.webp",
+    flurry: "/images/arena/vfx/flurry-peak.webp",
+    drain: "/images/arena/vfx/drain-peak.webp",
+    sunder: "/images/arena/vfx/sunder-peak.webp",
+    riposte: "/images/arena/vfx/riposte-peak.webp",
+    spell: "/images/arena/vfx/spell-peak.webp",
+    ward: "/images/arena/vfx/ward-peak.webp",
+    guard: "/images/arena/vfx/ward-peak.webp",
+    strike: "/images/arena/vfx/impact-peak.webp",
+    hit: "/images/arena/vfx/impact-peak.webp",
+    execute: "/images/arena/vfx/impact-peak.webp",
 };
 
-export const hasSheet = (kind) => Boolean(SHEETS[kind]);
+// Which movement each kind uses. The name is the gesture, not the art.
+const MOVE = {
+    rend: "rise", flurry: "stutter", drain: "siphon", sunder: "burst",
+    riposte: "ringback", spell: "spin", ward: "raise", guard: "raise",
+    strike: "punch", hit: "punch", execute: "punch",
+};
 
-// Measured on the bench: a few effects read quieter than the rest — the art is lower contrast, not smaller.
-// SCALING them was the wrong lever and made it worse: a bigger box stays anchored, so the content simply
-// moved outside the visible area (spell went from small to nearly absent). Brightness only.
-const PUNCH_UP = { spell: 1.3, riposte: 1.15, drain: 1.1 };
+export const hasSheet = (kind) => Boolean(ART[kind]);
 
 export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false, charge = false }) {
-    const sheet = SHEETS[kind];
-    if (!sheet) return null;
-    const boost = PUNCH_UP[kind] || 1;
-    // Things you do to YOURSELF (a ward, a surge, a drink) belong over your own body; things you do to THEM
-    // belong where the two of you meet, which is inboard of centre rather than in the middle of a half.
-    const onSelf = kind === "ward" || kind === "surge" || kind === "heal" || kind === "guard";
+    const art = ART[kind];
+    if (!art) return null;
+    const move = MOVE[kind] || "punch";
     return (
-        <span className={`sfx is-${side}${crit ? " is-crit" : ""}${onSelf ? " is-self" : ""}${charge ? " is-charge" : ""}`}
-            aria-hidden="true">
-            {/* --fw is one frame's width on screen: the sheet is FRAMES x the element, so a frame is exactly
-                the element's own width. The keyframe steps by that, in pixels. */}
-            <i style={{
-                backgroundImage: `url(${sheet})`,
-                width: `${size}px`, height: `${size}px`,
-                "--fw": `${size}px`,
-                ...(boost > 1 ? { filter: `brightness(${boost}) saturate(1.2)` } : null),
-            }} />
+        <span className={`sfx is-${side}${crit ? " is-crit" : ""}${charge ? " is-charge" : ""}`} aria-hidden="true">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className={`sfx-art is-${move}`} src={art} alt="" draggable="false"
+                style={{ width: `${size}px`, height: `${size}px` }} />
             <style jsx>{`
-                /* Anchored low and inboard — where two fighters standing on sand actually make contact —
-                   rather than dead centre of a half, which put every impact in the same patch of sky. */
+                /* OVER THE BODY of whoever it happened to. Aiming these at the "contact point" pushed
+                   is-right to flex-start and is-left to flex-end, which are the SAME PLACE — the middle of
+                   the ring — so an enemy blow played between the fighters and read as the enemy hitting
+                   themselves, and nothing ever landed on anybody. */
                 .sfx { position: absolute; top: 0; bottom: 0; width: 52%; z-index: 22;
-                    display: flex; align-items: flex-end; justify-content: center;
-                    padding-bottom: 12%; pointer-events: none; }
-                .sfx.is-right { right: 0; justify-content: flex-start; }
-                .sfx.is-left { left: 0; justify-content: flex-end; }
-                /* A thing you do to yourself sits over your own body, not at the meeting point. */
-                .sfx.is-self.is-right { justify-content: center; }
-                .sfx.is-self.is-left { justify-content: center; }
-                /* The strip itself. background-size 800% lays eight frames across the box; stepping
-                   background-position from 0% to 100% in 8 steps walks them exactly once. */
-                /* ── STEP IN PIXELS, NOT PERCENT ─────────────────────────────────────────────────────────
-                   background-position percentages are relative to (elementWidth - imageWidth), so with 8
-                   frames the correct stops are multiples of 100/7% — while steps(8) from 0% to 100% lands on
-                   multiples of 12.5%. Every "frame" was therefore half of one frame and half of the next,
-                   which is why effects rendered as two overlapping copies side by side.
-                   Sizing the sheet in PIXELS and stepping by exactly one frame width cannot drift. */
-                .sfx > i {
-                    display: block;
-                    background-repeat: no-repeat;
-                    background-size: ${FRAMES * 100}% 100%;
-                    background-position-x: 0px;
-                    /* The sheets carry REAL alpha (baked from brightness at generation time), so this needs
-                       no blend mode. mix-blend-mode: screen was the first attempt and it does not survive
-                       this DOM: .ar-floor and .ar-ring both create stacking contexts, which isolate the
-                       blend — so every effect played inside an opaque black rectangle. */
-                    filter: saturate(1.15);
-                    animation: sfxPlay ${DUR}ms steps(${FRAMES}) forwards;
-                    will-change: background-position;
-                }
-                @keyframes sfxPlay {
-                    from { background-position-x: 0px; }
-                    to { background-position-x: calc(var(--fw) * -${FRAMES}); } }
-                /* A crit gets a bigger, brighter, slightly slower version of the same effect. */
-                .sfx.is-crit > i { transform: scale(1.35); filter: brightness(1.35) saturate(1.2);
-                    animation-duration: ${Math.round(DUR * 1.15)}ms; }
-                /* ── THE CHARGE ── a cast and its impact used the same sheet at the same size, so every skill
-                   flashed the identical effect twice: once over the caster, once over the target, reading as
-                   a stutter rather than as cause and effect. The wind-up is now smaller, dimmer and slower —
-                   power GATHERING — and only the blow that lands plays at full size. */
-                .sfx.is-charge { align-items: center; padding-bottom: 0; }
-                .sfx.is-charge > i { transform: scale(.58); opacity: .8;
-                    filter: brightness(.85) saturate(1.3) blur(.4px);
-                    animation-duration: ${Math.round(DUR * 1.7)}ms; }
+                    display: flex; align-items: center; justify-content: center;
+                    padding-bottom: 6%; pointer-events: none; }
+                .sfx.is-right { right: 0; }
+                .sfx.is-left { left: 0; }
+
+                .sfx-art { display: block; object-fit: contain; transform-origin: 50% 60%;
+                    filter: saturate(1.12); will-change: transform, opacity; }
+
+                /* ── THE GESTURES ── one per kind, so two effects can never move alike. */
+                .is-punch { animation: fxPunch 520ms cubic-bezier(.16,.9,.3,1) both; }
+                @keyframes fxPunch {
+                    0% { opacity: 0; transform: scale(.35) rotate(-8deg); }
+                    18% { opacity: 1; transform: scale(1.18) rotate(2deg); }
+                    46% { transform: scale(1) rotate(0deg); }
+                    100% { opacity: 0; transform: scale(1.3); } }
+
+                /* Three quick cuts, not one — the volume IS the move. */
+                .is-stutter { animation: fxStutter 640ms cubic-bezier(.3,.1,.3,1) both; }
+                @keyframes fxStutter {
+                    0% { opacity: 0; transform: translateX(-18px) scale(.8) rotate(-12deg); }
+                    14% { opacity: 1; transform: translateX(-10px) scale(1.02) rotate(-9deg); }
+                    38% { opacity: .95; transform: translateX(3px) scale(1.08) rotate(3deg); }
+                    64% { opacity: .9; transform: translateX(15px) scale(1.14) rotate(13deg); }
+                    100% { opacity: 0; transform: translateX(24px) scale(1.2) rotate(18deg); } }
+
+                /* Pulled back toward the caster rather than thrown away from the target. */
+                .is-siphon { animation: fxSiphon 680ms cubic-bezier(.4,0,.5,1) both; }
+                @keyframes fxSiphon {
+                    0% { opacity: 0; transform: scale(1.45) rotate(0deg); }
+                    22% { opacity: 1; transform: scale(1.2) rotate(-40deg); }
+                    100% { opacity: 0; transform: scale(.35) rotate(-190deg); } }
+
+                .is-burst { animation: fxBurst 520ms cubic-bezier(.1,.85,.3,1) both; }
+                @keyframes fxBurst {
+                    0% { opacity: 0; transform: scale(.3) rotate(-20deg); }
+                    16% { opacity: 1; transform: scale(1.1) rotate(-4deg); }
+                    100% { opacity: 0; transform: scale(1.6) rotate(14deg); } }
+
+                /* Fire climbs. */
+                .is-rise { animation: fxRise 760ms cubic-bezier(.2,.7,.3,1) both; }
+                @keyframes fxRise {
+                    0% { opacity: 0; transform: translateY(18px) scale(.5, .35); }
+                    20% { opacity: 1; transform: translateY(2px) scale(1.05, 1.12); }
+                    60% { opacity: 1; transform: translateY(-4px) scale(1, 1); }
+                    100% { opacity: 0; transform: translateY(-26px) scale(.86, .8); } }
+
+                /* Out, then home again — a blow returned. */
+                .is-ringback { animation: fxRingback 720ms cubic-bezier(.3,.1,.3,1) both; }
+                @keyframes fxRingback {
+                    0% { opacity: 0; transform: scale(.4); }
+                    28% { opacity: 1; transform: scale(1.35); }
+                    62% { opacity: 1; transform: scale(.9); }
+                    100% { opacity: 0; transform: scale(1.5); } }
+
+                .is-spin { animation: fxSpin 680ms cubic-bezier(.2,.8,.3,1) both; }
+                @keyframes fxSpin {
+                    0% { opacity: 0; transform: scale(.4) rotate(-70deg); }
+                    24% { opacity: 1; transform: scale(1.12) rotate(10deg); }
+                    100% { opacity: 0; transform: scale(1.32) rotate(80deg); } }
+
+                /* A shield comes UP and holds before it goes. */
+                .is-raise { animation: fxRaise 820ms cubic-bezier(.2,1.3,.35,1) both; }
+                @keyframes fxRaise {
+                    0% { opacity: 0; transform: translateY(26px) scale(.6); }
+                    22% { opacity: 1; transform: translateY(0) scale(1.05); }
+                    62% { opacity: 1; transform: translateY(0) scale(1); }
+                    100% { opacity: 0; transform: translateY(-8px) scale(1.08); } }
+
+                /* A crit is the same gesture, bigger and brighter. */
+                .sfx.is-crit { transform: scale(1.28); }
+                .sfx.is-crit .sfx-art { filter: saturate(1.3) brightness(1.3)
+                    drop-shadow(0 0 18px rgba(255,220,140,.8)); }
+
+                /* ── THE CHARGE ── the wind-up before a skill lands. Smaller, dimmer, slower: power
+                   GATHERING. Without it a cast and its impact were the same picture twice, which reads as a
+                   stutter rather than as cause and effect. */
+                .sfx.is-charge { transform: scale(.55); opacity: .85; }
+                .sfx.is-charge .sfx-art { filter: saturate(1.4) brightness(.9);
+                    animation-duration: 990ms; }
             `}</style>
         </span>
     );

@@ -1061,7 +1061,16 @@ export default function ArenaClient({ initial }) {
                     </span>
                     <span className="ar-tonext-label">
                         {st.fightsLeft} of {st.fightsPerDay} challenges left today
-                        {st.laurels ? <> · <b>{money(st.laurels)}</b> laurels</> : null}
+                    </span>
+                    {/* Two numbers with no explanation anywhere is how you get asked "what are laurels".
+                        One line each, on the screen that shows them. */}
+                    <span className="ar-currency">
+                        <i title="Rank. Won by beating people — more for harder opponents. Never spent.">
+                            <b>{money(st.vp)}</b> VP<em>rank · never spent</em>
+                        </i>
+                        <i title="The arena's own currency. Earned every bout, win or lose. Spent in the Armoury.">
+                            <b>{money(st.laurels)}</b> Laurels<em>spend in the Armoury</em>
+                        </i>
                     </span>
                 </div>
             </div>
@@ -1240,6 +1249,13 @@ function Styles() {
             .ar-tonext > i { display: block; height: 100%; border-radius: 999px; background: var(--rank);
                 box-shadow: 0 0 12px -2px var(--rank); transition: width .7s cubic-bezier(.2,.8,.3,1); }
             .ar-tonext-label { display: block; font-size: 11px; color: #8a939d; }
+            /* VP and Laurels, each said in three words. */
+            .ar-currency { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+            .ar-currency i { font-style: normal; display: grid; padding: 4px 9px; border-radius: 9px;
+                background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.12); }
+            .ar-currency b { font-size: 12px; color: #ffd75e; font-variant-numeric: tabular-nums; }
+            .ar-currency em { font-style: normal; font-size: 8.5px; letter-spacing: .06em;
+                text-transform: uppercase; color: #7f8790; }
             .ar-tonext-label b { color: color-mix(in srgb, var(--rank) 70%, white); }
 
             /* ── the buttons ── */

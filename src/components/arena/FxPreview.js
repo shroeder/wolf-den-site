@@ -25,14 +25,14 @@ export default function FxPreview() {
     const [frame, setFrame] = useState(null);
     useEffect(() => {
         const q = new URLSearchParams(window.location.search);
-        const f = q.get("frame");
-        if (f !== null) { setFrame(Math.max(0, Math.min(7, Number(f) || 0))); return undefined; }
+        const f = q.get("seek");
+        if (f !== null) { setFrame(Math.max(0, Math.min(1200, Number(f) || 0))); return undefined; }
         const t = setInterval(() => setN((x) => x + 1), CYCLE);
         return () => clearInterval(t);
     }, []);
     return (
         <div className={`fxb${frame !== null ? " is-paused" : ""}`}
-            style={frame !== null ? { "--seek": `-${(frame * 560) / 8 + 8}ms` } : undefined}>
+            style={frame !== null ? { "--seek": `-${frame}ms` } : undefined}>
             {KINDS.map((k) => (
                 <div key={k} className="fxb-cell">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -65,7 +65,10 @@ export default function FxPreview() {
                 /* Seek-and-hold, so a screenshot lands on a KNOWN frame instead of racing a 560ms animation
                    — which is how "nothing renders" got reported for all eleven when the capture simply
                    landed after they had finished. */
-                .fxb.is-paused .sfx > i { animation-play-state: paused !important;
+                /* Targets .sfx-art — the effect is a single <img> moved by transforms now, not a stepped
+                   background. Left pointing at the old markup this matched nothing and the bench went back
+                   to racing a half-second animation, which is how it reported "nothing renders" twice. */
+                .fxb.is-paused .sfx-art { animation-play-state: paused !important;
                     animation-delay: var(--seek) !important; }
                 .fxb-lab { position: absolute; left: 7px; top: 6px; z-index: 30; font-size: 10px; font-weight: 900;
                     letter-spacing: .14em; text-transform: uppercase; color: #ffe0b0; text-shadow: 0 2px 6px #000; }
