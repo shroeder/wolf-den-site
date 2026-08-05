@@ -52,11 +52,20 @@ function blip(kind) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return;
         const a = new AC();
-        const notes = kind === "win" ? [523, 659, 880] : kind === "hit" ? [420, 300] : kind === "hurt" ? [180, 120] : [330, 300];
+        // A voice per ARCHETYPE, so a spell and a hammer-blow are told apart with your eyes shut. Cheap
+        // synthesis rather than assets: the arena had exactly three sounds and a cast made none of them.
+        const VOICE = {
+            win: [523, 659, 880], hit: [420, 300], hurt: [180, 120],
+            strike: [520, 380], spell: [660, 880, 990], execute: [300, 200, 140],
+            gamble: [440, 620, 440], surge: [392, 523, 659], ward: [260, 330],
+            guard: [240, 300], item: [600, 760], incoming: [220, 170], cast: [480, 600],
+        };
+        const notes = VOICE[kind] || [330, 300];
         notes.forEach((f, i) => {
             const t = a.currentTime + i * 0.06;
             const o = a.createOscillator(), g = a.createGain();
-            o.type = kind === "hurt" ? "sawtooth" : "triangle";
+            o.type = kind === "hurt" || kind === "execute" || kind === "incoming" ? "sawtooth"
+                : kind === "spell" || kind === "surge" ? "sine" : "triangle";
             o.frequency.setValueAtTime(f, t);
             g.gain.setValueAtTime(0.0001, t);
             g.gain.exponentialRampToValueAtTime(0.15, t + 0.012);
@@ -311,8 +320,15 @@ export default function ArenaClient({ initial }) {
     useEffect(() => {
         if (!bout) { prev.current = { hp: null, foeHp: null }; return; }
         const p = prev.current;
-        if (p.hp != null && bout.hp < p.hp) { setShake(2); blip("hurt"); }
-        else if (p.foeHp != null && bout.foeHp < p.foeHp) { setShake(1); blip("hit"); }
+        if (p.hp != null && bout.hp < p.hp) {
+            setShake(2); blip("hurt");
+            try { navigator.vibrate?.([0, 30, 40, 22]); } catch { /* no haptics */ }
+        } else if (p.foeHp != null && bout.foeHp < p.foeHp) {
+            setShake(1); blip("hit");
+            // The buzz scales with what you took off them, so a big hit is felt as well as read.
+            const bite = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.18));
+            try { navigator.vibrate?.(Math.round(10 + bite * 34)); } catch { /* no haptics */ }
+        }
         // SHOW the exchange. Which two stances met is the only moment the read pays off, and it was buried in
         // a line of grey log text under the buttons.
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
@@ -350,20 +366,29 @@ export default function ArenaClient({ initial }) {
     useEffect(() => {
         if (bout?.turn !== "you" || pending?.command !== "skill") { setCastDone(true); return undefined; }
         setCastDone(false);
-        const t = setTimeout(() => setCastDone(true), CAST_MS);
+        const p2 = pending;
+        // The cinematic plays, THEN the blow lands — one owner for the whole sequence, so there is no window
+        // where another effect can resolve the beat out from under it.
+        const t = setTimeout(() => {
+            setCastDone(true);
+            setPending(null); setMenu(null);
+            act("beat", { command: "skill", ability: p2.ability });
+        }, CAST_MS);
         return () => clearTimeout(t);
     }, [pending?.ability, pending?.command, bout?.turn, bout?.beat]);
 
     // ── THE BEAT RESOLVES ITSELF ── nothing to tap any more, so a committed command fires as soon as its
     // cinematic has finished. A skill gets the full cast first; a plain attack goes straight away.
+    // A SKILL IS NOT RESOLVED HERE. Both this and the cast timer run after the same render, and `castDone`
+    // in this closure is still the PREVIOUS value — true — so a skill fired instantly and the cinematic never
+    // got a frame. The cast timer owns firing the skill; this only handles commands with nothing to watch.
     useEffect(() => {
-        if (!pending || !bout || bout.over || bout.turn !== "you" || busy) return undefined;
-        if (pending.command === "skill" && !castDone) return undefined;
+        if (!pending || pending.command === "skill" || !bout || bout.over || bout.turn !== "you" || busy) return undefined;
         const p2 = pending;
         setPending(null); setMenu(null);
         act("beat", { command: p2.command, ability: p2.ability || null });
         return undefined;
-    }, [pending, castDone, bout?.turn, bout?.over, busy, act]);
+    }, [pending, bout?.turn, bout?.over, busy, act]);
 
     // Their beat plays its telegraph and then lands on its own.
     useEffect(() => {
@@ -393,6 +418,9 @@ export default function ArenaClient({ initial }) {
         if (!c) return undefined;
         setFx({ key: `cast-${bout.beat}-${c.name}`, kind: c.kind || "strike", element: c.element,
             side: mineCast ? "left" : "right", crit: false });
+        // The cast is the loudest moment in the fight and it was silent.
+        blip(mineCast ? (c.kind || "strike") : "incoming");
+        try { navigator.vibrate?.(mineCast ? [0, 14, 22, 26] : [0, 26, 30, 14]); } catch { /* no haptics */ }
         const t = setTimeout(() => setFx(null), 900);
         return () => clearTimeout(t);
     }, [pending?.ability, pending?.command, castDone, blockReady, bout?.turn, bout?.beat]);
@@ -1258,7 +1286,11 @@ function Styles() {
             /* ── THE COMMAND DECK ───────────────────────────────────────────────────────────────────────────
                Four commands across the bottom of the panel, JRPG-style. Two of them raise the timing ring and
                two spend the turn outright, which is what makes it a decision rather than four ways to attack. */
-            .ar-deck { position: relative; z-index: 8; flex: 0 0 auto; padding: 8px;
+            /* A FIXED FLOOR FOR THE DECK. Its contents swap between four command buttons, a one-line prompt
+               and a submenu — and because the panel is a flex column, every swap resized the fighters' half
+               and the whole scene jumped. The deck now reserves its own height and the stage never moves. */
+            .ar-deck { position: relative; z-index: 8; flex: 0 0 auto; min-height: 86px;
+                display: flex; flex-direction: column; justify-content: center; padding: 8px;
                 background: linear-gradient(180deg, transparent, rgba(6,4,8,0.82) 38%, rgba(6,4,8,0.95));
                 border-top: 1px solid rgba(255,190,110,0.16); }
             .ar-cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
