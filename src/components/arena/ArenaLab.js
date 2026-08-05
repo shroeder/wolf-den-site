@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import ArenaClient from "@/components/ArenaClient";
+import FxPreview from "@/components/arena/FxPreview";
 import { BATTLE_ITEMS, elementClash } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, featsFor, vpFor } from "@/lib/marketplace/arena-rewards.js";
@@ -193,6 +194,7 @@ export default function ArenaLab() {
     const [scene, setScene] = useState("ladder");
     const [chrome, setChrome] = useState(true);
     const [nonce, setNonce] = useState(0);
+    const [fxBench, setFxBench] = useState(false);
     const handlerRef = useRef(null);
 
     // The scene chosen by the URL, so a screenshot run is just a list of addresses.
@@ -201,6 +203,7 @@ export default function ArenaLab() {
         const s = q.get("scene");
         if (s && SCENES[s]) setScene(s);
         if (q.get("chrome") === "0") setChrome(false);
+        if (q.get("fx") === "1") setFxBench(true);
     }, []);
 
     const initial = useMemo(() => {
@@ -237,6 +240,9 @@ export default function ArenaLab() {
         }
         return gaps;
     }, [initial]);
+
+    // ?fx=1 — the VFX bench. Every effect at playback size over the real plate, side by side.
+    if (fxBench) return <FxPreview />;
 
     return (
         <div className="lab">

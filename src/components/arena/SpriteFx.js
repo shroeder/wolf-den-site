@@ -33,28 +33,43 @@ const SHEETS = {
     riposte: "/images/arena/vfx/riposte-strip.webp",
     spell: "/images/arena/vfx/spell-strip.webp",
     ward: "/images/arena/vfx/ward-strip.webp",
-    surge: "/images/arena/vfx/surge-strip.webp",
-    gamble: "/images/arena/vfx/gamble-strip.webp",
+    // surge and gamble are DELIBERATELY absent. Both came back from the generator twice as a big soft glow
+    // wash, which blocks badly under compression and reads as a yellow smear over the fighter rather than as
+    // rising power or tumbling coins — verified on the bench at ?fx=1&frame=3. SkillFx draws both of those
+    // well from shapes (embers rising, coins tumbling) with no artifacts at all, so they use it.
+    // Painted art where it is better; generated shapes where they are. Not everything wants to be a photo.
     // A plain swing and a committed strike both land as an impact.
     strike: "/images/arena/vfx/impact-strip.webp",
     hit: "/images/arena/vfx/impact-strip.webp",
     execute: "/images/arena/vfx/impact-strip.webp",
     guard: "/images/arena/vfx/ward-strip.webp",
-    heal: "/images/arena/vfx/surge-strip.webp",
 };
 
 export const hasSheet = (kind) => Boolean(SHEETS[kind]);
 
+// Measured on the bench: a few effects read quieter than the rest — the art is lower contrast, not smaller.
+// SCALING them was the wrong lever and made it worse: a bigger box stays anchored, so the content simply
+// moved outside the visible area (spell went from small to nearly absent). Brightness only.
+const PUNCH_UP = { spell: 1.3, riposte: 1.15, drain: 1.1 };
+
 export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false, charge = false }) {
     const sheet = SHEETS[kind];
     if (!sheet) return null;
+    const boost = PUNCH_UP[kind] || 1;
     // Things you do to YOURSELF (a ward, a surge, a drink) belong over your own body; things you do to THEM
     // belong where the two of you meet, which is inboard of centre rather than in the middle of a half.
     const onSelf = kind === "ward" || kind === "surge" || kind === "heal" || kind === "guard";
     return (
         <span className={`sfx is-${side}${crit ? " is-crit" : ""}${onSelf ? " is-self" : ""}${charge ? " is-charge" : ""}`}
             aria-hidden="true">
-            <i style={{ backgroundImage: `url(${sheet})`, width: `${size}px`, height: `${size}px` }} />
+            {/* --fw is one frame's width on screen: the sheet is FRAMES x the element, so a frame is exactly
+                the element's own width. The keyframe steps by that, in pixels. */}
+            <i style={{
+                backgroundImage: `url(${sheet})`,
+                width: `${size}px`, height: `${size}px`,
+                "--fw": `${size}px`,
+                ...(boost > 1 ? { filter: `brightness(${boost}) saturate(1.2)` } : null),
+            }} />
             <style jsx>{`
                 /* Anchored low and inboard — where two fighters standing on sand actually make contact —
                    rather than dead centre of a half, which put every impact in the same patch of sky. */
@@ -68,11 +83,17 @@ export default function SpriteFx({ kind = "hit", side = "right", size = 210, cri
                 .sfx.is-self.is-left { justify-content: center; }
                 /* The strip itself. background-size 800% lays eight frames across the box; stepping
                    background-position from 0% to 100% in 8 steps walks them exactly once. */
+                /* ── STEP IN PIXELS, NOT PERCENT ─────────────────────────────────────────────────────────
+                   background-position percentages are relative to (elementWidth - imageWidth), so with 8
+                   frames the correct stops are multiples of 100/7% — while steps(8) from 0% to 100% lands on
+                   multiples of 12.5%. Every "frame" was therefore half of one frame and half of the next,
+                   which is why effects rendered as two overlapping copies side by side.
+                   Sizing the sheet in PIXELS and stepping by exactly one frame width cannot drift. */
                 .sfx > i {
                     display: block;
                     background-repeat: no-repeat;
                     background-size: ${FRAMES * 100}% 100%;
-                    background-position: 0% 0;
+                    background-position-x: 0px;
                     /* The sheets carry REAL alpha (baked from brightness at generation time), so this needs
                        no blend mode. mix-blend-mode: screen was the first attempt and it does not survive
                        this DOM: .ar-floor and .ar-ring both create stacking contexts, which isolate the
@@ -81,7 +102,9 @@ export default function SpriteFx({ kind = "hit", side = "right", size = 210, cri
                     animation: sfxPlay ${DUR}ms steps(${FRAMES}) forwards;
                     will-change: background-position;
                 }
-                @keyframes sfxPlay { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+                @keyframes sfxPlay {
+                    from { background-position-x: 0px; }
+                    to { background-position-x: calc(var(--fw) * -${FRAMES}); } }
                 /* A crit gets a bigger, brighter, slightly slower version of the same effect. */
                 .sfx.is-crit > i { transform: scale(1.35); filter: brightness(1.35) saturate(1.2);
                     animation-duration: ${Math.round(DUR * 1.15)}ms; }

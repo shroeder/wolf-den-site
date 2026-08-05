@@ -52,8 +52,8 @@ const VFX = {
     // The four kinds still falling back to the generated-shape layer.
     spell: `${SHEET} The effect: a rune circle igniting and rotating, throwing off arcane sparks, then collapsing inward into a bright violet flash. ${LOOK} ${BLACK}`,
     ward: `${SHEET} The effect: interlocking translucent hexagonal shield plates snapping into place to form a curved barrier, flaring bright at the seams, then dimming. ${LOOK} ${BLACK}`,
-    surge: `${SHEET} The effect: golden power rising upward in a column of embers and light streaks, intensifying, then settling into a steady glow. ${LOOK} ${BLACK}`,
-    gamble: `${SHEET} The effect: golden coins and dice tumbling upward through the air trailing sparks, spinning, then scattering out of frame. ${LOOK} ${BLACK}`,
+    surge: `${SHEET} The effect: sharp golden light streaks and distinct rising embers shooting upward, crisp defined shapes with hard bright edges, intensifying then dispersing. NO soft haze, NO large smooth gradient wash, NO fog. ${LOOK} ${BLACK}`,
+    gamble: `${SHEET} The effect: crisply drawn golden coins and dice tumbling upward on black, sharp outlines, distinct separate objects with clear edges and small bright sparks, then scattering. NO soft haze, NO large smooth gradient glow, NO fog. ${LOOK} ${BLACK}`,
 };
 
 async function generate(prompt) {
