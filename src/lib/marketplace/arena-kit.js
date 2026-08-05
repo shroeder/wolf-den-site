@@ -48,23 +48,27 @@ export function elementClash(mine, theirs) {
 // don't transfer literally. What transfers is the identity: the name, the item and the archetype. Each becomes
 // an arena move of the matching character.
 const ARCHETYPE = {
-    firstHitMult: { kind: "strike", focus: 3, power: 2.1, blurb: "A committed opener." },
-    eruptChance: { kind: "strike", focus: 3, power: 2.0, blurb: "Erupts on contact." },
-    critMult: { kind: "strike", focus: 3, power: 2.2, blurb: "Finds the seam." },
-    opportunist: { kind: "execute", focus: 4, power: 2.4, blurb: "Hits far harder on a wounded foe." },
-    onslaught: { kind: "strike", focus: 3, power: 2.2, blurb: "Hits hardest while they're fresh." },
-    giantSlayer: { kind: "strike", focus: 4, power: 2.5, blurb: "Made for bigger things than you." },
-    vanguard: { kind: "surge", focus: 3, power: 1.0, blurb: "Sharpens your next two swings." },
-    attuned: { kind: "spell", focus: 4, power: 2.3, blurb: "Channels your affinity." },
-    bloodlust: { kind: "surge", focus: 3, power: 1.0, blurb: "Feeds on the fight." },
-    packTactics: { kind: "ward", focus: 3, power: 1.0, blurb: "Braces you against the next blow." },
-    overcharge: { kind: "spell", focus: 6, power: 3.2, blurb: "Discharges everything at once." },
-    highroller: { kind: "gamble", focus: 5, power: 3.0, blurb: "All of it, or none of it." },
-    beastbond: { kind: "surge", focus: 3, power: 1.0, blurb: "Your companion piles in." },
-    warbanner: { kind: "ward", focus: 4, power: 1.0, blurb: "A banner nobody wants to fight under." },
-    xpOnHit: { kind: "strike", focus: 2, power: 1.7, blurb: "Studied, precise." },
-    goldOnHit: { kind: "strike", focus: 2, power: 1.7, blurb: "Takes something with it." },
-    ticketOnCrit: { kind: "strike", focus: 2, power: 1.8, blurb: "Lucky." },
+    firstHitMult: { kind: "strike", cd: 3, power: 2.1, blurb: "A committed opener." },
+    eruptChance: { kind: "strike", cd: 3, power: 2.0, blurb: "Erupts on contact." },
+    critMult: { kind: "strike", cd: 3, power: 2.2, blurb: "Finds the seam." },
+    opportunist: { kind: "execute", cd: 4, power: 2.4, blurb: "Hits far harder on a wounded foe." },
+    onslaught: { kind: "strike", cd: 3, power: 2.2, blurb: "Hits hardest while they're fresh." },
+    giantSlayer: { kind: "strike", cd: 4, power: 2.5, blurb: "Made for bigger things than you." },
+    vanguard: { kind: "surge", cd: 3, power: 1.0, blurb: "Sharpens your next two swings." },
+    attuned: { kind: "spell", cd: 4, power: 2.3, blurb: "Channels your affinity." },
+    bloodlust: { kind: "surge", cd: 3, power: 1.0, blurb: "Feeds on the fight." },
+    packTactics: { kind: "ward", cd: 3, power: 1.0, blurb: "Braces you against the next blow." },
+    overcharge: { kind: "spell", cd: 6, power: 3.2, blurb: "Discharges everything at once." },
+    highroller: { kind: "gamble", cd: 5, power: 3.0, blurb: "All of it, or none of it." },
+    beastbond: { kind: "surge", cd: 3, power: 1.0, blurb: "Your companion piles in." },
+    warbanner: { kind: "ward", cd: 4, power: 1.0, blurb: "A banner nobody wants to fight under." },
+    xpOnHit: { kind: "strike", cd: 2, power: 1.7, blurb: "Studied, precise." },
+    goldOnHit: { kind: "strike", cd: 2, power: 1.7, blurb: "Takes something with it." },
+    ticketOnCrit: { kind: "strike", cd: 2, power: 1.8, blurb: "Lucky." },
+    // These two carried no arena move at all, which quietly benched fourteen legendary and mythic pieces —
+    // six helms and eight belts/boots whose signature is written for the BOSS fight. They read across fine.
+    firstHitCrit: { kind: "strike", cd: 3, power: 2.2, blurb: "Opens on a crit." },
+    extraStrikes: { kind: "surge", cd: 3, power: 1.0, blurb: "More swings in you than there should be." },
 };
 
 // Rarity is the dial: the same signature on an eternal hits harder than on a legendary.
@@ -105,7 +109,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
             name: sig.label || item?.name || "Signature",
             from: item?.name || id,          // ALWAYS shown — an ability must be traceable to a piece of gear
             kind: a.kind,
-            focus: a.focus,
+            cooldown: a.cd,
             power: Math.round(a.power * scale * 100) / 100,
             blurb: a.blurb,
             element: elementOf[id] || itemElement(id) || element,
@@ -120,7 +124,7 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
     if (!kit.length) {
         kit.push({
             id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
-            focus: 3, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
+            cooldown: 0, power: 1.9, blurb: "No magic in it. Still hurts.", element, rarity: "common", rank: 0,
         });
     }
     return { element, abilities: kit };
@@ -151,11 +155,11 @@ export function ringMsFor(foeGearPower = 0) {
 // outer edge of perfect is unchanged at 0.10 and its payout drops to make room — the .10 band as a whole is
 // worth what it always was, and the top slice is a callout you have to actually nail.
 export const GRADES = [
-    { key: "flawless", within: 0.05, atk: 1.75, def: 0.82, focus: 4, label: "FLAWLESS" },
-    { key: "perfect", within: 0.10, atk: 1.45, def: 0.70, focus: 3, label: "Perfect" },
-    { key: "great", within: 0.21, atk: 1.30, def: 0.50, focus: 2, label: "Great" },
-    { key: "good", within: 0.40, atk: 1.00, def: 0.28, focus: 1, label: "Good" },
-    { key: "miss", within: Infinity, atk: 0.45, def: 0.0, focus: 0, label: "Missed" },
+    { key: "flawless", within: 0.05, atk: 1.75, def: 0.82, label: "FLAWLESS" },
+    { key: "perfect", within: 0.10, atk: 1.45, def: 0.70, label: "Perfect" },
+    { key: "great", within: 0.21, atk: 1.30, def: 0.50, label: "Great" },
+    { key: "good", within: 0.40, atk: 1.00, def: 0.28, label: "Good" },
+    { key: "miss", within: Infinity, atk: 0.45, def: 0.0, label: "Missed" },
 ];
 
 // ── THE TUNING, AND WHERE IT CAME FROM ───────────────────────────────────────────────────────────────────────
@@ -202,7 +206,15 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
 /** `off` is |how far from the line|, as a fraction of the ring's duration. */
 export const gradeFor = (off) => GRADES.find((g) => Math.abs(off) <= g.within) || GRADES[GRADES.length - 1];
 
-export const FOCUS_MAX = 12;
+// ── COOLDOWNS, NOT FOCUS ─────────────────────────────────────────────────────────────────────────────────────
+// Focus was a pool you filled by timing well and spent on skills. It made every skill interchangeable — a
+// number you saved up — and a bad round of timing locked you out of your own gear entirely. Skills now go on
+// cooldown for a few of your turns after use, so each one has its own rhythm and nothing can lock you out.
+//
+// The cooldowns ARE the old Focus costs, one for one, which keeps the rate of skill use about where the
+// balance pass assumed: an ability with cooldown C is usable once every C+1 turns, so a four-piece kit at
+// C=3 has something ready on 1 - (3/4)^4 = 68% of turns. The tuning assumed skills on ~70% of beats.
+export const GUARD_COOL = 1;        // guarding also shaves a turn off everything cooling
 
 // ── THE FIELD KIT ────────────────────────────────────────────────────────────────────────────────────────────
 // Both fighters get the same small kit every bout. It is deliberately NOT the consumable economy: these cost
@@ -212,12 +224,11 @@ export const FOCUS_MAX = 12;
 export const BATTLE_ITEMS = [
     { id: "poultice", name: "Field Poultice", count: 2, sprite: "/images/arena/item-poultice.webp",
         blurb: "Binds a wound. Restores a quarter of your vigour.", kind: "heal", amount: 0.25 },
-    { id: "draught", name: "Focus Draught", count: 1, sprite: "/images/arena/item-draught.webp",
-        blurb: "Clears your head. Five Focus, at once.", kind: "focus", amount: 5 },
+    { id: "draught", name: "Quickening Draught", count: 1, sprite: "/images/arena/item-draught.webp",
+        blurb: "Every skill you own comes off cooldown at once.", kind: "refresh" },
 ];
 
 // GUARD — no ring, no roll. You give up your swing and take a braced stance: it soaks a slice of the next blow
 // outright and settles you enough to gain Focus. It is the honest answer to a bout going badly, and the reason
 // the command menu is a decision rather than four ways to press attack.
 export const GUARD_SOAK = 0.30;     // of your max vigour, absorbed from what comes next
-export const GUARD_FOCUS = 4;

@@ -31,11 +31,15 @@ const OBJ = `A single fantasy ARENA item game icon, three-quarter view, centered
 const ART = {
     // Unlabelled on purpose — the moment a bottle gets a paper label the model writes crooked nonsense on it.
     "item-poultice": [`${OBJ} A squat round field-medicine jar of thick amber glass with a cork stopper and a leather cord wound round its neck, filled with deep red liquid, a sprig of green herb tucked under the cord.`, "icon"],
+    "arena-bg": [`A wide atmospheric fantasy COLOSSEUM INTERIOR background plate, empty of characters: a sunlit sand arena floor in the foreground, curved tiers of weathered honey-coloured stone seating rising behind, deep shadowed archways around the ring, colourful triangular pennants strung above, dust motes in warm low sunlight, deep perspective. Painterly cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting, fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`, "scene"],
     "item-draught": [`${OBJ} A slender tapered vial of clear glass in a brass filigree cradle, filled with luminous electric-blue liquid giving off a few floating sparks, stoppered with a polished blue gem.`, "icon"],
 };
 
-const SIZE = { icon: "1024x1024" };
-const PX = { icon: 256 };
+// The colosseum is the one image on screen at full size for the whole fight, and it was generated at icon
+// quality: 64kb of mush that reads as one blurry texture behind the fighters. Backdrops get the better tier
+// and real pixels, exactly like the dungeon plates do.
+const SIZE = { icon: "1024x1024", scene: "1536x1024" };
+const PX = { icon: 256, scene: 1280 };
 
 async function generate(prompt, kind) {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -44,8 +48,8 @@ async function generate(prompt, kind) {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
                 body: JSON.stringify({
-                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: "low", n: 1,
-                    background: "transparent",
+                    model: "gpt-image-1", prompt, size: SIZE[kind], quality: kind === "scene" ? "medium" : "low", n: 1,
+                    ...(kind === "scene" ? {} : { background: "transparent" }),
                 }),
             });
             if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 140)}`);
@@ -72,7 +76,7 @@ for (const k of keys) {
         const buf = await generate(prompt, kind);
         const out = path.join(OUT, `${k}.webp`);
         await sharp(buf).resize({ width: PX[kind], withoutEnlargement: true })
-            .webp({ quality: 88, alphaQuality: 100 }).toFile(out);
+            .webp(kind === "scene" ? { quality: 84 } : { quality: 88, alphaQuality: 100 }).toFile(out);
         done += 1;
         console.log(`✓ ${k} (${Math.round(fs.statSync(out).size / 1024)}kb)`);
     } catch (e) {

@@ -378,7 +378,12 @@ export const RECIPES = [
 export const recipeById = (id) => RECIPES.find((r) => r.id === id) || null;
 
 // Where a recipe can drop from. Weighted by tier so the good ones stay rare.
-const DROP_WEIGHT = { 1: 40, 2: 28, 3: 18, 4: 10, 5: 4 };
+//
+// Nudged toward the bottom and middle of the book: 40/28/18/10/4 -> 46/32/20/9/3. This changes the MIX, not
+// the volume — the audited ~1.9 recipes per member per week is untouched, so nothing about how often a recipe
+// appears has moved. What shifts is which one you get. It matters most inside the upper bands, where a source
+// that can teach tiers 3-5 now lands on tier 3 about 63% of the time instead of 56%.
+const DROP_WEIGHT = { 1: 46, 2: 32, 3: 20, 4: 9, 5: 3 };
 
 // ── WHERE RECIPES COME FROM ──────────────────────────────────────────────────────────────────────────────────
 //

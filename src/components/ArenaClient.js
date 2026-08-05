@@ -301,7 +301,7 @@ export default function ArenaClient({ initial }) {
     // ── THE BOUT ──
     // Turn-based, and it looks it. A beat begins with a DECISION off a command deck — attack, skill, guard,
     // item — and only the commands that need execution raise the ring. Everything the fight needs now lives
-    // inside the panel: both fighters, both vigour bars, Focus, the last beat and the deck itself. It used to
+    // inside the panel: both fighters, both vigour bars, cooldowns, the last beat and the deck itself. It used to
     // be a picture on top with the controls stacked underneath it like a form, which is why it read as a page
     // rather than a fight.
     if (bout) {
@@ -407,15 +407,24 @@ export default function ArenaClient({ initial }) {
                         ) : null}
                     </div>
 
-                    {/* Focus, guard and surge live ON the field — they are combat state, not page furniture. */}
+                    {/* WHAT'S READY. Cooldowns, guard and surge live ON the field — combat state, not page
+                        furniture. Focus was a single pool that made every skill interchangeable and could lock
+                        you out of your own gear after one bad round; each skill keeps its own clock now. */}
                     {!bout.over ? (
                         <div className="ar-focus">
-                            <span className="ar-focus-lab">Focus</span>
-                            <span className="ar-focus-bar">
-                                {Array.from({ length: bout.focusMax || 12 }).map((_, i) => (
-                                    <i key={i} className={i < bout.focus ? "is-on" : ""} />
-                                ))}
-                            </span>
+                            {(bout.me?.abilities || []).map((ab) => {
+                                const left = bout.cd?.[ab.id] || 0;
+                                return (
+                                    <span key={ab.id} className={`ar-cdchip${left ? "" : " is-ready"}`}
+                                        style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}>
+                                        {ab.sprite ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={ab.sprite} alt="" draggable="false" />
+                                        ) : null}
+                                        {left ? <i>{left}</i> : null}
+                                    </span>
+                                );
+                            })}
                             {bout.shield > 0 ? <span className="ar-buff is-ward">Braced {bout.shield}</span> : null}
                             {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened &times;{bout.surge}</span> : null}
                         </div>
@@ -453,7 +462,8 @@ export default function ArenaClient({ initial }) {
                             ) : menu === "skill" ? (
                                 <div className="ar-sub">
                                     {abilities.map((ab) => {
-                                        const afford = bout.focus >= ab.focus;
+                                        const left = bout.cd?.[ab.id] || 0;
+                                        const afford = left === 0;
                                         return (
                                             <button key={ab.id} type="button"
                                                 className={`ar-pick${afford ? "" : " is-poor"}`}
@@ -469,7 +479,9 @@ export default function ArenaClient({ initial }) {
                                                     <em>{ab.blurb}</em>
                                                     <i>{ab.from}</i>
                                                 </span>
-                                                <u className="ar-pick-cost">{ab.focus}</u>
+                                                <u className="ar-pick-cost">
+                                                    {left ? `${left} turn${left === 1 ? "" : "s"}` : `${ab.cooldown || 0}t cd`}
+                                                </u>
                                             </button>
                                         );
                                     })}
@@ -586,7 +598,7 @@ export default function ArenaClient({ initial }) {
                                 <b>{ab.name}</b>
                             </span>
                             <em>{ab.blurb}</em>
-                            <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.focus} focus</u></span>
+                            <span className="ar-ability-foot"><i>{ab.from}</i><u>{ab.cooldown || 0}-turn cooldown</u></span>
                         </div>
                     ))}
                 </div>
@@ -1134,10 +1146,14 @@ function Styles() {
 
             .ar-focus { position: relative; z-index: 5; flex: 0 0 auto; padding: 6px 10px 0;
                 display: flex; align-items: center; gap: 9px; flex-wrap: wrap; pointer-events: none; }
-            .ar-focus-lab { font-size: 9.5px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #8a939d; }
-            .ar-focus-bar { display: flex; gap: 3px; }
-            .ar-focus-bar i { width: 9px; height: 14px; border-radius: 2px; background: rgba(255,255,255,0.12); }
-            .ar-focus-bar i.is-on { background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 0 8px rgba(255,176,32,.8); }
+            .ar-cdchip { position: relative; width: 30px; height: 30px; border-radius: 9px; display: grid;
+                place-items: center; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.14); }
+            .ar-cdchip img { width: 22px; height: 22px; object-fit: contain; opacity: .34; filter: grayscale(1); }
+            .ar-cdchip.is-ready { border-color: color-mix(in srgb, var(--el) 65%, transparent);
+                box-shadow: 0 0 12px -3px var(--el); }
+            .ar-cdchip.is-ready img { opacity: 1; filter: none; }
+            .ar-cdchip i { position: absolute; font-style: normal; font-size: 13px; font-weight: 900; color: #fff;
+                text-shadow: 0 2px 6px #000; }
             .ar-buff { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 999px; }
             .ar-buff.is-ward { color: #6fd0ff; border: 1px solid rgba(111,208,255,.5); }
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
