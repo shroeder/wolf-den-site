@@ -8,6 +8,7 @@ import {
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
+import SpriteFx, { hasSheet } from "@/components/arena/SpriteFx";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
@@ -796,8 +797,12 @@ export default function ArenaClient({ initial }) {
                         )) : null}
 
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
+                        {/* Painted sheet where one exists for this kind; the generated-shape layer otherwise,
+                            so a new archetype is never left with no effect at all. */}
                         {fx ? (
-                            <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
+                            hasSheet(fx.kind)
+                                ? <SpriteFx key={fx.key} kind={fx.kind} side={fx.side} crit={fx.crit} />
+                                : <SkillFx key={fx.key} kind={fx.kind} element={fx.element} side={fx.side} crit={fx.crit} />
                         ) : null}
                     </div>
 

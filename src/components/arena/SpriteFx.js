@@ -1,0 +1,75 @@
+"use client";
+
+// ── PAINTED VFX ──────────────────────────────────────────────────────────────────────────────────────────────
+// An 8-frame sprite strip played with CSS steps(). One <span>, one background-position animation, no canvas,
+// no library, no per-frame JavaScript — the compositor does all of it.
+//
+// WHY THIS EXISTS ALONGSIDE SkillFx. SkillFx builds effects out of coloured DOM shapes, which is genuinely
+// free and scales to any new archetype without art. What it cannot do is look PAINTED: a diamond is a diamond
+// however you tween it, so every skill came out as the same scatter in a different hue. These are real drawn
+// effects — fire that gutters, blades that trail, ribbons that siphon inward.
+//
+// WHY THE SHEETS ARE GENERATED ON BLACK. Asking an image model for transparency around fire gives you a hard
+// keyed edge; asking for black and deriving alpha from BRIGHTNESS keeps every soft ember soft. The alpha is
+// baked in at generation time rather than blended at runtime — mix-blend-mode: screen was the first attempt
+// and it does not survive this DOM, because .ar-floor and .ar-ring both create stacking contexts that isolate
+// the blend and leave the effect playing inside an opaque black rectangle.
+// It also means there is no cutout edge anywhere, so the white-halo problem the house rule about outlines,
+// sticker rims and drop shadows exists to prevent cannot occur here.
+//
+// Sheets are 8 frames × 192px in one row (see scripts/gen-arena-vfx.mjs). A single row is deliberate: a 4×2
+// grid would need two step animations on two axes to stay in sync, and one row needs one.
+
+const FRAMES = 8;
+const DUR = 560;   // ms — about 14fps, which is the length of a hit anyway
+
+// Only the kinds that HAVE painted art. Everything else falls back to SkillFx, so adding an archetype never
+// leaves a skill with no effect at all.
+const SHEETS = {
+    rend: "/images/arena/vfx/rend-strip.webp",
+    flurry: "/images/arena/vfx/flurry-strip.webp",
+    drain: "/images/arena/vfx/drain-strip.webp",
+    sunder: "/images/arena/vfx/sunder-strip.webp",
+    riposte: "/images/arena/vfx/riposte-strip.webp",
+    // A plain swing and a committed strike both land as an impact.
+    strike: "/images/arena/vfx/impact-strip.webp",
+    hit: "/images/arena/vfx/impact-strip.webp",
+    execute: "/images/arena/vfx/impact-strip.webp",
+};
+
+export const hasSheet = (kind) => Boolean(SHEETS[kind]);
+
+export default function SpriteFx({ kind = "hit", side = "right", size = 210, crit = false }) {
+    const sheet = SHEETS[kind];
+    if (!sheet) return null;
+    return (
+        <span className={`sfx is-${side}${crit ? " is-crit" : ""}`} aria-hidden="true">
+            <i style={{ backgroundImage: `url(${sheet})`, width: `${size}px`, height: `${size}px` }} />
+            <style jsx>{`
+                .sfx { position: absolute; top: 0; bottom: 0; width: 52%; z-index: 22;
+                    display: grid; place-items: center; pointer-events: none; }
+                .sfx.is-right { right: 0; }
+                .sfx.is-left { left: 0; }
+                /* The strip itself. background-size 800% lays eight frames across the box; stepping
+                   background-position from 0% to 100% in 8 steps walks them exactly once. */
+                .sfx > i {
+                    display: block;
+                    background-repeat: no-repeat;
+                    background-size: ${FRAMES * 100}% 100%;
+                    background-position: 0% 0;
+                    /* The sheets carry REAL alpha (baked from brightness at generation time), so this needs
+                       no blend mode. mix-blend-mode: screen was the first attempt and it does not survive
+                       this DOM: .ar-floor and .ar-ring both create stacking contexts, which isolate the
+                       blend — so every effect played inside an opaque black rectangle. */
+                    filter: saturate(1.15);
+                    animation: sfxPlay ${DUR}ms steps(${FRAMES}) forwards;
+                    will-change: background-position;
+                }
+                @keyframes sfxPlay { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+                /* A crit gets a bigger, brighter, slightly slower version of the same effect. */
+                .sfx.is-crit > i { transform: scale(1.35); filter: brightness(1.35) saturate(1.2);
+                    animation-duration: ${Math.round(DUR * 1.15)}ms; }
+            `}</style>
+        </span>
+    );
+}
