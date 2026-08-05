@@ -413,6 +413,12 @@ export default function ArenaClient({ initial }) {
                     ) : null}
                 </div>
 
+                {/* THE WAY OUT. This render was dropped in the rock-paper-scissors rewrite, and nothing caught
+                    it: the component still existed, the dismiss action still existed, clearBout still existed —
+                    only the one line that mounts it was gone. So every bout since then ended on a dead screen
+                    with no button, and the only escape was reloading the page. */}
+                {bout.over ? <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} /> : null}
+
                 {err ? <p className="ar-err">{err}</p> : null}
                 {bout.log?.length ? (
                     <div className="ar-log">

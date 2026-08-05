@@ -1708,15 +1708,6 @@ function ScenePlot({ p, left, top, bedW = 112, now, busy, bedUrl, bedTiers, crop
 // The controls panel below the pasture: the crops themselves live IN the scene (ScenePlots) — this is just the
 // seed bag, fertilizer, upgrades & owner debug. Shares the same live `garden` passed down from FarmClient.
 // A collapsible section header — themed gold triangle (never a light-blue arrow), rotates when open.
-function PanelToggle({ title, open, onToggle, accent = "#e7dcc4", note = null }) {
-    return (
-        <button type="button" onClick={onToggle} aria-expanded={open} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "11px 0 0", background: "none", border: "none", borderTop: "1px solid rgba(255,255,255,0.1)", color: "inherit", cursor: "pointer", textAlign: "left" }}>
-            <strong style={{ fontSize: 13, color: accent }}>{title}</strong>
-            {note ? <span className="muted" style={{ fontSize: 11 }}>{note}</span> : null}
-            <span aria-hidden="true" style={{ marginLeft: "auto", color: "#ffd75e", fontSize: 12, transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
-        </button>
-    );
-}
 
 // Farm LIKES bar — positive-only, three ascending tiers. On another member's farm the tiers are big tappable
 // buttons (your current pick glows); on your own farm it's a read-only tally of the love you've collected. New
