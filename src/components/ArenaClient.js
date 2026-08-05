@@ -34,6 +34,9 @@ function Portal({ children }) {
 
 const money = (n) => Number(n || 0).toLocaleString();
 
+// How long their move sits on screen before the block ring starts. Long enough to actually read a name.
+const TELEGRAPH_MS = 1100;
+
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
 };
@@ -181,6 +184,8 @@ export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [shake, setShake] = useState(0);
+    const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
+    const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
     const [pending, setPending] = useState(null); // the command you committed to, waiting on the ring
     const [clash, setClash] = useState(null);
@@ -236,6 +241,25 @@ export default function ArenaClient({ initial }) {
     }, [bout]);
     useEffect(() => { logEnd.current?.scrollIntoView?.({ block: "nearest" }); }, [bout?.log?.length]);
 
+    // ── READ IT FIRST ── their beat opens with a beat of nothing but the warning: who is coming and with
+    // what. Defending used to start the instant your own swing resolved, with an identical ring and no idea
+    // what it was for, which is exactly why it felt like a second attack of your own rather than a defence.
+    useEffect(() => {
+        if (!bout || bout.over || bout.turn !== "them") { setBlockReady(true); return undefined; }
+        setBlockReady(false);
+        const t = setTimeout(() => setBlockReady(true), TELEGRAPH_MS);
+        return () => clearTimeout(t);
+    }, [bout?.beat, bout?.turn, bout?.over]);
+
+    // A number, off the blow that actually landed, on the side that took it.
+    useEffect(() => {
+        const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
+        if (!l || !(l.damage > 0)) return undefined;
+        setPop({ id: bout.log.length, side: l.who === "you" ? "right" : "left", n: l.damage, grade: l.grade });
+        const t = setTimeout(() => setPop(null), 950);
+        return () => clearTimeout(t);
+    }, [bout?.log?.length]);
+
     if (!st?.unlocked) return null;
 
     // ── THE BOUT ──
@@ -246,13 +270,17 @@ export default function ArenaClient({ initial }) {
     // rather than a fight.
     if (bout) {
         const yourTurn = !bout.over && bout.turn === "you";
-        const ringUp = !bout.over && (bout.turn === "them" || Boolean(pending));
+        const ringUp = !bout.over && ((bout.turn === "them" && blockReady) || Boolean(pending));
+        const reading = !bout.over && bout.turn === "them" && !blockReady;   // the warning is on screen
+        // A landed blow of yours that was genuinely well timed gets the whole pane to itself for a moment.
+        const lastLog = bout.log?.length ? bout.log[bout.log.length - 1] : null;
+        const bigHit = lastLog?.who === "you" && (lastLog.grade === "flawless" || lastLog.grade === "perfect") && lastLog.damage > 0;
         const abilities = bout.me?.abilities || [];
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         return (
             <section className="card ar">
-                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}`}>
+                <div className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? " is-crit" : ""}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
@@ -275,15 +303,35 @@ export default function ArenaClient({ initial }) {
                             brace={!bout.over && bout.turn === "them"} />
                         <Fighter f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} mirrored hurt={shake === 1} lunge={shake === 2}
                             down={bout.over && bout.won}
-                            wind={!bout.over && bout.turn === "them" ? bout.ringMs : 0}
+                            wind={!bout.over && bout.turn === "them" ? TELEGRAPH_MS + (bout.defRingMs || 1600) : 0}
                             brace={yourTurn && Boolean(pending)} />
+                        {/* THE WARNING. Their whole move, named, before a ring appears. */}
+                        {reading ? (
+                            <div className="ar-incoming" aria-live="polite">
+                                {bout.incoming?.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img className="ar-incoming-art" src={bout.incoming.sprite} alt="" draggable="false" />
+                                ) : null}
+                                <span className="ar-incoming-body">
+                                    <em>{bout.foe.name} is coming with</em>
+                                    <b>{bout.incoming?.name || "a heavy swing"}</b>
+                                </span>
+                            </div>
+                        ) : null}
+
+                        {pop ? (
+                            <span key={pop.id} className={`ar-pop is-${pop.side} is-${pop.grade}`} aria-hidden="true">
+                                &minus;{pop.n}
+                            </span>
+                        ) : null}
+
                         {/* Over THEM when you swing, over YOU when they do — and only once you have
                             committed. Absolutely positioned, so it does not take a column in this grid. */}
                         {ringUp ? (
                             <div className={`ar-ringslot is-${bout.turn}`}>
                                 <TimingRing
                                     key={`${bout.beat}-${bout.turn}-${pending?.command || "block"}`}
-                                    ringMs={bout.ringMs || 1150}
+                                    ringMs={yourTurn ? (bout.ringMs || 1150) : (bout.defRingMs || 1600)}
                                     tone={yourTurn ? "attack" : "defend"}
                                     label={yourTurn ? (pending?.short || "Strike") : "Block"}
                                     onResult={(off) => {
@@ -335,7 +383,9 @@ export default function ArenaClient({ initial }) {
                     {!bout.over ? (
                         <div className="ar-deck">
                             {bout.turn === "them" ? (
-                                <p className="ar-prompt is-def"><b>{bout.foe.name}</b> is winding up — block it</p>
+                                <p className="ar-prompt is-def">
+                                    {reading ? <>Read it — <b>{bout.incoming?.name || "a heavy swing"}</b></> : <>Time your <b>block</b></>}
+                                </p>
                             ) : pending ? (
                                 <p className="ar-prompt is-atk">{pending.label} — time it</p>
                             ) : menu === "skill" ? (
@@ -953,6 +1003,40 @@ function Styles() {
             .ar-prompt b { font-weight: 900; }
             .ar-prompt.is-atk { color: #ffd75e; }
             .ar-prompt.is-def { color: #6fd0ff; }
+
+            /* ── THE WARNING ── deliberately not shaped like the ring. Defending has to look like a different
+               job than attacking, or it reads as another turn of your own. */
+            .ar-incoming { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 19;
+                display: flex; align-items: center; gap: 11px; padding: 10px 15px 10px 11px; border-radius: 14px;
+                background: rgba(8,10,18,0.86); border: 1px solid rgba(111,208,255,0.55);
+                box-shadow: 0 0 34px -6px rgba(111,208,255,0.6); backdrop-filter: blur(3px);
+                animation: arIncoming .32s cubic-bezier(.2,1.4,.35,1) both; pointer-events: none; max-width: 90%; }
+            @keyframes arIncoming { from { opacity: 0; transform: translate(-50%, -50%) scale(.82) }
+                to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
+            .ar-incoming-art { flex: 0 0 auto; width: 38px; height: 38px; object-fit: contain;
+                filter: drop-shadow(0 3px 7px rgba(0,0,0,0.7)); }
+            .ar-incoming-body { display: grid; min-width: 0; }
+            .ar-incoming-body em { font-style: normal; font-size: 10px; letter-spacing: .1em;
+                text-transform: uppercase; color: #6fd0ff; }
+            .ar-incoming-body b { font-size: 15px; color: #fff; line-height: 1.15; }
+
+            /* ── THE NUMBER ── the payoff, on the fighter that took it. */
+            .ar-pop { position: absolute; top: 34%; z-index: 21; font-size: 1.5rem; font-weight: 900;
+                letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000;
+                animation: arPop .95s cubic-bezier(.2,1,.3,1) both; }
+            .ar-pop.is-right { right: 16%; color: #ffd75e; }
+            .ar-pop.is-left { left: 16%; color: #ff8f9a; }
+            .ar-pop.is-flawless { font-size: 2.3rem; color: #fff6cc; text-shadow: 0 3px 12px #000, 0 0 30px #ffe28a; }
+            .ar-pop.is-perfect { font-size: 2rem; }
+            @keyframes arPop { from { opacity: 0; transform: translateY(14px) scale(.7) }
+                25% { opacity: 1; transform: translateY(-6px) scale(1.12) }
+                to { opacity: 0; transform: translateY(-46px) scale(1) } }
+
+            /* A well-timed hit takes the whole pane for a moment. */
+            .ar-ring.is-crit::after { content: ""; position: absolute; inset: 0; z-index: 18; pointer-events: none;
+                background: radial-gradient(60% 50% at 72% 55%, rgba(255,231,150,0.5), transparent 70%);
+                animation: arCrit .42s ease-out both; }
+            @keyframes arCrit { from { opacity: 1 } to { opacity: 0 } }
             /* The slot spans the WHOLE floor. It used to be half-width, positioned over the acting fighter —
                which made it the hit area as well as the artwork, so half of every tap aimed at the middle of
                the fight silently did nothing. TimingRing now draws itself over whoever is acting and takes

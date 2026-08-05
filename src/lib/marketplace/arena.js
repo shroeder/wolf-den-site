@@ -89,6 +89,24 @@ export function rankFor(rung, size) {
 // execution rather than handed out for owning the item.
 const AI_ABILITY_CHANCE = 0.45;      // how often the defender's kit answers with an ability rather than a swing
 
+// Defending felt like taking a second swing of your own: same ring, same tap, no idea what was coming. The
+// cause was structural — the opponent's move was rolled at the moment the beat RESOLVED, so there was nothing
+// to show you beforehand even in principle. It is now chosen the instant their turn begins, published to the
+// client, and consumed when the blow lands. Same randomness, but you get to see it first.
+function pickIncoming(b) {
+    const ability = (b.foe.abilities || []).length && Math.random() < AI_ABILITY_CHANCE
+        ? b.foe.abilities[Math.floor(Math.random() * b.foe.abilities.length)]
+        : null;
+    return {
+        name: ability?.name || "a heavy swing",
+        kind: ability?.kind || "swing",
+        element: ability?.element || b.foe.element || null,
+        sprite: ability?.sprite || null,
+        power: ability && ["strike", "spell", "execute"].includes(ability.kind) ? ability.power : 1,
+        isAbility: Boolean(ability),
+    };
+}
+
 // A defender is not present, so their timing is their GEAR: better loadouts brace and land more reliably. It
 // is deliberately capped below a good human — being outplayed by an absent opponent would feel like a cheat.
 const foeGrade = (gearPower) => {
@@ -324,6 +342,10 @@ function publicBout(b) {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         focus: b.focus, focusMax: FOCUS_MAX, ringMs: b.ringMs, clash: b.clash,
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
+        incoming: b.incoming || null,
+        // Blocking is strictly more work than swinging — you have to read the move first — so the window is
+        // wider on their beat. Same grades, more time to make the call.
+        defRingMs: Math.round((b.ringMs || 1150) * 1.4),
         log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), tell: b.tell, rankUp: b.rankUp || null,
         recap: b.recap || null,
         reward: b.reward || null,
@@ -468,11 +490,10 @@ export async function fightRound(buyerId, opts = {}) {
     } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
         const fg = foeGrade(b.foe.gearPower || 0);
-        // Their kit answers with an ability often enough that facing good gear feels like facing a person.
-        const theirAbility = (b.foe.abilities || []).length && Math.random() < AI_ABILITY_CHANCE
-            ? b.foe.abilities[Math.floor(Math.random() * b.foe.abilities.length)]
-            : null;
-        const power = theirAbility && ["strike", "spell", "execute"].includes(theirAbility.kind) ? theirAbility.power : 1;
+        // Whatever was telegraphed is what lands. Rolling again here would make the warning a lie.
+        const incoming = b.incoming || pickIncoming(b);
+        const theirAbility = incoming.isAbility ? incoming : null;
+        const power = incoming.power || 1;
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back));
@@ -488,8 +509,12 @@ export async function fightRound(buyerId, opts = {}) {
                 : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
             ability: theirAbility?.name || null });
         b.turn = "you";
+        b.incoming = null;
         b.beat += 1;
     }
+
+    // Whoever just acted, if it is now their turn we owe the player a warning.
+    if (b.turn === "them" && !b.incoming) b.incoming = pickIncoming(b);
 
     if (b.foeHp <= 0 || b.hp <= 0) return finishBout(buyerId, row, b, b.foeHp <= 0 && b.hp > 0);
     await saveBout(buyerId, b);
