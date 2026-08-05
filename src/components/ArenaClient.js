@@ -535,7 +535,7 @@ function Styles() {
             .ar-badge { display: flex; align-items: center; gap: 15px; padding: 15px 16px; border-radius: 17px;
                 background: linear-gradient(145deg, color-mix(in srgb, var(--rank) 24%, transparent), rgba(255,255,255,0.02) 66%), rgba(10,8,14,0.5);
                 border: 1px solid color-mix(in srgb, var(--rank) 50%, transparent);
-                box-shadow: 0 14px 34px -20px var(--rank); }
+                box-shadow: 0 14px 34px -20px var(--rank); margin-bottom: 20px; }
             .ar-insignia { flex: 0 0 auto; width: 78px; height: 78px; object-fit: contain;
                 filter: drop-shadow(0 4px 14px color-mix(in srgb, var(--rank) 60%, transparent));
                 animation: arBadgeIn .5s cubic-bezier(.2,1.4,.35,1) both; }
@@ -825,8 +825,8 @@ function Styles() {
             .ar-buff.is-ward { color: #6fd0ff; border: 1px solid rgba(111,208,255,.5); }
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
 
-            .ar-kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 7px; }
-            .ar-ability { text-align: left; padding: 9px 11px; border-radius: 12px; cursor: pointer;
+            .ar-kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 9px; }
+            .ar-ability { text-align: left; padding: 11px 13px; border-radius: 12px; cursor: pointer;
                 background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
             .ar-ability.is-armed { background: color-mix(in srgb, var(--el) 22%, transparent);
                 border-color: var(--el); box-shadow: 0 0 18px -4px var(--el); }
@@ -841,7 +841,7 @@ function Styles() {
             .ar-turn { margin: 10px 0 0; font-size: 12px; text-align: center; color: #cbd3dc; }
 
             .ar-ability.is-static { cursor: default; }
-            .ar-mykit, .ar-toll { margin-bottom: 14px; display: grid; gap: 7px; }
+            .ar-mykit, .ar-toll { margin-bottom: 22px; display: grid; gap: 11px; }
             .ar-el { font-style: normal; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 9.5px;
                 color: var(--el); border: 1px solid color-mix(in srgb, var(--el) 55%, transparent); text-transform: capitalize; }
             .ar-toll-note { margin: 0; font-size: 11.5px; line-height: 1.5; color: #8a939d; }
