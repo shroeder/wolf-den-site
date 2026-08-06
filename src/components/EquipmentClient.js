@@ -445,7 +445,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.78rem" }}>👆 Tap an item to equip it in this slot.</p>
                     {equipped[slot] ? <button type="button" className="pill" onClick={() => unequip(slot)} disabled={busy}>✕ Unequip {itemDef(equipped[slot])?.name}</button> : null}
                     <div className="equip-bag-grid">
-                        {(data.items || []).filter((i) => itemFitsSlot(i, slot)).map((i) => (
+                        {/* Trophies never appear in a slot picker: their bonus is already yours, so offering
+                            one here is offering to waste a slot. See isCollectionItem in items.js. */}
+                        {(data.items || []).filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece).map((i) => (
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equip(slot, i.id)} disabled={busy}>
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
@@ -582,7 +584,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 const it = detailItem;
                 // Slots this piece could go in. Rings accept TWO, so both are compared and each gets its own
                 // "equip here" — otherwise you can't say WHICH ring you meant to replace.
-                const slotDefs = it.equipped ? [] : EQUIP_SLOTS.filter((s) => s.accepts === it.slot);
+                // A collection piece has no loadout question attached to it, so the whole compare/equip half
+                // of this sheet is meaningless for one.
+                const slotDefs = (it.equipped || it.collectionPiece) ? [] : EQUIP_SLOTS.filter((s) => s.accepts === it.slot);
                 const multi = slotDefs.length > 1;
                 const canEquip = !it.shop; // shop preview compares, but you buy before you can equip
                 const statKeys = Object.keys(it.stats || {}).filter((k) => STAT_META[k]);
@@ -728,6 +732,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 {it.depth ? <div className="eqtrait t-depth"><span aria-hidden="true">⛏️</span><span><b>{describeDepth(it.depth)}</b><em>underground — delving · mining · smelting</em></span></div> : null}
                                 {it.farm ? <div className="eqtrait t-farm"><span aria-hidden="true">🌱</span><span><b>{describeFarm(it.farm)}</b><em>on the farm — crops · seeds · harvests</em></span></div> : null}
                                 {it.charge ? <div className="eqtrait t-charge"><span aria-hidden="true">🎁</span><span><b>{it.charge.rewardLabel}</b><em>an in-store perk — can&apos;t be sold</em></span></div> : null}
+                                {it.collectionPiece ? (
+                                    <div className="eqtrait t-set"><span aria-hidden="true">🏆</span><span><b>Collection piece</b><em>Owning it is enough — the bonus is permanent and it never needs to be worn, sold or salvaged.</em></span></div>
+                                ) : null}
                                 {it.setName ? (
                                     (data.setsOverview || []).some((s) => s.id === it.setId) ? (
                                         <button type="button" className="eqtrait t-set is-link" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === it.setId); if (s) setSetDetail(s); }}>
@@ -781,14 +788,14 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 // Equippable gear equips via the per-slot buttons in the comparison above; this is a fallback only.
                                 <button type="button" className="button primary" onClick={() => { equipFromBag(it); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
                             ) : null}
-                            {!it.shop && it.sellValue > 0 ? (
+                            {!it.shop && !it.collectionPiece && it.sellValue > 0 ? (
                                 sellArmed ? (
                                     <button type="button" className="button gold" onClick={() => doSell(it)} disabled={busy}>Confirm — sell for 🪙 {it.sellValue}</button>
                                 ) : (
                                     <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}>🪙 Sell for {it.sellValue}</button>
                                 )
                             ) : null}
-                            {!it.shop && !it.equipped ? (
+                            {!it.shop && !it.equipped && !it.collectionPiece ? (
                                 salvageArmed ? (
                                     <button type="button" className="button" onClick={() => doSalvage(it)} disabled={busy} style={{ borderColor: "rgba(255,154,60,0.6)", color: "#ffb877" }}>🔨 Confirm — salvage for parts</button>
                                 ) : (

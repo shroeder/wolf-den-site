@@ -1,6 +1,6 @@
 import "server-only";
 
-import { itemById, describeStats, describeSea, describeFarm, describeDepth } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeSea, describeFarm, describeDepth, registerCollectionItems } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 
 // EVERY SET NEEDS ITS OWN IDENTITY AT 2 PIECES.
@@ -171,6 +171,9 @@ export const ITEM_SETS = [
 const fullNeed = (set) => set.full || set.items.length;
 
 const SET_BY_ID = Object.fromEntries(ITEM_SETS.map((s) => [s.id, s]));
+// Tell items.js which ids are trophies rather than gear, so equip / sell / salvage can refuse them without
+// importing this module (which imports items.js — the cycle this registration exists to avoid).
+registerCollectionItems(ITEM_SETS.filter((s) => s.collection).flatMap((s) => s.items));
 const SET_BY_ITEM = {};
 for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
 

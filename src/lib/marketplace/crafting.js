@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, isCollectionItem, STAT_META, describeStats } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -247,6 +247,9 @@ export async function salvageItem(buyerId, itemId) {
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
     const equippedSet = new Set(Object.values(await getEquippedIds(buyerId)));
     if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
+    // A collection piece is a permanent bonus wearing an item's clothes. Melting one down for 40% of its parts
+    // would quietly delete that bonus, and nobody makes that trade knowingly.
+    if (isCollectionItem(itemId)) return { ok: false, error: "collection_piece" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
     // Mark it SOLD (same as selling) so an auto-granted LEVEL item is never re-granted — otherwise you could

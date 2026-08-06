@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, isCollectionItem, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
@@ -303,7 +303,10 @@ export async function getInventory(buyerId) {
                 // stats: without it, weighing a new piece against an enhanced one compared the new item to the
                 // equipped item's UNFORGED self and called a downgrade a sidegrade.
                 forgeBonus: enh?.statBonus && Object.keys(enh.statBonus).length ? enh.statBonus : null,
-                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null };
+                util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
+                // A trophy, not gear: the bag draws it as a collected piece and hides Equip / Sell / Salvage,
+                // all three of which the server now refuses anyway.
+                collectionPiece: isCollectionItem(def.id) };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
@@ -357,6 +360,9 @@ export async function sellItem(buyerId, itemId) {
     const item = itemById(itemId);
     if (!item) return { ok: false, error: "unknown_item" };
     if (item.charged) return { ok: false, error: "not_sellable" };
+    // Selling a collection piece would silently delete a permanent bonus for a handful of gold. There is no
+    // version of that trade anybody takes on purpose.
+    if (isCollectionItem(itemId)) return { ok: false, error: "collection_piece" };
     const value = sellValueOf(item);
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
@@ -385,6 +391,9 @@ export async function equipItem(buyerId, slot, itemId) {
     if (!buyerId) throw new Error("Not signed in.");
     const item = itemById(itemId);
     if (!item) throw new Error("Unknown item.");
+    // A collection piece is a trophy, not gear: its bonus is already yours for owning it, so a slot spent on
+    // one buys nothing and costs whatever it displaced. See isCollectionItem in items.js.
+    if (isCollectionItem(itemId)) throw new Error("That's a collection piece — its bonus is already yours, no need to wear it.");
     if (!itemFitsSlot(item, slot)) throw new Error(`That doesn't go in the ${slot} slot.`);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (!owned) throw new Error("You don't own that item.");

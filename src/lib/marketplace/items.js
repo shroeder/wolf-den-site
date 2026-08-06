@@ -661,6 +661,22 @@ export function itemById(id) {
 }
 
 // Does an item fit a given equip slot? (rings fit ring1/ring2)
+// ── A TROPHY IS NOT A SLOT ────────────────────────────────────────────────────────────────────────────────────
+// Collection pieces (the farm / mine / wheel / sailing sets) stopped being worn when their bonuses became
+// permanent on OWNERSHIP — so they must stop occupying a gear slot too, or they are a trap: a slot spent on a
+// piece whose bonus you already had, and combat stats worse than the thing you took off to make room.
+//
+// They are also not SELLABLE or SALVAGEABLE. The bonus follows the piece, so parting with one silently removes
+// a permanent upgrade, and there is no version of that trade a player would knowingly take for 40 parts.
+//
+// The list is derived from sets.js at import time rather than hand-maintained here — a second list of ids is a
+// second thing to forget when a set gains a piece.
+// The ids themselves are REGISTERED by sets.js when it loads, rather than read from it here: items.js is
+// imported BY sets.js, so importing back would be a cycle. One list, one owner, no second place to forget.
+let COLLECTION_ITEM_IDS = new Set();
+export function registerCollectionItems(ids) { COLLECTION_ITEM_IDS = new Set(ids || []); }
+export const isCollectionItem = (itemId) => COLLECTION_ITEM_IDS.has(itemId);
+
 export function itemFitsSlot(item, slot) {
     if (!item) return false;
     const def = EQUIP_SLOTS.find((s) => s.slot === slot);
