@@ -10,6 +10,7 @@ import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, affinityItemIds } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -68,6 +69,17 @@ const BOAT_TIERS = 11;
 const RAID_WIN_GOLD = () => 25 + randInt(51);   // 25–75 gold on a win
 const RAID_LOSS_MIN = 10, RAID_LOSS_MAX = 100;   // 10–100 gold lost on a loss
 const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item of theirs (they keep it)
+// ── RAIDING IS UNDER CONSTRUCTION ────────────────────────────────────────────────────────────────────────────
+// Raids are being rebuilt as SHIP battles — cannons, hull, ammunition, a raiding currency and a board — and the
+// old player-vs-player version is live while that happens. Rather than rip it out (and lose the working sim,
+// the scene and the daily economy in the meantime), the whole surface is gated to the dev allow-list: the
+// owner can still raid, to build and test against real data, and nobody else sees the feature at all.
+//
+// EVERY door has to be locked, not just the button: the CTA, the target list, the buy-another-raid, the
+// upgrade track, the incoming-raid reports and the quest/daily tasks that would otherwise ask a member to do
+// something they cannot reach. `raidsEnabled` is the one predicate they all read.
+export const raidsEnabled = (buyerId) => isOwner(buyerId);
+
 const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
 const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
@@ -972,8 +984,12 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         raid: (() => {
             const cap = raidsPerDay(level, raidSetBonus);
             const used = raidsUsedToday(row);
+            const enabled = raidsEnabled(buyerId);
             return {
-                usedToday: used >= cap, available: used < cap, used, cap,
+                // `enabled` false hides the entire raid surface client-side; `available` is kept false too so
+                // any older client that only checks that one still cannot open the picker.
+                enabled, underConstruction: !enabled,
+                usedToday: used >= cap, available: enabled && used < cap, used, cap,
                 dodgePct: raidDodgePct(raidLevel),
                 canStun: boatPerks(level).raidStun,
                 winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
@@ -1477,6 +1493,7 @@ async function raidTargetById(buyerId, targetId) {
 // The selectable-target list for the raid picker: real passing members + a hint of their GEAR (item count +
 // best rarity) so you can deliberately hunt someone worth plundering. Best-gear-first.
 export async function getRaidTargets(buyerId, limit = 12) {
+    if (!raidsEnabled(buyerId)) return []; // under construction — see raidsEnabled
     const rows = await db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
@@ -1563,6 +1580,7 @@ function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, myCritPow = 
 // Run the once-a-day raid. Win → gold (+0.5% to copy one random item of theirs; they keep it). Lose → 10–100
 // gold. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
 export async function doRaid(buyerId, targetId = null) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
@@ -1704,6 +1722,11 @@ export async function doRaid(buyerId, targetId = null) {
 // by attacker, with their hero card, how many times you beat them, gold earned, and any gear you took. Reading
 // it marks the entries seen so it only pops once.
 export async function getUnseenRaidDefenses(buyerId) {
+    // While raiding is under construction only the dev can raid — but their targets are ordinary members, and
+    // a "you were raided!" report is the feature announcing itself to someone who cannot see it. Nobody loses
+    // anything by being raided (the terms are win-only for the raider), so withholding the report costs them
+    // nothing and keeps the rebuild invisible.
+    if (!raidsEnabled(buyerId)) return [];
     if (!buyerId) return { defenses: [], totalGold: 0, totalWins: 0 };
     const rows = await db
         .query(
@@ -1746,6 +1769,7 @@ export async function getUnseenRaidDefenses(buyerId) {
 // Buy back your daily raid after it's spent. Cost DOUBLES with each reset that day (free while testing). Clears
 // raid_day so the raid is available again, and bumps the per-day reset counter that drives the escalating price.
 export async function resetRaid(buyerId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const { bonusRaids } = await equippedRaidExtras(buyerId);
@@ -2298,7 +2322,11 @@ export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");
 export const upgradeRarity = (buyerId) => buyUpgrade(buyerId, "rarity");
 export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (waves) lever
-export const upgradeRaid = (buyerId) => buyUpgrade(buyerId, "raid"); // the "Raiding" (raid-dodge) lever
+// The "Raiding" (raid-dodge) lever — gated with the rest of raiding, so nobody buys levels in a track whose
+// only effect is on a feature they cannot open.
+export const upgradeRaid = (buyerId) => (raidsEnabled(buyerId)
+    ? buyUpgrade(buyerId, "raid")
+    : Promise.resolve({ ok: false, error: "under_construction" }));
 export const upgradeDig = (buyerId, track) => buyUpgrade(buyerId, `dig_${track}`); // digging tracks
 // Rail tracks — gated like the rest of fishing, so nobody can buy into an unreleased feature.
 export const upgradeFishing = (buyerId, track) => (fishingUnlocked(buyerId)

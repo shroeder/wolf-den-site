@@ -35,7 +35,7 @@ export const FEATURE_DAILIES = {
     sailing: [
         { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
         { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 140 }, rewardLabel: "+140 gold" },
-        { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest", ownerOnly: true }, // raiding is under construction
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
         // the one task you can finish without waiting on a four-hour timer. (Was ownerOnly while fishing was
         // unreleased; the `ownerOnly` filter below is kept for the next feature that needs it.)

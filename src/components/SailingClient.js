@@ -604,9 +604,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         { action: "upgrade_luck", icon: "👋", name: "Luck", data: state.luck,
             desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
             effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`, next: `${state.luck?.wavesNext ?? 0}` },
-        { action: "upgrade_raid", icon: "🏴‍☠️", name: "Raiding", data: state.raiding,
+        ...(state.raid?.enabled ? [{ action: "upgrade_raid", icon: "🏴‍☠️", name: "Raiding", data: state.raiding,
             desc: <>Sea-dog cunning — a chance a raid <b>doesn&apos;t use up</b> your daily raid (raid again!).</>,
-            effLabel: "Free-raid chance", now: `${state.raiding?.pctNow ?? 0}%`, next: `${state.raiding?.pctNext ?? 0}%` },
+            effLabel: "Free-raid chance", now: `${state.raiding?.pctNow ?? 0}%`, next: `${state.raiding?.pctNext ?? 0}%` }] : []),
     ];
     // Digging upgrade tracks (separate system) — gold-leveled; the tools unlock via excavation level.
     const pct = (v) => `${Math.round((v || 0) * 100)}%`;
@@ -896,13 +896,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                             ))}
                         </div>
-                        {state.raid?.available ? (
+                        {/* RAIDING IS UNDER CONSTRUCTION — the whole surface is hidden unless the server says
+                            this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
+                        {!state.raid?.enabled ? null : state.raid?.available ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
                         ) : (
                             <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
                                 {busy ? "…" : resetCost > 0 ? <>⚔️ Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>⚔️ Buy another raid — free (testing)</>}
                             </button>
                         )}
+                        {state.raid?.enabled ? <p className="sail-raid-wip">🚧 Raiding is under construction — dev only. Being rebuilt as ship-to-ship battles.</p> : null}
                     </div>
                 )}
 
@@ -943,7 +946,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <b>Digging</b><em>{dig?.stamina} digs left</em>
                             </button>
                         )}
-                        {liveStatus === "sailing" && (
+                        {liveStatus === "sailing" && state.raid?.enabled && (
                             state.raid?.available ? (
                                 <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
                                     <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
