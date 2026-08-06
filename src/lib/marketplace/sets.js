@@ -169,7 +169,11 @@ export const ITEM_SETS = [
         // can never be worn at once; the capstone unlocks at 8 equipped.
         id: "wheelwarden", collection: true, feature: "wheel", name: "Wheelwarden's Fortune",
         items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
-        full: 8,
+        // `full` used to be 8: two pieces share the main-hand slot, so all ten could never be WORN at once and
+        // the capstone had to unlock early. Nothing is worn now — it is a collection — so the exception has no
+        // reason left, and "All 10" is what the card says. Checked before changing it: nobody holds 8 or 9, so
+        // this takes a live capstone away from no one.
+        full: 10,
         // `luck` = % CHANCE per spin to trigger a Lucky Spin (bonus gold on gold prizes), NOT a guaranteed
         // every-spin bonus — kept as a proc so the set is a fun edge, not an auto-win.
         bonuses: [

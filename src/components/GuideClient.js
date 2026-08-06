@@ -280,15 +280,6 @@ export default function GuideClient() {
                 .gd-stats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 11.5px; color: #8a939d; }
                 .gd-stats b { color: #ffd75e; font-variant-numeric: tabular-nums; }
 
-                .gd-ring { position: relative; flex: 0 0 auto; width: 92px; height: 92px; display: grid; place-items: center; }
-                .gd-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-                .gd-ring-track, .gd-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; }
-                .gd-ring-track { stroke: rgba(255,255,255,0.09); }
-                .gd-ring-fill { stroke: url(#gdgrad); stroke: #ffb020; filter: drop-shadow(0 0 6px rgba(255,176,32,0.55));
-                    transition: stroke-dasharray .7s cubic-bezier(.2,.8,.3,1); }
-                .gd-ring-num { position: relative; text-align: center; line-height: 1; }
-                .gd-ring-num b { display: block; font-size: 1.4rem; font-weight: 900; color: #fff; }
-                .gd-ring-num span { font-size: 10.5px; color: #8a939d; }
 
                 /* ── the point ── */
                 .gd-point-title { margin: 0 0 12px; font-size: 0.82rem; font-weight: 900; letter-spacing: .14em;
@@ -396,6 +387,20 @@ export default function GuideClient() {
             {/* Rules that land on a <Link>. See the note at the top of the file: styled-jsx will not scope a
                 custom component, so these have to be global or they match nothing at all. */}
             <style jsx global>{`
+                /* THE PROGRESS RING. These live in the GLOBAL block because the markup they style is in Ring(),
+                   a separate component in this file — and a scoped block only reaches JSX written inside the
+                   component that owns it. They sat in the scoped block above and matched nothing, so the ring
+                   rendered as a bare number with no circle around it at all. Caught by check:styled-jsx once
+                   it learned to look for this, rather than only for rules aimed at capitalised tags. */
+                .gd-ring { position: relative; flex: 0 0 auto; width: 92px; height: 92px; display: grid; place-items: center; }
+                .gd-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+                .gd-ring-track, .gd-ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; }
+                .gd-ring-track { stroke: rgba(255,255,255,0.09); }
+                .gd-ring-fill { stroke: url(#gdgrad); stroke: #ffb020; filter: drop-shadow(0 0 6px rgba(255,176,32,0.55));
+                    transition: stroke-dasharray .7s cubic-bezier(.2,.8,.3,1); }
+                .gd-ring-num { position: relative; text-align: center; line-height: 1; }
+                .gd-ring-num b { display: block; font-size: 1.4rem; font-weight: 900; color: #fff; }
+                .gd-ring-num span { font-size: 10.5px; color: #8a939d; }
                 .gd-cta { display: inline-flex; align-items: center; justify-content: center; padding: 12px 22px; border-radius: 12px;
                     border: none; cursor: pointer; text-decoration: none; font-size: 0.92rem; font-weight: 900; color: #241500;
                     background: linear-gradient(180deg, #ffe08a, #ffb020); box-shadow: 0 3px 0 #b47a12, 0 10px 26px -10px rgba(255,176,32,0.95);
