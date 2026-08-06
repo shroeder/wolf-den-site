@@ -241,6 +241,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
     const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
+    const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
     // Lock the background from scrolling while any sailing modal is open (raid picker, raid battle, arrival).
@@ -572,6 +573,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             });
             const d = await r.json().catch(() => ({}));
             setRaidTargets(Array.isArray(d.targets) ? d.targets : []);
+            setRaidMine(d.me || null);
         } catch { setRaidTargets([]); }
     }, []);
 
@@ -1452,14 +1454,27 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 <div className="sail-reward-overlay" style={{ padding: 0, alignItems: "stretch" }}>
                     <div className="card sail-recap sail-raid-pick" style={{ width: "100%", maxWidth: "none", height: "100dvh", maxHeight: "100dvh", margin: 0, borderRadius: 0, display: "flex", flexDirection: "column", overflowY: "auto", justifyContent: "flex-start" }}>
                         <div className="sail-raid-crest" aria-hidden="true">🏴‍☠️</div>
-                        <h2 style={{ margin: "6px 0 2px" }}>Choose your target</h2>
+                        <h2 style={{ margin: "6px 0 2px" }}>Pick a ship to run down</h2>
+                        {/* YOUR gun deck, up top: this is a matchup now, and the numbers you are comparing
+                            against are the ones on your own ship. */}
+                        {raidMine ? (
+                            <div className="sail-raid-mine">
+                                <b>Your ship</b>
+                                <span>{raidMine.guns} guns</span>
+                                <span>{raidMine.hull} hull</span>
+                                <span className={`sbt-ammo is-${raidMine.ammo}`}>{raidMine.ammo} shot loaded</span>
+                            </div>
+                        ) : null}
                         <ul className="sail-raid-terms">
                             <li><span>🏆 Win</span> — pocket <b>gold</b> + a <b>{state.raid?.itemChance ?? 0.5}%</b> shot at a copy of one of their items. <em>They lose nothing.</em></li>
-                            <li><span>🏳️ Lose</span> — you drop <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>.</li>
+                            <li><span>🏳️ Lose</span> — you drop <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>, and they take a cut for driving you off.</li>
                             {state.raid?.dodgePct ? <li><span>🍃 Cunning</span> — {state.raid.dodgePct}% chance this <b>won&apos;t use up</b> today&apos;s raid.</li> : null}
-                            {state.raid?.canStun ? <li><span>💫 Warship</span> — you can <b>stun</b> the foe once this fight.</li> : null}
                         </ul>
-                        <p className="muted sail-raid-hint">Ships with the best loot are up top. Pick one to raid.</p>
+                        <p className="muted sail-raid-hint">
+                            A raid is a <b>ship battle</b> — their guns and hull against yours, and one round of
+                            whatever you have loaded. The fattest holds are up top; the ships that can defend them
+                            are not always the same list.
+                        </p>
                         <div className="sail-raid-list">
                             {raidTargets === null ? (
                                 <div className="sail-raid-empty">Scanning the horizon…</div>
@@ -1478,6 +1493,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     <div className="sail-raid-tinfo">
                                         <div className="sail-raid-tname">{t.name} <span className="sail-raid-tlvl">Lv {t.level}</span></div>
                                         {t.handle && t.handle !== t.name ? <div className="sail-raid-thandle muted">@{t.handle}</div> : null}
+                                        {/* What you are sailing into: their broadside, their hull, and what is
+                                            in their racks. A row that only shows the loot is half the decision. */}
+                                        <div className="sail-raid-tship">
+                                            <span className={raidMine && t.guns > raidMine.guns ? "is-worse" : undefined}>{t.guns} guns</span>
+                                            <span className={raidMine && t.hull > raidMine.hull ? "is-worse" : undefined}>{t.hull} hull</span>
+                                            <span className={`sbt-ammo is-${t.ammo}`}>{t.ammo}</span>
+                                        </div>
                                         <div className="sail-raid-tgear">
                                             {t.topRarity
                                                 ? <span className={`sail-raid-rar rar-${t.topRarity}`}>{t.topRarity}</span>
@@ -1491,7 +1513,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </div>
                             ))}
                         </div>
-                        <button className="pill" disabled={busy} onClick={() => { setRaidOpen(false); setRaidTargets(null); }}>Back out</button>
+                        <button className="pill" disabled={busy} onClick={() => { setRaidOpen(false); setRaidTargets(null); setRaidMine(null); }}>Back out</button>
                     </div>
                 </div>
             ) : null}

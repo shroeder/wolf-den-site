@@ -13076,3 +13076,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @media (max-width: 420px) {
     .sby-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* The raid picker is a MATCHUP now — your gun deck at the top, theirs on every row. */
+.sail-raid-mine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 8px 0 2px;
+    padding: 7px 11px; border-radius: 11px; font-size: 0.74rem; color: #cdd3d8;
+    background: rgba(85,200,238,0.1); border: 1px solid rgba(85,200,238,0.35); }
+.sail-raid-mine b { font-size: 0.78rem; color: #9fe6ff; }
+.sail-raid-tship { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 2px 0 1px; font-size: 0.68rem; color: #9aa2ab; }
+/* A stat where THEY out-gun you — the one thing on the row that should stop you tapping Raid. */
+.sail-raid-tship .is-worse { color: #ff9a8a; font-weight: 800; }

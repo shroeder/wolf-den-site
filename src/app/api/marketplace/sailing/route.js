@@ -50,7 +50,7 @@ export async function POST(request) {
                 case "upgrade_rarity": return noStore(await upgradeRarity(g.buyer.id));
                 case "upgrade_luck": return noStore(await upgradeLuck(g.buyer.id));
                 case "upgrade_raid": return noStore(await upgradeRaid(g.buyer.id));
-                case "raid_targets": return noStore({ ok: true, targets: await getRaidTargets(g.buyer.id) });
+                case "raid_targets": return noStore({ ok: true, ...(await getRaidTargets(g.buyer.id)) });
                 case "raid_reset": return noStore(await resetRaid(g.buyer.id));
                 case "raid": return noStore(await doRaid(g.buyer.id, body.target));
                 // Ship battles (under construction — every one of these refuses off the allow-list).

@@ -1536,10 +1536,12 @@ async function raidTargetById(buyerId, targetId) {
     ).catch(() => null);
 }
 
-// The selectable-target list for the raid picker: real passing members + a hint of their GEAR (item count +
-// best rarity) so you can deliberately hunt someone worth plundering. Best-gear-first.
+// The selectable-target list for the raid picker: real passing members, the SHIP you would be fighting (guns
+// and hull, from their gun deck) and a hint of the hold you would be plundering (item count + best rarity).
+// Sorted by the loot, because that is what you are choosing between — but the guns are shown, because that is
+// what decides whether you get it.
 export async function getRaidTargets(buyerId, limit = 12) {
-    if (!raidsEnabled(buyerId)) return []; // under construction — see raidsEnabled
+    if (!raidsEnabled(buyerId)) return { targets: [], me: null }; // under construction — see raidsEnabled
     const rows = await db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
@@ -1568,10 +1570,23 @@ export async function getRaidTargets(buyerId, limit = 12) {
             rider: r.avatar_sprite_url || r.avatar_url || null,
             riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
+            // Their SHIP, in the same two numbers your own gun deck reports.
+            guns: gunsFor(r.gun_level || 0, level), hull: hullFor(r.hull_level || 0, level),
+            ammo: r.loadout || "round",
         };
     });
     list.sort((a, z) => z.gearRank - a.gearRank || z.items - a.items || z.level - a.level);
-    return list.slice(0, limit);
+
+    // What YOU are bringing, so the picker reads as a matchup: their guns against yours, in the same units.
+    const mine = await readRow(buyerId);
+    const myLevel = boatLevelFromUpgrades(mine?.speed_level || 0, mine?.luck_level || 0, mine?.rarity_level || 0, mine?.find_level || 0, mine?.raid_level || 0);
+    return {
+        targets: list.slice(0, limit),
+        me: {
+            guns: gunsFor(mine?.gun_level || 0, myLevel), hull: hullFor(mine?.hull_level || 0, myLevel),
+            ammo: mine?.loadout || "round", level: myLevel,
+        },
+    };
 }
 
 // A fighter's non-zero equipped stats, in display order, for the battle card.
