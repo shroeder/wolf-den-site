@@ -55,7 +55,17 @@ export async function POST(request) {
                 if (!body.image) return noStore({ error: "missing_image" }, { status: 400 });
                 return noStore({ spriteUrl: await setBuyerSprite(body.buyerId, body.image) });
             }
-            if (action === "generate") return noStore({ spriteUrl: await generateBuyerSprite(body.buyerId) });
+            // model/quality are optional TRIAL overrides — omit them and the configured recipe is used. They
+            // exist so a candidate model can be judged on art drawn by the real pipeline, not by a script
+            // that rebuilds the pipeline alongside it and gets the reference image subtly wrong.
+            if (action === "generate") {
+                return noStore({
+                    spriteUrl: await generateBuyerSprite(body.buyerId, {
+                        model: body.model || null,
+                        quality: body.quality || null,
+                    }),
+                });
+            }
             return noStore({ error: "unknown_action" }, { status: 400 });
         } catch (error) {
             if (error?.message && !/database|query/i.test(error.message)) return noStore({ error: error.message }, { status: 400 });

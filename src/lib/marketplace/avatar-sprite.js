@@ -264,7 +264,18 @@ export async function setBuyerSprite(buyerId, base64) {
  *   Return null instead of drawing when the prompt is byte-for-byte what the current sprite was drawn from.
  *   Used by the cron, NOT by a paid or admin redraw (those are someone asking for a re-roll on purpose).
  */
-export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false } = {}) {
+/**
+ * @param {object} [opts]
+ * @param {string} [opts.model]   Override the sprite model for THIS draw only.
+ * @param {string} [opts.quality] Override the quality for THIS draw only.
+ *
+ * The overrides exist so a model or quality can be trialled THROUGH THIS FUNCTION rather than by rebuilding
+ * the pipeline in a throwaway script beside it. That was tried and it produced a false result: the script's
+ * hand-rolled reference image left facialHairProbability unset, DiceBear's 10% default applied, and the
+ * reference went in WITHOUT the member's beard — so a model comparison that looked clean was actually
+ * comparing two different inputs. Anything worth measuring is worth measuring on the real rails.
+ */
+export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false, model = null, quality = null } = {}) {
     const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
@@ -289,7 +300,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false } =
     let verdict = { ok: true, problems: [] };
     const url = await editImage(png, prompt, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
-        model: SPRITE_MODEL, quality: SPRITE_QUALITY,
+        model: model || SPRITE_MODEL, quality: quality || SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
         validate: async (buf) => { verdict = spriteVerdict(await inspectSprite(buf)); return verdict; },
         meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
