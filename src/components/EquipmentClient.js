@@ -186,6 +186,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [setDetail, setSetDetail] = useState(null); // the full set breakdown modal (from a set card or an item's set link)
     const [sellArmed, setSellArmed] = useState(false); // two-tap sell confirm inside the sheet (no native popup)
     const [salvageArmed, setSalvageArmed] = useState(false); // two-tap salvage confirm (sends the piece to the Forge for parts)
+    const [glossOpen, setGlossOpen] = useState(false); // "what do these stats do?" — folded away by default
     const [salvaged, setSalvaged] = useState(null); // brief "salvaged into N parts" toast
     const [coinBurst, setCoinBurst] = useState(null); // coin-shower juice on a sale
     const burstKey = useRef(0);
@@ -250,10 +251,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     }
 
     function openDetail(item) {
-        setSellArmed(false); setSalvageArmed(false); setDetailItem(item);
+        setSellArmed(false); setSalvageArmed(false); setGlossOpen(false); setDetailItem(item);
         trackClient("inspect_item", { itemId: item.id, name: item.name, shop: Boolean(item.shop) });
     }
-    function closeDetail() { setDetailItem(null); setSellArmed(false); setSalvageArmed(false); }
+    function closeDetail() { setDetailItem(null); setSellArmed(false); setSalvageArmed(false); setGlossOpen(false); }
 
     // Salvage an unequipped piece at the Forge → tiered parts (the item is consumed). Refresh the bag after.
     async function doSalvage(item) {
@@ -569,195 +570,219 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 </div>
             ), document.body) : null}
 
-            {detailItem ? createPortal((
-                <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
-                    <div className={`card equip-sheet rar-${detailItem.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                            <ItemArt id={detailItem.id} icon={detailItem.icon} className="equip-card-glyph" />
+            {detailItem ? createPortal((() => {
+                const it = detailItem;
+                // Slots this piece could go in. Rings accept TWO, so both are compared and each gets its own
+                // "equip here" — otherwise you can't say WHICH ring you meant to replace.
+                const slotDefs = it.equipped ? [] : EQUIP_SLOTS.filter((s) => s.accepts === it.slot);
+                const multi = slotDefs.length > 1;
+                const canEquip = !it.shop; // shop preview compares, but you buy before you can equip
+                const statKeys = Object.keys(it.stats || {}).filter((k) => STAT_META[k]);
+                // Every comparison this sheet will draw, worked out ONCE so the header can carry the verdict.
+                const comps = slotDefs.map((sd) => {
+                    const eqId = equipped[sd.slot];
+                    if (eqId === it.id) return null; // already sitting in this slot
+                    const curDef = eqId ? itemDef(eqId) : null;
+                    const cur = curDef ? (ownedById.get(eqId) || curDef) : null;
+                    // Both sides at their REAL numbers — base plus forge.
+                    const mineStats = effStats(it, ownedById);
+                    const curStats = cur ? effStats(cur, ownedById) : {};
+                    const keys = Array.from(new Set([...Object.keys(mineStats), ...Object.keys(curStats)])).filter((k) => STAT_META[k]);
+                    // The verdict weighs the SIZE of the change, not how many stats moved. Counting winners
+                    // made "+1 Might, −2 Ferocity" a sidegrade.
+                    let net = 0;
+                    keys.forEach((k) => { net += (mineStats[k] || 0) - (curStats[k] || 0); });
+                    // What swapping COSTS you that isn't a number. Only the losses live here: everything the new
+                    // piece brings is already spelled out in its own traits above, and printing both sides meant
+                    // the sheet said "Wyrmscale · Dragonlord's set" twice inside one screenful.
+                    const lose = [];
+                    if (cur?.util) lose.push({ icon: "🔮", text: `+${cur.util.value}${cur.util.unit} ${cur.util.label}`, note: "attunement" });
+                    if (cur?.enhanceLevel > 0) lose.push({ icon: "★", text: `Forged to +${cur.enhanceLevel}`, note: "enhancement stays with the piece" });
+                    if (cur?.signature) lose.push({ icon: "☆", text: cur.signature.label, note: cur.signature.desc });
+                    if (cur?.setName && cur.setId !== it.setId) lose.push({ icon: "🛡", text: `${cur.setName} set piece`, note: "may break a set bonus" });
+                    const verdict = !cur ? { label: "FREE SLOT", color: "#8fe39a" }
+                        : net > 0 ? { label: "UPGRADE", color: "#8fe39a" }
+                        : net < 0 ? { label: "DOWNGRADE", color: "#ff8f9a" }
+                        : { label: "SIDEGRADE", color: "#cdd9c6" };
+                    return { sd, cur, mineStats, curStats, keys, net, lose, verdict };
+                }).filter(Boolean);
+                // One slot, one verdict → it belongs in the header, next to the name. Two rings disagree with
+                // each other, so each card keeps its own.
+                const headVerdict = comps.length === 1 ? comps[0].verdict : null;
+                const headNet = comps.length === 1 ? comps[0].net : 0;
+                // A table already prints "equipped → new → change" for every stat, so repeating the raw stat
+                // line above it was pure duplication. Chips only show when nothing is being replaced.
+                const showStatChips = !comps.some((c) => c.cur);
+
+                return (
+                <div className="equip-sheet-overlay" onClick={closeDetail} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)" }}>
+                    <div className={`card equip-sheet has-panes rar-${it.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
+                        <div className="equip-sheet-grip" aria-hidden="true" />
+                        {/* HEADER — pinned. Who the piece is, and the one-word answer to "should I wear it?". */}
+                        <div className="equip-sheet-head">
+                            <ItemArt id={it.id} icon={it.icon} className="equip-card-glyph" />
                             <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detailItem.name}</div>
-                                <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detailItem.rarity} · {detailItem.slot.replace("_", " ")}{detailItem.equipped ? " · Equipped ✓" : ""}</div>
-                                <div style={{ marginTop: 2 }}><ElBadge id={detailItem.id} elements={detailItem.elements} /></div>
+                                <div className="equip-sheet-name">{it.name}</div>
+                                <div className="equip-sheet-sub">
+                                    <span style={{ textTransform: "capitalize" }}>{it.rarity} · {it.slot.replace("_", " ")}</span>
+                                    {it.enhanceLevel > 0 ? <span className="equip-sheet-forge"><ForgeRank level={it.enhanceLevel} size={13} /> +{it.enhanceLevel}</span> : null}
+                                    {it.equipped ? <span style={{ color: "#8fe39a", fontWeight: 800 }}>Equipped</span> : null}
+                                    <ElBadge id={it.id} elements={it.elements} />
+                                </div>
                             </div>
+                            {headVerdict ? (
+                                <span className="eqcmp-verdict" style={{ "--v": headVerdict.color }}>
+                                    {headVerdict.label}{headNet ? ` ${headNet > 0 ? "▲" : "▼"}${Math.abs(headNet)}` : ""}
+                                </span>
+                            ) : null}
                         </div>
-                        <p style={{ margin: "12px 0 0", fontWeight: 700 }}>{describeStats(detailItem.stats) || "No combat stats"}</p>
-                        {/* WHAT THE FORGE ADDED. The sheet showed a "+1" pip on the icon and the merged stat
-                            line, so an enhanced item looked exactly like a lucky roll — you could see that you
-                            had forged it and never what it bought you. Broken out on its own line, in the same
-                            phrasing as every other stat, plus the attunement if one rolled. */}
-                        {detailItem.enhanceLevel > 0 || detailItem.util ? (
-                            <div style={{ margin: "10px 0 0", padding: "9px 11px", borderRadius: 10, background: "rgba(255,183,77,0.09)", border: "1px solid rgba(255,183,77,0.28)" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: "0.8rem", fontWeight: 900, color: "#ffc966" }}>
-                                    {detailItem.enhanceLevel > 0 ? <ForgeRank level={detailItem.enhanceLevel} size={18} /> : null}
-                                    <span>{detailItem.enhanceLevel > 0 ? `Forged to +${detailItem.enhanceLevel}` : "Attuned"}</span>
+
+                        {/* BODY — the only thing that scrolls. */}
+                        <div className="equip-sheet-body">
+                            {showStatChips ? (
+                                <div className="eqstats">
+                                    {statKeys.length ? statKeys.map((k) => (
+                                        <span key={k} className="eqstat">{STAT_META[k].icon} <b>+{it.stats[k]}{STAT_META[k].suffix || ""}</b> {STAT_META[k].label}</span>
+                                    )) : <span className="muted" style={{ fontSize: "0.82rem" }}>No combat stats</span>}
                                 </div>
-                                {detailItem.forgeStats ? (
-                                    <div style={{ marginTop: 5, fontSize: "0.8rem", color: "#f2ead9", fontWeight: 700 }}>{detailItem.forgeStats}<span style={{ color: "#9aa0a6", fontWeight: 600 }}> — on top of the base stats above</span></div>
-                                ) : detailItem.enhanceLevel > 0 ? (
-                                    <div style={{ marginTop: 5, fontSize: "0.78rem", color: "#9aa0a6" }}>No stat bonus recorded for this enhance.</div>
-                                ) : null}
-                                {detailItem.util ? (
-                                    <div style={{ marginTop: 5, fontSize: "0.78rem", color: "#e0c8ff", fontWeight: 700 }}>
-                                        🔮 +{detailItem.util.value}{detailItem.util.unit} {detailItem.util.label}{detailItem.util.level > 1 ? ` Lv${detailItem.util.level}` : ""}
-                                        <span style={{ color: "#9aa0a6", fontWeight: 600 }}> — attunement</span>
-                                    </div>
-                                ) : null}
-                            </div>
-                        ) : null}
-                        {/* Plain-English: what each of this item's stats actually DOES. */}
-                        {Object.keys(detailItem.stats || {}).filter((k) => STAT_META[k]).length ? (
-                            <div style={{ margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
-                                {Object.keys(detailItem.stats).filter((k) => STAT_META[k]).map((k) => (
-                                    <div key={k} style={{ fontSize: "0.78rem", lineHeight: 1.4, color: "#c2c9d2" }}>
-                                        <b style={{ color: "#f2ead9" }}>{STAT_META[k].icon} +{detailItem.stats[k]}{STAT_META[k].suffix || ""} {STAT_META[k].label}</b> — {STAT_META[k].desc}
-                                    </div>
-                                ))}
-                            </div>
-                        ) : null}
-                        {/* Compare against whatever's equipped in the slot(s) this item accepts. Rings accept TWO
-                            slots, so show BOTH — each with its own "Equip here" so you pick which ring to replace. */}
-                        {!detailItem.equipped ? (() => {
-                            const slotDefs = EQUIP_SLOTS.filter((s) => s.accepts === detailItem.slot);
-                            if (!slotDefs.length) return null;
-                            const multi = slotDefs.length > 1;
-                            const canEquip = !detailItem.shop; // shop preview compares but you buy before you can equip
-                            return (
-                                <div style={{ margin: "10px 0 0", display: "flex", flexDirection: "column", gap: 8 }}>
-                                    {multi ? <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9aa0a6" }}>Two {detailItem.slot} slots — choose which to fill:</div> : null}
-                                    {slotDefs.map((sd) => {
-                                        const eqId = equipped[sd.slot];
-                                        if (eqId === detailItem.id) return null; // already sitting in this slot
-                                        const curDef = eqId ? itemDef(eqId) : null;
-                                        const cur = curDef ? (ownedById.get(eqId) || curDef) : null;
+                            ) : null}
 
-                                        // Both sides at their REAL numbers — base plus forge.
-                                        const mineStats = effStats(detailItem, ownedById);
-                                        const curStats = cur ? effStats(cur, ownedById) : {};
-                                        const keys = Array.from(new Set([...Object.keys(mineStats), ...Object.keys(curStats)])).filter((k) => STAT_META[k]);
-
-                                        // The verdict weighs the SIZE of the change, not how many stats moved.
-                                        // Counting winners made "+1 Might, −2 Ferocity" a sidegrade.
-                                        let net = 0;
-                                        keys.forEach((k) => { net += (mineStats[k] || 0) - (curStats[k] || 0); });
-
-                                        // What swapping costs you that ISN'T a number. Losing a Green Thumb
-                                        // attunement or a forge level never appeared anywhere in this panel —
-                                        // you found out after the swap, if at all.
-                                        const lose = [];
-                                        const gain = [];
-                                        if (cur?.util) lose.push({ icon: "🔮", text: `+${cur.util.value}${cur.util.unit} ${cur.util.label}`, note: "attunement" });
-                                        if (detailItem.util) gain.push({ icon: "🔮", text: `+${detailItem.util.value}${detailItem.util.unit} ${detailItem.util.label}`, note: "attunement" });
-                                        if (cur?.enhanceLevel > 0) lose.push({ icon: "★", text: `Forged to +${cur.enhanceLevel}`, note: "enhancement stays with the piece" });
-                                        if (detailItem.enhanceLevel > 0) gain.push({ icon: "★", text: `Forged to +${detailItem.enhanceLevel}`, note: "already enhanced" });
-                                        if (cur?.signature) lose.push({ icon: "☆", text: cur.signature.label, note: cur.signature.desc });
-                                        if (detailItem.signature) gain.push({ icon: "☆", text: detailItem.signature.label, note: detailItem.signature.desc });
-                                        if (cur?.setName && cur.setId !== detailItem.setId) lose.push({ icon: "🛡", text: `${cur.setName} set piece`, note: "may break a set bonus" });
-                                        if (detailItem.setName && cur?.setId !== detailItem.setId) gain.push({ icon: "🛡", text: `${detailItem.setName} set piece`, note: "counts toward that set" });
-
-                                        const verdict = !cur ? { label: "FREE SLOT", color: "#8fe39a" }
-                                            : net > 0 ? { label: "UPGRADE", color: "#8fe39a" }
-                                            : net < 0 ? { label: "DOWNGRADE", color: "#ff8f9a" }
-                                            : { label: "SIDEGRADE", color: "#cdd9c6" };
-
-                                        return (
-                                            <div key={sd.slot} className="eqcmp">
-                                                <div className="eqcmp-head">
-                                                    <span className="eqcmp-title">{multi ? sd.label : "Replacing"}</span>
-                                                    <span className="eqcmp-cur">{cur ? cur.name : "empty slot"}</span>
-                                                    <span className="eqcmp-verdict" style={{ "--v": verdict.color }}>{verdict.label}</span>
-                                                </div>
-
-                                                {cur && keys.length ? (
-                                                    <>
-                                                        <div className="eqcmp-cols">
-                                                            <span />
-                                                            <span>Equipped</span>
-                                                            <span />
-                                                            <span>New</span>
-                                                            <span>Change</span>
-                                                        </div>
-                                                        {keys.map((k) => {
-                                                            const a = mineStats[k] || 0; const b = curStats[k] || 0;
-                                                            const d = a - b; const suf = STAT_META[k].suffix || "";
-                                                            return (
-                                                                <div key={k} className={`eqcmp-row${d > 0 ? " is-up" : d < 0 ? " is-down" : ""}`}>
-                                                                    <span className="eqcmp-stat">{STAT_META[k].icon} {STAT_META[k].label}</span>
-                                                                    <span className="eqcmp-was">{b}{suf}</span>
-                                                                    <span className="eqcmp-arrow" aria-hidden="true">&rarr;</span>
-                                                                    <span className="eqcmp-now">{a}{suf}</span>
-                                                                    <span className="eqcmp-delta">{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</span>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </>
-                                                ) : !cur ? <div className="muted" style={{ fontSize: "0.8rem" }}>Nothing equipped here — a pure gain.</div> : null}
-
-                                                {lose.length || gain.length ? (
-                                                    <div className="eqcmp-extras">
-                                                        {lose.length ? (
-                                                            <div className="eqcmp-ex is-lose">
-                                                                <b>You&rsquo;d lose</b>
-                                                                {lose.map((x, n) => <span key={n}>{x.icon} {x.text}<em>{x.note}</em></span>)}
-                                                            </div>
-                                                        ) : null}
-                                                        {gain.length ? (
-                                                            <div className="eqcmp-ex is-gain">
-                                                                <b>You&rsquo;d gain</b>
-                                                                {gain.map((x, n) => <span key={n}>{x.icon} {x.text}<em>{x.note}</em></span>)}
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                ) : null}
-
-                                                {canEquip ? (
-                                                    <button type="button" className="eqcmp-go" disabled={busy} onClick={() => { equip(sd.slot, detailItem.id); closeDetail(); }}>
-                                                        Equip{multi ? ` to ${sd.label}` : ""}{cur ? ` — replace ${cur.name}` : ""}
-                                                    </button>
-                                                ) : null}
+                            {/* Compare against whatever's equipped in the slot(s) this item accepts. */}
+                            {comps.length ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: showStatChips ? 10 : 0 }}>
+                                    {multi ? <div style={{ fontSize: "0.72rem", fontWeight: 800, color: "#9aa0a6" }}>Two {it.slot} slots — choose which to fill:</div> : null}
+                                    {comps.map(({ sd, cur, mineStats, curStats, keys, lose, verdict }) => (
+                                        <div key={sd.slot} className="eqcmp">
+                                            <div className="eqcmp-head">
+                                                <span className="eqcmp-title">{multi ? sd.label : "Replacing"}</span>
+                                                <span className="eqcmp-cur">{cur ? cur.name : "empty slot"}</span>
+                                                {multi ? <span className="eqcmp-verdict" style={{ "--v": verdict.color }}>{verdict.label}</span> : null}
                                             </div>
-                                        );
-                                    })}
+
+                                            {cur && keys.length ? (
+                                                <>
+                                                    <div className="eqcmp-cols">
+                                                        <span />
+                                                        <span>Equipped</span>
+                                                        <span />
+                                                        <span>New</span>
+                                                        <span>Change</span>
+                                                    </div>
+                                                    {keys.map((k) => {
+                                                        const a = mineStats[k] || 0; const b = curStats[k] || 0;
+                                                        const d = a - b; const suf = STAT_META[k].suffix || "";
+                                                        return (
+                                                            <div key={k} className={`eqcmp-row${d > 0 ? " is-up" : d < 0 ? " is-down" : ""}`}>
+                                                                <span className="eqcmp-stat">{STAT_META[k].icon} {STAT_META[k].label}</span>
+                                                                <span className="eqcmp-was">{b}{suf}</span>
+                                                                <span className="eqcmp-arrow" aria-hidden="true">&rarr;</span>
+                                                                <span className="eqcmp-now">{a}{suf}</span>
+                                                                <span className="eqcmp-delta">{d > 0 ? `+${d}` : d === 0 ? "±0" : d}{suf}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </>
+                                            ) : !cur ? <div className="muted" style={{ fontSize: "0.8rem" }}>Nothing equipped here — a pure gain.</div> : null}
+
+                                            {lose.length ? (
+                                                <div className="eqcmp-extras">
+                                                    <div className="eqcmp-ex is-lose">
+                                                        <b>You&rsquo;d lose</b>
+                                                        {lose.map((x, n) => <span key={n}>{x.icon} {x.text}<em>{x.note}</em></span>)}
+                                                    </div>
+                                                </div>
+                                            ) : null}
+
+                                            {canEquip ? (
+                                                <button type="button" className="eqcmp-go" disabled={busy} onClick={() => { equip(sd.slot, it.id); closeDetail(); }}>
+                                                    Equip{multi ? ` to ${sd.label}` : ""}{cur ? ` — replace ${cur.name}` : ""}
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    ))}
                                 </div>
-                            );
-                        })() : null}
-                        {detailItem.sea ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity: {describeSea(detailItem.sea)} <span className="muted" style={{ fontWeight: 600 }}>— helps you at sea (raids · digging · voyages)</span></p> : null}
-                        {detailItem.depth ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#ffb45e" }}>⛏️ Depths affinity: {describeDepth(detailItem.depth)} <span className="muted" style={{ fontWeight: 600 }}>— helps you underground (delving · mining · smelting)</span></p> : null}
-                        {detailItem.farm ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", fontWeight: 800, color: "#8fe39a" }}>🌱 Farm affinity: {describeFarm(detailItem.farm)} <span className="muted" style={{ fontWeight: 600 }}>— helps you on the farm (crops · seeds · harvests)</span></p> : null}
-                        {detailItem.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {detailItem.signature.label} — {detailItem.signature.desc}</p> : null}
-                        {detailItem.charge ? <p className="muted" style={{ margin: "6px 0 0", fontSize: "0.85rem" }}>🎁 {detailItem.charge.rewardLabel} — an in-store perk (can&apos;t be sold).</p> : null}
-                        {detailItem.setId && (data.setsOverview || []).some((s) => s.id === detailItem.setId) ? (
-                            <button type="button" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === detailItem.setId); if (s) setSetDetail(s); }} style={{ margin: "8px 0 0", padding: "7px 11px", borderRadius: 8, border: "1px solid rgba(143,216,255,0.45)", background: "rgba(143,216,255,0.08)", color: "#8fd8ff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                                <HelmetSprite size={15} /> Part of the {detailItem.setName} set <span style={{ opacity: 0.7 }}>· view set ›</span>
-                            </button>
-                        ) : detailItem.setName ? (
-                            <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#8fd8ff", display: "inline-flex", alignItems: "center", gap: 6 }}><HelmetSprite size={15} /> Part of the {detailItem.setName} set</p>
-                        ) : null}
-                        {detailItem.shop ? <p style={{ margin: "8px 0 0", fontSize: "0.95rem", fontWeight: 800, color: detailItem.canAfford ? "#ffd75e" : "#c9a24a" }}>🪙 {detailItem.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55, fontWeight: 700 }}>{(detailItem.cost || 0).toLocaleString()}</span> {(detailItem.effectiveCost || 0).toLocaleString()}</> : (detailItem.cost || 0).toLocaleString()} gold{detailItem.discounted ? ` · ${data.coupon?.pct || 50}% off` : ""}{detailItem.canAfford ? "" : " · not enough"}</p> : null}
-                        <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-                            {detailItem.shop ? (
-                                detailItem.canAfford ? (
-                                    <button type="button" className="button gold" onClick={() => { buy(detailItem); closeDetail(); }} disabled={busy}>
-                                        🪙 Buy for {((detailItem.discounted ? detailItem.effectiveCost : detailItem.cost) || 0).toLocaleString()}
+                            ) : null}
+
+                            {/* WHAT MAKES IT SPECIAL — forge, attunement, signature, affinities, set, perk. Each
+                                said exactly once, in one column, instead of scattered down the sheet AND repeated
+                                inside the comparison's "you'd gain" box. */}
+                            <div className="eqtraits">
+                                {it.enhanceLevel > 0 && it.forgeStats ? (
+                                    <div className="eqtrait t-forge"><span aria-hidden="true"><ForgeRank level={it.enhanceLevel} size={15} /></span><span><b>Forged to +{it.enhanceLevel}</b><em>{it.forgeStats} — on top of the stats above</em></span></div>
+                                ) : null}
+                                {it.util ? (
+                                    <div className="eqtrait t-att"><span aria-hidden="true">🔮</span><span><b>+{it.util.value}{it.util.unit} {it.util.label}{it.util.level > 1 ? ` Lv${it.util.level}` : ""}</b><em>attunement — a bonus rolled at the Forge</em></span></div>
+                                ) : null}
+                                {it.signature ? (
+                                    <div className="eqtrait t-sig"><span aria-hidden="true">★</span><span><b>{it.signature.label}</b><em>{it.signature.desc}</em></span></div>
+                                ) : null}
+                                {it.sea ? <div className="eqtrait t-sea"><span aria-hidden="true">⚓</span><span><b>{describeSea(it.sea)}</b><em>at sea — raids · digging · voyages</em></span></div> : null}
+                                {it.depth ? <div className="eqtrait t-depth"><span aria-hidden="true">⛏️</span><span><b>{describeDepth(it.depth)}</b><em>underground — delving · mining · smelting</em></span></div> : null}
+                                {it.farm ? <div className="eqtrait t-farm"><span aria-hidden="true">🌱</span><span><b>{describeFarm(it.farm)}</b><em>on the farm — crops · seeds · harvests</em></span></div> : null}
+                                {it.charge ? <div className="eqtrait t-charge"><span aria-hidden="true">🎁</span><span><b>{it.charge.rewardLabel}</b><em>an in-store perk — can&apos;t be sold</em></span></div> : null}
+                                {it.setName ? (
+                                    (data.setsOverview || []).some((s) => s.id === it.setId) ? (
+                                        <button type="button" className="eqtrait t-set is-link" onClick={() => { const s = (data.setsOverview || []).find((x) => x.id === it.setId); if (s) setSetDetail(s); }}>
+                                            <span aria-hidden="true"><HelmetSprite size={15} /></span>
+                                            <span><b>{it.setName} set piece</b><em>see the whole set and its bonuses ›</em></span>
+                                        </button>
+                                    ) : (
+                                        <div className="eqtrait t-set"><span aria-hidden="true"><HelmetSprite size={15} /></span><span><b>{it.setName} set piece</b><em>counts toward that set</em></span></div>
+                                    )
+                                ) : null}
+                            </div>
+
+                            {/* The plain-English "what is Ferocity" block was five lines of teaching stacked on
+                                top of the numbers every single time. Folded away — read once, then never again. */}
+                            {statKeys.length ? (
+                                <div className="eqgloss">
+                                    <button type="button" className="eqgloss-btn" onClick={() => setGlossOpen((v) => !v)} aria-expanded={glossOpen}>
+                                        {glossOpen ? "▾" : "▸"} What do these stats do?
+                                    </button>
+                                    {glossOpen ? (
+                                        <div className="eqgloss-list">
+                                            {statKeys.map((k) => (
+                                                <div key={k}><b>{STAT_META[k].icon} {STAT_META[k].label}</b> — {STAT_META[k].desc}</div>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {/* FOOTER — pinned, so buy/sell/close never scroll out of reach. */}
+                        <div className="equip-sheet-foot">
+                            {it.shop ? (
+                                <span className="equip-sheet-price" style={{ color: it.canAfford ? "#ffd75e" : "#c9a24a" }}>
+                                    🪙 {it.discounted ? <><span style={{ textDecoration: "line-through", opacity: 0.55 }}>{(it.cost || 0).toLocaleString()}</span> {(it.effectiveCost || 0).toLocaleString()}</> : (it.cost || 0).toLocaleString()}
+                                    {it.discounted ? <em> {data.coupon?.pct || 50}% off</em> : null}
+                                    {it.canAfford ? null : <em> not enough</em>}
+                                </span>
+                            ) : null}
+                            {it.shop ? (
+                                it.canAfford ? (
+                                    <button type="button" className="button gold" onClick={() => { buy(it); closeDetail(); }} disabled={busy}>
+                                        🪙 Buy for {((it.discounted ? it.effectiveCost : it.cost) || 0).toLocaleString()}
                                     </button>
                                 ) : (
-                                    <CoinCta price={detailItem.cost} label="Get coins to buy" />
+                                    <CoinCta price={it.cost} label="Get coins to buy" />
                                 )
-                            ) : detailItem.equipped ? (
-                                <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === detailItem.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
-                            ) : EQUIP_SLOTS.filter((s) => s.accepts === detailItem.slot).length === 0 ? (
+                            ) : it.equipped ? (
+                                <button type="button" className="button" onClick={() => { const s = Object.keys(equipped).find((k) => equipped[k] === it.id); if (s) unequip(s); closeDetail(); }} disabled={busy}>Unequip</button>
+                            ) : !slotDefs.length ? (
                                 // Equippable gear equips via the per-slot buttons in the comparison above; this is a fallback only.
-                                <button type="button" className="button primary" onClick={() => { equipFromBag(detailItem); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
+                                <button type="button" className="button primary" onClick={() => { equipFromBag(it); closeDetail(); }} disabled={busy}>⚔️ Equip</button>
                             ) : null}
-                            {!detailItem.shop && detailItem.sellValue > 0 ? (
+                            {!it.shop && it.sellValue > 0 ? (
                                 sellArmed ? (
-                                    <button type="button" className="button gold" onClick={() => doSell(detailItem)} disabled={busy}>Confirm — sell for 🪙 {detailItem.sellValue}</button>
+                                    <button type="button" className="button gold" onClick={() => doSell(it)} disabled={busy}>Confirm — sell for 🪙 {it.sellValue}</button>
                                 ) : (
-                                    <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}>🪙 Sell for {detailItem.sellValue}</button>
+                                    <button type="button" className="pill" onClick={() => { setSellArmed(true); setSalvageArmed(false); }} disabled={busy}>🪙 Sell for {it.sellValue}</button>
                                 )
                             ) : null}
-                            {!detailItem.shop && !detailItem.equipped ? (
+                            {!it.shop && !it.equipped ? (
                                 salvageArmed ? (
-                                    <button type="button" className="button" onClick={() => doSalvage(detailItem)} disabled={busy} style={{ borderColor: "rgba(255,154,60,0.6)", color: "#ffb877" }}>🔨 Confirm — salvage for parts</button>
+                                    <button type="button" className="button" onClick={() => doSalvage(it)} disabled={busy} style={{ borderColor: "rgba(255,154,60,0.6)", color: "#ffb877" }}>🔨 Confirm — salvage for parts</button>
                                 ) : (
                                     <button type="button" className="pill" onClick={() => { setSalvageArmed(true); setSellArmed(false); }} disabled={busy} title="Break it down at the Forge into crafting parts">🔨 Salvage</button>
                                 )
@@ -766,7 +791,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         </div>
                     </div>
                 </div>
-            ), document.body) : null}
+                );
+            })(), document.body) : null}
 
             {/* Full set breakdown (opened from a set card or an item's "part of a set" link). Read the LIVE set
                 from data so equip/unequip from inside the sheet immediately flips a piece's state. */}

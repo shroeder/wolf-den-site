@@ -12524,6 +12524,76 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Was a bare three-row list with the numbers crammed into one right-aligned string ("14% → 15% +1%"), so
    nothing lined up and the eye had no column to run down. It is a real table now: stat, what you have, what
    you'd get, and the delta — each in its own column, tabular figures, with the changed rows tinted. */
+/* THE GEAR SHEET IS A BOTTOM SHEET AND HAD NO CEILING. The overlay is `position:fixed; inset:0` with
+   `align-items:flex-end`, so a card taller than the screen does not push a scrollbar — it overflows UPWARD,
+   off the top of the viewport, and there is nothing to scroll because the overflow is on the wrong end. A
+   legendary with a compare table, an attunement, a signature and a set line ran ~1.4 screens: the art, the
+   name and the rarity were simply gone, and the player was looking at a panel whose first visible words were
+   the middle of a stat description. Bounded height + a body that owns the scrolling fixes it for good; the
+   base rule (no .has-panes) also catches the plainer sheets that share this class, e.g. InspectableGear. */
+.equip-sheet { max-height: 88vh; max-height: min(88svh, 900px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.equip-sheet.has-panes { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.equip-sheet-grip { flex: 0 0 auto; width: 38px; height: 4px; border-radius: 999px; margin: 8px auto 2px;
+    background: rgba(255,255,255,0.22); }
+.equip-sheet-head { flex: 0 0 auto; display: flex; gap: 12px; align-items: center; padding: 8px 16px 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.1); }
+.equip-sheet-name { font-weight: 800; font-size: 1.1rem; line-height: 1.2; }
+.equip-sheet-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 3px;
+    font-size: 0.78rem; color: #9aa0a6; }
+.equip-sheet-forge { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; color: #ffc966; }
+/* The one scroller. min-height:0 is load-bearing — without it a flex child refuses to shrink and the whole
+   sheet grows past its max-height again, which is the bug wearing a different hat. */
+.equip-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch; padding: 12px 16px 14px; }
+/* The shadows are the scroll affordance: content visibly passes UNDER the pinned bars, so a sheet cut off
+   mid-table reads as "keep scrolling" rather than "that's all there is". */
+.equip-sheet-head { box-shadow: 0 10px 14px -10px rgba(0,0,0,0.85); position: relative; z-index: 1; }
+.equip-sheet-foot { flex: 0 0 auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.28);
+    box-shadow: 0 -10px 14px -8px rgba(0,0,0,0.85); position: relative; z-index: 1; }
+.equip-sheet-price { font-size: 0.92rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.equip-sheet-price em { font-style: normal; font-weight: 600; font-size: 0.76rem; color: #9aa0a6; }
+
+/* An item's own stat line, as chips — shown only when there is no comparison table, which prints the same
+   numbers in a better form. */
+.eqstats { display: flex; flex-wrap: wrap; gap: 6px; }
+.eqstat { display: inline-flex; align-items: baseline; gap: 5px; padding: 5px 10px; border-radius: 999px;
+    font-size: 0.8rem; color: #c2c9d2; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.11); }
+.eqstat b { color: #f2ead9; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* WHAT MAKES THE PIECE SPECIAL, said once. These used to be loose <p> lines below the compare card, each
+   repeating something the "you'd gain" box had already said a few hundred pixels earlier. */
+.eqtraits:not(:empty) { display: grid; gap: 6px; margin-top: 11px; }
+.eqtrait { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; width: 100%;
+    padding: 8px 10px; border-radius: 11px; text-align: left; font-size: 0.83rem; color: inherit;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.eqtrait > span:first-child { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.eqtrait b { font-weight: 800; color: #f2ead9; }
+.eqtrait em { display: block; font-style: normal; margin-top: 2px; font-size: 0.75rem; line-height: 1.35; color: #8a9099; }
+.eqtrait.is-link { cursor: pointer; }
+.eqtrait.t-forge { border-color: rgba(255,183,77,0.3); background: rgba(255,183,77,0.07); }
+.eqtrait.t-forge b { color: #ffc966; }
+.eqtrait.t-att { border-color: rgba(224,200,255,0.3); background: rgba(224,200,255,0.06); }
+.eqtrait.t-att b { color: #e0c8ff; }
+.eqtrait.t-sig { border-color: rgba(255,215,94,0.32); background: rgba(255,215,94,0.06); }
+.eqtrait.t-sig b { color: #ffd75e; }
+.eqtrait.t-sea b { color: #7fd8ff; }
+.eqtrait.t-depth b { color: #ffb45e; }
+.eqtrait.t-farm b { color: #8fe39a; }
+.eqtrait.t-charge { border-color: rgba(255,215,94,0.28); }
+.eqtrait.t-charge b { color: #ffd75e; }
+.eqtrait.t-set { border-color: rgba(143,216,255,0.4); background: rgba(143,216,255,0.07); }
+.eqtrait.t-set b { color: #8fd8ff; }
+
+/* Teaching text, folded. Open it once to learn what Ferocity is; it stays out of the way after that. */
+.eqgloss { margin-top: 11px; }
+.eqgloss-btn { padding: 5px 10px; border-radius: 999px; cursor: pointer; font-size: 0.76rem; font-weight: 700;
+    color: #9aa0a6; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.11); }
+.eqgloss-list { display: grid; gap: 6px; margin-top: 8px; font-size: 0.78rem; line-height: 1.4; color: #c2c9d2; }
+.eqgloss-list b { color: #f2ead9; }
+
 .eqcmp { margin-top: 10px; padding: 12px 12px 11px; border-radius: 14px;
     background: linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02));
     border: 1px solid rgba(255,255,255,0.12); }
