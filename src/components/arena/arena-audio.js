@@ -254,6 +254,46 @@ export const Sfx = {
         tone({ at: at + 0.17, freq: 232, type: "sawtooth", dur: 0.2, gain: 0.12 });
     },
 
+    // ── CHESTS ───────────────────────────────────────────────────────────────────────────────────────────────
+    // Not arena sounds, but this is the Den's only audio engine — one context, one master, one stored mute — and
+    // a second one would be the exact bug the header above describes. Opening a chest is the single most
+    // celebratory thing in the game and it was completely silent: a 1.5s shake with no rattle and a full-screen
+    // legendary reveal with no payoff at all.
+
+    /** The box straining before it gives. Called once; it lays down its own little rhythm across `secs`. */
+    chestRattle(secs = 1.4) {
+        for (let i = 0; i < 5; i += 1) {
+            // Knocks come faster and climb as the lid gets closer to going — anticipation, not a metronome.
+            const at = (i * secs) / 6 + (i * i) * 0.012;
+            tone({ at, freq: 96 + i * 13, to: 54, type: "sine", dur: 0.11, gain: 0.16 + i * 0.02 });
+            noise({ at, dur: 0.07, gain: 0.05 + i * 0.012, type: "bandpass", freq: 900 + i * 260, q: 1.1 });
+        }
+    },
+
+    /** The lid goes. A wooden crack, then the haul chiming out — longer and brighter the better it is. */
+    chestOpen(rarity = "common", at = 0) {
+        const RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+        const r = RANK[rarity] ?? 0;
+        // The lid: a low thud with a splintery top, the same for every chest — what changes is what comes out.
+        tone({ at, freq: 132, to: 44, type: "sine", dur: 0.3, gain: 0.34 });
+        noise({ at, dur: 0.22, gain: 0.2, type: "lowpass", freq: 3000, sweepTo: 320 });
+        noise({ at: at + 0.02, dur: 0.16, gain: 0.09 + r * 0.012, type: "highpass", freq: 3600 });
+        // The haul: a rising figure, one note longer per tier, so an eternal is audibly a bigger deal than a
+        // common without anybody having to read the word.
+        const SCALE = [523, 659, 784, 988, 1175, 1319, 1568, 1976];
+        const notes = Math.min(SCALE.length, 3 + r);
+        for (let i = 0; i < notes; i += 1) {
+            tone({ at: at + 0.1 + i * 0.062, freq: SCALE[i], type: r >= 3 ? "triangle" : "sine", dur: 0.34, gain: 0.13 });
+        }
+        // Epic and up get a shimmer over the top and a low swell underneath — the "this one is good" tell.
+        if (r >= 2) {
+            noise({ at: at + 0.1, dur: 0.5 + r * 0.1, gain: 0.05 + r * 0.008, type: "highpass", freq: 5200 });
+            tone({ at: at + 0.08, freq: 82, to: 164, type: "sine", dur: 0.7, gain: 0.16 });
+        }
+        // The top tiers ring on afterwards rather than just stopping.
+        if (r >= 4) [1568, 2093, 2637].forEach((f, i) => tone({ at: at + 0.34 + i * 0.09, freq: f, type: "sine", dur: 0.6, gain: 0.08 }));
+    },
+
     /** A fighter goes down. */
     ko(at = 0) {
         tone({ at, freq: 220, to: 32, type: "sawtooth", dur: 0.9, gain: 0.3 });
@@ -483,4 +523,14 @@ export const Haptic = {
     ko() { Haptic.fire([0, 60, 50, 90]); },
     win() { Haptic.fire([0, 40, 60, 40, 60, 90]); },
     lose() { Haptic.fire([0, 90, 80, 40]); },
+    /** The box straining — a stutter that tightens, matched to chestRattle's knocks. */
+    chestShake() { Haptic.fire([0, 18, 170, 22, 150, 26, 130, 34, 110, 44]); },
+    /** The lid going, scaled by what came out: a common is a thump, an eternal is a fanfare you can feel. */
+    chestOpen(rarity = "common") {
+        const RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+        const r = RANK[rarity] ?? 0;
+        const p = [0, 40 + r * 10];
+        for (let i = 0; i < Math.min(4, r); i += 1) p.push(50, 22 + i * 8);
+        Haptic.fire(p);
+    },
 };

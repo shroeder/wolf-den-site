@@ -7,6 +7,10 @@ import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
 import ChestIcon from "@/components/ChestIcon";
+// The Den's audio engine. It lives in the arena folder because that is where it was built, but it is one
+// AudioContext, one master bus and one stored mute for the whole site — a second engine here would be the
+// exact leak its header warns about. It also means the mute you set in the arena is honoured here.
+import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio";
 
 const RARITY_LABEL = { common: "Common", rare: "Rare", epic: "Epic", legendary: "LEGENDARY", mythic: "MYTHIC", ascendant: "ASCENDANT", eternal: "ETERNAL" };
 const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
@@ -52,6 +56,15 @@ export default function ChestOpener({ onLoot }) {
     function open(tier) {
         if (busy) return;
         setBusy(true); setModalTier(tier); setPhase("shaking"); setReveal(null);
+        // ── THE SOUND OF IT ── this was silent from end to end: a second and a half of a chest visibly shaking
+        // with nothing coming out of the speaker, then a full-screen LEGENDARY with no payoff at all. Opening a
+        // chest is the most celebratory thing in the game and it was the quietest.
+        //
+        // The tap is the gesture that unlocks audio — browsers will not start a context without one — so the
+        // whole reveal is audible off this single call.
+        unlock();
+        Sfx.chestRattle(1.4);
+        Haptic.chestShake();
         const pending = fetch("/api/marketplace/chests", {
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ tier }),
         }).then((r) => r.json().catch(() => ({ error: "failed" })));
@@ -60,6 +73,11 @@ export default function ChestOpener({ onLoot }) {
             const d = await pending;
             if (d?.error) { setModalTier(null); setBusy(false); return; }
             setReveal(d); setChests(d.chests || []); setPhase("revealed"); setBusy(false);
+            // Scaled by what actually came out, on the same rarity scale the particles and the colours use —
+            // hearing "that was a big one" before you have read a word is the whole point.
+            const r = rarityOf(d);
+            Sfx.chestOpen(r);
+            Haptic.chestOpen(r);
             onLoot?.();
         }, 1500);
     }
