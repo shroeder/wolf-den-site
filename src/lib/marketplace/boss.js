@@ -887,14 +887,17 @@ async function finalizeBossKill(bossId) {
         await recordGift(p.id, { kind: "boss", title, body: bits.join(" "), icon, url: `/marketplace/boss/recap/${bossId}` }).catch(() => {});
     }
 
-    // Headline the announcement with the prize (raffle) winner if there was one, else the damage champion.
-    const hero = raffleWinner || top1;
-    let winnerInfo = null;
-    if (hero) {
-        const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [hero.id]).catch(() => null);
-        winnerInfo = { buyerId: hero.id, label: w?.display_name || w?.alias || "A member" };
-    }
-    await broadcastBossDefeated(boss, winnerInfo).catch(() => {});
+    // The raffle winner and the damage champion are announced as DIFFERENT THINGS. They used to be collapsed
+    // into one "hero" value — raffle winner if there was one, else the champion — which then also decided who
+    // was told they had won a prize. On a boss with no prize that handed the champion a "you won the raffle,
+    // come and claim it" email for a draw that never happened.
+    const label = async (id) => {
+        const w = await db.queryOne(`SELECT display_name, alias FROM mkt_buyer WHERE id = $1`, [id]).catch(() => null);
+        return w?.display_name || w?.alias || "A member";
+    };
+    const championInfo = top1 ? { buyerId: top1.id, label: await label(top1.id) } : null;
+    const raffleInfo = raffleWinner ? { buyerId: raffleWinner.id, label: await label(raffleWinner.id) } : null;
+    await broadcastBossDefeated(boss, { champion: championInfo, raffleWinner: raffleInfo }).catch(() => {});
     // Keep the fight going: immediately bring the next boss live so the game is never stuck on a 0-HP corpse.
     await activateNextBoss(boss).catch(() => {});
 }

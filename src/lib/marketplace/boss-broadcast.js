@@ -19,22 +19,39 @@ export async function broadcastBoss(boss) {
     await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss" } }).catch(() => {});
 }
 
-// The KILL event — a big deal. Announce everywhere + email every member (winner gets a claim nudge).
-export async function broadcastBossDefeated(boss, winner) {
-    const winnerLabel = winner?.label || null;
+// The KILL event — a big deal. Announce everywhere + email every member.
+//
+// TWO DIFFERENT PEOPLE, and they used to be one variable. The RAFFLE WINNER holds a ticket drawn for a
+// physical in-store prize. The CHAMPION merely dealt the most damage. finalizeBossKill headlines the
+// announcement with the raffle winner "if there was one, else the damage champion" — which is fine for a
+// headline and was catastrophic once that single value also decided who got told they had won something.
+//
+// Sythmara, Storm-Render had no prize set, so no raffle ran and nobody was drawn. The champion fell through
+// into the winner slot, and 77 members were emailed "The raffle winner is The Wolf Den", the owner account
+// got "🏆 You won the raffle — come by to claim your prize", and Discord and push said the same. The owner is
+// correctly filtered OUT of the raffle pool; the label path went around that filter entirely.
+//
+// So a raffle winner now only exists when a ticket was actually drawn AND there is a prize to hand over.
+// The champion is announced as the champion, in words that promise nothing.
+export async function broadcastBossDefeated(boss, { champion = null, raffleWinner = null } = {}) {
     const prize = boss.prize_name || null;
+    // No prize means no raffle, whatever was passed in.
+    const winner = prize ? raffleWinner : null;
+    const winnerLabel = winner?.label || null;
+    const championLabel = champion?.label || null;
+
     const title = `☠️ ${boss.name} has been slain!`;
-    const body = winnerLabel && prize
+    const body = winnerLabel
         ? `The pack took it down! ${winnerLabel} won the raffle: ${prize}. See the final stats →`
-        : winnerLabel
-            ? `The pack took it down! Raffle winner: ${winnerLabel}. See the final stats →`
+        : championLabel
+            ? `The pack took it down! Top damage: ${championLabel}. See the final stats →`
             : `The pack brought down ${boss.name}! See the final stats →`;
 
-    await postDiscordDefeated(boss, winnerLabel).catch(() => {});
+    await postDiscordDefeated(boss, winnerLabel, championLabel).catch(() => {});
     await broadcastWebPush({ kind: "bossevent", title, body, url: `/marketplace/boss/recap/${boss.id}`, tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
     await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss_defeated" } }).catch(() => {});
 
-    // Email every member (winner gets the "come claim" version).
+    // Email every member. Only a genuine raffle winner gets the "come claim" version.
     const members = await db.query(
         `SELECT id, email, display_name FROM mkt_buyer
           WHERE email IS NOT NULL AND email_verified = TRUE
@@ -45,15 +62,16 @@ export async function broadcastBossDefeated(boss, winner) {
             bossId: boss.id,
             bossName: boss.name,
             winnerLabel,
+            championLabel,
             prizeName: prize,
             prizeImageUrl: boss.prize_image_url || "",
-            isWinner: winner?.buyerId && m.id === winner.buyerId,
+            isWinner: Boolean(winner?.buyerId && m.id === winner.buyerId),
             name: m.display_name || "",
         }).catch(() => {});
     }
 }
 
-async function postDiscordDefeated(boss, winnerLabel) {
+async function postDiscordDefeated(boss, winnerLabel, championLabel) {
     const webhook = denWebhook();
     if (!webhook) return;
     const embed = {

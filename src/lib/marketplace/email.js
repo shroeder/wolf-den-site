@@ -345,7 +345,7 @@ export async function sendSailingLaunchEmail(email, { name = "" } = {}) {
 }
 
 // Sent to every member when the weekly boss is slain. Winners get the "come claim your prize" version.
-export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winnerLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
+export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winnerLabel = "", championLabel = "", prizeName = "", prizeImageUrl = "", isWinner = false, name = "" } = {}) {
     if (!email) return false;
     if (!process.env.RESEND_API_KEY) return false;
     const resend = getResendClient();
@@ -375,7 +375,7 @@ export async function sendBossDefeatedEmail(email, { bossId = "", bossName, winn
                 <p>${hi}</p>
                 ${isWinner
                     ? `<p><strong>Congratulations — you won the raffle!</strong> The pack took down <strong>${bossName}</strong> and your ticket was drawn.</p>${prizeBlock}<p>Come by The Wolf Den to claim your prize. 🐺</p>${prizeDisclaimer}`
-                    : `<p>The whole pack just brought down <strong>${bossName}</strong>! ${winnerLabel ? `The raffle winner is <strong>${winnerLabel}</strong>.` : ""}</p>${prizeBlock}<p>Thanks for fighting — everyone who took part earned XP.</p>`}
+                    : `<p>The whole pack just brought down <strong>${bossName}</strong>! ${winnerLabel ? `The raffle winner is <strong>${winnerLabel}</strong>.` : championLabel ? `Top damage went to <strong>${championLabel}</strong>.` : ""}</p>${winnerLabel ? prizeBlock : ""}<p>Thanks for fighting — everyone who took part earned XP.</p>`}
                 <p><a href="${bossUrl}" style="display:inline-block;padding:10px 18px;background:#d4af37;color:#171008;text-decoration:none;border-radius:999px;font-weight:700;">See the final battle stats →</a></p>
             </div>
         `,
