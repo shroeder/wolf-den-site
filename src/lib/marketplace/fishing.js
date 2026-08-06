@@ -116,7 +116,17 @@ const RARITY_RANK = Object.fromEntries(RARITY_ORDER.map((r, i) => [r, i]));
 // ── TUNING ───────────────────────────────────────────────────────────────────────────────────────────────────
 const CASTS_PER_DAY = 5;             // the daily allowance
 const CASTS_PER_ANGLING = 4;         // +1 cast per this many Angling points (sea affinity)
-const CASTS_MAX = 10;                // hard ceiling however much Angling you stack
+// ── THE CEILING THAT ATE THE UPGRADE ─────────────────────────────────────────────────────────────────────────
+// 10 was written as "however much ANGLING you stack" — a ceiling on a free stat that comes off gear. But it
+// caps the whole sum, and base(5) + a maxed Line(5) is already 10, so the cap started eating the thing people
+// PAY GOLD FOR. Reproduced against live rows: everyone at Line 4-5 with any Angling at all was pinned at 10,
+// and buying the next Line level moved their casts by zero. A member reported exactly that ("I'm level 4/5 for
+// casts but didn't get any more casts per day") and she was right — she had bought nothing.
+//
+// 15 is the number the track's own comment claims twenty lines below ("a fully-invested angler gets 15 casts a
+// day rather than 10"), and it is the number that makes every purchasable level do something: 5 base + 5 Line
+// + 5 from Angling at its own cap. The ceiling still exists — it just no longer sits underneath the shop.
+const CASTS_MAX = 15;
 const BITE_MIN_MS = 900;             // the line twitches somewhere in this window — unpredictable on purpose
 const BITE_MAX_MS = 4200;
 const BITE_GRACE_MS = 12000;         // after which the fish has clearly gone (the cast is refunded)
