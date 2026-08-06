@@ -12640,7 +12640,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* ── VISIT THE NEIGHBOURS ── the farm's social half, finally on the screen you open first. Deliberately the
    warmest card on the page: the two things it offers pay both people, and they were previously two taps and a
    collapsed summary away from being discovered at all. */
-.farm-neigh { padding: 12px 13px 13px;
+/* min-width: 0 IS LOAD-BEARING, on both the card and the scroller. These cards are GRID ITEMS on the farm
+   page, and a grid item defaults to `min-width: auto` — it refuses to shrink below its content's min-content
+   width. The face row is ~489px of chips, so instead of scrolling inside a 355px card, the card grew to 517px
+   in a 375px viewport, the document overflowed, and the phone scaled the whole page to fit: everything
+   oversized, the rating card's three tier buttons shoved off the right edge, and a big empty yellow box where
+   they used to be. The scroller cannot scroll until its ancestors are allowed to be narrower than it. */
+.farm-neigh { min-width: 0; padding: 12px 13px 13px;
     border: 1px solid rgba(255,193,110,0.34);
     background: linear-gradient(150deg, rgba(255,193,110,0.11), rgba(143,227,154,0.05) 62%, rgba(255,255,255,0.02)); }
 .farm-neigh-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -12654,7 +12660,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .farm-neigh-sub { margin: 4px 0 10px; font-size: 0.79rem; line-height: 1.4; color: #a9b0b8; }
 /* A scroller, not a grid: eight faces on a 375px phone is a swipe, and a wrapped grid of eight would push the
    pasture off the screen — which is the mistake this card exists to undo. */
-.farm-neigh-row { display: flex; gap: 9px; overflow-x: auto; overscroll-behavior-x: contain;
+.farm-neigh-row { min-width: 0; display: flex; gap: 9px; overflow-x: auto; overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch; padding-bottom: 3px; scrollbar-width: none; }
 .farm-neigh-row::-webkit-scrollbar { display: none; }
 .farm-neigh-chip { flex: 0 0 auto; width: 74px; display: grid; justify-items: center; gap: 3px;
