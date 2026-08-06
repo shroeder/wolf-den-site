@@ -1530,22 +1530,23 @@ function Styles() {
                still reads underneath. Wider than this and they crowd; narrower and they are back to being two
                small figures with an empty arena between them. */
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
-            /* PARTY RIGHT, ENEMY LEFT. The enemy is smaller and stands further up the sand — the two cues
-               together read as distance; equal size on one baseline reads as two of the same thing. */
-            /* Addressed by WHO, not by DOM order. YOU stand left, nearer and larger; the opponent stands
-               right, smaller and further up the sand. Two cues for depth — size alone reads as a mistake. */
+            /* SAME SAND, SAME SIZE. The enemy used to be drawn smaller and standing further up the field —
+               two deliberate cues for depth, and they worked: they made the opponent read as scenery. A duel
+               is two people at arm's length, and the person trying to kill you should not look like he is
+               standing at the back of the room. Both fighters share a baseline and a scale now; the frame
+               only has to say "these two, facing each other", and the arena painting behind them is doing
+               all the depth this scene needs. */
             /* FLUSH TO THE EDGE, NOT PAST IT. Both of these used to sit at -3%, which on a 375px phone is a
                297px ring and 8px of fighter hanging outside a box that clips its overflow — measured, not
                guessed: the foe's own bounding box ran to 304. The enemy is mirrored, so the 8px came off the
                FRONT of them: axe, leading shoulder, the side you are looking at. The 3% bought about five
                pixels of size and cost the part of the sprite that matters. */
-            .ar-floor > .ar-fighter:not(.is-foe) { left: 0; z-index: 3; width: 54%; bottom: 0; }
+            .ar-floor > .ar-fighter:not(.is-foe) { left: 0; z-index: 3; width: 52%; bottom: 0; }
             /* 47% -> 50% pays back what the sprite reframe cost. The NPC art now carries a 7% margin inside
                its own canvas so nothing is flush to a clipping edge, which also made every opponent render
                about that much smaller; three points of box width puts the enemy back to the size they read at
                before, without going anywhere near the frame. */
-            .ar-floor > .ar-fighter.is-foe { right: 0; z-index: 2; width: 50%; bottom: 9%; }
-            .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
+            .ar-floor > .ar-fighter.is-foe { right: 0; z-index: 2; width: 52%; bottom: 0; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
             .ar-ring.is-on-you .ar-floor { transform: scale(1.18) translateX(9%); }
@@ -2008,7 +2009,10 @@ function Styles() {
             .ar-prompt.is-def { color: #6fd0ff; }
 
             /* ── THE DECLARATION ── */
-            .ar-declare { position: absolute; left: 50%; top: 34%; transform: translate(-50%, -50%); z-index: 23;
+            /* HIGH ENOUGH TO NOT BE ON THEM. At top:34% of the floor the enemy's declaration landed across
+               their own chest and shoulders — the sprite you are trying to read the wind-up off. It sits in
+               the wall band now, the same empty strip the incoming warning uses. */
+            .ar-declare { position: absolute; left: 50%; top: 13%; transform: translate(-50%, -50%); z-index: 23;
                 display: grid; justify-items: center; gap: 2px; pointer-events: none; text-align: center;
                 animation: arDeclare .4s cubic-bezier(.2,1.5,.35,1) both; }
             .ar-declare img { width: 46px; height: 46px; object-fit: contain;
@@ -2269,9 +2273,9 @@ function Styles() {
                 .ar-cmd :global(svg) { width: 14px; height: 14px; }
                 .ar-beat { display: none; }          /* the log line; the log itself is still below the ring */
                 .ar-dust { display: none; }
-                /* The fighters get the reclaimed height. */
-                .ar-floor > .ar-fighter:first-of-type { left: 3%; width: 44%; }
-                .ar-floor > .ar-fighter.is-foe { right: 3%; width: 38%; bottom: 4%; }
+                /* The fighters get the reclaimed height — same size, same baseline as portrait. */
+                .ar-floor > .ar-fighter:first-of-type { left: 3%; width: 42%; }
+                .ar-floor > .ar-fighter.is-foe { right: 3%; width: 42%; bottom: 0; }
             }
 
         `}</style>
