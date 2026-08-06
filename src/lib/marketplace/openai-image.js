@@ -472,11 +472,15 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
         const verdict = await validate(buffer).catch(() => ({ ok: true, problems: [] }));
         problems = verdict.problems || [];
         if (verdict.ok) break;
-        // Log the rejected attempt so its cost is still attributed and the reason is visible in AI Costs.
-        await logGeneration({
-            model, size, quality, edit: true, source: pathPrefix, prompt, ok: false,
-            error: `rejected (attempt ${attempt}/${tries}): ${problems.join("; ")}`.slice(0, 300), ...meta,
-        });
+        // Log the rejected attempt so its cost is still attributed and the reason is visible in AI Costs —
+        // but ONLY when another attempt is actually coming. On the last attempt the image is kept and logged
+        // as a success below, and logging it here too would bill one draw twice in the ledger.
+        if (attempt < tries) {
+            await logGeneration({
+                model, size, quality, edit: true, source: pathPrefix, prompt, ok: false,
+                error: `rejected (attempt ${attempt}/${tries}): ${problems.join("; ")}`.slice(0, 300), ...meta,
+            });
+        }
     }
 
     if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;

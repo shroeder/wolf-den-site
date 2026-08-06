@@ -19,19 +19,28 @@ const DEFAULT_SPRITE_KEY = "default_sprite_url";
 // but stops burning image-gen budget every tick. A real avatar/gear change resets the counter.
 const MAX_SPRITE_ATTEMPTS = 6;
 
-// The sprite model. LEAVE THIS ALONE unless the art is being judged by eye afterwards — it is the single
-// biggest lever on what a sprite LOOKS like, and the look is the product.
+// The sprite recipe, reverted to what drew the sprites the Den actually likes — the ones from before 30 July.
 //
-// Currently the exact recipe that is already live and that Luke likes. gpt-image-1-mini at medium quality
-// measured cheaper AND marginally cleaner on the same prompt and reference ($0.0097 vs $0.0159 each, 3/4 vs
-// 2/4 passing the quality gate on a four-member sample) and is a two-line change if that trade is ever wanted.
+// QUALITY IS MEDIUM AND MUST STAY MEDIUM until someone compares the art side by side and says otherwise.
+// It was never lowered for sprites on purpose: 9c62df2c ("Low quality by default") set quality: "low" as the
+// GLOBAL default on editImage as a cost cut, and sprites went along with it silently. A low 1024x1024 is 272
+// output tokens for the whole image, so a face inside a full-body figure gets almost none of them — that is
+// the "blurry, like it was painted with a brush" that made the art stop looking like the game. Medium is
+// 1,056 and it is the difference between the two eras. ~$0.048 a head, matching the "~$0.046 a head" noted
+// in the code back when this was the live recipe.
+//
+// Cheaper options exist and are NOT taken here on purpose; the look is the product, so cost work happens one
+// measured step at a time with the art compared each time. Measured on the identical prompt and reference:
+// gpt-image-1-mini at medium is $0.0100 a head against $0.0484 — same class of art to my eye, but that is a
+// judgement for a human looking at it, not for me.
 const SPRITE_MODEL = "gpt-image-1";
-const SPRITE_QUALITY = "low";
+const SPRITE_QUALITY = "medium";
 
-// How many times a single draw may be REJECTED AND REDRAWN for art quality (cropped figure, holes punched
-// through the character) before we keep what we have. Every retry is a billed image, so this is deliberately
-// two and not five: it catches the common one-off bad draw without turning one sprite into a shopping spree.
-const SPRITE_ATTEMPTS = 2;
+// Redraw-on-bad-art is OFF (1 = draw once, keep it). The check still RUNS on every draw and records what it
+// found on the member's row, so cropped and hole-punched art stays visible in the admin list — it just does
+// not spend a second image on it. At $0.048 a head a retry is not a rounding error, and turning this to 2 is
+// a deliberate cost decision, not a default.
+const SPRITE_ATTEMPTS = 1;
 
 // Cost cap: a member's sprite is redrawn AT MOST once per this many hours, no matter how many times they
 // change their avatar/gear in between. Changes made inside the window are coalesced into one redraw once it
