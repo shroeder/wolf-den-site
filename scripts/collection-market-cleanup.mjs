@@ -47,8 +47,9 @@ function collectionItemIds() {
 }
 
 const IDS = collectionItemIds();
-if (IDS.length !== 35) {
-    console.error(`Refusing to run: parsed ${IDS.length} collection ids, expected 35. Did a set gain a piece?`);
+// 40 = the seven original collections (35) plus the Blacksmith's Regalia (5), converted 2026-08-06.
+if (IDS.length !== 40) {
+    console.error(`Refusing to run: parsed ${IDS.length} collection ids, expected 40. Did a set gain a piece?`);
     console.error(IDS.join(", "));
     process.exit(1);
 }

@@ -12,6 +12,13 @@ export const WHEEL_META = {
     respin: { label: "Free respin", desc: "A chance a spin costs you nothing — your spin is handed back." },
 };
 
+// The Forge's own effect layer — salvage output, never combat. Same reason as the wheel's: the storage keys
+// mean nothing to the person reading the card.
+export const FORGE_META = {
+    doubleParts: { label: "Double parts", desc: "A chance a salvage pays twice the parts." },
+    flatParts: { label: "Bonus part", desc: "An extra part on top of every salvage, always." },
+};
+
 // One line explaining what an effect key actually DOES, for the legend under a collection's tiers. Every
 // affinity layer already carries this text for its own screens; the collection panel was the one place
 // showing the numbers with no way to learn what they meant.
@@ -19,6 +26,7 @@ function effectHelp(kind, key) {
     if (kind === "sea") return SEA_META[key] ? { label: SEA_META[key].label, desc: SEA_META[key].desc } : null;
     if (kind === "depth") return DEPTH_META[key] ? { label: DEPTH_META[key].label, desc: DEPTH_META[key].desc } : null;
     if (kind === "wheel") return WHEEL_META[key] ? { label: WHEEL_META[key].label, desc: WHEEL_META[key].desc } : null;
+    if (kind === "forge") return FORGE_META[key] ? { label: FORGE_META[key].label, desc: FORGE_META[key].desc } : null;
     if (kind === "farm") return DECO_STATS[key] ? { label: DECO_STATS[key].label, desc: `Each point is 1${DECO_STATS[key].suffix}.` } : null;
     return null;
 }
@@ -31,6 +39,7 @@ function tierText(t) {
     for (const [k, v] of Object.entries(t.depth || {})) parts.push(`+${v} ${DEPTH_META[k]?.label || k}`);
     for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${SEA_META[k]?.label || k}`);
     for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${WHEEL_META[k]?.label || k} chance`);
+    for (const [k, v] of Object.entries(t.forge || {})) parts.push(`+${v}% ${FORGE_META[k]?.label || k} chance`);
     for (const [k, v] of Object.entries(t.stats || {})) parts.push(`+${v} ${k.replace(/_/g, " ")}`);
     return parts.join(" · ") || "—";
 }
@@ -189,6 +198,21 @@ export const ITEM_SETS = [
         capstone: { depthRichSeam: 0.15, desc: "Rich Seam: a 15% chance a cracked seam pays its ore TWICE." },
         weakness: null,
     },
+    // ── THE FORGE SET ── the "salvaging set": its pieces drop from salvaging itself (0.1% a swing, unowned
+    // pieces only) and its bonus is SALVAGE OUTPUT, read in crafting.js regaliaBonus. Never combat.
+    //
+    // It was the last non-combat set that still asked you to dress for the activity — 3 of 5 WORN for the
+    // bonus, on five epic pieces with real combat stats, so a night of forging meant taking off the gear that
+    // makes you good at fighting and putting it back afterwards. That is the exact bookkeeping the other seven
+    // collections were converted to end.
+    {
+        id: "regalia", collection: true, feature: "forge", name: "Blacksmith's Regalia",
+        items: ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"],
+        bonuses: [{ need: 3, forge: { doubleParts: 10 } }],
+        capstone: { forgeDouble: 0.15, forgeFlat: 1,
+            desc: "Master Smith's Kit: +15% chance of double parts, and one extra part from every salvage." },
+        weakness: null,
+    },
     {
         id: "founder", collection: true, feature: "depths", name: "Founder's Regalia",
         items: ["fd_apron", "fd_tongs", "fd_bellows_charm", "fd_slagsifter"],
@@ -220,6 +244,12 @@ export const PUBLIC_ITEM_SETS = ITEM_SETS.filter((s) => !s.ownerOnly);
 export function collectionsForFeature(feature, ownedIds) {
     const own = ownedIds || [];
     return getSetsOverview([], own).filter((s) => s.collection && SET_BY_ID[s.id]?.feature === feature);
+}
+
+// The ids in a named set. Exported so a feature that reads its own set's bonus (the Forge does) never keeps a
+// second copy of the list — one list, one owner, the same rule the collection registration follows.
+export function itemsOfSet(setId) {
+    return SET_BY_ID[setId]?.items || [];
 }
 
 // The set an item belongs to (for display on item cards), or null.
@@ -476,7 +506,7 @@ export function getSetsOverview(equippedIds, ownedIds) {
             have,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: have >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null, depth: t.depth || null, text: tierText(t) })),
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: have >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null, depth: t.depth || null, forge: t.forge || null, text: tierText(t) })),
             capstone: set.capstone ? { desc: set.capstone.desc, active: have >= fullNeed(set) } : null,
             // WHAT THE NUMBERS MEAN. Every effect key this set touches, once, in plain language — a tier that
             // reads "+12% Lucky Spin" is still jargon until something on the same screen says what a Lucky Spin is.
@@ -486,9 +516,10 @@ export function getSetsOverview(equippedIds, ownedIds) {
                     const h = effectHelp(kind, k);
                     if (h && !seen.has(h.label)) { seen.add(h.label); out.push(h); }
                 } };
-                for (const t of set.bonuses) { add("farm", t.farm); add("depth", t.depth); add("sea", t.sea); add("wheel", t.wheel); }
+                for (const t of set.bonuses) { add("farm", t.farm); add("depth", t.depth); add("sea", t.sea); add("wheel", t.wheel); add("forge", t.forge); }
                 for (const id of set.items) { const it = itemById(id); add("farm", it?.farm); add("depth", it?.depth); add("sea", it?.sea); }
                 if (set.capstone?.wheelRespin) { const h = effectHelp("wheel", "respin"); if (h && !seen.has(h.label)) out.push(h); }
+                if (set.capstone?.forgeFlat) { const h = effectHelp("forge", "flatParts"); if (h && !seen.has(h.label)) out.push(h); }
                 return out;
             })(),
         };

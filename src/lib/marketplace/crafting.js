@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { itemById, isCollectionItem, STAT_META, describeStats } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
+import { itemsOfSet } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -80,14 +81,17 @@ export async function enhanceDetailsFor(buyerId, itemIds = []) {
     return out;
 }
 
-// Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging; wearing 3/5 boosts salvage
-// output (a crafting-only bonus, kept out of combat).
-const REGALIA_IDS = ["regalia_visor", "regalia_plate", "regalia_girdle", "regalia_boots", "regalia_cloak"];
+// Blacksmith's Regalia — the "salvaging set". Pieces drop rarely from salvaging, and FINDING them is what pays:
+// it is a COLLECTION now (sets.js `regalia`), so the bonus is permanent on ownership and the pieces are never
+// worn, sold, salvaged or traded. It was the last non-combat set that still made you keep a forging kit and a
+// fighting kit and swap between them — on five epic pieces whose combat stats you gave up to salvage well.
+// The ids come from sets.js so this file never keeps a second copy of the list.
+const REGALIA_IDS = itemsOfSet("regalia");
 const REGALIA_DROP = 0.001; // per-salvage chance to receive an unowned Regalia piece (0.1% — a rare treasure)
-function regaliaBonus(equippedCount) {
-    if (equippedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
-    if (equippedCount >= 3) return { tier: 1, doubleBonus: 0.1, flatParts: 0, label: "3 pieces: +10% double-parts chance" };
-    return { tier: 0, doubleBonus: 0, flatParts: 0, label: "Wear 3 pieces for a salvage bonus" };
+function regaliaBonus(ownedCount) {
+    if (ownedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
+    if (ownedCount >= 3) return { tier: 1, doubleBonus: 0.1, flatParts: 0, label: "3 pieces: +10% double-parts chance" };
+    return { tier: 0, doubleBonus: 0, flatParts: 0, label: "Find 3 pieces for a salvage bonus" };
 }
 
 // Owner-buyable forge upgrades. `per` = effect per level; `steady_hand` levels are combo-saves + band-widening
@@ -263,7 +267,10 @@ export async function salvageItem(buyerId, itemId) {
     const cfg = SALVAGE[item.rarity] || SALVAGE.common;
     const upg = await upgradeLevels(buyerId);
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost salvage odds
-    const rb = regaliaBonus(REGALIA_IDS.filter((r) => equippedSet.has(r)).length); // Blacksmith's Regalia salvage bonus
+    // Blacksmith's Regalia salvage bonus — OWNED, not worn (it is a collection). The same read feeds the drop
+    // roll at the bottom of this function, so the set is queried once.
+    const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
+    const rb = regaliaBonus(ownedReg.size);
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
     // A forge companion's salvage perk stacks with Efficient Salvage and the Regalia set.
@@ -291,7 +298,6 @@ export async function salvageItem(buyerId, itemId) {
     if (cfg.tier < MAX_TIER && Math.random() < chance(upg, "keen_eye", bf)) { await addParts(buyerId, cfg.tier + 1, 1); bonusTier = cfg.tier + 1; } // Keen Eye
     // Rare Regalia piece drop (the "salvaging set" loop) — only pieces you don't own yet.
     let regaliaDrop = null;
-    const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
     const unowned = REGALIA_IDS.filter((r) => !ownedReg.has(r));
     if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantItem(buyerId, pick, "forge").catch(() => {}); regaliaDrop = itemById(pick)?.name || pick; }
     // Salvaging is done in bulk — 585 times a week — so this reads small per action and lands as 5% of all XP.
@@ -470,15 +476,15 @@ export async function getForgeState(buyerId) {
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
     // Blacksmith's Regalia collection (the salvaging set).
     const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));
-    const regaliaPieces = REGALIA_IDS.map((id) => { const it = itemById(id); return { id, name: it?.name || id, slot: it?.slot, icon: it?.icon, sprite: spriteMap[id] || null, owned: ownedIdSet.has(id), equipped: equippedIds.has(id) }; });
-    const regEquipped = regaliaPieces.filter((r) => r.equipped).length;
+    const regaliaPieces = REGALIA_IDS.map((id) => { const it = itemById(id); return { id, name: it?.name || id, slot: it?.slot, icon: it?.icon, sprite: spriteMap[id] || null, owned: ownedIdSet.has(id) }; });
+    const regFound = regaliaPieces.filter((r) => r.owned).length;
     const regaliaTiers = [
-        { need: 3, effect: "+10% double-parts chance on salvage", active: regEquipped >= 3 },
-        { need: 5, effect: "+15% double-parts & +1 part every salvage", active: regEquipped >= 5 },
+        { need: 3, effect: "+10% double-parts chance on salvage", active: regFound >= 3 },
+        { need: 5, effect: "+15% double-parts & +1 part every salvage", active: regFound >= 5 },
     ];
-    const regalia = { pieces: regaliaPieces, owned: regaliaPieces.filter((r) => r.owned).length, equipped: regEquipped, total: REGALIA_IDS.length, bonus: regaliaBonus(regEquipped), tiers: regaliaTiers, dropRate: REGALIA_DROP };
+    const regalia = { pieces: regaliaPieces, owned: regFound, total: REGALIA_IDS.length, bonus: regaliaBonus(regFound), tiers: regaliaTiers, dropRate: REGALIA_DROP };
     // Odds shown in the salvage preview modal (so the reward feels earned, not random).
-    const rbNow = regaliaBonus(regEquipped);
+    const rbNow = regaliaBonus(regFound);
     const salvageOdds = {
         doublePct: Math.round((chance(upg, "efficient", bf) + rbNow.doubleBonus) * 100),
         bonusPartPct: Math.round(chance(upg, "keen_eye", bf) * 100),

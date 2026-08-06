@@ -173,7 +173,7 @@ export default function BlacksmithClient({ initial }) {
     if (bestLvl > 0) statusBits.push(`best forge +${bestLvl}`);
     if (powerScrolls > 0) statusBits.push(`📜 ${powerScrolls} Power Scroll${powerScrolls === 1 ? "" : "s"}`);
     if (enchantScrolls > 0) statusBits.push(`🪄 ${enchantScrolls} Enchant Scroll${enchantScrolls === 1 ? "" : "s"}`);
-    if (forge.regalia?.equipped) statusBits.push(`${forge.regalia.equipped}/${forge.regalia.total} regalia worn`);
+    if (forge.regalia?.owned) statusBits.push(`${forge.regalia.owned}/${forge.regalia.total} regalia found`);
 
     return (
         <div className="stack reveal forge">
@@ -277,22 +277,25 @@ export default function BlacksmithClient({ initial }) {
                     ))}
                 </div>
 
-                {/* Blacksmith's Regalia — the salvaging set (pieces drop from salvaging; wearing them boosts output). */}
+                {/* Blacksmith's Regalia — the salvaging COLLECTION. Pieces drop from salvaging, and finding one is
+                    what pays: the bonus is permanent and the piece is never worn. It used to read "3/5 worn",
+                    which is the loadout-swap this set stopped asking for. */}
                 {forge.regalia ? (
                     <div className="forge-regalia">
                         <div className="forge-regalia-head">
                             <span className="forge-regalia-title">Blacksmith&apos;s Regalia</span>
-                            <span className="forge-regalia-count">{forge.regalia.equipped}/{forge.regalia.total} worn · {forge.regalia.owned}/{forge.regalia.total} found</span>
+                            <span className="forge-regalia-count">{forge.regalia.owned}/{forge.regalia.total} found</span>
                         </div>
+                        <p className="forge-regalia-note">Finding a piece is enough — the bonus is permanent, and these are never worn, sold or salvaged.</p>
                         <div className="forge-regalia-row">
                             {forge.regalia.pieces.map((p) => (
                                 <div key={p.id} className="forge-regalia-slot">
-                                    <span className={`forge-regalia-piece${p.equipped ? " is-equipped" : p.owned ? " is-owned" : ""}`} title={p.equipped ? "Worn" : p.owned ? "Owned — equip it!" : "Not forged yet"}>
+                                    <span className={`forge-regalia-piece${p.owned ? " is-found" : ""}`} title={p.owned ? "Found" : "Not found yet"}>
                                         {p.sprite ? (
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img src={p.sprite} alt={p.name} className={p.owned ? "" : "is-locked"} />
                                         ) : <span className="forge-regalia-glyph">?</span>}
-                                        {p.equipped ? <span className="forge-regalia-badge worn">✓</span> : !p.owned ? <span className="forge-regalia-badge lock">🔒</span> : null}
+                                        {p.owned ? <span className="forge-regalia-badge worn">✓</span> : <span className="forge-regalia-badge lock">🔒</span>}
                                     </span>
                                     <span className="forge-regalia-name">{p.name}</span>
                                 </div>
@@ -1238,11 +1241,12 @@ const FORGE_CSS = `
 .forge-regalia-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
 .forge-regalia-title { font-size: 12.5px; font-weight: 900; color: #ffcf8a; letter-spacing: 0.02em; }
 .forge-regalia-count { font-size: 10.5px; color: #c8b79f; }
+.forge-regalia-note { margin: -4px 0 9px; font-size: 10.5px; line-height: 1.4; color: #a89680; }
 .forge-regalia-row { display: flex; gap: 6px; }
 .forge-regalia-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .forge-regalia-piece { position: relative; width: 100%; max-width: 54px; aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.1); overflow: hidden; }
 .forge-regalia-piece.is-owned { border-color: rgba(255,215,94,0.55); }
-.forge-regalia-piece.is-equipped { border-color: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.5); background: rgba(255,180,80,0.12); }
+.forge-regalia-piece.is-found { border-color: #ffd75e; box-shadow: 0 0 10px rgba(255,215,94,0.5); background: rgba(255,180,80,0.12); }
 .forge-regalia-piece img { width: 82%; height: 82%; object-fit: contain; }
 .forge-regalia-piece img.is-locked { filter: grayscale(0.75) brightness(0.5); opacity: 0.6; }
 .forge-regalia-glyph { font-size: 20px; font-weight: 900; color: #6a5a48; }

@@ -43,7 +43,8 @@ const IDS = (() => {
     }
     return ids;
 })();
-if (IDS.length !== 35) console.warn(`!! expected 35 collection pieces, parsed ${IDS.length} — check sets.js before committing`);
+// 40 = the seven original collections (35) plus the Blacksmith's Regalia (5), converted 2026-08-06.
+if (IDS.length !== 40) console.warn(`!! expected 40 collection pieces, parsed ${IDS.length} — check sets.js before committing`);
 
 const RARITY = Object.fromEntries(
     [...itemsSrc.matchAll(/\{ id: "([^"]+)"[^\n]*?rarity: "([a-z]+)"/g)].map((m) => [m[1], m[2]])
