@@ -10,7 +10,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
-import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getOwnedItemIds } from "@/lib/marketplace/inventory.js";
 import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
 import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -311,9 +311,9 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Thumb upgrade (both cut grow time).
     const buffs = await farmBonuses(buyerId).catch(() => null);
     const decoGrow = Math.max(0.5, 1 - (buffs?.growSpeed || 0) / 100);
-    // Forager's Kit full-set capstone: crops grow 15% faster (a flat multiplier on top of every other speedup).
-    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
-    const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(equipped));
+    // Forager's Kit capstone: crops grow 15% faster. A COLLECTION set — completing it is the achievement, so
+    // it reads what you OWN rather than asking you to wear a basket while you plant.
+    const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(await getOwnedItemIds(buyerId).catch(() => [])));
     // Per-plot Fertile Soil specialization cuts THIS plot's grow time on top of everything else.
     const plotUp = await getPlotUpgrades(buyerId).catch(() => ({}));
     const plotGrow = plotEffects(plotUp[slot] || {}).growMult;
@@ -362,8 +362,8 @@ export async function harvestPlot(buyerId, slot) {
     // Town Greenhouse (community project) fattens the harvest for EVERY member, on top of personal gold-harvest buffs.
     const townB = await getTownBonuses(Date.now()).catch(() => ({}));
     let gold = Math.round((def?.sell || 0) * (1 + (buffs?.goldHarvest || 0) / 100) * (1 + (townB?.farmYieldPct || 0) / 100));
-    // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold.
-    const equipped = await getEquippedIds(buyerId).catch(() => ({}));
+    // Harvester's Garb full-set capstone: a chance the whole harvest yields DOUBLE gold. (Read below, off the
+    // owned list — the equipped loadout has nothing to do with a collection set any more.)
     let doubled = false;
     // A farm companion's yield perk stacks with the Harvester's Garb capstone. Both are stated as a plain
     // double-harvest chance, so a member can read the two numbers and add them up themselves.
@@ -376,7 +376,8 @@ export async function harvestPlot(buyerId, slot) {
         ]);
         petFarm = { yield: y, seed: sd };
     } catch { /* no companion, no bonus */ }
-    const dblChance = setFarmDoubleHarvest(equipped) + petFarm.yield / 100;
+    // Harvester's Garb capstone — same rule: owned, not worn.
+    const dblChance = setFarmDoubleHarvest(await getOwnedItemIds(buyerId).catch(() => [])) + petFarm.yield / 100;
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});

@@ -21,6 +21,20 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 // wear rotates with the boss. Stat bonuses flow through the normal pipeline (no combat code); capstones +
 // synergy are applied per-hit by setCombatMult (see boss.js). Sets span slots so a full bonus is achievable.
 
+// ── TWO KINDS OF SET ─────────────────────────────────────────────────────────────────────────────────────────
+// COMBAT sets are gear: their bonus is the reward for WEARING the pieces together, and choosing that loadout
+// over another is the decision. They count equipped pieces, as they always have.
+//
+// COLLECTION sets (`collection: true` — the farm, mine, wheel and sailing ones) count what you OWN. Their
+// bonuses go to activities you do with your hands, not to a fight, and tying them to your loadout meant
+// keeping a "crafting kit" and a "fighting kit" and swapping between them all day. That is not a build
+// decision, it is bookkeeping with an inventory screen attached — and the piece you had to take off to go
+// farming was usually the piece that made you good at fighting.
+//
+// So a collection piece is a TROPHY: obtaining it ticks its slot permanently and its bonus is simply on. The
+// chase, the tiers and the capstone are all unchanged — only the question changes, from "am I wearing this?"
+// to "did I ever find it?". They are still real items you can equip if you want their combat stats; equipping
+// one just does not decide whether its collection bonus applies.
 const GIANT_HP = 5_000_000;
 
 export const ITEM_SETS = [
@@ -83,7 +97,7 @@ export const ITEM_SETS = [
     {
         // The aspirational SAILING set — bonuses are SEA affinity (raids/digging/voyages), NOT boss power, and the
         // capstone is a build-defining raid boon. Pieces are scattered sea-themed gear (a real collect-them-all chase).
-        id: "corsair", name: "Dread Corsair's Regalia",
+        id: "corsair", collection: true, name: "Dread Corsair's Regalia",
         items: ["heavens_trident", "orb_of_tides", "girded_plate", "merchants_cape", "fortune_signet"],
         bonuses: [{ need: 2, sea: { plunder: 4 } }, { need: 4, sea: { broadside: 6, ironclad: 6 } }],
         capstone: { bonusRaids: 1, doubleRaidGold: true, sea: { plunder: 6, bounty: 6 },
@@ -94,14 +108,14 @@ export const ITEM_SETS = [
     // capstones are farm powers read+applied in farm-crops.js (setFarmGrowBonus / setFarmDoubleHarvest). Pieces
     // are utility-slot gear (helmet/belt/back/amulet/off_hand/ring) with FARM affixes — see items.js.
     {
-        id: "harvester", name: "Harvester's Garb",
+        id: "harvester", collection: true, name: "Harvester's Garb",
         items: ["harvesters_hat", "reapers_girdle", "sheafbound_cloak", "amber_grain_pendant"],
         bonuses: [{ need: 2, farm: { harvestLuck: 4 } }, { need: 4, farm: { harvestLuck: 6, goldHarvest: 8 } }],
         capstone: { farmDoubleYield: 0.2, desc: "Bountiful Reaping: each harvest has a 20% chance to yield DOUBLE gold." },
         weakness: null,
     },
     {
-        id: "forager", name: "Forager's Kit",
+        id: "forager", collection: true, name: "Forager's Kit",
         items: ["foragers_basket", "clover_signet", "deep_seed_pouch", "foxglove_charm"],
         bonuses: [{ need: 2, farm: { seedLuck: 5 } }, { need: 4, farm: { seedLuck: 7, growSpeed: 5 } }],
         capstone: { farmGrow: 0.15, desc: "Green Season: your crops grow 15% faster." },
@@ -112,7 +126,7 @@ export const ITEM_SETS = [
         // set whose bonuses feed the WHEEL itself (Lucky Spin proc gold + a free-respin capstone), read in
         // spin.js — NOT boss power. `full` = 8 because two pieces share the main_hand slot (blade + axe), so all ten
         // can never be worn at once; the capstone unlocks at 8 equipped.
-        id: "wheelwarden", name: "Wheelwarden's Fortune",
+        id: "wheelwarden", collection: true, name: "Wheelwarden's Fortune",
         items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
         full: 8,
         // `luck` = % CHANCE per spin to trigger a Lucky Spin (bonus gold on gold prizes), NOT a guaranteed
@@ -128,7 +142,7 @@ export const ITEM_SETS = [
     // ── DEPTHS SETS ── one per verb the Mine asks of you. Bonuses are DEPTH affinity (see items.js DEPTH_META),
     // never boss power, and the capstones are mine-only powers read in mining.js.
     {
-        id: "delver", name: "Delver's Kit",
+        id: "delver", collection: true, name: "Delver's Kit",
         items: ["dv_lamp_helm", "dv_rope_belt", "dv_lodestone", "dv_shoring_pack"],
         bonuses: [{ need: 2, depth: { nerve: 3 } }, { need: 4, depth: { nerve: 5, lodesense: 4 } }],
         // The push-your-luck loop's dream: one free mistake. You still collapse — you just walk away with the
@@ -137,14 +151,14 @@ export const ITEM_SETS = [
         weakness: null,
     },
     {
-        id: "rockbreaker", name: "Rockbreaker's Rig",
+        id: "rockbreaker", collection: true, name: "Rockbreaker's Rig",
         items: ["rb_maul", "rb_gauntlet", "rb_assay_ring", "rb_hobnails"],
         bonuses: [{ need: 2, depth: { hew: 4 } }, { need: 4, depth: { hew: 6, prospect: 4 } }],
         capstone: { depthRichSeam: 0.15, desc: "Rich Seam: a 15% chance a cracked seam pays its ore TWICE." },
         weakness: null,
     },
     {
-        id: "founder", name: "Founder's Regalia",
+        id: "founder", collection: true, name: "Founder's Regalia",
         items: ["fd_apron", "fd_tongs", "fd_bellows_charm", "fd_slagsifter"],
         bonuses: [{ need: 2, depth: { bellows: 4 } }, { need: 4, depth: { bellows: 5, crucible: 5 } }],
         capstone: { depthFreeSmelt: 0.18, desc: "Cold Crucible: an 18% chance a smelt costs you no ore at all." },
@@ -187,6 +201,22 @@ function equippedCounts(equippedIds) {
     return counts;
 }
 
+// Collection sets count OWNED pieces, so every reader of a collection bonus is handed the owned list instead
+// of the loadout. Duplicates cannot inflate a set — a piece you hold twice is still one slot ticked off.
+export function collectedCounts(ownedIds) {
+    const list = Array.isArray(ownedIds) ? ownedIds : Object.values(ownedIds || {});
+    const seen = new Set();
+    const counts = new Map();
+    for (const id of list) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const set = SET_BY_ITEM[id];
+        if (set?.collection) counts.set(set.id, (counts.get(set.id) || 0) + 1);
+    }
+    return counts;
+}
+export const COLLECTION_SETS = ITEM_SETS.filter((s) => s.collection);
+
 // Total extra stats from all ACTIVE set-bonus tiers for the equipped loadout.
 export function setBonusStats(equippedIds) {
     const counts = equippedCounts(equippedIds);
@@ -201,8 +231,8 @@ export function setBonusStats(equippedIds) {
 }
 
 // Aggregate SEA affinity granted by active set-bonus tiers + full-set capstones (read by sailing.js — never boss).
-export function setSeaBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setSeaBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     const total = {};
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
@@ -214,23 +244,23 @@ export function setSeaBonus(equippedIds) {
     return total;
 }
 // Extra daily RAIDS from full-set capstones (Dread Corsair +1).
-export function setRaidBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setRaidBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     let n = 0;
     for (const set of ITEM_SETS) if (set.capstone?.bonusRaids && (counts.get(set.id) || 0) >= set.items.length) n += set.capstone.bonusRaids;
     return n;
 }
 // Does a full-set capstone DOUBLE raid-win gold?
-export function setDoublesRaidGold(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setDoublesRaidGold(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     for (const set of ITEM_SETS) if (set.capstone?.doubleRaidGold && (counts.get(set.id) || 0) >= set.items.length) return true;
     return false;
 }
 
 // Aggregate FARM affinity granted by active set-bonus tiers (read by the farm-bonus aggregator — never boss).
 // Mirrors setSeaBonus: only tier `farm` blocks contribute (capstones are handled by the readers below).
-export function setFarmBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setFarmBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     const total = {};
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
@@ -241,23 +271,23 @@ export function setFarmBonus(equippedIds) {
     return total;
 }
 // Full-set FARM capstone: total crop grow-speed fraction (Forager 0.15). Consumed in farm-crops.js plantSeed.
-export function setFarmGrowBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setFarmGrowBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     let frac = 0;
     for (const set of ITEM_SETS) if (set.capstone?.farmGrow && (counts.get(set.id) || 0) >= set.items.length) frac += set.capstone.farmGrow;
     return Math.min(0.5, frac);
 }
 // Full-set FARM capstone: chance a harvest yields DOUBLE gold (Harvester 0.20). Consumed in farm-crops.js harvestPlot.
-export function setFarmDoubleHarvest(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setFarmDoubleHarvest(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     let chance = 0;
     for (const set of ITEM_SETS) if (set.capstone?.farmDoubleYield && (counts.get(set.id) || 0) >= set.items.length) chance += set.capstone.farmDoubleYield;
     return Math.min(0.75, chance);
 }
 
 // ── DEPTHS ── aggregate DEPTH affinity granted by active set tiers + capstones (read by mining.js, never boss).
-export function setDepthBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setDepthBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     const total = {};
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
@@ -272,8 +302,8 @@ export function setDepthBonus(equippedIds) {
 //   Delver     — the day's first collapse leaves your haul intact (goDeeper)
 //   Rockbreaker— a chance a cracked seam pays its ore twice (crack)
 //   Founder    — a chance a smelt costs no ore at all (smeltOre)
-export function setDepthCapstones(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setDepthCapstones(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     let secondWind = false, richSeam = 0, freeSmelt = 0;
     for (const set of ITEM_SETS) {
         if ((counts.get(set.id) || 0) < fullNeed(set)) continue;
@@ -287,8 +317,8 @@ export function setDepthCapstones(equippedIds) {
 // Aggregate WHEEL bonuses granted by active set-bonus tiers (read by spin.js — never boss). `luck` = % chance
 // per spin to trigger a Lucky Spin (bonus gold on gold prizes). It's a proc, not a
 // guaranteed per-spin bonus.
-export function setWheelBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setWheelBonus(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     const total = { luck: 0 };
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
@@ -299,8 +329,8 @@ export function setWheelBonus(equippedIds) {
     return total;
 }
 // Full-set WHEEL capstone: chance a spin is refunded (free re-spin). Consumed in spin.js doSpin.
-export function setWheelRespinChance(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setWheelRespinChance(ownedIds) {
+    const counts = collectedCounts(ownedIds);
     let chance = 0;
     for (const set of ITEM_SETS) if (set.capstone?.wheelRespin && (counts.get(set.id) || 0) >= fullNeed(set)) chance += set.capstone.wheelRespin;
     return Math.min(0.5, chance);
@@ -381,12 +411,18 @@ export function getSetsOverview(equippedIds, ownedIds) {
         });
         const equipped = pieces.filter((p) => p.equipped).length;
         const owned = pieces.filter((p) => p.owned).length;
+        // What makes a tier LIVE: worn pieces for a combat set, collected pieces for a collection. Reading the
+        // wrong one here is how a screen ends up telling somebody their farm bonus is off while the farm is
+        // busy applying it.
+        const have = set.collection ? owned : equipped;
         return {
             id: set.id, name: set.name, total: set.items.length, equipped, owned,
+            collection: Boolean(set.collection), // drives "collected 3/4" wording instead of "3/4 worn"
+            have,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: equipped >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null })),
-            capstone: set.capstone ? { desc: set.capstone.desc, active: equipped >= fullNeed(set) } : null,
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: have >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null, depth: t.depth || null })),
+            capstone: set.capstone ? { desc: set.capstone.desc, active: have >= fullNeed(set) } : null,
         };
     });
 }

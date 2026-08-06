@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { BUFF_CAP, emptyFarmBuffs } from "@/lib/marketplace/decorations.js";
 import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
-import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getOwnedItemIds, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { sumItemFarm } from "@/lib/marketplace/items.js";
 import { setFarmBonus } from "@/lib/marketplace/sets.js";
 import { collectibleById, petFarmPassive } from "@/lib/marketplace/collectibles.js";
@@ -22,17 +22,19 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 export async function farmBonuses(buyerId) {
     const out = emptyFarmBuffs();
     if (!buyerId) return out;
-    const [deco, bySlot, buyer, badgeFarm, utilTotals] = await Promise.all([
+    const [deco, bySlot, buyer, badgeFarm, utilTotals, ownedIds] = await Promise.all([
         placedDecoBuffs(buyerId).catch(() => emptyFarmBuffs()),
         getEquippedIds(buyerId).catch(() => ({})),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getBadgeFarm(buyerId).catch(() => ({})), // (d) earned FARMING/pet badges add farm bonuses too
         getEquippedUtilTotals(buyerId).catch(() => ({ farm: {} })), // (e) rare Forge "attunement" farm affixes on equipped gear
+        getOwnedItemIds(buyerId).catch(() => []), // (b2) the farm COLLECTION sets count what you own, not what you wear
     ]);
     const equippedList = Object.values(bySlot || {});
     const gearFarm = sumItemFarm(equippedList);
-    // (b2) FARM set-bonus tiers (Harvester / Forager) — small farm affinity on top of the pieces' own affixes.
-    const setFarm = setFarmBonus(equippedList);
+    // (b2) FARM set tiers (Harvester / Forager). COLLECTION sets: owning the piece is what counts, so this
+    // reads the owned list — nobody has to keep a farming loadout to farm well any more.
+    const setFarm = setFarmBonus(ownedIds);
     const utilFarm = utilTotals.farm || {};
     // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses + (d) farm/pet badges + (e) forge attunements
     for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0) + (badgeFarm[k] || 0) + (utilFarm[k] || 0);

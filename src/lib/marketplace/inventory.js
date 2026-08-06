@@ -60,6 +60,17 @@ export async function getEquippedIds(buyerId) {
     return bySlot;
 }
 
+// ── EVERY PIECE YOU OWN ──────────────────────────────────────────────────────────────────────────────────────
+// The counterpart to getEquippedIds, and the pool the COLLECTION sets count from (see sets.js). A farming or
+// mining set asks you to collect it, not to wear it: making its bonus depend on what is equipped forced people
+// to keep a crafting loadout and a fighting loadout and swap between them to do two different activities,
+// which is bookkeeping, not a decision. Owning the piece is the achievement; the bonus follows the piece.
+export async function getOwnedItemIds(buyerId) {
+    if (!buyerId) return [];
+    const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    return rows.map((r) => r.item_id);
+}
+
 // Forge enhancement stat bonuses for a member's given items → merged combat-stat totals. Only the items that
 // are actually equipped should be passed in (enhancement rides with the item wherever it's equipped).
 async function enhanceBonusFor(buyerId, itemIds) {

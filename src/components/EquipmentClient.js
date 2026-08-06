@@ -80,20 +80,27 @@ const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea
 // A rich, tappable card for one set the player is building: piece dots, a progress bar, the tiered stat
 // bonuses (active ones lit), and — the fun differentiator two sets otherwise hide — the full-set CAPSTONE.
 function SetBonusCard({ set, onOpen }) {
-    const complete = set.equipped >= set.total;
-    const pct = Math.round((set.equipped / set.total) * 100);
+    // A COLLECTION set (farm / mine / wheel / sailing) counts what you OWN; a combat set counts what you
+    // wear. `have` is the server's answer to which — reading `equipped` here would tell somebody their farm
+    // bonus is off while the farm is busy applying it.
+    const have = set.have ?? set.equipped;
+    const complete = have >= set.total;
+    const pct = Math.round((have / set.total) * 100);
     const nextTier = set.tiers.find((t) => !t.active);
-    const need = nextTier ? nextTier.need - set.equipped : set.total - set.equipped;
+    const need = nextTier ? nextTier.need - have : set.total - have;
     return (
         <button type="button" onClick={onOpen} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", marginTop: 8, borderRadius: 12, cursor: "pointer", color: "inherit", background: complete ? "linear-gradient(180deg, rgba(255,215,94,0.1), rgba(255,255,255,0.02))" : "rgba(255,255,255,0.03)", border: `1px solid ${complete ? "rgba(255,215,94,0.5)" : "rgba(255,255,255,0.1)"}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ display: "flex", gap: 3 }}>
+                    {/* A dot is LIT by whatever makes the bonus live: collected for a collection, worn for a
+                        combat set. Lighting it on "equipped" for a farm set would show four dark dots beside
+                        a bar reading 4/4 collected. */}
                     {set.pieces.map((p) => (
-                        <span key={p.id} title={p.equipped ? `${p.name} — equipped` : p.owned ? `${p.name} — owned, not equipped` : `${p.name} — locked`} style={{ width: 9, height: 9, borderRadius: "50%", boxSizing: "border-box", background: p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "transparent", border: p.equipped ? "none" : p.owned ? "1.5px solid rgba(255,255,255,0.55)" : "1.5px solid rgba(255,255,255,0.16)", boxShadow: p.equipped ? `0 0 6px ${SET_RARITY[p.rarity] || "#ffd75e"}` : "none" }} />
+                        <span key={p.id} title={(set.collection ? p.owned : p.equipped) ? `${p.name} — ${set.collection ? "collected" : "equipped"}` : p.owned ? `${p.name} — owned, not equipped` : `${p.name} — locked`} style={{ width: 9, height: 9, borderRadius: "50%", boxSizing: "border-box", background: (set.collection ? p.owned : p.equipped) ? (SET_RARITY[p.rarity] || "#ffd75e") : "transparent", border: (set.collection ? p.owned : p.equipped) ? "none" : p.owned ? "1.5px solid rgba(255,255,255,0.55)" : "1.5px solid rgba(255,255,255,0.16)", boxShadow: (set.collection ? p.owned : p.equipped) ? `0 0 6px ${SET_RARITY[p.rarity] || "#ffd75e"}` : "none" }} />
                     ))}
                 </span>
                 <strong style={{ flex: 1, minWidth: 0 }}>{set.name}{complete ? " ✨" : ""}</strong>
-                <span className="muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} worn{set.owned > set.equipped ? ` · ${set.owned} owned` : ""}</span>
+                <span className="muted" style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{have}/{set.total} {set.collection ? "collected" : "worn"}{!set.collection && set.owned > set.equipped ? ` · ${set.owned} owned` : ""}</span>
                 <span aria-hidden="true" style={{ opacity: 0.5 }}>›</span>
             </div>
             <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 8 }}>
@@ -122,25 +129,26 @@ function SetBonusCard({ set, onOpen }) {
 // The full set breakdown: every piece (equipped / owned / locked) plus all tiers and the capstone. Owned
 // pieces can be equipped (or unequipped) right here — no need to hunt the slot in the paper-doll.
 function SetDetailSheet({ set, onClose, onEquip, onUnequip, busy = false }) {
-    const complete = set.equipped >= set.total;
-    const pct = Math.round((set.equipped / set.total) * 100);
+    const have = set.have ?? set.equipped;
+    const complete = have >= set.total;
+    const pct = Math.round((have / set.total) * 100);
     return createPortal((
         <div className="equip-sheet-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.8)", padding: 16 }}>
             <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, margin: 0, maxHeight: "88dvh", overflowY: "auto", borderColor: complete ? "rgba(255,215,94,0.5)" : "rgba(143,216,255,0.4)", borderWidth: 2 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span aria-hidden="true"><HelmetSprite size={22} /></span>
                     <h3 style={{ margin: 0, flex: 1 }}>{set.name}{complete ? " ✨" : ""}</h3>
-                    <span className="muted" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{set.equipped}/{set.total} equipped</span>
+                    <span className="muted" style={{ fontSize: "0.8rem", whiteSpace: "nowrap" }}>{have}/{set.total} {set.collection ? "collected" : "equipped"}</span>
                 </div>
                 <div style={{ height: 7, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 10 }}>
                     <div style={{ height: "100%", width: `${pct}%`, borderRadius: 999, background: complete ? "linear-gradient(90deg,#ffd75e,#ffb648)" : "linear-gradient(90deg,#4aa3ff,#8fd8ff)", transition: "width .4s ease" }} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(88px,1fr))", gap: 8, marginTop: 12 }}>
                     {set.pieces.map((p) => (
-                        <div key={p.id} title={p.statsText || ""} style={{ display: "flex", flexDirection: "column", padding: 8, borderRadius: 12, textAlign: "center", border: `1.5px solid ${p.equipped ? (SET_RARITY[p.rarity] || "#ffd75e") : "rgba(255,255,255,0.1)"}`, background: p.equipped ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", opacity: p.owned || p.equipped ? 1 : 0.55 }}>
+                        <div key={p.id} title={p.statsText || ""} style={{ display: "flex", flexDirection: "column", padding: 8, borderRadius: 12, textAlign: "center", border: `1.5px solid ${(set.collection ? p.owned : p.equipped) ? (SET_RARITY[p.rarity] || "#ffd75e") : "rgba(255,255,255,0.1)"}`, background: (set.collection ? p.owned : p.equipped) ? "rgba(255,215,94,0.06)" : "rgba(255,255,255,0.03)", opacity: p.owned || p.equipped ? 1 : 0.55 }}>
                             <ItemArt id={p.id} icon={p.icon} className="set-tile-art" />
                             <div style={{ fontSize: "0.72rem", fontWeight: 700, marginTop: 3, color: p.equipped ? (SET_RARITY[p.rarity] || undefined) : undefined }}>{p.name}</div>
-                            <div className="muted" style={{ fontSize: "0.66rem", marginTop: 1 }}>{p.equipped ? "✅ equipped" : p.owned ? "• owned" : "🔒 locked"}</div>
+                            <div className="muted" style={{ fontSize: "0.66rem", marginTop: 1 }}>{set.collection ? (p.owned ? "✅ collected" : "🔒 not found yet") : p.equipped ? "✅ equipped" : p.owned ? "• owned" : "🔒 locked"}</div>
                             {p.equipped ? (
                                 onUnequip ? <button type="button" className="pill" onClick={() => onUnequip(p)} disabled={busy} style={{ marginTop: 6, fontSize: "0.68rem", padding: "3px 8px", alignSelf: "center" }}>Unequip</button> : null
                             ) : p.owned && onEquip ? (

@@ -6,7 +6,7 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
@@ -75,10 +75,11 @@ const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; 
 const BASE_RAIDS_PER_DAY = 3;
 const raidsPerDay = (level = 1, setBonus = 0) => BASE_RAIDS_PER_DAY + boatPerks(level).bonusRaids + Math.max(0, setBonus);
 const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) : 0); // count only counts if it's TODAY's
-// Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. One equipped-gear read.
+// Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. A COLLECTION set —
+// assembling it is the achievement, so it counts what you own rather than what is in your slots.
 async function equippedRaidExtras(buyerId) {
-    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
-    return { bonusRaids: setRaidBonus(bySlot), doubleGold: setDoublesRaidGold(bySlot) };
+    const owned = await getOwnedItemIds(buyerId).catch(() => []);
+    return { bonusRaids: setRaidBonus(owned), doubleGold: setDoublesRaidGold(owned) };
 }
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
 // RAID_RESET_PAID true (+ tune base) before release.
@@ -268,7 +269,8 @@ export async function equippedSeaAffinity(buyerId) {
     ]);
     const gear = sumItemSea(Object.values(bySlot || {}));
     for (const k in sea) sea[k] += gear[k] || 0;
-    const setSea = setSeaBonus(bySlot); // Dread Corsair set bonuses grant sea affinity too
+    // The pieces' own sea affixes come off the loadout above; the Corsair SET tiers are a collection.
+    const setSea = setSeaBonus(await getOwnedItemIds(buyerId).catch(() => []));
     for (const k in sea) sea[k] += setSea[k] || 0;
     const petId = me?.featured_collectible;
     const pet = petId ? collectibleById(petId) : null;
