@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { SMELT_GRADES, SMELT_MISS, SMELT_PHASES, smeltGrade } from "@/lib/marketplace/smelt-heat.js";
+import { SMELT_GRADES, SMELT_MAX_BATCHES, SMELT_MISS, SMELT_PHASES, smeltGrade } from "@/lib/marketplace/smelt-heat.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { getBadgeDepth, grantEventBadge } from "@/lib/marketplace/badges.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
@@ -1136,31 +1136,55 @@ async function claimNode(buyerId, node, row, run = {}) {
 
 // Smelt a stack. `heat` is 0..1+ from the client's heat bar — graded HERE and clamped, so a tampered client
 // can't claim a perfect pour every time.
-export async function smeltOre(buyerId, tier, dists = null) {
+export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
     const row = await minerRow(buyerId);
     const cost = smeltCostFor(row?.crucible_level);
 
-    // ONE BATCH PER SMELT. It used to melt the entire stack in a single tap — twenty-four ore, one heat
-    // reading, eight parts — which is why the minigame did not matter: you played it once a day. A smelt is
-    // now exactly what the row says it is: `cost` ore in, one part out, one hand of the game played.
-    const spend = cost;
+    // ── ONE POUR, UP TO TEN BATCHES ──────────────────────────────────────────────────────────────────────────
+    // A smelt is `cost` ore in, one part out, one hand of the minigame played — and that is right for the hand
+    // itself, but somebody standing on 73 ore was being asked to play it thirty-six times to empty their pack.
+    // The pour is the interesting part; the thirty-six taps around it are not.
+    //
+    // So the pour still happens ONCE and its quality carries across every batch it covers, good or bad. Nothing
+    // else changes: each batch draws its own tickets, rolls its own Bellows and Flux and its own Cold Crucible
+    // refund, and the quest and ore counters move by the batch. Ten batches on one pour must come out the same
+    // as ten single smelts that all poured that well — the only thing being saved is your thumb.
+    const want = Math.max(1, Math.min(SMELT_MAX_BATCHES, Math.floor(Number(batches) || 1)));
 
-    // Atomic guarded spend — the WHERE is what stops a double-tap smelting ore you no longer have.
-    const spent = await db
-        .queryOne(`UPDATE mkt_ore SET qty = qty - $3 WHERE buyer_id = $1 AND tier = $2 AND qty >= $3 RETURNING qty`, [buyerId, t, spend])
-        .catch(() => null);
+    // Atomic guarded spend — the WHERE is what stops a double-tap smelting ore you no longer have. Asking for
+    // ten when eight are affordable smelts EIGHT rather than failing: the ore may have moved since the screen
+    // was drawn, and "nothing happened" is the worst possible answer to a button you have already committed to.
+    const have = await db.queryOne(`SELECT qty FROM mkt_ore WHERE buyer_id = $1 AND tier = $2`, [buyerId, t]).catch(() => null);
+    let n = Math.min(want, Math.floor((Number(have?.qty) || 0) / cost));
+    if (n < 1) return { ok: false, error: "not_enough_ore" };
+    let spent = null;
+    while (n >= 1 && !spent) {
+        // The read above makes this one pass in every normal case; the loop only turns over if another tab
+        // spent the same ore in between, and it walks DOWN rather than giving up.
+        // eslint-disable-next-line no-await-in-loop
+        spent = await db
+            .queryOne(`UPDATE mkt_ore SET qty = qty - $3 WHERE buyer_id = $1 AND tier = $2 AND qty >= $3 RETURNING qty`, [buyerId, t, cost * n])
+            .catch(() => null);
+        if (!spent) n -= 1;
+    }
     if (!spent) return { ok: false, error: "not_enough_ore" };
+    const spend = cost * n;
 
     // COLD CRUCIBLE (full Founder's Regalia): the smelt sometimes costs no ore. Refunded AFTER the guarded
     // spend rather than skipping it, so the "do you actually have the ore" check still has to pass — you can
-    // never smelt ore you don't own just because the capstone happened to roll.
+    // never smelt ore you don't own just because the capstone happened to roll. Rolled PER BATCH, so a ten-
+    // batch pour gets ten chances at it exactly as ten single smelts would.
     const smeltCaps = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getEquippedIds(buyerId).catch(() => ({})));
-    const refunded = smeltCaps.freeSmelt > 0 && Math.random() < smeltCaps.freeSmelt;
+    let refundedBatches = 0;
+    if (smeltCaps.freeSmelt > 0) {
+        for (let i = 0; i < n; i += 1) if (Math.random() < smeltCaps.freeSmelt) refundedBatches += 1;
+    }
+    const refunded = refundedBatches > 0;
     if (refunded) {
-        await db.query(`UPDATE mkt_ore SET qty = qty + $3 WHERE buyer_id = $1 AND tier = $2`, [buyerId, t, spend]).catch(() => {});
+        await db.query(`UPDATE mkt_ore SET qty = qty + $3 WHERE buyer_id = $1 AND tier = $2`, [buyerId, t, cost * refundedBatches]).catch(() => {});
     }
 
     const o = oreTier(t);
@@ -1182,7 +1206,6 @@ export async function smeltOre(buyerId, tier, dists = null) {
     // The band reported back is whichever best describes the run as a whole.
     const band = [...SMELT_GRADES, SMELT_MISS]
         .reduce((a, b) => (Math.abs(b.mult - avgMult) < Math.abs(a.mult - avgMult) ? b : a), SMELT_GRADES[0]);
-    const n = 1;
 
     // DEPTHS: Bellows adds extra-part tickets, Crucible adds curio tickets. Both are additive with the
     // furnace tracks rather than replacing them — gear should stack with what you built, not substitute for it.
@@ -1219,14 +1242,19 @@ export async function smeltOre(buyerId, tier, dists = null) {
     let extras = 0, ups = 0;
     const curios = [];
     const add = (pt, count) => { made[pt] = (made[pt] || 0) + count; };
-    for (let i = 0; i < draws; i += 1) {
-        const ticket = bag[Math.floor(Math.random() * bag.length)] || "part";
-        if (ticket === "up" && o.part < 5) { add(o.part + 1, 1); ups += 1; }
-        else if (ticket === "extra") { add(o.part, 2); extras += 1; }
-        // No GEAR from the furnace. It used to roll gear here, which is the one thing that makes a side
-        // activity outshine the loop it feeds — smelting exists to supply the Forge, not to replace it.
-        else if (ticket === "curio") curios.push(Math.random() < 0.72 ? "consumable" : "chest");
-        else add(o.part, 1);
+    // Per BATCH, then per draw. The bag itself is built once (it is a function of the pour and your upgrades,
+    // both of which are the same for every batch on this hand) but every batch reaches into it separately, so
+    // a ten-batch pour is ten rolls of the same odds rather than one roll paid out ten times.
+    for (let batch = 0; batch < n; batch += 1) {
+        for (let i = 0; i < draws; i += 1) {
+            const ticket = bag[Math.floor(Math.random() * bag.length)] || "part";
+            if (ticket === "up" && o.part < 5) { add(o.part + 1, 1); ups += 1; }
+            // No GEAR from the furnace. It used to roll gear here, which is the one thing that makes a side
+            // activity outshine the loop it feeds — smelting exists to supply the Forge, not to replace it.
+            else if (ticket === "extra") { add(o.part, 2); extras += 1; }
+            else if (ticket === "curio") curios.push(Math.random() < 0.72 ? "consumable" : "chest");
+            else add(o.part, 1);
+        }
     }
 
     const { addParts } = await import("@/lib/marketplace/crafting.js");
@@ -1251,9 +1279,11 @@ export async function smeltOre(buyerId, tier, dists = null) {
     const totalParts = Object.values(made).reduce((a, b) => a + b, 0);
     const melted = await db.queryOne(`UPDATE mkt_mining SET ore_smelted = COALESCE(ore_smelted, 0) + $2 WHERE buyer_id = $1 RETURNING ore_smelted`, [buyerId, spend]).catch(() => null);
     if ((Number(melted?.ore_smelted) || 0) >= 1000) await grantEventBadge(buyerId, "mine_forgefed").catch(() => {});
-    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length, refunded }).catch(() => {});
-    await bumpQuestProgress(buyerId, "ore_smelt", 1).catch(() => {});
-    await bumpTownQuest(buyerId, "founder", 1).catch(() => {});
+    await trackActivity(buyerId, "ore_smelted", { tier: t, ore: spend, batches: n, parts: totalParts, band: band.key, ups, extras, bonus: bonus.length, refunded }).catch(() => {});
+    // By the BATCH, not by the tap — batching must never be a way to do less quest progress for the same ore
+    // (or more, which is why it is n and not n + 1).
+    await bumpQuestProgress(buyerId, "ore_smelt", n).catch(() => {});
+    await bumpTownQuest(buyerId, "founder", n).catch(() => {});
     // A FLAWLESS pour means every one of the five phases landed in the tightest band — 4.4% of a bar that is
     // under 600ms by the last phase. Counted per RUN, not per phase, which is why 25 is a real number.
     const allFlawless = bands.length === SMELT_PHASES && bands.every((b) => b.key === "pixel");
@@ -1267,7 +1297,7 @@ export async function smeltOre(buyerId, tier, dists = null) {
     return {
         ok: true,
         smelted: {
-            oreTier: t, oreName: o.ore, oreSpent: spend, partTier: o.part,
+            oreTier: t, oreName: o.ore, oreSpent: spend, batches: n, partTier: o.part,
             phases: bands.map((b) => ({ key: b.key, label: b.label, mult: b.mult })),
             band: band.key, bandLabel: band.label, bandBlurb: null,
             parts: totalParts, ups, extras, bonus,

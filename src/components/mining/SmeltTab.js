@@ -1,6 +1,7 @@
 "use client";
 
 import { Img, PART_NAME, PART_SPRITE, ToolPanel } from "@/components/mining/kit";
+import { SMELT_MAX_BATCHES } from "@/lib/marketplace/smelt-heat.js";
 
 // ── THE SMELTERY ─────────────────────────────────────────────────────────────────────────────────────────────
 // Your actual furnace, standing in the room, upgrading its sprite as you build it out. Ore of a tier melts
@@ -42,11 +43,29 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                                 <b className="mine-stash-qty">×{o.qty}</b>
                                 {/* The button said "Smelt 8" and got clipped on a phone. It now says what it
                                     MAKES — that is the number worth reading — and wraps to its own line rather
-                                    than fighting the name for width. */}
-                                <button type="button" className={`mine-smelt${o.canSmelt ? " is-ready" : ""}`} disabled={!o.canSmelt || Boolean(smelting)} onClick={() => onSmelt(o.tier)}>
-                                    <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" />
-                                    {o.canSmelt ? <>Smelt <b>1</b></> : "Not enough"}
-                                </button>
+                                    than fighting the name for width.
+
+                                    THE BULK BUTTON. A full pack is dozens of batches, and at one pour each
+                                    that is the same five-phase minigame thirty-six times over — the pour is the
+                                    good part, the thirty-six taps around it are not. The second button covers
+                                    up to ten batches with a single pour, and it never offers more than the ore
+                                    in the pack can pay for, so what it says is what you get. */}
+                                <span className="mine-smelt-btns">
+                                    <button type="button" className={`mine-smelt${o.canSmelt ? " is-ready" : ""}`} disabled={!o.canSmelt || Boolean(smelting)} onClick={() => onSmelt(o.tier, 1)}>
+                                        <Img src="/images/mining/track-crucible.png" className="mine-btn-ico" fallback="" />
+                                        {o.canSmelt ? <>Smelt <b>1</b></> : "Not enough"}
+                                    </button>
+                                    {(() => {
+                                        const most = Math.min(SMELT_MAX_BATCHES, Math.floor((o.qty || 0) / (o.smeltCost || 1)));
+                                        if (!o.canSmelt || most < 2) return null;
+                                        return (
+                                            <button type="button" className="mine-smelt is-bulk" disabled={Boolean(smelting)} onClick={() => onSmelt(o.tier, most)}
+                                                title={`One pour, ${most} batches — ${most * o.smeltCost} ${o.name}`}>
+                                                Smelt <b>{most}</b>
+                                            </button>
+                                        );
+                                    })()}
+                                </span>
                             </div>
                         ))}
                     </div>

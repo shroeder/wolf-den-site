@@ -151,6 +151,13 @@ export function SmeltModal({ smelting, onClose }) {
                             </div>
                         ) : null}
                         <h3 style={{ color: "#ffd08a" }}>{smelting.result?.parts ?? smelting.parts} parts</h3>
+                        {/* A bulk pour has to account for itself: ten batches on one hand is a lot of ore to
+                            watch disappear with no line saying where it went. */}
+                        {(smelting.result?.batches ?? smelting.batches ?? 1) > 1 ? (
+                            <div className="muted" style={{ marginTop: -6, marginBottom: 8, fontSize: 12 }}>
+                                {smelting.result?.batches ?? smelting.batches} batches on one pour · {smelting.result?.oreSpent ?? smelting.ore} ore
+                            </div>
+                        ) : null}
                         {/* THE PART YOU JUST MADE, AS THE THING IT IS. This was a count and a name in plain
                             text — "2× Iron Filings" — while the painted sprite for that exact part sat in the
                             forge catalog, already generated. Every part tier has one; draw it. */}

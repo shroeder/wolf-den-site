@@ -28,6 +28,9 @@ export const smeltGrade = (dist) =>
 // A full sweep in milliseconds. By the last one the marker crosses in well under a second, so the FLAWLESS
 // band — 4.4% of the bar — goes past in about 26ms and is a genuine reflex test rather than a formality.
 export const SMELT_PHASES = 5;
+// How many batches one pour may cover. Shared so the button, the server clamp and the ore maths cannot
+// disagree about what "smelt ten" means.
+export const SMELT_MAX_BATCHES = 10;
 export const PHASE_LABELS = ["Charge", "Stoke", "Melt", "Skim", "Pour"];
 export const PHASE_SWEEP_MS = [1200, 1000, 820, 690, 580];
 

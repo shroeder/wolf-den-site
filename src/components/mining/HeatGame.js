@@ -27,7 +27,7 @@ const BANDS = ["good", "great", "perfect", "pixel"].map((key) => ({
 const SCORE = { pixel: 4, perfect: 3, great: 2, good: 1, miss: 0 };
 const CHAIN_KEEPS = 2; // CLEAN or better keeps the chain alive
 
-export default function HeatGame({ stack, furnace, onPour }) {
+export default function HeatGame({ stack, furnace, onPour, batches = 1 }) {
     const [phase, setPhase] = useState(0);
     const [locked, setLocked] = useState([]);   // the grade banked on each finished phase
     const [chain, setChain] = useState(0);
@@ -183,7 +183,9 @@ export default function HeatGame({ stack, furnace, onPour }) {
                     <span className="smb-fire" style={{ opacity: 0.3 + phase * 0.17 }} aria-hidden="true" />
                     <div className="smb-head-txt">
                         <div className="smb-title">Work the heat</div>
-                        <div className="smb-sub">{stack.smeltCost} {stack.name} &rarr; 1 part</div>
+                        {/* One hand of the game covers however many batches you committed to — say so, because a
+                            spilled pour costs ten times as much when ten are riding on it. */}
+                        <div className="smb-sub">{stack.smeltCost * batches} {stack.name} &rarr; {batches} part{batches === 1 ? "" : "s"}{batches > 1 ? " — one pour, all of them" : ""}</div>
                     </div>
                 </div>
 

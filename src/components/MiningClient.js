@@ -112,7 +112,8 @@ export default function MiningClient({ initial }) {
 
             {/* THE POUR — the heat climbs, you decide when to tip the crucible. */}
             {m.forge ? (
-                <HeatGame stack={m.forge.stack} furnace={s.furnace} onPour={(dists) => m.pour(dists, m.forge.stack)} />
+                <HeatGame stack={m.forge.stack} furnace={s.furnace} batches={m.forge.batches || 1}
+                    onPour={(dists) => m.pour(dists, m.forge.stack, m.forge.batches || 1)} />
             ) : null}
 
             {m.smelting ? <SmeltModal smelting={m.smelting} onClose={() => m.setSmelting(null)} /> : null}
@@ -356,6 +357,11 @@ export default function MiningClient({ initial }) {
                 .mine-smelt { padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(255,120,32,0.55); background: rgba(255,120,32,0.16);
                     color: #ffcf9a; font-weight: 800; font-size: 12px; cursor: pointer; white-space: nowrap; }
                 .mine-smelt:disabled { opacity: 0.32; cursor: default; }
+                /* One-and-ten, stacked on a phone so neither gets clipped and the row keeps its shape. */
+                .mine-smelt-btns { display: grid; gap: 5px; flex: 0 0 auto; }
+                /* The bulk button is the same button, quieter — the single smelt stays the one that pulses. */
+                .mine-smelt.is-bulk { padding: 6px 12px; font-size: 11.5px; border-color: rgba(255,120,32,0.32);
+                    background: rgba(255,120,32,0.08); color: #e8b98f; }
                 .mine-ladder { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
                 .mine-ladder-intro { margin: 0 0 10px; font-size: 12.5px; color: #cdd3d8; line-height: 1.5; }
                 .mine-rung { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 10px; margin-bottom: 6px;

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import { clink, quench } from "@/components/mining/kit";
+import { SMELT_MAX_BATCHES } from "@/lib/marketplace/smelt-heat.js";
 
 // ── THE MINE'S STATE ─────────────────────────────────────────────────────────────────────────────────────────
 // Every server call and every piece of transient UI state, in one place. The three tabs are views onto this —
@@ -141,18 +142,23 @@ export function useMine(initial) {
     }, [post, state.node?.id, say, backToTunnel]);
 
     // ── THE SMELT ── played, not pressed. Opening the furnace starts the heat climbing; the pour is yours to time.
-    const smelt = useCallback((tier) => {
+    const smelt = useCallback((tier, batches = 1) => {
         const stack = (state.ore || []).find((o) => o.tier === tier);
         if (!stack?.canSmelt || smelting || forge) return;
-        setForge({ tier, stack });
+        // How many batches this hand covers. Clamped to what the pack can actually pay for, so the button can
+        // offer ten and the pour still does eight if that is all the ore there is.
+        const most = Math.max(1, Math.floor((stack.qty || 0) / (stack.smeltCost || 1)));
+        setForge({ tier, stack, batches: Math.max(1, Math.min(SMELT_MAX_BATCHES, Math.floor(batches) || 1, most)) });
     }, [state.ore, smelting, forge]);
 
     // The pour landed. Send the heat we read and play the result back.
-    const pour = useCallback(async (dists, stack) => {
+    const pour = useCallback(async (dists, stack, batches = 1) => {
         setForge(null);
-        // ONE batch — `cost` ore into one part — not the whole stack. `heats` is the three phase readings.
-        setSmelting({ stage: "load", oreArt: stack.art, oreName: stack.name, color: stack.color, partTier: stack.partTier, parts: 1, ore: stack.smeltCost });
-        const r = await post({ action: "smelt", tier: stack.tier, dists });
+        // `batches` batches of `cost` ore, all on this one pour — never the whole stack unless you asked for it.
+        // `dists` is the per-phase reading; the server grades every one of them.
+        const n = Math.max(1, Math.floor(batches) || 1);
+        setSmelting({ stage: "load", oreArt: stack.art, oreName: stack.name, color: stack.color, partTier: stack.partTier, parts: n, ore: stack.smeltCost * n, batches: n });
+        const r = await post({ action: "smelt", tier: stack.tier, dists, batches: n });
         setTimeout(() => setSmelting((v) => (v ? { ...v, stage: "burn" } : v)), 420);
         setTimeout(() => {
             if (r?.unlocked && r?.ok !== false) {
