@@ -177,15 +177,38 @@ const MERCHANT_PET_ID = "elephant_spear";
 const MERCHANT_PET_RARITY = "legendary";
 // Elephant find bonus by EQUIPPED pet level (1..5): +1% → +5%.
 const MERCHANT_PET_FIND = [0, 0.01, 0.02, 0.03, 0.04, 0.05];
-// His exclusive stock — premium / drop-only consumables at a steep discount (you can't buy these normally).
+// ── HIS STOCK, AND WHY IT IS CHEAP ───────────────────────────────────────────────────────────────────────────
+// A 5%-per-landing showman you meet a handful of times a month has to be WORTH stopping for, and at 25-35% off
+// he was not: the Tome of Wisdom came to 975 against 1,500 in a shop you can open any time you like, for a
+// saving of about one coin-toss. Every price was roughly twice what it should have been for a once-in-a-blue-
+// moon event, so this is a flat two-thirds off instead — the Tome lands at 495, and meeting him actually means
+// something.
+//
+// ONE discount for the whole cart, rather than a per-item number, because there is nothing to tune per item:
+// the interesting thing about a ware is what it does, not whether the showman feels 25% or 35% generous today.
+const MERCHANT_DISCOUNT = 0.67;
+// Where a ware is buyable in the ordinary shop, its base IS the shop price — read from CONSUMABLES rather than
+// copied here, so the discount can never quietly drift into a markup when a shop price moves. The drop-only
+// ones have no shop price to read, so they carry a notional value: what the piece would sell for if it were
+// stocked, which is what the percentage is honestly a discount FROM.
 const MERCHANT_STOCK = [
-    { id: "treat_wild", base: 1600, off: 0.3 },
-    { id: "treat_marrow", base: 3200, off: 0.3 },
-    { id: "spin_golden_ticket", base: 2400, off: 0.25 },
-    { id: "scroll_wisdom", base: 1500, off: 0.35 },
-    { id: "pot_secondwind", base: 3200, off: 0.35 },
-    { id: "stone_ember", base: 3500, off: 0.35 },
+    { id: "treat_wild", base: 1600 },        // drop-only
+    { id: "treat_marrow", base: 3200 },      // drop-only
+    { id: "spin_golden_ticket", base: 2400 },// drop-only
+    { id: "scroll_wisdom" },                 // 1,500 in the shop
+    { id: "pot_secondwind" },                // 3,200 in the shop
+    { id: "stone_ember" },                   // 3,500 in the shop
 ];
+const wareBase = (s) => s.base ?? CONSUMABLES[s.id]?.price ?? 1000;
+// Rounded to the nearest 5 — a showman shouts "495", not "494.7". Priced by a FUNCTION, not by whatever number
+// happened to be written into merchant_json when the offer was rolled: an offer sits in that column until the
+// next voyage, so a price change that only touched the roll would leave every merchant already on a beach
+// selling at yesterday's prices, and there is no reason for the player to care which side of a deploy they
+// landed on. Read, display and charge all call this.
+const warePrice = (id) => {
+    const s = MERCHANT_STOCK.find((w) => w.id === id);
+    return s ? Math.max(1, Math.round((wareBase(s) * (1 - MERCHANT_DISCOUNT)) / 5) * 5) : null;
+};
 
 // ── LEVEL-CORRECT PET ART FOR A SET OF MEMBERS ───────────────────────────────────────────────────────────────
 // Everywhere a pet appears on a boat -- the captain's, the fleet on the horizon, both sides of a raid, the
@@ -297,7 +320,7 @@ async function rollMerchant(buyerId) {
     if (Math.random() < chance) {
         const stock = [...MERCHANT_STOCK].sort(() => Math.random() - 0.5).slice(0, 3).map((s) => {
             const c = CONSUMABLES[s.id] || {};
-            return { id: s.id, name: c.name || s.id, emoji: c.emoji || "🧪", desc: c.desc || "", price: Math.max(1, Math.round(s.base * (1 - s.off))), off: Math.round(s.off * 100) };
+            return { id: s.id, name: c.name || s.id, emoji: c.emoji || "🧪", desc: c.desc || "", price: warePrice(s.id), off: Math.round(MERCHANT_DISCOUNT * 100) };
         });
         // The pet is earned by MEETING the merchant MERCHANT_PET_ENCOUNTERS times (set below), not by the minigame.
         offer = { shop: stock, minigamePlayed: false, goldWon: 0, perfect: false, petGranted: null };
@@ -949,8 +972,11 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         },
         // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
         encounter: (row && row.encounter_result) || null,
-        // The Gold Merchant offer, if he showed up this landing (shown at "arrived", before the dig).
-        merchant: (row && row.merchant_json && !row.merchant_json.none) ? row.merchant_json : null,
+        // The Gold Merchant offer, if he showed up this landing (shown at "arrived", before the dig). Prices are
+        // re-read from the table on the way out rather than served from the stored offer — see warePrice.
+        merchant: (row && row.merchant_json && !row.merchant_json.none)
+            ? { ...row.merchant_json, shop: (row.merchant_json.shop || []).map((s) => ({ ...s, price: warePrice(s.id) ?? s.price, off: Math.round(MERCHANT_DISCOUNT * 100) })) }
+            : null,
         merchantGold: { floor: MERCHANT_GOLD_FLOOR, ceil: MERCHANT_GOLD_CEIL },
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
@@ -1736,11 +1762,14 @@ export async function merchantBuy(buyerId, itemId) {
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const item = (m.shop || []).find((s) => s.id === itemId);
     if (!item) return { ok: false, error: "not_stocked", ...(await getSailingState(buyerId)) };
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, item.price]).catch(() => null);
+    // Charge the CURRENT price, the same one the screen was just shown — never the number frozen into the
+    // offer when it was rolled, which may predate a price change.
+    const price = warePrice(item.id) ?? item.price;
+    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
-    await logCoin(buyerId, -item.price, "merchant_buy", { meta: { name: item.name }, balanceAfter: paid.gold }).catch(() => {});
+    await logCoin(buyerId, -price, "merchant_buy", { meta: { name: item.name }, balanceAfter: paid.gold }).catch(() => {});
     await grantConsumable(buyerId, itemId, 1).catch(() => {});
-    await trackActivity(buyerId, "sail_merchant_buy", { name: item.name, cost: item.price }).catch(() => {});
+    await trackActivity(buyerId, "sail_merchant_buy", { name: item.name, cost: price }).catch(() => {});
     return { ok: true, bought: { id: item.id, name: item.name, emoji: item.emoji }, ...(await getSailingState(buyerId)) };
 }
 
