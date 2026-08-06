@@ -8,6 +8,7 @@ import { editImage, detectFacing, storeImage } from "@/lib/marketplace/openai-im
 import { getEquippedGearPhrase, getEquippedGearPhrasesForMembers } from "@/lib/marketplace/inventory.js";
 import { renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
 import { avatarConfigToQuery, DEFAULT_AVATAR, HAT_TOPS, humanizeAvatarLabel, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
+import { inspectSprite, spriteVerdict } from "@/lib/marketplace/sprite-cleanup.js";
 
 // The ONE shared default sprite used for members who haven't built their own avatar — so we don't spend
 // AI generating a unique sprite for everyone. Generated once from the default avatar, stored in settings.
@@ -18,13 +19,18 @@ const DEFAULT_SPRITE_KEY = "default_sprite_url";
 // but stops burning image-gen budget every tick. A real avatar/gear change resets the counter.
 const MAX_SPRITE_ATTEMPTS = 6;
 
+// How many times a single draw may be REJECTED AND REDRAWN for art quality (cropped figure, holes punched
+// through the character) before we keep what we have. Every retry is a billed image, so this is deliberately
+// two and not five: it catches the common one-off bad draw without turning one sprite into a shopping spree.
+const SPRITE_ATTEMPTS = 2;
+
 // Cost cap: a member's sprite is redrawn AT MOST once per this many hours, no matter how many times they
 // change their avatar/gear in between. Changes made inside the window are coalesced into one redraw once it
 // elapses (the sprite draws whatever is equipped at that moment). New members (no sprite yet) skip the
 // cooldown so their first sprite appears promptly; failure retries also skip it (they never set a success
 // timestamp) and are instead bounded by MAX_SPRITE_ATTEMPTS. Ceiling on image cost ≈ roster size / day.
 const REGEN_COOLDOWN_HOURS = 24;
-export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=2`;
+export const DEFAULT_SPRITE_AVATAR_PATH = `/api/marketplace/avatar?${avatarConfigToQuery(DEFAULT_AVATAR)}&format=png&v=3`;
 export const getDefaultSpriteUrl = () => getSetting(DEFAULT_SPRITE_KEY);
 
 // Turns a member's built DiceBear avatar into a 2D game-art character ("sprite") via OpenAI, in the same
@@ -72,7 +78,7 @@ export function describeAvatar(rawConfig) {
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
 export function buildSpritePrompt(config, gear = "") {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders at the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) filling the frame below, in a confident heroic standing pose shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders near the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) below it, in a confident heroic standing pose shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL FRAMING: the ENTIRE character must fit INSIDE the image with clear empty margin on all four sides — leave visible empty space above the highest point of the head, helmet or headgear and below the feet. Nothing may touch or run past the edge of the frame; do not crop the head, a helmet crest, a weapon, wings, or the feet. CRITICAL SOLIDITY: the character must be completely SOLID and opaque — no see-through areas, no transparent gaps or holes anywhere inside the body, armor, clothing, shield or weapons. Only the area OUTSIDE the character's silhouette is transparent. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
@@ -95,11 +101,20 @@ export function pendingSpriteIds(limit = null) {
                 -- shared default sprite exists for: they render it until they change something, which stamps
                 -- avatar_updated_at and makes them eligible here for the first time.
                 AND avatar_updated_at IS NOT NULL
-                -- FIRST sprite only. Redraws used to queue automatically whenever gear or the avatar changed —
-                -- one free redraw per member per day, forever, with nothing deciding whether the change was
-                -- worth it. A redraw is now a deliberate purchase (see buyHeroRedraw); this job just makes sure
-                -- everyone who has customised has a hero at all.
-                AND avatar_sprite_url IS NULL
+                AND (
+                    -- No sprite at all: draw it now, no cooldown.
+                    avatar_sprite_url IS NULL
+                    -- Or the look changed since the last draw. Bounded to one redraw per member per
+                    -- REGEN_COOLDOWN_HOURS, so a member trying on gear all afternoon costs one image, not
+                    -- twenty; the changes in between coalesce into the next draw.
+                    -- A sprite with no draw-time is a row we cannot reason about; treat it as due rather than
+                    -- letting the NULL comparison quietly exclude it forever.
+                    OR avatar_sprite_at IS NULL
+                    OR (
+                        (avatar_updated_at > avatar_sprite_at OR equipment_updated_at > avatar_sprite_at)
+                        AND avatar_sprite_at < NOW() - INTERVAL '${REGEN_COOLDOWN_HOURS} hours'
+                    )
+                )
               ORDER BY avatar_sprite_at NULLS FIRST, avatar_sprite_attempts ASC, avatar_updated_at DESC NULLS LAST
               ${capped ? "LIMIT $1" : ""}`,
             capped ? [Math.floor(Number(limit))] : []
@@ -114,7 +129,7 @@ export async function listSpritesAdmin() {
         .query(
             `SELECT id, display_name, alias, avatar_config, avatar_sprite_url, avatar_sprite_at, avatar_updated_at,
                     equipment_updated_at, avatar_sprite_flip, avatar_facing_checked_at,
-                    avatar_sprite_attempts, avatar_sprite_error
+                    avatar_sprite_attempts, avatar_sprite_error, avatar_sprite_prompt
                FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
               ORDER BY (avatar_sprite_url IS NULL) DESC, avatar_updated_at DESC NULLS LAST
@@ -136,14 +151,13 @@ export async function listSpritesAdmin() {
         stuck: (Number(r.avatar_sprite_attempts) || 0) >= MAX_SPRITE_ATTEMPTS,
         // Reference PNG the phone feeds to the OpenAI edits endpoint (rasterized DiceBear avatar, bust
         // placed at the top with room below). v bumps when the framing changes (immutable-cached URL).
-        avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=2`,
+        avatarPath: `/api/marketplace/avatar?${avatarConfigToQuery(r.avatar_config)}&format=png&v=3`,
         prompt: buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
-        // Pending when there's no sprite yet, or the avatar appearance OR equipped gear changed since it was drawn.
-        pending:
-            !r.avatar_sprite_url ||
-            !r.avatar_sprite_at ||
-            (r.avatar_updated_at && r.avatar_sprite_at && new Date(r.avatar_updated_at) > new Date(r.avatar_sprite_at)) ||
-            (r.equipment_updated_at && r.avatar_sprite_at && new Date(r.equipment_updated_at) > new Date(r.avatar_sprite_at)),
+        // Pending when there is no sprite, or the sprite on file was drawn from a DIFFERENT prompt than the
+        // one we would send now. That is exact where the old timestamp test was not: equipment_updated_at
+        // bumps when a member takes a ring off and puts the same ring back on, which changes nothing about
+        // the picture, and this screen used to report 43 of 84 members pending on that basis.
+        pending: !r.avatar_sprite_url || r.avatar_sprite_prompt !== buildSpritePrompt(r.avatar_config, gearMap.get(r.id) || ""),
     }));
 }
 
@@ -226,24 +240,50 @@ export async function setBuyerSprite(buyerId, base64) {
 
 // Server-side generation (used by the cron job): rasterize the avatar, feed it to the edits endpoint so
 // the sprite matches the member's avatar, then store the URL.
-export async function generateBuyerSprite(buyerId) {
-    const row = await db.queryOne(`SELECT avatar_config FROM mkt_buyer WHERE id = $1`, [buyerId]);
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.skipIfUnchanged]
+ *   Return null instead of drawing when the prompt is byte-for-byte what the current sprite was drawn from.
+ *   Used by the cron, NOT by a paid or admin redraw (those are someone asking for a re-roll on purpose).
+ */
+export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false } = {}) {
+    const row = await db.queryOne(`SELECT avatar_config, avatar_sprite_prompt, avatar_sprite_url FROM mkt_buyer WHERE id = $1`, [buyerId]);
     if (!row || !row.avatar_config) throw new Error("No avatar to draw");
     const gear = await getEquippedGearPhrase(buyerId).catch(() => "");
     const prompt = buildSpritePrompt(row.avatar_config, gear);
+
+    // equipment_updated_at bumps on EVERY equip, unequip and sell — including taking a ring off and putting
+    // the same ring back on, or swapping to a different item that reads identically in the prompt. The
+    // timestamp says "something happened"; the prompt says "the picture would be different". Only the second
+    // one is worth an image. This is the check the cost cut said was missing, and it is why a daily redraw is
+    // affordable: nobody pays for a draw that would come back looking exactly the same.
+    if (skipIfUnchanged && row.avatar_sprite_url && row.avatar_sprite_prompt === prompt) {
+        // Stamp it forward so this member stops being re-examined on every tick until something really moves.
+        await db.query(`UPDATE mkt_buyer SET avatar_sprite_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
+        return null;
+    }
+
     const png = await renderAvatarPng(row.avatar_config, 1024);
     // Redrawn whenever a member changes gear, so this fires far more often than once per member.
     const who = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    // A draw that came back cropped or full of holes is thrown away and redrawn rather than shipped. See
+    // sprite-cleanup.js for why these are detected-and-redrawn instead of repaired.
+    let verdict = { ok: true, problems: [] };
     const url = await editImage(png, prompt, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
+        attempts: SPRITE_ATTEMPTS,
+        validate: async (buf) => { verdict = spriteVerdict(await inspectSprite(buf)); return verdict; },
         meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
     });
     // New art: clear the flip + facing-check so the AI read-pass re-verifies which way it faces.
+    // If every attempt came back flawed we keep the best of a bad lot, but the reason is recorded rather than
+    // silently swallowed — otherwise a member with a permanently cropped sprite looks identical, in the data,
+    // to one whose art is fine.
     await db.query(
         `UPDATE mkt_buyer SET avatar_sprite_url = $2, avatar_sprite_at = NOW(), avatar_sprite_prompt = $3,
                               avatar_sprite_flip = FALSE, avatar_facing_checked_at = NULL,
-                              avatar_sprite_attempts = 0, avatar_sprite_error = NULL WHERE id = $1`,
-        [buyerId, url, prompt]
+                              avatar_sprite_attempts = 0, avatar_sprite_error = $4 WHERE id = $1`,
+        [buyerId, url, prompt, verdict.ok ? null : `art quality: ${verdict.problems.join("; ")}`.slice(0, 500)]
     );
     return url;
 }
@@ -264,7 +304,12 @@ export async function setDefaultSpriteFromImage(base64) {
 export async function generateDefaultSprite() {
     const prompt = buildSpritePrompt(DEFAULT_AVATAR);
     const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
-    const url = await editImage(png, prompt, { size: "1024x1024", pathPrefix: "marketplace/sprite", meta: { origin: "admin", label: "Default hero sprite" } });
+    const url = await editImage(png, prompt, {
+        size: "1024x1024", pathPrefix: "marketplace/sprite",
+        attempts: SPRITE_ATTEMPTS,
+        validate: async (buf) => spriteVerdict(await inspectSprite(buf)),
+        meta: { origin: "admin", label: "Default hero sprite" },
+    });
     await setSetting(DEFAULT_SPRITE_KEY, url);
     return url;
 }
@@ -277,11 +322,12 @@ export async function generateDefaultSprite() {
 export async function runAvatarSpriteJob({ batch = 8 } = {}) {
     const ids = await pendingSpriteIds(batch);
     let generated = 0;
+    let unchanged = 0;
     const errors = [];
     for (const id of ids) {
         try {
-            await generateBuyerSprite(id);
-            generated += 1;
+            const url = await generateBuyerSprite(id, { skipIfUnchanged: true });
+            if (url) generated += 1; else unchanged += 1;
         } catch (error) {
             const msg = error?.message || String(error);
             errors.push({ buyerId: id, error: msg });
@@ -308,7 +354,7 @@ export async function runAvatarSpriteJob({ batch = 8 } = {}) {
                 AND avatar_sprite_url IS NULL`
         )
         .catch(() => null);
-    return { generated, attempted: ids.length, remaining, stuck: stuck?.n || 0, errors };
+    return { generated, unchanged, attempted: ids.length, remaining, stuck: stuck?.n || 0, errors };
 }
 
 

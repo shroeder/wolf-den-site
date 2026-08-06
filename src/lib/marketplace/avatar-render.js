@@ -69,13 +69,17 @@ export function generateAvatarSvg(config) {
 export async function renderAvatarPng(config, size = 1024) {
     const { default: sharp } = await import("sharp");
     const svg = generateAvatarSvg(config);
-    const bust = Math.round(size * 0.42);
+    // The bust sat 3% from the top, all but flush against the edge, and the model copied that framing —
+    // 5 of 14 live sprites came back with the helmet crest or the feet cropped off by the canvas. Pulling it
+    // down and in leaves visible empty margin on every side of the reference, which is the composition we
+    // actually want back: a whole figure with air around it.
+    const bust = Math.round(size * 0.36);
     const avatarPng = await sharp(Buffer.from(svg))
         .resize(bust, bust, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
     return sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
-        .composite([{ input: avatarPng, top: Math.round(size * 0.03), left: Math.round((size - bust) / 2) }])
+        .composite([{ input: avatarPng, top: Math.round(size * 0.08), left: Math.round((size - bust) / 2) }])
         .png()
         .toBuffer();
 }
