@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
-import { liveFeed } from "@/lib/marketplace/activity.js";
+import { liveFeed, feedByMember } from "@/lib/marketplace/activity.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,6 +15,16 @@ export async function GET(request) {
         if (authError) return authError;
         try {
             const params = new URL(request.url).searchParams;
+            // ?by=member returns the same window grouped per person instead of the flat stream — the "who is
+            // in the game right now" question the firehose can't answer once one member starts farming.
+            if (params.get("by") === "member") {
+                const data = await feedByMember({
+                    hours: Number(params.get("hours")) || 2,
+                    perMember: Number(params.get("per")) || 6,
+                    limit: Number(params.get("limit")) || 40,
+                });
+                return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } });
+            }
             const sinceRaw = params.get("since");
             const sinceId = sinceRaw && /^\d+$/.test(sinceRaw) ? sinceRaw : null;
             const limit = Number(params.get("limit")) || 60;

@@ -418,6 +418,80 @@ export async function sourceDrill({ kind = null, source = null, hours = 168, lim
 // Real-time firehose: the newest activity events across the WHOLE site (members + anonymous), keyed by the
 // row id so a client can poll incrementally. Pass `sinceId` to get only events newer than the last one you
 // saw (returns them newest-first); omit it for the initial page. Powers the admin "Live Feed" screen.
+// ── THE SAME WINDOW, BY PERSON ───────────────────────────────────────────────────────────────────────────────
+// The firehose answers "what just happened" and nothing else: one member planting and harvesting eight plots
+// fills the whole screen, and the question you actually have looking at an admin feed — WHO is in the game
+// right now, and what is each of them doing — is unanswerable by scrolling past their crops.
+//
+// Same events, grouped by member over a window (2 hours by default): who, how long ago they were last seen,
+// how many events, which areas they touched, and their most recent handful in order. Anonymous traffic is
+// collapsed per anon_id so a visitor who is browsing still shows up as one row rather than forty.
+export async function feedByMember({ hours = 2, perMember = 6, limit = 40 } = {}) {
+    const hrs = Math.min(24, Math.max(1, Number(hours) || 2));
+    const per = Math.min(20, Math.max(1, Number(perMember) || 6));
+    const cap = Math.min(120, Math.max(1, Number(limit) || 40));
+    const rows = await db
+        .query(
+            `SELECT a.id, a.event, a.path, a.meta, a.created_at, a.buyer_id, a.anon_id, a.device,
+                    a.city, a.region, a.country, b.display_name, b.alias
+               FROM mkt_activity_event a LEFT JOIN mkt_buyer b ON b.id = a.buyer_id
+              WHERE a.created_at > NOW() - ($1 || ' hours')::interval
+              ORDER BY a.id DESC LIMIT 4000`,
+            [String(hrs)]
+        )
+        .catch(() => []);
+
+    const byKey = new Map();
+    for (const r of rows) {
+        // One row per person. Signed-in members key on the buyer; everyone else on their anon id, so a single
+        // visitor's session stays a single row (and every truly unkeyed hit lands in one "Anonymous" bucket).
+        const key = r.buyer_id ? `m:${r.buyer_id}` : `a:${r.anon_id || "unknown"}`;
+        let g = byKey.get(key);
+        if (!g) {
+            g = {
+                key,
+                buyerId: r.buyer_id || null,
+                anon: !r.display_name && !r.alias,
+                who: r.display_name || r.alias || (r.buyer_id ? "Member" : "Anonymous"),
+                device: r.device || null,
+                place: [r.city, r.region, r.country].filter(Boolean).join(", ") || null,
+                lastAt: r.created_at,
+                firstAt: r.created_at,
+                events: 0,
+                areas: new Map(),
+                recent: [],
+            };
+            byKey.set(key, g);
+        }
+        g.events += 1;
+        g.firstAt = r.created_at; // rows arrive newest-first, so the last one written is the oldest
+        // What they've been DOING, counted — "harvest crop ×14" is the line that makes a busy row readable.
+        g.areas.set(r.event, (g.areas.get(r.event) || 0) + 1);
+        if (g.recent.length < per) {
+            let meta = r.meta;
+            if (typeof meta === "string") { try { meta = JSON.parse(meta); } catch { meta = null; } }
+            g.recent.push({ id: Number(r.id), event: r.event, path: r.path || null, meta, at: r.created_at });
+        }
+    }
+
+    const members = [...byKey.values()]
+        .map((g) => ({
+            ...g,
+            areas: [...g.areas.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([event, n]) => ({ event, n })),
+        }))
+        // Most recently active first: this screen is "who is here now", so a member who did one thing a minute
+        // ago outranks one who did thirty things an hour ago.
+        .sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
+        .slice(0, cap);
+
+    return {
+        hours: hrs,
+        members,
+        totalMembers: members.filter((m) => m.buyerId).length,
+        totalEvents: rows.length,
+    };
+}
+
 export async function liveFeed({ sinceId = null, limit = 60 } = {}) {
     const lim = Math.min(200, Math.max(1, Number(limit) || 60));
     const since = sinceId == null ? null : String(sinceId);
