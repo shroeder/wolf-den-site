@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
+import {
+    buyArenaUpgrade, pickClass, refundNode, respecClass, respecTree, takeNode,
+} from "@/lib/marketplace/arena-progress.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -39,6 +42,20 @@ export async function POST(request) {
                     itemId: b?.item ? String(b.item) : null,
                 }));
                 case "dismiss": return noStore(await clearBout(buyer.id));
+                // ── PROGRESSION ── each returns the whole state so the screen never has to guess what
+                // changed; a skill point is worth gold, so every one of these re-validates server-side.
+                case "pick_class":
+                    return noStore({ ...(await pickClass(buyer.id, String(b?.classId || ""))), ...(await getArenaState(buyer.id)) });
+                case "take_node":
+                    return noStore({ ...(await takeNode(buyer.id, String(b?.nodeId || ""))), ...(await getArenaState(buyer.id)) });
+                case "refund_node":
+                    return noStore({ ...(await refundNode(buyer.id, String(b?.nodeId || ""))), ...(await getArenaState(buyer.id)) });
+                case "respec_tree":
+                    return noStore({ ...(await respecTree(buyer.id)), ...(await getArenaState(buyer.id)) });
+                case "respec_class":
+                    return noStore({ ...(await respecClass(buyer.id, String(b?.classId || ""))), ...(await getArenaState(buyer.id)) });
+                case "arena_upgrade":
+                    return noStore({ ...(await buyArenaUpgrade(buyer.id, String(b?.track || ""))), ...(await getArenaState(buyer.id)) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });
             }
         } catch (error) {

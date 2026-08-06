@@ -13,6 +13,11 @@ import {
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { ARMOURY, boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
+import {
+    arenaLevelFor, arenaXpFor, CLASSES, classById, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
+    pointsSpent, treeAbilities, treeEffects, treeState,
+} from "@/lib/marketplace/arena-classes.js";
+import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -193,7 +198,28 @@ async function kitFor(buyerId) {
     const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
     const flat = {};
     for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
+    // buildKit is still what decides your AFFINITY — that is a Forge decision and stays one. Its abilities
+    // are ignored: what you can DO in the ring is your class tree now, not a readout of your gear.
     const kit = buildKit(ids, sigsById(ids), flat);
+
+    // ── THE TREE ─────────────────────────────────────────────────────────────────────────────────────────
+    const prog = await db.queryOne(
+        `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
+    ).catch(() => null);
+    const classId = prog?.arena_class || null;
+    const taken = prog?.skill_tree || {};
+    const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
+    let abilities = treeAbilities(classId, taken, kit.element);
+    // Nobody fights empty-handed. Before a class is picked — or with every point refunded — you still get one
+    // honest move, exactly as the gear path used to guarantee.
+    if (!abilities.length) {
+        abilities = [{
+            id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
+            sprite: "/images/arena/skill-firstHitMult.webp", cooldown: 0, power: 1.9, hits: 1,
+            blurb: "No training in it. Still hurts.", element: kit.element, rarity: "common", rank: 0,
+            defensive: false,
+        }];
+    }
     // Abilities carry their own archetype emblem (set in buildKit). The piece they came from is still named
     // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
@@ -202,18 +228,33 @@ async function kitFor(buyerId) {
     const stats = sumItemStats(ids) || {};
     return {
         level, gearPower,
-        speed: speedOf(level, Number(stats.ferocity) || 0),
+        classId, taken, perks,
+        arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
+        speed: speedOf(level, Number(stats.ferocity) || 0) + (perks.speed || 0),
         // Fortune already means "luck" everywhere else in the Den; in here it is what moves your crit chance,
         // so the dial sits on the gear you built rather than on anything you do in the moment.
-        fortune: Number(stats.fortune) || 0,
-        vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
-        element: kit.element, abilities: kit.abilities,
+        fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
+        // The tree and the upgrade tracks both land here, so the engine reads one set of numbers and does not
+        // care which system paid for them.
+        vigour: arenaVigour(level, gearPower) + Math.round(perks.vigour || 0),
+        might: arenaMight(level, gearPower) + (perks.might || 0),
+        element: kit.element, abilities,
     };
+}
+
+// Two flat effect maps into one. Same stat from the tree and from an upgrade track adds rather than one
+// silently winning, which is what a spread would have done.
+function mergeAdd(a = {}, b = {}) {
+    const out = { ...a };
+    for (const [k, v] of Object.entries(b)) out[k] = (out[k] || 0) + v;
+    return out;
 }
 
 async function arenaRow(buyerId) {
     await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    let row = await db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    let row = await db.queryOne(
+        `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text, b.gold AS gold_now
+           FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
     // ── SEEDING ──────────────────────────────────────────────────────────────────────────────────────────
     // You join the ladder WHERE YOUR POWER PUTS YOU, not at the bottom. Entering at the bottom is what made
     // the first three fights of a geared member a waste of a day: eighty opponents who cannot beat them,
@@ -225,7 +266,9 @@ async function arenaRow(buyerId) {
         const slot = stronger + 1;
         await db.query(`UPDATE mkt_arena SET position = position + 1 WHERE position >= $1`, [slot]).catch(() => {});
         await db.query(`UPDATE mkt_arena SET position = $2, best_position = $2 WHERE buyer_id = $1`, [buyerId, slot]).catch(() => {});
-        row = await db.queryOne(`SELECT *, ${DAY}::text AS today, fights_day::text AS fights_day_text FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+        row = await db.queryOne(
+            `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text, b.gold AS gold_now
+               FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
     }
     return row;
 }
@@ -273,6 +316,8 @@ export async function getArenaState(buyerId) {
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
     const used = fightsUsed(row);
+    // The Stamina upgrade track buys extra challenges a day.
+    const dailyFights = FIGHTS_PER_DAY + Math.round(upgradeEffects(row?.upgrades || {}).fights || 0);
     const pos = Number(row?.position) || board.length;
     const bout = row?.bout_json || null;
 
@@ -328,13 +373,37 @@ export async function getArenaState(buyerId) {
 
     const myRank = (board.findIndex((o) => o.id === buyerId) + 1) || board.length;
     const myVp = Number(row?.vp) || 0;
+
+    // ── PROGRESSION ── arena XP, the level it buys, the class, and the state of every node. treeState is the
+    // SAME function the server validates a spend against, so the screen can never offer a node the server
+    // would refuse.
+    const lvl = arenaLevelFor(Number(row?.arena_xp) || 0);
+    const classId = row?.arena_class || null;
+    const taken = row?.skill_tree || {};
+    const spentPts = pointsSpent(taken);
+    const availPts = Math.max(0, lvl.level - spentPts);
+    const progress = {
+        xp: lvl.xp, level: lvl.level, into: lvl.into, span: lvl.span,
+        classId,
+        cls: classById(classId),
+        classes: CLASSES,
+        points: { total: lvl.level, spent: spentPts, available: availPts },
+        // A class is chosen the first time you have a point to spend.
+        needsClass: !classId && lvl.level >= 1,
+        tree: classId ? treeState(classId, taken, availPts) : [],
+        respec: {
+            one: RESPEC_ONE(spentPts),
+            tree: RESPEC_TREE(spentPts),
+            klass: RESPEC_CLASS(spentPts),
+        },
+    };
     return {
         unlocked: true,
         me: { ...me, name: "You", rank: myRank, vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
         rank: myRank, size: board.length,
         vp: myVp, laurels: Number(row?.laurels) || 0,
         band: rankFor(Math.max(0, board.length - myRank), board.length),
-        fightsLeft: Math.max(0, FIGHTS_PER_DAY - used), fightsPerDay: FIGHTS_PER_DAY,
+        fightsLeft: Math.max(0, dailyFights - used), fightsPerDay: dailyFights,
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
             streak: Number(row?.streak) || 0, bestStreak: Number(row?.best_streak) || 0,
@@ -344,6 +413,9 @@ export async function getArenaState(buyerId) {
         targets,
         gauntlet,
         armoury: ARMOURY,
+        progress,
+        upgrades: upgradeView(row?.upgrades || {}),
+        gold: Number(row?.gold_now) || 0,
         // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
         board: board.slice(0, 10).map((o) => ({ rank: o.rank, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
         podium: PODIUM,
@@ -815,6 +887,7 @@ async function finishBout(buyerId, row, b, won) {
     const myPower = b.myPower || 1;
     const theirPower = b.theirPower || 1;
     const baseVp = vpFor({ won, myPower, theirPower });
+    const axp = arenaXpFor({ won, myPower, theirPower });
     const baseLaurels = boutLaurels({ won, myPower, theirPower });
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     const vp = baseVp + (won ? featVp : 0);
@@ -825,13 +898,13 @@ async function finishBout(buyerId, row, b, won) {
     if (won) {
         const gold = Math.round(40 + theirPower * 0.9);
         const xp = Math.round(18 + theirPower * 0.4);
-        reward = { gold, xp, vp, laurels, feats };
+        reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
         await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
     } else {
-        reward = { gold: 0, xp: 0, vp: 0, laurels, feats: [] };
+        reward = { gold: 0, xp: 0, vp: 0, laurels, feats: [], arenaXp: axp };
     }
     b.reward = reward;
 
@@ -849,11 +922,12 @@ async function finishBout(buyerId, row, b, won) {
             vp = vp + $5, best_vp = GREATEST(best_vp, vp + $5),
             laurels = laurels + $6, laurels_earned = laurels_earned + $6,
             npc_best = GREATEST(npc_best, $7),
+            arena_xp = arena_xp + $8,
             streak = CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END,
             best_streak = GREATEST(best_streak, CASE WHEN $3 = 1 THEN streak + 1 ELSE 0 END),
             updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1, vp, laurels, npcBest]
+        [buyerId, JSON.stringify(b), won ? 1 : 0, won ? 0 : 1, vp, laurels, npcBest, axp]
     ).catch((e) => {
         // Never silent. This write losing is how a won fight comes back as an unfinished one.
         console.error("arena.finish.persist_failed", buyerId, e?.message || e);

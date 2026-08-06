@@ -1,6 +1,8 @@
 "use client";
 
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
+import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeState } from "@/lib/marketplace/arena-classes.js";
+import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 import { vpPreview, boutLaurels } from "@/lib/marketplace/arena-rewards.js";
 
 // ── THE ARENA LAB: FIXTURES ──────────────────────────────────────────────────────────────────────────────────
@@ -234,6 +236,25 @@ export function baseState(extra = {}) {
             reward: { vp: vpPreview(MY_POWER, n.gearPower), laurels: boutLaurels({ won: true, myPower: MY_POWER, theirPower: n.gearPower }) },
         })),
         board: BOARD,
+        gold: 12500,
+        // Progression, built from the REAL catalog so the lab cannot drift from what the server publishes.
+        progress: (() => {
+            const xp = 2400;
+            const lvl = arenaLevelFor(xp);
+            const classId = "reaver";
+            const taken = { rv_might: 3, rv_crit: 2, rv_strike: 1, rv_flurry: 1 };
+            const spent = pointsSpent(taken);
+            const avail = Math.max(0, lvl.level - spent);
+            return {
+                xp, level: lvl.level, into: lvl.into, span: lvl.span,
+                classId, cls: classById(classId), classes: CLASSES,
+                points: { total: lvl.level, spent, available: avail },
+                needsClass: false,
+                tree: treeState(classId, taken, avail),
+                respec: { one: RESPEC_ONE(spent), tree: RESPEC_TREE(spent), klass: RESPEC_CLASS(spent) },
+            };
+        })(),
+        upgrades: upgradeView({ conditioning: 4, footwork: 2, edge: 1 }),
         podium: [{ place: 1, chest: "gold" }, { place: 2, chest: "iron" }, { place: 3, chest: "wooden" }],
         bout: null,
         away: null,
@@ -258,6 +279,14 @@ export const SCENES = {
                 me: { element: "fire", abilities: NEW_KIND_ABILITIES, might: 24, speed: 29 },
             }),
         }),
+    },
+    pickclass: {
+        label: "Choose a class",
+        note: "The first arena level asks which discipline your points go into.",
+        state: () => {
+            const b = baseState();
+            return { ...b, progress: { ...b.progress, classId: null, cls: null, needsClass: true, tree: [], points: { total: 1, spent: 0, available: 1 } } };
+        },
     },
     ladder: {
         label: "Ladder",

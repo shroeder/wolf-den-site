@@ -9,6 +9,8 @@ import {
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
 import ArenaFx from "@/components/arena/ArenaFx";
+import ArenaUpgrades from "@/components/arena/ArenaUpgrades";
+import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
@@ -361,6 +363,10 @@ export default function ArenaClient({ initial }) {
     const [stop, setStop] = useState(false);      // hit-stop: the whole stage freezes for a moment on contact
     const [reading, setReading] = useState(false);// their move is named on screen and you are reading it
     const [muteOn, setMuteOn] = useState(false);
+    // The ladder screen carries three jobs now — who to fight, how you fight, and what you have trained. One
+    // scroll for all three was already long before the tree existed.
+    const [tab, setTab] = useState("fight");
+    const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     const resultAtRef = useRef(0);
     const setResultAt = (v) => { resultAtRef.current = v; };
@@ -1098,6 +1104,27 @@ export default function ArenaClient({ initial }) {
                 </div>
             </div>
 
+            {/* ── THREE JOBS, THREE TABS ── who to fight, how you fight, what you have trained. This screen
+                carried all of it in one scroll and it was already long before the tree existed. */}
+            <div className="ar-tabs" role="tablist">
+                {[["fight", "Fight"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"]].map(([k, label]) => (
+                    <button key={k} type="button" role="tab" aria-selected={tab === k}
+                        className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && st.progress?.points?.available ? " has-dot" : ""}`}
+                        onClick={() => { Sfx.ui(); setTab(k); }}>{label}</button>
+                ))}
+            </div>
+
+            {tab === "tree" ? (
+                <SkillTree progress={st.progress} gold={st.gold || 0} busy={busy}
+                    onAct={(action, extra) => act(action, extra)} />
+            ) : null}
+
+            {tab === "train" ? (
+                <ArenaUpgrades upgrades={st.upgrades || []} gold={st.gold || 0} busy={busy} flash={upgFlash}
+                    onBuy={(id) => { setUpgFlash(id); setTimeout(() => setUpgFlash(null), 700); act("arena_upgrade", { track: id }); }} />
+            ) : null}
+
+{tab === "fight" ? (<>
             {/* WHAT YOU FIGHT WITH — read straight off your gear, so the Forge and the ring are the same
                 conversation. Every ability names the piece it came from. */}
             <div className="ar-mykit">
@@ -1207,6 +1234,7 @@ export default function ArenaClient({ initial }) {
                     ))}
                 </div>
             ) : null}
+            </>) : null}
             <Styles />
         </section>
     );
@@ -1790,6 +1818,16 @@ function Styles() {
             .ar-target-go { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
             .ar-none { font-size: 12.5px; color: #8a939d; }
             .ar-up-row.is-you { border: 1px solid rgba(255,215,94,0.45); background: rgba(255,215,94,0.08); }
+
+            /* ── TABS ── */
+            .ar-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 16px; }
+            .ar-tab { position: relative; padding: 10px 8px; border-radius: 12px; cursor: pointer;
+                font-size: 12px; font-weight: 900; letter-spacing: .03em; color: #9aa2ab;
+                background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12); }
+            .ar-tab.is-on { color: #12101a; background: linear-gradient(180deg,#ffdf86,#e8ab24);
+                border-color: rgba(255,240,200,.5); }
+            /* An unspent point should be visible from the tab, not only once you are inside. */
+            .ar-tab.has-dot:not(.is-on) { color: #ffd75e; border-color: rgba(255,215,94,.5); }
 
             /* THE GAUNTLET — visually its own ladder, tinted by band so a Titan does not read like a
                Straw Dummy in a list. */
