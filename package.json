@@ -15,7 +15,8 @@
     "check:dead-components": "node scripts/check-dead-components.mjs",
     "check:styled-jsx": "node scripts/check-styled-jsx.mjs",
     "check:guide": "node scripts/check-guide.mjs",
-    "check:art": "node scripts/check-image-paths.mjs"
+    "check:art": "node scripts/check-image-paths.mjs",
+    "check:arena": "node scripts/check-arena.mjs"
   },
   "keywords": [],
   "author": "",

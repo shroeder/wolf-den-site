@@ -9,7 +9,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
-    SHIELD_CAP, WARD_SOAK, SURGE_SWINGS,
+    SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { ARMOURY, boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
@@ -709,6 +709,35 @@ export async function fightRound(buyerId, opts = {}) {
         if (command === "skill" && !ability) return { ok: false, error: "no_ability", ...(await getArenaState(buyerId)) };
         if (ability && (b.cd[ability.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
 
+        // ── FREE SKILLS ── a ward or a riposte does not spend your beat. Brace, then still swing.
+        //
+        // Both were a trap on your own turn. Bulwark's card literally reads "it does not cost you a swing", and
+        // it did: the on-their-beat path above is free, while tapping the same skill from the skill menu spent
+        // the entire turn to brace for a blow. Answer was worse — played on your own beat it matched none of
+        // the branches below, so it set no riposte, dealt no damage, and ended your turn anyway.
+        //
+        // What bounds this is the COOLDOWN, not the beat: 4 and 5 turns, ticking only when a real round passes,
+        // and a tree offers one of each. Measured over 2,000 bouts a cell against a player who already braced
+        // on every telegraph, the Gauntlet moved 43.6% → 45.0% at tier 20 and every kind stayed inside noise —
+        // this hands out no power, it stops charging a turn for something already priced as free.
+        //
+        // SURGE IS NOT IN HERE. See FREE_KINDS in arena-kit.js: its price genuinely is the turn.
+        if (ability && FREE_KINDS.has(ability.kind)) {
+            b.cd[ability.id] = ability.cooldown || 0;
+            if (ability.kind === "riposte") {
+                b.riposte = RIPOSTE_SHARE;
+                b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, free: true,
+                    text: `${ability.name} — set to answer. Your beat is still yours.`, ability: ability.name, kind: "riposte" });
+            } else {
+                const soak = Math.min(Math.round(b.maxHp * WARD_SOAK), Math.max(0, Math.round(b.maxHp * SHIELD_CAP) - b.shield));
+                b.shield += soak;
+                b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, soaked: soak, free: true,
+                    text: `${ability.name} — braced for ${soak}. Your beat is still yours.`, ability: ability.name, kind: "ward" });
+            }
+            await saveBout(buyerId, b);
+            return { ok: true, ...(await getArenaState(buyerId)) };
+        }
+
         let power = 1;
         let note = "";
         let hits = 1;              // flurry lands more than once
@@ -732,7 +761,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.cd[ability.id] = ability.cooldown || 0;
             power = ability.power;
             note = ` · ${ability.name}`;
-            if (ability.kind === "ward") { b.shield = Math.min(Math.round(b.maxHp * SHIELD_CAP), b.shield + Math.round(b.maxHp * WARD_SOAK)); power = 0; note += " — braced"; }
+            // ward and riposte never reach here — they resolve above as free actions and keep your beat.
             if (ability.kind === "surge") { b.surge = SURGE_SWINGS; power = 0; note += " — sharpened"; }
             if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }

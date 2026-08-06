@@ -20,6 +20,9 @@ const GUARD_SOAK = 0.30, GUARD_COOL = 1, WARD_SOAK = 0.09;
 const DRAIN_SHARE = 0.5, REND_TURNS = 3, REND_PER_TURN = 0.045, REND_MAX_STACKS = 3;
 const SUNDER_CUT = 0.4, SUNDER_TURNS = 3, RIPOSTE_SHARE = 0.3, SHIELD_CAP = 0.45;
 const SURGE_MULT = 1.5, SURGE_SWINGS = 3, EXECUTE_MULT = 1.5, EXECUTE_UNDER = 0.35;
+// The kinds that do NOT spend your beat — copied from arena-kit.js's FREE_KINDS. Surge is deliberately not
+// one of them: free, it measured 88% at tier 20 against 44%, and 62% even cut to +10% on three swings.
+const FREE_KINDS = new Set(["ward", "riposte"]);
 const UNDERDOG_MAX = 0.9, UNDERDOG_DEADBAND = 0.35;
 const AI_ABILITY_CHANCE = 0.45;
 
@@ -44,6 +47,11 @@ const critFor = (f) => Math.min(CRIT_CAP, CRIT_BASE + (f || 0) * CRIT_PER_FORTUN
 // ── THE KITS ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Powers copied from ARCHETYPE. A "pure" kit is four copies of one kind, which is how a kind's strength is
 // isolated — a mixed kit hides an outlier behind its neighbours.
+//
+// READ THE PURE COLUMN AS A STRESS TEST, NOT A LOADOUT. Abilities come from the class tree now, and no tree
+// holds more than one ward or one riposte, so "four wards" is unreachable in a real bout — which matters
+// because four FREE wards refill the shield every single turn and the row reads ~89%. Section 1b, one of the
+// kind plus three strikes, is the honest number for the defensive kinds.
 const KIND = {
     strike: { power: 2.35, cd: 3 },
     flurry: { power: 0.9, cd: 3, hits: 3 },
@@ -74,7 +82,17 @@ function bout({ myLevel, myGear, myFortune, foeVigour, foeMight, foeGear, foeFor
     while (hp > 0 && foeHp > 0 && beat < 60) {
         beat += 1;
         // ── YOUR BEAT ────────────────────────────────────────────────────────────────────────────────────
-        const ready = kit.filter((a) => !(cd[a.id] > 0) && !a.defensive);
+        // Wards and ripostes are FREE: arena.js resolves them and returns with the beat still yours. An honest
+        // player therefore braces the moment it is ready and THEN acts, which is the strongest line available
+        // and so the right one to measure. (They stay in the their-beat block below too, for a bout where the
+        // player waits for the telegraph instead — whichever comes first puts it on cooldown.)
+        for (const a of kit) {
+            if (cd[a.id] > 0 || !FREE_KINDS.has(a.kind)) continue;
+            cd[a.id] = a.cd;
+            if (a.kind === "riposte") riposte = RIPOSTE_SHARE;
+            else shield = Math.min(Math.round(maxHp * SHIELD_CAP), shield + Math.round(maxHp * WARD_SOAK));
+        }
+        const ready = kit.filter((a) => !(cd[a.id] > 0) && !FREE_KINDS.has(a.kind));
         const useSkill = ready.length && Math.random() < skillBias;
         // Drink when badly hurt and there is nothing better to do — an honest player would.
         if (hp < maxHp * 0.3 && items > 0 && !useSkill) {

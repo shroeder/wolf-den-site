@@ -155,6 +155,23 @@ export const RIPOSTE_SHARE = 0.3;   // of their landed blow, sent back at them
 // capped as a fraction of your own vigour, so stacking wards has a ceiling and the fifth one is wasted.
 export const SHIELD_CAP = 0.45;     // of your max vigour, total, at any moment
 
+// ── THE FREE KINDS ── the defensive pair costs you no beat, on EITHER side of the exchange: the effect lands,
+// the cooldown starts, and your turn is still yours to swing with.
+//
+// They were already free on their beat — Bulwark's own card reads "it does not cost you a swing" — while the
+// on-your-turn path quietly took the whole turn to do the same thing, and Answer on your own turn matched no
+// branch at all, so it set no riposte, dealt nothing and ended the turn regardless. This is the promise
+// already printed on the card, kept in both places.
+//
+// SURGE IS DELIBERATELY NOT HERE, even though it also deals no damage. It is the one support kind whose price
+// IS the turn: +50% across three swings on a three-turn cooldown is permanent uptime, so handing it out free
+// is a flat +50% damage. Measured over 2,000 bouts a cell in scripts/sim-arena.mjs, making it free took the
+// Gauntlet at tier 20 from 44% to 88%, and it was still 62% after cutting it to +10% on three swings. That is
+// a re-tune of a tuned card, not a fix to a trap, so it stays a turn you spend. (It is separately the weakest
+// kind in the game at 33.5% in a mixed kit — worth revisiting, on purpose, with the numbers in hand.)
+export const FREE_KINDS = new Set(["ward", "riposte"]);
+export const isFreeKind = (kind) => FREE_KINDS.has(kind);
+
 const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$/, "")}`;
 
 // A sentence per ability meant four cards of near-identical paragraph, and three of them opened with the same
@@ -217,23 +234,25 @@ function effectOf(kind, power, element, hits = 1) {
                 line: `${x(power * 2)} damage on a coin flip, nothing on the other side`,
                 tags: [{ t: "Coin flip", k: "bad" }],
             };
+        // Surge is the support kind you PAY for — see FREE_KINDS. Saying so is the whole point of the tag:
+        // next to two skills that keep your turn, "no damage" did not tell you which of the three cost one.
         case "surge":
             return {
                 head: `+${Math.round(SURGE_MULT * 100)}%`, sub: `next ${SURGE_SWINGS} swings`,
                 line: `+${Math.round(SURGE_MULT * 100)}% on your next ${SURGE_SWINGS} swings`,
-                tags: [{ t: "No damage", k: "bad" }],
+                tags: [{ t: "Spends your turn", k: "bad" }],
             };
         case "ward":
             return {
                 head: `${Math.round(WARD_SOAK * 100)}%`, sub: "soaked",
-                line: `Soaks ${Math.round(WARD_SOAK * 100)}% of your vigour from the next blow`,
-                tags: [{ t: "On their turn", k: "good" }],
+                line: `Soaks ${Math.round(WARD_SOAK * 100)}% of your vigour from the next blow — and you still act`,
+                tags: [{ t: "Keeps your turn", k: "good" }],
             };
         case "riposte":
             return {
                 head: `${Math.round(RIPOSTE_SHARE * 100)}%`, sub: "sent back",
-                line: `Their next blow returns ${Math.round(RIPOSTE_SHARE * 100)}% of itself to them`,
-                tags: [{ t: "On their turn", k: "good" }],
+                line: `Their next blow returns ${Math.round(RIPOSTE_SHARE * 100)}% of itself to them — and you still act`,
+                tags: [{ t: "Keeps your turn", k: "good" }],
             };
         default:
             return { head: x(power), sub: "damage", line: `${x(power)} damage`, tags: [] };
@@ -283,6 +302,8 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
             effect: effectOf(a.kind, Math.round(a.power * scale * 100) / 100, elementOf[id] || itemElement(id) || element, a.hits || 1),
             // Wards and ripostes are the defensive half — playable on THEIR beat instead of costing you a swing.
             defensive: a.kind === "ward" || a.kind === "riposte",
+            // …and the support kinds cost you nothing on your OWN beat either: cast it, then still act.
+            free: FREE_KINDS.has(a.kind),
             power: Math.round(a.power * scale * 100) / 100,
             blurb: a.blurb,
             element: elementOf[id] || itemElement(id) || element,

@@ -118,7 +118,7 @@ export const TREES = {
             desc: "+3 Speed per rank — decides who opens.", sprite: "/images/arena/node/rv_speed.webp" }),
 
         N({ id: "rv_surge", tier: 2, kind: "active", ability: "surge", name: "Warcry", cd: 3, needs: 7,
-            desc: "Sharpens your next three swings.", sprite: "/images/arena/node/rv_surge.webp" }),
+            desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
         N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.06, needs: 7,
             desc: "Cut 6% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
         N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 2.4, cd: 4, needs: 7,
@@ -139,12 +139,12 @@ export const TREES = {
         N({ id: "wd_block", tier: 0, name: "Footwork", ranks: 5, stat: "block", per: 0.02,
             desc: "Turn aside 2% more per rank.", sprite: "/images/arena/node/wd_block.webp" }),
         N({ id: "wd_ward", tier: 0, kind: "active", ability: "ward", name: "Bulwark", cd: 4,
-            desc: "Brace on THEIR beat — it does not cost you a swing.", sprite: "/images/arena/node/wd_ward.webp" }),
+            desc: "Brace against the next blow — on either beat, and it never costs you a swing.", sprite: "/images/arena/node/wd_ward.webp" }),
 
         N({ id: "wd_soak", tier: 1, name: "Deep Guard", ranks: 4, stat: "wardSoak", per: 0.02, needs: 3,
             desc: "Wards soak 2% more of your vigour per rank.", sprite: "/images/arena/node/wd_soak.webp" }),
         N({ id: "wd_riposte", tier: 1, kind: "active", ability: "riposte", name: "Answer", cd: 5, needs: 3,
-            desc: "Their next blow comes back at them.", sprite: "/images/arena/node/wd_riposte.webp" }),
+            desc: "Their next blow comes back at them — and you still act.", sprite: "/images/arena/node/wd_riposte.webp" }),
         N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.05, needs: 3,
             desc: "Return 5% of every blow you take, per rank.", sprite: "/images/arena/node/wd_thorns.webp" }),
 
@@ -259,6 +259,10 @@ export function treeAbilities(classId, taken = {}, element = null) {
             rarity: "epic",
             rank: 2,
             defensive: n.ability === "ward" || n.ability === "riposte",
+            // Free on your own beat too — cast it, then still act. Kept as a literal rather than importing
+            // arena-kit's FREE_KINDS because this module is pure on purpose; scripts/check-arena.mjs asserts
+            // the two lists never drift apart.
+            free: n.ability === "ward" || n.ability === "riposte",
             blurb: n.desc,
             sprite: n.sprite,
         });

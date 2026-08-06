@@ -104,9 +104,13 @@ function SkillFace({ ab, left = 0 }) {
                 <strong>{e.head}</strong>
                 {e.sub ? <em>{e.sub}</em> : null}
             </span>
-            {e.tags?.length ? (
+            {/* A support skill costs no beat, and that is the single most useful thing to know while choosing
+                one — so it is a chip on the card rather than a sentence in the description, and it is read off
+                the ability itself: tree skills carry no `effect` object to hang a tag on. */}
+            {e.tags?.length || ab.free ? (
                 <span className="sk-tags">
-                    {e.tags.map((t) => <i key={t.t} className={`sk-tag is-${t.k}`}>{t.t}</i>)}
+                    {ab.free ? <i className="sk-tag is-free">Keeps your turn</i> : null}
+                    {(e.tags || []).filter((t) => t.t !== "Keeps your turn").map((t) => <i key={t.t} className={`sk-tag is-${t.k}`}>{t.t}</i>)}
                 </span>
             ) : null}
             <span className="sk-foot">{ab.from} · cools {ab.cooldown || 0} turns</span>
@@ -1997,6 +2001,9 @@ function Styles() {
             .sk-tag.is-good { color: #8bf0b4; }
             .sk-tag.is-bad { color: #ff9f9f; }
             .sk-tag.is-el { color: #b061ff; }
+            /* A free skill is a different CLASS of move, not a better one — filled rather than outlined, so it
+               reads as a property of the card at a glance instead of one more tag to compare. */
+            .sk-tag.is-free { color: #08131f; background: #6fd0ff; border-color: #6fd0ff; }
             .sk-foot { font-size: 9px; color: #6f767e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
             /* ── BRACE ── defensive skills, offered while you read their move. */
