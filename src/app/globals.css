@@ -12637,6 +12637,42 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* Farm status, folded. The rank, bounties, love bar and directory are things you CHECK; the farm itself is
    what you came to use, and it used to sit two screens below all of them. */
+/* ── VISIT THE NEIGHBOURS ── the farm's social half, finally on the screen you open first. Deliberately the
+   warmest card on the page: the two things it offers pay both people, and they were previously two taps and a
+   collapsed summary away from being discovered at all. */
+.farm-neigh { padding: 12px 13px 13px;
+    border: 1px solid rgba(255,193,110,0.34);
+    background: linear-gradient(150deg, rgba(255,193,110,0.11), rgba(143,227,154,0.05) 62%, rgba(255,255,255,0.02)); }
+.farm-neigh-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.farm-neigh-head strong { font-size: 1rem; }
+/* What is still on the table today, as the loudest thing in the header. */
+.farm-neigh-left { margin-left: auto; display: inline-flex; align-items: baseline; gap: 5px; font-size: 0.78rem; color: #9aa0a6; }
+.farm-neigh-left b { color: #ffd75e; font-weight: 900; }
+.farm-neigh-left s { opacity: 0.5; }
+.farm-neigh-left em { font-style: normal; opacity: 0.7; }
+.farm-neigh-done { margin-left: auto; font-size: 0.78rem; font-weight: 800; color: #8fe39a; }
+.farm-neigh-sub { margin: 4px 0 10px; font-size: 0.79rem; line-height: 1.4; color: #a9b0b8; }
+/* A scroller, not a grid: eight faces on a 375px phone is a swipe, and a wrapped grid of eight would push the
+   pasture off the screen — which is the mistake this card exists to undo. */
+.farm-neigh-row { display: flex; gap: 9px; overflow-x: auto; overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch; padding-bottom: 3px; scrollbar-width: none; }
+.farm-neigh-row::-webkit-scrollbar { display: none; }
+.farm-neigh-chip { flex: 0 0 auto; width: 74px; display: grid; justify-items: center; gap: 3px;
+    padding: 8px 4px 9px; border-radius: 13px; text-decoration: none; color: inherit;
+    background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.11); }
+.farm-neigh-chip.is-done { opacity: 0.55; }
+.farm-neigh-face { position: relative; width: 44px; height: 44px; border-radius: 50%; overflow: visible;
+    display: grid; place-items: center; background: rgba(255,255,255,0.08);
+    border: 2px solid rgba(255,215,94,0.5); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+.farm-neigh-face img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+.farm-neigh-chip.is-done .farm-neigh-face { border-color: rgba(143,227,154,0.55); }
+.farm-neigh-tick { position: absolute; right: -3px; bottom: -3px; width: 17px; height: 17px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 10px; font-style: normal; font-weight: 900;
+    color: #08131f; background: #8fe39a; }
+.farm-neigh-chip b { max-width: 100%; font-size: 0.7rem; font-weight: 800; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.farm-neigh-chip em { font-style: normal; font-size: 0.62rem; color: #8a9099; }
+
 .farm-status { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; background: rgba(255,255,255,0.03); padding: 0 12px; }
 .farm-status > summary { cursor: pointer; padding: 12px 0; font-weight: 800; font-size: 0.95rem; color: #e7dcc4; list-style: none; }
 .farm-status > summary::-webkit-details-marker { display: none; }

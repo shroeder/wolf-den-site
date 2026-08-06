@@ -1183,6 +1183,15 @@ export default function FarmClient({ initial, viewingAlias }) {
                 are looking at — were a tap away and, folded shut by default, easy to never see at all. What
                 stays folded is the stuff you CHECK rather than DO: where you place, and who else to visit. */}
             <div style={{ display: "grid", gap: 10, margin: "12px 0" }}>
+                {/* On YOUR farm the neighbours come first: the two daily budgets and who to spend them on.
+                    On someone else's, the rating IS the neighbour action, so it leads instead. */}
+                {farm.mine ? (
+                    <NeighbourStrip
+                        neighbours={farm.neighbours}
+                        ratesLeft={farm.rating?.charge?.left ?? 0}
+                        petsLeft={farm.petting?.others?.left ?? 0}
+                    />
+                ) : null}
                 {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
                 {farm.rating ? (
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
@@ -2714,6 +2723,63 @@ const SearchIcon = () => (
         <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5l-4-4" />
     </svg>
 );
+// ── NEIGHBOURS ───────────────────────────────────────────────────────────────────────────────────────────────
+// The farm's two social loops — rate someone's farm, pet someone's pets — pay both sides and were effectively
+// hidden: the rating sat behind a collapsed summary on a farm you had to already be standing on, and the only
+// way to find a farm to stand on was a directory collapsed inside that same collapsed summary. Two things you
+// are given three of every single day, and nothing on the screen you open first said either of them existed.
+//
+// This is the fix, and it is the first thing under the pasture: what you have left today, and WHO to spend it
+// on — un-rated farms first, with a tick on the ones already done. The whole point is that it answers "who
+// haven't I visited yet" without a search box, a tap, or knowing anyone's @name.
+function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
+    if (!neighbours?.length) return null;
+    const togo = neighbours.filter((n) => !n.ratedToday);
+    const spent = ratesLeft <= 0 && petsLeft <= 0;
+    return (
+        <section className="card farm-neigh">
+            <div className="farm-neigh-head">
+                <strong>Visit the neighbours</strong>
+                {spent ? (
+                    <span className="farm-neigh-done">All spent today — nice one</span>
+                ) : (
+                    <span className="farm-neigh-left">
+                        {ratesLeft > 0 ? <b>{ratesLeft} rating{ratesLeft === 1 ? "" : "s"}</b> : <s>ratings</s>}
+                        <em>·</em>
+                        {petsLeft > 0 ? <b>{petsLeft} petting{petsLeft === 1 ? "" : "s"}</b> : <s>pettings</s>}
+                        <em>left</em>
+                    </span>
+                )}
+            </div>
+            <p className="farm-neigh-sub">
+                {togo.length
+                    ? "Their pets gain the XP and their farm gains the vote — and both pay you back."
+                    : "You have been round everyone today. They re-arm at midnight."}
+            </p>
+            <div className="farm-neigh-row">
+                {neighbours.map((n) => {
+                    const avatar = n.spriteUrl || n.avatarUrl;
+                    return (
+                        <a key={n.id} className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}`}
+                            href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
+                            title={n.ratedToday ? `${n.name} — rated today` : `Visit ${n.name}'s farm`}>
+                            <span className="farm-neigh-face">
+                                {avatar ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
+                                ) : <span aria-hidden="true">🐾</span>}
+                                {n.ratedToday ? <i className="farm-neigh-tick" aria-hidden="true">✓</i> : null}
+                            </span>
+                            <b>{n.name}</b>
+                            <em>{n.ratedToday ? "rated" : n.petCount ? `${n.petCount} pet${n.petCount === 1 ? "" : "s"}` : "say hi"}</em>
+                        </a>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
 function HeroCard({ m, onClick }) {
     const avatar = m.spriteUrl || m.avatarUrl;
     return (

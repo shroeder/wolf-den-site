@@ -138,7 +138,10 @@ export async function farmRatingBits(ownerId, viewerId) {
     const own = String(viewerId || "") === String(ownerId);
     const [summary, charge, standings] = await Promise.all([
         ratingSummary(ownerId, viewerId),
-        viewerId && !own ? rateCharge(viewerId) : Promise.resolve(null),
+        // The charge is the VIEWER's daily budget, so it is just as true standing on your own farm as on
+        // anyone else's — and your own farm is where the "you still have 3 ratings to give today" nudge has
+        // to live, because that is the screen you open first.
+        viewerId ? rateCharge(viewerId) : Promise.resolve(null),
         farmStandings(ownerId),
     ]);
     return {

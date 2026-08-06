@@ -111,6 +111,52 @@ export async function farmDirectory(viewerId, { q = "", limit = 60 } = {}) {
     }));
 }
 
+// ── NEIGHBOURS ───────────────────────────────────────────────────────────────────────────────────────────────
+// The two social loops on the farm — rating someone's farm and petting someone's pets — were both real, both
+// rewarding, and both invisible: the rating lived behind a collapsed summary on a farm you had to already be
+// standing on, and petting someone else's pet required knowing whose farm to open. The directory that would
+// have told you was itself collapsed, inside the same collapsed summary, and sorted by "best farms" rather
+// than by anything to do with what you had left to spend today.
+//
+// This is the missing question answered directly: WHO HAVE I NOT VISITED YET TODAY. Un-rated farms first,
+// each one carrying the two facts that decide whether it is worth the tap — whether you have rated them today,
+// and how many of their pets are still worth petting.
+export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
+    if (!viewerId) return [];
+    const rows = await db
+        .query(
+            `SELECT b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip,
+                    b.avatar_url, b.avatar_config, b.avatar_cosmetics, b.equipped_border,
+                    COALESCE(d.deco_count, 0) AS deco_count,
+                    COALESCE(p.pet_count, 0) AS pet_count,
+                    (fr.last_rated_day = ${DAY}) AS rated_today,
+                    (fr.rater_id IS NOT NULL) AS ever_rated
+               FROM mkt_buyer b
+               LEFT JOIN (SELECT buyer_id, COUNT(*)::int AS deco_count FROM mkt_deco_placement GROUP BY buyer_id) d ON d.buyer_id = b.id
+               LEFT JOIN (SELECT buyer_id::text AS buyer_id, COUNT(*)::int AS pet_count FROM mkt_pet_level GROUP BY buyer_id) p ON p.buyer_id = b.id::text
+               LEFT JOIN mkt_farm_rating fr ON fr.owner_id = b.id AND fr.rater_id = $1
+              WHERE b.alias IS NOT NULL AND b.id <> $1
+              ORDER BY (fr.last_rated_day = ${DAY}) NULLS FIRST,   -- not yet rated today, first
+                       b.last_seen_at DESC NULLS LAST              -- then whoever is actually around
+              LIMIT $2`,
+            [viewerId, Math.min(24, Math.max(1, limit))]
+        )
+        .catch(() => []);
+    return rows.map((r) => ({
+        id: r.id,
+        alias: r.alias,
+        name: r.display_name || r.alias || "Member",
+        decoCount: Number(r.deco_count) || 0,
+        petCount: Number(r.pet_count) || 0,
+        ratedToday: r.rated_today === true,
+        everRated: r.ever_rated === true,
+        spriteUrl: r.avatar_sprite_url || null,
+        spriteFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
+        avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || null,
+        border: r.equipped_border && r.equipped_border !== "none" ? r.equipped_border : null,
+    }));
+}
+
 // Resolve a farm owner by @alias (for inspecting someone else's farm). Returns { id, name, alias } or null.
 export async function resolveFarmOwner(alias) {
     if (!alias) return null;
@@ -288,12 +334,15 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const [garden, ratingBits, placements, decorations, crownCfg] = await Promise.all([
+    const [garden, ratingBits, placements, decorations, crownCfg, neighbours] = await Promise.all([
         mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
         mine ? decoState(viewerId).catch(() => null) : Promise.resolve(null), // your inventory — manage on your own farm only
         getCrownConfig().catch(() => null), // loot-pig crown placement (owner-calibrated)
+        // Only on your OWN farm: the "who haven't I visited today" strip. On someone else's you are already
+        // doing the visiting, and a list of other people to go and see is the last thing that screen needs.
+        mine ? farmNeighbours(viewerId, { limit: 8 }).catch(() => []) : Promise.resolve([]),
     ]);
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
@@ -314,6 +363,7 @@ export async function getFarm(ownerId, viewerId) {
         placements, // decorations placed in this pasture (rendered for everyone)
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
         crownCfg, // loot-pig crown placement
+        neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
         ...extras,
         ...ratingBits,
     };
@@ -475,6 +525,10 @@ export async function petPet(petterId, petId, ownerId = null) {
     await awardXp(petterId, own ? "pet_farm" : "pet_farm_other", { points: playerXp, gold: goldGained }).catch(() => {});
     await trackActivity(petterId, own ? "pet_farm" : "pet_other", { petId, owner: own ? undefined : petOwner }).catch(() => {});
     await bumpQuestProgress(petterId, "pet_animal", 1).catch(() => {});
+    // A SEPARATE metric for someone else's pet. "pet_animal" fires on your own too, so a bounty built on it
+    // can be finished without ever leaving your own farm — which is exactly how the social half of this
+    // feature ended up with no bounty asking for it.
+    if (!own) await bumpQuestProgress(petterId, "pet_other", 1).catch(() => {});
     // Farm-native seed drop: tending a pet on the farm can turn up a fresh seed (mostly common). Best-effort,
     // Forager-scaled inside dropSeedFrom — feeds the farm's own seed supply.
     const foundSeed = await dropSeedFrom(petterId, "pet_farm").catch(() => null);

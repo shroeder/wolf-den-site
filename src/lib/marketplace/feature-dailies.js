@@ -13,10 +13,24 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 
 export const FEATURE_DAILIES = {
+    // THE FARM'S FIVE. The first three are things you do alone on your own patch, and for a long time they
+    // were the whole list — which meant the farm's two SOCIAL loops, rating a neighbour and petting their
+    // pets, were the only rewarding things on the feature that no bounty ever asked for. "Pet 2 companions"
+    // could be finished without leaving home, because the metric it counts fires on your own pets too.
+    //
+    // The last two are the fix, and they are deliberately the ones that pay a chest: visiting somebody is
+    // worth more than watering your own crops, both to the Den and to the person being visited (their pet
+    // gains the XP, their farm gains the vote). Neither pays more PER ACTION — those awards were trimmed once
+    // already for being 5.5% of all XP in the game — the pull is the bounty on top.
     farm: [
         { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold", ownerOnly: true },
         { key: "farm_plant2", label: "Plant 2 seeds", metric: "plant_seed", need: 2, reward: { gold: 90 }, rewardLabel: "+90 gold" },
-        { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { gold: 120 }, rewardLabel: "+120 gold" },
+        // The chest moves to the visiting bounty rather than being minted twice: a full farm day still pays
+        // exactly ONE chest, it is just no longer claimable without leaving your own patch. The petting one
+        // pays the biggest gold on the card because it asks the most — you have to be on someone else's farm.
+        { key: "farm_rate2", label: "Rate 2 neighbours' farms", metric: "farm_rate", need: 2, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "farm_petother2", label: "Pet 2 of a neighbour's pets", metric: "pet_other", need: 2, reward: { gold: 200 }, rewardLabel: "+200 gold" },
     ],
     sailing: [
         { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
