@@ -11,6 +11,9 @@ import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, 
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
+         gunsFor, accuracyFor, hullFor, armorFor } from "@/lib/marketplace/ship-battle.js";
+import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView } from "@/lib/marketplace/fleet.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -997,6 +1000,9 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
                 reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
             };
         })(),
+        // SHIP BATTLES — the gun deck, the racks, the fleet ladder and the purse. Gated with raiding while the
+        // rework is under construction; a member outside the allow-list gets null and renders nothing.
+        combat: raidsEnabled(buyerId) ? combatView(row, level) : null,
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1059,6 +1065,7 @@ async function readRow(buyerId) {
                 (wave_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS wave_is_today,
                 (raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_used_today,
                 (raid_reset_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS raid_reset_is_today,
+                (fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fleet_is_today,
                 -- fish_is_today was MISSING, and castsUsed() reads it: without it every view reported zero
                 -- casts spent, so the screen said "13/13 casts left today" while the server — which reads the
                 -- row through readFishRow, where the flag IS computed — refused with out_of_casts.
@@ -1768,6 +1775,223 @@ export async function getUnseenRaidDefenses(buyerId) {
 
 // Buy back your daily raid after it's spent. Cost DOUBLES with each reset that day (free while testing). Clears
 // raid_day so the raid is available again, and bumps the per-day reset counter that drives the escalating price.
+// ── SHIP BATTLES: THE GUN DECK, THE FLEET AND THE QUARTERMASTER ──────────────────────────────────────────────
+// Combat progression is bought with DOUBLOONS, not gold. Gold is minted by half the game — letting it buy
+// gunnery would mean the best warship in the Den belongs to whoever farms the most rather than to whoever
+// fights. Doubloons only come out of a ship battle, so the gun deck is paid for at sea.
+const FLEET_SORTIES_PER_DAY = 3;      // sorties against the fleet ladder, separate from the member raid
+const COMBAT_COST_BASE = 18;          // doubloons for the first level of a combat track
+const COMBAT_COST_STEP = 1.55;        // each level costs this much more than the last
+export const combatUpgradeCost = (level = 0) => Math.round(COMBAT_COST_BASE * Math.pow(COMBAT_COST_STEP, Math.max(0, level)));
+
+const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || {};
+const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
+const fleetSortiesUsed = (row) => (row?.fleet_is_today ? (row?.fleet_count || 0) : 0);
+
+// Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
+function combatView(row, boatLevel) {
+    const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
+    const stock = ammoStock(row);
+    const loaded = ammoById(row?.loadout || "round");
+    const depth = row?.fleet_depth || 0;
+    return {
+        doubloons: row?.doubloons || 0,
+        // The ship as it actually fights, in the same numbers the battle uses — no hidden maths on a screen
+        // whose whole job is to let you decide what to buy next.
+        ship: {
+            guns: gunsFor(gun, boatLevel),
+            accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
+            hp: hullFor(hull, boatLevel),
+            armor: Math.round(armorFor(hull) * 100),
+            boatLevel,
+        },
+        tracks: Object.values(COMBAT_TRACKS).map((t) => {
+            const level = row?.[t.col] || 0;
+            return {
+                key: t.key, name: t.name, icon: t.icon, desc: t.desc,
+                level, max: t.max, maxed: level >= t.max,
+                cost: level >= t.max ? null : combatUpgradeCost(level),
+            };
+        }),
+        ammo: AMMO_LIST.map((a) => ({
+            id: a.id, name: a.name, icon: a.icon, blurb: a.blurb, basic: a.basic, price: a.price,
+            count: a.basic ? null : (Number(stock[a.id]) || 0),
+            loaded: loaded.id === a.id,
+        })),
+        loadout: loaded.id,
+        fleet: {
+            depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
+            wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
+            cleared: depth >= MAX_FLEET_RANK,
+            sortiesLeft: Math.max(0, FLEET_SORTIES_PER_DAY - fleetSortiesUsed(row)),
+            sortiesMax: FLEET_SORTIES_PER_DAY,
+            ships: fleetView(depth),
+        },
+    };
+}
+
+// The player's profile for a battle: their boat, their gun deck, their sea affinity and what is loaded.
+async function myShipProfile(buyerId, row, name) {
+    const boatLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
+    return shipProfile({
+        name: name || "Your ship",
+        boatLevel,
+        gunLevel: row?.gun_level || 0,
+        gunneryLevel: row?.gunnery_level || 0,
+        hullLevel: row?.hull_level || 0,
+        ammo: row?.loadout || "round",
+        art: boatArt(boatLevel),
+        sea,
+    });
+}
+
+// Spend a round of the loaded ammunition (basic types are free and infinite). Returns the id actually fired,
+// falling back to round shot when the racks are empty rather than refusing the battle — nobody is ever unable
+// to fight because they are out of the fancy stuff.
+async function consumeAmmo(buyerId, row) {
+    const id = String(row?.loadout || "round");
+    const def = ammoById(id);
+    if (def.basic) return def.id;
+    if (ammoCount(row, id) <= 0) return "round";
+    const stock = { ...ammoStock(row), [id]: Math.max(0, (Number(ammoStock(row)[id]) || 0) - 1) };
+    await db.query(`UPDATE mkt_sailing SET ammo = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(stock)]).catch(() => {});
+    return def.id;
+}
+
+// Pay out a fleet win. Deliberately a HAND of things, most of which spend somewhere else in the game — the
+// fleet should move whatever else you are working on, not just its own counter.
+async function payFleetReward(buyerId, reward) {
+    const out = [];
+    if (reward.doubloons) {
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, reward.doubloons]).catch(() => {});
+        out.push({ kind: "doubloons", n: reward.doubloons });
+    }
+    if (reward.gold) {
+        const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, reward.gold]).catch(() => null);
+        await logCoin(buyerId, reward.gold, "ship_battle", { balanceAfter: paid?.gold }).catch(() => {});
+        out.push({ kind: "gold", n: reward.gold });
+    }
+    // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the gold is paid above.
+    if (reward.xp) { await awardXp(buyerId, "ship_battle", { points: reward.xp, gold: 0 }).catch(() => {}); out.push({ kind: "xp", n: reward.xp }); }
+    if (reward.fragments) { await grantFragment(buyerId, reward.fragments, "wooden").catch(() => {}); out.push({ kind: "fragments", n: reward.fragments }); }
+    if (reward.parts) {
+        try {
+            const { addParts } = await import("@/lib/marketplace/crafting.js");
+            await addParts(buyerId, reward.parts.tier, reward.parts.n);
+            out.push({ kind: "parts", n: reward.parts.n, tier: reward.parts.tier });
+        } catch { /* the Forge is optional — a battle never fails for it */ }
+    }
+    if (reward.chest) { await addChests(buyerId, { [reward.chest]: 1 }, { source: "ship_battle" }).catch(() => {}); out.push({ kind: "chest", tier: reward.chest }); }
+    if (reward.seed) { const sid = await dropSeedFrom(buyerId, "ship_battle").catch(() => null); if (sid) out.push({ kind: "seed", id: sid }); }
+    return out;
+}
+
+// ── A SORTIE AGAINST THE FLEET ───────────────────────────────────────────────────────────────────────────────
+// Fight the next rank down the ladder, or re-fight one already sunk for a reduced purse. Win and the ladder
+// advances; lose and you have spent a sortie and nothing else — the fleet never takes a rung back.
+export async function doFleetBattle(buyerId, rank = null) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    if (fleetSortiesUsed(row) >= FLEET_SORTIES_PER_DAY) return { ok: false, error: "no_sorties", ...(await getSailingState(buyerId)) };
+    const depth = row?.fleet_depth || 0;
+    // Default target is the next unbeaten rung; an explicit rank may only be one already sunk.
+    const want = rank == null ? Math.min(MAX_FLEET_RANK, depth + 1) : Number(rank);
+    if (!Number.isFinite(want) || want < 1 || want > MAX_FLEET_RANK) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
+    if (want > depth + 1) return { ok: false, error: "locked", ...(await getSailingState(buyerId)) };
+    const ship = fleetShip(want);
+    if (!ship) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
+
+    const me = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const fired = await consumeAmmo(buyerId, row);
+    const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
+    const foe = foeProfile(ship);
+    const sim = simulateShipBattle(mine, foe);
+
+    const first = want > depth;
+    const reward = sim.win ? fleetReward(want, { first }) : null;
+    const paid = sim.win ? await payFleetReward(buyerId, reward) : [];
+
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    await db.query(
+        `UPDATE mkt_sailing
+            SET fleet_count = CASE WHEN fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN fleet_count + 1 ELSE 1 END,
+                fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                fleet_depth = GREATEST(COALESCE(fleet_depth,0), $2::int),
+                fleet_best = GREATEST(COALESCE(fleet_best,0), $2::int),
+                fleet_wins = COALESCE(fleet_wins,0) + $3::int,
+                fleet_losses = COALESCE(fleet_losses,0) + $4::int,
+                updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId, sim.win && first ? want : depth, sim.win ? 1 : 0, sim.win ? 0 : 1]
+    ).catch(() => {});
+
+    await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, win: sim.win, ammo: fired, first }).catch(() => {});
+    await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
+
+    return {
+        ok: true,
+        battle: {
+            kind: "fleet", rank: want, first, win: sim.win, sunk: sim.sunk,
+            me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel },
+            foe: { name: foe.name, cls: ship.cls, art: ship.art, guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor },
+            events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
+            reward: paid,
+        },
+        ...(await getSailingState(buyerId)),
+    };
+}
+
+// ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────
+export async function buyAmmo(buyerId, ammoId, qty = 5) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = AMMO[String(ammoId)];
+    if (!def || def.basic) return { ok: false, error: "bad_ammo", ...(await getSailingState(buyerId)) };
+    const n = Math.max(1, Math.min(50, Number(qty) || 5));
+    const cost = def.price * n;
+    const row = await readRow(buyerId);
+    if ((row?.doubloons || 0) < cost) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    const stock = { ...ammoStock(row), [def.id]: (Number(ammoStock(row)[def.id]) || 0) + n };
+    await db.query(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, ammo = $3::jsonb, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2`,
+        [buyerId, cost, JSON.stringify(stock)]
+    ).catch(() => {});
+    await trackActivity(buyerId, "buy_ammo", { ammo: def.id, n, cost }).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// What is in the racks for the next battle. Loading a type you have none of is refused here rather than
+// silently swapped at fire time, so the loadout screen never lies about what you are about to shoot.
+export async function setLoadout(buyerId, ammoId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = AMMO[String(ammoId)];
+    if (!def) return { ok: false, error: "bad_ammo", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    if (!def.basic && ammoCount(row, def.id) <= 0) return { ok: false, error: "no_stock", ...(await getSailingState(buyerId)) };
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_sailing SET loadout = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, def.id]).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+export async function upgradeCombat(buyerId, track) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = COMBAT_TRACKS[String(track)];
+    if (!def) return { ok: false, error: "bad_upgrade", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    const level = row?.[def.col] || 0;
+    if (level >= def.max) return { ok: false, error: "maxed", ...(await getSailingState(buyerId)) };
+    const cost = combatUpgradeCost(level);
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, ${def.col} = ${def.col} + 1, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    await trackActivity(buyerId, "buy_upgrade", { track: `ship_${def.key}`, level: level + 1, cost, currency: "doubloons" }).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
 export async function resetRaid(buyerId) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
