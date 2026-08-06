@@ -61,11 +61,17 @@ const WINDUP = { attack: 420, skill: CAST_MS, guard: 300, item: 420 };
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
 // own result and their incoming telegraph from being on screen at the same time — which they were, in the same
 // hundred pixels, on every single exchange.
-const RESULT_MS = 900;
+//
+// 900 -> 1500. The window has to outlast the thing it is protecting, and it did not: the damage number now
+// holds for about a second before it drifts, so at 900 their telegraph arrived while your own hit was still
+// mid-air. A beat you cannot read is not faster, it is just gone.
+const RESULT_MS = 1500;
 
 // The freeze on contact. Every fighting game made since Street Fighter II holds both fighters still for a few
 // frames at the moment of impact; it is most of why a hit reads as a hit rather than a position change.
-const HITSTOP_MS = 110;
+// A touch longer than the classic 6-8 frames, because this fight is watched rather than played frame by
+// frame — the freeze is the cue to LOOK, not a combo window.
+const HITSTOP_MS = 170;
 
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
@@ -678,7 +684,9 @@ export default function ArenaClient({ initial }) {
         if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
-        const t = setTimeout(() => setPop(null), 1000);
+        // Outlives the animation (2.1s, crit 2.4s) rather than cutting it off — unmounting at 1000ms is what
+        // made even the old, faster float disappear mid-air.
+        const t = setTimeout(() => setPop(null), 2500);
         return () => clearTimeout(t);
     }, [bout?.log?.length]);
 
@@ -840,8 +848,12 @@ export default function ArenaClient({ initial }) {
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="ar-incoming-art" src={bout.incoming.sprite} alt="" draggable="false" />
                                 ) : null}
+                                {/* One line, not three, and the MOVE rather than the mover: their name is on
+                                    the vigour bar six pixels above this and on the cast card when they cast,
+                                    while "Tidecall" is the part you are deciding against. Fitting both meant
+                                    ellipsising the half that matters. */}
                                 <span className="ar-incoming-body">
-                                    <em>{bout.foe.name} is coming with</em>
+                                    <em>Incoming</em>
                                     <b>{bout.incoming?.name || "a heavy swing"}</b>
                                 </span>
                             </div>
@@ -2053,49 +2065,77 @@ function Styles() {
 
             /* ── THE WARNING ── deliberately not shaped like the ring. Defending has to look like a different
                job than attacking, or it reads as another turn of your own. */
-            .ar-incoming { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 19;
-                display: flex; align-items: center; gap: 11px; padding: 10px 15px 10px 11px; border-radius: 14px;
-                background: rgba(8,10,18,0.86); border: 1px solid rgba(111,208,255,0.55);
-                box-shadow: 0 0 34px -6px rgba(111,208,255,0.6); backdrop-filter: blur(3px);
-                animation: arIncoming .32s cubic-bezier(.2,1.4,.35,1) both; pointer-events: none; max-width: 90%; }
-            @keyframes arIncoming { from { opacity: 0; transform: translate(-50%, -50%) scale(.82) }
-                to { opacity: 1; transform: translate(-50%, -50%) scale(1) } }
-            .ar-incoming-art { flex: 0 0 auto; width: 38px; height: 38px; object-fit: contain;
-                filter: drop-shadow(0 3px 7px rgba(0,0,0,0.7)); }
-            .ar-incoming-body { display: grid; min-width: 0; }
-            .ar-incoming-body em { font-style: normal; font-size: 10px; letter-spacing: .1em;
+            /* ABOVE THE FIGHTERS, NOT ON THEM. This sat at top:46% of the floor — dead centre, which is where
+               the two people fighting are. It announced their move by covering the man about to make it and
+               the man about to take it, at exactly the moment you are trying to read both. It hangs over the
+               arena wall now: same card, same timing, in the empty band the painting already gives us. */
+            /* A STRIP IN THE ONLY CLEAR BAND. Measured on a 375px phone: the vigour bars end at y159 and the
+               sand starts below them, and the fighters' ART begins about 120px lower still — the top of the
+               floor is empty arena wall, because a sprite is bottom-aligned inside a full-height box. That
+               band is the only part of this screen that is neither a fighter nor a number, so the warning
+               lives there: pinned 8px inside the top of the floor, one line, 34px tall.
+               It used to sit at 46% of the floor — dead centre, covering the man about to swing and the man
+               about to be hit, at the exact moment you are trying to read both. */
+            .ar-incoming { position: absolute; left: 50%; top: 8px; transform: translateX(-50%);
+                z-index: 19; display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 7px;
+                border-radius: 999px; background: rgba(8,10,18,0.9); border: 1px solid rgba(111,208,255,0.55);
+                box-shadow: 0 0 26px -6px rgba(111,208,255,0.6); backdrop-filter: blur(3px);
+                animation: arIncoming .32s cubic-bezier(.2,1.4,.35,1) both; pointer-events: none; max-width: 94%; }
+            @keyframes arIncoming { from { opacity: 0; transform: translateX(-50%) scale(.82) }
+                to { opacity: 1; transform: translateX(-50%) scale(1) } }
+            .ar-incoming-art { flex: 0 0 auto; width: 22px; height: 22px; object-fit: contain;
+                filter: drop-shadow(0 2px 5px rgba(0,0,0,0.7)); }
+            .ar-incoming-body { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+            .ar-incoming-body em { flex: 0 0 auto; font-style: normal; font-size: 9.5px; letter-spacing: .08em;
                 text-transform: uppercase; color: #6fd0ff; }
-            .ar-incoming-body b { font-size: 15px; color: #fff; line-height: 1.15; }
+            .ar-incoming-body b { font-size: 13px; color: #fff; line-height: 1.1; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; }
 
             /* ── THE NUMBERS ── the payoff, over the fighter it happened to.
                These used to sit at top:34% of a floor box that is most of the panel tall, while the fighters
                stand at its BOTTOM — so every damage number floated in empty sky near the HP bars, a couple of
                hundred pixels from the thing it described. They are anchored to the fighters now. */
-            .ar-pop { position: absolute; bottom: 34%; z-index: 21; font-size: 1.7rem; font-weight: 900;
+            /* ── HOW LONG A NUMBER LIVES ── it used to be up and gone inside a second, most of which was spent
+               moving: the readable part of the old curve was about a quarter of a second, in the middle of a
+               hit-stop, a shake, a flash and a floating move name. You could not tell a 20 from a 70, and a
+               blocked amount you had actively spent a turn earning went past before your eye reached it.
+               Twice as long now, and the extra time is all HOLD — it rises, stops where you can read it, and
+               only then drifts off. Slower, not laggier: the beat behind it is unchanged. */
+            .ar-pop { position: absolute; bottom: 34%; z-index: 21; font-size: 1.9rem; font-weight: 900;
                 letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
                 font-variant-numeric: tabular-nums;
-                animation: arPop 1s cubic-bezier(.2,1,.3,1) both; }
+                animation: arPop 2.1s cubic-bezier(.2,1,.3,1) both; }
             .ar-pop.is-right { right: 18%; }
             .ar-pop.is-left { left: 18%; }
             .ar-pop.is-dmg { color: #ffd75e; }
             .ar-pop.is-left.is-dmg { color: #ff8f9a; }
             /* A crit is the biggest number in the game and it should look like it. */
-            .ar-pop.is-crit { font-size: 2.7rem; color: #fff6cc;
+            .ar-pop.is-crit { font-size: 2.9rem; color: #fff6cc;
                 text-shadow: 0 3px 12px #000, 0 0 26px #ffe28a, 0 0 60px rgba(255,190,60,.95);
-                animation: arPopCrit 1.15s cubic-bezier(.2,1.1,.3,1) both; }
-            /* The half of the exchange your defensive choices actually bought you. Smaller, cooler, offset —
-               it must never be mistaken for damage you took. */
-            .ar-pop.is-block, .ar-pop.is-ward { font-size: 1rem; color: #9fdcff; bottom: 46%; }
+                animation: arPopCrit 2.4s cubic-bezier(.2,1.1,.3,1) both; }
+            /* The half of the exchange your defensive choices actually bought you. Cooler and offset so it is
+               never mistaken for damage you took — but no longer TINY. At 1rem next to a 1.9rem hit it read as
+               a footnote, which is the wrong way round: the block is the thing you chose. */
+            .ar-pop.is-block, .ar-pop.is-ward { font-size: 1.35rem; color: #9fdcff; bottom: 47%;
+                text-shadow: 0 3px 12px #000, 0 0 18px rgba(159,220,255,.55); }
             .ar-pop.is-heal { font-size: 1.5rem; color: #8bf0b4; text-shadow: 0 3px 12px #000, 0 0 22px rgba(139,240,180,.7); }
             .ar-pop u { display: block; text-decoration: none; font-size: 8.5px; font-weight: 900;
                 letter-spacing: .14em; text-transform: uppercase; opacity: .8; }
+            /* Punch in, HOLD, then drift. The hold is the whole point — 12% to 62% of the run is the number
+               sitting still at full opacity, which is roughly a second of actually being readable against the
+               quarter-second it had before. */
             @keyframes arPop { from { opacity: 0; transform: translateY(14px) scale(.7) }
-                25% { opacity: 1; transform: translateY(-6px) scale(1.12) }
-                to { opacity: 0; transform: translateY(-52px) scale(1) } }
+                12% { opacity: 1; transform: translateY(-8px) scale(1.14) }
+                20% { transform: translateY(-8px) scale(1) }
+                62% { opacity: 1; transform: translateY(-14px) scale(1) }
+                to { opacity: 0; transform: translateY(-62px) scale(.96) } }
             @keyframes arPopCrit { from { opacity: 0; transform: translateY(10px) scale(.4) rotate(-8deg) }
-                18% { opacity: 1; transform: translateY(-10px) scale(1.35) rotate(2deg) }
-                34% { transform: translateY(-10px) scale(1.08) rotate(0deg) }
-                to { opacity: 0; transform: translateY(-64px) scale(1) } }
+                9% { opacity: 1; transform: translateY(-12px) scale(1.4) rotate(2deg) }
+                16% { transform: translateY(-12px) scale(1.1) rotate(0deg) }
+                22% { transform: translateY(-12px) scale(1.18) }
+                28% { transform: translateY(-12px) scale(1.1) }
+                66% { opacity: 1; transform: translateY(-18px) scale(1.1) }
+                to { opacity: 0; transform: translateY(-74px) scale(1) } }
 
             /* ── HIT-STOP ── both fighters hold still for a few frames at the moment of contact. It is most of
                why a blow reads as a blow rather than a position change, and it costs one class. */
