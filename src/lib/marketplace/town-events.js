@@ -183,11 +183,15 @@ const gradeForDist = (dist) => STRIKE_GRADES.find((g) => dist <= g.max) || STRIK
 // across the pack, so a threshold reads as "this fraction of the work": in a six-wolf raid the average share
 // is ~17%, which puts Champion meaningfully above average and Recruit where someone barely swung.
 const RAID_DAMAGE_WEIGHT = 0.7; // remainder is the strike share
+// XP CUT ~40% (2026-08-06). Over 30 days the raid minted more player XP than any other action in the game —
+// 38k across 45 fightersworth, an average of 844 each — while a harvest paid 8 and a salvage 10. The raid should
+// be the best hour you spend, not worth more than a week of everything else; the GOLD is untouched, because the
+// gold faucet's problem is elsewhere (the farm), and the chests are what people actually turn up for.
 const RAID_TIERS = [
-    { key: "champion", min: 0.25, gold: 1500, xp: 1300, chest: "gold", label: "Champion" },
-    { key: "veteran", min: 0.12, gold: 1000, xp: 875, chest: "gold", label: "Veteran" },
-    { key: "fighter", min: 0.04, gold: 650, xp: 575, chest: "iron", label: "Fighter" },
-    { key: "recruit", min: 0, gold: 350, xp: 300, chest: "wooden", label: "Recruit" },
+    { key: "champion", min: 0.25, gold: 1500, xp: 780, chest: "gold", label: "Champion" },
+    { key: "veteran", min: 0.12, gold: 1000, xp: 525, chest: "gold", label: "Veteran" },
+    { key: "fighter", min: 0.04, gold: 650, xp: 345, chest: "iron", label: "Fighter" },
+    { key: "recruit", min: 0, gold: 350, xp: 180, chest: "wooden", label: "Recruit" },
 ];
 // One step down the chest ladder when the boss escapes the timer (the gold/XP already take BOSS_ESCAPE_MULT).
 const CHEST_DOWNGRADE = { gold: "iron", iron: "wooden", wooden: "wooden" };

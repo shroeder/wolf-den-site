@@ -93,7 +93,7 @@ const WHEELS = [
             // pays more now and comes up far less; the weight it gave up is spread across the middle of the
             // list, where the wedges people actually want to land on live.
             { label: "250 gold", sprite: "coins-small", weight: 12, kind: "gold", amount: 250 },
-            { label: "350 XP", sprite: "xp-orb", weight: 10, kind: "xp", amount: 350 },
+            { label: "200 XP", sprite: "xp-orb", weight: 10, kind: "xp", amount: 200 },
             { label: "Hearty Snack", sprite: "pet-treat", weight: 9, kind: "consumable", consumable: "treat_snack", n: 1 },
             { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
             { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
@@ -104,7 +104,7 @@ const WHEELS = [
             // either. Salvage parts are the thing every enhancer is short of, so this is the wedge that makes a
             // spin matter to someone who already has plenty of gold.
             { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 7, kind: "parts" },
-            { label: "900 XP", sprite: "xp-orb", weight: 7, kind: "xp", amount: 900 },
+            { label: "500 XP", sprite: "xp-orb", weight: 7, kind: "xp", amount: 500 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
             { label: "BONUS SPIN", sprite: "bonus-spin", weight: 8, tier: "bonus", kind: "respin" },
             { label: "Wooden Chest", sprite: "chest-wood", weight: 9, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
@@ -151,7 +151,7 @@ for (const w of WHEELS) {
 // the treat is the 150-pet-XP one rather than the 25, and the top wedge is a Gold Chest.
 const MINI_WHEEL_PRIZES = [
     { label: "400 gold", sprite: "coins-big", weight: 17, kind: "gold", amount: 400 },
-    { label: "400 XP", sprite: "xp-orb", weight: 13, kind: "xp", amount: 400 },
+    { label: "225 XP", sprite: "xp-orb", weight: 13, kind: "xp", amount: 225 },
     { label: "Chew Toy", sprite: "pet-treat", weight: 11, kind: "consumable", consumable: "treat_toy", n: 1 },
     { label: `8 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 8, tierId: FRAGMENT_PRIZE_TIER },
     { label: "700 gold", sprite: "coins-big", weight: 11, kind: "gold", amount: 700 },

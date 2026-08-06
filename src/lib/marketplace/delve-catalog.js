@@ -56,7 +56,7 @@ export const DUNGEONS = [
         blurb: "A collapsed badger warren under the old orchard. Cramped, damp, and full of things that bite.",
         bg: "/images/delves/bg-hollow.webp",
         loot: { parts: [1, 2], chest: "wooden", bigChest: "iron", frags: [3, 5], gear: ["rare"], gearOdds: 0.06 },
-        foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [10, 18],
+        foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [7, 12],
         boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.webp",
             blurb: "Something far too large for these tunnels, and it has been waiting." },
         foes: [
@@ -71,7 +71,7 @@ export const DUNGEONS = [
         blurb: "A flooded treasury beneath the docks. The water is cold, the gold is real, and so is what guards it.",
         bg: "/images/delves/bg-sunken.webp",
         loot: { parts: [2, 3], chest: "iron", bigChest: "gold", frags: [4, 7], gear: ["rare", "epic"], gearOdds: 0.07 },
-        foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [16, 28],
+        foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [11, 19],
         boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.webp",
             blurb: "It still wears the vault key on a chain. It has not let go in a very long time." },
         foes: [
@@ -86,7 +86,7 @@ export const DUNGEONS = [
         blurb: "A magma seam the miners broke into and sealed again. Whatever they sealed in is still burning.",
         bg: "/images/delves/bg-ember.webp",
         loot: { parts: [3, 4], chest: "iron", bigChest: "gold", frags: [6, 10], gear: ["epic"], gearOdds: 0.08 },
-        foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [26, 42],
+        foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [18, 29],
         boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.webp",
             blurb: "It was a smith once. Now it is the forge." },
         foes: [
@@ -101,7 +101,7 @@ export const DUNGEONS = [
         blurb: "A tower that is only there on some nights. Ten floors up is the same as ten floors down.",
         bg: "/images/delves/bg-astral.webp",
         loot: { parts: [4, 5], chest: "gold", bigChest: "gold", frags: [8, 14], gear: ["epic", "legendary"], gearOdds: 0.09 },
-        foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [40, 66],
+        foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [28, 46],
         boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.webp",
             blurb: "It has no face, and it is looking at you." },
         foes: [
