@@ -12672,6 +12672,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .farm-neigh-chip b { max-width: 100%; font-size: 0.7rem; font-weight: 800; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
 .farm-neigh-chip em { font-style: normal; font-size: 0.62rem; color: #8a9099; }
+/* The visiting variant: same card, pink like every other petting affordance in the game, and its chips are
+   BUTTONS that pet on the spot rather than links that go somewhere. */
+.farm-neigh.is-visit { border-color: rgba(224,85,154,0.36);
+    background: linear-gradient(150deg, rgba(224,85,154,0.12), rgba(255,193,110,0.05) 62%, rgba(255,255,255,0.02)); }
+.farm-neigh.is-visit .farm-neigh-left b { color: #ff8fc4; }
+.farm-neigh-chip.is-pet { cursor: pointer; font: inherit; }
+.farm-neigh-chip.is-pet .farm-neigh-face { border-color: rgba(224,85,154,0.6); }
+.farm-neigh-chip.is-pet:disabled { cursor: default; opacity: 0.42; }
+.farm-neigh-chip.is-pet:not(:disabled):active { transform: translateY(1px) scale(0.97); }
+.farm-neigh-done.is-out { color: #ff9a9a; }
 
 .farm-status { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; background: rgba(255,255,255,0.03); padding: 0 12px; }
 .farm-status > summary { cursor: pointer; padding: 12px 0; font-weight: 800; font-size: 0.95rem; color: #e7dcc4; list-style: none; }

@@ -885,7 +885,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 /* Rarity-framed portrait tile so a pet sprite reads as an intentional framed portrait, not a raw square. */
                 .farm-portrait { position: relative; display: inline-block; border-radius: 20px; overflow: hidden; }
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
-                .farm-rank { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.35); background: linear-gradient(180deg, rgba(255,214,110,0.14), rgba(255,255,255,0.02) 60%); }
+                .farm-rank { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.35); background: linear-gradient(180deg, rgba(255,214,110,0.14), rgba(255,255,255,0.02) 60%); }
                 .farm-rank-crest { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; font-weight: 900; color: #3a2c08; background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); }
                 /* Unranked is a real state, not an error — nobody has visited yet. Read it as quiet, not broken. */
                 .farm-rank.is-unranked { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); }
@@ -1192,15 +1192,27 @@ export default function FarmClient({ initial, viewingAlias }) {
                         petsLeft={farm.petting?.others?.left ?? 0}
                     />
                 ) : null}
+                {/* Visiting: their pets first — that is the action with three charges behind it and no way to
+                    find it — then the rating, which is one tap and already has a card of its own. */}
+                {!farm.mine && farm.canPet ? (
+                    <VisitPets pets={pets} ownerName={farm.owner.name} petsLeft={farm.petting?.left ?? 0}
+                        petXp={farm.petXp} petGold={farm.petGold} busyKey={busy} onPet={petIt} />
+                ) : null}
                 {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
                 {farm.rating ? (
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
                 ) : null}
             </div>
 
+            {/* Your standing sits WITH your love tally, not folded away underneath it — they are the same
+                sentence ("people like this farm, and here is where that puts you"), and splitting them left
+                the tally above the fold saying a number nobody could place. */}
+            {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+
+            {/* All that is left to fold is SEARCH. The neighbour strip up top is the fast path — this is for
+                when you want somebody specific, which is the one case worth a tap and a text box. */}
             <details className="farm-status">
-                <summary>Farm rank &amp; neighbours</summary>
-                {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+                <summary>Find a farm by name</summary>
                 <FarmDirectory current={viewingAlias} />
             </details>
 
@@ -2775,6 +2787,52 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                         </a>
                     );
                 })}
+            </div>
+        </section>
+    );
+}
+
+// ── VISITING SOMEBODY ────────────────────────────────────────────────────────────────────────────────────────
+// The other half of the same problem. You land on a friend's farm holding three pettings you probably do not
+// know you have, and the only way to spend one is to notice a small animal somewhere in the pasture art, tap
+// it, and find the button inside the panel that opens. Nothing counted them, nothing named them, and a pet
+// standing behind the barn was a petting nobody ever gave.
+//
+// Their whole menagerie, as buttons, at the top of the screen. Tap a face, that pet gains the XP and you get
+// paid — no hunting in the scene, and the number you have left is the loudest thing on the card.
+function VisitPets({ pets = [], ownerName, petsLeft = 0, petXp = 30, petGold = 8, busyKey, onPet }) {
+    if (!pets.length) return null;
+    const spent = petsLeft <= 0;
+    return (
+        <section className="card farm-neigh is-visit">
+            <div className="farm-neigh-head">
+                <strong>Say hello to {ownerName}&rsquo;s companions</strong>
+                {spent
+                    ? <span className="farm-neigh-done is-out">None left today</span>
+                    : <span className="farm-neigh-left"><b>{petsLeft}</b><em>petting{petsLeft === 1 ? "" : "s"} left</em></span>}
+            </div>
+            <p className="farm-neigh-sub">
+                {spent
+                    ? "Your three re-arm at midnight — the ratings are separate, so you may still have one of those."
+                    : <>+{petXp} pet XP for theirs, +{petGold} gold and XP for you. Costs them nothing.</>}
+            </p>
+            <div className="farm-neigh-row">
+                {pets.map((p) => (
+                    <button key={p.id} type="button"
+                        className={`farm-neigh-chip is-pet${p.maxed ? " is-done" : ""}`}
+                        disabled={p.maxed || spent || Boolean(busyKey)}
+                        onClick={() => onPet(p)}
+                        title={p.maxed ? `${p.name} is fully grown` : `Pet ${p.name}`}>
+                        <span className="farm-neigh-face">
+                            {p.spriteUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={p.spriteUrl} alt="" style={{ transform: p.flip ? "scaleX(-1)" : "none" }} />
+                            ) : <span aria-hidden="true">🐾</span>}
+                        </span>
+                        <b>{p.name}</b>
+                        <em>{p.maxed ? "fully grown" : busyKey === p.id ? "…" : `Lv${p.level} · pet`}</em>
+                    </button>
+                ))}
             </div>
         </section>
     );
