@@ -53,7 +53,6 @@ export default function SkillFx({ kind = "strike", element = null, side = "right
     return (
         <span className={`fx is-${side}${crit ? " is-crit" : ""}`} style={{ "--c": color }} aria-hidden="true">
             <span className="fx-flash" />
-            <span className={`fx-ring is-${kind}`} />
             {Array.from({ length: shape.n }).map((_, i) => (
                 <span key={i} className={`fx-p is-${shape.cls}`} style={spread(i, shape.n)} />
             ))}
@@ -70,14 +69,11 @@ export default function SkillFx({ kind = "strike", element = null, side = "right
                     animation: fxFlash .42s ease-out both; }
                 @keyframes fxFlash { from { opacity: .95; transform: scale(.5) } to { opacity: 0; transform: scale(1.5) } }
 
-                /* A shockwave whose shape follows the archetype. */
-                .fx-ring { position: absolute; width: 96px; height: 96px; border-radius: 50%;
-                    border: 3px solid var(--c); box-shadow: 0 0 26px var(--c);
-                    animation: fxRing .5s cubic-bezier(.15,.8,.3,1) both; }
-                .fx-ring.is-ward { border-width: 6px; border-radius: 22%; }
-                .fx-ring.is-surge { border-style: dashed; }
-                .fx-ring.is-execute { border-radius: 14%; }
-                @keyframes fxRing { from { opacity: 1; transform: scale(.35) } to { opacity: 0; transform: scale(2.1) } }
+                /* THE SHOCKWAVE RING IS GONE. It was a hard 3px circle scaling to 2.1x on every single
+                   effect in the game — every hit, every skill, every ward — and a geometric outline drawn
+                   over hand-painted characters reads as UI, not as force. It also fired constantly: the one
+                   element on the field you saw more often than the fighters. The soft elemental flash and the
+                   particles do the same job without putting a drawn circle on top of the art. */
 
                 /* Every particle is the same span; the shape class changes what it looks like and the custom
                    properties change where it goes. */
@@ -140,7 +136,6 @@ export default function SkillFx({ kind = "strike", element = null, side = "right
 
                 /* A genuinely well-timed hit gets more of everything. */
                 .fx.is-crit .fx-flash { animation-duration: .6s; }
-                .fx.is-crit .fx-ring { border-width: 5px; animation-duration: .68s; }
                 .fx.is-crit .fx-p { width: 12px; height: 12px; }
             `}</style>
         </span>
