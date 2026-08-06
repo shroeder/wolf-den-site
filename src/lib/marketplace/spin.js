@@ -364,6 +364,14 @@ export async function getSpinState(buyerId) {
         tokenCost,
         extraSpinsToday: boughtToday,
         isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
+        // The Wheelwarden chase — ten wheel-exclusive pieces, shown on the wheel that drops them.
+        collections: await (async () => {
+            const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+                import("@/lib/marketplace/sets.js"),
+                import("@/lib/marketplace/inventory.js"),
+            ]);
+            return collectionsForFeature("wheel", await getOwnedItemIds(buyerId).catch(() => []));
+        })().catch(() => []),
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {
             const total = wheel.prizes.reduce((s, p) => s + p.weight, 0) || 1;

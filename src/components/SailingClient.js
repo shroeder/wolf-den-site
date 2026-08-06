@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
+import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
 import RaidScene from "@/components/RaidScene";
@@ -1020,6 +1021,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             </div>
 
             {station === "helm" ? <>
+            {/* The sea's collection — the Corsair chase, on the screen its raids and affinity land on. Above
+                the upgrade card rather than inside it: a card nested in a card reads as a rendering mistake. */}
+            {state.collections?.length ? (
+                <CollectionPanel sets={state.collections} title="🏴‍☠️ Sea collections"
+                    blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
+            ) : null}
             {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}
             <section className="card" style={{ borderColor: "rgba(96,170,255,0.45)", background: "linear-gradient(180deg, rgba(70,130,220,0.08), transparent 40%)" }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(96,170,255,0.16)", border: "1px solid rgba(96,170,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛵ Sailing</div>

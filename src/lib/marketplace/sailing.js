@@ -883,7 +883,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = []) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -965,6 +965,10 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
         digTools: toolsView(row), // chest-point-unlocked proc tools + invest state
+        // The Dread Corsair chase, shown on the screen its bonuses pay out on (see CollectionPanel). Passed
+        // IN rather than fetched here — decorate() is synchronous, and reaching for the database from inside
+        // a view builder is how a render turns into a query cascade.
+        collections,
         status, progress, departedAt, arrivesAt,
         // Waves — greet a passing sailor a few times a day (only meaningful mid-voyage).
         waves: {
@@ -1119,7 +1123,15 @@ export async function getSailingState(buyerId, skyKey = null) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId), gold: goldRow?.gold || 0, fleet, sky, sea };
+    // The Corsair collection, fetched here where awaiting is allowed, then handed to the view builder.
+    const collections = await (async () => {
+        const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+            import("@/lib/marketplace/sets.js"),
+            import("@/lib/marketplace/inventory.js"),
+        ]);
+        return collectionsForFeature("sea", await getOwnedItemIds(buyerId).catch(() => []));
+    })().catch(() => []);
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
