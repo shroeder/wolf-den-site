@@ -72,6 +72,32 @@ async function generate(prompt) {
 // So it is checked here, on the way in, and a flush draw is thrown away and re-rolled.
 const MARGIN = 0.03;   // of the frame, required on every side — about 11px at 384
 
+// ── WHICH WAY IS IT LOOKING ──────────────────────────────────────────────────────────────────────────────────
+// Every sprite in this game is drawn FACING RIGHT and the arena mirrors the opponent to turn them around, so a
+// sprite that comes back facing left ends up mirrored into facing AWAY from the hero — two fighters standing
+// back to back. That is exactly what shipped when the veteran was re-rolled: the prompt asks for "facing
+// right", the model drew left, the margin checker had no opinion about it, and the Den watched an axeman
+// admire the far wall.
+//
+// A flip is free and lossless, so this does not re-roll — it asks which way the figure looks and mirrors it if
+// the answer is left. One vision call per sprite, on a script that runs by hand a few times a year.
+async function facesLeft(buf) {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEY}` },
+        body: JSON.stringify({
+            model: "gpt-4o", temperature: 0, max_tokens: 3,
+            messages: [{ role: "user", content: [
+                { type: "text", text: "A game character sprite drawn at a 3/4 angle. Look at which direction its NOSE and CHEST point — that is the way it faces. Ignore the image sides; judge only the character's own orientation. Answer exactly one word: left or right." },
+                { type: "image_url", image_url: { url: `data:image/png;base64,${(await sharp(buf).png().toBuffer()).toString("base64")}`, detail: "high" } },
+            ] }],
+        }),
+    }).catch(() => null);
+    if (!r || !r.ok) return false; // unreadable → leave it alone rather than flipping on a guess
+    const answer = ((await r.json().catch(() => null))?.choices?.[0]?.message?.content || "").toLowerCase();
+    return answer.includes("left") && !answer.includes("right");
+}
+
 // ── THE FRAME IS OURS, NOT THE MODEL'S ───────────────────────────────────────────────────────────────────────
 // Asking for margin does not get margin. Four rolls of the veteran came back at 0.0–1.0% top and 0.4–2.6%
 // bottom with the instruction stated in pixels, because a model composing a character portrait fills the
@@ -88,8 +114,9 @@ const CANVAS = 384;
 const HEAD_ROOM = 0.07;   // empty above the tallest pixel
 const FOOT_ROOM = 0.05;   // empty below the feet
 const SIDE_ROOM = 0.07;   // empty at each side
-async function frame(buf) {
-    const { data } = await sharp(buf).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+async function frame(buf, { flip = false } = {}) {
+    const source = flip ? await sharp(buf).flop().toBuffer() : buf; // flop = mirror horizontally
+    const { data } = await sharp(source).trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
     const ink = await sharp(data)
         .resize({
             width: Math.round(CANVAS * (1 - SIDE_ROOM * 2)),
@@ -139,6 +166,19 @@ if (want[0] === "--reframe") {
     process.exit(0);
 }
 
+// ── node scripts/gen-arena-npcs.mjs --flip <key …> ── mirror sprites that came out facing the wrong way.
+// Lossless and free; the arena mirrors the opponent, so art must face RIGHT or the fighters end up back to
+// back. Named keys only — this is a scalpel, and flipping the whole folder would break the nine that are fine.
+if (want[0] === "--flip") {
+    for (const k of want.slice(1)) {
+        const p = path.join(OUT, `${k}.webp`);
+        if (!fs.existsSync(p)) { console.log(`✗ ${k}: no such sprite`); continue; }
+        fs.writeFileSync(p, await frame(fs.readFileSync(p), { flip: true }));
+        console.log(`✓ ${k} mirrored`);
+    }
+    process.exit(0);
+}
+
 const keys = Object.keys(NPCS).filter((k) => (want.length ? want.includes(k) : !fs.existsSync(path.join(OUT, `${k}.webp`))));
 console.log(`${keys.length} NPC sprites to generate: ${keys.join(", ") || "(none)"}`);
 
@@ -157,8 +197,11 @@ for (const k of keys) {
         }
         const out = path.join(OUT, `${k}.webp`);
         // 384 matches the member hero sprites, so an NPC and a member stand at the same scale on the sand,
-        // and frame() guarantees the margin the prompt only asks for.
-        fs.writeFileSync(out, await frame(buf));
+        // frame() guarantees the margin the prompt only asks for, and the facing check guarantees the
+        // direction it only asks for. Both are things the prompt states and the model ignores.
+        const flip = await facesLeft(buf);
+        if (flip) console.log(`  · ${k} came back facing left — mirroring`);
+        fs.writeFileSync(out, await frame(buf, { flip }));
         const mg = await inkMargins(fs.readFileSync(out));
         console.log(`✓ ${k} (${Math.round(fs.statSync(out).size / 1024)}kb) margins `
             + `T${(mg.top * 100).toFixed(1)}% B${(mg.bottom * 100).toFixed(1)}% L${(mg.left * 100).toFixed(1)}% R${(mg.right * 100).toFixed(1)}%`
