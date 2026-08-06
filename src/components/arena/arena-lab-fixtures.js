@@ -1,8 +1,13 @@
 "use client";
 
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
-import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeState } from "@/lib/marketplace/arena-classes.js";
+import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
+
+// One source for the fixture's build, so the kit strip, the tree and the header all describe the SAME hero.
+const TREE_CLASS = "reaver";
+const TREE_TAKEN = { rv_might: 3, rv_crit: 2, rv_strike: 1, rv_flurry: 1 };
+const TREE_XP = 2400;
 import { vpPreview, boutLaurels } from "@/lib/marketplace/arena-rewards.js";
 
 // ── THE ARENA LAB: FIXTURES ──────────────────────────────────────────────────────────────────────────────────
@@ -223,7 +228,9 @@ const AWAY = [
 export function baseState(extra = {}) {
     return {
         unlocked: true,
-        me: { ...ME, rank: 12, vp: 1040, power: MY_POWER },
+        // The Fight tab's kit strip reads me.abilities, and this was still handing it the GEAR-era list — so
+        // the lab showed four sprites that no longer come from anywhere. Derive it the way the server does.
+        me: { ...ME, rank: 12, vp: 1040, power: MY_POWER, abilities: treeAbilities(TREE_CLASS, TREE_TAKEN, "fire") },
         rank: 12, size: 84,
         vp: 1040, laurels: 640,
         band: RANK_HUNTER,
@@ -239,10 +246,10 @@ export function baseState(extra = {}) {
         gold: 12500,
         // Progression, built from the REAL catalog so the lab cannot drift from what the server publishes.
         progress: (() => {
-            const xp = 2400;
+            const xp = TREE_XP;
             const lvl = arenaLevelFor(xp);
-            const classId = "reaver";
-            const taken = { rv_might: 3, rv_crit: 2, rv_strike: 1, rv_flurry: 1 };
+            const classId = TREE_CLASS;
+            const taken = TREE_TAKEN;
             const spent = pointsSpent(taken);
             const avail = Math.max(0, lvl.level - spent);
             return {

@@ -19,6 +19,7 @@ if (!KEY) throw new Error("no OPENAI_API_KEY");
 
 fs.mkdirSync("public/images/arena/node", { recursive: true });
 fs.mkdirSync("public/images/arena/class", { recursive: true });
+fs.mkdirSync("public/images/arena/track", { recursive: true });
 
 const STYLE = "Painterly cel-shaded 2D video-game art, bold clean dark outlines, chunky readable silhouette, high contrast, vibrant colors, soft inner shading, fantasy action-RPG style.";
 const CUT = "ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. Nothing but the subject. No text, no words, no letters, no numbers, no logo, no watermark, no border.";
@@ -66,6 +67,14 @@ const ART = {
     "node/rc_overcharge": NODE("a crystal overloading with violet lightning, cracks blazing white."),
     "node/rc_spread": NODE("a bursting star of fire scattering smaller flames outward."),
     "node/rc_fortune": NODE("a rune-carved coin spinning inside a ring of luck-sparks."),
+    // Training tracks — bought with gold, so they get the same treatment as the Kitchen's tracks: sprites,
+    // never emoji.
+    "track/conditioning": NODE("a muscular armoured torso wrapped in training bindings, a steady red heart-glow at its centre."),
+    "track/footwork": NODE("a pair of worn leather arena sandals mid-stride over a scuffed sand ring, dust curling."),
+    "track/edge": NODE("a spinning whetstone throwing sparks off a blade held against it."),
+    "track/instinct": NODE("a single narrowed eye inside a targeting rune, a fine crosshair line across it."),
+    "track/stamina": NODE("an hourglass of burning sand with a small flame at its neck, deep orange."),
+    "track/renown": NODE("a laurel wreath around a raised gladiator's fist, gold and warm light."),
     // Class emblems
     "class/reaver": EMBLEM("crossed notched cleavers over a snarling wolf skull, crimson and iron, aggressive and brutal."),
     "class/warden": EMBLEM("a tower shield bearing a wolf's head, flanked by two upright spears, steel and deep blue, immovable."),

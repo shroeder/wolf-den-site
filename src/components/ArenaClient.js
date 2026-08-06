@@ -87,19 +87,6 @@ function castSound(kind, element) {
 // One ability, said in as few words as possible: the number that matters, big, then the exceptions as chips.
 // Four cards of near-identical paragraph — three of them opening with the same twenty words — is not something
 // anybody reads in the middle of a fight.
-// The LADDER's version of a skill: name, one sentence, and the gear it came from. No headline/sub split and
-// no tag stack — that layout was designed for a wide card and shipped onto a 375px phone.
-function SkillLine({ ab }) {
-    const e = ab.effect && typeof ab.effect === "object" ? ab.effect : null;
-    return (
-        <span className="sk">
-            <span className="sk-top"><b className="sk-name">{ab.name}</b></span>
-            <span className="sk-line">{e?.line || e?.head || ab.blurb || "Damage"}</span>
-            <span className="sk-foot">{ab.from} · cools {ab.cooldown || 0}</span>
-        </span>
-    );
-}
-
 function SkillFace({ ab, left = 0 }) {
     // A bout freezes its abilities into bout_json at the start, so a fight already running when the effect
     // format changed carries the OLD shape — and the card rendered its headline as nothing at all. Never let
@@ -366,6 +353,8 @@ export default function ArenaClient({ initial }) {
     // The ladder screen carries three jobs now — who to fight, how you fight, and what you have trained. One
     // scroll for all three was already long before the tree existed.
     const [tab, setTab] = useState("fight");
+    const [who, setWho] = useState("npc");        // which opponent list — the Gauntlet or the member ladder
+    const [boardAll, setBoardAll] = useState(false);
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
     const resultAtRef = useRef(0);
@@ -1085,8 +1074,9 @@ export default function ArenaClient({ initial }) {
                 <div className="ar-badge-body">
                     <span className="ar-badge-kick">The Arena</span>
                     <b className="ar-rankname">{st.band?.name}</b>
+                    {/* VP used to be here AND in the chip below it — the same number twice, two lines apart. */}
                     <span className="ar-standing">
-                        <b>#{st.rank}</b> of {st.size} · <b>{money(st.vp)}</b> VP
+                        <b>#{st.rank}</b> of {st.size}
                     </span>
                     <span className="ar-tonext-label">
                         {st.fightsLeft} of {st.fightsPerDay} challenges left today
@@ -1125,45 +1115,56 @@ export default function ArenaClient({ initial }) {
             ) : null}
 
 {tab === "fight" ? (<>
-            {/* WHAT YOU FIGHT WITH — read straight off your gear, so the Forge and the ring are the same
-                conversation. Every ability names the piece it came from. */}
-            <div className="ar-mykit">
-                <span className="ar-up-head">
-                    Your kit{st.me?.element ? <em className="ar-el" style={{ "--el": ELEMENT_COLOR[st.me.element] }}>{st.me.element}</em> : null}
+            {/* ── ONE LINE FOR WHAT YOU FIGHT WITH ── the kit used to be four full cards at the top of this
+                tab. It is now the Skills tab's entire subject, so repeating it here was a screen of scrolling
+                spent restating the tab next door. A strip of the sprites, and a way through to them. */}
+            <button type="button" className="ar-kitline" onClick={() => { Sfx.ui(); setTab("tree"); }}>
+                <span className="ar-kitline-arts">
+                    {(st.me?.abilities || []).slice(0, 5).map((ab) => (
+                        ab.sprite ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={ab.id} src={ab.sprite} alt="" draggable="false" />
+                        ) : null
+                    ))}
                 </span>
-                <div className="ar-kit">
-                    {(st.me?.abilities || []).map((ab) => (
-                        <div key={ab.id} className="ar-ability is-static" style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}>
-                            <span className="ar-ability-head">
-                                {ab.sprite ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img className="ar-ability-art" src={ab.sprite} alt="" draggable="false" />
-                                ) : null}
-                                <SkillLine ab={ab} />
-                            </span>
-                        </div>
+                <span className="ar-kitline-txt">
+                    <b>{st.progress?.cls?.name || "No discipline yet"}</b>
+                    <em>
+                        {(st.me?.abilities || []).length} skill{(st.me?.abilities || []).length === 1 ? "" : "s"}
+                        {st.me?.element ? ` · ${st.me.element}` : ""}
+                        {st.progress?.points?.available ? ` · ${st.progress.points.available} point to spend` : ""}
+                    </em>
+                </span>
+                <span className="ar-kitline-go" aria-hidden="true">›</span>
+            </button>
+
+            {/* The podium was a three-box card for a fact that fits on one line. */}
+            {st.podium?.length ? (
+                <p className="ar-podline">
+                    Top three at the end of the day take a chest —
+                    {st.podium.map((p) => (
+                        <i key={p.place} className={`is-${p.chest}`}> #{p.place} {p.chest}</i>
                     ))}
-                </div>
+                </p>
+            ) : null}
+
+            {/* ── ONE OPPONENT LIST ── the Gauntlet and the member ladder were two stacked lists of the same
+                row, one after the other, and you had to scroll past all of one to reach the other. They are
+                the same question — who am I fighting — so they are one list with a switch. */}
+            <div className="ar-who">
+                <button type="button" className={`ar-who-btn${who === "npc" ? " is-on" : ""}`}
+                    onClick={() => { Sfx.ui(); setWho("npc"); }}>
+                    The Gauntlet<em>best tier {st.stats?.npcBest || 0}</em>
+                </button>
+                <button type="button" className={`ar-who-btn${who === "member" ? " is-on" : ""}`}
+                    onClick={() => { Sfx.ui(); setWho("member"); }}>
+                    Members<em>{st.targets?.length || 0} in the Den</em>
+                </button>
             </div>
 
-            {/* the podium — the reason to hold a spot overnight */}
-            <div className="ar-podium">
-                <span className="ar-podium-lab">Top three at the end of the day take a chest</span>
-                <div className="ar-podium-row">
-                    {st.podium?.map((p) => (
-                        <span key={p.place} className={`ar-podium-slot is-${p.chest}`}>
-                            <i>#{p.place}</i>{p.chest}
-                        </span>
-                    ))}
-                </div>
-            </div>
-
-            {/* THE GAUNTLET — endless NPC tiers. Always something to fight when the Den is asleep, and
-                always something harder to aspire to. */}
-            {st.gauntlet?.length ? (
+            {who === "npc" ? (
                 <div className="ar-targets ar-gaunt">
-                    <span className="ar-up-head">The Gauntlet — best tier {st.stats?.npcBest || 0}</span>
-                    {st.gauntlet.map((n) => (
+                    {st.gauntlet?.length ? st.gauntlet.map((n) => (
                         <div key={n.id} className={`ar-target is-npc${n.beaten ? " is-beaten" : ""}`}
                             style={{ "--el": n.color }}>
                             <span className="ar-target-pos">T{n.tier}</span>
@@ -1183,55 +1184,60 @@ export default function ArenaClient({ initial }) {
                                 </button>
                             </div>
                         </div>
-                    ))}
+                    )) : <p className="ar-none">The Gauntlet is being set up.</p>}
                 </div>
-            ) : null}
+            ) : (
+                /* No reach window: points are accrued, so a fight can never cost you rank and there is no
+                   such thing as an opponent who is off limits. */
+                <div className="ar-targets">
+                    {st.targets?.length ? st.targets.map((o) => (
+                        <div key={o.id} className="ar-target">
+                            <span className="ar-target-pos">#{o.rank}</span>
+                            <div className="ar-portrait is-tiny">
+                                {o.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={o.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
+                                ) : <span className="ar-noface" aria-hidden="true" />}
+                            </div>
+                            <div className="ar-target-body">
+                                <b>{o.name}</b>
+                                {/* This said "Lv 34 · 241 vigour · {o.tell}" — and `tell` is never set by the
+                                    server, on this row or anywhere else, so every opponent on the ladder
+                                    rendered with a trailing separator and nothing after it. Their record is
+                                    real, free (standings already selects it) and the thing you actually want
+                                    to know before spending one of ten daily challenges on them. */}
+                                <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L · {money(o.vp)} VP</em>
+                            </div>
+                            <div className="ar-target-go">
+                                <span className="ar-prize">+{money(o.reward.vp)} VP</span>
+                                <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
+                                    onClick={() => act("start", { target: o.id })}>
+                                    {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
+                                </button>
+                            </div>
+                        </div>
+                    )) : (
+                        <p className="ar-none">Nobody else has entered the arena yet — try the Gauntlet.</p>
+                    )}
+                </div>
+            )}
 
-            {/* WHO YOU CAN CHALLENGE — everyone. No reach window: points are accrued, so a fight can never
-                cost you rank and there is no such thing as an opponent who is off limits. */}
-            <div className="ar-targets">
-                <span className="ar-up-head">Challenge anyone</span>
-                {st.targets?.length ? st.targets.map((o) => (
-                    <div key={o.id} className="ar-target">
-                        <span className="ar-target-pos">#{o.rank}</span>
-                        <div className="ar-portrait is-tiny">
-                            {o.sprite ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={o.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
-                            ) : <span className="ar-noface" aria-hidden="true" />}
-                        </div>
-                        <div className="ar-target-body">
-                            <b>{o.name}</b>
-                            {/* This said "Lv 34 · 241 vigour · {o.tell}" — and `tell` is never set by the
-                                server, on this row or anywhere else, so every opponent on the ladder rendered
-                                with a trailing separator and nothing after it. Their record is real, free
-                                (standings already selects it) and the thing you actually want to know about
-                                somebody before you spend one of ten daily challenges on them. */}
-                            <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L · {money(o.vp)} VP</em>
-                        </div>
-                        <div className="ar-target-go">
-                            <span className="ar-prize">+{money(o.reward.vp)} VP</span>
-                            <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
-                                onClick={() => act("start", { target: o.id })}>
-                                {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
-                            </button>
-                        </div>
-                    </div>
-                )) : (
-                    <p className="ar-none">Nobody else has entered the arena yet — the Gauntlet is above.</p>
-                )}
-            </div>
-
+            {/* The standings are context, not the job. Three rows, and the rest on request. */}
             {st.board?.length ? (
                 <div className="ar-board">
                     <span className="ar-up-head">The top of the Den</span>
-                    {st.board.map((r) => (
+                    {(boardAll ? st.board : st.board.slice(0, 3)).map((r) => (
                         <div key={r.rank} className={`ar-up-row${r.you ? " is-you" : ""}`}>
                             <span className="ar-up-rung">#{r.rank}</span>
                             <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
                             <span className="ar-up-lvl">{money(r.vp)} VP</span>
                         </div>
                     ))}
+                    {st.board.length > 3 ? (
+                        <button type="button" className="ar-more" onClick={() => setBoardAll((v) => !v)}>
+                            {boardAll ? "Show less" : `Show all ${st.board.length}`}
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
             </>) : null}
@@ -1301,7 +1307,9 @@ function Styles() {
                 box-shadow: 0 0 12px -2px var(--rank); transition: width .7s cubic-bezier(.2,.8,.3,1); }
             .ar-tonext-label { display: block; font-size: 11px; color: #8a939d; }
             /* VP and Laurels, each said in three words. */
-            .ar-currency { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+            /* Two chips SIDE BY SIDE. As a wrapping flex row the second one dropped to its own line on every
+               phone, which cost the header a whole band of height for two short numbers. */
+            .ar-currency { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
             .ar-currency i { font-style: normal; display: grid; padding: 4px 9px; border-radius: 9px;
                 background: rgba(0,0,0,0.32); border: 1px solid rgba(255,255,255,0.12); }
             .ar-currency b { font-size: 12px; color: #ffd75e; font-variant-numeric: tabular-nums; }
@@ -1794,16 +1802,35 @@ function Styles() {
                 background: rgba(255,160,80,0.12); border: 1px solid rgba(255,160,80,0.4); }
             /* 31px measured on an iPhone SE. This is the button the entire ladder exists to make you press. */
             .ar-btn.is-sm { padding: 11px 16px; font-size: 0.8rem; min-height: 40px; }
-            .ar-podium { margin: 12px 0 14px; padding: 11px 13px; border-radius: 13px;
-                background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.3); }
-            .ar-podium-lab { font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #cdb894; }
-            .ar-podium-row { display: flex; gap: 7px; margin-top: 7px; }
-            .ar-podium-slot { flex: 1; text-align: center; padding: 7px 4px; border-radius: 9px; font-size: 11px;
-                font-weight: 900; text-transform: capitalize; background: rgba(0,0,0,0.3); border: 1px solid; }
-            .ar-podium-slot i { display: block; font-style: normal; font-size: 13px; }
-            .ar-podium-slot.is-gold { color: #ffd75e; border-color: rgba(255,215,94,0.55); }
-            .ar-podium-slot.is-iron { color: #cfd6dd; border-color: rgba(207,214,221,0.45); }
-            .ar-podium-slot.is-wooden { color: #c39b6a; border-color: rgba(195,155,106,0.45); }
+            /* ── THE KIT, IN ONE ROW ── sprites, discipline, and the way through to the tab that owns them. */
+            .ar-kitline { display: flex; align-items: center; gap: 11px; width: 100%; margin: 0 0 10px;
+                padding: 9px 12px; border-radius: 13px; cursor: pointer; text-align: left;
+                background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12); }
+            .ar-kitline-arts { display: flex; flex: 0 0 auto; }
+            .ar-kitline-arts img { width: 30px; height: 30px; object-fit: contain; border-radius: 8px;
+                background: rgba(0,0,0,0.34); border: 1px solid rgba(255,255,255,0.1); margin-right: -8px; }
+            .ar-kitline-txt { flex: 1; min-width: 0; }
+            .ar-kitline-txt b { display: block; font-size: 12.5px; font-weight: 900; color: #e9eef3; }
+            .ar-kitline-txt em { display: block; font-style: normal; font-size: 10.5px; color: #8a939d;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .ar-kitline-go { flex: 0 0 auto; font-size: 20px; line-height: 1; color: #6f7883; }
+
+            .ar-podline { margin: 0 0 12px; font-size: 10.5px; line-height: 1.5; color: #8a939d; }
+            .ar-podline i { font-style: normal; font-weight: 900; text-transform: capitalize; }
+            .ar-podline i.is-gold { color: #ffd75e; }
+            .ar-podline i.is-iron { color: #cfd6dd; }
+            .ar-podline i.is-wooden { color: #c39b6a; }
+
+            /* ── ONE LIST, TWO SOURCES ── */
+            .ar-who { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }
+            .ar-who-btn { padding: 8px 6px; border-radius: 11px; cursor: pointer; font-size: 12px; font-weight: 900;
+                color: #9aa2ab; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.11); }
+            .ar-who-btn em { display: block; font-style: normal; font-size: 9.5px; font-weight: 700; opacity: .8; }
+            .ar-who-btn.is-on { color: #12101a; background: linear-gradient(180deg,#ffb0b8,#ff6f7d); border-color: transparent; }
+
+            .ar-more { width: 100%; margin-top: 6px; padding: 8px; border-radius: 10px; cursor: pointer;
+                font-size: 11px; font-weight: 800; color: #9aa2ab;
+                background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.11); }
 
             .ar-targets { display: grid; gap: 7px; margin-bottom: 16px; }
             .ar-target { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
@@ -2106,8 +2133,6 @@ function Styles() {
                by side on a 375px phone, which is where every wrap in that screenshot came from: a two-word
                skill name broke over two lines, the effect broke over four, and the piece it came from was cut
                to "Ring of Titans · cool…". A skill card has to be readable in about a second. */
-            .ar-kit { display: grid; grid-template-columns: 1fr; gap: 8px; }
-            @media (min-width: 620px) { .ar-kit { grid-template-columns: 1fr 1fr; } }
             .ar-ability { text-align: left; padding: 11px 13px; border-radius: 12px; cursor: pointer;
                 background: rgba(255,255,255,0.04); border: 1px solid color-mix(in srgb, var(--el) 45%, transparent); }
             .ar-ability.is-armed { background: color-mix(in srgb, var(--el) 22%, transparent);
@@ -2127,9 +2152,6 @@ function Styles() {
             .ar-turn { margin: 10px 0 0; font-size: 12px; text-align: center; color: #cbd3dc; }
 
             .ar-ability.is-static { cursor: default; }
-            .ar-mykit { margin-bottom: 22px; display: grid; gap: 11px; }
-            .ar-el { font-style: normal; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: 9.5px;
-                color: var(--el); border: 1px solid color-mix(in srgb, var(--el) 55%, transparent); text-transform: capitalize; }
 
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }

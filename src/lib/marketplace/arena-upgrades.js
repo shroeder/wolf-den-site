@@ -8,32 +8,32 @@
 // stops the tree from turning into "spend gold to win": no amount of gold buys a skill point.
 export const ARENA_UPGRADES = [
     {
-        id: "conditioning", name: "Conditioning", icon: "🫀", max: 20, base: 240, stat: "vigour", per: 6,
+        id: "conditioning", name: "Conditioning", icon: "/images/arena/track/conditioning.webp", max: 20, base: 240, stat: "vigour", per: 6,
         desc: "Ring fitness. More vigour to spend before somebody takes it off you.",
         unit: (v) => `+${Math.round(v)} vigour`,
     },
     {
-        id: "footwork", name: "Footwork", icon: "👣", max: 20, base: 260, stat: "block", per: 0.006,
+        id: "footwork", name: "Footwork", icon: "/images/arena/track/footwork.webp", max: 20, base: 260, stat: "block", per: 0.006,
         desc: "Reading a swing early. You turn aside more of every blow that lands.",
         unit: (v) => `+${(v * 100).toFixed(1)}% turned aside`,
     },
     {
-        id: "edge", name: "Whetstone", icon: "🗡️", max: 20, base: 280, stat: "might", per: 0.8,
+        id: "edge", name: "Whetstone", icon: "/images/arena/track/edge.webp", max: 20, base: 280, stat: "might", per: 0.8,
         desc: "A sharper edge on everything you bring into the ring.",
         unit: (v) => `+${v.toFixed(1)} might`,
     },
     {
-        id: "instinct", name: "Instinct", icon: "🎯", max: 15, base: 340, stat: "crit", per: 0.006,
+        id: "instinct", name: "Instinct", icon: "/images/arena/track/instinct.webp", max: 15, base: 340, stat: "crit", per: 0.006,
         desc: "Finding the seam. Raises the chance a blow lands critical.",
         unit: (v) => `+${(v * 100).toFixed(1)}% crit`,
     },
     {
-        id: "stamina", name: "Stamina", icon: "🔥", max: 5, base: 900, stat: "fights", per: 1,
+        id: "stamina", name: "Stamina", icon: "/images/arena/track/stamina.webp", max: 5, base: 900, stat: "fights", per: 1,
         desc: "One more challenge in you each day.",
         unit: (v) => `+${Math.round(v)} challenge${v === 1 ? "" : "s"}/day`,
     },
     {
-        id: "renown", name: "Renown", icon: "🏆", max: 15, base: 300, stat: "laurels", per: 0.04,
+        id: "renown", name: "Renown", icon: "/images/arena/track/renown.webp", max: 15, base: 300, stat: "laurels", per: 0.04,
         desc: "A name worth watching. Every bout pays more laurels.",
         unit: (v) => `+${(v * 100).toFixed(0)}% laurels`,
     },

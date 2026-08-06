@@ -1,6 +1,17 @@
 "use client";
 
+import { useState } from "react";
+
 import CoinCta from "@/components/CoinCta";
+
+// Track icons are SPRITES, never emoji — emoji are the OS's artwork and render differently on every device.
+// Falls back to nothing rather than a broken-image glyph, so a missing file is invisible instead of ugly.
+function TrackIcon({ src }) {
+    const [bad, setBad] = useState(false);
+    if (bad || !src) return null;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={src} alt="" draggable="false" onError={() => setBad(true)} />;
+}
 
 // ── ARENA UPGRADE TRACKS ─────────────────────────────────────────────────────────────────────────────────────
 // Deliberately the SAME card as the boat, the dig site and the rail: `sail-upg` markup, the level pips, the
@@ -28,7 +39,7 @@ export default function ArenaUpgrades({ upgrades = [], gold = 0, busy, onBuy, fl
                         className={`sail-upg${u.maxed ? " is-maxed" : ""}${flash === u.id ? " is-bought" : ""}`}>
                         <div className="sail-upg-top">
                             <span className="sail-upg-title">
-                                <span className="sail-upg-ico">{u.icon}</span>{u.name}
+                                <span className="sail-upg-ico"><TrackIcon src={u.icon} /></span>{u.name}
                             </span>
                             <span className="muted sail-upg-lv">Lv {u.level}/{u.max}</span>
                         </div>
