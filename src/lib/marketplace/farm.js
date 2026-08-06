@@ -130,14 +130,31 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
                     COALESCE(d.deco_count, 0) AS deco_count,
                     COALESCE(p.pet_count, 0) AS pet_count,
                     (fr.last_rated_day = ${DAY}) AS rated_today,
-                    (fr.rater_id IS NOT NULL) AS ever_rated
+                    (fr.rater_id IS NOT NULL) AS ever_rated,
+                    -- Did THEY come to YOU lately? Either half of the visit counts: petting one of your pets,
+                    -- or rating your farm. This is the reciprocity signal and it outranks everything except
+                    -- "have I already rated them today".
+                    (pv.at IS NOT NULL OR rin.rater_id IS NOT NULL) AS came_by,
+                    (fx.requester_id IS NOT NULL) AS is_friend
                FROM mkt_buyer b
                LEFT JOIN (SELECT buyer_id, COUNT(*)::int AS deco_count FROM mkt_deco_placement GROUP BY buyer_id) d ON d.buyer_id = b.id
                LEFT JOIN (SELECT buyer_id::text AS buyer_id, COUNT(*)::int AS pet_count FROM mkt_pet_level GROUP BY buyer_id) p ON p.buyer_id = b.id::text
                LEFT JOIN mkt_farm_rating fr ON fr.owner_id = b.id AND fr.rater_id = $1
+               LEFT JOIN LATERAL (
+                   SELECT MAX(v.created_at) AS at FROM mkt_pet_visit v
+                    WHERE v.owner_id = $1 AND v.petter_id = b.id AND v.created_at > NOW() - INTERVAL '3 days'
+               ) pv ON TRUE
+               LEFT JOIN mkt_farm_rating rin ON rin.owner_id = $1 AND rin.rater_id = b.id
+                    AND rin.updated_at > NOW() - INTERVAL '3 days'
+               LEFT JOIN mkt_friendship fx ON fx.status = 'accepted'
+                    AND ((fx.requester_id = $1 AND fx.addressee_id = b.id) OR (fx.addressee_id = $1 AND fx.requester_id = b.id))
               WHERE b.alias IS NOT NULL AND b.id <> $1
-              ORDER BY (fr.last_rated_day = ${DAY}) NULLS FIRST,   -- not yet rated today, first
-                       b.last_seen_at DESC NULLS LAST              -- then whoever is actually around
+              -- The order IS the feature. Eight faces picked by "whoever logged in last" is a directory with
+              -- the search box removed; this is a list of who you owe a visit to.
+              ORDER BY (fr.last_rated_day = ${DAY}) NULLS FIRST,                        -- not yet rated today
+                       (pv.at IS NOT NULL OR rin.rater_id IS NOT NULL) DESC,            -- they came to you
+                       (fx.requester_id IS NOT NULL) DESC,                              -- then friends
+                       b.last_seen_at DESC NULLS LAST                                   -- then whoever is around
               LIMIT $2`,
             [viewerId, Math.min(24, Math.max(1, limit))]
         )
@@ -150,6 +167,8 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
         petCount: Number(r.pet_count) || 0,
         ratedToday: r.rated_today === true,
         everRated: r.ever_rated === true,
+        cameBy: r.came_by === true,
+        friend: r.is_friend === true,
         spriteUrl: r.avatar_sprite_url || null,
         spriteFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
         avatarUrl: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || null,

@@ -12672,6 +12672,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .farm-neigh-chip b { max-width: 100%; font-size: 0.7rem; font-weight: 800; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
 .farm-neigh-chip em { font-style: normal; font-size: 0.62rem; color: #8a9099; }
+/* Someone who came to YOU and has not been paid back — lit, because reciprocity is the strongest reason on
+   the card to tap anything. */
+.farm-neigh-chip.is-owed { border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.09); }
+.farm-neigh-chip.is-owed .farm-neigh-face { box-shadow: 0 0 0 3px rgba(255,215,94,0.16), 0 2px 8px rgba(0,0,0,0.4); }
+.farm-neigh-owed { color: #ffd75e; font-weight: 800; }
+
 /* The visiting variant: same card, pink like every other petting affordance in the game, and its chips are
    BUTTONS that pet on the spot rather than links that go somewhere. */
 .farm-neigh.is-visit { border-color: rgba(224,85,154,0.36);

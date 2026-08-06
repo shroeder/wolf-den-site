@@ -2748,6 +2748,9 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
     if (!neighbours?.length) return null;
     const togo = neighbours.filter((n) => !n.ratedToday);
     const spent = ratesLeft <= 0 && petsLeft <= 0;
+    // Who came to YOU and has not been paid back yet. This is the line worth leading with when it applies —
+    // "someone was here" is a far better reason to tap than "here are some farms".
+    const owed = neighbours.filter((n) => n.cameBy && !n.ratedToday);
     return (
         <section className="card farm-neigh">
             <div className="farm-neigh-head">
@@ -2764,17 +2767,19 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                 )}
             </div>
             <p className="farm-neigh-sub">
-                {togo.length
-                    ? "Their pets gain the XP and their farm gains the vote — and both pay you back."
-                    : "You have been round everyone today. They re-arm at midnight."}
+                {!togo.length
+                    ? "You have been round everyone today. They re-arm at midnight."
+                    : owed.length
+                        ? <><b style={{ color: "#ffd75e" }}>{owed.length === 1 ? `${owed[0].name} came by` : `${owed.length} of these came by`}</b> in the last few days — pay it back.</>
+                        : "Their pets gain the XP and their farm gains the vote — and both pay you back."}
             </p>
             <div className="farm-neigh-row">
                 {neighbours.map((n) => {
                     const avatar = n.spriteUrl || n.avatarUrl;
                     return (
-                        <a key={n.id} className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}`}
+                        <a key={n.id} className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}${n.cameBy && !n.ratedToday ? " is-owed" : ""}`}
                             href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
-                            title={n.ratedToday ? `${n.name} — rated today` : `Visit ${n.name}'s farm`}>
+                            title={n.ratedToday ? `${n.name} — rated today` : n.cameBy ? `${n.name} visited you recently` : `Visit ${n.name}'s farm`}>
                             <span className="farm-neigh-face">
                                 {avatar ? (
                                     // eslint-disable-next-line @next/next/no-img-element
@@ -2783,7 +2788,11 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                                 {n.ratedToday ? <i className="farm-neigh-tick" aria-hidden="true">✓</i> : null}
                             </span>
                             <b>{n.name}</b>
-                            <em>{n.ratedToday ? "rated" : n.petCount ? `${n.petCount} pet${n.petCount === 1 ? "" : "s"}` : "say hi"}</em>
+                            {/* Why this face is here, in the one line there is room for. "Came by" beats a pet
+                                count every time — it is the only one of these that is about you. */}
+                            <em>{n.ratedToday ? "rated"
+                                : n.cameBy ? <span className="farm-neigh-owed">came by</span>
+                                    : n.petCount ? `${n.petCount} pet${n.petCount === 1 ? "" : "s"}` : "say hi"}</em>
                         </a>
                     );
                 })}
