@@ -418,9 +418,9 @@ export async function generateWideSceneImage(prompt, { pathPrefix = "marketplace
  * One call to the edits endpoint. Returns the raw PNG buffer; storage and logging are the caller's job so a
  * rejected draw can be thrown away without leaving an orphan blob behind.
  */
-async function editOnce(imageBuffer, prompt, { size, quality, key }) {
+async function editOnce(imageBuffer, prompt, { size, quality, key, model }) {
     const form = new FormData();
-    form.append("model", "gpt-image-1");
+    form.append("model", model);
     form.append("image", new Blob([imageBuffer], { type: "image/png" }), "avatar.png");
     form.append("prompt", prompt);
     form.append("size", size);
@@ -453,7 +453,7 @@ async function editOnce(imageBuffer, prompt, { size, quality, key }) {
  * Returns the stored URL, unchanged from before the gate existed, so the four callers that don't validate
  * carry on working. A caller that wants the verdict of the KEPT image closes over it from `validate`.
  */
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", faceRight = false, deHalo = false, resizeTo = null, validate = null, attempts = 1, meta = {} } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, resizeTo = null, validate = null, attempts = 1, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -463,9 +463,9 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
 
     for (let attempt = 1; attempt <= tries; attempt += 1) {
         try {
-            buffer = await editOnce(imageBuffer, prompt, { size, quality, key });
+            buffer = await editOnce(imageBuffer, prompt, { size, quality, key, model });
         } catch (error) {
-            await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: String(error.message).slice(0, 300), ...meta });
+            await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, ok: false, error: String(error.message).slice(0, 300), ...meta });
             throw error;
         }
         if (!validate) break;
@@ -474,7 +474,7 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
         if (verdict.ok) break;
         // Log the rejected attempt so its cost is still attributed and the reason is visible in AI Costs.
         await logGeneration({
-            size, quality, edit: true, source: pathPrefix, prompt, ok: false,
+            model, size, quality, edit: true, source: pathPrefix, prompt, ok: false,
             error: `rejected (attempt ${attempt}/${tries}): ${problems.join("; ")}`.slice(0, 300), ...meta,
         });
     }
@@ -484,6 +484,6 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
     const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SCENE_MAX_PX });
     // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
     // draw of the same size — estimateImageCost() adds that when edit is true.
-    await logGeneration({ size, quality, edit: true, source: pathPrefix, prompt, url, ...meta });
+    await logGeneration({ model, size, quality, edit: true, source: pathPrefix, prompt, url, ...meta });
     return url;
 }

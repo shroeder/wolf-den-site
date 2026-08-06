@@ -16,13 +16,22 @@ const TOKENS = {
     "1024x1536": { low: 408, medium: 1584, high: 6240 },
     "1536x1024": { low: 400, medium: 1568, high: 6208 },
 };
-const PER_TOKEN = 40 / 1_000_000;
-const EDIT_INPUT_USD = 0.004; // reference image fed back in on an edit/outpaint pass
+// Output-token price per model, $/1M. gpt-image-1-mini bills output at a fifth of gpt-image-1 for the same
+// token counts, which is what makes a medium-quality mini draw cheaper than a LOW-quality full-model one —
+// measured at $0.0099 vs $0.0171 on the same prompt and reference.
+const OUT_PER_M = { "gpt-image-1": 40, "gpt-image-1-mini": 8 };
+const IN_PER_M = { "gpt-image-1": 10, "gpt-image-1-mini": 2.5 };
+// The reference image fed back in on an edit/outpaint pass. Measured at 625 input tokens, and it does NOT
+// scale with the reference we send — a 512px and a 1024px reference both bill 625, so shrinking it saves
+// nothing.
+const EDIT_INPUT_TOKENS = 625;
 
-export function estimateImageCost({ size = "1024x1024", quality = "low", edit = false } = {}) {
+export function estimateImageCost({ size = "1024x1024", quality = "low", edit = false, model = "gpt-image-1" } = {}) {
     const row = TOKENS[size] || TOKENS["1024x1024"];
     const tokens = row[quality] ?? row.medium;
-    return Math.round((tokens * PER_TOKEN + (edit ? EDIT_INPUT_USD : 0)) * 100000) / 100000;
+    const out = (OUT_PER_M[model] ?? OUT_PER_M["gpt-image-1"]) / 1_000_000;
+    const inp = (IN_PER_M[model] ?? IN_PER_M["gpt-image-1"]) / 1_000_000;
+    return Math.round((tokens * out + (edit ? EDIT_INPUT_TOKENS * inp : 0)) * 100000) / 100000;
 }
 
 // Text/vision pricing, $ per 1M tokens {in, out}. Priced from the token counts OpenAI returns on every
@@ -104,7 +113,9 @@ export async function logGeneration({
     ok = true, error, costUsd, costBasis = "measured",
 } = {}) {
     try {
-        const cost = costUsd != null ? costUsd : estimateImageCost({ size, quality, edit });
+        // Pass the model through — mini bills at a fifth, and pricing it as gpt-image-1 would overstate the
+        // sprite line on the AI Costs screen by ~5x.
+        const cost = costUsd != null ? costUsd : estimateImageCost({ size, quality, edit, model });
         await db.query(
             `INSERT INTO mkt_ai_generation
                 (model, size, quality, edit, source, label, subject, prompt, url, bytes,

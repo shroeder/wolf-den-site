@@ -19,6 +19,17 @@ const DEFAULT_SPRITE_KEY = "default_sprite_url";
 // but stops burning image-gen budget every tick. A real avatar/gear change resets the counter.
 const MAX_SPRITE_ATTEMPTS = 6;
 
+// The sprite model. gpt-image-1-mini bills output at a fifth of gpt-image-1, which means a MEDIUM-quality
+// mini draw is both cheaper AND visibly better than the LOW-quality full-model draw it replaces — measured on
+// the same prompt and reference: $0.0099 vs $0.0171.
+//
+// Quality is medium and not low for the FACES. A low 1024x1024 is 272 output tokens for the entire image, and
+// a face inside a full-body sprite gets a sliver of those — which is why the low-quality draws came back
+// blurry and wrong-featured. Medium is 1,056 tokens and the faces come back clean. On a five-member sample,
+// low passed the quality gate 0/5 and medium 3/5.
+const SPRITE_MODEL = "gpt-image-1-mini";
+const SPRITE_QUALITY = "medium";
+
 // How many times a single draw may be REJECTED AND REDRAWN for art quality (cropped figure, holes punched
 // through the character) before we keep what we have. Every retry is a billed image, so this is deliberately
 // two and not five: it catches the common one-off bad draw without turning one sprite into a shopping spree.
@@ -78,7 +89,7 @@ export function describeAvatar(rawConfig) {
 // boss art (BossArt.kt) — only "boss art / action pose" is swapped for "character / heroic pose" — so
 // sprites and bosses look like the same game universe.
 export function buildSpritePrompt(config, gear = "") {
-    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders near the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) below it, in a confident heroic standing pose shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL FRAMING: the ENTIRE character must fit INSIDE the image with clear empty margin on all four sides — leave visible empty space above the highest point of the head, helmet or headgear and below the feet. Nothing may touch or run past the edge of the frame; do not crop the head, a helmet crest, a weapon, wings, or the feet. CRITICAL SOLIDITY: the character must be completely SOLID and opaque — no see-through areas, no transparent gaps or holes anywhere inside the body, armor, clothing, shield or weapons. Only the area OUTSIDE the character's silhouette is transparent. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
+    return `Redraw this cartoon avatar as a full-body 2D video-game hero character. The reference shows only the head and shoulders near the top of the frame — invent and draw the COMPLETE figure head to toe (torso, arms, hands, legs and feet) below it, in a confident heroic standing pose shown from a three-quarter view facing to the RIGHT (the character's body turned toward the right side of the frame), keeping the same face, skin tone, hairstyle and hair color, facial hair, glasses, and clothing colors/style as the reference (${describeAvatar(config)}). ${gear ? gear + " " : ""}Fit the WHOLE character inside the frame with empty margin on every side — never crop the head, a helmet crest, a weapon, wings or the feet. Keep the character solid and opaque; only the area outside its silhouette is transparent. 2D video-game character art, bold stylized illustration, clean confident outlines, cel-shaded flat vibrant colors, strong readable silhouette, centered full-body character splash art, polished RPG game-art style, clean coherent anatomy, no extra or malformed limbs, no visual artifacts, transparent background, no text, no logo, no watermark, no border. CRITICAL: the character must be oriented facing and looking toward the RIGHT side of the image (a right-facing three-quarter view) — NOT facing forward and NOT facing left.`;
 }
 
 // The prompt for the shared default sprite (built from the default avatar). Sent to the phone.
@@ -271,6 +282,7 @@ export async function generateBuyerSprite(buyerId, { skipIfUnchanged = false } =
     let verdict = { ok: true, problems: [] };
     const url = await editImage(png, prompt, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
+        model: SPRITE_MODEL, quality: SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
         validate: async (buf) => { verdict = spriteVerdict(await inspectSprite(buf)); return verdict; },
         meta: { origin: "member", buyerId, buyerLabel: who?.alias ? `@${who.alias}` : (who?.display_name || null), label: "Hero sprite redraw" },
@@ -306,6 +318,7 @@ export async function generateDefaultSprite() {
     const png = await renderAvatarPng(DEFAULT_AVATAR, 1024);
     const url = await editImage(png, prompt, {
         size: "1024x1024", pathPrefix: "marketplace/sprite",
+        model: SPRITE_MODEL, quality: SPRITE_QUALITY,
         attempts: SPRITE_ATTEMPTS,
         validate: async (buf) => spriteVerdict(await inspectSprite(buf)),
         meta: { origin: "admin", label: "Default hero sprite" },
