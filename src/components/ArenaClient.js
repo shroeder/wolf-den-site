@@ -341,7 +341,14 @@ function Recap({ bout, busy, onClose }) {
 export default function ArenaClient({ initial }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
-    const [shake, setShake] = useState(0);
+    // ── WHO TOOK IT, AND HOW HARD ── two different questions, and they used to share one number.
+    // `shake` was 1 for "you landed a normal hit", 2 for "you landed a crit" AND for "you took a normal hit",
+    // 3 for "you took a heavy one" — so the fighters, which read it as `hurt={shake >= 2}` for you and
+    // `lunge={shake >= 2}` for them, played the exchange BACKWARDS on every critical you landed: your own
+    // hero snapped back and flashed red while the enemy lunged into you. Landing your best hit of the fight
+    // looked like taking one. Two pieces of state, because they are two facts.
+    const [shake, setShake] = useState(0);          // 0 = still, 1 = a hit, 2 = a heavy one. Intensity only.
+    const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [wheel, setWheel] = useState(false);    // the element-wheel explainer
@@ -499,7 +506,8 @@ export default function ArenaClient({ initial }) {
             // YOU TOOK IT. Weight is the fraction of your whole bar this blow cost, which is what decides how
             // hard everything hits: the shake, the buzz, and how low and long the sound is.
             const w = Math.min(1, (p.hp - bout.hp) / Math.max(1, bout.maxHp * 0.22));
-            setShake(2 + (w > 0.7 ? 1 : 0));
+            setHitSide("you");
+            setShake(w > 0.7 ? 2 : 1);
             setStop(true);
             Sfx.hurt(w);
             Haptic.hurt(w);
@@ -507,7 +515,8 @@ export default function ArenaClient({ initial }) {
         } else if (p.foeHp != null && bout.foeHp < p.foeHp) {
             // YOU LANDED IT.
             const w = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.22));
-            setShake(1 + (crit || w > 0.7 ? 1 : 0));
+            setHitSide("them");
+            setShake(crit || w > 0.7 ? 2 : 1);
             setStop(true);
             if (crit) { Sfx.crit(w); Haptic.crit(); duck(0.5, 0.3); }
             else { Sfx.impact(w); Haptic.hit(w); }
@@ -529,7 +538,7 @@ export default function ArenaClient({ initial }) {
             setResultAt(Date.now());
         }
         prev.current = { hp: bout.hp, foeHp: bout.foeHp, round: bout.log?.length || 0 };
-        const t = setTimeout(() => setShake(0), 360);
+        const t = setTimeout(() => { setShake(0); setHitSide(null); }, 360);
         const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
         const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
         return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); };
@@ -814,11 +823,13 @@ export default function ArenaClient({ initial }) {
                             are separate flags — one is which way a drawing points, the other is which
                             fighter is the opponent — so the arrangement is stated rather than implied by
                             DOM order, which is what made the last flip go wrong. */}
-                        <FighterBody f={st.me} hurt={shake >= 2} lunge={shake === 1}
+                        {/* Whoever took the blow recoils; the other one lunged to deliver it. Driven by
+                            `hitSide`, never by the intensity — see the note on the state itself. */}
+                        <FighterBody f={st.me} hurt={hitSide === "you"} lunge={hitSide === "them"}
                             down={bout.over && !bout.won}
                             wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
                             brace={!bout.over && bout.turn === "them" && blockReady} />
-                        <FighterBody f={bout.foe} foe mirrored hurt={shake === 1} lunge={shake >= 2}
+                        <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
                             brace={yourTurn && Boolean(pending)} />
@@ -1415,16 +1426,22 @@ function Styles() {
                slice — and the centre slice of this particular arena is its darkest part, which is how the
                stage ended up looking like a black rectangle with two men in it. Biased left and scaled up so
                the lit sand sits under their feet and the arches read above them. */
+            /* THE PAINTING IS THE ONLY THING TELLING YOU WHERE YOU ARE, and it was being thrown away twice
+               over: a 1.25 zoom anchored at 38% cropped past the lit sand into the shadowed left arches, and
+               the vignette below then took another 50% off what survived. Measured on a 375px phone, the ring
+               averaged RGB 44,37,28 — a fight happening in a nearly black box. Pulled back to 1.12 and
+               re-aimed at the middle, where the warm pool of light actually is, and lifted a touch. */
             .ar-ring-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-                object-position: 38% 100%; transform: scale(1.25); transform-origin: 50% 100%; }
+                object-position: 46% 100%; transform: scale(1.12); transform-origin: 50% 100%;
+                filter: brightness(1.2) saturate(1.06); }
             /* Two washes, not one: a vignette that pushes the eye to the middle, and a warm floor glow that
                makes the sand read as lit ground rather than more brown. Kept LIGHT — the first cut of this
                stacked a scrim, a bottom gradient and a crop that between them turned a rather good painting
                of an arena into a black rectangle. The background is the only thing telling you where you are. */
             .ar-ring-scrim { position: absolute; inset: 0;
                 background:
-                    radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.18), transparent 72%),
-                    radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.5)); }
+                    radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.22), transparent 72%),
+                    radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.32)); }
             /* ── LANDSCAPE PHONE ── a short, wide viewport leaves ~250px for the whole ring, so every band
                that is merely nice-to-have gives its pixels back to the stage. The fighters and the deck are
                what you cannot do without. */
@@ -1498,8 +1515,13 @@ function Styles() {
                together read as distance; equal size on one baseline reads as two of the same thing. */
             /* Addressed by WHO, not by DOM order. YOU stand left, nearer and larger; the opponent stands
                right, smaller and further up the sand. Two cues for depth — size alone reads as a mistake. */
-            .ar-floor > .ar-fighter:not(.is-foe) { left: -3%; z-index: 3; width: 54%; bottom: 0; }
-            .ar-floor > .ar-fighter.is-foe { right: -3%; z-index: 2; width: 47%; bottom: 9%; }
+            /* FLUSH TO THE EDGE, NOT PAST IT. Both of these used to sit at -3%, which on a 375px phone is a
+               297px ring and 8px of fighter hanging outside a box that clips its overflow — measured, not
+               guessed: the foe's own bounding box ran to 304. The enemy is mirrored, so the 8px came off the
+               FRONT of them: axe, leading shoulder, the side you are looking at. The 3% bought about five
+               pixels of size and cost the part of the sprite that matters. */
+            .ar-floor > .ar-fighter:not(.is-foe) { left: 0; z-index: 3; width: 54%; bottom: 0; }
+            .ar-floor > .ar-fighter.is-foe { right: 0; z-index: 2; width: 47%; bottom: 9%; }
             .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
