@@ -11054,6 +11054,8 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .merchant-pet img { width: 72px; height: 72px; object-fit: contain; flex: none; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
 .merchant-shop { display: flex; flex-direction: column; gap: 8px; }
 .merchant-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+/* Already bought today — still listed (you should see what he had), visibly spent. */
+.merchant-item.is-bought { opacity: 0.5; }
 .merchant-item-emoji { font-size: 1.5rem; flex: none; }
 .merchant-item-body { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .merchant-off { font-size: 0.66rem; font-weight: 800; color: #0f2a12; background: #7cffb2; border-radius: 999px; padding: 1px 6px; vertical-align: middle; }

@@ -274,13 +274,17 @@ export default function MerchantScene({ merchant, gold = 0, floor = 20, ceil = 3
                             {(merchant.shop || []).map((it) => {
                                 const afford = gold >= it.price;
                                 return (
-                                    <div key={it.id} className="merchant-item">
+                                    <div key={it.id} className={`merchant-item${it.bought ? " is-bought" : ""}`}>
                                         <span className="merchant-item-emoji">{it.emoji}</span>
                                         <div className="merchant-item-body">
                                             <strong>{it.name} <span className="merchant-off">-{it.off}%</span></strong>
                                             <span className="muted" style={{ fontSize: "0.76rem" }}>{it.desc}</span>
                                         </div>
-                                        {afford ? (
+                                        {/* ONE OF EACH PER DAY. Said on the button rather than on the tap: a price
+                                            you can see and press, that then refuses, is worse than no button. */}
+                                        {it.bought ? (
+                                            <button type="button" className="btn btn-small" disabled>Bought today</button>
+                                        ) : afford ? (
                                             <button type="button" className="btn btn-small" disabled={busy} onClick={() => onBuy(it.id)}>🪙 {it.price.toLocaleString()}</button>
                                         ) : (
                                             <CoinCta price={it.price} have={gold} label="coins" />

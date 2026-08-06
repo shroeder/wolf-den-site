@@ -975,7 +975,16 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // The Gold Merchant offer, if he showed up this landing (shown at "arrived", before the dig). Prices are
         // re-read from the table on the way out rather than served from the stored offer — see warePrice.
         merchant: (row && row.merchant_json && !row.merchant_json.none)
-            ? { ...row.merchant_json, shop: (row.merchant_json.shop || []).map((s) => ({ ...s, price: warePrice(s.id) ?? s.price, off: Math.round(MERCHANT_DISCOUNT * 100) })) }
+            ? {
+                ...row.merchant_json,
+                // `bought` rides along per ware so the button can say "bought today" instead of failing on tap.
+                shop: (row.merchant_json.shop || []).map((s) => ({
+                    ...s,
+                    price: warePrice(s.id) ?? s.price,
+                    off: Math.round(MERCHANT_DISCOUNT * 100),
+                    bought: merchantBoughtSet(row).has(s.id),
+                })),
+            }
             : null,
         merchantGold: { floor: MERCHANT_GOLD_FLOOR, ceil: MERCHANT_GOLD_CEIL },
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
@@ -1011,7 +1020,9 @@ async function readRow(buyerId) {
                 -- fish_is_today was MISSING, and castsUsed() reads it: without it every view reported zero
                 -- casts spent, so the screen said "13/13 casts left today" while the server — which reads the
                 -- row through readFishRow, where the flag IS computed — refused with out_of_casts.
-                (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today
+                (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today,
+                -- Same reason, same trap: compared in SQL so today means the STORE's today, not the server's.
+                (merchant_buy_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS merchant_buys_are_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId]
     ).catch(() => null);
@@ -1183,7 +1194,9 @@ export async function unusedCasts(buyerId) {
     const row = await db.queryOne(
         `SELECT departed_at, dig_state, fish_line_level, fish_lure_level, fish_net_level, fish_gaff_level,
                 COALESCE(fish_casts, 0) AS fish_casts, COALESCE(fish_recharges, 0) AS fish_recharges,
-                (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today
+                (fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS fish_is_today,
+                -- Same reason, same trap: compared in SQL so today means the STORE's today, not the server's.
+                (merchant_buy_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS merchant_buys_are_today
            FROM mkt_sailing WHERE buyer_id = $1`,
         [buyerId],
     ).catch(() => null);
@@ -1754,19 +1767,67 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     return { ok: true, goldWon: gold, perfect, ...(await getSailingState(buyerId)) };
 }
 
-// Buy one of the merchant's discounted exclusive consumables. Price comes from HIS rolled offer (not the
-// client) so it can't be spoofed. Repeatable while he's here.
+// ── WHAT YOU HAVE ALREADY BOUGHT FROM HIM TODAY ──────────────────────────────────────────────────────────────
+// Day-stamped and cleared lazily on read, exactly like every other daily budget here (pettings, ratings,
+// raids, waves): no cron, no midnight job, and a stale stamp resets itself the first time anyone looks.
+const SDAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
+// What the ROW says you have bought today, without another query. Trusts the SQL-computed day flag rather
+// than comparing a Postgres DATE to a JS Date, which reads as yesterday on a UTC server.
+function merchantBoughtSet(row) {
+    if (!row || row.merchant_buys_are_today !== true) return new Set();
+    const raw = row.merchant_bought;
+    const list = typeof raw === "string" ? JSON.parse(raw || "[]") : (raw || []);
+    return new Set(Array.isArray(list) ? list : []);
+}
+async function merchantBoughtToday(buyerId) {
+    const r = await db
+        .queryOne(
+            `UPDATE mkt_sailing
+                SET merchant_bought = CASE WHEN merchant_buy_day = ${SDAY} THEN merchant_bought ELSE '[]'::jsonb END,
+                    merchant_buy_day = ${SDAY}
+              WHERE buyer_id = $1
+              RETURNING merchant_bought`,
+            [buyerId]
+        )
+        .catch(() => null);
+    const raw = r?.merchant_bought;
+    const list = typeof raw === "string" ? JSON.parse(raw || "[]") : (raw || []);
+    return new Set(Array.isArray(list) ? list : []);
+}
+
+// Buy one of the merchant's discounted exclusive consumables. Price comes from the STOCK TABLE (never the
+// client, and never the number frozen into his rolled offer) so it can't be spoofed or go stale.
+//
+// ONE OF EACH PER DAY. He is two-thirds off precisely because meeting him is rare, and those two facts were
+// fighting: one lucky landing let you buy the same discounted ware until your gold ran out, which turns a rare
+// event into a vending machine. The limit is per ITEM, not per visit — his three wares are still three
+// purchases, you just cannot stand there buying the same Tome eleven times.
 export async function merchantBuy(buyerId, itemId) {
     const row = await readRow(buyerId);
     const m = row?.merchant_json;
     if (!m || m.none) return { ok: false, error: "no_merchant", ...(await getSailingState(buyerId)) };
     const item = (m.shop || []).find((s) => s.id === itemId);
     if (!item) return { ok: false, error: "not_stocked", ...(await getSailingState(buyerId)) };
-    // Charge the CURRENT price, the same one the screen was just shown — never the number frozen into the
-    // offer when it was rolled, which may predate a price change.
+    const bought = await merchantBoughtToday(buyerId);
+    if (bought.has(itemId)) return { ok: false, error: "already_bought_today", ...(await getSailingState(buyerId)) };
     const price = warePrice(item.id) ?? item.price;
+    // Claim the day's slot for this ware BEFORE taking the gold, guarded on the item not already being in the
+    // list — two taps racing each other can't both get through, and a refund is easier than an un-grant.
+    const claimed = await db
+        .queryOne(
+            `UPDATE mkt_sailing SET merchant_bought = merchant_bought || to_jsonb($2::text)
+              WHERE buyer_id = $1 AND merchant_buy_day = ${SDAY} AND NOT (merchant_bought ? $2::text)
+              RETURNING buyer_id`,
+            [buyerId, itemId]
+        )
+        .catch(() => null);
+    if (!claimed) return { ok: false, error: "already_bought_today", ...(await getSailingState(buyerId)) };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, price]).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    if (!paid) {
+        // Couldn't afford it — hand the day's slot back rather than charging them a purchase they never made.
+        await db.query(`UPDATE mkt_sailing SET merchant_bought = merchant_bought - $2::text WHERE buyer_id = $1`, [buyerId, itemId]).catch(() => {});
+        return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
+    }
     await logCoin(buyerId, -price, "merchant_buy", { meta: { name: item.name }, balanceAfter: paid.gold }).catch(() => {});
     await grantConsumable(buyerId, itemId, 1).catch(() => {});
     await trackActivity(buyerId, "sail_merchant_buy", { name: item.name, cost: price }).catch(() => {});
