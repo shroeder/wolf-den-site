@@ -1438,10 +1438,17 @@ function Styles() {
                makes the sand read as lit ground rather than more brown. Kept LIGHT — the first cut of this
                stacked a scrim, a bottom gradient and a crop that between them turned a rather good painting
                of an arena into a black rectangle. The background is the only thing telling you where you are. */
+            /* THE BOTTOM HAS TO GO DARK, and the vignette alone never did it: a radial darkens the CORNERS and
+               leaves the middle of the bottom edge — which is exactly where the lit sand is, where the beat
+               line sits, and where the command deck starts. The result was a bright band with white text on
+               it, unreadable, right under two dark fighters. The linear below is the fix: the painting stays
+               lit where the fighters stand and falls away into the deck, so the text has something to sit on
+               and the ring ends rather than being cut off. */
             .ar-ring-scrim { position: absolute; inset: 0;
                 background:
-                    radial-gradient(58% 30% at 50% 84%, rgba(255,186,92,0.22), transparent 72%),
-                    radial-gradient(95% 80% at 50% 56%, transparent, rgba(10,6,4,0.32)); }
+                    radial-gradient(58% 26% at 50% 72%, rgba(255,186,92,0.2), transparent 72%),
+                    radial-gradient(95% 80% at 50% 50%, transparent, rgba(10,6,4,0.3)),
+                    linear-gradient(180deg, transparent 52%, rgba(8,5,4,0.42) 74%, rgba(6,4,3,0.86) 90%, rgba(5,3,3,0.94) 100%); }
             /* ── LANDSCAPE PHONE ── a short, wide viewport leaves ~250px for the whole ring, so every band
                that is merely nice-to-have gives its pixels back to the stage. The fighters and the deck are
                what you cannot do without. */
@@ -1521,7 +1528,11 @@ function Styles() {
                FRONT of them: axe, leading shoulder, the side you are looking at. The 3% bought about five
                pixels of size and cost the part of the sprite that matters. */
             .ar-floor > .ar-fighter:not(.is-foe) { left: 0; z-index: 3; width: 54%; bottom: 0; }
-            .ar-floor > .ar-fighter.is-foe { right: 0; z-index: 2; width: 47%; bottom: 9%; }
+            /* 47% -> 50% pays back what the sprite reframe cost. The NPC art now carries a 7% margin inside
+               its own canvas so nothing is flush to a clipping edge, which also made every opponent render
+               about that much smaller; three points of box width puts the enemy back to the size they read at
+               before, without going anywhere near the frame. */
+            .ar-floor > .ar-fighter.is-foe { right: 0; z-index: 2; width: 50%; bottom: 9%; }
             .ar-floor > .ar-fighter.is-foe .ar-shadow { width: min(70%, 120px); height: 13px; }
             /* ── SPOTLIGHT ── the floor pushes in on the caster and everything else dims out of the way. */
 /* The camera pushes toward whoever is casting and everything else falls away. */
@@ -1698,8 +1709,11 @@ function Styles() {
             .ar-verdict.is-loss b { color: #ffb0b8; text-shadow: 0 3px 18px #000, 0 0 40px rgba(255,80,100,.8); }
             @keyframes arVerdict { from { opacity: 0; transform: scale(1.7) } to { opacity: 1; transform: scale(1) } }
 
-            .ar-beat { position: relative; z-index: 5; flex: 0 0 auto; padding: 5px 10px 0; margin: 0;
-                font-size: 12px; line-height: 1.4; color: #e4d9c6; text-align: center;
+            /* The blow-by-blow sits ON the sand, so it needs its own floor rather than a text-shadow doing all
+               the work — over the lit patch it was cream text on orange. */
+            .ar-beat { position: relative; z-index: 5; flex: 0 0 auto; padding: 7px 10px 8px; margin: 0;
+                font-size: 12px; line-height: 1.4; color: #efe6d6; text-align: center;
+                background: linear-gradient(180deg, rgba(6,4,3,0.55), rgba(6,4,3,0.8));
                 text-shadow: 0 2px 8px #000; pointer-events: none; }
 
             .ar-tell { margin: 10px 0 12px; font-size: 12px; color: #cbb; text-align: center; }
