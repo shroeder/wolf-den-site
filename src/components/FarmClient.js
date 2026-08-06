@@ -239,6 +239,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // clear the instant you pet (the server's petNudge is only the starting value at load).
     const petsUnpetted = useMemo(() => pets.filter((p) => !p.petted).length, [pets]);
     const liveNudge = farm.mine ? Math.max(0, Math.min(farm.petting?.left ?? farm.petNudge ?? 0, petsUnpetted)) : 0;
+    const todoCount = farm.mine ? (farm.rating?.charge?.left ?? 0) + (farm.petting?.others?.left ?? 0) : 0;
     // Pets roam the FULL width of the backdrop now that the garden is its own view (no crops to avoid) — evenly
     // spread from the left edge to the right so they're never bunched or missing from the left side.
     const petMinX = FARM_PAD; // left edge of the pets' roaming band
@@ -274,6 +275,12 @@ export default function FarmClient({ initial, viewingAlias }) {
     // ── Garden (crops live IN the pasture) ── state is lifted up here so the growing plots render inside the
     // scrolling field, while a compact controls panel below shares the exact same live garden.
     const [garden, setGarden] = useState(initial.garden || null);
+    // ── WHICH PANEL IS OPEN, AND WHAT THE CLOSED ONES ARE HIDING ────────────────────────────────────────────
+    // Tabs only stop being a filing cabinet if the closed drawers can still shout. Today counts the daily
+    // charges you have not spent (ratings + a neighbour's pettings); Garden counts crops standing ready. Both
+    // are derived from live state, so a badge clears the moment you spend the thing rather than on next load.
+    const [panel, setPanel] = useState("today"); // 'today' | 'garden' | 'standing' — own farm only
+    const readyCrops = Number(garden?.readyCount) || 0;
     const [gardenBusy, setGardenBusy] = useState(null);
     const [bountyTick, setBountyTick] = useState(0); // bumps after a mission-progressing action → FeatureDailies re-fetches
     const [planting, setPlanting] = useState(null); // slot awaiting a seed choice → opens the picker modal
@@ -912,6 +919,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                 /* Absolutely positioned so a badge never widens the tab or shoves the label into its neighbour. */
                 .farm-viewtabs .farm-tab-badge { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 900; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #e0433f; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
                 @keyframes farmTabPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+                /* THE SECOND TAB ROW. Same control, different job — the row above the scene picks WHICH
+                   pasture you are looking at, this one picks which of the three panels below it you want. Gold
+                   rather than green so two rows of tabs on one screen never read as one confused row, and it
+                   matches the gold the neighbour card and the rank badge already use. */
+                .farm-viewtabs.is-panel { background: rgba(0,0,0,0.34); border-color: rgba(255,215,94,0.18); }
+                .farm-viewtabs.is-panel button.on { background: linear-gradient(180deg, #ffe488, #f3b23a); color: #3a2c08; box-shadow: 0 2px 6px rgba(243,178,58,0.4), inset 0 1px 0 rgba(255,255,255,0.35); }
+                .farm-viewtabs.is-panel .farm-tab-badge { background: #f3b23a; color: #3a2c08; }
             `}</style>
 
             {farm.mine ? (
@@ -1188,43 +1202,77 @@ export default function FarmClient({ initial, viewingAlias }) {
                 the two ACTIONS on this screen — the quests you are working through, and liking the farm you
                 are looking at — were a tap away and, folded shut by default, easy to never see at all. What
                 stays folded is the stuff you CHECK rather than DO: where you place, and who else to visit. */}
-            <div style={{ display: "grid", gap: 10, margin: "12px 0" }}>
-                {/* On YOUR farm the neighbours come first: the two daily budgets and who to spend them on.
-                    On someone else's, the rating IS the neighbour action, so it leads instead. */}
-                {farm.mine ? (
-                    <NeighbourStrip
-                        neighbours={farm.neighbours}
-                        ratesLeft={farm.rating?.charge?.left ?? 0}
-                        petsLeft={farm.petting?.others?.left ?? 0}
-                    />
+            {/* ── EVERYTHING UNDER THE SCENE, IN THREE ─────────────────────────────────────────────────────
+                The farm grew a card at a time and ended up as one column four screens long: neighbours, five
+                bounties, your love, your rank, a search box, the garden, the seed bag, the seed packs, the
+                fertilizer shop and the whole upgrade tree, every one of them expanded, every one of them
+                between you and the next. Nothing here deserved deleting and nothing deserved folding — it is
+                all real — so it is tabbed instead, the way the rest of the Den already handles this much
+                depth (the mine, the arena, sailing).
+
+                Three, because there are exactly three questions this half of the page answers:
+                  TODAY     — what is there to do right now (neighbours, bounties)
+                  GARDEN    — the plot work, the bag, the supplies, the upgrade tree
+                  STANDING  — how the farm is doing, and how to go and find another one
+
+                VISITING somebody skips the tabs entirely: their pets and the rating card, nothing else. Their
+                garden is not yours to work and their rank is on their card already. */}
+            {farm.mine ? (
+                <div className="farm-viewtabs is-panel" style={{ margin: "12px 0 10px" }}>
+                    {[["today", "📋", "Today", todoCount], ["garden", "🌱", "Garden", readyCrops], ["standing", "🏅", "Standing", 0]]
+                        .filter(([key]) => key !== "garden" || garden)
+                        .map(([key, ico, label, badge]) => (
+                            <button key={key} type="button" className={panel === key ? "on" : undefined}
+                                onClick={() => setPanel(key)} aria-pressed={panel === key}>
+                                <span aria-hidden="true">{ico}</span>{label}
+                                {/* A tab that hides something claimable has to say so, or tabbing IS hiding. */}
+                                {badge > 0 ? <i className="farm-tab-badge">{badge}</i> : null}
+                            </button>
+                        ))}
+                </div>
+            ) : null}
+
+            <div style={{ display: "grid", gap: 10, margin: farm.mine ? 0 : "12px 0" }}>
+                {/* TODAY — the two things with a daily budget behind them. */}
+                {farm.mine && panel === "today" ? (
+                    <>
+                        <NeighbourStrip
+                            neighbours={farm.neighbours}
+                            ratesLeft={farm.rating?.charge?.left ?? 0}
+                            petsLeft={farm.petting?.others?.left ?? 0}
+                        />
+                        <FeatureDailies feature="farm" refreshKey={bountyTick} />
+                    </>
                 ) : null}
-                {/* Visiting: their pets first — that is the action with three charges behind it and no way to
-                    find it — then the rating, which is one tap and already has a card of its own. */}
+
+                {/* VISITING — their pets first (three charges and no other way to find it), then the rating. */}
                 {!farm.mine && farm.canPet ? (
                     <VisitPets pets={pets} ownerName={farm.owner.name} petsLeft={farm.petting?.left ?? 0}
                         petXp={farm.petXp} petGold={farm.petGold} busyKey={busy} onPet={petIt} />
                 ) : null}
-                {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
-                {farm.rating ? (
+                {!farm.mine && farm.rating ? (
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
+                ) : null}
+
+                {/* STANDING — your love, where that places you, and the way to somebody else's farm. */}
+                {farm.mine && panel === "standing" ? (
+                    <>
+                        {farm.rating ? (
+                            <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
+                        ) : null}
+                        {farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+                        <details className="farm-status">
+                            <summary>Find a farm by name</summary>
+                            <FarmDirectory current={viewingAlias} />
+                        </details>
+                    </>
                 ) : null}
             </div>
 
-            {/* Your standing sits WITH your love tally, not folded away underneath it — they are the same
-                sentence ("people like this farm, and here is where that puts you"), and splitting them left
-                the tally above the fold saying a number nobody could place. */}
-            {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
-
-            {/* All that is left to fold is SEARCH. The neighbour strip up top is the fast path — this is for
-                when you want somebody specific, which is the one case worth a tap and a text box. */}
-            <details className="farm-status">
-                <summary>Find a farm by name</summary>
-                <FarmDirectory current={viewingAlias} />
-            </details>
-
             {bgOpen ? <FarmBgCreator bg={farm.customBg} draft={farm.customBgDraft} busy={bgBusy} onAct={bgAct} onClose={() => setBgOpen(false)} /> : null}
 
-            {farm.mine && garden ? (
+            {/* GARDEN — plots, bag, supplies and the upgrade tree, which is most of the page's length on its own. */}
+            {farm.mine && garden && panel === "garden" ? (
                 <GardenPanel
                     garden={garden}
                     busy={gardenBusy}
