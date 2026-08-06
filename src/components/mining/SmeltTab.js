@@ -83,7 +83,7 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
 
             {/* The mine's chases, permanently on the screen their bonuses feed. */}
             {s.collections?.length ? (
-                <CollectionPanel sets={s.collections} title="⛏️ Depths collections"
+                <CollectionPanel sets={s.collections} feature="depths" title="Depths collections"
                     blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
             ) : null}
 

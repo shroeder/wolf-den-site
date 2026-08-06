@@ -374,7 +374,7 @@ export default function SpinWheel() {
             {/* The wheel's own chase: ten wheel-exclusive pieces that only this wheel drops, shown on the
                 wheel. Nothing else in the Den can tell you they exist. */}
             {st.collections?.length ? (
-                <CollectionPanel sets={st.collections} title="🎡 Wheel collection"
+                <CollectionPanel sets={st.collections} feature="wheel" title="Wheel collection"
                     blurb="Won only from this wheel — the bonus is permanent and you never have to wear them." />
             ) : null}
 

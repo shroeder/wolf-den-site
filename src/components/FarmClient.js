@@ -12,6 +12,7 @@ import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import CollectionPanel from "@/components/CollectionPanel";
+import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
@@ -894,7 +895,15 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-portrait { position: relative; display: inline-block; border-radius: 20px; overflow: hidden; }
                 .farm-portrait::after { content: ""; position: absolute; inset: 0; border-radius: 20px; box-shadow: inset 0 0 0 2px var(--pring, rgba(255,255,255,0.15)), inset 0 -18px 30px rgba(0,0,0,0.35); pointer-events: none; }
                 .farm-rank { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 11px 14px; border-radius: 14px; border: 1px solid rgba(255,214,110,0.35); background: linear-gradient(180deg, rgba(255,214,110,0.14), rgba(255,255,255,0.02) 60%); }
-                .farm-rank-crest { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 19px; font-weight: 900; color: #3a2c08; background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); }
+                .farm-rank-crest { flex: none; width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 15px; font-weight: 900; letter-spacing: -0.02em; color: #3a2c08; background: linear-gradient(180deg, #ffe488, #f3b23a); box-shadow: 0 3px 0 #b57f22, 0 0 14px rgba(255,214,110,0.5); }
+                /* Silver and bronze for 2nd and 3rd — the same struck-metal ladder the shared board uses. */
+                .farm-rank.rank-2 .farm-rank-crest { background: linear-gradient(180deg, #f4f7fa, #b9c4ce); box-shadow: 0 3px 0 #7c8894, 0 0 14px rgba(200,214,226,0.45); }
+                .farm-rank.rank-3 .farm-rank-crest { background: linear-gradient(180deg, #f0c08a, #c47a3c); box-shadow: 0 3px 0 #82491d, 0 0 14px rgba(196,122,60,0.45); }
+                .farm-rank.rank-n .farm-rank-crest { color: #cdd3d8; background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05)); box-shadow: 0 3px 0 rgba(0,0,0,0.35); }
+                .farm-loveboard { margin: 0 0 10px; }
+                .farm-loveboard-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 8px; }
+                .farm-loveboard-head b { font-size: 15px; font-weight: 900; }
+                .farm-loveboard-head span { font-size: 10.5px; color: #8a9099; }
                 /* Unranked is a real state, not an error — nobody has visited yet. Read it as quiet, not broken. */
                 .farm-rank.is-unranked { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); }
                 .farm-rank.is-unranked .farm-rank-crest { color: #9aa2ab; background: rgba(255,255,255,0.06); box-shadow: none; }
@@ -1258,7 +1267,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {/* GARDEN tab also carries the farm CHASES — the Harvester and Forager collections belong on
                     the screen their bonuses land on, not three taps away on the equipment page. */}
                 {farm.mine && panel === "garden" && farm.collections?.length ? (
-                    <CollectionPanel sets={farm.collections} title="🌾 Farm collections"
+                    <CollectionPanel sets={farm.collections} feature="farm" title="Farm collections"
                         blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
                 ) : null}
 
@@ -1269,6 +1278,34 @@ export default function FarmClient({ initial, viewingAlias }) {
                             <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
                         ) : null}
                         {farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+                        {/* HOW YOU COMPARE. A place with no other farms next to it is a fact, not a standing —
+                            you cannot tell whether 1st is comfortable or one vote from being taken. */}
+                        {farm.loveBoard?.top?.length ? (
+                            <div className="farm-loveboard">
+                                <div className="farm-loveboard-head">
+                                    <b>Most-loved farms</b>
+                                    <span>tier-weighted · like 1 · love 2 · admire 3</span>
+                                </div>
+                                <Leaderboard
+                                    rows={farm.loveBoard.top.map((r) => ({
+                                        place: r.place, who: r.who, avatar: r.avatar, you: r.you,
+                                        value: r.score.toLocaleString(),
+                                        unit: `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
+                                    }))}
+                                    mine={farm.loveBoard.mine ? {
+                                        place: farm.loveBoard.mine.place, who: farm.loveBoard.mine.who,
+                                        avatar: farm.loveBoard.mine.avatar, you: true,
+                                        value: farm.loveBoard.mine.score.toLocaleString(),
+                                        unit: `love · ${farm.loveBoard.mine.votes} vote${farm.loveBoard.mine.votes === 1 ? "" : "s"}`,
+                                        toNext: farm.rating?.standings?.toNext
+                                            ? `${farm.rating.standings.toNext} more love to catch ${ordinal(farm.loveBoard.mine.place - 1)}`
+                                            : null,
+                                    } : null}
+                                    total={farm.rating?.standings?.ranked || null}
+                                    unitPlural="farms"
+                                />
+                            </div>
+                        ) : null}
                         <details className="farm-status">
                             <summary>Find a farm by name</summary>
                             <FarmDirectory current={viewingAlias} />
@@ -1871,8 +1908,9 @@ function FarmRankBadge({ standings }) {
     // The bar shows how far up the board you are, not progress toward a threshold — full at 1st, empty at last.
     const pct = ranked > 1 ? Math.max(4, Math.round(((ranked - place) / (ranked - 1)) * 100)) : 100;
     return (
-        <div className={`farm-rank${place === 1 ? " is-first" : ""}`}>
-            <div className="farm-rank-crest">{place === 1 ? "🥇" : place === 2 ? "🥈" : place === 3 ? "🥉" : ordinal(place)}</div>
+        <div className={`farm-rank${place === 1 ? " is-first" : ""} rank-${place <= 3 ? place : "n"}`}>
+            {/* The place itself, struck into metal — a medal emoji is the phone's artwork, not the Den's. */}
+            <div className="farm-rank-crest">{ordinal(place)}</div>
             <div className="farm-rank-body">
                 <div className="farm-rank-top">
                     <span className="farm-rank-label">Farm Rank</span>

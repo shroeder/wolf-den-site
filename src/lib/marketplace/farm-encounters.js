@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { PART_TIERS } from "@/lib/marketplace/crafting.js";
@@ -92,7 +93,11 @@ export async function maybeStartEncounter(buyerId, { rarity = "common", wardChan
         const sid = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "wheat";
         loot = { type: "seed", seed: sid, label: `a ${SEEDS[sid]?.name || "mystery"} seed`, emoji: "🌱" };
     } else if (bucket === "chest") {
-        loot = { type: "chest", chestTier: c.chestTier, label: `a ${CHEST_TIERS[c.chestTier]?.label || c.chestTier} chest`, emoji: CHEST_TIERS[c.chestTier]?.emoji || "🧰" };
+        // The tier's label already ENDS in "Chest" — appending the word again produced "a Wooden Chest chest".
+        // And the chest has real painted art, so show the chest rather than a cardboard-box emoji.
+        const art = await getChestArt().catch(() => ({}));
+        loot = { type: "chest", chestTier: c.chestTier, label: `a ${CHEST_TIERS[c.chestTier]?.label || `${c.chestTier} chest`}`,
+            emoji: CHEST_TIERS[c.chestTier]?.emoji || "🧰", sprite: art?.[c.chestTier] || null };
     } else {
         const n = c.partsMin + Math.floor(Math.random() * (c.partsMax - c.partsMin + 1));
         const pt = PART_TIERS.find((p) => p.tier === c.partsTier) || PART_TIERS[0];

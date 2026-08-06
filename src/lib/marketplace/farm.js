@@ -16,7 +16,7 @@ import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { getGarden, farmPetCapBonus, dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { farmRatingBits } from "@/lib/marketplace/farm-rating.js";
+import { farmRatingBits, farmLoveBoard } from "@/lib/marketplace/farm-rating.js";
 import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
@@ -362,7 +362,7 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const [garden, ratingBits, placements, decorations, crownCfg, neighbours, collections] = await Promise.all([
+    const [garden, ratingBits, placements, decorations, crownCfg, neighbours, collections, loveBoard] = await Promise.all([
         mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
@@ -374,6 +374,9 @@ export async function getFarm(ownerId, viewerId) {
         // The farm COLLECTIONS (Harvester / Forager) — shown permanently on the farm screen, because that is
         // where their bonuses land and where somebody chasing them is standing.
         mine ? farmCollections(viewerId).catch(() => []) : Promise.resolve([]),
+        // The most-loved board. Only on your own farm — Standing is the tab that asks "how do I compare?", and
+        // a position with nobody else's name next to it is not an answer.
+        mine ? farmLoveBoard(viewerId).catch(() => ({ top: [], mine: null })) : Promise.resolve({ top: [], mine: null }),
     ]);
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
@@ -381,7 +384,9 @@ export async function getFarm(ownerId, viewerId) {
         garden,
         customBg: owner.farm_bg_active_url || null, // the equipped library background (shown to everyone), or none → default scenes
         customBgDraft: mine ? (owner.farm_bg_draft_url || null) : null, // your pending, not-yet-accepted preview
-        spriteBrightness: Number(owner.sprite_brightness ?? 1), // global brightness multiplier for this farm's sprites
+        // Clamped on read as well as on write: a value stored before the floor existed would otherwise keep
+        // rendering this farm's pets as silhouettes until the owner happened to touch the slider.
+        spriteBrightness: Math.max(0.6, Math.min(2.2, Number(owner.sprite_brightness ?? 1))), // global brightness multiplier for this farm's sprites
         visitors: await farmVisitors(ownerId, viewerId).catch(() => []), // live wolves viewing this farm (incl. you when visiting)
         canPet: Boolean(viewerId), // pet your own OR a friend's pets (spends your shared 3/day budget)
         // How many of your own pets you can actually pet RIGHT NOW (charges left ∩ un-petted pets) — nudges the
@@ -396,6 +401,7 @@ export async function getFarm(ownerId, viewerId) {
         crownCfg, // loot-pig crown placement
         neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
         collections, // own farm only: the Harvester / Forager chases, always visible
+        loveBoard, // own farm only: { top, mine } — the most-loved farms, for the Standing tab
         ...extras,
         ...ratingBits,
     };

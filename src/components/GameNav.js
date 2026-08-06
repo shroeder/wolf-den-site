@@ -182,6 +182,33 @@ export default function GameNav() {
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
+    // Measure what the strip has to sit under. The site header is sticky and its height moves with the
+    // announcement banner and the viewport, so the offsets are read from the DOM and refreshed on resize
+    // rather than pinned to a magic number that only holds on one phone.
+    useEffect(() => {
+        const body = document.body;
+        if (!inGame) { body.classList.remove("in-game"); return undefined; }
+        body.classList.add("in-game");
+        const measure = () => {
+            const hdr = document.querySelector(".site-header")?.getBoundingClientRect().height || 0;
+            const hud = document.querySelector(".hud-strip")?.getBoundingClientRect().height || 0;
+            document.documentElement.style.setProperty("--gnav-hdr", `${Math.round(hdr)}px`);
+            document.documentElement.style.setProperty("--gnav-top", `${Math.round(hdr + hud)}px`);
+        };
+        measure();
+        const ro = typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+        const hdrEl = document.querySelector(".site-header");
+        const hudEl = document.querySelector(".hud-strip");
+        if (ro && hdrEl) ro.observe(hdrEl);
+        if (ro && hudEl) ro.observe(hudEl);
+        window.addEventListener("resize", measure);
+        return () => {
+            body.classList.remove("in-game");
+            window.removeEventListener("resize", measure);
+            ro?.disconnect();
+        };
+    }, [inGame, pathname]);
+
     const [chests, setChests] = useState(0);
     const [consumables, setConsumables] = useState(0); // unused potions/treats/relics — the Gear badge counts these too
     const [townTodo, setTownTodo] = useState(null); // { total, quests, well, tavern, event } from the town
@@ -412,6 +439,22 @@ export default function GameNav() {
 }
 
 const GAMENAV_CSS = `
+/* ── THE MENU STAYS PUT ──────────────────────────────────────────────────────────────────────────────────────
+   In game, the HUD and the menu strip used to scroll away with the page: three screens down a gear grid there
+   was no coin count, no level, and no way anywhere else without scrolling all the way back up. Both now stick
+   under the site header while you are in the game (the class is only on the body on game paths, so the shop
+   and the rest of the site are untouched).
+
+   The offsets are measured, not guessed — the header's height changes with the announcement banner, the
+   viewport width and the font, and a hard-coded top lands the strip either overlapping the logo or floating
+   below it with a stripe of page showing through. */
+body.in-game .hud-strip { position: sticky; top: var(--gnav-hdr, 0px); z-index: 9; backdrop-filter: blur(9px);
+    background: linear-gradient(90deg, rgba(28,24,14,0.94), rgba(20,18,12,0.94)); }
+body.in-game .game-nav { position: sticky; top: var(--gnav-top, 0px); z-index: 8; padding: 6px 7px 2px;
+    margin-left: -7px; margin-right: -7px; border-radius: 0 0 13px 13px;
+    /* Opaque, not a fade: a translucent tail let the page's text read straight through the strip. */
+    background: #0e0e0e; border-bottom: 1px solid rgba(255,215,94,0.16);
+    box-shadow: 0 10px 20px -14px rgba(0,0,0,1); }
 /* Nav sprites sit on the same baseline the emoji did, so swapping them in doesn't shift any row. */
 .game-nav-sprite { display: inline-block; object-fit: contain; vertical-align: -0.28em; flex: 0 0 auto; }
 .gm-item .game-nav-sprite { vertical-align: middle; }

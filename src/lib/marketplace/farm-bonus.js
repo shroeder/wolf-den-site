@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { BUFF_CAP, emptyFarmBuffs } from "@/lib/marketplace/decorations.js";
 import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
 import { getOwnedItemIds, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { sumItemFarm } from "@/lib/marketplace/items.js";
+import { sumItemFarm, affinityItemIds } from "@/lib/marketplace/items.js";
 import { setFarmBonus } from "@/lib/marketplace/sets.js";
 import { collectibleById, petFarmPassive } from "@/lib/marketplace/collectibles.js";
 import { getBadgeFarm } from "@/lib/marketplace/badges.js";
@@ -14,7 +14,9 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 // The single source the farm reads for passive bonuses. Returns the SAME { growSpeed, seedLuck, harvestLuck,
 // petXp, fertPower, goldHarvest } % shape as decorationBuffs, but summed from THREE sources:
 //   (a) PLACED DECORATIONS   — placedDecoBuffs (existing behaviour, unchanged)
-//   (b) EQUIPPED GEAR        — the `farm` affix block on equipped items (items.js sumItemFarm)
+//   (b) GEAR AFFIXES        — the `farm` affix block on equipped items PLUS every farm collection piece you own
+//                              (items.js affinityItemIds — a collection piece can't be worn, so its own affix
+//                               would otherwise be unreachable)
 //   (c) EQUIPPED PET         — the pastoral pet's farm passive (collectibles.js petFarmPassive)
 // The per-stat BUFF_CAP (shared with decorations) is applied to the COMBINED total, so gear + pet can't blow
 // past the ceiling decorations already respect. Gear farm affixes and pet farm passives are quarantined from
@@ -31,7 +33,7 @@ export async function farmBonuses(buyerId) {
         getOwnedItemIds(buyerId).catch(() => []), // (b2) the farm COLLECTION sets count what you own, not what you wear
     ]);
     const equippedList = Object.values(bySlot || {});
-    const gearFarm = sumItemFarm(equippedList);
+    const gearFarm = sumItemFarm(affinityItemIds(equippedList, ownedIds));
     // (b2) FARM set tiers (Harvester / Forager). COLLECTION sets: owning the piece is what counts, so this
     // reads the owned list — nobody has to keep a farming loadout to farm well any more.
     const setFarm = setFarmBonus(ownedIds);

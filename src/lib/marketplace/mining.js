@@ -148,18 +148,20 @@ async function computeDepthAffinity(buyerId) {
     // silently dropped forever. (That exact bug cost sailing four of its eight effects for months.)
     const depth = { nerve: 0, lodesense: 0, hew: 0, prospect: 0, bellows: 0, crucible: 0 };
     if (!buyerId) return depth;
-    const [{ sumItemDepth }, { setDepthBonus }, { getEquippedIds, getOwnedItemIds }] = await Promise.all([
+    const [{ sumItemDepth, affinityItemIds }, { setDepthBonus }, { getEquippedIds, getOwnedItemIds }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/sets.js"),
         import("@/lib/marketplace/inventory.js"),
     ]);
     // getEquippedIds returns a {slot → id} OBJECT, not an array. Iterating it directly is a known landmine here.
     const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
-    const gear = sumItemDepth(Object.values(bySlot || {}));
+    const ownedIds = await getOwnedItemIds(buyerId).catch(() => []);
+    // Delver / Rockbreaker / Founder are things you assembled, not a kit you swap in to go mining — so BOTH
+    // halves read ownership for them: the per-piece affix (affinityItemIds, since a trophy can't be worn) and
+    // the set tiers. Ordinary mining gear still has to be equipped for its affix to count.
+    const gear = sumItemDepth(affinityItemIds(Object.values(bySlot || {}), ownedIds));
     for (const k in depth) depth[k] += gear[k] || 0;
-    // The AFFIXES on the pieces are gear and want the loadout; the SET TIERS are a collection and want the
-    // owned list. Delver / Rockbreaker / Founder are things you assembled, not a kit you swap in to go mining.
-    const set = setDepthBonus(await getOwnedItemIds(buyerId).catch(() => []));
+    const set = setDepthBonus(ownedIds);
     for (const k in depth) depth[k] += set[k] || 0;
 
     const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);

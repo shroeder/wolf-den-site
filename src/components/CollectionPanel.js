@@ -1,6 +1,11 @@
 "use client";
 
+import { GiWheat, GiMiningHelmet, GiPirateFlag, GiCartwheel } from "react-icons/gi";
+
 import ItemArt from "@/components/ItemArt";
+
+// The panel's own themed glyph per feature — an emoji here is the operating system's artwork, not the Den's.
+const PANEL_ICONS = { farm: GiWheat, depths: GiMiningHelmet, sea: GiPirateFlag, wheel: GiCartwheel };
 
 // ── A COLLECTION, SHOWN THE WAY THE FORGE SHOWS ITS PARTS ────────────────────────────────────────────────────
 // Every feature with a set gets the same permanent panel on its own screen: all the pieces laid out, what each
@@ -14,12 +19,13 @@ import ItemArt from "@/components/ItemArt";
 //
 // Collections are not worn (see sets.js): owning the piece is what counts, which is why a slot here says
 // "found" and never "equipped".
-export default function CollectionPanel({ sets = [], title = "Collections", blurb = null }) {
+export default function CollectionPanel({ sets = [], title = "Collections", blurb = null, feature = null }) {
     if (!sets.length) return null;
+    const Icon = PANEL_ICONS[feature] || null;
     return (
         <section className="card coll">
             <div className="coll-head">
-                <strong>{title}</strong>
+                <strong>{Icon ? <Icon className="coll-head-icon" aria-hidden="true" /> : null}{title}</strong>
                 <span className="coll-sub">{blurb || "Find the pieces — the bonus is permanent, no need to wear them."}</span>
             </div>
 
@@ -51,7 +57,7 @@ export default function CollectionPanel({ sets = [], title = "Collections", blur
                         <div className="coll-tiers">
                             {set.tiers.map((t, i) => (
                                 <span key={i} className={t.active ? "is-on" : undefined}>
-                                    {t.active ? "✓" : "○"} {t.need} pieces — {tierText(t)}
+                                    {t.active ? "✓" : "○"} {t.need} pieces — {t.text || tierText(t)}
                                 </span>
                             ))}
                             {set.capstone ? (
@@ -60,6 +66,19 @@ export default function CollectionPanel({ sets = [], title = "Collections", blur
                                 </span>
                             ) : null}
                         </div>
+
+                        {/* WHAT THE NUMBERS MEAN. "+12% Lucky Spin" is jargon until this line is on the same
+                            screen — a player should never have to guess what an effect they're chasing does. */}
+                        {set.legend?.length ? (
+                            <dl className="coll-legend">
+                                {set.legend.map((l) => (
+                                    <div key={l.label}>
+                                        <dt>{l.label}</dt>
+                                        <dd>{l.desc}</dd>
+                                    </div>
+                                ))}
+                            </dl>
+                        ) : null}
                     </div>
                 );
             })}

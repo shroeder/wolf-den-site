@@ -105,7 +105,7 @@ export default function AuctionClient({ initial }) {
         const r = await fetch("/api/marketplace/auction", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "list", itemId: sellPick.itemId, price: p, days }) }).then((x) => x.json()).catch(() => null);
         setBusy(false);
         if (r?.ok) { showFlash(`📜 Listed ${sellPick.name} for ${p.toLocaleString()} 🪙 (fee ${r.fee.toLocaleString()} 🪙).`); setSellPick(null); setPrice(""); try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } reloadState(); }
-        else showFlash(r?.error === "insufficient_gold" ? `You need ${Math.max(1, Math.ceil(p * feePct)).toLocaleString()} 🪙 for the listing fee.` : r?.error === "equipped" ? "Unequip it first." : "Couldn't list that.");
+        else showFlash(r?.error === "insufficient_gold" ? `You need ${Math.max(1, Math.ceil(p * feePct)).toLocaleString()} 🪙 for the listing fee.` : r?.error === "equipped" ? "Unequip it first." : r?.error === "collection_piece" ? "That's a collection piece — its bonus is permanent, so it can't be auctioned." : "Couldn't list that.");
     }, [price, sellPick, days, feePct, showFlash, reloadState]);
 
     const cancel = useCallback(async (id) => {

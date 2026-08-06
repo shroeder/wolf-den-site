@@ -7,8 +7,10 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
-import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, affinityItemIds } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
@@ -263,14 +265,16 @@ export async function equippedSeaAffinity(buyerId) {
     // old `bulwark` key wasn't a real effect and is removed.)
     const sea = { broadside: 0, ironclad: 0, plunder: 0, bounty: 0, dredge: 0, trove: 0, tailwind: 0, angling: 0 };
     if (!buyerId) return sea;
-    const [bySlot, me] = await Promise.all([
+    const [bySlot, me, ownedIds] = await Promise.all([
         getEquippedIds(buyerId).catch(() => ({})),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        getOwnedItemIds(buyerId).catch(() => []),
     ]);
-    const gear = sumItemSea(Object.values(bySlot || {}));
+    // Worn gear's sea affixes, PLUS the affix on every Corsair piece you own — those can't be equipped at all,
+    // so the loadout alone would drop them and the collection panel's "+4 Tailwind" would be a lie.
+    const gear = sumItemSea(affinityItemIds(Object.values(bySlot || {}), ownedIds));
     for (const k in sea) sea[k] += gear[k] || 0;
-    // The pieces' own sea affixes come off the loadout above; the Corsair SET tiers are a collection.
-    const setSea = setSeaBonus(await getOwnedItemIds(buyerId).catch(() => []));
+    const setSea = setSeaBonus(ownedIds);
     for (const k in sea) sea[k] += setSea[k] || 0;
     const petId = me?.featured_collectible;
     const pet = petId ? collectibleById(petId) : null;
@@ -573,6 +577,7 @@ export async function sailingBoards(viewerId = null) {
         db.query(
             `SELECT s.buyer_id,
                     COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                    b.avatar_url, b.avatar_config, b.avatar_cosmetics,
                     (1 + GREATEST(s.speed_level,0) + GREATEST(s.luck_level,0) + GREATEST(s.rarity_level,0)
                        + GREATEST(s.find_level,0) + GREATEST(s.raid_level,0))::int AS level,
                     COALESCE(s.voyages_completed, 0)::int AS voyages,
@@ -587,6 +592,7 @@ export async function sailingBoards(viewerId = null) {
         db.query(
             `SELECT s.buyer_id,
                     COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                    b.avatar_url, b.avatar_config, b.avatar_cosmetics,
                     COALESCE(s.chest_points, 0)::int AS points,
                     COALESCE(s.chests_forged, 0)::int AS forged
                FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
@@ -599,11 +605,13 @@ export async function sailingBoards(viewerId = null) {
         place: i + 1,
         who: r.who || "Member",
         alias: r.alias || null,
+        // A board of names is a spreadsheet; a board of FACES is people you know you can catch.
+        avatar: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
         you: viewerId ? String(r.buyer_id) === String(viewerId) : false,
         ...extra(r),
     }));
     const boards = {
-        fleet: mark(fleet, (r) => ({ level: r.level, voyages: r.voyages, raids: r.raids, art: boatArt(r.level) })),
+        fleet: mark(fleet, (r) => ({ level: r.level, voyages: r.voyages, raids: r.raids, art: boatArt(r.level), form: boatName(r.level) })),
         dig: mark(dig, (r) => ({ points: r.points, forged: r.forged })),
     };
 
@@ -612,7 +620,16 @@ export async function sailingBoards(viewerId = null) {
     const me = { fleet: null, dig: null };
     if (viewerId && !boards.fleet.some((r) => r.you)) me.fleet = await placeOf(viewerId, "fleet");
     if (viewerId && !boards.dig.some((r) => r.you)) me.dig = await placeOf(viewerId, "dig");
-    return { ...boards, me };
+
+    // HOW MANY PEOPLE ARE ON EACH BOARD. "4th" is a number; "4th of 63 captains" is a standing.
+    const counts = await db.queryOne(
+        `SELECT COUNT(*) FILTER (WHERE COALESCE(voyages_completed,0) > 0
+                                    OR COALESCE(speed_level,0) + COALESCE(luck_level,0) + COALESCE(rarity_level,0)
+                                     + COALESCE(find_level,0) + COALESCE(raid_level,0) > 0)::int AS fleet,
+                COUNT(*) FILTER (WHERE COALESCE(chest_points,0) > 0)::int AS dig
+           FROM mkt_sailing`
+    ).catch(() => null);
+    return { ...boards, me, totals: { fleet: Number(counts?.fleet || boards.fleet.length), dig: Number(counts?.dig || boards.dig.length) } };
 }
 
 // One member's standing on a board. RANK() over the same ordering the board uses, so the number it reports can
@@ -635,10 +652,13 @@ async function placeOf(viewerId, board) {
            SELECT place::int, points, forged FROM r WHERE buyer_id = $1`;
     const row = await db.queryOne(sql, [viewerId]).catch(() => null);
     if (!row) return null;
-    const who = await db.queryOne(`SELECT COALESCE(NULLIF(display_name, ''), alias) AS who FROM mkt_buyer WHERE id = $1`, [viewerId]).catch(() => null);
-    const base = { place: Number(row.place), who: who?.who || "You", you: true };
+    const who = await db.queryOne(`SELECT COALESCE(NULLIF(display_name, ''), alias) AS who, avatar_url, avatar_config, avatar_cosmetics FROM mkt_buyer WHERE id = $1`, [viewerId]).catch(() => null);
+    const base = {
+        place: Number(row.place), who: who?.who || "You", you: true,
+        avatar: avatarImageUrl(who?.avatar_config, who?.avatar_cosmetics) || who?.avatar_url || DEFAULT_AVATAR_URL,
+    };
     return board === "fleet"
-        ? { ...base, level: row.level, voyages: row.voyages, art: boatArt(row.level) }
+        ? { ...base, level: row.level, voyages: row.voyages, art: boatArt(row.level), form: boatName(row.level) }
         : { ...base, points: row.points, forged: row.forged };
 }
 

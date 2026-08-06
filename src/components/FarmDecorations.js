@@ -112,7 +112,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                 {onSpriteBrightness ? (
                     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 12px 4px" }}>
                         <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2" }} title="Global brightness for all your farm sprites (a real filter, not an overlay)">🔆 All sprites</span>
-                        <input type="range" min="0.3" max="2.2" step="0.05" value={bright} onChange={(e) => setBright(Number(e.target.value))} onPointerUp={() => onSpriteBrightness(bright)} onKeyUp={() => onSpriteBrightness(bright)} style={{ flex: 1, accentColor: "#ffd27a" }} />
+                        <input type="range" min="0.6" max="2.2" step="0.05" value={bright} onChange={(e) => setBright(Number(e.target.value))} onPointerUp={() => onSpriteBrightness(bright)} onKeyUp={() => onSpriteBrightness(bright)} style={{ flex: 1, accentColor: "#ffd27a" }} />
                         <span style={{ fontSize: 11, fontWeight: 800, color: "#ffd27a", width: 38, textAlign: "right" }}>{Math.round(bright * 100)}%</span>
                     </div>
                 ) : null}

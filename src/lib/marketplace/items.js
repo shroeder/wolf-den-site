@@ -677,6 +677,15 @@ let COLLECTION_ITEM_IDS = new Set();
 export function registerCollectionItems(ids) { COLLECTION_ITEM_IDS = new Set(ids || []); }
 export const isCollectionItem = (itemId) => COLLECTION_ITEM_IDS.has(itemId);
 
+// The list every AFFINITY aggregate (farm / sea / depth) should sum over: what you WEAR, plus every collection
+// piece you OWN. Collection pieces can't be equipped, so summing the loadout alone silently drops their own
+// affix block — the Merchant's Cape would show "+4 Tailwind" on the collection panel and grant nothing. A set's
+// TIERS were already moved to ownership; the affix printed on the piece has to move with them or the piece is
+// the only thing in the game whose stat line is decorative. Union'd through a Set so a stale equipment row
+// (there shouldn't be one) can never count a piece twice.
+export const affinityItemIds = (equippedIds = [], ownedIds = []) =>
+    [...new Set([...(equippedIds || []).filter(Boolean), ...(ownedIds || []).filter((id) => isCollectionItem(id))])];
+
 export function itemFitsSlot(item, slot) {
     if (!item) return false;
     const def = EQUIP_SLOTS.find((s) => s.slot === slot);

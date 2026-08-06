@@ -6,6 +6,8 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
+import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 
 // Farm LIKES — a positive-only, three-tier "rate a friend's farm" system. Rating is a like, not a score:
 // Like 👍 < Love ❤️ < Admire ⭐.
@@ -131,6 +133,39 @@ async function farmStandings(ownerId) {
         // How many points would draw level with the place above. Null at the top.
         toNext: row?.next_score != null ? Math.max(1, Number(row.next_score) - score) : null,
     };
+}
+
+// THE BOARD ITSELF. "1st of 47 farms" tells you your position and nothing about the race: who is behind you,
+// who you would have to pass, whether the farm in 2nd is one vote away or thirty. Same DENSE_RANK standings,
+// but handed over as rows — the top of the board plus, if you placed below it, your own row to pin underneath.
+export async function farmLoveBoard(viewerId, limit = 10) {
+    const rows = await db.query(
+        `WITH scored AS (
+             SELECT owner_id, SUM(votes * CASE tier WHEN 3 THEN 3 WHEN 2 THEN 2 ELSE 1 END)::int AS score,
+                    SUM(votes)::int AS votes
+               FROM mkt_farm_rating GROUP BY owner_id
+         ), placed AS (
+             SELECT owner_id, score, votes, DENSE_RANK() OVER (ORDER BY score DESC) AS place FROM scored
+         )
+         SELECT p.owner_id, p.score, p.votes, p.place::int AS place,
+                COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                b.avatar_url, b.avatar_config, b.avatar_cosmetics
+           FROM placed p JOIN mkt_buyer b ON b.id = p.owner_id
+          WHERE p.place <= $1 OR p.owner_id = $2
+          ORDER BY p.place, who`,
+        [limit, viewerId || null]
+    ).catch(() => []);
+    const shape = (r) => ({
+        place: Number(r.place), who: r.who || "Member", alias: r.alias || null,
+        score: Number(r.score) || 0, votes: Number(r.votes) || 0,
+        avatar: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
+        you: viewerId ? String(r.owner_id) === String(viewerId) : false,
+    });
+    const all = rows.map(shape);
+    const top = all.filter((r) => r.place <= limit);
+    // Only pin a separate "you" row when the viewer isn't already visible in the top.
+    const mine = all.find((r) => r.you && !top.some((t) => t.you)) || null;
+    return { top, mine };
 }
 
 // The rating block attached to a farm view: the summary, whether the viewer can rate, and their charge state.

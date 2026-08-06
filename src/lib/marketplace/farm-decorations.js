@@ -227,10 +227,14 @@ export async function transformDecoration(buyerId, placementId, { scale, rot, fl
     return { ok: true, ...(await decoState(buyerId)) };
 }
 
-// Per-farm GLOBAL sprite brightness (applied as a real filter on the sprites, never an overlay). 0.3–2.2.
+// Per-farm GLOBAL sprite brightness (applied as a real filter on the sprites, never an overlay). 0.6–2.2.
+// The floor was 0.3, which silhouettes everything: the pets, the decorations and the owner's own walker all
+// went to black cut-outs on a daylight background — and because the setting rides on the FARM, every visitor
+// saw it that way too. 0.6 is still visibly dim without erasing the art. See migration 337.
+export const MIN_SPRITE_BRIGHTNESS = 0.6;
 export async function setSpriteBrightness(buyerId, value) {
     if (!buyerId) return { ok: false, error: "bad_request" };
-    const b = Math.max(0.3, Math.min(2.2, Number(value) || 1));
+    const b = Math.max(MIN_SPRITE_BRIGHTNESS, Math.min(2.2, Number(value) || 1));
     await db.query(`UPDATE mkt_buyer SET sprite_brightness = $2 WHERE id = $1`, [buyerId, b]).catch(() => {});
     return { ok: true, spriteBrightness: b, ...(await decoState(buyerId)) };
 }

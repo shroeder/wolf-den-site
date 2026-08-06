@@ -1024,7 +1024,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {/* The sea's collection — the Corsair chase, on the screen its raids and affinity land on. Above
                 the upgrade card rather than inside it: a card nested in a card reads as a rendering mistake. */}
             {state.collections?.length ? (
-                <CollectionPanel sets={state.collections} title="🏴‍☠️ Sea collections"
+                <CollectionPanel sets={state.collections} feature="sea" title="Sea collections"
                     blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
             ) : null}
             {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}

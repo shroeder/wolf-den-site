@@ -1,7 +1,39 @@
 import "server-only";
 
-import { itemById, describeStats, describeSea, describeFarm, describeDepth, registerCollectionItems } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeSea, describeFarm, describeDepth, registerCollectionItems, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
+import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
+
+// The wheel's own effect layer had no meta anywhere, so every screen printed the raw key: "+10% luck" told a
+// player nothing — luck at what, and how much is 10%? It is a PROC CHANCE, and saying so is the difference
+// between a number and a reason to chase the set.
+export const WHEEL_META = {
+    luck: { label: "Lucky Spin", desc: "A chance each spin pays bonus gold on top of a gold prize." },
+    respin: { label: "Free respin", desc: "A chance a spin costs you nothing — your spin is handed back." },
+};
+
+// One line explaining what an effect key actually DOES, for the legend under a collection's tiers. Every
+// affinity layer already carries this text for its own screens; the collection panel was the one place
+// showing the numbers with no way to learn what they meant.
+function effectHelp(kind, key) {
+    if (kind === "sea") return SEA_META[key] ? { label: SEA_META[key].label, desc: SEA_META[key].desc } : null;
+    if (kind === "depth") return DEPTH_META[key] ? { label: DEPTH_META[key].label, desc: DEPTH_META[key].desc } : null;
+    if (kind === "wheel") return WHEEL_META[key] ? { label: WHEEL_META[key].label, desc: WHEEL_META[key].desc } : null;
+    if (kind === "farm") return DECO_STATS[key] ? { label: DECO_STATS[key].label, desc: `Each point is 1${DECO_STATS[key].suffix}.` } : null;
+    return null;
+}
+
+// A tier's bonus in words, with the effect's real LABEL rather than its storage key ("+10% Lucky Spin chance",
+// not "+10% luck"). Built server-side so every screen says it the same way.
+function tierText(t) {
+    const parts = [];
+    for (const [k, v] of Object.entries(t.farm || {})) parts.push(`+${v}% ${DECO_STATS[k]?.label || k}`);
+    for (const [k, v] of Object.entries(t.depth || {})) parts.push(`+${v} ${DEPTH_META[k]?.label || k}`);
+    for (const [k, v] of Object.entries(t.sea || {})) parts.push(`+${v} ${SEA_META[k]?.label || k}`);
+    for (const [k, v] of Object.entries(t.wheel || {})) parts.push(`+${v}% ${WHEEL_META[k]?.label || k} chance`);
+    for (const [k, v] of Object.entries(t.stats || {})) parts.push(`+${v} ${k.replace(/_/g, " ")}`);
+    return parts.join(" · ") || "—";
+}
 
 // EVERY SET NEEDS ITS OWN IDENTITY AT 2 PIECES.
 // The capstones were always distinct — crit bonus, erupt, execute, extra strike, pack damage. The TIERS were
@@ -414,7 +446,10 @@ export function getSetsOverview(equippedIds, ownedIds) {
                 rarity: it?.rarity || null,
                 slot: it?.slot || null,
                 icon: it?.icon || null,
-                statsText: describeStats(it?.stats) || "",
+                // A collection piece can't be equipped, so its COMBAT stats can never apply — printing them on
+                // the panel advertises a bonus nobody will ever receive. What a trophy gives you is its affinity
+                // affix (below) and the tiers it unlocks.
+                statsText: set.collection ? "" : (describeStats(it?.stats) || ""),
                 // WHAT THIS ONE PIECE GIVES YOU, on its own. A collection panel that lists the set's tiers but
                 // not the slots' own bonuses is only telling you half of what you collected — and for the farm
                 // and mine pieces the affix IS the reason to want it.
@@ -441,8 +476,21 @@ export function getSetsOverview(equippedIds, ownedIds) {
             have,
             weakness: set.weakness || null,
             pieces,
-            tiers: set.bonuses.map((t) => ({ need: t.need, active: have >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null, depth: t.depth || null })),
+            tiers: set.bonuses.map((t) => ({ need: t.need, active: have >= t.need, stats: t.stats || null, sea: t.sea || null, farm: t.farm || null, wheel: t.wheel || null, depth: t.depth || null, text: tierText(t) })),
             capstone: set.capstone ? { desc: set.capstone.desc, active: have >= fullNeed(set) } : null,
+            // WHAT THE NUMBERS MEAN. Every effect key this set touches, once, in plain language — a tier that
+            // reads "+12% Lucky Spin" is still jargon until something on the same screen says what a Lucky Spin is.
+            legend: (() => {
+                const seen = new Set(), out = [];
+                const add = (kind, obj) => { for (const k of Object.keys(obj || {})) {
+                    const h = effectHelp(kind, k);
+                    if (h && !seen.has(h.label)) { seen.add(h.label); out.push(h); }
+                } };
+                for (const t of set.bonuses) { add("farm", t.farm); add("depth", t.depth); add("sea", t.sea); add("wheel", t.wheel); }
+                for (const id of set.items) { const it = itemById(id); add("farm", it?.farm); add("depth", it?.depth); add("sea", it?.sea); }
+                if (set.capstone?.wheelRespin) { const h = effectHelp("wheel", "respin"); if (h && !seen.has(h.label)) out.push(h); }
+                return out;
+            })(),
         };
     });
 }

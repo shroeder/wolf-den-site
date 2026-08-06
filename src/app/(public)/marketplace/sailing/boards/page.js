@@ -17,7 +17,7 @@ export default async function SailingBoardsPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
     if (!buyer) return notFound();
 
-    const { me, ...boards } = await sailingBoards(buyer.id);
+    const { me, totals, ...boards } = await sailingBoards(buyer.id);
     return (
         <div className="stack reveal">
             <section className="card">
@@ -28,7 +28,7 @@ export default async function SailingBoardsPage() {
                 </p>
                 <Link href="/marketplace/sailing" className="pill">&larr; Back to the docks</Link>
             </section>
-            <SailingBoards boards={boards} mePlace={me} />
+            <SailingBoards boards={boards} mePlace={me} totals={totals} />
         </div>
     );
 }

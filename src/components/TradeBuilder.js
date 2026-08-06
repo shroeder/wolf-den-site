@@ -90,6 +90,7 @@ export default function TradeBuilder({ me, them, preselectWant = null, preselect
                     pet_in_pending_trade: `${d?.itemName || "That pet"} is already in a pending trade — resolve that one first.`,
                     they_dont_own_requested: "They no longer have that item.",
                     you_dont_own_offered: "You no longer have one of those items.",
+                    collection_piece: `${d?.itemName || "That piece"} is a collection piece — its bonus is permanent for whoever found it, so it can't be traded away.`,
                     pet_not_tradeable: "One of your pets can't be traded (only earned pets you haven't already traded).",
                     their_pet_not_tradeable: "One of their pets isn't tradeable.",
                     they_already_own_pet: "They already own a pet you're offering.",

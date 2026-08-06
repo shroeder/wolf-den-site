@@ -17,7 +17,9 @@ const mergeStats = (base = {}, bonus = {}) => { const m = { ...(base || {}) }; f
 
 // Carry the item's EFFECTIVE stats (base + that owner's forge enhancement) + charged/sea flags so the trade
 // cards show what a piece actually does — including forging — you shouldn't have to guess what you're giving away.
-const strip = (inv, enh = {}) => (inv?.items || []).map((i) => {
+// Collection pieces never appear on either side: they pay their bonus for being OWNED, so trading one is a
+// silent downgrade for whoever hands it over (the server refuses them too — see trade.js).
+const strip = (inv, enh = {}) => (inv?.items || []).filter((i) => !i.collectionPiece).map((i) => {
     const d = itemById(i.id);
     const lvl = enh[i.id]?.level || 0;
     const stats = lvl ? mergeStats(d?.stats || {}, enh[i.id]?.bonus || {}) : (d?.stats || null);

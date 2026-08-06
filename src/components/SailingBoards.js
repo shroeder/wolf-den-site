@@ -2,40 +2,47 @@
 
 import { useState } from "react";
 
+import Leaderboard from "@/components/Leaderboard";
+
 // ── THE BOARDS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Whose boat is biggest, and who has dug the most out of the sand. Two tabs rather than two stacked lists: they
 // are different competitions and nobody reads both at once.
 //
-// Your own row is highlighted and, if you placed outside the top 25, pinned to the bottom — a leaderboard that
-// cannot tell you where YOU are is a wall of other people's names.
+// Rows, ranks and the pinned "where you placed" line are all the shared Leaderboard — the styling lives in
+// globals.css. This file used to carry its own <style jsx> with the row markup in a separate Row() function,
+// which meant not one of those rules ever applied: the rows rendered as raw text and the boat <img>, with its
+// width rule dead, painted at full size. Nothing here re-invents that.
 
 const ordinal = (n) => {
     const s = ["th", "st", "nd", "rd"], v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
 };
-const medal = (p) => (p === 1 ? "🥇" : p === 2 ? "🥈" : p === 3 ? "🥉" : null);
 
-function Row({ r, children }) {
-    return (
-        <div className={`sbd-row${r.you ? " is-you" : ""}${r.place <= 3 ? " is-podium" : ""}`}>
-            <span className="sbd-place">{medal(r.place) || ordinal(r.place)}</span>
-            {r.art ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="sbd-boat" src={r.art} alt="" draggable="false" />
-            ) : null}
-            <span className="sbd-who">
-                {r.who}{r.you ? <b> · you</b> : null}
-            </span>
-            <span className="sbd-stat">{children}</span>
-        </div>
-    );
+// The gap to the rung above — the number that makes somebody want to climb, rather than just close the tab.
+function chase(tab, mine, rows) {
+    if (!mine || mine.place <= 1) return null;
+    const above = rows.find((r) => r.place === mine.place - 1);
+    if (!above) return null;
+    if (tab === "fleet") {
+        const d = (above.level || 0) - (mine.level || 0);
+        return d > 0 ? `${d} more boat level${d === 1 ? "" : "s"} to catch ${ordinal(above.place)}` : null;
+    }
+    const d = (above.points || 0) - (mine.points || 0);
+    return d > 0 ? `${d} more chest point${d === 1 ? "" : "s"} to catch ${ordinal(above.place)}` : null;
 }
 
-export default function SailingBoards({ boards, mePlace }) {
+const toRow = (tab) => (r) => (tab === "fleet"
+    ? { place: r.place, who: r.who, avatar: r.avatar, art: r.art, you: r.you,
+        sub: r.form || null, value: `Lv ${r.level}`, unit: `${r.voyages} voyage${r.voyages === 1 ? "" : "s"}` }
+    : { place: r.place, who: r.who, avatar: r.avatar, you: r.you,
+        value: (r.points || 0).toLocaleString(), unit: `pts · ${r.forged} chest${r.forged === 1 ? "" : "s"}` });
+
+export default function SailingBoards({ boards, mePlace, totals = null }) {
     const [tab, setTab] = useState("fleet");
     const rows = boards?.[tab] || [];
     const mine = mePlace?.[tab] || null;   // set only when the viewer placed outside the visible top
 
+    const map = toRow(tab);
     return (
         <section className="card">
             <div className="sbd-tabs" role="tablist">
@@ -53,32 +60,13 @@ export default function SailingBoards({ boards, mePlace }) {
                     : "Ranked by chest points. A chest is worth more the rarer it is, so a shelf of wooden chests doesn't out-rank a haul of mythics."}
             </p>
 
-            {rows.length === 0 ? (
-                <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                    {tab === "fleet" ? "Nobody has set sail yet." : "Nobody has forged a chest yet — go dig one up."}
-                </p>
-            ) : (
-                <div className="sbd-rows">
-                    {rows.map((r) => (
-                        <Row key={`${tab}-${r.place}-${r.who}`} r={r}>
-                            {tab === "fleet"
-                                ? <><b>Lv {r.level}</b><em>{r.voyages} voyage{r.voyages === 1 ? "" : "s"}</em></>
-                                : <><b>{r.points} pts</b><em>{r.forged} chest{r.forged === 1 ? "" : "s"}</em></>}
-                        </Row>
-                    ))}
-                    {/* You, if you didn't make the cut. */}
-                    {mine ? (
-                        <>
-                            <div className="sbd-gap" aria-hidden="true">···</div>
-                            <Row r={{ ...mine, you: true }}>
-                                {tab === "fleet"
-                                    ? <><b>Lv {mine.level}</b><em>{mine.voyages} voyage{mine.voyages === 1 ? "" : "s"}</em></>
-                                    : <><b>{mine.points} pts</b><em>{mine.forged} chest{mine.forged === 1 ? "" : "s"}</em></>}
-                            </Row>
-                        </>
-                    ) : null}
-                </div>
-            )}
+            <Leaderboard
+                rows={rows.map(map)}
+                mine={mine ? { ...map(mine), toNext: chase(tab, mine, rows) } : null}
+                total={totals?.[tab] || null}
+                unitPlural={tab === "fleet" ? "captains" : "diggers"}
+                empty={tab === "fleet" ? "Nobody has set sail yet." : "Nobody has forged a chest yet — go dig one up."}
+            />
 
             <style jsx>{`
                 .sbd-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
@@ -86,20 +74,6 @@ export default function SailingBoards({ boards, mePlace }) {
                     font-size: 0.83rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
                 .sbd-tabs button.is-on { color: #0d1a22; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
                 .sbd-blurb { margin: 0 0 11px; font-size: 0.76rem; line-height: 1.45; color: #8d96a0; }
-                .sbd-rows { display: grid; gap: 5px; }
-                .sbd-row { display: grid; grid-template-columns: 34px auto 1fr auto; align-items: center; gap: 9px;
-                    padding: 7px 10px; border-radius: 11px; background: rgba(255,255,255,0.035);
-                    border: 1px solid rgba(255,255,255,0.07); }
-                .sbd-row.is-podium { background: rgba(255,215,94,0.08); border-color: rgba(255,215,94,0.28); }
-                .sbd-row.is-you { border-color: #55c8ee; background: rgba(85,200,238,0.13); }
-                .sbd-place { font-size: 0.82rem; font-weight: 900; color: #cdd3d8; text-align: center; }
-                .sbd-boat { width: 30px; height: 30px; object-fit: contain; }
-                .sbd-who { min-width: 0; font-size: 0.85rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .sbd-who b { color: #55c8ee; font-weight: 800; }
-                .sbd-stat { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
-                .sbd-stat b { font-size: 0.85rem; color: #ffe28a; font-variant-numeric: tabular-nums; }
-                .sbd-stat em { font-size: 0.66rem; font-style: normal; color: #8d96a0; }
-                .sbd-gap { text-align: center; font-size: 0.8rem; color: #59606a; letter-spacing: 0.2em; padding: 1px 0; }
             `}</style>
         </section>
     );
