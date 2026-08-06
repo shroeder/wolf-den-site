@@ -985,6 +985,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                 scene, which meant two full screens of reading before you could see your own farm. They are
                 all status — things you check — while the scene is the thing you came to use. Status now sits
                 underneath it, and folds away. */}
+            {/* Windowed: the toolbar sits ABOVE the scene, directly under the view tabs — the tabs say WHICH
+                pasture, these act ON it, so they belong together.
+                It used to sit below, on the reasoning that controls over the pasture would cover the animals.
+                But "not on top of" and "underneath" are different things: underneath put Backdrop, Decorate
+                and Full screen below a scene roughly a phone-screen tall, so you scrolled past the whole farm
+                to reach the buttons that change how the farm looks. Above it, nothing is covered and nothing
+                has to be hunted. (Fullscreen keeps its floating overlay row at the bottom of the scene.) */}
+            {!fullscreen && view !== "art" ? (
+                <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>{sceneControls}</div>
+            ) : null}
             <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
@@ -1172,10 +1182,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                     {weatherLabel(wx)}
                 </div>
             </div>
-            {/* Windowed: control toolbar BELOW the scene so it never covers the animals on the floor. */}
-            {!fullscreen ? (
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>{sceneControls}</div>
-            ) : null}
 
             {/* ── THE TWO THINGS YOU CAME TO DO ── the day's bounties and the rating, never behind a fold.
                 Everything here used to live inside the collapsed "Farm status & bounties" summary, which meant
