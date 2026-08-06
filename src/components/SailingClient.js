@@ -1465,16 +1465,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <span className={`sbt-ammo is-${raidMine.ammo}`}>{raidMine.ammo} shot loaded</span>
                             </div>
                         ) : null}
-                        <ul className="sail-raid-terms">
-                            <li><span>🏆 Win</span> — pocket <b>gold</b> + a <b>{state.raid?.itemChance ?? 0.5}%</b> shot at a copy of one of their items. <em>They lose nothing.</em></li>
-                            <li><span>🏳️ Lose</span> — you drop <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>, and they take a cut for driving you off.</li>
-                            {state.raid?.dodgePct ? <li><span>🍃 Cunning</span> — {state.raid.dodgePct}% chance this <b>won&apos;t use up</b> today&apos;s raid.</li> : null}
-                        </ul>
-                        <p className="muted sail-raid-hint">
-                            A raid is a <b>ship battle</b> — their guns and hull against yours, and one round of
-                            whatever you have loaded. The fattest holds are up top; the ships that can defend them
-                            are not always the same list.
+                        {/* One line of stakes. This was three stacked cards and a paragraph — most of a phone
+                            screen spent before the first ship you could actually pick. */}
+                        <p className="sail-raid-stakes">
+                            Win: <b>gold</b> + a {state.raid?.itemChance ?? 0.5}% shot at a copy of an item — they lose nothing.
+                            Lose: <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>, and they take a cut.
+                            {state.raid?.dodgePct ? <> Cunning: {state.raid.dodgePct}% this is free.</> : null}
                         </p>
+                        {/* The FLEET lives on the gun deck, not here — but this is where somebody looking for a
+                            fight actually is, so it has a door. */}
+                        <button type="button" className="sail-raid-fleetlink" disabled={busy}
+                            onClick={() => { setRaidOpen(false); setRaidTargets(null); act("fleet_battle", {}); }}>
+                            ⚔️ Or take on the pirate fleet — {state.combat?.fleet?.sortiesLeft ?? 0} sortie
+                            {(state.combat?.fleet?.sortiesLeft ?? 0) === 1 ? "" : "s"} left today
+                        </button>
                         <div className="sail-raid-list">
                             {raidTargets === null ? (
                                 <div className="sail-raid-empty">Scanning the horizon…</div>
@@ -1541,7 +1545,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* RAID — the full-screen auto-battle show, then reward reveal */}
             {shipBattle ? (
-                <ShipBattleScene battle={shipBattle} onClose={() => setShipBattle(null)} />
+                <ShipBattleScene battle={shipBattle} busy={busy}
+                    onOrder={async (order) => { const d = await act("battle_order", { order }); if (d?.battle) setShipBattle(d.battle); }}
+                    onClose={() => setShipBattle(null)} />
             ) : null}
 
         </div>

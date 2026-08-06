@@ -353,6 +353,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const stats = data.stats || {};
     const statEntries = Object.entries(stats).filter(([, v]) => v);
     const charged = (data.items || []).filter((i) => i.charge);
+    // Trophies are not gear. They live in their own section below the bag: you cannot wear, sell, salvage or
+    // trade one, so listing them among the things you can is the screen telling you something untrue.
+    const gearItems = (data.items || []).filter((i) => !i.collectionPiece);
+    const trophyItems = (data.items || []).filter((i) => i.collectionPiece);
     // Your OWNED copies, by id — these carry forgeBonus, util and enhanceLevel, which the bare ITEMS
     // definition does not. The compare panel has to weigh the equipped piece as YOU have it, not as it ships.
     //
@@ -494,9 +498,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     <a href="/marketplace/trade" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff", whiteSpace: "nowrap" }}>my trades →</a>
                 </div>
                 <p className="muted" style={{ marginTop: 4 }}>Tap a piece of gear to see what it does — then equip, sell, or trade it.</p>
-                {(data.items || []).length ? (
+                {gearItems.length ? (
                     <div className="equip-bag-grid">
-                        {(data.items || []).map((i) => (
+                        {gearItems.map((i) => (
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
                                 {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
@@ -511,6 +515,34 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         ))}
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>No items yet — level up, fight the boss, and check back.</p>}
+
+                {/* TROPHIES, not gear. Kept on this screen because it is where you look for things you own —
+                    but out of the bag, because you cannot wear, sell, salvage or trade one, and listing them
+                    among the things you can is how a member ends up tapping equip three times and asking the
+                    whole Den what is wrong with their belt. */}
+                {trophyItems.length ? (
+                    <div className="equip-trophies">
+                        <div className="equip-trophies-head">
+                            <b>Collections</b>
+                            <span>{trophyItems.length} found</span>
+                        </div>
+                        <p className="muted equip-trophies-note">
+                            Finding these is what pays — their bonus is permanent and applies whether or not you are
+                            wearing anything. They are never worn, sold, salvaged or traded. Each one belongs to a set
+                            you can see on the screen it pays out on: the farm, the mine, the Helm or the wheel.
+                        </p>
+                        <div className="equip-bag-grid">
+                            {trophyItems.map((i) => (
+                                <button type="button" key={i.id} className={`equip-card rar-${i.rarity} is-trophy`} onClick={() => openDetail(i)} disabled={busy}>
+                                    <ItemGlyph id={i.id} className="equip-card-glyph" />
+                                    <span className="equip-card-name">{i.name}</span>
+                                    <span className="equip-card-trophy">✓ collected</span>
+                                    {i.util ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#e0c8ff" }}>🔮 +{i.util.value}{i.util.unit} {i.util.label}</span> : null}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
             </div>
             </>) : null}
 

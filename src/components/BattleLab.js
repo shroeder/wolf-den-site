@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
-import { shipProfile, foeProfile, simulateShipBattle } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveRound, ORDER_LIST, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, fleetView, fleetArt } from "@/lib/marketplace/fleet.js";
 
 // Dev-only lab for the ship battle. The real thing is behind a login, a daily sortie limit and a gun deck you
@@ -23,19 +23,40 @@ export default function BattleLab() {
     const [ammo, setAmmo] = useState("round");
     const [battle, setBattle] = useState(null);
 
+    const [live, setLive] = useState(null); // { me, foe, state, meta }
+
+    const view = (st, meta, events, over, win, sunk, reward) => ({
+        kind: "fleet", rank: meta.rank, first: true, me: meta.me, foe: meta.foe,
+        myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
+        round: st.round, maxRounds: MAX_ROUNDS, gauge: st.gauge,
+        rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
+        burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
+        orders: ORDER_LIST.map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+        events: events || [], over: Boolean(over), win, sunk, reward,
+    });
+
     const fight = (rank) => {
         const ship = FLEET.find((f) => f.rank === rank);
-        const me = shipProfile({ ...BUILDS[build], ammo, name: "Your ship", art: "/images/sailing/boat-tier5-galleon.png" });
-        const foe = foeProfile(ship);
-        const sim = simulateShipBattle(me, foe);
-        setBattle({
-            kind: "fleet", rank, first: true, win: sim.win, sunk: sim.sunk,
-            me: { name: me.name, art: me.art, guns: me.guns, hp: me.hp, ammo: me.ammo.id, level: me.boatLevel },
-            foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id,
-                   boss: Boolean(ship.boss), flavor: ship.flavor },
-            events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
-            reward: sim.win ? [{ kind: "doubloons", n: 12 }, { kind: "gold", n: 340 }, { kind: "parts", n: 2, tier: 3 }] : [],
-        });
+        const meP = shipProfile({ ...BUILDS[build], ammo, name: "Your ship", art: "/images/sailing/boat-tier5-galleon.png" });
+        const foeP = foeProfile(ship);
+        const meta = {
+            rank,
+            me: { name: meP.name, art: meP.art, guns: meP.guns, hp: meP.hp, ammo: meP.ammo.id, level: meP.boatLevel,
+                  rider: "/api/marketplace/avatar?seed=lab", pet: null },
+            foe: { name: foeP.name, cls: ship.cls, art: fleetArt(ship), guns: foeP.guns, hp: foeP.hp,
+                   ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false },
+        };
+        const st = initBattleState(meP, foeP);
+        setLive({ me: meP, foe: foeP, state: st, meta });
+        setBattle(view(st, meta, [], false));
+    };
+
+    const order = (id) => {
+        if (!live) return;
+        const r = resolveRound(live.me, live.foe, live.state, id);
+        setLive((l) => ({ ...l, state: r.state }));
+        setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
+            r.over && r.win ? [{ kind: "doubloons", n: 14 }, { kind: "gold", n: 320 }] : []));
     };
 
     // The yard against fixture state, so the gun deck and the ladder can be looked at without a database.
@@ -85,7 +106,7 @@ export default function BattleLab() {
 
             <ShipYard combat={combat} busy={false} onAct={({ action, rank }) => { if (action === "fleet_battle") fight(rank); }} />
 
-            {battle ? <ShipBattleScene battle={battle} onClose={() => setBattle(null)} /> : null}
+            {battle ? <ShipBattleScene battle={battle} busy={false} onOrder={order} onClose={() => { setBattle(null); setLive(null); }} /> : null}
         </div>
     );
 }

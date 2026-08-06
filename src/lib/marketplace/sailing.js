@@ -7,12 +7,13 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
-import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, affinityItemIds } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, affinityItemIds, isCollectionItem } from "@/lib/marketplace/items.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
-         gunsFor, accuracyFor, hullFor, armorFor } from "@/lib/marketplace/ship-battle.js";
+         gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, initBattleState, resolveRound,
+         MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt } from "@/lib/marketplace/fleet.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
@@ -1606,40 +1607,28 @@ export async function getRaidTargets(buyerId, limit = 12) {
 export async function doRaid(buyerId, targetId = null) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
+    if (readBattle(row)) return { ok: false, error: "battle_in_progress", ...(await getSailingState(buyerId)) };
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
-    // Raid the CHOSEN target if one was picked (validated); otherwise fall back to a random passing ship.
     const target = (await raidTargetById(buyerId, targetId)) || (targetId ? null : await pickRaidTarget(buyerId));
     if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
 
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
-
-    // Who you are, and your sea affinity. Equipped GEAR stats are deliberately not read any more: a raid is a
-    // fight between ships, and the boss-fight stat line has no business deciding one.
     const [me, mySea] = await Promise.all([
         db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         equippedSeaAffinity(buyerId),
     ]);
-    const seaEff = seaEffects(mySea); // Plunder → copy odds, Bounty → gold (Broadside/Ironclad ride the profile)
-    const perks = boatPerks(myLevel);
-    // A raid is a SHIP battle: their gun deck against yours, the same maths the fleet is fought with. It used
-    // to be resolved off equipped GEAR — the Might and Crit Power that fight the weekly boss — so the way to
-    // get better at sailing combat was to go and do something else.
     const fired = await consumeAmmo(buyerId, row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
     const theirs = shipProfile({
-        name: target.display_name || target.alias || "Rival ship",
-        boatLevel: foeLevel,
-        gunLevel: target.gun_level || 0,
-        gunneryLevel: target.gunnery_level || 0,
-        hullLevel: target.hull_level || 0,
-        ammo: target.loadout || "round",
-        art: boatArt(foeLevel),
+        name: target.display_name || target.alias || "Rival ship", boatLevel: foeLevel,
+        gunLevel: target.gun_level || 0, gunneryLevel: target.gunnery_level || 0, hullLevel: target.hull_level || 0,
+        ammo: target.loadout || "round", art: boatArt(foeLevel),
     });
-    const sim = simulateShipBattle(mine, theirs);
 
-    // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
+    // The raid is spent at the OPENING (unless cunning saves it), so a losing fight cannot be abandoned and
+    // re-rolled by closing the tab.
     const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     if (!dodged) await db.query(
@@ -1647,46 +1636,80 @@ export async function doRaid(buyerId, targetId = null) {
             SET raid_count = CASE WHEN raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN raid_count + 1 ELSE 1 END,
                 raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-    await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {}); // "Raid a passing ship" daily quest
+    await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {});
 
+    const crew = await petArtByBuyer([
+        { buyerId, petId: me?.featured_collectible },
+        { buyerId: target.id, petId: target.featured_collectible },
+    ]);
+    const meta = {
+        kind: "raid", targetId: target.id, dodged,
+        targetName: target.display_name || target.alias,
+        meProfile: { name: mine.name, boatLevel: myLevel, gunLevel: row?.gun_level || 0,
+            gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art, sea: mySea },
+        foeProfile: { name: theirs.name, boatLevel: foeLevel, gunLevel: target.gun_level || 0,
+            gunneryLevel: target.gunnery_level || 0, hullLevel: target.hull_level || 0,
+            ammo: target.loadout || "round", art: boatArt(foeLevel) },
+        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel,
+            rider: me?.avatar_sprite_url || me?.avatar_url || null,
+            riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
+            pet: crew[buyerId] || null },
+        foe: { name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns, hp: theirs.hp,
+            ammo: theirs.ammo.id, boss: false, mirror: true, flavor: "A passing ship, and everything they are carrying.",
+            rider: target.avatar_sprite_url || target.avatar_url || null,
+            riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
+            pet: crew[target.id] || null },
+    };
+    const state = initBattleState(mine, theirs);
+    await saveBattle(buyerId, state, meta);
+    return { ok: true, battle: { ...battleView(state, meta), events: [], over: false }, ...(await getSailingState(buyerId)) };
+}
+
+// Paying out a finished RAID — the purse, the copied item, the defender's cut, the badges. Called once, from
+// shipBattleOrder, after the state row is cleared.
+async function finishRaidBattle(buyerId, meta, res) {
+    const target = await db.queryOne(`SELECT ${RAID_TARGET_COLS} FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id WHERE b.id = $1`, [meta.targetId]).catch(() => null);
+    const me = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const mySea = await equippedSeaAffinity(buyerId).catch(() => ({}));
+    const seaEff = seaEffects(mySea);
+    const raidExtras = await equippedRaidExtras(buyerId);
+    const spoils = [];
     let goldDelta = 0, itemWon = null;
-    if (sim.win) {
-        // A plundering companion adds to the Bounty affinity rather than replacing it — the pet card says
-        // "+N% gold from raids and the sea merchant" and this is the raid half of that promise.
+
+    if (res.win) {
         let plunder = 0;
         try {
             const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
             plunder = await getPetSystemPerk(buyerId, "sea_plunder");
         } catch { /* no companion, no plunder */ }
-        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1)); // Bounty + companion + Dread Corsair double
+        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1));
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
-        if (Math.random() < Math.min(0.16, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) { // Plunder raises copy odds (cap 16%)
-            // Copy one of THEIR items — but never a BOUND piece (ascendant+ can't be copied/traded).
+        spoils.push({ kind: "gold", n: goldDelta });
+        if (target && Math.random() < Math.min(0.16, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) {
             const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [target.id]).catch(() => []);
-            const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity));
+            const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity) && !isCollectionItem(d.id));
             const item = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
             if (item) {
                 const g = await grantItem(buyerId, item.id, "raid").catch(() => null);
-                itemWon = { id: item.id, name: item.name, rarity: item.rarity, image: await itemSpriteFor(item.id).catch(() => null), isNew: !!g?.granted };
+                itemWon = { id: item.id, name: item.name, rarity: item.rarity, isNew: !!g?.granted };
+                spoils.push({ kind: "item", name: item.name });
             }
         }
-        // Achievement badges (hard): raid-win milestones, a flawless (no-damage) win, and a rare plunder.
         const wonRow = await db.queryOne(`UPDATE mkt_sailing SET raids_won = COALESCE(raids_won, 0) + 1 WHERE buyer_id = $1 RETURNING raids_won`, [buyerId]).catch(() => null);
         const wins = wonRow?.raids_won || 0;
         if (wins >= BADGE_RAID_MARAUDER) await grantEventBadge(buyerId, "raid_marauder").catch(() => {});
         if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
-        if (sim.myHp >= sim.myMax) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never took a ball
+        if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {});
         if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
-        // Earned cosmetic: the "Warborn" border for raid-win milestone (idempotent).
         if (wins >= COSMETIC_WARBORN_WINS) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'warborn') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
-    } else {
-        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1); // Ironclad reduces losses by winning more, not by softening the bill
+        await dropSeedFrom(buyerId, "sail_raid").catch(() => {});
+    } else if (target) {
+        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
         await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
-        await logCoin(buyerId, -loss, "raid_loss", { meta: { foe: target.display_name || target.alias } }).catch(() => {});
+        await logCoin(buyerId, -loss, "raid_loss", { meta: { foe: meta.targetName } }).catch(() => {});
         goldDelta = -loss;
+        spoils.push({ kind: "goldLost", n: loss });
 
-        // ── The DEFENDER repelled the raid — reward them (20% of what the attacker lost + a small gear chance)
-        // and record it so they see who they beat when they next log in. ──
         const bounty = Math.round(loss * DEFENSE_GOLD_PCT);
         if (bounty > 0) {
             await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [target.id, bounty]).catch(() => {});
@@ -1709,40 +1732,9 @@ export async function doRaid(buyerId, targetId = null) {
         if (defended >= BADGE_RAID_DEFENDER) await grantEventBadge(target.id, "raid_defender").catch(() => {});
         if (defended >= BADGE_RAID_BASTION) await grantEventBadge(target.id, "raid_bastion").catch(() => {});
     }
-    // Log the raid AFTER resolution so gold + the copied item carry real values (this call used to sit before
-    // goldDelta/itemWon were assigned, which threw in the temporal dead zone and dropped the event entirely).
-    await trackActivity(buyerId, "sail_raid", { outcome: sim.win ? "win" : "lose", foe: target.display_name || target.alias, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
-    // PLUNDER, not participation — a recipe is part of what you take off a beaten crew, returned with the
-    // rest of the spoils instead of rolled quietly afterwards.
-    let raidRecipe = null;
-    if (sim.win) {
-        try {
-            const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-            if (Math.random() < 0.018 * await recipeLuck(buyerId)) raidRecipe = await grantRecipeReward(buyerId, "raid_win");
-        } catch { /* a recipe is a bonus; never let it fail the raid */ }
-    }
-    if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
-
-    // The spoils, in the same shape a fleet win reports them, so one scene plays both kinds of battle.
-    const spoils = [];
-    if (goldDelta > 0) spoils.push({ kind: "gold", n: goldDelta });
-    else if (goldDelta < 0) spoils.push({ kind: "goldLost", n: Math.abs(goldDelta) });
-    if (itemWon) spoils.push({ kind: "item", name: itemWon.name });
-    if (dodged) spoils.push({ kind: "free", n: 1 });
-
-    return {
-        ok: true,
-        battle: {
-            kind: "raid", win: sim.win, sunk: sim.sunk, dodged,
-            me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel },
-            foe: { name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns,
-                   hp: theirs.hp, ammo: theirs.ammo.id, boss: false,
-                   flavor: "A passing ship, and everything they are carrying." },
-            events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
-            reward: spoils,
-        },
-        ...(await getSailingState(buyerId)),
-    };
+    if (meta.dodged) spoils.push({ kind: "free", n: 1 });
+    await trackActivity(buyerId, "sail_raid", { outcome: res.win ? "win" : "lose", foe: meta.targetName, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
+    return spoils;
 }
 
 // The "you got raided (and won)" welcome-back report: every raid you repelled since you last saw it, grouped
@@ -1907,6 +1899,80 @@ async function payFleetReward(buyerId, reward) {
     return out;
 }
 
+// ── A BATTLE IS FOUGHT A ROUND AT A TIME ─────────────────────────────────────────────────────────────────────
+// The first cut resolved the whole thing in one call and played it back, which looked fine and felt like
+// nothing: you pressed Engage and watched a replay of a fight you had no part in. Now the server opens a
+// battle, hands back the two ships, and waits for an ORDER. Each order resolves one exchange.
+//
+// The state lives on the row (mkt_sailing.battle_state) rather than in memory, so a locked screen or a reload
+// mid-fight does not lose the battle — and one battle at a time per member is the anti-cheat, because the
+// sortie is spent the moment the state appears and you cannot open a second fight to shop for a better opening.
+const battleView = (st, meta) => ({
+    kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
+    me: meta.me, foe: meta.foe,
+    myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
+    round: st.round, maxRounds: MAX_ROUNDS,
+    gauge: st.gauge,
+    rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
+    burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
+    orders: ORDER_LIST.map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+});
+
+// Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.
+function profilesFrom(meta) {
+    return { me: shipProfile(meta.meProfile), foe: meta.foeProfile.fleet ? foeProfile(meta.foeProfile) : shipProfile(meta.foeProfile) };
+}
+
+async function saveBattle(buyerId, state, meta) {
+    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+    await db.query(`UPDATE mkt_sailing SET battle_state = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
+        [buyerId, state ? JSON.stringify({ state, meta }) : null]).catch(() => {});
+}
+const readBattle = (row) => {
+    const b = row?.battle_state;
+    if (!b) return null;
+    const parsed = typeof b === "string" ? (() => { try { return JSON.parse(b); } catch { return null; } })() : b;
+    return parsed?.state && parsed?.meta ? parsed : null;
+};
+
+// GIVE AN ORDER — one exchange, then the fight waits again. When it ends, this is also where the spoils are
+// paid, exactly once, because the state row is cleared in the same breath.
+export async function shipBattleOrder(buyerId, order) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    const open = readBattle(row);
+    if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
+    const { me, foe } = profilesFrom(open.meta);
+    const res = resolveRound(me, foe, open.state, order);
+
+    if (!res.over) {
+        await saveBattle(buyerId, res.state, open.meta);
+        return {
+            ok: true,
+            battle: { ...battleView(res.state, open.meta), events: res.events, over: false,
+                yourOrder: res.myOrder, theirOrder: res.theirOrder },
+            ...(await getSailingState(buyerId)),
+        };
+    }
+
+    // ── The fight is over. Clear the state FIRST so a double-tap cannot pay twice. ──
+    await saveBattle(buyerId, null, null);
+    const meta = open.meta;
+    let reward = [];
+    if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
+    else reward = await finishRaidBattle(buyerId, meta, res);
+
+    return {
+        ok: true,
+        battle: {
+            ...battleView(res.state, meta), events: res.events, over: true,
+            win: res.win, sunk: res.sunk, reward,
+            yourOrder: res.myOrder, theirOrder: res.theirOrder,
+        },
+        ...(await getSailingState(buyerId)),
+    };
+}
+
 // ── A SORTIE AGAINST THE FLEET ───────────────────────────────────────────────────────────────────────────────
 // Fight the next rank down the ladder, or re-fight one already sunk for a reduced purse. Win and the ladder
 // advances; lose and you have spent a sortie and nothing else — the fleet never takes a rung back.
@@ -1922,55 +1988,71 @@ export async function doFleetBattle(buyerId, rank = null) {
     const ship = fleetShip(want);
     if (!ship) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
 
-    const me = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const me = await db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const fired = await consumeAmmo(buyerId, row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
     const foe = foeProfile(ship);
-    const sim = simulateShipBattle(mine, foe);
-
     const first = want > depth;
-    const reward = sim.win ? fleetReward(want, { first }) : null;
-    const paid = sim.win ? await payFleetReward(buyerId, reward) : [];
 
+    // The sortie is spent HERE, at the opening, not at the end — otherwise a fight you are losing can be
+    // abandoned by closing the tab and re-rolled for free.
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     await db.query(
         `UPDATE mkt_sailing
             SET fleet_count = CASE WHEN fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN fleet_count + 1 ELSE 1 END,
-                fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
-                fleet_depth = GREATEST(COALESCE(fleet_depth,0), $2::int),
+                fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
+          WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+
+    const crew = await petArtByBuyer([{ buyerId, petId: me?.featured_collectible }]);
+    const meta = {
+        kind: "fleet", rank: want, first,
+        meProfile: { name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
+            gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
+            sea: await equippedSeaAffinity(buyerId).catch(() => ({})) },
+        foeProfile: { ...ship, fleet: true },
+        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
+            rider: me?.avatar_sprite_url || me?.avatar_url || null,
+            riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
+            pet: crew[buyerId] || null },
+        foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id,
+            boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false },
+    };
+    const state = initBattleState(mine, foe);
+    await saveBattle(buyerId, state, meta);
+
+    await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, ammo: fired, first }).catch(() => {});
+    await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
+
+    return { ok: true, battle: { ...battleView(state, meta), events: [], over: false }, ...(await getSailingState(buyerId)) };
+}
+
+// Paying out a finished FLEET battle — called once, from shipBattleOrder, after the state row is cleared.
+async function finishFleetBattle(buyerId, meta, res) {
+    const want = meta.rank, first = meta.first;
+    const row = await readRow(buyerId);
+    const depth = row?.fleet_depth || 0;
+    const reward = res.win ? fleetReward(want, { first }) : null;
+    const paid = res.win ? await payFleetReward(buyerId, reward) : [];
+    await db.query(
+        `UPDATE mkt_sailing
+            SET fleet_depth = GREATEST(COALESCE(fleet_depth,0), $2::int),
                 fleet_best = GREATEST(COALESCE(fleet_best,0), $2::int),
                 fleet_wins = COALESCE(fleet_wins,0) + $3::int,
                 fleet_losses = COALESCE(fleet_losses,0) + $4::int,
                 updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, sim.win && first ? want : depth, sim.win ? 1 : 0, sim.win ? 0 : 1]
+        [buyerId, res.win && first ? want : depth, res.win ? 1 : 0, res.win ? 0 : 1]
     ).catch(() => {});
-
-    await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, win: sim.win, ammo: fired, first }).catch(() => {});
-    await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
-
-    // Milestones down the fleet. Bosses are the walls, so they are what the badges mark — plus one for taking
-    // a ship without losing a plank, which is the flex the sim makes possible and nothing else records.
-    if (sim.win) {
+    await trackActivity(buyerId, "ship_battle_end", { rank: want, win: res.win, sunk: res.sunk, rounds: res.state.round }).catch(() => {});
+    if (res.win) {
         const depthNow = Math.max(depth, first ? want : depth);
         if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});
         if (depthNow >= 5) await grantEventBadge(buyerId, "fleet_meg").catch(() => {});
         if (depthNow >= 10) await grantEventBadge(buyerId, "fleet_tithe").catch(() => {});
         if (depthNow >= MAX_FLEET_RANK) await grantEventBadge(buyerId, "fleet_admiral").catch(() => {});
-        if (sim.myHp >= sim.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
+        if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
     }
-
-    return {
-        ok: true,
-        battle: {
-            kind: "fleet", rank: want, first, win: sim.win, sunk: sim.sunk,
-            me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel },
-            foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor },
-            events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
-            reward: paid,
-        },
-        ...(await getSailingState(buyerId)),
-    };
+    return paid;
 }
 
 // ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────

@@ -130,6 +130,151 @@ export function foeProfile(foe) {
     };
 }
 
+
+// ── ORDERS: THE PART YOU ACTUALLY PLAY ───────────────────────────────────────────────────────────────────────
+// The first cut resolved the whole battle in one call and played it back. It looked fine and felt like
+// nothing — you pressed Engage and watched a replay of a fight you had no part in. A battle is fought a round
+// at a time now, and each round you give an order.
+//
+// Four orders, each a real trade rather than a strictly-better button:
+//   BROADSIDE  everything you have. The honest default.
+//   RAKE       aim high. Two thirds damage, but it shreds rigging — their next broadside comes up short.
+//   BRACE      no volley at all this round. Half damage taken, and the crew reloads: your next broadside is
+//              truer and hits harder. Buys a round when you are losing one.
+//   BOARD      close and take her. Huge damage, but you eat a full broadside doing it — and if their hull is
+//              healthier than yours it goes very badly. The finisher, or the mistake.
+export const ORDERS = {
+    broadside: { id: "broadside", name: "Broadside", icon: "GiCannon",
+        desc: "Fire everything that bears." },
+    rake: { id: "rake", name: "Rake the rigging", icon: "GiSailboat",
+        desc: "Aim high — less damage, but their next broadside comes up short." },
+    brace: { id: "brace", name: "Brace", icon: "GiShieldBash",
+        desc: "Hold fire and take the volley on the armour — then hit harder next round." },
+    board: { id: "board", name: "Close and board", icon: "GiCrossedSwords",
+        desc: "All or nothing. Devastating if they are hurt, suicide if they are not." },
+};
+export const ORDER_LIST = Object.values(ORDERS);
+export const orderById = (id) => ORDERS[String(id || "broadside")] || ORDERS.broadside;
+
+// The opening state of a fight. Kept small and JSON-safe: it is stored on the sailing row between rounds.
+export function initBattleState(me, foe, { rng = Math.random } = {}) {
+    const myOdds = 0.5 + Math.max(-0.18, Math.min(0.18, (foe.guns - me.guns) * 0.02));
+    return {
+        myHp: me.hp, foeHp: foe.hp, myMax: me.hp, foeMax: foe.hp,
+        round: 0, myRig: 0, foeRig: 0, myFire: 0, foeFire: 0,
+        braced: false, trueAim: false,
+        gauge: rng() < myOdds ? "me" : "foe",
+    };
+}
+
+// What the enemy does this round. Deliberately simple and readable rather than clever: they board when you are
+// hurt and they are not, rake when they are carrying chain, brace when they are nearly gone, and otherwise
+// fire. A foe with a visible reason for every order is one you can play against.
+export function foeOrder(me, foe, st, { rng = Math.random } = {}) {
+    const theirs = st.foeHp / Math.max(1, st.foeMax), mine = st.myHp / Math.max(1, st.myMax);
+    if (theirs > 0.5 && mine < 0.35 && rng() < 0.6) return "board";
+    if (theirs < 0.22 && rng() < 0.45) return "brace";
+    if (foe.ammo?.rigging && rng() < 0.35) return "rake";
+    return "broadside";
+}
+
+// One exchange: fires burn, both ships act in weather-gauge order, and the state comes back updated. Pure —
+// the caller persists whatever it gets.
+export function resolveRound(me, foe, state, order, { rng = Math.random } = {}) {
+    const st = { ...state };
+    const events = [];
+    const myOrder = orderById(order).id;
+    const theirOrder = foeOrder(me, foe, st, { rng });
+    st.round += 1;
+
+    // Fires first — a shell landed last round is still working.
+    if (st.foeFire > 0) {
+        st.foeHp = Math.max(0, st.foeHp - st.foeFire);
+        events.push({ type: "fire", side: "me", dmg: st.foeFire, my: st.myHp, foe: st.foeHp });
+        st.foeFire = Math.max(0, st.foeFire - FIRE_DECAY);
+    }
+    if (st.myFire > 0 && st.foeHp > 0) {
+        st.myHp = Math.max(0, st.myHp - st.myFire);
+        events.push({ type: "fire", side: "foe", dmg: st.myFire, my: st.myHp, foe: st.foeHp });
+        st.myFire = Math.max(0, st.myFire - FIRE_DECAY);
+    }
+
+    const act = (who) => {
+        const mineTurn = who === "me";
+        const att = mineTurn ? me : foe;
+        const def = mineTurn ? foe : me;
+        const ord = mineTurn ? myOrder : theirOrder;
+        const rigged = mineTurn ? st.myRig : st.foeRig;
+        const defHp = mineTurn ? st.foeHp : st.myHp;
+        const attHp = mineTurn ? st.myHp : st.foeHp;
+        if (defHp <= 0 || attHp <= 0) return;
+
+        if (ord === "brace") {
+            if (mineTurn) { st.braced = true; st.trueAim = true; } else st.foeBraced = true;
+            events.push({ type: "order", side: who, order: "brace", my: st.myHp, foe: st.foeHp });
+            return;
+        }
+
+        // Damage shape by order.
+        const boarding = ord === "board";
+        const raking = ord === "rake";
+        const powerMult = boarding ? 2.1 : raking ? 0.66 : 1;
+        const accBonus = (mineTurn && st.trueAim ? 0.12 : 0) + (boarding ? 0.1 : 0);
+        const braceCut = mineTurn ? (st.foeBraced ? 0.5 : 1) : (st.braced ? 0.5 : 1);
+        // Alongside and grappled: whoever boarded last round eats the answer at close range. This is the cost
+        // that makes BOARD a decision rather than a button you always press.
+        const exposedMult = mineTurn ? (st.foeExposed ? 1.6 : 1) : (st.exposed ? 1.6 : 1);
+
+        const guns = Math.max(1, att.guns - rigged);
+        const shots = [];
+        let total = 0;
+        for (let g = 0; g < guns; g += 1) {
+            if (rng() > Math.min(0.97, att.accuracy + accBonus)) { shots.push({ hit: false }); continue; }
+            const rake = rng() < att.rake;
+            let dmg = (SHOT_MIN + rng() * SHOT_VAR) * att.ammo.dmg * att.dmgMult * powerMult;
+            if (rake) dmg *= 1.8;
+            const armor = Math.max(0, def.armor * (1 - att.ammo.armorPierce));
+            dmg = dmg * (1 - armor) * def.dmgTaken * braceCut * exposedMult;
+            const rounded = Math.max(1, Math.round(dmg));
+            total += rounded;
+            shots.push({ hit: true, dmg: rounded, rake });
+        }
+
+        if (mineTurn) { st.foeHp = Math.max(0, st.foeHp - total); st.trueAim = false; st.foeRig = 0; st.foeExposed = false; }
+        else { st.myHp = Math.max(0, st.myHp - total); st.myRig = 0; st.foeBraced = false; st.exposed = false; }
+
+        // Raking shreds rigging; a boarding action leaves you exposed for their answer.
+        const riggingCut = (raking ? 0.34 : 0) + (att.ammo.rigging || 0);
+        if (riggingCut && total > 0) {
+            const knocked = Math.max(1, Math.round(def.guns * riggingCut));
+            if (mineTurn) st.foeRig = knocked; else st.myRig = knocked;
+        }
+        if (att.ammo.fire && shots.some((sh) => sh.hit) && rng() < att.ammo.fire) {
+            if (mineTurn) st.foeFire = Math.min(FIRE_START, st.foeFire + FIRE_START);
+            else st.myFire = Math.min(FIRE_START, st.myFire + FIRE_START);
+        }
+        // Boarding cuts both ways: you are alongside, so their answer lands harder.
+        if (boarding) { if (mineTurn) st.exposed = true; else st.foeExposed = true; }
+
+        events.push({
+            type: "volley", side: who, order: ord, shots, dmg: total, guns,
+            rigged: mineTurn ? st.foeRig : st.myRig,
+            my: st.myHp, foe: st.foeHp,
+        });
+    };
+
+    if (st.gauge === "me") { act("me"); act("foe"); } else { act("foe"); act("me"); }
+    if (st.braced && st.round > 0) st.braced = false; // a brace covers one round
+
+    const sunk = st.foeHp <= 0 ? "foe" : st.myHp <= 0 ? "me" : null;
+    const outOfRounds = st.round >= MAX_ROUNDS;
+    const over = Boolean(sunk) || outOfRounds;
+    const win = sunk === "foe" || (!sunk && outOfRounds && st.myHp / st.myMax >= st.foeHp / st.foeMax);
+    return { events, state: st, over, win, sunk, myOrder, theirOrder };
+}
+
+export const MAX_ROUNDS = 14;
+
 // ── THE BATTLE ───────────────────────────────────────────────────────────────────────────────────────────────
 // Broadsides alternate. Each gun rolls to hit on its own, so a wide deck is a steadier stream of damage rather
 // than one big swing — which is what makes Gunnery worth buying and what gives the scene something to draw:
