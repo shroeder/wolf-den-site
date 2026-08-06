@@ -15,8 +15,10 @@ import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 //
 // A rating row holds your CURRENT tier plus a VOTE COUNT. You may rate the same person again each DAY, at most
 // once per person per store-local day, so your three have to be spread across three different farms — and every
-// visit ADDS to that farm's total, which is the whole reason to come back. Changing your mind on someone you
-// already rated today still costs a charge and pays nothing: that is a revision, not a fresh visit.
+// visit ADDS to that farm's total, which is the whole reason to come back. Once you have rated someone today
+// you are DONE with them until tomorrow: changing your mind is free and does nothing, because a revision was
+// never a visit and letting it spend a charge is what allowed all three of the day's ratings to land on one
+// farm (Like, Love, Admire, "none left today", two farms never visited).
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // THREE A DAY, ONE PER PERSON — so the three have to be SPREAD.
 //
@@ -213,29 +215,18 @@ export async function rateFarm(raterId, ownerId, tier) {
         return { ok: true, changed: true, repeat: true, myTier: t, xpGained: raterXp, ...summary, charge };
     }
 
+    // ── ONE FARM, ONCE A DAY. FULL STOP. ─────────────────────────────────────────────────────────────────────
+    // Only reachable when you have ALREADY rated this person today (the branch above owns every other case).
+    //
+    // This used to allow a revision: tapping a different tier spent a charge, changed the tier and paid no XP.
+    // Which meant the daily three could all be spent on ONE farm — Like, then Love, then Admire on the same
+    // person, "none left today", and the other two farms you were meant to go and look at never got visited.
+    // Three a day exists to send you to three different farms; a revision is not a visit, so it is not a use
+    // of a charge and there is nothing here to spend one on. Come back tomorrow and rate them again — that
+    // path is the repeat above, and it both pays and adds to their tally.
     if (existing) {
-        // Tapping the tier you already gave = no-op (no charge spent).
-        if (existing.tier === t) {
-            const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-            return { ok: true, changed: false, myTier: t, ...summary, charge, xpGained: 0 };
-        }
-        // CHANGING your rating now costs a charge too — no free flip-flopping. No XP (anti-farm).
-        const charge0 = await rateCharge(raterId);
-        if (charge0.left <= 0) {
-            const summary = await ratingSummary(ownerId, raterId);
-            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge: charge0 };
-        }
-        const slot = await db
-            .queryOne(`UPDATE mkt_buyer SET farm_rate_used = farm_rate_used + 1 WHERE id = $1 AND farm_rate_day = ${DAY} AND farm_rate_used < $2 RETURNING farm_rate_used`, [raterId, charge0.allowance])
-            .catch(() => null);
-        if (!slot) {
-            const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-            return { ok: false, error: "no_charge_left", myTier: existing.tier, ...summary, charge };
-        }
-        await db.query(`UPDATE mkt_farm_rating SET tier = $3, updated_at = NOW(), owner_seen_at = NULL WHERE rater_id = $1 AND owner_id = $2`, [raterId, ownerId, t]).catch(() => {});
-        await trackActivity(raterId, "farm_rate_revise", { owner: ownerId, tier: t }).catch(() => {});
         const [summary, charge] = await Promise.all([ratingSummary(ownerId, raterId), rateCharge(raterId)]);
-        return { ok: true, changed: true, revised: true, myTier: t, ...summary, charge, xpGained: 0 };
+        return { ok: true, changed: false, alreadyToday: true, myTier: existing.tier, ...summary, charge, xpGained: 0 };
     }
 
     // NEW rating — spend one daily charge (atomic guard), then insert + award XP to both.

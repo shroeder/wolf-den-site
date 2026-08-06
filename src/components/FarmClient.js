@@ -571,10 +571,11 @@ export default function FarmClient({ initial, viewingAlias }) {
     const rateFarmAt = useCallback(async (tier) => {
         const R = farm.rating;
         if (!R?.canRate || rateBusy) return;
-        // Tapping the tier you already gave is a no-op ONLY if you gave it TODAY. Ratings re-arm daily, and
-        // "admire them again" is by definition tapping the same tier you last gave — this guard used to
-        // swallow exactly that tap and never reach the server.
-        if (R.myTier === tier && R.ratedToday) return;
+        // Rated them today = done with this farm until tomorrow, whichever tier is tapped. Ratings re-arm
+        // daily, and "admire them again" is by definition tapping the same tier you last gave, so this must
+        // key off the DAY and not off the tier — an earlier version keyed off the tier and swallowed exactly
+        // that tap; the version after it let the other two tiers through and spent a charge per tap.
+        if (R.ratedToday) return;
         if ((R.charge?.left ?? 0) <= 0) { setRateNote("You're out of ratings for today — come back tomorrow."); return; } // new, repeat OR change all need a charge
         setRateBusy(true);
         setRateNote(null);
@@ -1176,13 +1177,21 @@ export default function FarmClient({ initial, viewingAlias }) {
                 <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>{sceneControls}</div>
             ) : null}
 
-            <details className="farm-status">
-                <summary>Farm status &amp; bounties</summary>
-                {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
+            {/* ── THE TWO THINGS YOU CAME TO DO ── the day's bounties and the rating, never behind a fold.
+                Everything here used to live inside the collapsed "Farm status & bounties" summary, which meant
+                the two ACTIONS on this screen — the quests you are working through, and liking the farm you
+                are looking at — were a tap away and, folded shut by default, easy to never see at all. What
+                stays folded is the stuff you CHECK rather than DO: where you place, and who else to visit. */}
+            <div style={{ display: "grid", gap: 10, margin: "12px 0" }}>
                 {farm.mine ? <FeatureDailies feature="farm" refreshKey={bountyTick} /> : null}
                 {farm.rating ? (
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
                 ) : null}
+            </div>
+
+            <details className="farm-status">
+                <summary>Farm rank &amp; neighbours</summary>
+                {farm.mine && farm.rating ? <FarmRankBadge standings={farm.rating.standings} /> : null}
                 <FarmDirectory current={viewingAlias} />
             </details>
 
@@ -1924,12 +1933,15 @@ function FarmRatingBar({ rating, ownerName, mine, busy, burst, note, onRate }) {
                     const active = myTier === t.tier;
                     // Already spent on this person today → nothing to do here until tomorrow. Otherwise your
                     // existing tier is tappable again: giving it a second time on a new day is the point.
-                    const spentToday = ratedToday && active;
+                    // ONE FARM A DAY: rating anyone today closes all three buttons on them until tomorrow, not
+                    // just the tier you picked. Leaving the other two live is how three charges ended up on one
+                    // farm — each "change my mind" tap spent one and sent you nowhere.
+                    const spentToday = ratedToday;
                     const disabled = busy || spentToday || left <= 0;
                     const bursting = burst && burst.tier === t.tier;
                     return (
                         <button key={t.key} type="button" onClick={() => onRate(t.tier)} disabled={disabled} aria-pressed={active}
-                            title={spentToday ? `${t.label} — given today, come back tomorrow`
+                            title={spentToday ? (active ? `${t.label} — given today, come back tomorrow` : "You've already rated this farm today — come back tomorrow")
                                 : left <= 0 ? "No ratings left today"
                                     : active ? `${t.label} again` : `${t.label} this farm`}
                             style={{ position: "relative", overflow: "visible", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "11px 6px 8px", borderRadius: 14, cursor: disabled ? "default" : "pointer", opacity: disabled && !active ? 0.45 : 1, WebkitTapHighlightColor: "transparent",
