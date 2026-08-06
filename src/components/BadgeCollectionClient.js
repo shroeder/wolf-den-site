@@ -18,6 +18,36 @@ const bonusWeight = (b) => {
     return n;
 };
 
+// ── HOW MANY OTHERS HAVE THIS ────────────────────────────────────────────────────────────────────────────────
+// Asked for by a member, and it is the fact that turns a wall of 210 badges into a scoreboard: without it you
+// cannot tell the badge everyone gets on day one from the one three people in the Den have ever earned.
+//
+// The wording changes with WHO holds it, because "1 other" and "nobody else" are different pieces of news:
+// holding something alone is the brag, and an unearned badge nobody has is a target rather than a failure.
+const RARITY_BANDS = [
+    { max: 5, label: "Almost nobody", tone: "myth" },
+    { max: 15, label: "Rare", tone: "rare" },
+    { max: 40, label: "Uncommon", tone: "unc" },
+    { max: 101, label: "Common", tone: "com" },
+];
+function RarityLine({ b }) {
+    if (b.holders == null) return null; // an older payload — say nothing rather than "0 have this"
+    const band = RARITY_BANDS.find((r) => b.pct < r.max) || RARITY_BANDS[RARITY_BANDS.length - 1];
+    const who = b.earned
+        ? (b.others === 0 ? "Only you have this" : `${b.others.toLocaleString()} other${b.others === 1 ? "" : "s"} have this`)
+        : (b.holders === 0 ? "Nobody has this yet" : `${b.holders.toLocaleString()} ${b.holders === 1 ? "member has" : "members have"} this`);
+    // Holding something ALONE is the loudest fact a badge can carry, so that is the one that gets the gold.
+    // "Nobody has this yet" is true of 134 of the 252 badges — it is a target, and if it shouted, half the
+    // wall would be shouting.
+    const tone = b.earned && b.others === 0 ? "solo" : b.holders === 0 ? "none" : band.tone;
+    return (
+        <span className={`bc-rare tone-${tone}`}>
+            {who}
+            {b.holders > 0 ? <em>{b.pct < 1 ? "<1" : b.pct}% of the Den</em> : null}
+        </span>
+    );
+}
+
 function BadgeCard({ b, featured = false }) {
     const chips = bonusChips(b.bonus);
     return (
@@ -30,6 +60,7 @@ function BadgeCard({ b, featured = false }) {
             {chips.length ? (
                 <span className="bc-bonus">{chips.map((c, i) => <span key={i} className={`bc-bonus-chip dom-${c.domain}`}><span className="bc-chip-ico">{c.icon}</span>{c.text}</span>)}</span>
             ) : null}
+            <RarityLine b={b} />
             {b.earned ? (
                 <span className="bc-status is-earned">Earned ✓</span>
             ) : b.progress ? (
@@ -211,6 +242,17 @@ const BC_CSS = `
 .bc-bonus-chip.dom-sea { --chip: #66d6ff; }
 .bc-bonus-chip.dom-farm { --chip: #8fe08f; }
 .bc-bonus-chip.dom-forge { --chip: #ffc24a; }
+/* How many others hold it. Coloured by how rare that makes it, so the wall can be read at a glance without
+   anybody doing arithmetic — the four bands are the same idea as item rarity, applied to achievement. */
+.bc-rare { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 1px;
+    font-size: 0.68rem; font-weight: 800; line-height: 1.2; }
+.bc-rare em { font-style: normal; font-size: 0.62rem; font-weight: 700; color: #7f868e; }
+.bc-rare.tone-myth { color: #ff8fd0; }   /* under 5% of the Den */
+.bc-rare.tone-rare { color: #8fd8ff; }
+.bc-rare.tone-unc  { color: #8fe39a; }
+.bc-rare.tone-com  { color: #93999f; }
+.bc-rare.tone-solo { color: #ffd75e; text-shadow: 0 0 14px rgba(255,215,94,0.4); } /* you are the only one */
+.bc-rare.tone-none { color: #6f767e; }   /* nobody has it yet — a target, and true of half the wall */
 .bc-status { font-size: 0.76rem; font-weight: 800; margin-top: 2px; }
 .bc-status.is-earned { color: #7dbf72; }
 .bc-status.muted { color: #9aa2ab; }

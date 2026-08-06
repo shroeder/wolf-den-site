@@ -573,8 +573,25 @@ function qualifies(rule, threshold, m) {
 
 // The full badge board for a member: every badge with earned/locked state + progress on the unlockables,
 // plus the single "next badge" (closest unearned unlockable). Powers the Badges hub + the next-badge nudge.
+// ── HOW RARE IS IT ───────────────────────────────────────────────────────────────────────────────────────────
+// How many people hold each badge, and how many people there are to hold them. A member asked for this
+// directly: "## other players have earned this, to see the rarity of each you've earned/haven't earned" —
+// and it is the one fact a collection screen is missing without. A wall of 210 badges with no idea which are
+// hard tells you nothing about what you have done; "3 of 84 have this" turns the same wall into a scoreboard.
+//
+// Two rows total (one grouped count, one population count), so it costs nothing to answer for every badge.
+// The denominator is members with an ALIAS — the same "is a real player" test the directory and the
+// leaderboards use, so 4% here means the same thing as 4% anywhere else in the Den.
+async function badgeRarity() {
+    const [rows, pop] = await Promise.all([
+        db.query(`SELECT badge_slug, COUNT(*)::int AS n FROM mkt_user_badge GROUP BY badge_slug`).catch(() => []),
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => null),
+    ]);
+    return { holders: new Map(rows.map((r) => [r.badge_slug, Number(r.n) || 0])), population: Math.max(1, Number(pop?.n) || 1) };
+}
+
 export async function getBadgeBoard(buyerId) {
-    const [all, held, m, totals] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId), getBadgeBonusTotals(buyerId)]);
+    const [all, held, m, totals, rarity] = await Promise.all([listBadges(), heldSlugs(buyerId), getMemberMetrics(buyerId), getBadgeBonusTotals(buyerId), badgeRarity()]);
     const passives = totals.combat; // { might, crit_chance, crit_power } — buffs your daily boss strike
     // Secret badges stay hidden until you actually hold one — no locked/mystery slot teasing them.
     const visible = all.filter((b) => !b.secret || held.has(b.slug));
@@ -586,7 +603,18 @@ export async function getBadgeBoard(buyerId) {
             const t = Math.max(1, target);
             progress = { current: Math.max(0, Math.min(current, t)), target: t, pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))) };
         }
-        return { slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color, adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly, earned, progress, bonus: BADGE_BONUSES[b.slug] || null };
+        // Rarity. `others` is the number asked for — holders NOT counting you — so a badge only you hold reads
+        // "nobody else", not "1 person". The percentage is of the whole Den either way, because that is the
+        // number that says how hard the thing was.
+        const holders = rarity.holders.get(b.slug) || 0;
+        return {
+            slug: b.slug, label: b.label, description: b.description, icon: b.icon, color: b.color,
+            adminOnly: b.adminOnly, unlockable: Boolean(b.autoRule), goldPrice: b.goldPrice, dropOnly: b.dropOnly,
+            earned, progress, bonus: BADGE_BONUSES[b.slug] || null,
+            holders,
+            others: Math.max(0, holders - (earned ? 1 : 0)),
+            pct: Math.round((holders / rarity.population) * 100),
+        };
     });
     // Next = closest unearned UNLOCKABLE badge by progress (admin-assigned ones can't be "earned" by progress).
     const next = badges
@@ -599,6 +627,7 @@ export async function getBadgeBoard(buyerId) {
         next: next ? { label: next.label, icon: next.icon, color: next.color, ...next.progress } : null,
         passives, // { might, crit_chance, crit_power } summed from earned badges — buffs your daily boss strike
         bonusTotals: totals, // { combat, sea, farm, forge } — every earned badge's bonuses, grouped by system
+        population: rarity.population, // members the rarity percentages are OF — shown so the % is not a mystery
     };
 }
 
