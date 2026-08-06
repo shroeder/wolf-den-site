@@ -12,7 +12,7 @@ const XP_ACTION = {
     donate_event: "🎁 Event donation", donation: "🎁 Donation", badge_earned: "🎖️ Badge earned",
     harvest: "🌾 Harvest", farm_daily: "🌱 Farm daily", farm_rate_get: "⭐ Farm rated", farm_rate_give: "👍 Rated a farm",
     pet_farm: "🐾 Pet petted", pet_farm_other: "🐾 Petted a friend's", sail_wave: "🌊 Sailing wave", sail_encounter: "🦑 Sea encounter",
-    sail_raid_win: "🏴‍☠️ Raid win", sailing_daily: "⛵ Sailing daily", cheer: "📣 Cheer", quests_cleared: "📜 Quests cleared",
+    sail_raid_win: "🏴‍☠️ Raid win", ship_battle: "🚢 Ship battle", sailing_daily: "⛵ Sailing daily", cheer: "📣 Cheer", quests_cleared: "📜 Quests cleared",
     consumable: "🧪 Consumable", craft_enhance: "⚒️ Forge enhance", craft_salvage: "🔨 Forge salvage", craft_combine: "🧩 Forge combine",
     forge_daily: "🔥 Forge daily", daily_active: "📅 Daily active", first_friend: "👥 First friend", first_message: "✉️ First message",
     message: "✉️ Message", discord_link: "🔗 Discord linked", trade: "🤝 Trade", first_wishlist: "📝 First wishlist",

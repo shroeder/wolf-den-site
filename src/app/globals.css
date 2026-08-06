@@ -13085,3 +13085,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sail-raid-tship { display: flex; flex-wrap: wrap; gap: 3px 8px; margin: 2px 0 1px; font-size: 0.68rem; color: #9aa2ab; }
 /* A stat where THEY out-gun you — the one thing on the row that should stop you tapping Raid. */
 .sail-raid-tship .is-worse { color: #ff9a8a; font-weight: 800; }
+.sail-raid-odds { font-weight: 800; color: #cdd3d8; }
+.sail-raid-odds.is-good { color: #8fe39a; }
+.sail-raid-odds.is-bad { color: #ff9a8a; }
+.sail-raid-warn { margin-top: 2px; font-size: 0.66rem; font-weight: 700; color: #ff9a8a; }

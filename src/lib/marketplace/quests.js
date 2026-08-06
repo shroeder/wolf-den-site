@@ -36,6 +36,7 @@ export const QUEST_TEMPLATES = [
     { key: "sail_voyage", label: "Set sail on a voyage", metric: "voyage_start", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Set sail", gate: "sailing" },
     { key: "sail_wave", label: "Greet a passing sailor at sea", metric: "wave", target: 1, gold: 90, area: "/marketplace/sailing", cta: "Go sailing", gate: "sailing" },
     { key: "sail_raid", label: "Raid a passing ship", metric: "raid_do", target: 1, gold: 150, area: "/marketplace/sailing", cta: "Go raiding", gate: "sailing", ownerOnly: true }, // raiding is under construction
+    { key: "ship_battle", label: "Sink a ship from the fleet", metric: "ship_battle", target: 1, gold: 170, area: "/marketplace/sailing", cta: "Beat to quarters", gate: "sailing", ownerOnly: true }, // under construction with the rest of raiding
     { key: "sail_dig", label: "Dig up buried treasure", metric: "dig_done", target: 1, gold: 160, chest: "wooden", area: "/marketplace/sailing", cta: "Go digging", gate: "sailing" },
     // ── Farm quests (gated: only appear for members who can access the Farm — see eligibleTemplates) ──
     { key: "harvest_crop", label: "Harvest a crop from your farm", metric: "harvest_crop", target: 1, gold: 150, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },

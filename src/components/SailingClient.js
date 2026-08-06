@@ -1499,7 +1499,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                             <span className={raidMine && t.guns > raidMine.guns ? "is-worse" : undefined}>{t.guns} guns</span>
                                             <span className={raidMine && t.hull > raidMine.hull ? "is-worse" : undefined}>{t.hull} hull</span>
                                             <span className={`sbt-ammo is-${t.ammo}`}>{t.ammo}</span>
+                                            {t.odds != null ? (
+                                                <span className={`sail-raid-odds${t.odds >= 60 ? " is-good" : t.odds >= 35 ? "" : " is-bad"}`}>
+                                                    ~{t.odds}% your favour
+                                                </span>
+                                            ) : null}
                                         </div>
+                                        {t.outgunned ? <div className="sail-raid-warn">Out-gunned and out-hulled — this one can hurt you</div> : null}
                                         <div className="sail-raid-tgear">
                                             {t.topRarity
                                                 ? <span className={`sail-raid-rar rar-${t.topRarity}`}>{t.topRarity}</span>

@@ -346,6 +346,9 @@ const BADGE_BONUSES = {
     // ── RAIDING → broadside / ironclad / plunder ──
     raid_marauder: S({ broadside: 3 }), raid_scourge: S({ broadside: 5, plunder: 3 }), raid_untouchable: S({ ironclad: 4 }),
     raid_plunderer: S({ plunder: 5 }), raid_defender: S({ ironclad: 3 }), raid_bastion: S({ ironclad: 5 }),
+    // ── THE FLEET → broadside / ironclad, because that is what sinking one of them takes ──
+    fleet_first_blood: S({ broadside: 2 }), fleet_meg: S({ broadside: 4 }), fleet_tithe: S({ broadside: 5, ironclad: 3 }),
+    fleet_admiral: S({ broadside: 7, ironclad: 5 }), fleet_unscathed: S({ ironclad: 6 }),
     // ── DIGGING → dredge / trove ──
     dig_excavator: S({ trove: 4 }), dig_goldtouch: S({ trove: 3, dredge: 2 }), dig_cleansweep: S({ dredge: 4 }),
     // ── FISHING → Angling (its own stat: more casts a day, rarer fish on the line), so fishing badges make you

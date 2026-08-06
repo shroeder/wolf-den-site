@@ -1575,17 +1575,27 @@ export async function getRaidTargets(buyerId, limit = 12) {
             ammo: r.loadout || "round",
         };
     });
-    list.sort((a, z) => z.gearRank - a.gearRank || z.items - a.items || z.level - a.level);
-
-    // What YOU are bringing, so the picker reads as a matchup: their guns against yours, in the same units.
+    // What YOU are bringing — needed before the sort, because the sort depends on it.
     const mine = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(mine?.speed_level || 0, mine?.luck_level || 0, mine?.rarity_level || 0, mine?.find_level || 0, mine?.raid_level || 0);
+    const myGuns = gunsFor(mine?.gun_level || 0, myLevel), myHull = hullFor(mine?.hull_level || 0, myLevel);
+
+    // WORTH IT × WINNABLE, not just worth it. Sorting on loot alone put the heaviest ship in the Den at the
+    // top of a brand-new captain's list, which is the one raid a day they have to spend. `odds` is a rough
+    // read of the matchup (their broadside and hull against yours) and it scales the loot score, so the top of
+    // the list is the best prize you can actually take rather than the best prize that exists.
+    const scored = list.map((t) => {
+        const gunEdge = myGuns / Math.max(1, t.guns);
+        const hullEdge = myHull / Math.max(1, t.hull);
+        const odds = Math.max(0.05, Math.min(0.95, 0.5 * (gunEdge ** 1.4) * (hullEdge ** 0.7)));
+        const loot = (t.gearRank + 1) * 10 + t.items;
+        return { ...t, odds: Math.round(odds * 100), outgunned: t.guns > myGuns && t.hull > myHull, score: loot * odds };
+    });
+    scored.sort((a, z) => z.score - a.score || z.gearRank - a.gearRank || z.items - a.items);
+
     return {
-        targets: list.slice(0, limit),
-        me: {
-            guns: gunsFor(mine?.gun_level || 0, myLevel), hull: hullFor(mine?.hull_level || 0, myLevel),
-            ammo: mine?.loadout || "round", level: myLevel,
-        },
+        targets: scored.slice(0, limit),
+        me: { guns: myGuns, hull: myHull, ammo: mine?.loadout || "round", level: myLevel },
     };
 }
 
@@ -1938,6 +1948,17 @@ export async function doFleetBattle(buyerId, rank = null) {
 
     await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, win: sim.win, ammo: fired, first }).catch(() => {});
     await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
+
+    // Milestones down the fleet. Bosses are the walls, so they are what the badges mark — plus one for taking
+    // a ship without losing a plank, which is the flex the sim makes possible and nothing else records.
+    if (sim.win) {
+        const depthNow = Math.max(depth, first ? want : depth);
+        if (depthNow >= 1) await grantEventBadge(buyerId, "fleet_first_blood").catch(() => {});
+        if (depthNow >= 5) await grantEventBadge(buyerId, "fleet_meg").catch(() => {});
+        if (depthNow >= 10) await grantEventBadge(buyerId, "fleet_tithe").catch(() => {});
+        if (depthNow >= MAX_FLEET_RANK) await grantEventBadge(buyerId, "fleet_admiral").catch(() => {});
+        if (sim.myHp >= sim.myMax) await grantEventBadge(buyerId, "fleet_unscathed").catch(() => {});
+    }
 
     return {
         ok: true,

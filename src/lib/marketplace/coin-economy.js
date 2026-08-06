@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 // minting vs burning per day, coin gain/usage by source, and the biggest holders + growers. Read-only.
 
 const COIN_REASON = {
-    raid_win: "⚔️ Raid win", raid_loss: "🛡️ Raid loss", spin_prize: "🎡 Spin prize", boss_reward: "🐉 Boss reward",
+    raid_win: "⚔️ Raid win", ship_battle: "🚢 Ship battle", raid_loss: "🛡️ Raid loss", spin_prize: "🎡 Spin prize", boss_reward: "🐉 Boss reward",
     quest_reward: "📜 Quest reward", badge_reward: "🎖️ Badge reward", chest_reward: "🧰 Chest reward",
     checkin: "📅 Daily check-in", bounty: "🎯 Bounty", giveaway: "🎁 Giveaway", sell_gear: "💰 Sold gear",
     xp_accrual: "✨ XP accrual", coin_purchase: "🪙 Bought coins", admin_grant: "⚙️ Admin grant",
