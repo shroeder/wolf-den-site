@@ -7,7 +7,8 @@ import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
-import RaidScene from "@/components/RaidScene";
+import ShipBattleScene from "@/components/ShipBattleScene";
+import ShipYard from "@/components/ShipYard";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
@@ -22,7 +23,7 @@ const GUST_MS = 3000;
 // never drift apart again (the old three-separate-maps setup is what kept letting the background sailors
 // float while the main crew looked fine). Open boats (tier 1–2) have a low floor so figures sit LOW; taller
 // ships seat higher. These numbers were dialed in with the (now-removed) crew calibrator; retune by hand here
-// if a new boat form is added. Keep in sync with the same DECK map in RaidScene.js.
+// if a new boat form is added.
 const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 34, 11: 26 };
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
@@ -240,10 +241,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
     const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
-    const [raidPlay, setRaidPlay] = useState(null);        // the resolved raid → drives the full-screen battle scene
+    const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
     // Lock the background from scrolling while any sailing modal is open (raid picker, raid battle, arrival).
-    useScrollLock(raidOpen || Boolean(raidPlay) || arriveModal || fishOpen);
+    useScrollLock(raidOpen || Boolean(shipBattle) || arriveModal || fishOpen);
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -514,7 +515,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
-                if (d.raidResult) { setRaidOpen(false); setRaidTargets(null); setRaidPlay(d.raidResult); } // launch the full-screen auto-battle
+                // A resolved battle — fleet sortie or member raid — plays out in the ship-battle scene.
+                if (d.battle) { setRaidOpen(false); setRaidTargets(null); setShipBattle(d.battle); }
             }
             return d;
         } finally { setBusy(false); }
@@ -1024,6 +1026,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             </div>
 
             {station === "helm" ? <>
+            {/* SHIP BATTLES — the gun deck, the racks and the fleet ladder. Gated with raiding while the rework
+                is under construction: the server sends `combat: null` to everyone off the dev allow-list. */}
+            {state.combat ? (
+                <ShipYard combat={state.combat} busy={busy}
+                    onAct={({ action, ...extra }) => act(action, extra)} />
+            ) : null}
+
             {/* The sea's collection — the Corsair chase, on the screen its raids and affinity land on. Above
                 the upgrade card rather than inside it: a card nested in a card reads as a rendering mistake. */}
             {state.collections?.length ? (
@@ -1503,9 +1512,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             ) : null}
 
             {/* RAID — the full-screen auto-battle show, then reward reveal */}
-            {raidPlay ? (
-                <RaidScene raid={raidPlay} myBoat={state.boatArt} hero={hero} pet={pet} captain={captain} onClose={() => setRaidPlay(null)} />
+            {shipBattle ? (
+                <ShipBattleScene battle={shipBattle} onClose={() => setShipBattle(null)} />
             ) : null}
+
         </div>
     );
 }

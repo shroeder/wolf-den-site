@@ -12838,3 +12838,241 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .lb-art { width: 52px; height: 42px; }
     .lb-stat b { font-size: 1.05rem; }
 }
+
+/* ── SHIP BATTLES ────────────────────────────────────────────────────────────────────────────────────────────
+   The scene, the gun deck and the fleet ladder. In the GLOBAL sheet on purpose: the scene is several
+   components in one file, and a styled-jsx block only reaches markup written inside the component that owns
+   it — the sailing boards shipped with every row rule dead for exactly that reason. */
+.sbt-scene { position: fixed; inset: 0; z-index: 4000; overflow: hidden; display: flex; flex-direction: column;
+    background: linear-gradient(180deg, #0a1622 0%, #0e2436 44%, #0a1a28 100%); }
+.sbt-sky { position: absolute; inset: 0 0 52% 0;
+    background: radial-gradient(120% 90% at 70% 10%, rgba(120,180,230,0.22), transparent 60%),
+                linear-gradient(180deg, #12283c, #0b1a28); }
+.sbt-sea { position: absolute; inset: 48% 0 0 0;
+    background: linear-gradient(180deg, #0d3350, #071a2a 70%);
+    box-shadow: inset 0 12px 26px -10px rgba(0,0,0,0.8); }
+.sbt-sea::after { content: ""; position: absolute; inset: 0; opacity: 0.35;
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 12px);
+    animation: sbtSwell 7s ease-in-out infinite; }
+@keyframes sbtSwell { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+
+/* HUD */
+.sbt-hud { position: relative; z-index: 3; display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px;
+    align-items: start; padding: 12px 10px 0; }
+.sbt-vs { align-self: center; font-size: 1.1rem; opacity: 0.8; }
+.sbt-panel { min-width: 0; padding: 8px 10px; border-radius: 12px; background: rgba(4,12,20,0.66);
+    border: 1px solid rgba(255,255,255,0.12); }
+.sbt-panel-foe { text-align: right; }
+.sbt-pname { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sbt-panel-foe .sbt-pname { align-items: flex-end; }
+.sbt-pname b { font-size: 0.86rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sbt-pname em { font-style: normal; font-size: 0.64rem; color: #93a3b4; }
+.sbt-hpbar { position: relative; height: 12px; margin: 5px 0 4px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+.sbt-hpfill { display: block; height: 100%; transition: width .32s cubic-bezier(.3,1,.4,1); }
+.sbt-hpfill.is-me { background: linear-gradient(90deg, #45d18a, #8ef0b6); }
+.sbt-hpfill.is-foe { background: linear-gradient(90deg, #e06a5a, #ffa08c); }
+.sbt-hpfill.is-low { background: linear-gradient(90deg, #ff5a4a, #ffb36b); animation: sbtPulse 0.8s ease-in-out infinite; }
+@keyframes sbtPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.5); } }
+.sbt-hpnum { position: absolute; inset: 0; display: grid; place-items: center; font-size: 0.6rem; font-weight: 900;
+    color: #08131c; text-shadow: 0 1px 0 rgba(255,255,255,0.35); font-variant-numeric: tabular-nums; }
+.sbt-meta { display: flex; gap: 7px; font-size: 0.62rem; color: #93a3b4; }
+.sbt-panel-foe .sbt-meta { justify-content: flex-end; }
+.sbt-ammo { text-transform: uppercase; letter-spacing: 0.04em; font-weight: 800; color: #ffd28a; }
+.sbt-ammo.is-chain { color: #9fd0ff; }
+.sbt-ammo.is-grape { color: #ffb0d0; }
+.sbt-ammo.is-explosive { color: #ff9a6b; }
+
+/* Stage */
+.sbt-shakewrap { position: relative; z-index: 2; flex: 1; min-height: 0; }
+.sbt-shakewrap.is-shake { animation: sbtShake .22s ease; }
+.sbt-shakewrap.is-quake { animation: sbtQuake .42s ease; }
+@keyframes sbtShake { 0%,100% { transform: translate(0,0); } 30% { transform: translate(-4px,2px); } 70% { transform: translate(4px,-2px); } }
+@keyframes sbtQuake { 0%,100% { transform: translate(0,0) rotate(0); } 20% { transform: translate(-9px,4px) rotate(-.5deg); } 55% { transform: translate(8px,-5px) rotate(.5deg); } 80% { transform: translate(-4px,2px) rotate(0); } }
+.sbt-stage { position: absolute; inset: 0; }
+.sbt-stage.is-desperate::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 120px 30px rgba(120,0,0,0.35); }
+
+.sbt-ship { position: absolute; bottom: 34%; width: min(50%, 280px); }
+.sbt-ship-me { left: 2%; }
+.sbt-ship-foe { right: 2%; }
+.sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; }
+.sbt-ship-foe .sbt-hull { animation-delay: -1.6s; }
+@keyframes sbtBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
+.sbt-boat { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.55)); }
+.sbt-boat.is-mirror { transform: scaleX(-1); }
+.sbt-boat-fallback { display: block; width: 100%; padding-bottom: 46%; border-radius: 12px;
+    background: linear-gradient(180deg, #6b4a2a, #3a2716); }
+.sbt-ship.is-firing .sbt-hull { animation: sbtRecoil .34s ease; }
+@keyframes sbtRecoil { 0% { transform: translateX(0); } 30% { transform: translateX(-10px); } 100% { transform: translateX(0); } }
+.sbt-ship-foe.is-firing .sbt-hull { animation: sbtRecoilFoe .34s ease; }
+@keyframes sbtRecoilFoe { 0% { transform: translateX(0); } 30% { transform: translateX(10px); } 100% { transform: translateX(0); } }
+.sbt-ship.is-hurt .sbt-hull { animation: sbtHurt .3s ease; }
+@keyframes sbtHurt { 0%,100% { filter: none; } 40% { filter: brightness(1.9) saturate(0.4); } }
+.sbt-ship.is-low .sbt-hull { filter: drop-shadow(0 0 12px rgba(255,90,60,0.55)); }
+.sbt-wake { position: absolute; left: 8%; right: 8%; bottom: -6px; height: 10px; border-radius: 50%;
+    background: radial-gradient(50% 100% at 50% 50%, rgba(255,255,255,0.35), transparent 70%); }
+
+/* SINKING — bow down, slow, and the sea closes over it. */
+.sbt-ship.is-sinking { animation: sbtSink 2.6s cubic-bezier(.55,0,.85,.4) forwards; }
+@keyframes sbtSink {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    35% { transform: translateY(6px) rotate(-9deg); opacity: 1; }
+    100% { transform: translateY(150px) rotate(-26deg); opacity: 0; }
+}
+.sbt-ship-foe.is-sinking { animation-name: sbtSinkFoe; }
+@keyframes sbtSinkFoe {
+    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+    35% { transform: translateY(6px) rotate(9deg); opacity: 1; }
+    100% { transform: translateY(150px) rotate(26deg); opacity: 0; }
+}
+.sbt-foam { position: absolute; inset: auto 0 -4px 0; height: 40px; }
+.sbt-foam i { position: absolute; bottom: 0; width: 12px; height: 12px; border-radius: 50%;
+    background: rgba(255,255,255,0.6); animation: sbtFoam 1.6s ease-out infinite; }
+.sbt-foam i:nth-child(1) { left: 18%; animation-delay: .1s; }
+.sbt-foam i:nth-child(2) { left: 32%; animation-delay: .5s; }
+.sbt-foam i:nth-child(3) { left: 46%; animation-delay: .2s; }
+.sbt-foam i:nth-child(4) { left: 58%; animation-delay: .8s; }
+.sbt-foam i:nth-child(5) { left: 70%; animation-delay: .35s; }
+.sbt-foam i:nth-child(6) { left: 82%; animation-delay: .65s; }
+@keyframes sbtFoam { 0% { transform: translateY(0) scale(.4); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-26px) scale(1.3); opacity: 0; } }
+
+/* THE VOLLEY — one ball per gun that bore, in a ragged stagger, misses splashing short. */
+.sbt-volley { position: absolute; top: 58%; left: 0; right: 0; height: 0; pointer-events: none; }
+.sbt-ball { position: absolute; top: var(--lane, 0px); width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #f0e6d2, #4a4034 70%);
+    box-shadow: 0 0 7px rgba(255,220,150,0.65); opacity: 0; }
+.sbt-volley.to-foe .sbt-ball { left: 26%; animation: sbtFlyR .46s cubic-bezier(.35,0,.9,.6) forwards; }
+.sbt-volley.to-me .sbt-ball { right: 26%; animation: sbtFlyL .46s cubic-bezier(.35,0,.9,.6) forwards; }
+@keyframes sbtFlyR { 0% { opacity: 1; transform: translate(0,0); } 50% { transform: translate(22vw,-16px); } 100% { opacity: 1; transform: translate(44vw,-2px); } }
+@keyframes sbtFlyL { 0% { opacity: 1; transform: translate(0,0); } 50% { transform: translate(-22vw,-16px); } 100% { opacity: 1; transform: translate(-44vw,-2px); } }
+.sbt-ball.is-rake { width: 13px; height: 13px; box-shadow: 0 0 14px rgba(255,180,90,0.95); }
+/* A miss falls short and drops into the sea rather than reaching the hull. */
+.sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
+.sbt-volley.to-me .sbt-ball.is-miss { animation-name: sbtMissL; }
+@keyframes sbtMissR { 0% { opacity: 1; transform: translate(0,0); } 65% { opacity: 1; transform: translate(24vw,-4px); } 100% { opacity: 0; transform: translate(32vw,26px); } }
+@keyframes sbtMissL { 0% { opacity: 1; transform: translate(0,0); } 65% { opacity: 1; transform: translate(-24vw,-4px); } 100% { opacity: 0; transform: translate(-32vw,26px); } }
+
+.sbt-float { position: absolute; top: 38%; font-size: 1.5rem; font-weight: 900; color: #ffe07a;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.6); animation: sbtFloat .95s ease-out forwards; }
+.sbt-float.on-foe { right: 16%; }
+.sbt-float.on-me { left: 16%; color: #ff9a8a; }
+.sbt-float b { display: block; font-size: 0.7rem; letter-spacing: 0.08em; color: #ffb04a; }
+@keyframes sbtFloat { 0% { opacity: 0; transform: translateY(10px) scale(.8); } 20% { opacity: 1; transform: translateY(0) scale(1.1); } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
+
+.sbt-note { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); white-space: nowrap;
+    padding: 5px 12px; border-radius: 999px; font-size: 0.74rem; font-weight: 800;
+    background: rgba(4,12,20,0.92); border: 1px solid rgba(255,255,255,0.3); color: #eaf3fb;
+    animation: sbtNote 1.1s ease-out forwards; }
+.sbt-note.is-fire { color: #ffb06a; border-color: rgba(255,140,60,0.5); }
+.sbt-note.is-rig { top: 30%; color: #9fd0ff; border-color: rgba(120,190,255,0.45); }
+@keyframes sbtNote { 0% { opacity: 0; transform: translate(-50%, 8px); } 18% { opacity: 1; transform: translate(-50%, 0); } 82% { opacity: 1; } 100% { opacity: 0; } }
+
+.sbt-intro { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; text-align: center;
+    padding: 24px; background: rgba(3,9,15,0.7); animation: sbtIntro 1.5s ease forwards; }
+@keyframes sbtIntro { 0% { opacity: 0; } 15% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+.sbt-intro-tag { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.22em; color: #ffd75e; }
+.sbt-intro-name { margin-top: 6px; font-size: 1.7rem; font-weight: 900; }
+.sbt-intro-cls { font-size: 0.8rem; color: #93a3b4; }
+.sbt-intro-flavor { max-width: 32ch; margin: 10px auto 0; font-size: 0.82rem; line-height: 1.45; color: #b9c6d4; font-style: italic; }
+
+.sbt-sinkcall { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); z-index: 5;
+    font-size: 1.15rem; font-weight: 900; color: #fff; text-shadow: 0 3px 10px rgba(0,0,0,0.9);
+    animation: sbtNote 2.4s ease-out forwards; }
+
+.sbt-result { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 18px;
+    background: rgba(3,9,15,0.62); }
+.sbt-result-card { width: 100%; max-width: 380px; text-align: center; }
+.sbt-result-banner { font-size: 1.35rem; font-weight: 900; letter-spacing: 0.03em; }
+.sbt-result-banner.is-win { color: #8ef0b6; }
+.sbt-result-banner.is-lose { color: #ff9a8a; }
+.sbt-result-line { margin: 6px 0 10px; font-size: 0.84rem; line-height: 1.45; color: #b9c6d4; }
+.sbt-rewards { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 12px; }
+.sbt-reward { padding: 4px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 800;
+    background: rgba(255,215,94,0.14); border: 1px solid rgba(255,215,94,0.4); color: #ffd75e; }
+.sbt-reward.is-doubloons { background: rgba(120,220,255,0.14); border-color: rgba(120,220,255,0.45); color: #9fe6ff; }
+.sbt-reward.is-chest { background: rgba(180,120,255,0.16); border-color: rgba(180,120,255,0.5); color: #d6b0ff; }
+
+/* ── THE GUN DECK, THE RACKS AND THE LADDER ─────────────────────────────────────────────────────────────── */
+.sby { display: grid; gap: 12px; }
+.sby-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sby-head h3 { margin: 0; font-size: 1.05rem; }
+.sby-purse { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+    border-radius: 999px; font-weight: 900; font-size: 0.86rem; color: #9fe6ff;
+    background: rgba(120,220,255,0.14); border: 1px solid rgba(120,220,255,0.45); }
+.sby-sub { margin: 0; font-size: 0.78rem; line-height: 1.45; color: #8d96a0; }
+
+/* The ship as it fights — the same four numbers the battle uses. */
+.sby-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.sby-stat { padding: 8px 6px; border-radius: 11px; text-align: center; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1); }
+.sby-stat b { display: block; font-size: 1.05rem; font-weight: 900; color: #ffe28a; font-variant-numeric: tabular-nums; }
+.sby-stat em { font-style: normal; font-size: 0.6rem; color: #8d96a0; }
+
+.sby-tracks { display: grid; gap: 7px; }
+.sby-track { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1); }
+.sby-track-ico { width: 26px; height: 26px; color: #ffd75e; }
+.sby-track-body { min-width: 0; }
+.sby-track-body b { display: block; font-size: 0.86rem; font-weight: 800; }
+.sby-track-body em { font-style: normal; font-size: 0.68rem; line-height: 1.35; color: #8d96a0; }
+.sby-pips { display: flex; gap: 3px; margin-top: 5px; }
+.sby-pips i { width: 12px; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.14); }
+.sby-pips i.on { background: linear-gradient(90deg, #ffd75e, #ffb648); }
+.sby-buy { flex: none; padding: 7px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 0.76rem;
+    color: #06212b; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border: none; white-space: nowrap; }
+.sby-buy:disabled { opacity: 0.45; cursor: default; }
+.sby-buy.is-maxed { background: rgba(255,255,255,0.1); color: #9aa0a6; }
+
+/* Ammunition: a rack you load from, not a list of upgrades. */
+.sby-ammo { display: grid; gap: 7px; }
+.sby-round { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.1); }
+.sby-round.is-loaded { border-color: #55c8ee; background: rgba(85,200,238,0.12); }
+.sby-round-ico { width: 26px; height: 26px; color: #ffd28a; }
+.sby-round.is-loaded .sby-round-ico { color: #9fe6ff; }
+.sby-round-body { min-width: 0; }
+.sby-round-body b { display: block; font-size: 0.84rem; font-weight: 800; }
+.sby-round-body em { font-style: normal; font-size: 0.67rem; line-height: 1.35; color: #8d96a0; }
+.sby-round-acts { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.sby-count { font-size: 0.68rem; font-weight: 800; color: #cdd3d8; white-space: nowrap; }
+.sby-count.is-out { color: #ff9a8a; }
+.sby-mini { padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 0.68rem; font-weight: 800;
+    color: #cdd3d8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); white-space: nowrap; }
+.sby-mini:disabled { opacity: 0.4; cursor: default; }
+.sby-mini.is-load { color: #06212b; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
+
+/* The ladder. Beaten rungs read as done, the next one is the one that matters. */
+.sby-fleet { display: grid; gap: 6px; }
+.sby-rung { display: grid; grid-template-columns: 34px auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.035);
+    border: 1px solid rgba(255,255,255,0.09); }
+.sby-rung.is-beaten { opacity: 0.72; }
+.sby-rung.is-current { border-color: #ffd75e; background: rgba(255,215,94,0.1);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.25); }
+.sby-rung.is-boss .sby-rank { background: linear-gradient(160deg, #ffe89a, #f0b429 55%, #a97612); color: #2b1f06; }
+.sby-rung-art { width: 46px; height: 38px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.sby-rung.is-beaten .sby-rung-art { filter: grayscale(0.7) brightness(0.65); }
+.sby-rank { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+    font-size: 0.8rem; font-weight: 900; color: #cdd3d8; background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.12); font-variant-numeric: tabular-nums; }
+.sby-rung-body { min-width: 0; }
+.sby-rung-body b { display: block; font-size: 0.86rem; font-weight: 800; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.sby-rung-body em { font-style: normal; font-size: 0.66rem; color: #8d96a0; }
+.sby-rung-stats { display: flex; gap: 8px; margin-top: 3px; font-size: 0.64rem; color: #7f868e; }
+.sby-done { font-size: 0.72rem; font-weight: 900; color: #8fe39a; white-space: nowrap; }
+.sby-engage { flex: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;
+    font-size: 0.78rem; color: #2b1f06; background: linear-gradient(180deg, #ffe488, #f3b23a); border: none;
+    white-space: nowrap; }
+.sby-engage:disabled { opacity: 0.45; cursor: default; }
+.sby-sorties { font-size: 0.72rem; font-weight: 800; color: #8d96a0; }
+.sby-cleared { padding: 10px 12px; border-radius: 12px; text-align: center; font-size: 0.82rem; font-weight: 800;
+    color: #ffd75e; background: rgba(255,215,94,0.1); border: 1px dashed rgba(255,215,94,0.45); }
+
+@media (max-width: 420px) {
+    .sby-stats { grid-template-columns: repeat(2, 1fr); }
+}

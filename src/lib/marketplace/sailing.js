@@ -13,7 +13,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
          gunsFor, accuracyFor, hullFor, armorFor } from "@/lib/marketplace/ship-battle.js";
-import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView } from "@/lib/marketplace/fleet.js";
+import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt } from "@/lib/marketplace/fleet.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -625,26 +625,47 @@ export async function sailingBoards(viewerId = null) {
         you: viewerId ? String(r.buyer_id) === String(viewerId) : false,
         ...extra(r),
     }));
+    // WHO HAS FOUGHT DEEPEST. Depth first, then wins: two captains stuck on the same rung are separated by how
+    // much they have actually fought, not by who arrived first.
+    const battles = await db.query(
+        `SELECT s.buyer_id,
+                COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                b.avatar_url, b.avatar_config, b.avatar_cosmetics,
+                COALESCE(s.fleet_best, 0)::int AS depth,
+                COALESCE(s.fleet_wins, 0)::int AS wins
+           FROM mkt_sailing s JOIN mkt_buyer b ON b.id = s.buyer_id
+          WHERE COALESCE(s.fleet_best, 0) > 0
+          ORDER BY depth DESC, wins DESC
+          LIMIT $1`, [BOARD_LIMIT]
+    ).catch(() => []);
+
     const boards = {
         fleet: mark(fleet, (r) => ({ level: r.level, voyages: r.voyages, raids: r.raids, art: boatArt(r.level), form: boatName(r.level) })),
         dig: mark(dig, (r) => ({ points: r.points, forged: r.forged })),
+        battle: mark(battles, (r) => ({ depth: r.depth, wins: r.wins, ship: fleetShip(r.depth)?.name || null })),
     };
 
     // WHERE YOU PLACED, if you didn't make the visible top. A board that can't tell you your own position is a
     // wall of other people's names — and "you're 41st" is the number that makes someone want to climb.
-    const me = { fleet: null, dig: null };
+    const me = { fleet: null, dig: null, battle: null };
     if (viewerId && !boards.fleet.some((r) => r.you)) me.fleet = await placeOf(viewerId, "fleet");
     if (viewerId && !boards.dig.some((r) => r.you)) me.dig = await placeOf(viewerId, "dig");
+    if (viewerId && !boards.battle.some((r) => r.you)) me.battle = await placeOf(viewerId, "battle");
 
     // HOW MANY PEOPLE ARE ON EACH BOARD. "4th" is a number; "4th of 63 captains" is a standing.
     const counts = await db.queryOne(
         `SELECT COUNT(*) FILTER (WHERE COALESCE(voyages_completed,0) > 0
                                     OR COALESCE(speed_level,0) + COALESCE(luck_level,0) + COALESCE(rarity_level,0)
                                      + COALESCE(find_level,0) + COALESCE(raid_level,0) > 0)::int AS fleet,
-                COUNT(*) FILTER (WHERE COALESCE(chest_points,0) > 0)::int AS dig
+                COUNT(*) FILTER (WHERE COALESCE(chest_points,0) > 0)::int AS dig,
+                COUNT(*) FILTER (WHERE COALESCE(fleet_best,0) > 0)::int AS battle
            FROM mkt_sailing`
     ).catch(() => null);
-    return { ...boards, me, totals: { fleet: Number(counts?.fleet || boards.fleet.length), dig: Number(counts?.dig || boards.dig.length) } };
+    return { ...boards, me, totals: {
+        fleet: Number(counts?.fleet || boards.fleet.length),
+        dig: Number(counts?.dig || boards.dig.length),
+        battle: Number(counts?.battle || boards.battle.length),
+    } };
 }
 
 // One member's standing on a board. RANK() over the same ordering the board uses, so the number it reports can
@@ -652,6 +673,22 @@ export async function sailingBoards(viewerId = null) {
 async function placeOf(viewerId, board) {
     const lvl = `(1 + GREATEST(s.speed_level,0) + GREATEST(s.luck_level,0) + GREATEST(s.rarity_level,0)
                    + GREATEST(s.find_level,0) + GREATEST(s.raid_level,0))`;
+    if (board === "battle") {
+        const row = await db.queryOne(
+            `WITH r AS (
+                 SELECT buyer_id, COALESCE(fleet_best,0)::int AS depth, COALESCE(fleet_wins,0)::int AS wins,
+                        RANK() OVER (ORDER BY COALESCE(fleet_best,0) DESC, COALESCE(fleet_wins,0) DESC) AS place
+                   FROM mkt_sailing WHERE COALESCE(fleet_best,0) > 0)
+             SELECT place::int, depth, wins FROM r WHERE buyer_id = $1`, [viewerId]
+        ).catch(() => null);
+        if (!row) return null;
+        const who = await db.queryOne(`SELECT COALESCE(NULLIF(display_name, ''), alias) AS who, avatar_url, avatar_config, avatar_cosmetics FROM mkt_buyer WHERE id = $1`, [viewerId]).catch(() => null);
+        return {
+            place: Number(row.place), who: who?.who || "You", you: true,
+            avatar: avatarImageUrl(who?.avatar_config, who?.avatar_cosmetics) || who?.avatar_url || DEFAULT_AVATAR_URL,
+            depth: row.depth, wins: row.wins, ship: fleetShip(row.depth)?.name || null,
+        };
+    }
     const sql = board === "fleet"
         ? `WITH r AS (
                SELECT s.buyer_id, ${lvl}::int AS level, COALESCE(s.voyages_completed,0)::int AS voyages,
@@ -1473,7 +1510,9 @@ export async function ackEncounter(buyerId) {
 const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
                 COALESCE(s.speed_level,0) AS speed_level, COALESCE(s.luck_level,0) AS luck_level,
                 COALESCE(s.rarity_level,0) AS rarity_level, COALESCE(s.find_level,0) AS find_level,
-                COALESCE(s.raid_level,0) AS raid_level`;
+                COALESCE(s.raid_level,0) AS raid_level,
+                COALESCE(s.gun_level,0) AS gun_level, COALESCE(s.gunnery_level,0) AS gunnery_level,
+                COALESCE(s.hull_level,0) AS hull_level, COALESCE(s.loadout,'round') AS loadout`;
 const RAID_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
 
 // Pick a random passing player to raid — a real member with a hero. They're a target only; they lose nothing.
@@ -1536,56 +1575,9 @@ export async function getRaidTargets(buyerId, limit = 12) {
 }
 
 // A fighter's non-zero equipped stats, in display order, for the battle card.
-function compactStats(stats = {}) {
-    const out = [];
-    for (const key of Object.keys(STAT_META)) {
-        const v = Math.round(Number(stats?.[key]) || 0);
-        if (v) out.push({ key, label: STAT_META[key].label, icon: STAT_META[key].icon, value: v, suffix: STAT_META[key].suffix || "" });
-    }
-    return out;
-}
-// Overall combat rating — boat level is the backbone, equipped GEAR tips the scales (so raiding a well-geared
-// player is riskier, and gear finally matters here too). Offense-weighted.
-function combatPower(stats = {}, level = 1) {
-    const might = Number(stats?.might) || 0, fero = Number(stats?.ferocity) || 0;
-    const critC = Number(stats?.crit_chance) || 0, critP = Number(stats?.crit_power) || 0;
-    return Math.max(1, level) + (might * 0.6 + fero * 0.5 + critC * 0.3 + critP * 0.25) / 6;
-}
-
-// Simulate a ship-vs-ship auto-battle. Both open at 100 HP and trade cannon volleys; damage scales with each
-// side's COMBAT POWER (boat level + gear) so upgrades AND loadout matter, with crits + randomness so it's never
-// a lock. The tier-11 perk lets you STUN the foe once (they skip 2 volleys). Returns the full turn-by-turn
-// script for the client to animate.
-function simulateRaid({ myPower, foePower, myCrit = 0, foeCrit = 0, myCritPow = 35, foeCritPow = 35,
-                       myDmgMult = 1, foeDmgMult = 1, myDmgReduction = 0, canStun = false, openingCrit = false }) {
-    let my = 100, foe = 100;
-    const events = [];
-    // crit magnitude comes from crit_power now (1.5x floor + 1%/point → ~1.85x at 35, the old flat value).
-    const swing = (power, crit, critPow, dmgMult, forceCrit = false) => {
-        let dmg = (7 + randInt(7)) * (1 + Math.max(0, power) * 0.011) * dmgMult;
-        const isCrit = forceCrit || Math.random() < Math.min(0.6, Math.max(0, crit) / 100);
-        if (isCrit) dmg *= 1.5 + Math.max(0, critPow) / 100;
-        return { dmg: Math.max(1, Math.round(dmg)), crit: isCrit };
-    };
-    let foeStun = 0, stunUsed = false;
-    for (let round = 0; round < 40 && my > 0 && foe > 0; round++) {
-        const a = swing(myPower, myCrit, myCritPow, myDmgMult, openingCrit && round === 0); // Sovereign: guaranteed opening crit
-        foe = Math.max(0, foe - a.dmg);
-        events.push({ side: "me", dmg: a.dmg, crit: a.crit, my, foe });
-        if (foe <= 0) break;
-        if (canStun && !stunUsed && round >= 1) { stunUsed = true; foeStun = 2; events.push({ side: "stun", dmg: 0, my, foe }); }
-        if (foeStun > 0) { foeStun -= 1; continue; } // foe frozen this volley
-        const b = swing(foePower, foeCrit, foeCritPow, foeDmgMult);
-        const taken = Math.max(1, Math.round(b.dmg * (1 - myDmgReduction))); // Ironclad softens incoming hits
-        my = Math.max(0, my - taken);
-        events.push({ side: "foe", dmg: taken, crit: b.crit, my, foe });
-    }
-    const win = foe <= 0 ? my > 0 : my > 0 && my >= foe; // decisive KO, else higher HP after the cap (ties → me)
-    return { win, events, myHp: my, foeHp: foe, stunUsed };
-}
-
-// Run the once-a-day raid. Win → gold (+0.5% to copy one random item of theirs; they keep it). Lose → 10–100
-// gold. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
+// Run the once-a-day raid: a SHIP battle against another member's boat and gun deck. Win → gold (+ a chance to
+// copy one random item of theirs; they keep it). Lose → 10–100 gold, and the defender takes a cut for repelling
+// you. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
 export async function doRaid(buyerId, targetId = null) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
@@ -1598,22 +1590,29 @@ export async function doRaid(buyerId, targetId = null) {
 
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
 
-    // Presentation + combat inputs for BOTH fighters (their hero sprite, pet, and equipped gear stats).
-    const [me, myStats, foeStats, mySea] = await Promise.all([
+    // Who you are, and your sea affinity. Equipped GEAR stats are deliberately not read any more: a raid is a
+    // fight between ships, and the boss-fight stat line has no business deciding one.
+    const [me, mySea] = await Promise.all([
         db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        getEquippedStats(buyerId).catch(() => ({})),
-        getEquippedStats(target.id).catch(() => ({})),
         equippedSeaAffinity(buyerId),
     ]);
-    const seaEff = seaEffects(mySea); // Broadside/Ironclad → combat, Plunder → copy odds, Bounty → gold
+    const seaEff = seaEffects(mySea); // Plunder → copy odds, Bounty → gold (Broadside/Ironclad ride the profile)
     const perks = boatPerks(myLevel);
-    const sim = simulateRaid({
-        myPower: combatPower(myStats, myLevel), foePower: combatPower(foeStats, foeLevel),
-        myCrit: Number(myStats?.crit_chance) || 0, foeCrit: Number(foeStats?.crit_chance) || 0,
-        myCritPow: Number(myStats?.crit_power) || 35, foeCritPow: Number(foeStats?.crit_power) || 35,
-        myDmgMult: seaEff.raidDmgMult, myDmgReduction: seaEff.raidDmgReduction,
-        canStun: perks.raidStun, openingCrit: perks.openingCrit,
+    // A raid is a SHIP battle: their gun deck against yours, the same maths the fleet is fought with. It used
+    // to be resolved off equipped GEAR — the Might and Crit Power that fight the weekly boss — so the way to
+    // get better at sailing combat was to go and do something else.
+    const fired = await consumeAmmo(buyerId, row);
+    const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
+    const theirs = shipProfile({
+        name: target.display_name || target.alias || "Rival ship",
+        boatLevel: foeLevel,
+        gunLevel: target.gun_level || 0,
+        gunneryLevel: target.gunnery_level || 0,
+        hullLevel: target.hull_level || 0,
+        ammo: target.loadout || "round",
+        art: boatArt(foeLevel),
     });
+    const sim = simulateShipBattle(mine, theirs);
 
     // Consume the daily raid UNLESS raid-dodge procs (then it's free — you can raid again today).
     const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
@@ -1651,7 +1650,7 @@ export async function doRaid(buyerId, targetId = null) {
         const wins = wonRow?.raids_won || 0;
         if (wins >= BADGE_RAID_MARAUDER) await grantEventBadge(buyerId, "raid_marauder").catch(() => {});
         if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
-        if (sim.myHp >= 100) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never got hit
+        if (sim.myHp >= sim.myMax) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {}); // never took a ball
         if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
         // Earned cosmetic: the "Warborn" border for raid-win milestone (idempotent).
         if (wins >= COSMETIC_WARBORN_WINS) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'warborn') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
@@ -1699,30 +1698,26 @@ export async function doRaid(buyerId, targetId = null) {
     }
     if (sim.win) await dropSeedFrom(buyerId, "sail_raid").catch(() => {}); // plundered seeds on a raid win
 
-    const raidPetArt = await petArtByBuyer([
-        { buyerId, petId: me?.featured_collectible },
-        { buyerId: target.id, petId: target.featured_collectible },
-    ]);
-    const petView = (id) => raidPetArt[id] || null;
-    const result = {
-        outcome: sim.win ? "win" : "lose", gold: goldDelta, itemWon, dodged, stunUsed: sim.stunUsed,
-        battle: sim.events, myHp: sim.myHp, foeHp: sim.foeHp, myLevel,
-        me: {
-            name: me?.display_name || me?.alias || "You", level: myLevel, tier: boatTier(myLevel), boat: boatArt(myLevel),
-            rider: me?.avatar_sprite_url || me?.avatar_url || null,
-            riderFlip: me?.avatar_sprite_url ? me?.avatar_sprite_flip === true : false,
-            pet: petView(buyerId), stats: compactStats(myStats), canStun: perks.raidStun,
+    // The spoils, in the same shape a fleet win reports them, so one scene plays both kinds of battle.
+    const spoils = [];
+    if (goldDelta > 0) spoils.push({ kind: "gold", n: goldDelta });
+    else if (goldDelta < 0) spoils.push({ kind: "goldLost", n: Math.abs(goldDelta) });
+    if (itemWon) spoils.push({ kind: "item", name: itemWon.name });
+    if (dodged) spoils.push({ kind: "free", n: 1 });
+
+    return {
+        ok: true,
+        battle: {
+            kind: "raid", win: sim.win, sunk: sim.sunk, dodged,
+            me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel },
+            foe: { name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns,
+                   hp: theirs.hp, ammo: theirs.ammo.id, boss: false,
+                   flavor: "A passing ship, and everything they are carrying." },
+            events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
+            reward: spoils,
         },
-        foe: {
-            name: target.display_name || target.alias, level: foeLevel, tier: boatTier(foeLevel), boat: boatArt(foeLevel),
-            rider: target.avatar_sprite_url || target.avatar_url || null,
-            riderFlip: target.avatar_sprite_url ? target.avatar_sprite_flip === true : false,
-            pet: petView(target.id), stats: compactStats(foeStats),
-        },
-        // Back-compat shim for any older client build still reading .target.
-        target: { name: target.display_name || target.alias, level: foeLevel, boat: boatArt(foeLevel) },
+        ...(await getSailingState(buyerId)),
     };
-    return { ok: true, raidResult: result, ...(await getSailingState(buyerId)) };
 }
 
 // The "you got raided (and won)" welcome-back report: every raid you repelled since you last saw it, grouped
@@ -1934,7 +1929,7 @@ export async function doFleetBattle(buyerId, rank = null) {
         battle: {
             kind: "fleet", rank: want, first, win: sim.win, sunk: sim.sunk,
             me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel },
-            foe: { name: foe.name, cls: ship.cls, art: ship.art, guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor },
+            foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor },
             events: sim.events, myMax: sim.myMax, foeMax: sim.foeMax, myHp: sim.myHp, foeHp: sim.foeHp,
             reward: paid,
         },
