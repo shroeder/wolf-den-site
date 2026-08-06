@@ -2,6 +2,7 @@
 
 import { Img, PART_NAME, PART_SPRITE, ToolPanel } from "@/components/mining/kit";
 import { SMELT_MAX_BATCHES } from "@/lib/marketplace/smelt-heat.js";
+import CollectionPanel from "@/components/CollectionPanel";
 
 // ── THE SMELTERY ─────────────────────────────────────────────────────────────────────────────────────────────
 // Your actual furnace, standing in the room, upgrading its sprite as you build it out. Ore of a tier melts
@@ -79,6 +80,12 @@ export default function SmeltTab({ s, msg, busy, smelting, onSmelt, upgrade }) {
                 artClass="is-furnace" trackClass="is-forge"
                 maxedNote="Fully built — every smelting upgrade bought."
             />
+
+            {/* The mine's chases, permanently on the screen their bonuses feed. */}
+            {s.collections?.length ? (
+                <CollectionPanel sets={s.collections} title="⛏️ Depths collections"
+                    blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
+            ) : null}
 
             <p className="mine-hint">Ore of a tier melts into that tier&rsquo;s forge part. The Crucible lowers what each part costs you, the Bellows sometimes throws in an extra, and Flux sometimes lifts one a whole tier.</p>
         </>

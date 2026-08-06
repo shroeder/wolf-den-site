@@ -784,8 +784,18 @@ export async function getMiningState(buyerId) {
     const lvls = totalLevels(row);
     const tripsUsed = Number(row?.trips_used) || 0;
     const run = row?.run_json && !row.run_json.over ? row.run_json : null;
+    // The mine's three COLLECTIONS (Delver / Rockbreaker / Founder), shown permanently on the Smeltery tab —
+    // their bonuses land down here, so this is where the chase belongs.
+    const collections = await (async () => {
+        const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+            import("@/lib/marketplace/sets.js"),
+            import("@/lib/marketplace/inventory.js"),
+        ]);
+        return collectionsForFeature("depths", await getOwnedItemIds(buyerId).catch(() => []));
+    })().catch(() => []);
     return {
         unlocked: true,
+        collections,
 
         pick: pickForm(lvls),
         trips: {

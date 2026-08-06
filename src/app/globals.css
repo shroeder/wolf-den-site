@@ -12703,3 +12703,45 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .farm-status > summary::after { content: " ▾"; color: #8a939d; }
 .farm-status[open] > summary::after { content: " ▴"; }
 .farm-status > *:not(summary) { margin-bottom: 10px; }
+
+/* ── COLLECTIONS ── one panel, four features (see CollectionPanel.js). Modelled on the Forge's parts display:
+   every slot visible whether or not you have it, because the empty ones are the reason to keep looking. */
+.coll { padding: 12px 13px 13px; }
+.coll-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.coll-head strong { font-size: 1rem; }
+.coll-sub { font-size: 0.76rem; color: #8a9099; }
+.coll-set { margin-top: 12px; padding: 10px 11px; border-radius: 13px;
+    background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.1); }
+.coll-set.is-complete { border-color: rgba(255,215,94,0.45); background: rgba(255,215,94,0.06); }
+.coll-set-head { display: flex; align-items: baseline; gap: 8px; }
+.coll-set-head b { font-size: 0.92rem; }
+.coll-count { margin-left: auto; font-size: 0.72rem; font-weight: 800; color: #9aa0a6; white-space: nowrap; }
+.coll-count.is-done { color: #ffd75e; }
+.coll-bar { height: 5px; margin: 7px 0 9px; border-radius: 999px; background: rgba(0,0,0,0.35); overflow: hidden; }
+.coll-bar > i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #4aa3ff, #8fd8ff); transition: width .4s ease; }
+.coll-set.is-complete .coll-bar > i { background: linear-gradient(90deg, #ffd75e, #ffb648); }
+/* A row of slots that scrolls inside itself. min-width:0 because these panels sit in grids on some screens —
+   without it the row's content width pushes the whole page sideways (the farm learned this the hard way). */
+.coll-pieces { min-width: 0; display: flex; gap: 7px; overflow-x: auto; overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch; padding-bottom: 3px; scrollbar-width: none; }
+.coll-pieces::-webkit-scrollbar { display: none; }
+.coll-piece { position: relative; flex: 0 0 auto; width: 92px; display: grid; justify-items: center; gap: 2px;
+    padding: 8px 5px 9px; border-radius: 11px; text-align: center;
+    background: rgba(255,255,255,0.04); border: 1px dashed rgba(255,255,255,0.16); opacity: 0.6; }
+.coll-piece.is-found { border-style: solid; border-color: rgba(255,215,94,0.45);
+    background: rgba(255,215,94,0.07); opacity: 1; }
+.coll-piece-art { width: 34px; height: 34px; object-fit: contain; }
+.coll-piece.is-found .coll-piece-art { filter: drop-shadow(0 2px 7px rgba(255,215,94,0.35)); }
+.coll-piece:not(.is-found) .coll-piece-art { filter: grayscale(1) brightness(0.6); }
+.coll-piece b { max-width: 100%; font-size: 0.66rem; font-weight: 800; line-height: 1.15;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coll-piece em { font-style: normal; font-size: 0.6rem; line-height: 1.2; color: #8a9099; }
+.coll-piece.is-found em { color: #cdd3d8; }
+.coll-tick { position: absolute; top: -5px; right: -4px; width: 16px; height: 16px; border-radius: 50%;
+    display: grid; place-items: center; font-style: normal; font-size: 9px; font-weight: 900;
+    color: #3a2c08; background: #ffd75e; }
+.coll-tiers { display: grid; gap: 3px; margin-top: 9px; font-size: 0.72rem; color: #7f868e; }
+.coll-tiers .is-on { color: #8fe39a; font-weight: 700; }
+.coll-cap { color: #9a8a5e; }
+.coll-cap.is-on { color: #ffd75e; font-weight: 800; }

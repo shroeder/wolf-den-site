@@ -176,6 +176,15 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
     }));
 }
 
+// The farm's own collection sets, for the permanent panel on the farm screen. Owned-based (see sets.js).
+async function farmCollections(buyerId) {
+    const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+        import("@/lib/marketplace/sets.js"),
+        import("@/lib/marketplace/inventory.js"),
+    ]);
+    return collectionsForFeature("farm", await getOwnedItemIds(buyerId).catch(() => []));
+}
+
 // Resolve a farm owner by @alias (for inspecting someone else's farm). Returns { id, name, alias } or null.
 export async function resolveFarmOwner(alias) {
     if (!alias) return null;
@@ -353,7 +362,7 @@ export async function getFarm(ownerId, viewerId) {
     // using your treats.) pettedToday only limits YOUR OWN pets; a friend's pets you can pet freely (budget cap).
     const extras = viewerId ? await farmMineBits(viewerId, mine) : { treats: [], treatShop: [], wallet: null, petting: null, pigAvailable: false };
     // Your crops only show on your own farm (you tend your own garden).
-    const [garden, ratingBits, placements, decorations, crownCfg, neighbours] = await Promise.all([
+    const [garden, ratingBits, placements, decorations, crownCfg, neighbours, collections] = await Promise.all([
         mine ? getGarden(ownerId).catch(() => null) : Promise.resolve(null),
         farmRatingBits(ownerId, viewerId).catch(() => ({ rating: null })),
         getPlacements(ownerId).catch(() => []), // the OWNER's placed decorations — rendered on any farm
@@ -362,6 +371,9 @@ export async function getFarm(ownerId, viewerId) {
         // Only on your OWN farm: the "who haven't I visited today" strip. On someone else's you are already
         // doing the visiting, and a list of other people to go and see is the last thing that screen needs.
         mine ? farmNeighbours(viewerId, { limit: 8 }).catch(() => []) : Promise.resolve([]),
+        // The farm COLLECTIONS (Harvester / Forager) — shown permanently on the farm screen, because that is
+        // where their bonuses land and where somebody chasing them is standing.
+        mine ? farmCollections(viewerId).catch(() => []) : Promise.resolve([]),
     ]);
     return {
         owner: { id: owner.id, name: owner.display_name || owner.alias || "Member", alias: owner.alias || null, avatarUrl: owner.avatar_sprite_url || null, avatarFlip: owner.avatar_sprite_flip === true, border: owner.equipped_border && owner.equipped_border !== "none" ? owner.equipped_border : null },
@@ -383,6 +395,7 @@ export async function getFarm(ownerId, viewerId) {
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
         crownCfg, // loot-pig crown placement
         neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
+        collections, // own farm only: the Harvester / Forager chases, always visible
         ...extras,
         ...ratingBits,
     };

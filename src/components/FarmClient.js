@@ -11,6 +11,7 @@ import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
+import CollectionPanel from "@/components/CollectionPanel";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
@@ -1252,6 +1253,13 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ) : null}
                 {!farm.mine && farm.rating ? (
                     <FarmRatingBar rating={farm.rating} ownerName={farm.owner.name} mine={farm.mine} busy={rateBusy} burst={rateBurst} note={rateNote} onRate={rateFarmAt} />
+                ) : null}
+
+                {/* GARDEN tab also carries the farm CHASES — the Harvester and Forager collections belong on
+                    the screen their bonuses land on, not three taps away on the equipment page. */}
+                {farm.mine && panel === "garden" && farm.collections?.length ? (
+                    <CollectionPanel sets={farm.collections} title="🌾 Farm collections"
+                        blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
                 ) : null}
 
                 {/* STANDING — your love, where that places you, and the way to somebody else's farm. */}

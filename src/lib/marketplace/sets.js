@@ -1,6 +1,6 @@
 import "server-only";
 
-import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeSea, describeFarm, describeDepth } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 
 // EVERY SET NEEDS ITS OWN IDENTITY AT 2 PIECES.
@@ -97,7 +97,7 @@ export const ITEM_SETS = [
     {
         // The aspirational SAILING set — bonuses are SEA affinity (raids/digging/voyages), NOT boss power, and the
         // capstone is a build-defining raid boon. Pieces are scattered sea-themed gear (a real collect-them-all chase).
-        id: "corsair", collection: true, name: "Dread Corsair's Regalia",
+        id: "corsair", collection: true, feature: "sea", name: "Dread Corsair's Regalia",
         items: ["heavens_trident", "orb_of_tides", "girded_plate", "merchants_cape", "fortune_signet"],
         bonuses: [{ need: 2, sea: { plunder: 4 } }, { need: 4, sea: { broadside: 6, ironclad: 6 } }],
         capstone: { bonusRaids: 1, doubleRaidGold: true, sea: { plunder: 6, bounty: 6 },
@@ -108,14 +108,14 @@ export const ITEM_SETS = [
     // capstones are farm powers read+applied in farm-crops.js (setFarmGrowBonus / setFarmDoubleHarvest). Pieces
     // are utility-slot gear (helmet/belt/back/amulet/off_hand/ring) with FARM affixes — see items.js.
     {
-        id: "harvester", collection: true, name: "Harvester's Garb",
+        id: "harvester", collection: true, feature: "farm", name: "Harvester's Garb",
         items: ["harvesters_hat", "reapers_girdle", "sheafbound_cloak", "amber_grain_pendant"],
         bonuses: [{ need: 2, farm: { harvestLuck: 4 } }, { need: 4, farm: { harvestLuck: 6, goldHarvest: 8 } }],
         capstone: { farmDoubleYield: 0.2, desc: "Bountiful Reaping: each harvest has a 20% chance to yield DOUBLE gold." },
         weakness: null,
     },
     {
-        id: "forager", collection: true, name: "Forager's Kit",
+        id: "forager", collection: true, feature: "farm", name: "Forager's Kit",
         items: ["foragers_basket", "clover_signet", "deep_seed_pouch", "foxglove_charm"],
         bonuses: [{ need: 2, farm: { seedLuck: 5 } }, { need: 4, farm: { seedLuck: 7, growSpeed: 5 } }],
         capstone: { farmGrow: 0.15, desc: "Green Season: your crops grow 15% faster." },
@@ -126,7 +126,7 @@ export const ITEM_SETS = [
         // set whose bonuses feed the WHEEL itself (Lucky Spin proc gold + a free-respin capstone), read in
         // spin.js — NOT boss power. `full` = 8 because two pieces share the main_hand slot (blade + axe), so all ten
         // can never be worn at once; the capstone unlocks at 8 equipped.
-        id: "wheelwarden", collection: true, name: "Wheelwarden's Fortune",
+        id: "wheelwarden", collection: true, feature: "wheel", name: "Wheelwarden's Fortune",
         items: ["wg_helm", "wg_shield", "wg_ring", "wg_cloak", "wg_amulet", "wg_blade", "wg_chest", "wg_belt", "wg_boots", "wg_axe"],
         full: 8,
         // `luck` = % CHANCE per spin to trigger a Lucky Spin (bonus gold on gold prizes), NOT a guaranteed
@@ -142,7 +142,7 @@ export const ITEM_SETS = [
     // ── DEPTHS SETS ── one per verb the Mine asks of you. Bonuses are DEPTH affinity (see items.js DEPTH_META),
     // never boss power, and the capstones are mine-only powers read in mining.js.
     {
-        id: "delver", collection: true, name: "Delver's Kit",
+        id: "delver", collection: true, feature: "depths", name: "Delver's Kit",
         items: ["dv_lamp_helm", "dv_rope_belt", "dv_lodestone", "dv_shoring_pack"],
         bonuses: [{ need: 2, depth: { nerve: 3 } }, { need: 4, depth: { nerve: 5, lodesense: 4 } }],
         // The push-your-luck loop's dream: one free mistake. You still collapse — you just walk away with the
@@ -151,14 +151,14 @@ export const ITEM_SETS = [
         weakness: null,
     },
     {
-        id: "rockbreaker", collection: true, name: "Rockbreaker's Rig",
+        id: "rockbreaker", collection: true, feature: "depths", name: "Rockbreaker's Rig",
         items: ["rb_maul", "rb_gauntlet", "rb_assay_ring", "rb_hobnails"],
         bonuses: [{ need: 2, depth: { hew: 4 } }, { need: 4, depth: { hew: 6, prospect: 4 } }],
         capstone: { depthRichSeam: 0.15, desc: "Rich Seam: a 15% chance a cracked seam pays its ore TWICE." },
         weakness: null,
     },
     {
-        id: "founder", collection: true, name: "Founder's Regalia",
+        id: "founder", collection: true, feature: "depths", name: "Founder's Regalia",
         items: ["fd_apron", "fd_tongs", "fd_bellows_charm", "fd_slagsifter"],
         bonuses: [{ need: 2, depth: { bellows: 4 } }, { need: 4, depth: { bellows: 5, crucible: 5 } }],
         capstone: { depthFreeSmelt: 0.18, desc: "Cold Crucible: an 18% chance a smelt costs you no ore at all." },
@@ -170,6 +170,7 @@ export const ITEM_SETS = [
 // share a slot and the whole set can't be worn at once — e.g. the wheel set's two main-hand pieces).
 const fullNeed = (set) => set.full || set.items.length;
 
+const SET_BY_ID = Object.fromEntries(ITEM_SETS.map((s) => [s.id, s]));
 const SET_BY_ITEM = {};
 for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
 
@@ -177,6 +178,14 @@ for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
 // invisible in the browser, but fully functional for whoever actually holds the pieces (the bonus maths below
 // walks ITEM_SETS unfiltered on purpose — an owner testing the feature should get the real set bonus).
 export const PUBLIC_ITEM_SETS = ITEM_SETS.filter((s) => !s.ownerOnly);
+
+// The collections belonging to one feature, in the shape the shared panel renders. Called by the farm, the
+// mine, sailing and the wheel so each screen can show its own chase permanently — the pieces, what each one
+// gives, the tiers and the capstone — the way the Forge already shows its parts.
+export function collectionsForFeature(feature, ownedIds) {
+    const own = ownedIds || [];
+    return getSetsOverview([], own).filter((s) => s.collection && SET_BY_ID[s.id]?.feature === feature);
+}
 
 // The set an item belongs to (for display on item cards), or null.
 export function setForItem(itemId) {
@@ -403,6 +412,14 @@ export function getSetsOverview(equippedIds, ownedIds) {
                 slot: it?.slot || null,
                 icon: it?.icon || null,
                 statsText: describeStats(it?.stats) || "",
+                // WHAT THIS ONE PIECE GIVES YOU, on its own. A collection panel that lists the set's tiers but
+                // not the slots' own bonuses is only telling you half of what you collected — and for the farm
+                // and mine pieces the affix IS the reason to want it.
+                utilText: [
+                    it?.sea ? describeSea(it.sea) : "",
+                    it?.farm ? describeFarm(it.farm) : "",
+                    it?.depth ? describeDepth(it.depth) : "",
+                ].filter(Boolean).join(" · ") || "",
                 signature: sig ? `${sig.label}: ${sig.desc}` : null,
                 flavor: it?.flavor || null,
                 owned: own.has(id),
