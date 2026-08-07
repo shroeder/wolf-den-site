@@ -59,7 +59,7 @@ export async function grantBossTrophy({ bossId, bossName, imageUrl, winnerId, da
             const buf = Buffer.from(await (await fetch(imageUrl)).arrayBuffer());
             const url = await editImage(buf, STATUE_PROMPT, {
                 size: "1024x1024", pathPrefix: "marketplace/decorations/trophy", quality: "medium",
-                resizeTo: 512, deHalo: true,
+                resizeTo: 512, deHalo: true, frameSprite: true,
                 meta: { origin: "boss", subject: bossId, label: `Boss trophy — ${bossName || bossId}` },
             });
             if (url) {

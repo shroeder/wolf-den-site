@@ -2,6 +2,7 @@ import "server-only";
 
 import { put } from "@vercel/blob";
 import { logGeneration, logText, estimateImageCost } from "@/lib/marketplace/ai-ledger.js";
+import { reframeSprite } from "@/lib/marketplace/sprite-cleanup.js";
 import sharp from "sharp";
 
 // AI art generation via OpenAI's image model (gpt-image-1), stored to Vercel Blob. Reuses the same
@@ -242,7 +243,7 @@ function qualityForOutput(resizeTo) {
     return resizeTo && resizeTo <= TILE_PX ? "low" : "medium";
 }
 
-export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = null, faceRight = false, resizeTo = null, deHalo = false, meta = {} } = {}) {
+export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = null, faceRight = false, resizeTo = null, deHalo = false, frameSprite = false, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
     quality = quality || qualityForOutput(resizeTo);
@@ -272,6 +273,11 @@ export async function generateImage(prompt, { size = "1024x1024", pathPrefix = "
     // Future-proof the die-cut white halo: safely peel it off die-cut sprite generations (no-ops when there's
     // no halo, keeps the original if a pale subject would go ragged). Callers opt in; never used on scenes.
     if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
+    // Re-seat the subject with a consistent margin (sprite-cleanup.js). This cannot restore a subject the
+    // model drew off the edge — those pixels were never in the file — but it stops a merely-TIGHT draw from
+    // reading as guillotined, and it makes two sprites side by side the same apparent size. It deliberately
+    // leaves an already-clipped sprite alone; padding a crop just centres it and makes it look intended.
+    if (frameSprite) buffer = (await reframeSprite(buffer, { margin: 0.08 }).catch(() => ({ buffer }))).buffer;
     // Downscale + WebP on the way out. `resizeTo` (callers that already asked for a smaller sprite, e.g.
     // badges at ~24px) still wins; everything else lands on the SPRITE_MAX_PX cap instead of shipping the raw
     // 1024px PNG. Transparency is preserved either way.
@@ -453,7 +459,7 @@ async function editOnce(imageBuffer, prompt, { size, quality, key, model }) {
  * Returns the stored URL, unchanged from before the gate existed, so the four callers that don't validate
  * carry on working. A caller that wants the verdict of the KEPT image closes over it from `validate`.
  */
-export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, resizeTo = null, validate = null, attempts = 1, meta = {} } = {}) {
+export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathPrefix = "marketplace/ai", quality = "low", model = "gpt-image-1", faceRight = false, deHalo = false, frameSprite = false, resizeTo = null, validate = null, attempts = 1, meta = {} } = {}) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
@@ -485,6 +491,8 @@ export async function editImage(imageBuffer, prompt, { size = "1024x1024", pathP
 
     if (faceRight) buffer = (await orientFacingRight(buffer, key)).buffer;
     if (deHalo) { const { deHaloBuffer } = await import("@/lib/marketplace/dehalo.js"); buffer = await deHaloBuffer(buffer); }
+    // Consistent margin — see the note on the same line in generateImage.
+    if (frameSprite) buffer = (await reframeSprite(buffer, { margin: 0.08 }).catch(() => ({ buffer }))).buffer;
     const url = await storeImage(buffer, pathPrefix, { maxWidth: resizeTo || SCENE_MAX_PX });
     // An edit bills the reference image back in as input on top of the output, so it costs more than a fresh
     // draw of the same size — estimateImageCost() adds that when edit is true.

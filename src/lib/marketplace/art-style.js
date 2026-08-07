@@ -35,9 +35,16 @@ export const NEGATIVE_STYLE =
     "not pixel art.";
 
 // A single object floating free, for anything composited into the UI (items, pets, badges, decorations, chests).
+// "filling most of the frame" is what sliced the ears and feet off a player's Dog monster. The model reads it
+// as licence to draw past the edge, and a pixel drawn outside the canvas was never in the file — no amount of
+// downstream processing gets it back. Ask for the margin explicitly, in numbers, and say what must not touch.
 export const DIE_CUT =
-    "A SINGLE isolated subject, centred and filling most of the frame, on a FULLY TRANSPARENT background — " +
-    "nothing behind it at all: no backdrop, no scene, no ground, no shadow beneath it.";
+    "A SINGLE isolated subject, CENTRED and drawn ENTIRELY INSIDE the frame with clear empty space on all four " +
+    "sides — roughly 8% of the image empty above, below, left and right. NO part of the subject may touch or " +
+    "run off any edge of the image: not the top of the head, ears, horns, hat or antennae, not the feet or " +
+    "base, not a tail, wing, weapon or outstretched limb. Fit the WHOLE subject in view, smaller rather than " +
+    "cropped. On a FULLY TRANSPARENT background — nothing behind it at all: no backdrop, no scene, no ground, " +
+    "no shadow beneath it.";
 
 // A full-bleed environment, for backgrounds and boss/key art.
 export const SCENE =
