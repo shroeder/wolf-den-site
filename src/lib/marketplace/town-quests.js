@@ -16,7 +16,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // VARIANTS (different target/reward); a rotating handful of activities is FEATURED each day, one variant apiece,
 // chosen deterministically from the date so every member sees the same quests, stable for the whole day.
 const QUEST_POOL = {
-    rally: { emoji: "⚔️", variants: [
+    rally: { icon: "GiCrossedSwords", variants: [
         { label: "Rally the Plaza", desc: "Land 15 hits on a town raid", target: 15, gold: 150 },
         { label: "Hold the Line", desc: "Land 30 hits on a town raid", target: 30, gold: 280 },
     ] },
@@ -24,67 +24,67 @@ const QUEST_POOL = {
     // up with people posting the same wolf emoji five times in a row to clear it. A daily that rewards VOLUME of
     // talking buys spam, not conversation — there is no target number that doesn't. If social ever comes back it
     // has to reward something you can't grind (being replied to, being thanked), not message count.
-    civic: { emoji: "🏗️", variants: [
+    civic: { icon: "GiHammerNails", variants: [
         { label: "Civic Duty", desc: "Chip in to the plaza fund", target: 1, gold: 100 },
         { label: "Town Benefactor", desc: "Chip in to the plaza fund 3 times", target: 3, gold: 240 },
     ] },
-    patron: { emoji: "🍺", variants: [
+    patron: { icon: "GiBeerStein", variants: [
         { label: "Tavern Patron", desc: "Down your daily pint (or win a dice hand)", target: 1, gold: 60 },
         { label: "Life of the Party", desc: "Enjoy the tavern 3 times today", target: 3, gold: 140 },
     ] },
-    well: { emoji: "🪙", variants: [
+    well: { icon: "GiWaterSplash", variants: [
         { label: "Make a Wish", desc: "Toss a coin in the Wishing Well", target: 1, gold: 70 },
     ] },
-    merchant: { emoji: "🧳", variants: [
+    merchant: { icon: "GiSwapBag", variants: [
         { label: "Window Shopping", desc: "Buy a chest from the Traveling Merchant", target: 1, gold: 90 },
     ] },
-    harvest: { emoji: "🌾", variants: [
+    harvest: { icon: "GiWheat", variants: [
         { label: "Bring in the Sheaves", desc: "Harvest 5 crops on your farm", target: 5, gold: 110 },
         { label: "Full Barn", desc: "Harvest 12 crops on your farm", target: 12, gold: 220 },
     ] },
-    angler: { emoji: "🎣", variants: [
+    angler: { icon: "GiFishingHook", variants: [
         { label: "Something for the Pot", desc: "Land 3 fish", target: 3, gold: 100 },
         { label: "Full Creel", desc: "Land 8 fish", target: 8, gold: 210 },
     ] },
     // Digs are random PROCS during a voyage, not something you can decide to do — so these were written as if
     // they were. Across 207 member-days the best anyone has ever managed is 8, and the average is 1.6, which
     // made "dig 15" literally unachievable and "dig 6" a 95th-percentile day. Retuned to the real curve.
-    voyage: { emoji: "⛵", variants: [
+    voyage: { icon: "GiSailboat", variants: [
         { label: "Weigh Anchor", desc: "Dig 2 times at sea", target: 2, gold: 120 },
         { label: "Deep Water", desc: "Dig 5 times at sea", target: 5, gold: 250 },
     ] },
-    slayer: { emoji: "⚔️", variants: [
+    slayer: { icon: "GiBloodySword", variants: [
         { label: "Blood on the Blade", desc: "Strike the weekly boss 3 times", target: 3, gold: 130 },
         { label: "Boss Hunter", desc: "Strike the weekly boss 8 times", target: 8, gold: 260 },
     ] },
-    smith: { emoji: "🔨", variants: [
+    smith: { icon: "GiBlacksmith", variants: [
         { label: "Sparks Fly", desc: "Salvage or enhance 2 items at the Forge", target: 2, gold: 120 },
     ] },
-    cook: { emoji: "🍳", variants: [
+    cook: { icon: "GiCookingPot", variants: [
         { label: "Something on the Stove", desc: "Cook 2 dishes", target: 2, gold: 120 },
     ] },
-    beastfriend: { emoji: "🐾", variants: [
+    beastfriend: { icon: "GiPawPrint", variants: [
         { label: "Good Company", desc: "Feed or pet your pets 3 times", target: 3, gold: 100 },
     ] },
     // The mine's three verbs. The Quartermaster could not ask for any of them before — the whole feature was
     // invisible to both quest systems because mining.js never bumped a metric.
-    delver: { emoji: "🪜", variants: [
+    delver: { icon: "GiLadder", variants: [
         { label: "Into the Dark", desc: "Take 6 steps down the tunnel", target: 6, gold: 130 },
         { label: "Bottom of the Shaft", desc: "Take 12 steps down the tunnel", target: 12, gold: 280 },
     ] },
-    collier: { emoji: "⛏️", variants: [
+    collier: { icon: "GiMining", variants: [
         { label: "Swing a Pick", desc: "Crack open 2 seams", target: 2, gold: 120 },
         { label: "Day at the Face", desc: "Crack open 5 seams", target: 5, gold: 250 },
     ] },
-    founder: { emoji: "🔥", variants: [
+    founder: { icon: "GiFlame", variants: [
         { label: "Fire the Furnace", desc: "Pour 2 smelts", target: 2, gold: 120 },
         { label: "Keep It Roaring", desc: "Pour 5 smelts", target: 5, gold: 240 },
     ] },
-    delver_deep: { emoji: "🗝️", variants: [
+    delver_deep: { icon: "GiKeyLock", variants: [
         { label: "Into the Dungeon", desc: "Clear 6 dungeon floors", target: 6, gold: 150 },
         { label: "All the Way Down", desc: "Clear 15 dungeon floors", target: 15, gold: 300 },
     ] },
-    hoarder: { emoji: "🧰", variants: [
+    hoarder: { icon: "GiChest", variants: [
         { label: "Crack Them Open", desc: "Open 3 chests", target: 3, gold: 110 },
     ] },
 };
@@ -113,7 +113,7 @@ function dailyQuests(day, buyerId = null) {
     return chosen.map((key) => {
         const pool = QUEST_POOL[key];
         const variant = pool.variants[hashStr(day + ":v:" + key) % pool.variants.length];
-        return { key, emoji: pool.emoji, ...variant };
+        return { key, icon: pool.icon, ...variant };
     });
 }
 function todayQuestByKey(day, buyerId = null) {

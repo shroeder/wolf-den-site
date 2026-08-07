@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as Gi from "react-icons/gi";
 
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
@@ -565,6 +566,13 @@ function BossRaidModal({ ev, bossArt, you, onStrike, onClose }) {
         </div>
     );
 }
+
+// A bounty's glyph. Game-Icons, not emoji: emoji are drawn by the operating system, so the same bounty is a
+// different picture on an iPhone, an Android and a laptop, and none of the three match this game's art.
+const QuestIcon = ({ name }) => {
+    const C = Gi[name] || Gi.GiScrollUnfurled;
+    return <span className="tw-quest-emoji" aria-hidden="true"><C /></span>;
+};
 
 export default function TownClient({ initial }) {
     const [state, setState] = useState(initial || null);
@@ -1601,14 +1609,14 @@ export default function TownClient({ initial }) {
                                 const pct = Math.max(0, Math.min(100, Math.round((q.progress / q.target) * 100)));
                                 return (
                                     <div key={q.key} className={`tw-quest${q.claimed ? " is-claimed" : ""}`}>
-                                        <span className="tw-quest-emoji" aria-hidden="true">{q.emoji}</span>
+                                        <QuestIcon name={q.icon} />
                                         <div className="tw-quest-body">
-                                            <div className="tw-quest-top"><strong>{q.label}</strong><span className="tw-quest-reward">🪙 {q.gold}</span></div>
+                                            <div className="tw-quest-top"><strong>{q.label}</strong><span className="tw-quest-reward"><img src="/images/ui/coin.png" alt="" className="tw-quest-coin" draggable="false" />{q.gold}</span></div>
                                             <div className="muted" style={{ fontSize: "0.76rem" }}>{q.desc}</div>
                                             <div className="tw-quest-bar"><span style={{ width: `${pct}%` }} /></div>
                                             <div className="tw-quest-prog muted">{q.progress}/{q.target}</div>
                                         </div>
-                                        {q.claimed ? <span className="tw-quest-tag is-done">✅</span>
+                                        {q.claimed ? <span className="tw-quest-tag is-done" aria-label="Claimed"><Gi.GiCheckMark /></span>
                                             : q.done ? <button type="button" className="tw-quest-claim" disabled={questBusy} onClick={() => claimQuest(q.key)}>Claim</button>
                                                 : null}
                                     </div>
@@ -2546,7 +2554,11 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-quests { display: flex; flex-direction: column; gap: 10px; }
 .tw-quest { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
 .tw-quest.is-claimed { opacity: 0.6; }
-.tw-quest-emoji { font-size: 26px; flex: 0 0 auto; }
+/* A drawn glyph, not an emoji — sized and coloured to the card instead of to whatever the OS ships. */
+.tw-quest-emoji { display: grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px;
+    font-size: 26px; color: #ffd28a; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.tw-quest-coin { width: 15px; height: 15px; object-fit: contain; vertical-align: -2px; margin-right: 4px; }
+.tw-quest-tag.is-done { display: grid; place-items: center; font-size: 22px; color: #8fe39a; }
 .tw-quest-body { flex: 1 1 auto; min-width: 0; }
 .tw-quest-top { display: flex; align-items: center; gap: 8px; }
 .tw-quest-top strong { font-size: 0.9rem; color: #f2ead9; }
