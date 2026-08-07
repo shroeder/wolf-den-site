@@ -13251,17 +13251,42 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-track { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
     padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1); }
-.sby-track-ico { width: 26px; height: 26px; color: #ffd75e; }
+.sby-track-ico { width: 44px; height: 44px; flex: none; object-fit: contain; color: #ffd75e;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
 .sby-track-body { min-width: 0; }
 .sby-track-body b { display: block; font-size: 0.86rem; font-weight: 800; }
 .sby-track-body em { font-style: normal; font-size: 0.68rem; line-height: 1.35; color: #8d96a0; }
 .sby-pips { display: flex; gap: 3px; margin-top: 5px; }
 .sby-pips i { width: 12px; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.14); }
 .sby-pips i.on { background: linear-gradient(90deg, #ffd75e, #ffb648); }
-.sby-buy { flex: none; padding: 7px 12px; border-radius: 10px; cursor: pointer; font-weight: 900; font-size: 0.76rem;
-    color: #06212b; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border: none; white-space: nowrap; }
-.sby-buy:disabled { opacity: 0.45; cursor: default; }
-.sby-buy.is-maxed { background: rgba(255,255,255,0.1); color: #9aa0a6; }
+/* ── THE PRICE BUTTON ─────────────────────────────────────────────────────────────────────────────────────
+   This is the moment you decide to spend, and it was a flat pale-teal pill with a number on it — a form
+   control, not a purchase. It is a struck coin plate now: the currency's own metal, a raised edge, a real
+   press with the shadow collapsing under it, and the coin sprite big enough to tell doubloons from gold at a
+   glance. Sized past the 44px tap target because it is the only thing on the row you can actually press. */
+.sby-buy { flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 44px;
+    padding: 8px 14px 8px 11px; border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 0.92rem;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.01em; white-space: nowrap;
+    color: #10306b; background: linear-gradient(180deg, #b9f0ff 0%, #6fd8f6 48%, #35a9d4 100%);
+    border: 1px solid rgba(210,248,255,0.9);
+    box-shadow: 0 4px 0 #1d6f92, 0 6px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.85);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.45);
+    transition: transform .1s ease, box-shadow .1s ease, filter .15s ease; }
+.sby-buy:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 0 0 #1d6f92, 0 2px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.7); }
+@media (hover: hover) { .sby-buy:not(:disabled):hover { filter: brightness(1.08); } }
+/* GOLD, when the track is bought with gold rather than doubloons — the metal is the label. */
+.sby-buy.is-gold { color: #4a2f05; background: linear-gradient(180deg, #ffeaa0 0%, #ffcc4d 48%, #e09a1c 100%);
+    border-color: rgba(255,240,190,0.95); box-shadow: 0 4px 0 #a06a12, 0 6px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.85); }
+.sby-buy.is-gold:active:not(:disabled) { box-shadow: 0 0 0 #a06a12, 0 2px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.7); }
+/* CANNOT AFFORD is a different thing from "disabled" — it should read as a price you have not reached, not as
+   a broken button, so the metal goes cold rather than the whole thing going translucent. */
+.sby-buy:disabled { cursor: default; filter: grayscale(0.85) brightness(0.62);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2); transform: none; }
+.sby-buy.is-maxed { min-height: 0; padding: 7px 12px; font-size: 0.76rem; color: #9aa0a6;
+    background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16);
+    box-shadow: none; text-shadow: none; filter: none; }
+.sby-buy-coin { width: 22px; height: 22px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45)); }
 
 /* Ammunition: a rack you load from, not a list of upgrades. */
 .sby-ammo { display: grid; gap: 7px; }

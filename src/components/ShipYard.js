@@ -34,11 +34,20 @@ const Icon = ({ name, className }) => {
     return <C className={className} aria-hidden="true" />;
 };
 
+// A painted sprite per track, keyed by the track itself — the four things doubloons actually buy were a flat
+// single-colour glyph while every other thing this game asks you to tap is an object. Falls back to the old
+// Game-Icons glyph if a sprite is missing, so a new track is never a blank square.
+const TRACK_ART = { guns: "guns", gunnery: "gunnery", hull: "hull", cunning: "cunning" };
+
 export function Track({ t, purse, gold, busy, onBuy }) {
     const afford = t.cost != null && (t.currency === "gold" ? (gold ?? 0) : purse) >= t.cost;
+    const art = TRACK_ART[t.key];
     return (
         <div className="sby-track">
-            <Icon name={t.icon} className="sby-track-ico" />
+            {art ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="sby-track-ico" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
+            ) : <Icon name={t.icon} className="sby-track-ico" />}
             <div className="sby-track-body">
                 <b>{t.name}</b>
                 <em>{t.desc}</em>
@@ -52,11 +61,14 @@ export function Track({ t, purse, gold, busy, onBuy }) {
             ) : (
                 <button type="button" className={`sby-buy${t.currency === "gold" ? " is-gold" : ""}`}
                     disabled={busy || !afford} onClick={() => onBuy(t)}
-                    title={`Costs ${t.cost} ${t.currency === "gold" ? "gold" : "doubloons"}`}>
+                    title={afford ? `Costs ${t.cost} ${t.currency === "gold" ? "gold" : "doubloons"}`
+                        : `Need ${t.cost} ${t.currency === "gold" ? "gold" : "doubloons"} — you have ${(t.currency === "gold" ? (gold ?? 0) : purse).toLocaleString()}`}>
+                    {/* The coin leads. Which currency this costs is the first thing to read, not the last. */}
                     {t.currency === "gold"
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <><img className="sby-dbl" src="/images/ui/coin.png" alt="gold" draggable="false" />{t.cost.toLocaleString()}</>
-                        : <>{t.cost}<Dbl /></>}
+                        ? <img className="sby-buy-coin" src="/images/ui/coin.png" alt="gold" draggable="false" />
+                        : <Dbl className="sby-buy-coin" />}
+                    {t.cost.toLocaleString()}
                 </button>
             )}
         </div>
