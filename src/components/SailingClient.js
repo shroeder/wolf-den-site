@@ -1127,18 +1127,34 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         come from is a ship battle.
                     </p>
                     <div className="sby-stats">
-                        <div className="sby-stat"><b>{state.combat.ship.guns}</b><em>guns</em></div>
-                        <div className="sby-stat"><b>{state.combat.ship.accuracy}%</b><em>accuracy</em></div>
+                        {/* ALL FOUR CARRY ART, or none should. One tile had a hull-grade sprite and the other
+                            three were bare numbers, so the row sized itself to the tallest and the other three
+                            became mostly padding — a panel that looks unfinished rather than designed. Every
+                            sprite here already existed; nothing was drawn for this. */}
+                        {/* eslint-disable @next/next/no-img-element */}
+                        <div className="sby-stat">
+                            <img className="sby-stat-ico" src="/images/sailing/tracks/guns.png" alt="" draggable="false" />
+                            <span><b>{state.combat.ship.guns}</b><em>guns</em></span>
+                        </div>
+                        <div className="sby-stat">
+                            <img className="sby-stat-ico" src="/images/sailing/tracks/gunnery.png" alt="" draggable="false" />
+                            <span><b>{state.combat.ship.accuracy}%</b><em>accuracy</em></span>
+                        </div>
                         <div className="sby-stat is-hull">
                             {state.combat.ship.hullGrade ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="sby-stat-grade" src={`/images/sailing/hull/grade${state.combat.ship.hullGrade.grade}.png`}
+                                <img className="sby-stat-ico" src={`/images/sailing/hull/grade${state.combat.ship.hullGrade.grade}.png`}
                                     alt="" draggable="false" title={`${state.combat.ship.hullGrade.name} — ${state.combat.ship.hullGrade.blurb}`} />
                             ) : null}
-                            <b>{state.combat.ship.hp}</b>
-                            <em>{state.combat.ship.hullGrade ? state.combat.ship.hullGrade.name.toLowerCase() : "hull"}</em>
+                            <span>
+                                <b>{state.combat.ship.hp}</b>
+                                <em>{state.combat.ship.hullGrade ? state.combat.ship.hullGrade.name.toLowerCase() : "hull"}</em>
+                            </span>
                         </div>
-                        <div className="sby-stat"><b>{state.combat.ship.armor}%</b><em>armour</em></div>
+                        <div className="sby-stat">
+                            <img className="sby-stat-ico" src="/images/sailing/tracks/hull.png" alt="" draggable="false" />
+                            <span><b>{state.combat.ship.armor}%</b><em>armour</em></span>
+                        </div>
+                        {/* eslint-enable @next/next/no-img-element */}
                     </div>
                     <div className="sby-tracks" style={{ marginTop: 12 }}>
                         {(state.combat.tracks || []).map((t) => (

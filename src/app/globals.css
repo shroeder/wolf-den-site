@@ -13199,6 +13199,18 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A MISS falls short and throws a splash — the whole reason accuracy is a stat you can feel. */
 .sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
 .sbt-volley.to-me .sbt-ball.is-miss { animation-name: sbtMissL; }
+/* A MISS FLIES A DIFFERENT ARC, SO ITS TRAIL NEEDS A DIFFERENT TILT. The hit crosses nearly flat and lands at
+   +2px; a miss climbs half again as high and then plunges 34px into the sea. One shared tilt tuned for the hit
+   left the streak sitting almost level while the ball dropped out from under it — the same class of mismatch
+   as the spinning trail, just quieter. This one follows the plunge down. */
+.sbt-volley.to-foe .sbt-ball.is-miss::before { animation-name: sbtTrailMissR; }
+.sbt-volley.to-me .sbt-ball.is-miss::before { animation-name: sbtTrailMissL; }
+@keyframes sbtTrailMissR {
+    0% { transform: rotate(-22deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(34deg); }
+}
+@keyframes sbtTrailMissL {
+    0% { transform: rotate(22deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(-34deg); }
+}
 @keyframes sbtMissR {
     0% { opacity: 0; transform: translate(0,0) scale(.6); }
     8% { opacity: 1; }
@@ -13322,10 +13334,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* The ship as it fights — the same four numbers the battle uses. */
 .sby-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-.sby-stat { padding: 8px 6px; border-radius: 11px; text-align: center; background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.1); }
-.sby-stat b { display: block; font-size: 1.05rem; font-weight: 900; color: #ffe28a; font-variant-numeric: tabular-nums; }
-.sby-stat em { font-style: normal; font-size: 0.6rem; color: #8d96a0; }
+/* Sprite beside the number rather than stacked above it. Centred text with one tile carrying art and three
+   carrying nothing made the row size to the tallest and left the other three as mostly padding — the panel
+   read as unfinished. Now every tile is the same shape: art, then the figure and what it measures. */
+.sby-stat { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 11px;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); min-width: 0; }
+.sby-stat > span { min-width: 0; }
+.sby-stat-ico { width: 30px; height: 30px; flex: none; object-fit: contain;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55)); }
+.sby-stat b { display: block; font-size: 1.05rem; font-weight: 900; color: #ffe28a; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sby-stat em { display: block; font-style: normal; font-size: 0.6rem; color: #8d96a0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
 
 .sby-tracks { display: grid; gap: 7px; }
 .sby-track { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
@@ -13475,8 +13494,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     box-shadow: inset 0 0 12px rgba(255,180,60,0.22), 0 0 10px rgba(255,180,60,0.25); }
 /* Your own hull on the gun deck, with the grade named under it. */
 .sby-stat.is-hull { position: relative; }
-.sby-stat-grade { display: block; width: 26px; height: 26px; margin: 0 auto 2px; object-fit: contain;
-    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)); }
+/* .sby-stat-grade is gone — the hull grade uses .sby-stat-ico now, the same class as the other three tiles,
+   which is the whole point of the change. */
 .sby-chip.is-ammo { text-transform: uppercase; letter-spacing: 0.04em; }
 .sby-chip.is-ammo i { background: #cdd3d8; }
 .sby-chip.is-ammo.is-chain i { background: #9fd0ff; }
