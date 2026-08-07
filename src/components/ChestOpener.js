@@ -201,7 +201,11 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                         <>
                             <ItemArt id={reveal.item.id} icon={reveal.item.icon} className="chest-reward-glyph" />
                             <div className="chest-reward-name">{reveal.item.name}</div>
-                            <div className="chest-reward-sub muted">{reveal.item.slot.replace("_", " ")} · {statLine(reveal.item.stats)}</div>
+                            {/* A chest can hand out a collection TROPHY as well as gear, and a trophy has no
+                                slot and no combat stats — it pays for being owned. */}
+                            <div className="chest-reward-sub muted">
+                                {reveal.item.slot ? `${reveal.item.slot.replace("_", " ")} · ${statLine(reveal.item.stats)}` : "Collection piece"}
+                            </div>
                             {reveal.item.signature ? <div className="chest-reward-sig">★ {reveal.item.signature.label} — {reveal.item.signature.desc}</div> : null}
                             {reveal.item.chargeReward ? <div className="chest-reward-sig" style={{ color: "#ffd75e" }}>🎁 Real-world reward: {reveal.item.chargeReward}</div> : null}
                         </>

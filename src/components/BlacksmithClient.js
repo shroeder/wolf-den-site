@@ -114,19 +114,27 @@ export default function BlacksmithClient({ initial }) {
         const r = await post({ action: "combine_all", tier }, `cba-${tier}`);
         if (r?.ok) {
             SFX.perfect();
-            setToast({ kind: "ok", text: `Combined ${r.runs}× → ${r.made} ${parts[tier]?.name || "next tier"}${r.doubled ? ` · ${r.doubled} doubled!` : ""}` });
+            // Read the tier names off the RESPONSE's forge state, not off a `const parts` declared further
+            // down this component: useCallback evaluates its dependency array at render, so naming a
+            // not-yet-initialised const there throws "Cannot access 'parts' before initialization" on every
+            // render — which is exactly what took the Forge down for four members.
+            const names = r.parts || [];
+            setToast({ kind: "ok", text: `Combined ${r.runs}× → ${r.made} ${names[tier]?.name || "next tier"}${r.doubled ? ` · ${r.doubled} doubled!` : ""}` });
         } else if (r?.error) setToast({ kind: "err", text: "Not enough to combine." });
-    }, [post, parts]);
+    }, [post]);
 
     const doSalvageAll = useCallback(async (rarity) => {
         const r = await post({ action: "salvage_all", rarity }, `sva-${rarity}`);
         setBulk(null);
         if (r?.ok) {
             SFX.perfect();
-            const got = (r.parts || []).map((x) => `${x.n} ${parts[x.tier - 1]?.name || `T${x.tier}`}`).join(" · ");
+            // `r.parts` here is the RUN's tally ({tier, n}); the tier NAMES come off the refreshed forge state
+            // the same response carries. Neither reads a const from further down — see doCombineAll.
+            const names = r.parts || [];                 // the tier catalog, off the refreshed forge state
+            const got = (r.tally || []).map((x) => `${x.n} ${names[x.tier - 1]?.name || `T${x.tier}`}`).join(" · ");
             setToast({ kind: "ok", text: `Salvaged ${r.count} ${rarity} — ${got}${r.regaliaDrops?.length ? ` · ${r.regaliaDrops.join(", ")}!` : ""}` });
         } else if (r?.error) setToast({ kind: "err", text: r.error === "nothing_to_salvage" ? "Nothing spare of that rarity." : "Couldn't salvage those." });
-    }, [post, parts]);
+    }, [post]);
 
     const doUpgrade = useCallback(async (key) => {
         const r = await post({ action: "upgrade", key }, `up-${key}`);

@@ -366,11 +366,17 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // not worth a hook anyway.
     const ownedById = new Map((data.items || []).map((i) => [i.id, i]));
     // Group the gold shop by slot into ordered, collapsible categories (any unlisted slot → "Other").
-    const shopBySlot = (data.shop || []).reduce((acc, i) => { (acc[i.slot] = acc[i.slot] || []).push(i); return acc; }, {});
+    // The shop stocks GEAR (which has a slot) and COLLECTION PIECES (which do not — a trophy is never worn).
+    // Grouping everything by slot filed the trophies under the key "null" and then called null.replace() on it,
+    // which is the crash three members hit on /marketplace/store. Trophies get their own category instead.
+    const shopGear = (data.shop || []).filter((i) => !i.collectionPiece && i.slot);
+    const shopTrophies = (data.shop || []).filter((i) => i.collectionPiece || !i.slot);
+    const shopBySlot = shopGear.reduce((acc, i) => { (acc[i.slot] = acc[i.slot] || []).push(i); return acc; }, {});
     const shopCategories = [
         ...SHOP_SLOT_CATS.filter((c) => shopBySlot[c.slot]?.length).map((c) => ({ ...c, items: shopBySlot[c.slot] })),
         ...Object.keys(shopBySlot).filter((s) => !SHOP_SLOT_CATS.some((c) => c.slot === s))
-            .map((s) => ({ slot: s, label: s.replace(/_/g, " "), icon: "🎒", items: shopBySlot[s] })),
+            .map((s) => ({ slot: s, label: String(s).replace(/_/g, " "), icon: "🎒", items: shopBySlot[s] })),
+        ...(shopTrophies.length ? [{ slot: "__collection", label: "Collection pieces", icon: "🏆", items: shopTrophies }] : []),
     ];
 
     return (
@@ -501,11 +507,11 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                 {gearItems.length ? (
                     <div className="equip-bag-grid">
                         {gearItems.map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
+                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
                                 {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
                                 <ItemGlyph id={i.id} className="equip-card-glyph" />
                                 <span className="equip-card-name">{i.name}</span>
-                                <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot.replace("_", " ")}</span>
+                                <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.equipped ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#ffd75e" }}>✓ Equipped</span> : null}
                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.desc}</span> : null}
@@ -563,7 +569,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 {open ? (
                                     <div className="equip-bag-grid">
                                         {cat.items.map((i) => (
-                                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot.replace("_", " ")} · ${i.statsText}`}>
+                                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")} · ${i.statsText}`}>
                                                 <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
                                                 <span className="equip-card-name">{i.name}</span>
                                                 <span className="equip-card-stats">{i.statsText}</span>
@@ -668,7 +674,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div className="equip-sheet-name">{it.name}</div>
                                 <div className="equip-sheet-sub">
-                                    <span style={{ textTransform: "capitalize" }}>{it.rarity} · {it.slot.replace("_", " ")}</span>
+                                    <span style={{ textTransform: "capitalize" }}>{it.rarity}{it.slot ? ` · ${it.slot.replace("_", " ")}` : (it.setName ? ` · ${it.setName}` : "")}</span>
                                     {it.enhanceLevel > 0 ? <span className="equip-sheet-forge"><ForgeRank level={it.enhanceLevel} size={13} /> +{it.enhanceLevel}</span> : null}
                                     {it.equipped ? <span style={{ color: "#8fe39a", fontWeight: 800 }}>Equipped</span> : null}
                                     <ElBadge id={it.id} elements={it.elements} />

@@ -378,7 +378,9 @@ export async function salvageAllOfRarity(buyerId, rarity) {
     }
     return {
         ok: true, count: names.length, names, rarity, doubled,
-        parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n })).sort((a, b) => a.tier - b.tier),
+        // `tally`, NOT `parts`: getForgeState spreads last and carries its own `parts` (the tier catalog), so a
+        // key called `parts` here is silently overwritten and the recap loses everything it just counted.
+        tally: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n })).sort((a, b) => a.tier - b.tier),
         regaliaDrops: drops,
         ...(await getForgeState(buyerId)),
     };

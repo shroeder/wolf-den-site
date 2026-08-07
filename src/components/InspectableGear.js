@@ -50,7 +50,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
                             <ItemArt id={detail.id} icon={detail.icon} className="equip-card-glyph" />
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detail.name}</div>
-                                <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detail.rarity} · {detail.slot.replace("_", " ")}{detail.equipped ? " · Equipped ✓" : ""}</div>
+                                <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detail.rarity}{detail.slot ? ` · ${detail.slot.replace("_", " ")}` : ""}{detail.equipped ? " · Equipped ✓" : ""}</div>
                                 {detail.element ? <div style={{ marginTop: 3 }}><span className="equip-el" style={{ color: detail.element.color }}>{detail.element.emoji} {detail.element.label}</span></div> : null}
                             </div>
                         </div>
