@@ -13146,8 +13146,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    motion streak whirled around the ball on the end of an invisible arm and the whole thing read as a thrown
    hammer rather than a round shot. The mover translates, the shot spins inside it, and the trail follows the
    direction of travel without ever going round. */
-.sbt-ball { position: absolute; top: var(--lane, 0px); width: 16px; height: 16px; opacity: 0;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* THE SHOT NO LONGER FLIES. The travelling ball was the weakest thing in the fight and every fix bought a new
+   defect — it read as a thrown hammer, then as a smear, then as a ball on an arc that did not match its own
+   trail, and a miss needed a third path again. None of that was ever the point: a broadside is guns going off
+   and timber breaking, not a projectile you follow across a phone screen at sixteen pixels.
+   So the guns flash, the hull answers 210ms later, and the eye fills in the middle — which is how every game
+   that does this well has always done it. The markup stays (the ball elements still render the muzzle lane and
+   the shot count drives the audio stagger); only the drawing of the ball itself is gone, so nothing downstream
+   had to be unpicked to try this. */
+.sbt-ball { display: none; }
 /* The iron itself. Spins on its own axis — visible because the sprite has a highlight and pitting, and slow
    enough (a bit over one turn across the whole flight) to read as tumbling shot rather than a fan blade. */
 .sbt-ball::after { content: ""; position: absolute; inset: 0;

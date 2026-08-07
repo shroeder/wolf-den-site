@@ -391,9 +391,9 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 const heavy = shots.some((s) => s.rake) || ev.order === "board";
                 if (hits) sfxHit(heavy || hits >= 4); else if (shots.length) sfxSplash();
                 if (hits) setShake({ k: step, big: heavy });
-            }, 440);
+            }, 210);
             const clearShake = setTimeout(() => setShake(null), 900);
-            const next = setTimeout(() => setStep((v) => v + 1), 1150);
+            const next = setTimeout(() => setStep((v) => v + 1), 900);
             return () => { clearTimeout(land); clearTimeout(clearShake); clearTimeout(next); };
         }
         setMyHp(ev.my); setFoeHp(ev.foe);
