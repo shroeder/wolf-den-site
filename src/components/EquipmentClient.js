@@ -44,8 +44,8 @@ const SHOP_SLOT_CATS = [
     { slot: "ring", label: "Rings", icon: "💍" },
 ];
 
-function ItemGlyph({ id, className = "" }) {
-    return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} />;
+function ItemGlyph({ id, className = "", elements = null }) {
+    return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} elements={elements} />;
 }
 
 // Render a slot's glyph. The helmet slot uses the approved Warplate Helm die-cut sprite (never the 🪖
@@ -391,7 +391,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     const def = id ? itemDef(id) : null;
                     return (
                         <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? `${def.name}${def.enhanceLevel > 0 ? ` +${def.enhanceLevel}` : ""}` : s.label} style={{ position: "relative" }}>
-                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
+                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" elements={def.elements} /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
                             {def && def.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -5, right: -5, zIndex: 3 }}><ForgeRank level={def.enhanceLevel} size={20} /></span> : null}
                         </button>
                     );
@@ -461,7 +461,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             one here is offering to waste a slot. See isCollectionItem in items.js. */}
                         {(data.items || []).filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece).map((i) => (
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equip(slot, i.id)} disabled={busy}>
-                                <ItemGlyph id={i.id} className="equip-card-glyph" />
+                                <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
@@ -481,7 +481,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     <p className="muted" style={{ marginTop: 0 }}>Tap <strong>Use charge</strong> on a ready perk to get a QR — show it to staff and they&apos;ll scan it to redeem.</p>
                     {charged.map((i) => (
                         <div key={i.id} className={`equip-perk rar-${i.rarity}`}>
-                            <ItemGlyph id={i.id} className="equip-perk-glyph" />
+                            <ItemGlyph id={i.id} className="equip-perk-glyph" elements={i.elements} />
                             <div className="equip-perk-body">
                                 <strong>{i.name}</strong>
                                 <span className="muted">{i.charge.rewardLabel}</span>
@@ -511,7 +511,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                         {gearItems.map((i) => (
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
                                 {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
-                                <ItemGlyph id={i.id} className="equip-card-glyph" />
+                                <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="muted" style={{ fontSize: "0.66rem", fontWeight: 700, textTransform: "capitalize", letterSpacing: "0.03em" }}>{i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
@@ -572,10 +572,10 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <div className="equip-bag-grid">
                                         {cat.items.map((i) => (
                                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")} · ${i.statsText}`}>
-                                                <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
+                                                <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements} />
                                                 <span className="equip-card-name">{i.name}</span>
                                                 <span className="equip-card-stats">{i.statsText}</span>
-                                                <ElBadge id={i.id} />
+                                                <ElBadge id={i.id} elements={i.elements} />
                                                 {i.signature ? <span className="equip-card-sig">★ {i.signature.label}</span> : null}
                                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
                                                 {!i.signature && i.sea ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#7fd8ff" }}>⚓ Sea affinity</span> : null}

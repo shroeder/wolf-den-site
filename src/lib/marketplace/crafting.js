@@ -529,12 +529,18 @@ export async function getForgeState(buyerId) {
         for (const [k, v] of Object.entries(bonus || {})) out[k] = (out[k] || 0) + Number(v || 0);
         return out;
     };
+    // Fetched HERE rather than down by the Attune tab that used to be its only consumer: `dress` builds the
+    // Enhance and Salvage lists too, and both of those now carry the element so the marker can ride the corner
+    // of a forge card. Reading it after `dress` had already run would have shipped those two tabs the base
+    // element and quietly told a member their reforged piece was still fire.
+    const elemOver = await getElementOverrides(buyerId).catch(() => ({}));
     const dress = (id) => {
         const it = itemById(id);
         if (!it) return null;
         const enh = enhById.get(id);
         return {
             id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon, flavor: it.flavor || null, sprite: spriteMap[id] || null,
+            elements: describeItemElements(id, elemOver[id]),
             stats: describeStats(it.stats), salvageTier: rarityTier(it.rarity),
             // RAW effective totals (base + any forge bonus), keyed by stat, so the client can diff this piece
             // against whatever is in the same slot. The `stats` string above is already rendered and can't be
@@ -579,7 +585,6 @@ export async function getForgeState(buyerId) {
         return { key, name: u.name, emoji: UPG_EMOJI[key], desc: u.desc, level, max: u.max, unit: u.unit, cost: level >= u.max ? null : upgCost(u, level), effect: u.unit === "%" ? pct(level) : `${level}`, eff };
     });
     // ── Attune (elemental reforge) — every OWNED piece + its current element(s) + the gold cost to reforge it. ──
-    const elemOver = await getElementOverrides(buyerId).catch(() => ({}));
     const reforgeItems = (ownedRows || []).map((r) => r.item_id).map((id) => {
         const it = itemById(id);
         if (!it) return null;

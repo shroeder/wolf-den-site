@@ -9,7 +9,7 @@ import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { transferItemEnhancement, enhanceDetailsFor } from "@/lib/marketplace/crafting.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
-import { transferItemElement } from "@/lib/marketplace/item-element.js";
+import { transferItemElement, describeItemElements, getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 
@@ -81,12 +81,16 @@ const MAX_PRICE = 10_000_000;
 export const listingFee = (price) => Math.max(1, Math.ceil((Number(price) || 0) * LIST_FEE_PCT));
 
 // A public shape for one listing (item meta merged in). `me`/`owned` are viewer-relative.
-function shapeListing(row, sprites, viewerId, ownedSet, enhMap) {
+function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
     const it = itemById(row.item_id);
     if (!it) return null;
     const det = enhMap && enhMap.get(`${row.seller_id}|${row.item_id}`);
     const bonus = det?.bonus || null;
+    // The SELLER's override, not the viewer's — an element reforge follows the item to whoever buys it
+    // (transferItemElement), so the attunement on the shelf is the one you are actually paying for.
+    const elems = elemMap?.get(row.seller_id)?.[row.item_id] || null;
     return {
+        elements: describeItemElements(row.item_id, elems),
         id: Number(row.id),
         itemId: row.item_id,
         name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null,
@@ -148,11 +152,12 @@ export async function getSellableItems(buyerId) {
     // top of the sell list — and auctioning one silently deletes the permanent bonus owning it pays.
     const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id) && !isTradeLocked(itemById(id).rarity));
     const enh = await enhanceDetailsFor(buyerId, sellableIds).catch(() => ({}));
+    const elemOver = await getElementOverrides(buyerId, sellableIds).catch(() => ({}));
     return sellableIds
         .map((id) => {
             const it = itemById(id);
             const bonus = enh[id]?.bonus || null;
-            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
+            return { itemId: id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[id] || null, elements: describeItemElements(id, elemOver[id]), stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null, forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null, farm: it.farm ? describeFarm(it.farm) : null, sea: it.sea ? describeSea(it.sea) : null, depth: it.depth ? describeDepth(it.depth) : null, util: enh[id]?.util || null, signature: signatureFor(id), enhanceLevel: enh[id]?.level || 0 };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -173,7 +178,8 @@ export async function getAuctionListings(buyerId, { q = "", slot = "", rarity = 
     const itemIds = [...new Set(rows.map((r) => r.item_id))];
     const enhRows = sellerIds.length ? await db.query(`SELECT buyer_id, item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = ANY($1) AND item_id = ANY($2) AND level > 0`, [sellerIds, itemIds]).catch(() => []) : [];
     const enhMap = new Map(enhRows.map((e) => [`${e.buyer_id}|${e.item_id}`, { level: Number(e.level) || 0, bonus: (typeof e.stat_bonus === "string" ? (() => { try { return JSON.parse(e.stat_bonus); } catch { return {}; } })() : (e.stat_bonus || {})), util: describeUtil(e.util) }]));
-    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap)).filter(Boolean);
+    const elemMap = sellerIds.length ? await getElementOverridesForMembers(sellerIds).catch(() => new Map()) : new Map();
+    let out = rows.map((r) => shapeListing(r, sprites, buyerId, ownedSet, enhMap, elemMap)).filter(Boolean);
     const needle = String(q || "").trim().toLowerCase();
     if (needle) out = out.filter((l) => l.name.toLowerCase().includes(needle) || l.sellerName.toLowerCase().includes(needle));
     if (slot) out = out.filter((l) => l.slot === slot);
@@ -212,6 +218,9 @@ export async function getMyListings(buyerId) {
     const enhRows = itemIds.length ? await db.query(`SELECT item_id, level, stat_bonus, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND level > 0`, [buyerId, itemIds]).catch(() => []) : [];
     const enh = new Map(enhRows.map((e) => [e.item_id, { level: Number(e.level) || 0, bonus: parseBonus(e.stat_bonus), util: describeUtil(e.util) }]));
     const equippedMap = await equippedComparisonMap(buyerId);
+    // A SOLD row's override has already moved to its buyer, so this resolves to the base element on those —
+    // which is right: the piece is gone, and the history card is a receipt rather than a live listing.
+    const elemOver = await getElementOverrides(buyerId, itemIds).catch(() => ({}));
     return rows.map((r) => {
         const it = itemById(r.item_id);
         if (!it) return null;
@@ -220,6 +229,7 @@ export async function getMyListings(buyerId) {
         const buyerName = r.status === "sold" ? (r.buyer_name || (r.buyer_alias ? `@${r.buyer_alias}` : "a wolf")) : null;
         return {
             id: Number(r.id), itemId: r.item_id, name: it.name, rarity: it.rarity, slot: it.slot || "misc", icon: it.icon || null, sprite: sprites[r.item_id] || null,
+            elements: describeItemElements(r.item_id, elemOver[r.item_id]),
             price: Number(r.price), status: r.status, listedAt: r.listed_at, expiresAt: r.expires_at, soldAt: r.sold_at, buyerName, buyerAlias: r.status === "sold" ? r.buyer_alias : null,
             stats: describeStats(mergeStats(it.stats || {}, bonus || {})) || null,
             forgeStats: bonus && Object.keys(bonus).length ? describeStats(bonus) : null,

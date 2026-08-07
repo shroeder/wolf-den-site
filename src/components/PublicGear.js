@@ -9,7 +9,7 @@ import { setForItem } from "@/lib/marketplace/sets.js";
 // the client <InspectableGear> so visitors can tap any piece to inspect it (and trade for un-equipped ones).
 // `owned` is every item id this member has, so a piece can say how far along its set they actually are —
 // which is the whole question you ask when you look at somebody else's loadout.
-function prep(id, equipped, owned) {
+function prep(id, equipped, owned, elMap) {
     const d = itemById(id);
     if (!d) return null;
     const sig = signatureFor(id);
@@ -20,6 +20,10 @@ function prep(id, equipped, owned) {
         statsText: describeStats(d.stats),
         signature: sig ? { label: sig.label, desc: sig.desc } : null,
         element: el && ELEMENTS[el] ? { label: ELEMENTS[el].label, emoji: ELEMENTS[el].emoji, color: ELEMENTS[el].color } : null,
+        // The EFFECTIVE elements off the inventory payload, not the base one `element` above is derived from.
+        // A profile is where you size somebody's loadout up, so showing a reforged piece as whatever it rolled
+        // at birth is worse than showing nothing — it is a marker that lies to the one person checking.
+        elements: elMap.get(id) || null,
         flavor: d.flavor || null,
         equipped: Boolean(equipped),
         reqLevel: d.reqLevel || null,
@@ -47,8 +51,11 @@ export default function PublicGear({ inventory, displayLabel = "This member", ca
     if (!equippedIds.length && !items.length) return null;
 
     const owned = new Set([...equippedIds, ...items.map((i) => i.id)]);
-    const equippedData = equippedIds.map((id) => prep(id, true, owned)).filter(Boolean);
-    const inventoryData = items.filter((i) => !i.equipped).map((i) => prep(i.id, false, owned)).filter(Boolean);
+    // getInventory already resolved each piece's effective (reforged) elements; the equipped map is only
+    // slot → id, so the equipped pieces borrow theirs from the same item list they also appear in.
+    const elMap = new Map(items.filter((i) => i.elements?.length).map((i) => [i.id, i.elements]));
+    const equippedData = equippedIds.map((id) => prep(id, true, owned, elMap)).filter(Boolean);
+    const inventoryData = items.filter((i) => !i.equipped).map((i) => prep(i.id, false, owned, elMap)).filter(Boolean);
 
     // Every set this member has any progress in, best first — the summary you actually want when sizing
     // somebody up, rather than having to tap twelve pieces to work it out.

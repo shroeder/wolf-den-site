@@ -169,7 +169,7 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-grid">
                             {listings.map((l) => (
                                 <div key={l.id} className="ah-card ah-card-tap" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }} onClick={() => setDetail(l)} role="button" tabIndex={0}>
-                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
+                                    <div className="ah-card-art"><ItemArt id={l.itemId} icon={l.icon} elements={l.elements} />{l.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{l.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                     {l.stats ? <div className="ah-card-stats muted">{l.stats}</div> : null}
                                     {l.forgeStats ? <div className="ah-card-forge">⚒️ +{l.enhanceLevel} · {l.forgeStats}</div> : null}
@@ -206,7 +206,7 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-grid">
                             {(state?.sellable || []).map((it) => (
                                 <button key={it.itemId} type="button" className={`ah-card ah-sellcard${sellPick?.itemId === it.itemId ? " is-picked" : ""}`} style={{ "--rc": RARITY_TXT[it.rarity] || "#9aa7b5" }} onClick={() => { setSellPick(it); setPrice(""); setTimeout(() => priceRef.current?.focus(), 60); }}>
-                                    <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} />{it.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{it.enhanceLevel}</span> : null}</div>
+                                    <div className="ah-card-art"><ItemArt id={it.itemId} icon={it.icon} elements={it.elements} />{it.enhanceLevel > 0 ? <span className="ah-enh">⚒️ +{it.enhanceLevel}</span> : null}</div>
                                     <div className="ah-card-name" style={{ color: RARITY_TXT[it.rarity] || "#fff" }}>{it.name}</div>
                                     {it.stats ? <div className="ah-card-stats muted">{it.stats}</div> : null}
                                     {it.forgeStats ? <div className="ah-card-forge">⚒️ +{it.enhanceLevel} · {it.forgeStats}</div> : null}
@@ -245,7 +245,7 @@ export default function AuctionClient({ initial }) {
                         <div className="ah-mine">
                             {(state?.mine || []).map((l) => (
                                 <div key={l.id} className="ah-minerow ah-minerow-tap" style={{ "--rc": RARITY_TXT[l.rarity] || "#9aa7b5" }} onClick={() => setDetail(l)} role="button" tabIndex={0}>
-                                    <div className="ah-minerow-art"><ItemArt id={l.itemId} icon={l.icon} /></div>
+                                    <div className="ah-minerow-art"><ItemArt id={l.itemId} icon={l.icon} elements={l.elements} /></div>
                                     <div className="ah-minerow-body">
                                         <div className="ah-minerow-name" style={{ color: RARITY_TXT[l.rarity] || "#fff" }}>{l.name}</div>
                                         <div className="muted" style={{ fontSize: "0.76rem" }}>

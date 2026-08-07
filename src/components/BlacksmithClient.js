@@ -389,7 +389,7 @@ export default function BlacksmithClient({ initial }) {
                                     if (!it.affordable && !scroll) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage, combine, or use a 📜 Power Scroll.` }); return; }
                                     ac(); setEnhancing({ ...it, useScroll: scroll });
                                 }}>
-                                <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
+                                <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} elements={it.elements} />
                                 <span className="forge-card-name">{it.name}</span>
                                 {it.level > 0 ? <span className="forge-card-rankline"><ForgeRank level={it.level} size={22} /></span> : null}
                                 <span className="forge-card-stats">{it.stats || "—"}</span>
@@ -427,7 +427,7 @@ export default function BlacksmithClient({ initial }) {
                     <div className="forge-grid">
                         {salvage.length ? salvage.map((it) => (
                             <button key={it.id} type="button" className="forge-card is-salvage" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setSalvaging(it); }}>
-                                <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
+                                <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} elements={it.elements} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats" style={{ color: rc(it.rarity) }}>{it.rarity}</span>
                                 <span className="forge-card-cost">
@@ -446,7 +446,7 @@ export default function BlacksmithClient({ initial }) {
                         <div className="forge-grid">
                             {reforge.items.length ? reforge.items.map((it) => (
                                 <button key={it.id} type="button" className="forge-card is-attune" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setReforgeFor(it); }}>
-                                    <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} />
+                                    <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} elements={it.elements} />
                                     <span className="forge-card-name">{it.name}</span>
                                     <span className="forge-card-elems">
                                         {it.elements.length ? it.elements.map((e) => <span key={e.key} className="forge-elem-chip" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>) : <span className="forge-elem-chip is-neutral">◇ Neutral</span>}

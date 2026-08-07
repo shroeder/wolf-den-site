@@ -23,7 +23,9 @@ const strip = (inv, enh = {}) => (inv?.items || []).filter((i) => !i.collectionP
     const d = itemById(i.id);
     const lvl = enh[i.id]?.level || 0;
     const stats = lvl ? mergeStats(d?.stats || {}, enh[i.id]?.bonus || {}) : (d?.stats || null);
-    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats, enhanceLevel: lvl, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea), equipped: Boolean(i.equipped) };
+    // getInventory already resolved the effective (reforged) elements for whichever side this is, so the
+    // marker on a trade tile is the affinity that would actually change hands.
+    return { id: i.id, name: i.name, rarity: i.rarity, icon: i.icon, slot: d?.slot || null, stats, elements: i.elements || null, enhanceLevel: lvl, charged: Boolean(d?.charged), chargeLabel: d?.chargeRewardLabel || null, sea: Boolean(d?.sea), equipped: Boolean(i.equipped) };
 });
 const petStrip = (ids) => ids.map((id) => collectibleById(id)).filter(Boolean).map((d) => ({ id: d.id, name: d.name, rarity: d.rarity }));
 

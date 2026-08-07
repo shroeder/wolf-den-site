@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import ElementPip from "@/components/ElementPip";
 import { itemIcon } from "@/lib/marketplace/items.js";
 
 // Renders an item's AI sprite (an <img> die-cut on transparent bg) when one exists, else falls back to the
@@ -41,13 +42,18 @@ export function useItemSprite(id) {
     return SPRITES ? SPRITES[id] || null : null;
 }
 
-export default function ItemArt({ id, icon, className = "", alt = "" }) {
+// `elements` is opt-in and only ever additive: pass the item's effective elements and a mini marker rides the
+// bottom-left corner of the art. It lives HERE rather than at each call site because every gear icon in the
+// app — bag, slot picker, gold shop, Forge, auction, trade, public profile — already funnels through this one
+// component, so a marker added here is a marker on every grid at once and can never drift between them.
+export default function ItemArt({ id, icon, className = "", alt = "", elements = null }) {
     const sprite = useItemSprite(id);
     // Always render the SAME styled box the glyph used (rarity backplate, border, sizing) — just swap the
     // svg glyph for the die-cut <img> so layout is identical whether or not a sprite exists yet.
     return (
         <span className={`${className} item-art${sprite ? " has-sprite" : ""}`}>
             {sprite ? <img src={sprite} alt={alt} className="item-art-img" loading="lazy" /> : (() => { const Icon = itemIcon(icon); return <Icon aria-hidden="true" />; })()}
+            <ElementPip elements={elements} />
         </span>
     );
 }

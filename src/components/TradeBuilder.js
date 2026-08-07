@@ -19,7 +19,7 @@ function ItemToggle({ item, on, onClick, blocked = false, bound = false }) {
             title={bound ? "Bound — Ascendant+ gear can't be traded" : blocked ? "Equipped — unequip it on your Gear screen before you can trade it" : (item.chargeLabel ? `Charged perk: ${item.chargeLabel}` : item.name)}
             style={blocked ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
         >
-            <ItemArt id={item.id} icon={item.icon} className="equip-card-glyph" />
+            <ItemArt id={item.id} icon={item.icon} className="equip-card-glyph" elements={item.elements} />
             <span className="equip-card-name">{item.name}</span>
             {stats.length ? (
                 <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 7px", justifyContent: "center", fontSize: "0.66rem", fontWeight: 800, color: "#dfe8d6", lineHeight: 1.3, margin: "1px 0 2px" }}>

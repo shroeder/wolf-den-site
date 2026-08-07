@@ -23,7 +23,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
             className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""} is-clickable`}
             onClick={() => setDetail(i)}
         >
-            <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" />
+            <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements} />
             <span className="equip-card-name">{i.name}</span>
         </button>
     );

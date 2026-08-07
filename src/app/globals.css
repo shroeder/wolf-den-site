@@ -9943,8 +9943,47 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* AI item sprites (ItemArt) drop into the same glyph boxes as the react-icons. Sized by em so they scale
    with the box's font-size just like the svg glyph did; a hair larger than 1em to offset the sprite's
    transparent padding, and a drop-shadow so the die-cut art reads on the rarity backplate. */
-.item-art { display: grid; place-items: center; }
+.item-art { display: grid; place-items: center; position: relative; }
 .item-art-img { width: 1.55em; height: 1.55em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
+/* ── ELEMENT MARKERS ON A GEAR ICON ───────────────────────────────────────────────────────────────────────
+   Sits in the BOTTOM-LEFT because the forge rank badge already owns the top-right of these same tiles, and
+   two badges fighting for one corner is how you get a +9 that reads as a fire pip.
+
+   The size is a VARIABLE, not a fixed em. Most glyph boxes set a font-size proportional to themselves
+   (.equip-card-glyph is 46px at 1.7rem), so an em default tracks the box for free — but the Forge's 76px card
+   sets no font-size at all and would inherit the body's 16px, putting a 10px marker on the largest art in the
+   game. Any host that doesn't size its own text overrides --pip instead. */
+.el-pips {
+    --pip: 0.62em;
+    position: absolute; left: -0.14em; bottom: -0.14em; z-index: 3;
+    display: flex; align-items: center; pointer-events: none;
+}
+/* No disc, no ring behind the marker: the sprites are drawn with their own bold dark ink contour, so a plate
+   under them would only eat the item art they sit on. A dark drop-shadow is what separates them from a bright
+   sprite underneath — never a light one, which reads as the white halo we strip out of every other asset. */
+/* Two classes deep on purpose. Several hosts size their art with a bare element selector — the auction card
+   has `.ah-card-art img { width: 58px }` — which outranks a single-class `.el-pip` and would inflate a 15px
+   marker into a 58px blob covering the item. styled-jsx scoping happens to spare us today (that rule compiles
+   to `img.jsx-xxx`, and this img comes from another component so it never gets the scope class), but that is
+   an accident of where the CSS lives, not a guarantee. This wins outright either way. */
+.el-pips .el-pip {
+    width: var(--pip); height: var(--pip); object-fit: contain; display: block;
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.9)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+/* Overlap a second marker rather than widening the cluster — a dual-affinity piece must not push its badge
+   across half the sprite it is annotating. */
+.el-pip + .el-pip { margin-left: calc(var(--pip) * -0.16); }
+.el-pip-more {
+    padding: 0 0.25em; border-radius: 999px;
+    font-size: calc(var(--pip) * 0.5); font-weight: 900; line-height: 1.6; color: #dfe6ec;
+    background: rgba(11, 16, 22, 0.92); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+/* Hosts whose art box sets no font-size of its own, so --pip cannot inherit a useful em. */
+.forge-art .el-pips { --pip: 22px; left: -3px; bottom: -3px; }
+.forge-reforge-art .el-pips, .forge-er-art .el-pips { --pip: 20px; }
+.ah-card-art .el-pips { --pip: 15px; }
+.ah-minerow-art .el-pips { --pip: 13px; }
+.trade-item-art .el-pips { --pip: 11px; }
 /* Legendary + mythic get a brighter frame; mythic gently pulses. */
 .equip-card.rar-legendary, .equip-slot.filled.rar-legendary { box-shadow: 0 0 18px -5px var(--rar), inset 0 0 18px -10px var(--rar); }
 .equip-card.rar-mythic, .equip-slot.filled.rar-mythic { animation: rar-pulse 3s ease-in-out infinite; }

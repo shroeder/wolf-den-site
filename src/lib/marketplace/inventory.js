@@ -346,6 +346,9 @@ export async function getInventory(buyerId) {
             return {
                 id: i.id, name: i.name, slot: i.slot, rarity: i.rarity, icon: i.icon, reqLevel: i.reqLevel,
                 stats: i.stats, statsText: describeStats(i.stats), sea: i.sea || null, depth: i.depth || null, signature: signatureFor(i.id),
+                // Base elements only, and correctly so: an override belongs to an OWNER, and nothing in the
+                // shop is owned yet. What you see on the shelf is what the piece arrives attuned to.
+                elements: describeItemElements(i.id, null),
                 farmText: i.farm ? describeFarm(i.farm) : null,
                 setName: set?.name || null, setId: set?.id || null,
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
