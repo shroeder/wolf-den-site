@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { GiAnchor, GiCannon, GiMining, GiFishingPole } from "react-icons/gi";
 
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
@@ -1053,11 +1054,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* ── STATIONS ── the ship as a place you move around, not a page you scroll. */}
             <div className="sail-stations">
-                {[["helm", "⚓", "Helm", "Boat upgrades"],
-                  ...(state.combat ? [["guns", "💣", "Gun Deck", "Raiding upgrades"]] : []),
-                  ["dig", "⛏️", "Dig Site", "Tools & excavation"], ["rail", "🎣", "The Rail", "Fishing"]].map(([k, ico, label, sub]) => (
-                    <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub}>
-                        <span aria-hidden="true">{ico}</span>{label}
+                {/* ONE WORD each, stacked under its glyph. Adding a fourth station broke the row: "Gun Deck",
+                    "Dig Site" and "The Rail" all wrapped to two lines at 393px, and only the selected tab had
+                    any chrome, so the other three read as loose text rather than controls. Short labels cannot
+                    wrap, and stacking gives every tab the same footprint no matter how long the word is. */}
+                {[["helm", GiAnchor, "Helm", "Boat upgrades"],
+                  ...(state.combat ? [["guns", GiCannon, "Guns", "Raiding upgrades"]] : []),
+                  ["dig", GiMining, "Dig", "Tools & excavation"], ["rail", GiFishingPole, "Rail", "Fishing"]].map(([k, Ico, label, sub]) => (
+                    <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub} aria-label={sub}>
+                        <Ico aria-hidden="true" />
+                        <em>{label}</em>
                     </button>
                 ))}
             </div>

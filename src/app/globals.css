@@ -11330,19 +11330,28 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    Everything below the scene used to be one continuous scroll: boat upgrades, then excavation, then tools,
    then boat forms. Upgrading meant hunting through a document, and the tools sat at the very bottom of the
    longest section. Same tab idiom as the farm's Garden/Outside/Inside, so there's nothing new to learn. */
+/* ── STATION TABS ─────────────────────────────────────────────────────────────────────────────────────────
+   A fourth station broke the row: "Gun Deck", "Dig Site" and "The Rail" each wrapped to two lines at 393px,
+   and only the selected tab had any background, so the other three read as loose text rather than controls.
+   Fixed by shape, not by squeezing: one-word labels stacked under a glyph, so every tab has the same footprint
+   whatever the word is and nothing can wrap. Four fit at 360px with room to spare. */
 .sail-stations { display: flex; gap: 6px; padding: 5px; margin: 12px 0 10px; border-radius: 14px;
     background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
-.sail-stations button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    padding: 10px 4px; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer; border: 1px solid transparent;
-    background: transparent; color: #93a3b4; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
-.sail-stations button > span { font-size: 15px; }
-/* WHITE on deep blue, not dark ink on mid blue. The selected tab was the lowest-contrast pair in the row —
-   the one element that has to be unmistakable at a glance. A lit rim and a glow do the rest. */
+.sail-stations button { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; padding: 8px 2px 7px; border-radius: 10px; cursor: pointer;
+    /* Every tab carries chrome now — an unstyled tab beside a filled one does not read as a sibling. */
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09); color: #93a3b4;
+    transition: background .15s ease, color .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.sail-stations button > svg { width: 20px; height: 20px; flex: none; }
+.sail-stations button > em { font-style: normal; font-size: 11.5px; font-weight: 800; letter-spacing: 0.02em;
+    line-height: 1; white-space: nowrap; }
+/* WHITE on deep blue, not dark ink on mid blue — the selected tab was the lowest-contrast pair in the row. */
 .sail-stations button.on { color: #fff; border-color: rgba(160,215,255,0.85);
     background: linear-gradient(180deg, #2f7fc4, #14507f);
     box-shadow: 0 0 14px rgba(90,175,255,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
-.sail-stations button.on > span { filter: drop-shadow(0 0 5px rgba(150,215,255,0.9)); }
-@media (hover: hover) { .sail-stations button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0f8; } }
+.sail-stations button.on > svg { filter: drop-shadow(0 0 6px rgba(150,215,255,0.95)); }
+@media (hover: hover) { .sail-stations button:not(.on):hover { background: rgba(255,255,255,0.09); color: #e8f0f8; } }
+@media (max-width: 340px) { .sail-stations button > em { font-size: 10.5px; } }
 /* The Rail's at-a-glance numbers. */
 .sail-railstats { display: flex; gap: 8px; }
 .sail-railstats > div { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
