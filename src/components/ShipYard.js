@@ -210,7 +210,9 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
         for (const t of targets || []) {
             rows.push({
                 key: `r${t.id}`, kind: "rival", id: t.id, rank: t.rank || 1, name: t.name,
-                sub: `boat level ${t.level}${t.topRarity ? ` · best ${t.topRarity}` : ""}`,
+                // Was "boat level 15 · best legendary" — the rarity was left over from when a raid could copy
+                // one of their items, and read as an advertisement for loot that no longer drops.
+                sub: `boat level ${t.level}`,
                 art: t.boat, rider: t.rider || null, boss: false,
                 guns: t.guns, hull: t.hull, ammo: t.ammo,
                 odds: t.odds != null ? t.odds / 100 : matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull }),

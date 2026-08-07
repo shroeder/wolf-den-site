@@ -1554,7 +1554,8 @@ async function raidTargetById(buyerId, targetId) {
 // and hull, from their gun deck) and a hint of the hold you would be plundering (item count + best rarity).
 // Sorted by the loot, because that is what you are choosing between — but the guns are shown, because that is
 // what decides whether you get it.
-export async function getRaidTargets(buyerId, limit = 12) {
+// `limit` is how many rivals make the horizon — a handful, not everyone who has ever sailed.
+export async function getRaidTargets(buyerId, limit = 4) {
     if (!raidsEnabled(buyerId)) return { targets: [], me: null }; // under construction — see raidsEnabled
     const rows = await db.query(
         `SELECT ${RAID_TARGET_COLS}
@@ -1564,26 +1565,16 @@ export async function getRaidTargets(buyerId, limit = 12) {
         [buyerId]
     ).catch(() => []);
     if (!rows.length) return [];
-    const ids = rows.map((r) => r.id);
-    const items = await db.query(`SELECT buyer_id, item_id FROM mkt_user_item WHERE buyer_id = ANY($1)`, [ids]).catch(() => []);
-    const gear = new Map();
-    for (const it of items) {
-        const def = itemById(it.item_id);
-        if (!def) continue;
-        const cur = gear.get(it.buyer_id) || { count: 0, topRank: -1, topRarity: null };
-        cur.count += 1;
-        const rank = RAID_RARITY_RANK[def.rarity] ?? -1;
-        if (rank > cur.topRank) { cur.topRank = rank; cur.topRarity = def.rarity; }
-        gear.set(it.buyer_id, cur);
-    }
+    // Their INVENTORY used to be read here — every candidate's whole item list, to find their best piece for
+    // the "worth it" half of the sort and the "best legendary" on the row. A raid pays out of the fleet table
+    // now, so none of that changes anything, and the query was scanning forty members' bags to decide nothing.
     const list = rows.map((r) => {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
-        const g = gear.get(r.id) || { count: 0, topRank: -1, topRarity: null };
         return {
             id: r.id, name: r.display_name || r.alias, handle: r.alias, level, boat: boatArt(level),
             rider: r.avatar_sprite_url || r.avatar_url || null,
             riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
-            items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
+            // `items` / `topRarity` deliberately NOT sent: nothing about their inventory affects a raid any more.
             // Their SHIP, in the same two numbers your own gun deck reports — plus the fleet rank it fights
             // like, which is also exactly what beating it pays.
             guns: gunsFor(r.gun_level || 0), hull: hullFor(r.hull_level || 0, level),
@@ -1600,16 +1591,43 @@ export async function getRaidTargets(buyerId, limit = 12) {
     // top of a brand-new captain's list, which is the one raid a day they have to spend. `odds` is a rough
     // read of the matchup (their broadside and hull against yours) and it scales the loot score, so the top of
     // the list is the best prize you can actually take rather than the best prize that exists.
+    // THEIR GEAR NO LONGER MATTERS HERE. The old raid could copy one of their items, so the list was sorted by
+    // "worth it × winnable" — how good their best piece was, scaled by your odds — and every row advertised
+    // "best legendary". That reward is gone: a raid pays out of the FLEET table now, matched to the rank their
+    // SHIP resembles, and their wardrobe has nothing to do with it. Leaving the rarity on the row was the
+    // screen promising loot that cannot drop, and leaving it in the sort was ordering the list by a number
+    // that stopped meaning anything.
     const scored = list.map((t) => {
         // Shared with the row on screen (ship-battle.js) so the fleet and rivals rank on ONE scale.
         const odds = matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull });
-        const loot = (t.gearRank + 1) * 10 + t.items;
-        return { ...t, odds: Math.round(odds * 100), outgunned: t.guns > myGuns && t.hull > myHull, score: loot * odds };
+        return { ...t, odds: Math.round(odds * 100), outgunned: t.guns > myGuns && t.hull > myHull };
     });
-    scored.sort((a, z) => z.score - a.score || z.gearRank - a.gearRank || z.items - a.items);
+
+    // ── A FEW SHIPS ON THE HORIZON, NOT A DIRECTORY ──────────────────────────────────────────────────────
+    // This used to hand back the top twelve, which sat above fifteen fleet rungs and made the battle list a
+    // scroll rather than a choice. It is a HORIZON: you see the handful of ships that happen to be passing.
+    //
+    // Weighted toward your OWN rank, because a list of people you cannot beat is the same as no list, and a
+    // list of people who cannot fight back is boring. Weight falls off with the square of the rank gap, so
+    // near matches dominate without a hard cutoff — an occasional heavyweight still drifts past, which is
+    // what makes checking the horizon worth doing.
+    //
+    // Re-rolled on every scan on purpose: the copy says you are scanning the horizon, and ships that never
+    // change are a directory wearing a nautical hat.
+    const myRank = fleetRankForShip({ guns: myGuns, hp: myHull });
+    const pool = scored.map((t) => ({ t, w: 1 / (1 + (t.rank - myRank) ** 2) }));
+    const picked = [];
+    while (picked.length < Math.min(limit, scored.length) && pool.length) {
+        let roll = Math.random() * pool.reduce((sum, p) => sum + p.w, 0);
+        let i = pool.findIndex((p) => (roll -= p.w) <= 0);
+        if (i < 0) i = pool.length - 1;
+        picked.push(pool.splice(i, 1)[0].t);
+    }
+    // Shown easiest first so the merged list still reads as a ladder once the fleet is folded in.
+    picked.sort((a, z) => a.rank - z.rank || z.odds - a.odds);
 
     return {
-        targets: scored.slice(0, limit),
+        targets: picked,
         me: { guns: myGuns, hull: myHull, ammo: mine?.loadout || "round", level: myLevel },
     };
 }
