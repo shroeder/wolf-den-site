@@ -59,6 +59,9 @@ function Thread({ thread, onActivity }) {
     const [typing, setTyping] = useState(false);
     const typingSentRef = useRef(0);
     const endRef = useRef(null);
+    // Whether we have already dropped this thread to its newest message once. A ref, not state: flipping it
+    // must not itself cause a render, and it has to survive every poll.
+    const didFirstScroll = useRef(false);
 
     const load = useCallback(async () => {
         const r = await fetch(`/api/marketplace/dm/${thread.id}`, { cache: "no-store" }).catch(() => null);
@@ -84,7 +87,16 @@ function Thread({ thread, onActivity }) {
         return () => clearInterval(iv);
     }, [load]);
 
-    useEffect(() => { scrollToEndIfPinned(endRef); }, [messages]);
+    // ONLY ON THE FIRST LOAD. Following new messages on every refresh was still the app deciding to move
+    // your view — restricting it to "you were already at the bottom" made it defensible but not wanted, and
+    // the honest answer to "is it really needed" is no. Opening on the newest message IS needed, or you land
+    // at the top of history; after that the view is yours. A message arriving below the fold costs you a
+    // thumb-flick, which is cheaper than ever being moved while reading.
+    useEffect(() => {
+        if (messages === null || didFirstScroll.current) return;
+        didFirstScroll.current = true;
+        scrollToEndIfPinned(endRef, true);
+    }, [messages]);
 
     // Ping "I'm typing" as they compose, at most once every 3s (the server window is 6s, so this keeps it alive
     // without a request per keystroke).
@@ -534,6 +546,9 @@ function GlobalChatTab({ open, onRead }) {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const endRef = useRef(null);
+    // Whether we have already dropped this thread to its newest message once. A ref, not state: flipping it
+    // must not itself cause a render, and it has to survive every poll.
+    const didFirstScroll = useRef(false);
 
     const load = useCallback(async () => {
         const r = await fetch("/api/marketplace/global-chat", { cache: "no-store" }).catch(() => null);
@@ -552,7 +567,16 @@ function GlobalChatTab({ open, onRead }) {
         return () => clearInterval(iv);
     }, [open, load]);
 
-    useEffect(() => { scrollToEndIfPinned(endRef); }, [messages]);
+    // ONLY ON THE FIRST LOAD. Following new messages on every refresh was still the app deciding to move
+    // your view — restricting it to "you were already at the bottom" made it defensible but not wanted, and
+    // the honest answer to "is it really needed" is no. Opening on the newest message IS needed, or you land
+    // at the top of history; after that the view is yours. A message arriving below the fold costs you a
+    // thumb-flick, which is cheaper than ever being moved while reading.
+    useEffect(() => {
+        if (messages === null || didFirstScroll.current) return;
+        didFirstScroll.current = true;
+        scrollToEndIfPinned(endRef, true);
+    }, [messages]);
 
     async function send(e) {
         e.preventDefault();
