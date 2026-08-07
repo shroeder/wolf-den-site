@@ -31,23 +31,29 @@ export async function POST(request) {
         const digest = body?.digest ? String(body.digest).slice(0, 120) : null;
         const stack = body?.stack ? String(body.stack).slice(0, 4000) : null;
         const ua = body?.ua ? String(body.ua).slice(0, 300) : null;
+        // A chunk failure that the client already recovered from by reloading (see ChunkRecovery). Still worth
+        // recording — a run of them means we deployed on top of people — but it is not worth a push, because
+        // the member saw a blink and carried on, and a phone buzzing "A page crashed" for that is a false alarm
+        // that teaches you to ignore the real ones.
+        const recovered = body?.recovered === true;
 
         const buyer = await getAuthenticatedBuyer().catch(() => null);
         const who = buyer?.display_name || buyer?.alias || (buyer?.id ? `buyer:${buyer.id}` : "signed out");
 
         // Structured log first — this is the copy that survives regardless of push config.
-        log.error("client.crash", { path, message, digest, who, ua, stack });
+        if (recovered) log.warn("client.chunk_recovered", { path, message, who, ua });
+        else log.error("client.crash", { path, message, digest, who, ua, stack });
 
         // And keep it, so a pattern across members is visible rather than a scroll through logs.
         await db.query(
             `INSERT INTO mkt_client_error (buyer_id, path, message, digest, stack, ua)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [buyer?.id || null, path, message, digest, stack, ua]
+            [buyer?.id || null, path, recovered ? `[recovered] ${message}` : message, digest, stack, ua]
         ).catch(() => { /* the log line above is the real record */ });
 
         const key = `${path}|${message}`;
         const now = Date.now();
-        if (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS) {
+        if (!recovered && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
             lastPush.set(key, now);
             await sendAdminPush({
                 title: "A page crashed",

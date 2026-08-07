@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { isChunkError, recoverFromChunkError } from "@/components/ChunkRecovery";
+
 // ── WHEN A PAGE DIES ─────────────────────────────────────────────────────────────────────────────────────────
 // A React render error used to hand the member straight to the browser's own "This page couldn't load" — no
 // idea what broke, nothing to send anyone, and no way for us to know it happened at all unless they thought to
@@ -30,6 +32,10 @@ export default function CrashScreen({ error, reset, where = "page" }) {
         // bury the one report that matters under a thousand copies of itself.
         if (reported.current) return;
         reported.current = true;
+        // A CHUNK failure is not this page being broken — it is a deploy landing while the member had the tab
+        // open, so the build their HTML names no longer exists. Reloading fetches the current one and puts
+        // them on the page they asked for. Showing them a crash screen for that is a bug in us, not the page.
+        if (recoverFromChunkError(error, where)) return;
         fetch("/api/client-error", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -70,10 +76,13 @@ export default function CrashScreen({ error, reset, where = "page" }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/images/nav/home.png" alt="" draggable="false" />
                 </div>
-                <h1>That page fell over</h1>
+                <h1>{isChunkError(error) ? "The Den updated under you" : "That page fell over"}</h1>
                 <p className="crash-lead">
-                    Not your fault, and nothing you did is lost. It&rsquo;s worth trying again — most of these
-                    are one-offs.
+                    {isChunkError(error)
+                        ? <>We shipped an update while this tab was open, so it was reaching for a version of the
+                          page that no longer exists. A refresh puts you on the new one — nothing is lost.</>
+                        : <>Not your fault, and nothing you did is lost. It&rsquo;s worth trying again — most of
+                          these are one-offs.</>}
                 </p>
 
                 <div className="crash-actions">

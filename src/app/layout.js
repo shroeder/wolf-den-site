@@ -3,6 +3,7 @@ import { Manrope, Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
 import Telemetry from "@/components/Telemetry";
+import ChunkRecovery from "@/components/ChunkRecovery";
 
 const manrope = Manrope({
     subsets: ["latin"],
@@ -127,6 +128,10 @@ export default function RootLayout({ children }) {
     return (
         <html lang="en">
             <body className={`${manrope.variable} ${spaceGrotesk.variable}`}>
+                {/* A deploy landing while a tab is open makes the build that tab names disappear; the next
+                    navigation then 404s a chunk. This reloads once instead of showing a crash screen for a
+                    page that is perfectly healthy. Root layout, because it has to cover every route. */}
+                <ChunkRecovery />
                 <Script id="tv-mode-init" strategy="beforeInteractive">{`
                     try {
                         var isTv = window.localStorage.getItem("wolfden-tv-mode") === "1";
