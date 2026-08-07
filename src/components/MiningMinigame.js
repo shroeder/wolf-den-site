@@ -48,6 +48,9 @@ const sweepFor = (hits) => Math.max(SWEEP_MIN_MS, SWEEP_MS - Math.max(0, hits) *
 // Matches the server's anti-double-tap floor. Not a cooldown — you will never see it; it exists so a shaky
 // double-tap can't come back as "Easy — let the bar refill".
 const FLOOR_MS = 300;
+// Minimum gap between REQUESTS leaving the client. The server rejects two swings inside 300ms of each other,
+// and it measures on arrival, so the queue leaves a little headroom for jitter reordering them.
+const SEND_GAP_MS = 330;
 
 let _ac = null;
 const ac = () => { if (typeof window === "undefined") return null; try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === "suspended") _ac.resume(); return _ac; } catch { return null; } };
@@ -114,7 +117,22 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const [tickets, setTickets] = useState(0);   // rare tickets your timing has put in the bag
     const [cracked, setCracked] = useState(null);
     const [notice, setNotice] = useState(null);
-    const busyRef = useRef(false), cdUntil = useRef(0);
+    const cdUntil = useRef(0);
+    // ── THE NETWORK IS BEHIND YOU, NOT IN FRONT OF YOU ───────────────────────────────────────────────────
+    // A swing used to hold a lock for the whole round trip, so the next swing was gated on Vercel + Neon
+    // answering — 200-700ms, and DIFFERENT every time. That is the "client-server timing issue" this felt
+    // like, because it was one: the bar kept sweeping while your input was quietly refused, and how many
+    // passes you lost depended on the network. Smelting has never had it (HeatGame has no await anywhere in
+    // its tap path — it banks locally and submits once at the end), which is the whole of why that one is
+    // butter smooth.
+    //
+    // Input is never blocked now. Swings queue and drain in order, one request at a time, spaced far enough
+    // apart that the server's own 300ms anti-double-tap can never reject a legitimate one. The player is
+    // ahead of the queue; the queue catches up.
+    const queueRef = useRef([]);
+    const drainingRef = useRef(false);
+    const lastSentRef = useRef(0);
+    const hitsRef = useRef(node?.mySwings ?? 0);
     // Current sweep period. A ref because the animation loop reads it every frame and must not restart.
     const sweepRef = useRef(SWEEP_MS);
     const idRef = useRef(0);
@@ -159,17 +177,82 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
         setTimeout(() => setSparks((s) => s.filter((x) => !made.some((m) => m.id === x.id))), 700);
     };
 
-    const swing = useCallback(async () => {
-        // Only two reasons not to swing: one is already in flight, or the seam is already open. No cooldown —
-        // the bar takes 900ms to cross, so there is nothing to gain by tapping faster than you can aim, and
-        // locking the button was punishing a problem nobody had. The tiny floor below just matches the
-        // server's anti-double-tap so a fumbled double never comes back as an error.
-        if (busyRef.current || cracked) return;
+    // Fold one server answer into the screen. Split out of the swing handler so the swing itself can be
+    // synchronous — this is the only part that has to wait for the network, and nothing waits for it.
+    const applyServer = useCallback((r) => {
+        if (!r?.ok) {
+            // `too_fast` is now the queue's problem to avoid, not something to blame the player for; if it
+            // still happens it is a spacing bug and saying "easy, let the bar refill" would be a lie.
+            // The seam breaking while a swing was in flight is normal now that swings can be queued behind
+            // one, and `too_fast` is the queue's spacing to get right rather than anything the player did.
+            if (r?.error === "node_gone" || r?.error === "too_fast") return;
+            setNotice("That swing didn't land");
+            setTimeout(() => setNotice(null), 1500);
+            return;
+        }
+
+        setPop({ k: Date.now(), label: r.gradeLabel, color: GRADE_COLOR[r.grade], chain: r.combo });
+        setTimeout(() => setPop(null), 800);
+        const fid = (idRef.current += 1);
+        setFloats((f) => [...f.slice(-6), { id: fid, dmg: r.damage, grade: r.grade }]);
+        setTimeout(() => setFloats((f) => f.filter((x) => x.id !== fid)), 900);
+        setChain(r.combo || 0);
+        if (r.grade === "pixel") setTickets((t) => t + 2);
+        else if (r.grade === "perfect") setTickets((t) => t + 1);
+        if (typeof r.hits === "number") {
+            // The server is the count of record; the local guess above is only there so the bar re-paces on
+            // the tap instead of on the reply.
+            hitsRef.current = r.hits;
+            setHits(r.hits);
+            sweepRef.current = sweepFor(r.hits);
+        }
+        if (typeof r.score === "number") setScore(r.score);
+        if (typeof r.pct === "number") setPct(r.pct);
+        if (typeof r.quality === "number") setQuality(r.quality);
+
+        if (r.cracked) {
+            breakChord();
+            setShake(4); setTimeout(() => setShake(0), 420);
+            try { navigator.vibrate?.([40, 50, 40, 50, 140]); } catch { /* no haptics */ }
+            setTimeout(() => setCracked(r.cracked), 380);
+        }
+    }, []);
+
+    // Drain the queue one request at a time, in order, never faster than the server's own throttle allows.
+    // Serialised rather than fired in parallel because the server scores each swing against the seam as it
+    // stands — overlapping requests would race on the same rock.
+    const drain = useCallback(async () => {
+        if (drainingRef.current) return;
+        drainingRef.current = true;
+        try {
+            while (queueRef.current.length) {
+                // The server throttles on ARRIVAL, so space the SENDS. The local tap floor is the same 300ms,
+                // which means a player swinging as fast as the bar allows never actually waits here.
+                const gap = SEND_GAP_MS - (Date.now() - lastSentRef.current);
+                if (gap > 0) await new Promise((res) => setTimeout(res, gap));
+                const d = queueRef.current.shift();
+                lastSentRef.current = Date.now();
+                const r = await onSwing(d).catch(() => null);
+                applyServer(r);
+            }
+        } finally { drainingRef.current = false; }
+    }, [onSwing, applyServer]);
+
+    const swing = useCallback(() => {
+        // The ONLY reasons not to swing: the seam is already open, or this is the same finger landing twice.
+        // Nothing here waits on the server.
+        if (cracked) return;
         if (Date.now() < cdUntil.current) return;
-        busyRef.current = true;
         cdUntil.current = Date.now() + FLOOR_MS;
         const d = Math.abs(markerRef.current - 0.5);
         const key = gradeKeyForDist(d, widen);
+
+        // The bar tightens on YOUR swing, not on the server's reply. Reading the new speed off `r.hits` meant
+        // the sweep changed pace at whatever moment the network happened to answer — a rhythm change caused by
+        // latency rather than by anything the player did. The reply still corrects the count if it disagrees.
+        hitsRef.current += 1;
+        setHits(hitsRef.current);
+        sweepRef.current = sweepFor(hitsRef.current);
 
         // Everything you FEEL fires now, off the local grade — the round trip must never be in the way of the
         // hit landing. The server's answer only ever corrects the numbers.
@@ -184,39 +267,9 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                 : key === "great" ? [16, 30, 40] : key === "good" ? [12, 26] : [8]);
         } catch { /* no haptics here */ }
 
-        const r = await onSwing(d);
-        busyRef.current = false;
-
-        if (!r?.ok) {
-            cdUntil.current = 0;
-            setNotice(r?.error === "too_fast" ? "Easy — let the bar refill" : r?.error === "node_gone" ? "This seam is gone" : "That swing didn't land");
-            setTimeout(() => setNotice(null), 1500);
-            return;
-        }
-
-        setPop({ k: Date.now(), label: r.gradeLabel, color: GRADE_COLOR[r.grade], chain: r.combo });
-        setTimeout(() => setPop(null), 800);
-        const fid = (idRef.current += 1);
-        setFloats((f) => [...f.slice(-6), { id: fid, dmg: r.damage, grade: r.grade }]);
-        setTimeout(() => setFloats((f) => f.filter((x) => x.id !== fid)), 900);
-        setChain(r.combo || 0);
-        if (r.grade === "pixel") setTickets((t) => t + 2);
-        else if (r.grade === "perfect") setTickets((t) => t + 1);
-        if (typeof r.hits === "number") {
-            setHits(r.hits);
-            sweepRef.current = sweepFor(r.hits);   // each landed swing tightens the next
-        }
-        if (typeof r.score === "number") setScore(r.score);
-        if (typeof r.pct === "number") setPct(r.pct);
-        if (typeof r.quality === "number") setQuality(r.quality);
-
-        if (r.cracked) {
-            breakChord();
-            setShake(4); setTimeout(() => setShake(0), 420);
-            try { navigator.vibrate?.([40, 50, 40, 50, 140]); } catch { /* no haptics */ }
-            setTimeout(() => setCracked(r.cracked), 380);
-        }
-    }, [onSwing, cracked]);
+        queueRef.current.push(d);
+        drain();
+    }, [drain, cracked, widen]);
 
     const label = (kind, x) => {
         if (kind === "gold") return `${Number(x.n).toLocaleString()} gold`;
