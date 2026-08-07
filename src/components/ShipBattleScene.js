@@ -298,7 +298,9 @@ function Bar({ f, hp, max, side, rigged, burning }) {
                 <b className="sbt-hpnum">{Math.max(0, Math.round(hp))} / {max}</b>
             </div>
             <div className="sbt-meta">
-                <span className="sbt-guns">{f?.guns} guns</span>
+                {/* The gun COUNT is off the HUD. Every gun a ship owns is drawn on its deck, so a chip saying
+                    "1 guns" was both redundant and — while the deck was rendering bare — the only evidence the
+                    guns existed at all. Count the barrels. */}
                 {f?.ammo ? <span className={`sbt-ammo is-${f.ammo}`}>{f.ammo}</span> : null}
                 {rigged ? <span className="sbt-flag is-rig">−{rigged} guns</span> : null}
                 {burning ? <span className="sbt-flag is-fire">burning</span> : null}
@@ -443,7 +445,7 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
             <div className="sbt-motes" aria-hidden="true">
                 {MOTES.map((m, i) => <i key={i} style={{ left: `${m.x}%`, animationDelay: `${m.d}s`, animationDuration: `${m.t}s`, "--mz": m.z }} />)}
             </div>
-            <SceneMusic vibe="seabattle" place="bottom-left" />
+            <SceneMusic vibe="seabattle" place="top-left" />
 
             <div className="sbt-hud">
                 <Bar f={me} hp={myHp} max={battle?.myMax} side="me" rigged={battle?.rigged?.me} burning={battle?.burning?.me} />

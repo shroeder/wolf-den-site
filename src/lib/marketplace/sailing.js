@@ -1993,15 +1993,31 @@ async function payFleetReward(buyerId, reward) {
 // The state lives on the row (mkt_sailing.battle_state) rather than in memory, so a locked screen or a reload
 // mid-fight does not lose the battle — and one battle at a time per member is the anti-cheat, because the
 // sortie is spent the moment the state appears and you cannot open a second fight to shop for a better opening.
-const battleView = (st, meta) => ({
+// GUNS ARE RESOLVED AT VIEW TIME, NOT AT BATTLE START. They used to be written into the meta when the fight
+// was created, which meant a battle already in progress when the code changed came back for round after round
+// with a bare deck — and the fleet path got ports before the rival path did, so member-vs-member fights (the
+// common ones) had none at all. Deriving them on every read makes a stored meta's age irrelevant: any fight,
+// however old, draws the guns the ship is holding right now.
+const withGuns = (side, saved) => {
+    if (!side) return side;
+    const deck = side.deck ?? (side.art?.includes("/fleet/") ? 30 : boatDeck(1));
+    const art = side.art?.includes("/fleet/")
+        ? side.art.split("/").pop().replace(/\.png$/, "")
+        : `boat:${boatTier(side.level || 1)}`;
+    return { ...side, deck, ports: side.ports?.length ? side.ports : portsWithSaved(saved, art, deck, side.guns || 1) };
+};
+const battleView = (st, meta, saved = {}) => ({
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
-    me: meta.me,
+    me: withGuns(meta.me, saved),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
     // a fight resumed across it would come back to an empty enemy deck. Fill it from the rank rather than
     // migrating the jsonb: these rows are transient and a read is the cheaper place to be forgiving.
-    foe: meta.kind === "fleet" && meta.foe && !meta.foe.rider && meta.rank
-        ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false }
-        : meta.foe,
+    foe: withGuns(
+        meta.kind === "fleet" && meta.foe && !meta.foe.rider && meta.rank
+            ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false }
+            : meta.foe,
+        saved,
+    ),
     myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
     round: st.round, maxRounds: MAX_ROUNDS,
     gauge: st.gauge,

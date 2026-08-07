@@ -32,7 +32,12 @@ const P = (s) => `${s} ${STYLE} ${CUTOUT}`;
 const ORDERS = {
     broadside: P("A brass-banded naval CANNON on a wooden carriage seen from a three-quarter angle, firing to the right — a bright golden-orange muzzle flash and a burst of smoke bursting from the barrel, a cannonball leaving the flash. Dominant colours warm gold, brass and orange fire."),
     rake: P("A tall ship's MAST AND RIGGING section with a torn canvas sail and snapped ropes whipping loose in the wind, a chain shot spinning through it — cold moonlit blues and pale grey canvas. Dominant colour icy blue."),
-    brace: P("A heavy round iron-and-oak naval SHIELD braced against an impact, iron rim and rivets, a cannonball striking it and shattering into sparks and splinters, a green protective shimmer running over the shield face. Dominant colours deep green and dark iron."),
+    // brace.png is retired with the order — left undeleted so an old cached client does not 404 mid-fight.
+    // Asking for "a hole through planking" makes the PLANKING the object and you get a rectangular panel with
+    // rounded corners — a background, not a die-cut. The subject has to be the WATER, with the broken timber
+    // only as a ragged ring torn around it, explicitly not a plank wall or a square.
+    hole: P("A violent BURST OF SEAWATER blasting toward the viewer through a ragged ring of shattered, splintered oak planks, white foam and spray exploding outward, broken timber shards flung around the jet. The wood forms only a torn irregular ring around the water — NOT a square panel, NOT a flat wall of planking, NOT a rectangle. Dominant colours white foam, deep sea blue and dark wet oak."),
+    patch: P("A ship's wooden BILGE PUMP handle and a coil of rope beside a timber patch board hammered over planking, water sloshing at the base, iron nails and a mallet. Dominant colours warm oak brown, wet grey water and iron."),
     board: P("A pirate's curved CUTLASS and a heavy iron GRAPPLING HOOK on a rope crossed over each other in an X, blade catching a hot red rim light, rope coiled around them. Dominant colours crimson red and steel."),
 };
 

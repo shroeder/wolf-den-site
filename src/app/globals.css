@@ -13713,9 +13713,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* CLOSED, IT IS JUST A PILL. Nothing but the toggle occupies the stage until you open the log, so the strip
    it used to hold — over the masts at the top, over the order cards at the bottom — is free again. Right-hand
    side, out of the way of both hulls. */
-.sbt-logwrap { position: absolute; z-index: 5; right: 10px; bottom: 8px; display: flex;
+/* TOP-RIGHT OF THE STAGE, and this is the last time it moves. Anchored to the top it covered the masts;
+   anchored to the bottom it covered the order cards. The one genuinely empty strip in this scene is the band
+   between the HUD and the ships, so the toggle lives there and the log opens downward into the water — which
+   is the only region of the stage nothing else occupies. */
+.sbt-logwrap { position: absolute; z-index: 6; right: 10px; top: 8px; display: flex;
     flex-direction: column-reverse; align-items: flex-end; gap: 5px; pointer-events: none; }
-/* Open, it takes the width it needs and sits above its own button. */
+/* Open, it takes the width it needs and hangs under its own button. */
 .sbt-logwrap.is-open { left: 10px; align-items: stretch; }
 .sbt-logwrap.is-empty { display: none; }
 /* A SHIP'S LOG, not a console. It was bare text on a flat dark rectangle — the one panel in the fight that
@@ -13728,7 +13732,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
         linear-gradient(180deg, rgba(26,18,10,0.93), rgba(10,7,4,0.88));
     border: 1px solid rgba(196,150,88,0.42); box-shadow: 0 8px 22px rgba(0,0,0,0.55), inset 0 0 26px rgba(0,0,0,0.45);
     scrollbar-width: none; transition: max-height .28s ease;
-    -webkit-mask-image: linear-gradient(0deg, transparent, #000 14px); mask-image: linear-gradient(0deg, transparent, #000 14px); }
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 14px), transparent); }
 .sbt-log.is-open { max-height: 42vh; }
 /* The toggle sits UNDER the log now (column-reverse), which is also where a thumb already is. */
 .sbt-logtoggle { pointer-events: auto; padding: 4px 14px; border-radius: 999px; cursor: pointer; font-size: 0.62rem;
