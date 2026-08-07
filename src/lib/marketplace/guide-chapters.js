@@ -154,7 +154,7 @@ export const GUIDE_CHAPTERS = [
             // last step of a 33-step guide a paywall — you could do every single thing in the game and still be
             // told you were not done until you spent money. The lesson (being a customer pays you in here) is
             // worth teaching; charging for the last tick is not.
-            { key: "store_browse", label: "See what's in the case", why: "Have a look at what's in stock — new arrivals land most weeks. And whenever you do buy something, in store or here, it pays XP and gold into this account automatically. You never have to buy anything to finish this guide.", href: "/shop", cta: "Browse the shop", gold: 300, events: ["view_shop"], verify: "purchase" },
+            { key: "store_browse", label: "See what's in the case", why: "Have a look at what's in stock — new arrivals land most weeks. And whenever you do buy something, in store or here, it pays XP and gold into this account automatically. You never have to buy anything to finish this guide.", href: "/shop", cta: "Browse the shop", gold: 300, events: ["view_shop", "browse_shop"], verify: "shopvisit" },
         ],
         reward: { gold: 800, chest: "gold" },
     },

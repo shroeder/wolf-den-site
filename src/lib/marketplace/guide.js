@@ -25,7 +25,7 @@ async function trueSteps(buyerId, steps) {
     if (!steps.length) return new Set();
     const wanted = [...new Set(steps.flatMap((s) => s.events || []))];
     const needs = (v) => steps.some((s) => s.verify === v);
-    const [events, avatar, wish, push, purchase] = await Promise.all([
+    const [events, avatar, wish, push, purchase, shopVisit] = await Promise.all([
         wanted.length
             ? db.query(`SELECT DISTINCT event FROM mkt_activity_event WHERE buyer_id = $1 AND event = ANY($2)`, [buyerId, wanted]).catch(() => [])
             : [],
@@ -62,6 +62,18 @@ async function trueSteps(buyerId, steps) {
         needs("purchase")
             ? db.queryOne(`SELECT 1 AS x FROM mkt_xp_event WHERE buyer_id = $1 AND action IN ('purchase_spend','purchase_flat','first_purchase') LIMIT 1`, [buyerId]).catch(() => null)
             : null,
+        // DID THEY EVER LOOK AT THE SHOP. The step asked for a `view_shop` event that the activity allow-list
+        // silently rejected, so it recorded ZERO times across the whole Den while members browsed the shop
+        // dozens of times each — the last step of a 33-step guide, uncompletable for everyone. The ping is
+        // fixed, but reading the PAGE VIEW as well is what un-sticks the people already stuck: page_view has
+        // always recorded the path, so the evidence was sitting there the whole time.
+        needs("shopvisit")
+            ? db.queryOne(
+                `SELECT 1 AS x FROM mkt_activity_event
+                  WHERE buyer_id = $1 AND (event IN ('view_shop','browse_shop') OR path LIKE '/shop%') LIMIT 1`,
+                [buyerId]
+            ).catch(() => null)
+            : null,
     ]);
     const seen = new Set(events.map((r) => r.event));
     const out = new Set();
@@ -71,6 +83,7 @@ async function trueSteps(buyerId, steps) {
         else if (s.verify === "wishlist" && wish) out.add(s.key);
         else if (s.verify === "push" && push) out.add(s.key);
         else if (s.verify === "purchase" && purchase) out.add(s.key);
+        else if (s.verify === "shopvisit" && (shopVisit || purchase)) out.add(s.key);
     }
     return out;
 }

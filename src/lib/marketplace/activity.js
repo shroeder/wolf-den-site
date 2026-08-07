@@ -8,7 +8,9 @@ import { db } from "@/lib/db";
 // Client-firable events (via /api/marketplace/track). page_view covers ALL traffic incl. anonymous.
 export const CLIENT_EVENTS = new Set([
     "page_view", "view_profile", "shop_search", "shop_filter", "inspect_item",
-    "view_boss", "view_leaderboard", "browse_shop", "view_vendor", "view_inventory",
+    // `view_shop` was missing while /shop fired exactly that — 0 recorded events Den-wide against 29 page
+    // hits from one member alone — which made the Pathfinder's last step uncompletable for everybody.
+    "view_boss", "view_leaderboard", "browse_shop", "view_shop", "view_vendor", "view_inventory",
     "share_location", "view_bounties",
 ]);
 

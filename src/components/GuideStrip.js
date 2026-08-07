@@ -45,6 +45,23 @@ export default function GuideStrip() {
     // The guide page shows all of this in full; a strip above it would just be the same sentence twice.
     const show = onGame && pathname !== "/marketplace/guide";
     const step = g?.current?.step || null;
+    // DISMISSABLE. A step whose completion signal is broken traps you on it forever — the Pathfinder's last
+    // step recorded zero events Den-wide for months and members sat staring at it. The signal is fixed, but a
+    // guide that CANNOT be put down is a trap by design, so any step can be waved off.
+    //
+    // Keyed BY STEP and kept in localStorage: this is "not now", not "never show me the guide". Dismiss the
+    // current step and the strip returns the moment a different step is next, and the Guide page still lists
+    // everything either way.
+    const [hidden, setHidden] = useState(() => {
+        try { return new Set(JSON.parse(window.localStorage.getItem("wolfden-guide-dismissed") || "[]")); } catch { return new Set(); }
+    });
+    const dismiss = useCallback((key) => {
+        setHidden((prev) => {
+            const next = new Set(prev); next.add(key);
+            try { window.localStorage.setItem("wolfden-guide-dismissed", JSON.stringify([...next])); } catch { /* private mode */ }
+            return next;
+        });
+    }, []);
     const here = Boolean(step && (pathname === step.href || pathname.startsWith(`${step.href}/`)));
 
     useEffect(() => { if (show) load(); }, [show, pathname, load]);
@@ -71,7 +88,7 @@ export default function GuideStrip() {
     //
     // It is not gone for good: it comes back on its own the moment a step exists again — a chapter unlocking at
     // a higher level, or a new one shipping — and the Guide sits in the nav the whole time regardless.
-    if (!show || !g?.signedIn || !step) return null;
+    if (!show || !g?.signedIn || !step || hidden.has(step.key)) return null;
     const pct = g.totals?.steps ? Math.round((g.totals.doneSteps / g.totals.steps) * 100) : 0;
     const tint = g.current?.tint || "#ffd75e";
 
@@ -100,21 +117,36 @@ export default function GuideStrip() {
         return (
             <div className="gs is-here" style={{ "--tint": tint }}>
                 {body}
+                <button type="button" className="gs-x" aria-label="Hide this step"
+                    onClick={() => dismiss(step.key)}>×</button>
                 <Styles />
             </div>
         );
     }
+    // The X sits OUTSIDE the anchor rather than inside it — a button nested in a link is ambiguous to a
+    // screen reader and a coin-flip for which one a tap lands on.
     return (
-        <Link className="gs" href={step.href} style={{ "--tint": tint }}>
-            {body}
+        <div className="gs-wrap">
+            <Link className="gs" href={step.href} style={{ "--tint": tint }}>
+                {body}
+            </Link>
+            <button type="button" className="gs-x" aria-label="Hide this step" onClick={() => dismiss(step.key)}>×</button>
             <Styles />
-        </Link>
+        </div>
     );
 }
 
 function Styles() {
     return (
         <style jsx global>{`
+            .gs-wrap { position: relative; }
+            /* "Not now." A step whose signal is broken would otherwise sit there forever; this is the escape
+               hatch, per step, so the strip returns for the next one. */
+            .gs-x { position: absolute; top: 4px; right: 6px; z-index: 2; width: 26px; height: 26px; border-radius: 50%;
+                display: grid; place-items: center; cursor: pointer; font-size: 17px; line-height: 1;
+                color: #cdd3d8; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.18); }
+            .gs-x:hover { color: #fff; background: rgba(0,0,0,0.7); }
+            .gs.is-here { position: relative; }
             .gs { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 11px;
                 padding: 9px 13px; margin: 0 auto 10px; max-width: 1100px; border-radius: 14px; text-decoration: none;
                 background: linear-gradient(148deg, color-mix(in srgb, var(--tint) 22%, transparent), rgba(255,255,255,0.03) 62%), rgba(12,10,16,0.66);
