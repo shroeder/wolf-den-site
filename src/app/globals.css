@@ -11956,6 +11956,21 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    allow-list ever renders this — the whole surface is absent for them. */
 .sail-raid-wip { margin: 7px 0 0; padding: 6px 10px; border-radius: 10px; font-size: 0.72rem; line-height: 1.35;
     color: #ffd08a; background: rgba(255,170,60,0.12); border: 1px dashed rgba(255,170,60,0.5); }
+/* THE DOOR to the ship yard, and the SHEET the yard itself lives in. The yard was a tall four-tab card sitting
+   inline in the page, which meant the only thing its two entry points could do was scroll to it — so tapping
+   Raid read as "the page moved", not "something opened". */
+.sail-yard-door h3 { margin: 0 0 4px; }
+.sail-yard-door .sail-cta { width: 100%; }
+.sail-yard-sheet { position: relative; width: min(560px, 100%); }
+/* The yard's own <h3> is the sheet's title, so the close button tucks into that line rather than adding a
+   header bar of its own — which means the header has to give up the corner the ✕ sits in, or the doubloon
+   purse ends up underneath it. */
+.sail-yard-sheet .sby-head { padding-right: 42px; }
+.sail-yard-close { position: absolute; top: 10px; right: 10px; z-index: 3; width: 34px; height: 34px;
+    border-radius: 50%; display: grid; place-items: center; font-size: 1rem; line-height: 1; cursor: pointer;
+    color: #e6e9ec; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.22); }
+.sail-yard-close:hover { background: rgba(0,0,0,0.65); }
+
 /* An unfinished fight, and the reason a Battle tap declined. Both sit ABOVE the battle card, because both
    explain why the buttons underneath them are not doing what you just asked. */
 .sail-battle-resume { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px;

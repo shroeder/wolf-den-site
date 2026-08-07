@@ -243,7 +243,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [fishOpen, setFishOpen] = useState(false);       // the fishing scene (cast → bite → reel) is open
     const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
     const [battleTab, setBattleTab] = useState("fleet");   // which tab the one battle card is showing
-    const yardRef = useRef(null);                          // ...so a CTA can bring you to it
+    // The ship yard is a full-screen INTERFACE you open, not a card you get scrolled to. Both doors into it —
+    // the Raid tile out at sea and the entry button at the helm — used to call scrollIntoView, so tapping
+    // either one just moved the page and left you to find what had changed. See the entry button below.
+    const [yardOpen, setYardOpen] = useState(false);
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
@@ -251,7 +254,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
     // Lock the background from scrolling while a full-screen sailing modal is open (the battle, arrival, the
     // rail). The raid picker used to be one of these; it is a tab on the battle card now.
-    useScrollLock(Boolean(shipBattle) || arriveModal || fishOpen);
+    useScrollLock(Boolean(shipBattle) || arriveModal || fishOpen || yardOpen);
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -588,7 +591,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // Show the battle card on the RAIDS tab and load who is passing. There is no separate picker any more.
     const openRaid = useCallback(async () => {
         setBattleTab("raid");
-        yardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setYardOpen(true);
         setRaidTargets(null);
         try {
             const r = await fetch("/api/marketplace/sailing", {
@@ -924,7 +927,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             says this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
                         {state.combat ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy}
-                                onClick={() => { setBattleTab("fleet"); yardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+                                onClick={() => { setBattleTab("fleet"); setYardOpen(true); }}>
                                 ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
                         ) : null}
@@ -1042,11 +1045,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {station === "helm" ? <>
             {/* SHIP BATTLES — the gun deck, the racks and the fleet ladder. Gated with raiding while the rework
                 is under construction: the server sends `combat: null` to everyone off the dev allow-list. */}
+            {/* The DOOR, not the room. The yard itself is a full-screen interface (below) — inline it was a
+                tall four-tab card that the two entry points could only scrollIntoView, so tapping Raid read as
+                "the page moved" rather than "something opened". */}
             {state.combat ? (
-                <div ref={yardRef}>
-                    {/* A fight you walked away from. The sortie is spent and no other battle can start until
-                        it ends, so this is the one thing on the card worth reading — and without it the only
-                        symptom was a Battle button that appeared to do nothing. */}
+                <div className="card sail-yard-door">
+                    <h3>⚔️ Ship battles</h3>
+                    {/* A fight you walked away from. The sortie is spent and no other battle can start until it
+                        ends, so it belongs out HERE, on the door, not behind it. */}
                     {state.combat.openBattle && !shipBattle ? (
                         <div className="sail-battle-resume">
                             <span>You left a fight unfinished against <b>{state.combat.openBattle.foe?.name || "a ship"}</b>.</span>
@@ -1054,13 +1060,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 onClick={() => setShipBattle(state.combat.openBattle)}>Back on deck</button>
                         </div>
                     ) : null}
-                    {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
-                    <ShipYard
-                        combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
-                        targets={raidTargets} targetsMine={raidMine}
-                        tab={battleTab}
-                        onTab={(t) => { setBattleTab(t); if (t === "raid" && raidTargets === null) openRaid(); }}
-                        onAct={({ action, ...extra }) => act(action, extra)} />
+                    <p className="muted" style={{ margin: "2px 0 10px" }}>
+                        Your guns, your hull, the shot in the racks and the fifteen ships of the pirate fleet — plus
+                        any rival worth running down.
+                    </p>
+                    <button type="button" className="sail-cta sail-cta-raid" disabled={busy}
+                        onClick={() => { setBattleTab("fleet"); setYardOpen(true); }}>
+                        Open the ship yard — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left today
+                    </button>
                 </div>
             ) : null}
 
@@ -1493,7 +1500,27 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             ) : null}
 
-            {/* RAID — the full-screen auto-battle show, then reward reveal */}
+            {/* THE SHIP YARD — one interface, opened from either door, closed by one button. It hides while a
+                battle is playing so the fight is never fought through a card. */}
+            {yardOpen && state.combat && !shipBattle ? (
+                <div className="sail-reward-overlay" role="dialog" aria-modal="true"
+                    onClick={(e) => { if (e.target === e.currentTarget) setYardOpen(false); }}>
+                    <div className="sail-yard-sheet">
+                        <button type="button" className="sail-yard-close" onClick={() => setYardOpen(false)} aria-label="Close">✕</button>
+                        {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
+                        <ShipYard
+                            combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
+                            targets={raidTargets} targetsMine={raidMine}
+                            tab={battleTab}
+                            onTab={(t) => { setBattleTab(t); if (t === "raid" && raidTargets === null) openRaid(); }}
+                            onAct={({ action, ...extra }) => act(action, extra)} />
+                    </div>
+                </div>
+            ) : null}
+
+            {/* RAID — the full-screen auto-battle show, then reward reveal. Closing a finished fight leaves
+                `yardOpen` as it was, so a battle launched FROM the yard drops you back into it — the natural
+                next question is "who next?" — while one resumed from the door returns you to the page. */}
             {shipBattle ? (
                 <ShipBattleScene battle={shipBattle} busy={busy}
                     onOrder={async (order) => { const d = await act("battle_order", { order }); if (d?.battle) setShipBattle(d.battle); }}
