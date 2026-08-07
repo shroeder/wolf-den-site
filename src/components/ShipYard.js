@@ -308,10 +308,10 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                         one screen where you already have the purse open. */}
                     {(combat.locker || []).length ? (
                         <>
-                            <h3 className="sby-lockerhead">The prize locker</h3>
+                            <h3 className="sby-lockerhead">The Doubloon Shop</h3>
                             <p className="sby-sub">
-                                Plunder buys more than powder. Chests you would otherwise wait on a level for, and the
-                                only scroll in the game that lets you choose a piece of gear&apos;s element.
+                                Everything on this counter is chest-only everywhere else in the game — a random roll
+                                inside a random drop. Here you can decide to have one.
                             </p>
                             <div className="sby-locker">
                                 {combat.locker.map((l) => (
@@ -323,7 +323,7 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                                             point at from here. */}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img className="sby-lockerart" alt="" draggable="false"
-                                            src={l.kind === "chest" ? "/images/ui/chest.png" : "/images/ui/potion.png"} />
+                                            src="/images/ui/potion.png" />
                                         <span className="sby-lockerbody">
                                             <b>{l.name}</b>
                                             <em>{l.blurb}</em>

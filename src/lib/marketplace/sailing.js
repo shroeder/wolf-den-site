@@ -2201,10 +2201,28 @@ export async function buyAmmo(buyerId, ammoId, qty = 5) {
 //
 // Priced off what a battle actually pays: roughly a dozen doubloons a win, so an Iron chest is two or three
 // fights, a Gold chest most of a week, and a scroll is a genuine save-up.
+// NOT CHESTS. A chest already falls out of the boss, the delves, the mine, the sea, the dailies and the wheel
+// — selling one here is a shortcut to something the game hands you anyway, and it would make the shop a
+// vending machine rather than a reason to sail.
+//
+// Every line below is a REAL ORPHAN: an item that exists, does something worth wanting, and has no route you
+// can choose. All five drop only out of a chest — a random roll inside a random drop — so until now you could
+// not decide to go and get one no matter how well you played. That is the gap this fills.
+//
+// Deliberately NOT stocked: the forty-five `source: "admin"` items. Those are the real-world store perks —
+// credit tokens, snack tokens, line-cutter, box breaks, grading — and letting anybody convert game currency
+// into real store credit is not a design decision, it is a hole in the till.
 export const LOCKER = {
-    chest_iron: { id: "chest_iron", kind: "chest", tier: "iron", name: "Iron Chest", price: 30, blurb: "Ship's stores. Reliable, and yours in two good fights." },
-    chest_gold: { id: "chest_gold", kind: "chest", tier: "gold", name: "Gold Chest", price: 75, blurb: "The captain's own. Worth saving for." },
-    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 110, blurb: "Adds an element to a piece of gear — permanently. The only way to buy one." },
+    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 120,
+        blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
+    scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 90,
+        blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
+    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 75,
+        blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
+    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 65,
+        blurb: "Fully recharges a charged item — the in-store perks you thought were spent." },
+    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 45,
+        blurb: "Resets the cooldown on a charged item. Use the perk again today." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
 
@@ -2221,17 +2239,12 @@ export async function buyLocker(buyerId, id) {
         [buyerId, def.price]
     ).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
-    // Granted after the charge landed. If a grant were to fail the member is out the doubloons, which is why
-    // both paths below are the same calls the rest of the game already uses rather than bespoke SQL.
-    if (def.kind === "chest") {
-        await addChests(buyerId, { [def.tier]: 1 }, { source: "doubloon_locker", meta: { id: def.id } }).catch(() => {});
-    } else {
-        await db.query(
-            `INSERT INTO mkt_user_consumable (buyer_id, consumable_id, count) VALUES ($1, $2, 1)
-             ON CONFLICT (buyer_id, consumable_id) DO UPDATE SET count = mkt_user_consumable.count + 1`,
-            [buyerId, def.consumable]
-        ).catch(() => {});
-    }
+    // Granted after the charge landed, using the same table the rest of the game reads rather than bespoke SQL.
+    await db.query(
+        `INSERT INTO mkt_user_consumable (buyer_id, consumable_id, count) VALUES ($1, $2, 1)
+         ON CONFLICT (buyer_id, consumable_id) DO UPDATE SET count = mkt_user_consumable.count + 1`,
+        [buyerId, def.consumable]
+    ).catch(() => {});
     await trackActivity(buyerId, "buy_locker", { id: def.id, cost: def.price }).catch(() => {});
     return { ok: true, bought: def.name, ...(await getSailingState(buyerId)) };
 }
