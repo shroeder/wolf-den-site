@@ -93,8 +93,8 @@ const Img = ({ src, className, fallback }) => {
 };
 
 export default function MiningMinigame({ node, pick, onSwing, onDone }) {
-    const [marker, setMarker] = useState(0.5);
     const markerRef = useRef(0.5);
+    const markerEl = useRef(null);
     const [hits, setHits] = useState(node?.mySwings ?? 0);
     // Seam integrity and your running average swing quality, both straight from the server's answer — the two
     // things worth knowing mid-hand now that there is no swing budget to count down.
@@ -120,6 +120,15 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
     const idRef = useRef(0);
 
     // The marker sweeps. rAF rather than CSS so the sampled position and the drawn position are the same number.
+    //
+    // WHY THE POSITION GOES STRAIGHT TO THE DOM. This loop used to also call setMarker(pos) every frame, which
+    // re-rendered this entire component ~60 times a second and painted the marker from React state. The maths
+    // never moved — the tap has always sampled markerRef.current — but the PICTURE lagged it: a state update
+    // scheduled inside rAF paints a frame or more later, and this component is heavy (sparks, floats, notices,
+    // a full outcome panel), so under load the drawn marker trailed the real one. You aimed at what you could
+    // see and were graded on a position slightly past it, which is exactly what "the timing doesn't feel right"
+    // is. The smelting bar (HeatGame.js) never had it because it writes style.left directly — and that is the
+    // one and only reason smelting feels honest and this did not. Same technique here now.
     useEffect(() => {
         let raf = 0;
         const t0 = performance.now();
@@ -129,7 +138,8 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
             const ms = sweepRef.current;
             const phase = ((t - t0) % (ms * 2)) / ms;
             const pos = phase <= 1 ? phase : 2 - phase;
-            markerRef.current = pos; setMarker(pos);
+            markerRef.current = pos;
+            if (markerEl.current) markerEl.current.style.left = `${pos * 100}%`;
             raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
@@ -301,7 +311,7 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                     <>
                         <div className="mmg-bar" aria-hidden="true">
                             {bands.map((b) => <span key={b.key} className={`mmg-zone is-${b.key}`} style={{ width: `${b.pct}%` }} />)}
-                            <span className="mmg-marker" style={{ left: `${marker * 100}%` }} />
+                            <span ref={markerEl} className="mmg-marker" style={{ left: "50%" }} />
                             <Img src={pick?.sprite} className="mmg-rider" fallback="" />
                             {sparks.map((sp) => (
                                 <span key={sp.id} className="mmg-spark" style={{ "--a": `${sp.a}deg`, "--d": `${sp.d}px`, background: sp.c }} />

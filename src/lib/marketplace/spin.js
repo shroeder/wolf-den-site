@@ -65,6 +65,7 @@ function prizeDesc(p) {
         case "xp": return `Gain ${(p.amount || 0).toLocaleString()} XP toward your next level.`;
         case "consumable": return CONSUMABLES[p.consumable]?.desc || p.label;
         case "seed": return "A random farm seed to plant and grow in your pasture.";
+        case "decoration": return "A random farm decoration you don't own yet — yours to place, and to keep placing.";
         case "fragment": return `${p.n || 1} ${fragName(p.tierId || FRAGMENT_PRIZE_TIER)} chest fragments — collect enough of a kind to forge that chest at the docks.`;
         case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
         case "recipe": return "A page for the Kitchen's book — something new you can cook.";
@@ -93,7 +94,12 @@ const WHEELS = [
             // pays more now and comes up far less; the weight it gave up is spread across the middle of the
             // list, where the wedges people actually want to land on live.
             { label: "250 gold", sprite: "coins-small", weight: 12, kind: "gold", amount: 250 },
-            { label: "200 XP", sprite: "xp-orb", weight: 10, kind: "xp", amount: 200 },
+            // Was "200 XP" — the weakest thing on the wheel, and by some way: 200 XP is a rounding error to
+            // anyone past the first week, so the most likely low-tier outcome was also the most forgettable.
+            // The wheel is locked to EXACTLY 20 wedges (see WHEEL_WEDGES below — it throws at build time
+            // otherwise), so making good on the eighteen decorations that claim `source: "spin"` meant taking
+            // a wedge from something. This was the one to take. 500 XP is still on the wheel further down.
+            { label: "Farm Decoration", sprite: "farm-deco", weight: 10, kind: "decoration" },
             { label: "Hearty Snack", sprite: "pet-treat", weight: 9, kind: "consumable", consumable: "treat_snack", n: 1 },
             { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
             { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
@@ -320,6 +326,25 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const sid = commons[Math.floor(Math.random() * commons.length)];
         await grantSeed(buyerId, sid).catch(() => {});
         return { sprite, text: `${SEEDS[sid]?.name || "Common"} seed!` };
+    }
+    // A FARM DECORATION. Eighteen decorations in decorations.js are declared `source: "spin"`, and the farm
+    // tells you so to your face — "🎡 Win it from the Daily Spin wheel" — but no wedge had ever been able to
+    // pay one out and grantDecoration() was only ever reached from the shop and the Town glint. Those eighteen
+    // were unobtainable for their whole life while the UI kept pointing at this wheel.
+    if (prize.kind === "decoration") {
+        const { DECORATIONS } = await import("@/lib/marketplace/decorations.js");
+        const { grantDecoration } = await import("@/lib/marketplace/farm-decorations.js");
+        const pool = DECORATIONS.filter((d) => d.source === "spin");
+        const owned = new Set((await db.query(`SELECT deco_id FROM mkt_deco_owned WHERE buyer_id = $1`, [buyerId]).catch(() => []) || []).map((r) => r.deco_id));
+        const fresh = pool.filter((d) => !owned.has(d.id));
+        // Own every one of them? Pay gold rather than landing on a blank wedge — same as the recipe wedge above.
+        if (!fresh.length) {
+            await db.query(`UPDATE mkt_buyer SET gold = gold + 400 WHERE id = $1`, [buyerId]).catch(() => {});
+            return { sprite, text: "400 gold — your farm has them all" };
+        }
+        const pick = fresh[Math.floor(Math.random() * fresh.length)];
+        await grantDecoration(buyerId, pick.id, 1, "spin").catch(() => {});
+        return { sprite, text: `${pick.name} — for the farm!` };
     }
     return { sprite, text: prize.label };
 }

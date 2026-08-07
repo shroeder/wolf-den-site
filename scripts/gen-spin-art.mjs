@@ -26,6 +26,9 @@ const JOBS = [
     { out: "public/images/spin/prizes/xp-orb.png", size: "1024x1024", prompt: SPRITE("glowing sky-blue experience orb, a radiant magical star-crystal") },
     { out: "public/images/spin/prizes/pet-treat.png", size: "1024x1024", prompt: SPRITE("big meaty golden-brown bone pet treat") },
     { out: "public/images/spin/prizes/seed-pouch.png", size: "1024x1024", prompt: SPRITE("small brown drawstring pouch spilling a few green sprouting seeds") },
+    // The farm-decoration wedge. Deliberately generic — it pays out a RANDOM one of eighteen decorations, so
+    // the icon has to say "something pretty for your farm" rather than name any single object.
+    { out: "public/images/spin/prizes/farm-deco.png", size: "1024x1024", prompt: SPRITE("charming little garden ornament set — a painted birdhouse on a post beside a small stone lantern and a flowering window box, tied with a ribbon like a gift") },
     { out: "public/images/spin/prizes/fertilizer.png", size: "1024x1024", prompt: SPRITE("burlap sack of dark rich fertilizer soil with a green leaf sprouting on top") },
     { out: "public/images/spin/prizes/dig-shard.png", size: "1024x1024", prompt: SPRITE("glowing carved ancient stone treasure fragment / relic shard with golden runes") },
     { out: "public/images/spin/prizes/potion-red.png", size: "1024x1024", prompt: SPRITE("glowing red adrenaline potion in a corked glass vial with a sparkle") },
