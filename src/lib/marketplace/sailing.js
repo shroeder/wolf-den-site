@@ -1613,7 +1613,13 @@ export async function getRaidTargets(buyerId, limit = 12) {
 export async function doRaid(buyerId, targetId = null) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
-    if (readBattle(row)) return { ok: false, error: "battle_in_progress", ...(await getSailingState(buyerId)) };
+    // Same as the fleet: an open fight resumes rather than silently refusing. See doFleetBattle.
+    const openNow = readBattle(row);
+    if (openNow) {
+        return { ok: true, resumed: true,
+            battle: { ...battleView(openNow.state, openNow.meta), events: [], over: false },
+            ...(await getSailingState(buyerId)) };
+    }
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
@@ -1842,6 +1848,10 @@ function combatView(row, boatLevel) {
             cleared: depth >= MAX_FLEET_RANK,
             ships: fleetView(depth),
         },
+        // A battle you walked away from — closed the tab, locked the phone, reloaded. The sortie is already
+        // spent, so this fight is the only one you have; handing it back on every state read is what lets the
+        // screen put you straight back on deck instead of leaving a saved fight nobody can reach.
+        openBattle: (() => { const b = readBattle(row); return b ? { ...battleView(b.state, b.meta), events: [], over: false } : null; })(),
     };
 }
 
@@ -1912,7 +1922,13 @@ async function payFleetReward(buyerId, reward) {
 // sortie is spent the moment the state appears and you cannot open a second fight to shop for a better opening.
 const battleView = (st, meta) => ({
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
-    me: meta.me, foe: meta.foe,
+    me: meta.me,
+    // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
+    // a fight resumed across it would come back to an empty enemy deck. Fill it from the rank rather than
+    // migrating the jsonb: these rows are transient and a read is the cheaper place to be forgiving.
+    foe: meta.kind === "fleet" && meta.foe && !meta.foe.rider && meta.rank
+        ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false }
+        : meta.foe,
     myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
     round: st.round, maxRounds: MAX_ROUNDS,
     gauge: st.gauge,
@@ -1982,7 +1998,16 @@ export async function shipBattleOrder(buyerId, order) {
 export async function doFleetBattle(buyerId, rank = null) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
-    if (readBattle(row)) return { ok: false, error: "battle_in_progress", ...(await getSailingState(buyerId)) };
+    // ONE FIGHT AT A TIME — but a battle already open is not a reason to do NOTHING. Walking away from a fight
+    // (closing the tab, a reload) left a saved battle that no screen reopened, so every later tap on Battle
+    // came back `battle_in_progress` and the button looked broken. The sortie is already spent on that fight;
+    // hand it back and put them on deck to finish it.
+    const openNow = readBattle(row);
+    if (openNow) {
+        return { ok: true, resumed: true,
+            battle: { ...battleView(openNow.state, openNow.meta), events: [], over: false },
+            ...(await getSailingState(buyerId)) };
+    }
     const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myBattleLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };

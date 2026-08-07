@@ -11956,6 +11956,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    allow-list ever renders this — the whole surface is absent for them. */
 .sail-raid-wip { margin: 7px 0 0; padding: 6px 10px; border-radius: 10px; font-size: 0.72rem; line-height: 1.35;
     color: #ffd08a; background: rgba(255,170,60,0.12); border: 1px dashed rgba(255,170,60,0.5); }
+/* An unfinished fight, and the reason a Battle tap declined. Both sit ABOVE the battle card, because both
+   explain why the buttons underneath them are not doing what you just asked. */
+.sail-battle-resume { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px;
+    padding: 9px 11px; border-radius: 12px; font-size: 0.8rem; line-height: 1.35; color: #ffe1b0;
+    background: rgba(255,170,60,0.14); border: 1px solid rgba(255,170,60,0.55); }
+.sail-battle-resume span { flex: 1 1 160px; }
+.sail-battle-msg { margin: 0 0 8px; padding: 8px 11px; border-radius: 12px; font-size: 0.78rem; line-height: 1.35;
+    color: #ffc0b2; background: rgba(255,90,60,0.12); border: 1px solid rgba(255,90,60,0.42); }
 .sail-raid-list { display: grid; gap: 8px; max-height: 46vh; overflow-y: auto; margin-bottom: 12px; padding: 2px; }
 .sail-raid-empty { padding: 22px 8px; text-align: center; opacity: 0.7; font-size: 0.88rem; }
 .sail-raid-target { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 10px; border-radius: 12px;

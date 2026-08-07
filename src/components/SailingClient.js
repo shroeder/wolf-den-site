@@ -27,6 +27,9 @@ const GUST_MS = 3000;
 const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10: 34, 11: 26 };
 // Scan HEAT word by level (3 hot … 0 cold) — how close the nearest treasure is.
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
+// The actions that open a fight. A refusal from any of these has to be SAID — a battle button that silently
+// does nothing reads as a broken build, which is precisely how it read.
+const BATTLE_ACTIONS = new Set(["fleet_battle", "raid"]);
 // An uncovered chest cell shows ITS SLICE of the real chest sprite (positioned like a sprite-sheet), so the
 // tiles assemble into one recognizable treasure chest as you dig it out.
 function chestSlice(cp) {
@@ -244,6 +247,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
+    const [battleMsg, setBattleMsg] = useState(null);      // why a Battle tap did nothing — see act()'s error branch
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
     // Lock the background from scrolling while a full-screen sailing modal is open (the battle, arrival, the
     // rail). The raid picker used to be one of these; it is a tab on the battle card now.
@@ -496,6 +500,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 clearTimeout(windMsgTimer.current);
                 windMsgTimer.current = setTimeout(() => setWindMsg(null), 2800);
             }
+            // ── A BATTLE THAT REFUSES HAS TO SAY SO ──────────────────────────────────────────────────────
+            // Every error from this endpoint used to fall straight through this function and out, so a Battle
+            // tap that the server declined was indistinguishable from a dead button — which is exactly how it
+            // looked when an abandoned fight left `battle_in_progress` on the row. The server resumes that case
+            // now; everything else at least gets a reason.
+            if (BATTLE_ACTIONS.has(action)) {
+                setBattleMsg(!d ? "The sea didn't answer — try that again."
+                    : d.error === "no_battles" || d.error === "no_raid" ? "No battles left today — they come back at midnight."
+                    : d.error === "no_target" ? "Nobody worth taking on out there right now."
+                    : d.error === "locked" ? "Sink the ship ahead of it first."
+                    : d.error === "under_construction" ? "Ship battles are under construction."
+                    : d.error ? "That fight couldn't start — try again."
+                    : null);
+            }
             if (d && !d.error) {
                 // A `partial` response carries only what changed (mid-dig taps send just the board), so merge it
                 // onto what we already have. Replacing wholesale would drop the fleet, the art maps and the
@@ -520,7 +538,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
                 // A resolved battle — fleet or rival — plays out in the ship-battle scene. Clearing the target
                 // list means the raids tab re-scans the horizon next time rather than offering a stale ship.
-                if (d.battle) { setRaidTargets(null); setShipBattle(d.battle); }
+                if (d.battle) { setRaidTargets(null); setShipBattle(d.battle); setBattleMsg(null); }
             }
             return d;
         } finally { setBusy(false); }
@@ -1026,6 +1044,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 is under construction: the server sends `combat: null` to everyone off the dev allow-list. */}
             {state.combat ? (
                 <div ref={yardRef}>
+                    {/* A fight you walked away from. The sortie is spent and no other battle can start until
+                        it ends, so this is the one thing on the card worth reading — and without it the only
+                        symptom was a Battle button that appeared to do nothing. */}
+                    {state.combat.openBattle && !shipBattle ? (
+                        <div className="sail-battle-resume">
+                            <span>You left a fight unfinished against <b>{state.combat.openBattle.foe?.name || "a ship"}</b>.</span>
+                            <button type="button" className="sby-engage" disabled={busy}
+                                onClick={() => setShipBattle(state.combat.openBattle)}>Back on deck</button>
+                        </div>
+                    ) : null}
+                    {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
                     <ShipYard
                         combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
                         targets={raidTargets} targetsMine={raidMine}
