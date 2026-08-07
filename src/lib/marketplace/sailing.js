@@ -6,10 +6,10 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
+import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
 import { sumPieceSea } from "@/lib/marketplace/collection-pieces.js";
-import { getOwnedPieceIds } from "@/lib/marketplace/collection-owned.js";
+import { getOwnedPieceIds, getOwnedSetIds } from "@/lib/marketplace/collection-owned.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -100,7 +100,7 @@ const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) :
 // Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. A COLLECTION set —
 // assembling it is the achievement, so it counts what you own rather than what is in your slots.
 async function equippedRaidExtras(buyerId) {
-    const owned = await getOwnedItemIds(buyerId).catch(() => []);
+    const owned = await getOwnedSetIds(buyerId).catch(() => []);
     return { bonusRaids: setRaidBonus(owned), doubleGold: setDoublesRaidGold(owned) };
 }
 // Spent your daily raid? Buy another. Cost DOUBLES with each reset that day. FREE while testing — flip
@@ -288,7 +288,7 @@ export async function equippedSeaAffinity(buyerId) {
     const [bySlot, me, ownedIds] = await Promise.all([
         getEquippedIds(buyerId).catch(() => ({})),
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
-        getOwnedItemIds(buyerId).catch(() => []),
+        getOwnedSetIds(buyerId).catch(() => []),
     ]);
     // Worn gear's sea affixes, PLUS the affix on every Corsair piece you own. Trophies cannot be equipped at
     // all, so the loadout alone would drop them and the collection panel's "+4 Tailwind" would be a lie. They

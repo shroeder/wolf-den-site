@@ -5,10 +5,10 @@ import { dropSeedFrom, grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js"
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
-import { grantItem, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
+import { grantItem, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
-import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
+import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { setWheelBonus, setWheelRespinChance } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
@@ -444,7 +444,7 @@ export async function doSpin(buyerId) {
     // ten wheel-exclusive pieces, two of which share a slot, so it could never all be worn at once anyway.
     // Winning the piece is what counts now, which is the only reading of a collect-them-all chase that makes
     // sense: you cannot ask someone to wear a wheel prize to spin the wheel.
-    const owned = await getOwnedItemIds(buyerId).catch(() => []);
+    const owned = await getOwnedSetIds(buyerId).catch(() => []);
     const luckChance = setWheelBonus(owned).luck || 0;  // % CHANCE for a Lucky Spin proc this spin
     const respinChance = setWheelRespinChance(owned);   // capstone: 0..0.5
     const lucky = luckChance > 0 && Math.random() * 100 < luckChance; // did the wheel set proc this spin?

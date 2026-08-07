@@ -10,7 +10,7 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { grantConsumable } from "@/lib/marketplace/consumables.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
-import { getOwnedItemIds } from "@/lib/marketplace/inventory.js";
+import { getOwnedSetIds } from "@/lib/marketplace/collection-owned.js";
 import { SEED_PACK_IDS, seedPackById } from "@/lib/marketplace/seed-packs.js";
 import { setFarmGrowBonus, setFarmDoubleHarvest } from "@/lib/marketplace/sets.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
@@ -318,7 +318,7 @@ export async function plantSeed(buyerId, slot, seedId) {
     const decoGrow = Math.max(0.5, 1 - (buffs?.growSpeed || 0) / 100);
     // Forager's Kit capstone: crops grow 15% faster. A COLLECTION set — completing it is the achievement, so
     // it reads what you OWN rather than asking you to wear a basket while you plant.
-    const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(await getOwnedItemIds(buyerId).catch(() => [])));
+    const capGrow = Math.max(0.5, 1 - setFarmGrowBonus(await getOwnedSetIds(buyerId).catch(() => [])));
     // Per-plot Fertile Soil specialization cuts THIS plot's grow time on top of everything else.
     const plotUp = await getPlotUpgrades(buyerId).catch(() => ({}));
     const plotGrow = plotEffects(plotUp[slot] || {}).growMult;
@@ -382,7 +382,7 @@ export async function harvestPlot(buyerId, slot) {
         petFarm = { yield: y, seed: sd };
     } catch { /* no companion, no bonus */ }
     // Harvester's Garb capstone — same rule: owned, not worn.
-    const dblChance = setFarmDoubleHarvest(await getOwnedItemIds(buyerId).catch(() => [])) + petFarm.yield / 100;
+    const dblChance = setFarmDoubleHarvest(await getOwnedSetIds(buyerId).catch(() => [])) + petFarm.yield / 100;
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});

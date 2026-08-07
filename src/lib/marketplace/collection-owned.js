@@ -90,3 +90,25 @@ export async function unownedFromSource(buyerId, source) {
     const owned = new Set(await getOwnedPieceIds(buyerId));
     return COLLECTION_PIECES.filter((p) => p.source === source && !owned.has(p.id));
 }
+
+/**
+ * Everything you own that a SET can count — gear in the bag plus trophies in this table.
+ *
+ * This exists because `getOwnedItemIds` did not survive the migration honestly. Every one of its nine callers
+ * was asking "what do I own, for set purposes" — farm grow and double-harvest, four mining capstones, the raid
+ * extras, the wheel's lucky-spin chance, the sea and farm affinity panels — and the moment trophies left
+ * mkt_user_item every one of them silently started reading a set as unfinished. Nothing threw. Two members
+ * noticed before I did.
+ *
+ * So the question is asked explicitly now. `getOwnedGearIds` is gear and says so; this is the union and says
+ * so. There is no longer a function whose name lets you get it wrong by default.
+ */
+export async function getOwnedSetIds(buyerId) {
+    if (!buyerId) return [];
+    const { getOwnedGearIds } = await import("@/lib/marketplace/inventory.js");
+    const [gear, pieces] = await Promise.all([
+        getOwnedGearIds(buyerId).catch(() => []),
+        getOwnedPieceIds(buyerId).catch(() => []),
+    ]);
+    return [...gear, ...pieces];
+}

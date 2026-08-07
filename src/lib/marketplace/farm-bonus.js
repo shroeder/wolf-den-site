@@ -3,7 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { BUFF_CAP, emptyFarmBuffs } from "@/lib/marketplace/decorations.js";
 import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
-import { getOwnedItemIds, getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getEquippedIds } from "@/lib/marketplace/inventory.js";
+import { getOwnedSetIds } from "@/lib/marketplace/collection-owned.js";
 import { sumItemFarm } from "@/lib/marketplace/items.js";
 import { sumPieceFarm } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds } from "@/lib/marketplace/collection-owned.js";
@@ -32,7 +33,7 @@ export async function farmBonuses(buyerId) {
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getBadgeFarm(buyerId).catch(() => ({})), // (d) earned FARMING/pet badges add farm bonuses too
         getEquippedUtilTotals(buyerId).catch(() => ({ farm: {} })), // (e) rare Forge "attunement" farm affixes on equipped gear
-        getOwnedItemIds(buyerId).catch(() => []), // (b2) the farm COLLECTION sets count what you own, not what you wear
+        getOwnedSetIds(buyerId).catch(() => []), // (b2) the farm COLLECTION sets count what you own, not what you wear
     ]);
     const equippedList = Object.values(bySlot || {});
     // Worn gear's farm affixes plus every Harvester/Forager trophy you own. Trophies live in their own table

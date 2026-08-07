@@ -342,7 +342,7 @@ export async function descend(buyerId) {
     if (Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level) * (1 - eff.collapseCut)) {
         // SECOND WIND (full Delver's Kit): the day's FIRST collapse still ends the run, but you keep the haul.
         // Guarded by a dated column so it is genuinely once a day and not once a page-load.
-        const capstones = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getOwnedItemIds(buyerId).catch(() => []));
+        const capstones = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
         const saved = capstones.secondWind && Boolean(await db.queryOne(
             `UPDATE mkt_mining SET second_wind_day = ${DAY} WHERE buyer_id = $1 AND (second_wind_day IS DISTINCT FROM ${DAY}) RETURNING buyer_id`,
             [buyerId]).catch(() => null));
@@ -922,7 +922,7 @@ export async function getMiningState(buyerId) {
                     extraPartChance: Math.round(eff.extraPartChance * 1000) / 10,
                     curioBonus: Math.round(eff.curioBonus * 1000) / 10,
                 },
-                capstones: setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getOwnedItemIds(buyerId).catch(() => [])),
+                capstones: setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => [])),
                 // Whether today's Second Wind has already been spent, so the panel can say so rather than
                 // promising a save that has already been used.
                 // Compared in SQL (see minerRow), never in JS. Building a Date from a Postgres DATE reads
@@ -1065,7 +1065,7 @@ async function claimNode(buyerId, node, row, run = {}) {
     // like anything.
     // DEPTHS: Hew adds ore on top of the Haul track, and a full Rockbreaker's Rig can pay the seam TWICE.
     const dEff = depthEffects(await equippedDepthAffinity(buyerId));
-    const dCap = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getOwnedItemIds(buyerId).catch(() => []));
+    const dCap = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
     const richSeam = dCap.richSeam > 0 && Math.random() < dCap.richSeam;
     const ore = Math.max(1, Math.round(baseOre(node.tier) * rank.oreMult * (1 + haulBonus + dEff.oreBonus))) * (richSeam ? 2 : 1);
     await db.query(
@@ -1204,7 +1204,7 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     // spend rather than skipping it, so the "do you actually have the ore" check still has to pass — you can
     // never smelt ore you don't own just because the capstone happened to roll. Rolled PER BATCH, so a ten-
     // batch pour gets ten chances at it exactly as ten single smelts would.
-    const smeltCaps = setDepthCapstones(await (await import("@/lib/marketplace/inventory.js")).getOwnedItemIds(buyerId).catch(() => []));
+    const smeltCaps = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
     let refundedBatches = 0;
     if (smeltCaps.freeSmelt > 0) {
         for (let i = 0; i < n; i += 1) if (Math.random() < smeltCaps.freeSmelt) refundedBatches += 1;
