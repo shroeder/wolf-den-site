@@ -78,9 +78,10 @@ function tierForLevel(level) {
     return "wooden";
 }
 
-// Elite-chest lottery: a rare BONUS roll on each level-up (from L20). Ordered rarest-first and stops at the
-// first hit, so you get at most one elite chest per level and the tiers get exponentially harder to see —
-// the last three especially. This is how Ascendant→Primordial chests are earned purely through play.
+// Elite-chest lottery: a rare BONUS roll on each MILESTONE level-up (every tenth, from L20). Ordered
+// rarest-first and stops at the first hit, so you get at most one elite chest per milestone and the tiers get
+// exponentially harder to see — the last three especially. This is how Ascendant→Primordial chests are earned
+// purely through play. The odds below are per ROLL; see syncLevelChests for how often a roll happens.
 const ELITE_CHEST_LOTTERY = [
     { tier: "primordial", chance: 0.00015 }, // ~1 in 6,700 level-ups
     { tier: "celestial", chance: 0.0012 }, //  ~1 in 830
@@ -122,16 +123,26 @@ export async function chestGrantHistory(buyerId, { limit = 100 } = {}) {
     return rows.map((r) => ({ tier: r.tier, count: Number(r.count), source: r.source, meta: r.meta || {}, at: r.created_at }));
 }
 
-// Grant loot chests for level-ups. CONSERVATIVE: no retroactive flood — the first time we see a member we
-// seed chest_level to their current level and give a single welcome chest; from then on each NEW level-up
-// grants one chest (tier scales with the level reached).
+// Grant loot chests for level-ups.
+//
+// THE CADENCE IS EVERY TENTH LEVEL, and the Rewards Track is the contract: it prints "💰 Gold Chest" on levels
+// 10, 20, 30… and prints nothing on the nine levels in between (track.js — `L % 10 === 0`). This used to hand
+// out a chest on EVERY level as well, so the track advertised one chest per ten and the game paid eleven. That
+// made level-ups the second-largest chest faucet in the whole economy behind the daily cards, on a cadence
+// nobody was ever promised.
+//
+// Nothing is clawed back. Chests already opened stay opened, and everyone keeps what they were given under the
+// old rule — the leak was ours, and members budgeted around what they had. This only stops the bleed going
+// forward.
 export async function syncLevelChests(buyerId) {
     if (!buyerId) return {};
     const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(chest_level,0) AS chest_level FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!row) return {};
     const level = levelForXp(row.xp).level;
 
-    // First encounter: seed to current level, one welcome chest, NO back-fill.
+    // First encounter: seed to current level, one welcome chest, NO back-fill. Kept deliberately even though
+    // the track does not print it — it is a one-time hello, not a cadence, and it is the difference between a
+    // new member's chest panel having something in it and being an empty box with a note about level 10.
     if (row.chest_level === 0) {
         const tally = { [tierForLevel(level)]: 1 };
         await addChests(buyerId, tally, { source: "level_up", meta: { level, welcome: true } });
@@ -142,16 +153,23 @@ export async function syncLevelChests(buyerId) {
     if (level <= row.chest_level) return {};
     const tally = {};
     for (let L = row.chest_level + 1; L <= level; L++) {
-        const t = tierForLevel(L);
-        tally[t] = (tally[t] || 0) + 1;
-        // Milestone: a BONUS Gold chest every 10th level — a reliable, satisfying reward without firehosing
-        // mythic gear. (Mythic chests are no longer handed out on the level cadence; they come from the boss,
-        // the elite lottery, and other rarer sources.)
-        if (L % 10 === 0) tally.gold = (tally.gold || 0) + 1;
-        // Elite lottery (L20+): a tiny shot at an Ascendant→Primordial chest, exponentially rarer per tier.
+        // The milestone, and the ONLY level-up chest: a Gold Chest every tenth level, exactly as the track
+        // says. The loop still walks every level so that gaining several at once (which happens constantly
+        // from a big raid) cannot skip a milestone it passed through.
+        if (L % 10 !== 0) continue;
+        tally.gold = (tally.gold || 0) + 1;
+        // Elite lottery: a tiny shot at an Ascendant→Primordial chest riding ON the milestone. It used to roll
+        // on every level from 20, which is ten rolls per advertised chest — the same leak wearing a different
+        // hat, and the reason three Ascendants are already out. Odds per roll are untouched; only the number
+        // of rolls changes, so an elite chest stays a real thing that happens, just at the promised cadence.
         if (L >= 20) {
             for (const e of ELITE_CHEST_LOTTERY) { if (Math.random() < e.chance) { tally[e.tier] = (tally[e.tier] || 0) + 1; break; } }
         }
+    }
+    // A run of levels that crossed no milestone grants nothing — don't write an empty grant row.
+    if (!Object.keys(tally).length) {
+        await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});
+        return {};
     }
     await addChests(buyerId, tally, { source: "level_up", meta: { level } });
     await db.query(`UPDATE mkt_buyer SET chest_level = $2 WHERE id = $1`, [buyerId, level]).catch(() => {});

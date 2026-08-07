@@ -115,7 +115,11 @@ export default function ChestOpener({ onLoot }) {
             <h2 style={{ marginTop: 0 }}>🎁 Loot chests {total ? <span className="chest-total">{total}</span> : null}</h2>
             {total ? (
                 <>
-                    <p className="muted" style={{ marginTop: 0 }}>Earned every time you level up. Tap to open — you never know what&apos;s inside.</p>
+                    {/* Said "earned every time you level up", which was the OTHER half of the chest leak: the
+                        Rewards Track promises a Gold Chest every tenth level and this line promised one every
+                        level. Fixing the grant alone would have left this copy lying in the opposite
+                        direction. Chests come from most of the game, so say that rather than name one source. */}
+                    <p className="muted" style={{ marginTop: 0 }}>A Gold Chest every 10th level — plus whatever the boss, the delves, the sea and your dailies turn up. Tap to open.</p>
                     <div className="chest-grid">
                         {chests.map((c) => (
                             <button type="button" key={c.tier} className="chest-tile" style={{ "--chest": c.color }} onClick={() => open(c.tier)} disabled={busy}>
