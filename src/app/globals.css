@@ -13022,24 +13022,45 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-volley.to-me .sbt-muzzle { right: 24%; }
 @keyframes sbtMuzzle { 0% { opacity: 0; transform: scale(.4); } 12% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.9); } }
 
-.sbt-ball { position: absolute; top: var(--lane, 0px); width: 11px; height: 11px; border-radius: 50%;
-    background: radial-gradient(circle at 34% 28%, #fff6e2, #6a5b48 62%, #241d15);
-    box-shadow: 0 0 9px rgba(255,214,140,0.8), inset -1px -1px 2px rgba(0,0,0,0.6); opacity: 0; }
+/* THE SHOT.
+   It read as a pinball and then it stayed on screen: the flight keyframes ended at opacity 1 with a forwards
+   fill, so every ball parked at its landing point and hung there until the next phase unmounted the volley.
+   Three changes — it is iron rather than chrome (dark body, one hot rim-light, no fat glow), it is STRETCHED
+   along its travel so it reads as speed instead of a sphere, and it now DIES on impact into a burst rather
+   than sitting where it stopped. */
+.sbt-ball { position: absolute; top: var(--lane, 0px); width: 13px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 32% 26%, #a9a096, #47403a 55%, #14100c);
+    box-shadow: 0 0 4px rgba(255,190,110,0.55), inset -1px -1px 2px rgba(0,0,0,0.7); opacity: 0; }
+/* The impact: a hot flash and a ring of splinters, fired at the very end of the flight from the ball itself,
+   so it always lands exactly where the ball did without a second element to position. */
+.sbt-ball::after { content: ""; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px;
+    margin: -17px 0 0 -17px; border-radius: 50%; opacity: 0; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,240,190,0.95), rgba(255,150,50,0.6) 38%, transparent 70%);
+    animation: sbtHitPop .34s ease-out forwards; animation-delay: .46s; }
+@keyframes sbtHitPop {
+    0% { opacity: 0; transform: scale(.2); }
+    22% { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 0; transform: scale(2.1); }
+}
 .sbt-volley.to-foe .sbt-ball { left: 27%; animation: sbtFlyR .52s cubic-bezier(.3,0,.7,1) forwards; }
 .sbt-volley.to-me .sbt-ball { right: 27%; animation: sbtFlyL .52s cubic-bezier(.3,0,.7,1) forwards; }
-/* A real arc — up out of the muzzle, over, and DOWN onto the target, growing as it comes at you. */
+/* A real arc — up out of the muzzle, over, and DOWN onto the target. The last 8% is the ball being destroyed
+   by what it hit; without it the shot simply stopped existing wherever the animation left it. */
 @keyframes sbtFlyR {
-    0% { opacity: 0; transform: translate(0,0) scale(.6); }
+    0% { opacity: 0; transform: translate(0,0) scale(.6) rotate(-8deg); }
     8% { opacity: 1; }
-    45% { transform: translate(20vw,-42px) scale(1.15); }
-    100% { opacity: 1; transform: translate(42vw,4px) scale(.9); }
+    45% { transform: translate(20vw,-42px) scaleX(1.5) scaleY(1) rotate(-4deg); }
+    92% { opacity: 1; transform: translate(42vw,4px) scaleX(1.35) scaleY(.9) rotate(6deg); }
+    100% { opacity: 0; transform: translate(43vw,5px) scale(.6) rotate(8deg); }
 }
 @keyframes sbtFlyL {
-    0% { opacity: 0; transform: translate(0,0) scale(.6); }
+    0% { opacity: 0; transform: translate(0,0) scale(.6) rotate(8deg); }
     8% { opacity: 1; }
-    45% { transform: translate(-20vw,-42px) scale(1.15); }
-    100% { opacity: 1; transform: translate(-42vw,4px) scale(.9); }
+    45% { transform: translate(-20vw,-42px) scaleX(1.5) scaleY(1) rotate(4deg); }
+    92% { opacity: 1; transform: translate(-42vw,4px) scaleX(1.35) scaleY(.9) rotate(-6deg); }
+    100% { opacity: 0; transform: translate(-43vw,5px) scale(.6) rotate(-8deg); }
 }
+.sbt-ball.is-miss::after { animation: none; opacity: 0; }
 .sbt-ball.is-rake { width: 15px; height: 15px; box-shadow: 0 0 18px rgba(255,170,60,1), inset -1px -1px 2px rgba(0,0,0,0.6); }
 /* A MISS falls short and throws a splash — the whole reason accuracy is a stat you can feel. */
 .sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
@@ -13099,10 +13120,23 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 .sbt-result { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; padding: 18px;
     background: rgba(3,9,15,0.62); }
-.sbt-result-card { width: 100%; max-width: 380px; text-align: center; }
-.sbt-result-banner { font-size: 1.35rem; font-weight: 900; letter-spacing: 0.03em; }
-.sbt-result-banner.is-win { color: #8ef0b6; }
-.sbt-result-banner.is-lose { color: #ff9a8a; }
+/* THE RECAP. It was a card that simply existed: no arrival, no weight, and the same flat treatment whether you
+   had just sunk the flagship or been sent to the bottom. Now the card drops in, and the verdict punches. */
+.sbt-result-card { position: relative; overflow: hidden; width: 100%; max-width: 380px; text-align: center;
+    animation: sbtCardIn .42s cubic-bezier(.2,1.35,.35,1) both; }
+@keyframes sbtCardIn { 0% { opacity: 0; transform: translateY(26px) scale(.92); } 100% { opacity: 1; transform: none; } }
+.sbt-result-card.is-win { border-color: rgba(140,240,180,0.5); box-shadow: 0 0 34px rgba(70,220,150,0.28); }
+.sbt-result-card.is-lose { border-color: rgba(255,120,100,0.45); box-shadow: 0 0 34px rgba(220,60,40,0.22); }
+/* A slow sweep of light across a win, so the card is not a still image while you read your spoils. */
+.sbt-result-card.is-win::before { content: ""; position: absolute; inset: -40%; pointer-events: none;
+    background: conic-gradient(from 0deg, transparent 0 78%, rgba(140,255,200,0.16) 86%, transparent 94% 100%);
+    animation: sbtWinSweep 4.5s linear infinite; }
+@keyframes sbtWinSweep { to { transform: rotate(360deg); } }
+.sbt-result-banner { position: relative; font-size: 1.9rem; font-weight: 900; letter-spacing: 0.02em; line-height: 1.1;
+    animation: sbtBannerIn .5s cubic-bezier(.2,1.6,.35,1) both .1s; }
+@keyframes sbtBannerIn { 0% { opacity: 0; transform: scale(2.1); filter: blur(6px); } 60% { opacity: 1; filter: blur(0); } 100% { opacity: 1; transform: scale(1); } }
+.sbt-result-banner.is-win { color: #8ef0b6; text-shadow: 0 0 26px rgba(70,220,150,0.75), 0 2px 0 rgba(0,0,0,0.5); }
+.sbt-result-banner.is-lose { color: #ff9a8a; text-shadow: 0 0 24px rgba(230,70,50,0.6), 0 2px 0 rgba(0,0,0,0.5); }
 .sbt-result-line { margin: 6px 0 10px; font-size: 0.84rem; line-height: 1.45; color: #b9c6d4; }
 /* THE SPOILS. They pop in one after another rather than all appearing at once — a stack of prizes landing is
    the reward for the fight, and it costs nothing to let the player watch it arrive. */
@@ -13117,6 +13151,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-reward.is-doubloons { color: #9fe6ff; background: linear-gradient(180deg, rgba(120,220,255,0.24), rgba(60,170,230,0.1)); border-color: rgba(120,220,255,0.55); }
 .sbt-reward.is-chest { color: #d6b0ff; background: linear-gradient(180deg, rgba(180,120,255,0.26), rgba(140,70,230,0.1)); border-color: rgba(180,120,255,0.6); }
 .sbt-reward.is-goldLost { color: #ff9a8a; background: linear-gradient(180deg, rgba(255,90,70,0.22), rgba(200,40,30,0.1)); border-color: rgba(255,110,90,0.55); }
+/* PLUNDER off their deck, coloured by rarity like gear is everywhere else — the chip should tell you whether
+   this was worth the fight before you have read the item's name. */
+.sbt-reward.is-loot { color: #dbe4ee; background: linear-gradient(180deg, rgba(190,205,220,0.2), rgba(120,140,160,0.08)); border-color: rgba(190,205,220,0.5); }
+.sbt-reward.is-loot.is-r-rare { color: #9fd0ff; background: linear-gradient(180deg, rgba(90,170,255,0.24), rgba(40,110,200,0.1)); border-color: rgba(120,190,255,0.6); }
+.sbt-reward.is-loot.is-r-epic { color: #d6b0ff; background: linear-gradient(180deg, rgba(180,120,255,0.26), rgba(120,60,210,0.1)); border-color: rgba(190,130,255,0.65); }
+.sbt-reward.is-loot.is-r-legendary { color: #ffd06a; background: linear-gradient(180deg, rgba(255,190,60,0.3), rgba(220,130,20,0.12)); border-color: rgba(255,200,80,0.75);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35), 0 0 16px rgba(255,190,60,0.5), inset 0 1px 0 rgba(255,240,190,0.35); }
 
 /* ── THE GUN DECK, THE RACKS AND THE LADDER ─────────────────────────────────────────────────────────────── */
 .sby { display: grid; gap: 12px; }
@@ -13247,12 +13288,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* THE LOG — a number that flashes for 900ms is not information.
    It lives in the SKY now, floating over the empty upper half instead of taking a strip off the bottom. That
    band was the dead space on the screen and the log is the one thing that always has something to say. */
-.sbt-log { position: absolute; z-index: 5; left: 10px; right: 10px; top: 96px; max-height: 26vh;
-    overflow-y: auto; padding: 8px 11px; border-radius: 12px;
+/* COLLAPSED by default. A line lands per exchange, so by round three the full history was a wall of text
+   sitting directly over the two ships you are trying to read while choosing an order. Two lines is enough to
+   see what just happened; the toggle below opens the rest.
+   The wrapper is what carries the absolute position — the toggle used to be positioned off the same 96px
+   origin with a hand-computed offset, which put it on top of the last log line the moment the padding or the
+   line-height moved. Stacked in a wrapper it simply sits under whatever height the log currently is. */
+.sbt-logwrap { position: absolute; z-index: 5; left: 10px; right: 10px; top: 96px; display: flex;
+    flex-direction: column; align-items: center; gap: 5px; pointer-events: none; }
+.sbt-logwrap.is-empty { display: none; }
+.sbt-log { align-self: stretch; max-height: 4.6em; overflow-y: auto; padding: 8px 11px; border-radius: 12px;
     background: linear-gradient(180deg, rgba(6,16,26,0.82), rgba(3,9,15,0.62));
     border: 1px solid rgba(255,205,120,0.2); box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    scrollbar-width: none; pointer-events: none;
+    scrollbar-width: none; transition: max-height .28s ease;
     -webkit-mask-image: linear-gradient(180deg, transparent, #000 14px); mask-image: linear-gradient(180deg, transparent, #000 14px); }
+.sbt-log.is-open { max-height: 42vh; }
+.sbt-logtoggle { pointer-events: auto; padding: 3px 12px; border-radius: 999px; cursor: pointer; font-size: 0.62rem;
+    font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #ffd9a0;
+    background: rgba(6,16,26,0.92); border: 1px solid rgba(255,205,120,0.34); box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
 .sbt-log::-webkit-scrollbar { display: none; }
 /* Each line slides in as it lands, so the log reads as events arriving rather than text appearing. */
 .sbt-logline { margin: 0 0 3px; font-size: 0.7rem; line-height: 1.4; color: #9fb0c0;
@@ -13338,14 +13391,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .equip-trophies-note { margin: 3px 0 10px; font-size: 0.72rem; line-height: 1.45; }
 .equip-card.is-trophy { border-style: dashed; opacity: 0.94; }
 .equip-card-trophy { font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
-.sbt-log.is-empty { display: none; }
 @media (min-width: 900px) {
     /* A battle between two ships at opposite ends of a widescreen is two ships, not a battle. */
     .sbt-stage { max-width: 900px; left: 50%; transform: translateX(-50%); }
     .sbt-orders { max-width: 900px; margin-left: auto; margin-right: auto; }
     /* The log is absolutely positioned now, and `margin: auto` does nothing for that — it stretched the full
        width of a desktop window while the HUD above it stayed capped at 900. Centre it explicitly. */
-    .sbt-log { left: 50%; right: auto; transform: translateX(-50%); width: min(900px, calc(100% - 20px)); }
+    .sbt-logwrap { left: 50%; right: auto; transform: translateX(-50%); width: min(900px, calc(100% - 20px)); }
     .sbt-hud { max-width: 900px; margin: 0 auto; }
 }
 /* Tab pills shared by the sailing boards and the gun deck. They lived in SailingBoards' scoped <style jsx>,

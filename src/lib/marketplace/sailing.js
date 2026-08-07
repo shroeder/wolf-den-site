@@ -1899,7 +1899,14 @@ async function payFleetReward(buyerId, reward) {
     }
     // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the gold is paid above.
     if (reward.xp) { await awardXp(buyerId, "ship_battle", { points: reward.xp, gold: 0 }).catch(() => {}); out.push({ kind: "xp", n: reward.xp }); }
-    if (reward.fragments) { await grantFragment(buyerId, reward.fragments, "wooden").catch(() => {}); out.push({ kind: "fragments", n: reward.fragments }); }
+    if (reward.fragments) {
+        // Carry the TIER through to the recap. It always granted wooden and always said "+1 fragments", so the
+        // one reward that varies by how hard the fight was read identically whether you sank a fishing boat or
+        // the flagship.
+        const tier = reward.fragTier || "wooden";
+        await grantFragment(buyerId, reward.fragments, tier).catch(() => {});
+        out.push({ kind: "fragments", n: reward.fragments, tier });
+    }
     if (reward.parts) {
         try {
             const { addParts } = await import("@/lib/marketplace/crafting.js");
@@ -1909,6 +1916,27 @@ async function payFleetReward(buyerId, reward) {
     }
     if (reward.chest) { await addChests(buyerId, { [reward.chest]: 1 }, { source: "ship_battle" }).catch(() => {}); out.push({ kind: "chest", tier: reward.chest }); }
     if (reward.seed) { const sid = await dropSeedFrom(buyerId, "ship_battle").catch(() => null); if (sid) out.push({ kind: "seed", id: sid }); }
+    // PLUNDER — something off their deck. Uncommon by design and weighted hard toward common: the fleet is not
+    // meant to out-supply the Forge or the chests, it is meant to occasionally hand you a story. The rank sets
+    // both the odds and the ceiling, so a fishing cutter can only ever cough up something ordinary.
+    if (reward.loot && Math.random() < reward.loot.chance) {
+        const r = reward.loot.maxRank || 1;
+        const weights = r >= 13 ? { common: 30, rare: 38, epic: 25, legendary: 7 }
+            : r >= 9 ? { common: 42, rare: 40, epic: 16, legendary: 2 }
+            : r >= 5 ? { common: 60, rare: 33, epic: 7 }
+            : { common: 82, rare: 18 };
+        const total = Object.values(weights).reduce((s, w) => s + w, 0);
+        let roll = Math.random() * total;
+        let rarity = "common";
+        for (const [k, w] of Object.entries(weights)) { roll -= w; if (roll <= 0) { rarity = k; break; } }
+        // isCollectionItem is excluded on purpose — collection pieces are earned by their own set, never dropped.
+        const pool = randomDropPool((i) => i.rarity === rarity && !isCollectionItem(i.id) && !i.charged);
+        const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+        if (pick) {
+            await grantItem(buyerId, pick.id, "ship_battle").catch(() => {});
+            out.push({ kind: "loot", id: pick.id, name: pick.name, rarity: pick.rarity, slot: pick.slot || null });
+        }
+    }
     return out;
 }
 

@@ -281,13 +281,30 @@ export function FishingLog({ log, known, total, records, onClose }) {
     const [tab, setTab] = useState("log");
     // `records` arrives as { records, top } — the per-species board and the ranked leaderboard.
     const perSpecies = records?.records || [];
-    const top = records?.top || [];
+
+    // MY BESTS. This tab used to be "Top Catches": the Den's heaviest catches ranked overall, sitting beside
+    // "Species Records", the Den's heaviest catch PER SPECIES. Two boards of other people's big fish, and from
+    // the player's chair they read as the same board twice. Species Records is the one worth keeping — it is
+    // per species and it shows which records are unclaimed, so it tells you what to go and chase.
+    //
+    // What was missing was your own trophy wall. My Collection has your best weight in it, but it is a
+    // checklist of all 40-odd species in fixed order, mostly question marks — you cannot see your best catches
+    // in it, only look them up one at a time. This ranks what you have actually landed, heaviest first, next
+    // to the Den record for that species so the gap (or the crown) is right there.
+    //
+    // Built from data already on the client — `log` carries your best per species and `perSpecies` carries the
+    // Den record for it — so this needed no new endpoint.
+    const bestOf = new Map(perSpecies.map((r) => [r.id, r.record || 0]));
+    const mine = (log || [])
+        .filter((f) => f.caught && f.best > 0)
+        .map((f) => ({ ...f, denRecord: bestOf.get(f.id) || 0 }))
+        .sort((a, b) => b.best - a.best);
     return (
         <div className="fish-log">
             <div className="fish-log-tabs">
                 <button type="button" className={tab === "log" ? "on" : ""} onClick={() => setTab("log")}>📖 My Collection</button>
-                <button type="button" className={tab === "top" ? "on" : ""} onClick={() => setTab("top")}>🏆 Top Catches</button>
-                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🥇 Species Records</button>
+                <button type="button" className={tab === "top" ? "on" : ""} onClick={() => setTab("top")}>🥇 My Bests</button>
+                <button type="button" className={tab === "rec" ? "on" : ""} onClick={() => setTab("rec")}>🏆 Den Records</button>
             </div>
             {tab === "log" ? (
                 <>
@@ -315,28 +332,34 @@ export function FishingLog({ log, known, total, records, onClose }) {
                 </>
             ) : tab === "top" ? (
                 <>
-                    {/* Scored against each species' own maximum, so this isn't just a list of whales — and so a
-                        perfect Sardine on your first day can genuinely sit at the top of the Den. */}
-                    <p className="fish-log-progress">The heaviest catches anyone in the Den has landed</p>
+                    <p className="fish-log-progress">Your heaviest of every species you&apos;ve landed</p>
                     <div className="fish-log-grid">
-                        {top.map((r, i) => (
-                            <div key={`${r.species}-${r.alias}-${r.lb}-${i}`} className="fish-log-row">
-                                <span className="fish-top-rank">{i + 1}</span>
-                                <FishArt id={r.species} emoji={r.emoji} size={34} className="fish-log-art" />
-                                <span className="fish-log-name">
-                                    {r.name}
-                                    <em>{r.who ? `@${r.alias}` : "—"}</em>
-                                </span>
-                                <span className="fish-log-best">
-                                    <strong>{weightLabel(r.lb)}</strong>
-                                    {r.lb > r.max ? <em className="fish-over">🏆 record class</em> : null}
-                                </span>
-                            </div>
-                        ))}
-                        {!top.length ? <p className="muted" style={{ padding: 12 }}>No catches yet. The top of the board is wide open.</p> : null}
+                        {mine.map((f, i) => {
+                            // Your best matching the Den record for that species means the record is yours.
+                            const holder = f.denRecord > 0 && f.best >= f.denRecord;
+                            return (
+                                <div key={f.id} className="fish-log-row">
+                                    <span className="fish-top-rank">{i + 1}</span>
+                                    <FishArt id={f.id} emoji={f.emoji} size={34} className="fish-log-art" />
+                                    <span className="fish-log-name">
+                                        {f.name}
+                                        <em style={{ color: RARITY_COLOR[f.rarity] }}>{RARITY_LABEL[f.rarity]} · caught ×{f.caught}</em>
+                                    </span>
+                                    <span className="fish-log-best">
+                                        <strong>{weightLabel(f.best)}</strong>
+                                        {holder
+                                            ? <em className="fish-over">🏆 Den record</em>
+                                            : f.denRecord > 0 ? <em>best {weightLabel(f.denRecord)}</em> : null}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        {!mine.length ? <p className="muted" style={{ padding: 12 }}>Nothing landed yet — your first catch starts this board.</p> : null}
                     </div>
                 </>
             ) : (
+                <>
+                <p className="fish-log-progress">The Den&apos;s heaviest of each species — unclaimed ones are yours for the taking</p>
                 <div className="fish-log-grid">
                     {perSpecies.map((r) => (
                         <div key={r.id} className={`fish-log-row${r.record ? "" : " is-unknown"}`}>
@@ -349,6 +372,7 @@ export function FishingLog({ log, known, total, records, onClose }) {
                     ))}
                     {!perSpecies.length ? <p className="muted" style={{ padding: 12 }}>Nobody has landed anything yet. The board is yours for the taking.</p> : null}
                 </div>
+                </>
             )}
             {/* No close button on the dedicated page — there's nothing to close, it IS the screen. */}
             {onClose ? <button type="button" className="fish-close" onClick={onClose}>Back to the rail</button> : null}

@@ -109,14 +109,22 @@ export function fleetReward(rank, { first = false } = {}) {
         doubloons: round(6 + r * 2 + (boss ? 18 : 0)),
         gold: round(40 + r * 26 + (boss ? 260 : 0)),
         xp: round(18 + r * 7 + (boss ? 80 : 0)),
-        // Sailing's own chest currency — a battle now feeds the dig economy it sits next to.
+        // Sailing's own chest currency — a battle now feeds the dig economy it sits next to. The TIER climbs
+        // with the fleet: every rank used to hand out wooden fragments, so sinking Admiral Vane and sinking a
+        // fishing boat filled the same jar and the recap could only ever say "+1 fragments".
         fragments: round(1 + Math.floor(r / 3) + (boss ? 3 : 0)),
+        fragTier: r >= 13 ? "mythic" : r >= 9 ? "gold" : r >= 5 ? "iron" : "wooden",
         // Forge parts, tiered by how far down the fleet you are. The Forge is where people want for materials.
         parts: r >= 3 ? { tier: Math.min(5, 1 + Math.floor(r / 4)), n: round(1 + Math.floor(r / 5) + (boss ? 2 : 0)) } : null,
         // Bosses drop a chest, and the last two drop a good one. This is the fleet's tie into gear.
         chest: boss ? (r >= 15 ? "mythic" : r >= 10 ? "gold" : "iron") : null,
         // A seed for the farm from the mid fleet on — small, but it lands somewhere else in the game.
         seed: r >= 6 && first ? true : false,
+        // PLUNDER OFF THEIR DECK. A beaten crew should occasionally leave something behind, and it is the one
+        // reward that makes a sinking feel like a boarding rather than a payout. Deliberately uncommon and
+        // deliberately weighted DOWN: the rank sets the ceiling and the odds, but common is always the most
+        // likely roll, so this stays a nice surprise rather than a gear faucet that outruns the Forge.
+        loot: { chance: Math.min(0.34, 0.06 + r * 0.018) * (first ? 1 : 0.5), maxRank: r, boss },
         first,
         boss,
     };

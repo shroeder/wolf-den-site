@@ -14,7 +14,127 @@ const REWARD_ART = {
     parts: "/images/ui/parts.png",
     seed: "/images/ui/seed.png",
     item: "/images/ui/gear.png",
+    loot: "/images/ui/gear.png",
 };
+// Chest-tier fragments have their own art per tier, so the sprite says which jar it went into before the words do.
+const FRAG_ART = (tier) => `/images/sailing/fragment-${tier || "wooden"}.png`;
+const rewardArt = (r) => (r.kind === "fragments" ? FRAG_ART(r.tier) : REWARD_ART[r.kind] || null);
+
+// WHAT THE SPOIL ACTUALLY SAYS. "+1 fragments" was the complaint and it was the right one — fragments are the
+// only reward whose VALUE is the tier, and the recap named every other thing precisely while calling that one
+// by its plural. Same for a chest ("gold chest" → "Gold Chest") and for plunder, which now names the item and
+// its rarity because "you took something off their deck" is the whole point of it.
+const TIER_WORD = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
+const cap1 = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : "");
+function rewardText(r) {
+    switch (r.kind) {
+        case "doubloons": return `+${r.n} doubloons`;
+        case "gold": return `+${r.n.toLocaleString()} gold`;
+        case "goldLost": return `−${r.n.toLocaleString()} gold`;
+        case "xp": return `+${r.n} XP`;
+        case "fragments": return `+${r.n} ${TIER_WORD[r.tier] || "Wooden"} fragment${r.n === 1 ? "" : "s"}`;
+        case "parts": return `+${r.n} tier-${r.tier} parts`;
+        case "chest": return `${TIER_WORD[r.tier] || cap1(r.tier)} Chest`;
+        case "loot": return `${r.name} · ${cap1(r.rarity)}`;
+        case "item": return `plundered ${r.name}`;
+        case "free": return "battle not used up!";
+        case "seed": return "a seed for the farm";
+        default: return String(r.kind);
+    }
+}
+
+// ── SOUND ────────────────────────────────────────────────────────────────────────────────────────────────────
+// The fight had music and nothing else: guns fired in silence and a hit landed in silence, which is why a
+// broadside felt like a number changing. All built live off one AudioContext (no assets to load, same approach
+// as the forge and the mine), and every call is wrapped — a browser that blocks audio must never break a tap.
+let _ac = null;
+const ac = () => {
+    if (typeof window === "undefined") return null;
+    try {
+        _ac = _ac || new (window.AudioContext || window.webkitAudioContext)();
+        if (_ac.state === "suspended") _ac.resume();
+        return _ac;
+    } catch { return null; }
+};
+// Filtered noise — the body of every one of these sounds. A cannon is mostly noise; tone alone reads as a beep.
+function noise(a, { dur = 0.4, type = "lowpass", freq = 900, q = 1, gain = 0.3, sweepTo = null } = {}) {
+    const n = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, n, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+    const src = a.createBufferSource(); src.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, a.currentTime); f.Q.value = q;
+    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, a.currentTime + dur);
+    const g = a.createGain();
+    g.gain.setValueAtTime(gain, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+    src.connect(f); f.connect(g); g.connect(a.destination);
+    src.start(); src.stop(a.currentTime + dur);
+}
+// A BROADSIDE — not one bang but `guns` staggered cracks, so eleven guns sound like eleven guns.
+function sfxFire(guns = 4) {
+    const a = ac(); if (!a) return;
+    try {
+        const n = Math.max(1, Math.min(8, guns));
+        for (let i = 0; i < n; i++) {
+            setTimeout(() => {
+                const t = ac(); if (!t) return;
+                noise(t, { dur: 0.34, freq: 1500, sweepTo: 180, gain: 0.16 });
+                const o = t.createOscillator(), g = t.createGain();
+                o.type = "sine"; o.frequency.setValueAtTime(120, t.currentTime);
+                o.frequency.exponentialRampToValueAtTime(38, t.currentTime + 0.22);
+                g.gain.setValueAtTime(0.22, t.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.0001, t.currentTime + 0.26);
+                o.connect(g); g.connect(t.destination); o.start(); o.stop(t.currentTime + 0.28);
+            }, i * 48);
+        }
+    } catch { /* audio is a bonus */ }
+}
+// SHOT INTO A HULL — timber, not metal: a short low crack with a woody band-pass on the noise.
+function sfxHit(big = false) {
+    const a = ac(); if (!a) return;
+    try {
+        noise(a, { dur: big ? 0.5 : 0.3, type: "bandpass", freq: big ? 260 : 420, q: 0.8, gain: big ? 0.3 : 0.2 });
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = "triangle"; o.frequency.setValueAtTime(big ? 90 : 150, a.currentTime);
+        o.frequency.exponentialRampToValueAtTime(big ? 34 : 60, a.currentTime + 0.2);
+        g.gain.setValueAtTime(big ? 0.28 : 0.16, a.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + (big ? 0.42 : 0.24));
+        o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.45);
+    } catch { /* audio is a bonus */ }
+}
+// A MISS — shot into the sea. Bright hiss sweeping down, no thump.
+function sfxSplash() {
+    const a = ac(); if (!a) return;
+    try { noise(a, { dur: 0.45, type: "highpass", freq: 900, sweepTo: 2600, gain: 0.11 }); } catch { /* ok */ }
+}
+// THE RESULT. A win gets a rising major fanfare; a loss gets the same shape falling and detuned, so you know
+// which happened before you have read a word of it.
+function sfxResult(win) {
+    const a = ac(); if (!a) return;
+    try {
+        const notes = win ? [523.25, 659.25, 783.99, 1046.5] : [392, 349.23, 293.66, 233.08];
+        notes.forEach((f, i) => {
+            const o = a.createOscillator(), g = a.createGain();
+            const t = a.currentTime + i * (win ? 0.11 : 0.16);
+            o.type = win ? "triangle" : "sawtooth";
+            o.frequency.setValueAtTime(f, t);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(win ? 0.16 : 0.1, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + (win ? 0.55 : 0.7));
+            o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.72);
+        });
+        if (win) { // a bell over the top of the last note
+            const o = a.createOscillator(), g = a.createGain();
+            const t = a.currentTime + 0.44;
+            o.type = "sine"; o.frequency.setValueAtTime(1567.98, t);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.1, t + 0.03);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+            o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 1.2);
+        }
+    } catch { /* audio is a bonus */ }
+}
 
 // Drifting sea spray. A fixed table rather than Math.random() so the server and the client agree on the first
 // paint — randomising these at render is a hydration mismatch, and the whole field is decorative anyway.
@@ -158,6 +278,7 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
     const [shake, setShake] = useState(null);
     const [log, setLog] = useState([]);
     const [ready, setReady] = useState(false);
+    const [logOpen, setLogOpen] = useState(false);
     const logRef = useRef(null);
 
     // Open the log with the ship you are up against, so round one is not a blank panel over an empty sea. The
@@ -201,9 +322,16 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
 
         if (ev.type === "volley") {
             setFx({ k: `${battle?.round}-${step}`, ...ev });
+            // The guns go off as the balls leave, and the timber cracks when they arrive — the 440ms below is
+            // the flight time the shot animation is built around, so picture and sound land together.
+            sfxFire(ev.guns || (ev.shots || []).length);
             const land = setTimeout(() => {
                 setMyHp(ev.my); setFoeHp(ev.foe);
-                if ((ev.shots || []).some((s) => s.hit)) setShake({ k: step, big: (ev.shots || []).some((s) => s.rake) || ev.order === "board" });
+                const shots = ev.shots || [];
+                const hits = shots.filter((s) => s.hit).length;
+                const heavy = shots.some((s) => s.rake) || ev.order === "board";
+                if (hits) sfxHit(heavy || hits >= 4); else if (shots.length) sfxSplash();
+                if (hits) setShake({ k: step, big: heavy });
             }, 440);
             const clearShake = setTimeout(() => setShake(null), 900);
             const next = setTimeout(() => setStep((v) => v + 1), 1150);
@@ -222,9 +350,10 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
 
     useEffect(() => {
         if (phase !== "result") return undefined;
+        sfxResult(Boolean(battle?.win));
         const t = setTimeout(() => setReady(true), 600);
         return () => clearTimeout(t);
-    }, [phase]);
+    }, [phase, battle?.win]);
 
     useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
@@ -274,11 +403,22 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 </div>
             </div>
 
-            {/* THE LOG — what actually happened, in order, still there a second later. */}
-            <div className={`sbt-log${log.length ? "" : " is-empty"}`} ref={logRef}>
-                {log.map((l) => (
-                    <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
-                ))}
+            {/* THE LOG — what actually happened, in order, still there a second later.
+                It grows a line per exchange, and by round three a full history was a wall of text sitting over
+                the two ships you are trying to look at while choosing an order. So it is COLLAPSED by default
+                to the last couple of lines — enough to see what just happened — and taps open to the whole
+                fight. The information never goes away; it just stops being in front of the thing it describes. */}
+            <div className={`sbt-logwrap${log.length ? "" : " is-empty"}`}>
+                <div className={`sbt-log${logOpen ? " is-open" : ""}`} ref={logRef}>
+                    {log.map((l) => (
+                        <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
+                    ))}
+                </div>
+                {log.length > 2 ? (
+                    <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}`} onClick={() => setLogOpen((o) => !o)}>
+                        {logOpen ? "Hide log" : `Battle log · ${log.length}`}
+                    </button>
+                ) : null}
             </div>
 
             {/* ORDERS — the reason this is a fight rather than a cutscene, so this is where the juice goes.
@@ -331,25 +471,19 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                         </p>
                         {battle?.reward?.length ? (
                             <div className="sbt-rewards">
-                                {battle.reward.map((r, i) => (
-                                    <span key={i} className={`sbt-reward is-${r.kind}`} style={{ animationDelay: `${0.12 + i * 0.09}s` }}>
-                                        {REWARD_ART[r.kind] ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img className="sbt-reward-art" src={REWARD_ART[r.kind]} alt="" draggable="false" />
-                                        ) : null}
-                                        {r.kind === "doubloons" ? `+${r.n} doubloons`
-                                            : r.kind === "gold" ? `+${r.n.toLocaleString()} gold`
-                                            : r.kind === "goldLost" ? `−${r.n.toLocaleString()} gold`
-                                            : r.kind === "xp" ? `+${r.n} XP`
-                                            : r.kind === "fragments" ? `+${r.n} fragments`
-                                            : r.kind === "parts" ? `+${r.n} tier-${r.tier} parts`
-                                            : r.kind === "chest" ? `${r.tier} chest`
-                                            : r.kind === "item" ? `plundered ${r.name}`
-                                            : r.kind === "free" ? "raid not used up!"
-                                            : r.kind === "seed" ? "a seed for the farm"
-                                            : `${r.kind}`}
-                                    </span>
-                                ))}
+                                {battle.reward.map((r, i) => {
+                                    const art = rewardArt(r);
+                                    return (
+                                        <span key={i} className={`sbt-reward is-${r.kind}${r.rarity ? ` is-r-${r.rarity}` : ""}`}
+                                            style={{ animationDelay: `${0.18 + i * 0.11}s` }}>
+                                            {art ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img className="sbt-reward-art" src={art} alt="" draggable="false" />
+                                            ) : null}
+                                            {rewardText(r)}
+                                        </span>
+                                    );
+                                })}
                             </div>
                         ) : null}
                         <button className="sail-cta" disabled={!ready} onClick={onClose}>{ready ? "Back to the helm ⚓" : "…"}</button>
