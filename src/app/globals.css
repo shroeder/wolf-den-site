@@ -9214,7 +9214,7 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .con-art { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .con-art-img { width: 1.45em; height: 1.45em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.45)); }
 /* Small inline gear sprite next to text (trade offers). */
-.trade-item-art { display: inline-flex; vertical-align: middle; }
+.trade-item-art { display: inline-flex; vertical-align: middle; position: relative; }
 .trade-item-art .item-art-img { width: 1.2em; height: 1.2em; }
 .collectible-name { font-size: 0.68rem; font-weight: 600; color: #cdbfa6; line-height: 1.2; }
 .collectible.is-locked { opacity: 0.45; }
@@ -9943,7 +9943,11 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* AI item sprites (ItemArt) drop into the same glyph boxes as the react-icons. Sized by em so they scale
    with the box's font-size just like the svg glyph did; a hair larger than 1em to offset the sprite's
    transparent padding, and a drop-shadow so the die-cut art reads on the rarity backplate. */
-.item-art { display: grid; place-items: center; position: relative; }
+/* NOT position:relative. It was, and that made every element marker anchor to the ART rather than to the tile
+   the art sits in — so on the paper doll, where the glyph box is a good deal smaller than the bordered slot,
+   the marker landed on top of the gear instead of on the slot's corner. The marker belongs on the border, the
+   way the forge-rank stars already sit on the opposite one. Its offset parent is now the tile. */
+.item-art { display: grid; place-items: center; }
 .item-art-img { width: 1.55em; height: 1.55em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
 /* ── ELEMENT MARKERS ON A GEAR ICON ───────────────────────────────────────────────────────────────────────
    Sits in the BOTTOM-LEFT because the forge rank badge already owns the top-right of these same tiles, and
@@ -9956,9 +9960,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .el-pips {
     /* 0.74, not the 0.62 this shipped at first. On the real bag grid the marker was legible but visibly
        lighter than the forge-rank badge on the opposite corner, and the shadow crescent — dark purple on a
-       dark card — was the case that suffered for it. This is still well inside the plate. */
+       dark card — was the case that suffered for it. */
     --pip: 0.74em;
-    position: absolute; left: -0.14em; bottom: -0.14em; z-index: 3;
+    /* ON THE BORDER, straddling the bottom-left corner of the TILE — the mirror of where the forge-rank stars
+       sit. Pixels, not em: this is an offset against a box edge, and an em here would drift with whatever
+       font-size the host happens to carry. */
+    position: absolute; left: -5px; bottom: -5px; z-index: 3;
     display: flex; align-items: center; pointer-events: none;
 }
 /* No disc, no ring behind the marker: the sprites are drawn with their own bold dark ink contour, so a plate
@@ -9981,10 +9988,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     font-size: calc(var(--pip) * 0.5); font-weight: 900; line-height: 1.6; color: #dfe6ec;
     background: rgba(11, 16, 22, 0.92); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
-/* Hosts whose art box sets no font-size of its own, so --pip cannot inherit a useful em. */
-.forge-art .el-pips { --pip: 22px; left: -3px; bottom: -3px; }
+/* Explicit sizes per host. The offset parent is the TILE now, and a tile inherits the page's font-size rather
+   than the enlarged one its glyph box sets — so an em basis would silently shrink every marker. */
+.equip-card .el-pips { --pip: 19px; }
+.equip-slot .el-pips { --pip: 20px; }
+.forge-art .el-pips { --pip: 22px; }
 .forge-reforge-art .el-pips, .forge-er-art .el-pips { --pip: 20px; }
 .ah-card-art .el-pips { --pip: 15px; }
+.ah-minerow-art { position: relative; }
 .ah-minerow-art .el-pips { --pip: 13px; }
 .trade-item-art .el-pips { --pip: 11px; }
 /* Legendary + mythic get a brighter frame; mythic gently pulses. */
