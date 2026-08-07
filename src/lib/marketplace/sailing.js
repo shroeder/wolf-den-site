@@ -1586,15 +1586,15 @@ export async function getRaidTargets(buyerId, limit = 12) {
             items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
             // Their SHIP, in the same two numbers your own gun deck reports — plus the fleet rank it fights
             // like, which is also exactly what beating it pays.
-            guns: gunsFor(r.gun_level || 0, level), hull: hullFor(r.hull_level || 0, level),
+            guns: gunsFor(r.gun_level || 0), hull: hullFor(r.hull_level || 0, level),
             ammo: r.loadout || "round",
-            rank: fleetRankForShip({ guns: gunsFor(r.gun_level || 0, level), hp: hullFor(r.hull_level || 0, level) }),
+            rank: fleetRankForShip({ guns: gunsFor(r.gun_level || 0), hp: hullFor(r.hull_level || 0, level) }),
         };
     });
     // What YOU are bringing — needed before the sort, because the sort depends on it.
     const mine = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(mine?.speed_level || 0, mine?.luck_level || 0, mine?.rarity_level || 0, mine?.find_level || 0, mine?.raid_level || 0);
-    const myGuns = gunsFor(mine?.gun_level || 0, myLevel), myHull = hullFor(mine?.hull_level || 0, myLevel);
+    const myGuns = gunsFor(mine?.gun_level || 0), myHull = hullFor(mine?.hull_level || 0, myLevel);
 
     // WORTH IT × WINNABLE, not just worth it. Sorting on loot alone put the heaviest ship in the Den at the
     // top of a brand-new captain's list, which is the one raid a day they have to spend. `odds` is a rough
@@ -1815,7 +1815,7 @@ function combatView(row, boatLevel) {
         // The ship as it actually fights, in the same numbers the battle uses — no hidden maths on a screen
         // whose whole job is to let you decide what to buy next.
         ship: {
-            guns: gunsFor(gun, boatLevel),
+            guns: gunsFor(gun),
             accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
             hp: hullFor(hull, boatLevel),
             armor: Math.round(armorFor(hull) * 100),

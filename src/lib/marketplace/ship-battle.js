@@ -64,17 +64,18 @@ export const COMBAT_TRACKS = {
         desc: "Oak and iron plate — more hit points, and every ball that lands hurts less." },
 };
 
-// Guns in a broadside.
+// Guns in a broadside. ONE, plus one per level of the Cannons track. Nothing else.
 //
-// You start with ONE. It used to be three before you had bought anything, which meant the Cannons track — the
-// headline upgrade of the whole feature — moved you from 3 to 4 on the first purchase: a 33% bump you could
-// not see and did not feel. Starting at one makes the second gun an event, and every gun after it is visibly
-// another barrel on your deck now that they are drawn.
+// This started at 3 and also handed out a free gun per six boat levels, which meant a level-37 captain who had
+// never touched the Cannons track sailed with SEVEN guns — the headline upgrade of the whole feature was
+// decoration on top of something you got for playing other parts of the game. Every rival in the list showed
+// "3 guns" for the same reason, and none of them had bought a single one.
 //
-// The hull still contributes: a bigger boat is a bigger platform, which is what "your overall ship level
-// counts" means in practice.
-export const gunsFor = (gunLevel = 0, boatLevel = 1) =>
-    1 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel)) + Math.floor(Math.max(0, boatLevel - 1) / 6);
+// The boat still matters, just not here: hull points and accuracy both scale with boat level (below). The boat
+// is the platform; the guns are the thing you decided to buy, and now they are the only thing you can point at
+// on your own deck and count.
+export const gunsFor = (gunLevel = 0) =>
+    1 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel));
 
 // Chance a single gun hits. Gunnery is the lever; the boat contributes a little steadiness.
 export const accuracyFor = (gunneryLevel = 0, boatLevel = 1) =>
@@ -106,7 +107,7 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
         art,
         flavor,
         boatLevel,
-        guns: gunsFor(gunLevel, boatLevel),
+        guns: gunsFor(gunLevel),
         accuracy: Math.min(0.95, Math.max(0.15, accuracyFor(gunneryLevel, boatLevel) + a.accuracy)),
         rake: rakeFor(gunneryLevel) + a.rakeBonus,
         hp: hullFor(hullLevel, boatLevel),
