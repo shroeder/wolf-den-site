@@ -1123,7 +1123,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     <div className="sby-stats">
                         <div className="sby-stat"><b>{state.combat.ship.guns}</b><em>guns</em></div>
                         <div className="sby-stat"><b>{state.combat.ship.accuracy}%</b><em>accuracy</em></div>
-                        <div className="sby-stat"><b>{state.combat.ship.hp}</b><em>hull</em></div>
+                        <div className="sby-stat is-hull">
+                            {state.combat.ship.hullGrade ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="sby-stat-grade" src={`/images/sailing/hull/grade${state.combat.ship.hullGrade.grade}.png`}
+                                    alt="" draggable="false" title={`${state.combat.ship.hullGrade.name} — ${state.combat.ship.hullGrade.blurb}`} />
+                            ) : null}
+                            <b>{state.combat.ship.hp}</b>
+                            <em>{state.combat.ship.hullGrade ? state.combat.ship.hullGrade.name.toLowerCase() : "hull"}</em>
+                        </div>
                         <div className="sby-stat"><b>{state.combat.ship.armor}%</b><em>armour</em></div>
                     </div>
                     <div className="sby-tracks" style={{ marginTop: 12 }}>

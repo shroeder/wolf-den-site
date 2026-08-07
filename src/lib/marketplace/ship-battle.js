@@ -86,8 +86,26 @@ export const rakeFor = (gunneryLevel = 0) => Math.min(0.35, 0.06 + Math.max(0, g
 
 // Hull integrity. Flat base + hull track + the boat you built, so a big trader can survive a gunboat that has
 // bought more cannon than it can carry.
+// YOUR BOAT IS YOUR HULL. It used to be a flat 120 with boat level worth +4 a level — so the boat you had
+// spent weeks levelling was a footnote next to a number everyone got for free, and a level-37 captain sailed
+// with 264 hit points against a level-1's 120. Boat level is the BASE now (+9 a level) and the Hull track is
+// what you buy on top, which is the shape the two things actually have: the boat is how much ship there is,
+// the track is how well it is armoured.
 export const hullFor = (hullLevel = 0, boatLevel = 1) =>
-    120 + Math.max(0, hullLevel) * 26 + Math.max(0, boatLevel - 1) * 4;
+    90 + Math.max(1, boatLevel) * 9 + Math.max(0, hullLevel) * 26;
+
+// ── HOW HEAVY A SHIP IS, AT A GLANCE ─────────────────────────────────────────────────────────────────────────
+// Five grades with their own art, so a ship's hull is something you SEE on the row rather than a number you
+// have to hold two of and compare. Thresholds sit on the fleet's own spine — grade 3 is roughly where the
+// mid-fleet lives, grade 5 is flagship weight.
+export const HULL_GRADES = [
+    { grade: 1, name: "Timber", max: 179, blurb: "Bare planking. It floats." },
+    { grade: 2, name: "Reinforced", max: 299, blurb: "Doubled frames and a strake of oak." },
+    { grade: 3, name: "Iron-bound", max: 449, blurb: "Iron banding at the waterline." },
+    { grade: 4, name: "Plated", max: 649, blurb: "Plate over oak. Shot bounces." },
+    { grade: 5, name: "Ironclad", max: Infinity, blurb: "A fortress that happens to float." },
+];
+export const hullGrade = (hp = 0) => HULL_GRADES.find((g) => hp <= g.max) || HULL_GRADES[HULL_GRADES.length - 1];
 
 // Armour: a flat fraction off every ball that lands, before ammunition's piercing is applied.
 export const armorFor = (hullLevel = 0) => Math.min(0.4, Math.max(0, hullLevel) * 0.035);

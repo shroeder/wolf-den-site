@@ -15,7 +15,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
          gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, initBattleState, resolveRound,
-         MAX_ROUNDS, matchupOdds } from "@/lib/marketplace/ship-battle.js";
+         MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
@@ -1578,6 +1578,7 @@ export async function getRaidTargets(buyerId, limit = 4) {
             // Their SHIP, in the same two numbers your own gun deck reports — plus the fleet rank it fights
             // like, which is also exactly what beating it pays.
             guns: gunsFor(r.gun_level || 0), hull: hullFor(r.hull_level || 0, level),
+            hullGrade: hullGrade(hullFor(r.hull_level || 0, level)),
             ammo: r.loadout || "round",
             rank: fleetRankForShip({ guns: gunsFor(r.gun_level || 0), hp: hullFor(r.hull_level || 0, level) }),
         };
@@ -1834,6 +1835,7 @@ function combatView(row, boatLevel) {
         // whose whole job is to let you decide what to buy next.
         ship: {
             guns: gunsFor(gun),
+            hullGrade: hullGrade(hullFor(hull, boatLevel)),
             accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
             hp: hullFor(hull, boatLevel),
             armor: Math.round(armorFor(hull) * 100),

@@ -66,6 +66,7 @@ export const FLEET = [
 ];
 
 import { fleetDeck } from "@/lib/marketplace/deck-lines.js";
+import { hullGrade } from "@/lib/marketplace/ship-battle.js";
 
 export const MAX_FLEET_RANK = FLEET.length;
 // ── WHAT RANK IS THAT SHIP? ──────────────────────────────────────────────────────────────────────────────────
@@ -73,12 +74,17 @@ export const MAX_FLEET_RANK = FLEET.length;
 // to the nearest fleet rank lets a RAID pay out of the same reward table as everything else, so there is one
 // reward design in the game rather than two that have to be balanced against each other forever.
 //
-// Compared on both dimensions because either alone lies — a gunboat with no hull and a fat trader with two
-// cannons are not the same problem, and averaging them separately would rank both as "middling".
-export function fleetRankForShip({ guns = 4, hp = 140 } = {}) {
+// Matched on HULL alone, and that is deliberate. It used to weigh guns too, which stopped working the moment
+// guns became something you buy rather than something you get: every member has one gun until they spend on
+// the Cannons track, so every member collapsed to rank 1 and a 208-hull ship paid like a fishing boat.
+//
+// Hull is also the honest axis. It is the dimension a player actually grows — boat level IS hull now — so
+// matching on it makes the tier rise with investment, monotonically: boat 1 ranks 1, boat 25 ranks 5, a
+// maxed boat and hull track ranks 10. Guns still decide the FIGHT; they just do not decide how big you are.
+export function fleetRankForShip({ hp = 140 } = {}) {
     let best = FLEET[0], bestGap = Infinity;
     for (const f of FLEET) {
-        const gap = Math.abs(f.guns - guns) / 4 + Math.abs(f.hp - hp) / 200;
+        const gap = Math.abs(f.hp - hp);
         if (gap < bestGap) { bestGap = gap; best = f; }
     }
     return best.rank;
@@ -148,7 +154,7 @@ export function fleetView(depth = 0) {
         rank: f.rank, name: f.name, cls: f.cls, art: fleetArt(f), boss: Boolean(f.boss), flavor: f.flavor,
         // The captain, so the picker can show the person on their deck rather than an empty hull.
         crew: fleetCaptain(f),
-        guns: f.guns, hp: f.hp, ammo: f.ammo,
+        guns: f.guns, hp: f.hp, ammo: f.ammo, hullGrade: hullGrade(f.hp),
         beaten: f.rank <= depth,
         current: f.rank === next && f.rank > depth,
         locked: f.rank > next,

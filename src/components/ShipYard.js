@@ -162,7 +162,17 @@ function BattleRow({ e, busy, canFight, onFight }) {
                 </div>
                 <div className="sby-row-stats">
                     <span className="sby-chip is-guns"><i /><b>{e.guns}</b> guns</span>
-                    <span className="sby-chip is-hull"><i /><b>{e.hull}</b> hull</span>
+                    {/* HULL, as a thing you can see. Boat level is base hull now, so this badge is mostly a
+                        readout of how much boat somebody has actually built — which is the point: the weeks
+                        you put into the boat should be legible on the row, not buried in a number. */}
+                    <span className={`sby-chip is-hull is-g${e.hullGrade?.grade || 1}`}
+                        title={e.hullGrade ? `${e.hullGrade.name} — ${e.hullGrade.blurb}` : undefined}>
+                        {e.hullGrade ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="sby-hullgrade" src={`/images/sailing/hull/grade${e.hullGrade.grade}.png`} alt="" draggable="false" />
+                        ) : <i />}
+                        <b>{e.hull}</b> hull
+                    </span>
                     <span className={`sby-chip is-ammo is-${e.ammo}`}><i /><b>{e.ammo}</b></span>
                 </div>
             </div>
@@ -202,7 +212,7 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             rows.push({
                 key: `f${f.rank}`, kind: "fleet", rank: f.rank, name: f.name,
                 sub: f.cls || "", art: f.art, rider: f.crew || null, boss: Boolean(f.boss),
-                guns: f.guns, hull: f.hp, ammo: f.ammo,
+                guns: f.guns, hull: f.hp, ammo: f.ammo, hullGrade: f.hullGrade || null,
                 odds: matchupOdds({ myGuns, myHull, guns: f.guns, hull: f.hp }),
                 beaten: Boolean(f.beaten), locked: Boolean(f.locked),
             });
@@ -214,7 +224,7 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                 // one of their items, and read as an advertisement for loot that no longer drops.
                 sub: `boat level ${t.level}`,
                 art: t.boat, rider: t.rider || null, boss: false,
-                guns: t.guns, hull: t.hull, ammo: t.ammo,
+                guns: t.guns, hull: t.hull, ammo: t.ammo, hullGrade: t.hullGrade || null,
                 odds: t.odds != null ? t.odds / 100 : matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull }),
                 beaten: false, locked: false,
             });
