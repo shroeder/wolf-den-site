@@ -37,23 +37,36 @@ export async function POST(request) {
         // that teaches you to ignore the real ones.
         const recovered = body?.recovered === true;
 
+        // A CHUNK THAT WOULD NOT DOWNLOAD IS NOT A BUG IN OUR CODE. It means the browser asked for a JS file
+        // from a build that is no longer the current one, or the connection dropped mid-fetch — a stale tab, a
+        // deploy landing under someone's feet, a phone on one bar. Nothing in the source can prevent it and
+        // nothing in the source needs changing when it happens.
+        //
+        // The client already downgrades these when it manages to recover by reloading, but recovery needs a
+        // working connection to succeed — so the exact case worth ignoring most, genuinely bad internet, is the
+        // one that arrives flagged as a hard crash and buzzes the phone. Classified here instead, off the error
+        // itself, so it does not depend on the client being well enough to say so.
+        const chunkNoise = /ChunkLoadError|Loading chunk \d|Failed to load chunk|error loading dynamically imported module|Importing a module script failed/i
+            .test(`${message} ${stack || ""}`);
+        const quiet = recovered || chunkNoise;
+
         const buyer = await getAuthenticatedBuyer().catch(() => null);
         const who = buyer?.display_name || buyer?.alias || (buyer?.id ? `buyer:${buyer.id}` : "signed out");
 
         // Structured log first — this is the copy that survives regardless of push config.
-        if (recovered) log.warn("client.chunk_recovered", { path, message, who, ua });
+        if (quiet) log.warn("client.chunk_noise", { path, message, who, ua, recovered, chunkNoise });
         else log.error("client.crash", { path, message, digest, who, ua, stack });
 
         // And keep it, so a pattern across members is visible rather than a scroll through logs.
         await db.query(
             `INSERT INTO mkt_client_error (buyer_id, path, message, digest, stack, ua)
              VALUES ($1, $2, $3, $4, $5, $6)`,
-            [buyer?.id || null, path, recovered ? `[recovered] ${message}` : message, digest, stack, ua]
+            [buyer?.id || null, path, quiet ? `[chunk] ${message}` : message, digest, stack, ua]
         ).catch(() => { /* the log line above is the real record */ });
 
         const key = `${path}|${message}`;
         const now = Date.now();
-        if (!recovered && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
+        if (!quiet && (!lastPush.has(key) || now - lastPush.get(key) > PUSH_COOLDOWN_MS)) {
             lastPush.set(key, now);
             await sendAdminPush({
                 title: "A page crashed",
