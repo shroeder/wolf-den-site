@@ -469,7 +469,14 @@ export async function getForgeState(buyerId) {
             util: describeUtil(enh?.util),
         };
     };
-    const salvage = (ownedRows || []).map((r) => r.item_id).filter((id) => !equippedIds.has(id)).map(dress).filter(Boolean)
+    // Collection pieces are NOT salvage stock. salvageItem() has always refused them (see the guard above), but
+    // this list never filtered them, so the Forge sat there offering you a Forgeplate that "yields Tempered
+    // Steel" and the tap came back as an error. Every other surface in the game already gets this right — the
+    // bag hides Equip/Sell/Salvage on them, the auction and trade both drop them — this was the one list that
+    // still described a trophy as raw material.
+    const salvage = (ownedRows || []).map((r) => r.item_id)
+        .filter((id) => !equippedIds.has(id) && !isCollectionItem(id))
+        .map(dress).filter(Boolean)
         .map((d) => { const cfg = SALVAGE[d.rarity] || SALVAGE.common; return { ...d, salvageMin: cfg.min, salvageMax: cfg.max }; })
         .sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));
     const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; const c = enhanceCost(itemById(id), d.level); const maxed = d.level >= MAX_FORGE_LEVEL; return { ...d, cost: c, have: parts[c.tier] || 0, affordable: (parts[c.tier] || 0) >= c.qty, maxed }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
