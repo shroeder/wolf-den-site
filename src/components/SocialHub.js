@@ -7,6 +7,31 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import MemberHeroCard from "@/components/MemberHeroCard";
 import { borderClass } from "@/lib/marketplace/borders.js";
 
+// ── STICK TO THE BOTTOM, BUT ONLY IF YOU WERE ALREADY THERE ──────────────────────────────────────────────────
+// Both threads used to jump to the newest message every time `messages` changed, and messages change on a
+// timer — every 12s for global, every 4s for a DM. So scrolling up to read anything older gave you a few
+// seconds before the view yanked itself back down. Reported as "chat keeps snapping to the bottom so I can't
+// scroll back", with a member having found the workaround of holding a finger down to block it.
+//
+// A chat should follow new messages while you are watching the newest ones, and hold still the moment you go
+// looking for something. So: only scroll if the reader is already parked near the end.
+const PINNED_SLACK_PX = 140;
+function scrollToEndIfPinned(endRef, force = false) {
+    const end = endRef.current;
+    if (!end) return;
+    // Find the actual scrolling ancestor rather than assuming which element it is — this hub renders the same
+    // thread markup inside two different panels, and hard-coding a parent would silently fix one of them.
+    let box = end.parentElement;
+    while (box && box !== document.body) {
+        const oy = getComputedStyle(box).overflowY;
+        if ((oy === "auto" || oy === "scroll") && box.scrollHeight > box.clientHeight + 4) break;
+        box = box.parentElement;
+    }
+    if (!box || box === document.body) { end.scrollIntoView({ block: "end" }); return; }
+    const gap = box.scrollHeight - box.scrollTop - box.clientHeight;
+    if (force || gap <= PINNED_SLACK_PX) end.scrollIntoView({ block: "end" });
+}
+
 // Ever-present social hub: a floating launcher on EVERY page (signed-in members only) that opens a
 // tabbed panel — Messages (unified inbox + inline chat), Friends (your friends + requests), and
 // Discover (search members → hero cards → add). Couples people + messaging in one place.
@@ -59,9 +84,7 @@ function Thread({ thread, onActivity }) {
         return () => clearInterval(iv);
     }, [load]);
 
-    useEffect(() => {
-        endRef.current?.scrollIntoView({ block: "end" });
-    }, [messages]);
+    useEffect(() => { scrollToEndIfPinned(endRef); }, [messages]);
 
     // Ping "I'm typing" as they compose, at most once every 3s (the server window is 6s, so this keeps it alive
     // without a request per keystroke).
@@ -87,6 +110,8 @@ function Thread({ thread, onActivity }) {
         if (r && r.ok) {
             setInput("");
             await load();
+            // Your OWN message always pulls you down, wherever you were reading — you just spoke.
+            scrollToEndIfPinned(endRef, true);
         }
         setSending(false);
     }
@@ -527,7 +552,7 @@ function GlobalChatTab({ open, onRead }) {
         return () => clearInterval(iv);
     }, [open, load]);
 
-    useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages]);
+    useEffect(() => { scrollToEndIfPinned(endRef); }, [messages]);
 
     async function send(e) {
         e.preventDefault();
@@ -539,7 +564,7 @@ function GlobalChatTab({ open, onRead }) {
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ body }),
         }).catch(() => null);
-        if (r && r.ok) { setInput(""); await load(); }
+        if (r && r.ok) { setInput(""); await load(); scrollToEndIfPinned(endRef, true); }
         setSending(false);
     }
 
