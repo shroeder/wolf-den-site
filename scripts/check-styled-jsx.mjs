@@ -22,6 +22,13 @@
 // The fix is always one of: use a DOM element inside the owning component, or declare that rule in
 // `<style jsx global>` (or globals.css, which is where anything shared belongs).
 //
+// THERE IS A THIRD CASE THIS SCRIPT DELIBERATELY DOES NOT CHECK: the same class name declared in one file's
+// scoped block and used in ANOTHER file (it is dead there too — scoping cannot cross a file). It was tried and
+// removed. Modifier names like `is-on` and `is-spent` are a convention half the app follows independently, and
+// telling class names apart from ordinary identifiers inside `className={...}` expressions needs a real JSX
+// parser, not a regex — the attempt reported `.fx` as a dead rule because a ternary mentioned a variable
+// called fx. A gate that cries wolf gets ignored, and then it is not a gate. Shared classes go in globals.css.
+//
 // Usage:  node scripts/check-styled-jsx.mjs
 import fs from "node:fs";
 import path from "node:path";

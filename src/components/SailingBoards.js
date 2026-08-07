@@ -90,13 +90,6 @@ export default function SailingBoards({ boards, mePlace, totals = null }) {
                     : "Nobody has forged a chest yet — go dig one up."}
             />
 
-            <style jsx>{`
-                .sbd-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-                .sbd-tabs button { flex: 1 1 0; padding: 9px 8px; border-radius: 11px; cursor: pointer; color: #9aa2ab;
-                    font-size: 0.83rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
-                .sbd-tabs button.is-on { color: #0d1a22; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
-                .sbd-blurb { margin: 0 0 11px; font-size: 0.76rem; line-height: 1.45; color: #8d96a0; }
-            `}</style>
         </section>
     );
 }

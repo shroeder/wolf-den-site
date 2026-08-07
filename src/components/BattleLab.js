@@ -42,7 +42,7 @@ export default function BattleLab() {
         const meta = {
             rank,
             me: { name: meP.name, art: meP.art, guns: meP.guns, hp: meP.hp, ammo: meP.ammo.id, level: meP.boatLevel,
-                  rider: "/api/marketplace/avatar?seed=lab", pet: null },
+                  rider: "/images/nav/boss.png", pet: null }, // stand-in for a hero sprite in the lab
             foe: { name: foeP.name, cls: ship.cls, art: fleetArt(ship), guns: foeP.guns, hp: foeP.hp,
                    ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false },
         };

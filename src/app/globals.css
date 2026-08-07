@@ -13198,3 +13198,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .sbt-log, .sbt-orders { max-width: 900px; margin-left: auto; margin-right: auto; }
     .sbt-hud { max-width: 900px; margin: 0 auto; }
 }
+/* Tab pills shared by the sailing boards and the gun deck. They lived in SailingBoards' scoped <style jsx>,
+   which meant they styled nothing at all in ShipYard — a scoped block cannot reach another file. */
+.sbd-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.sbd-tabs button { flex: 1 1 0; padding: 9px 8px; border-radius: 11px; cursor: pointer; color: #9aa2ab;
+    font-size: 0.83rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.sbd-tabs button.is-on { color: #0d1a22; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
+.sbd-blurb { margin: 0 0 11px; font-size: 0.76rem; line-height: 1.45; color: #8d96a0; }
