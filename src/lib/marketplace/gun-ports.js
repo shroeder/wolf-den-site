@@ -24,13 +24,19 @@ export const GUN_PORTS = {
 // Guns spread evenly across the middle of the hull, sitting on its own measured deck line.
 function fallbackPorts(deckPct, n) {
     const y = 1 - deckPct / 100;          // deck line is measured from the BOTTOM; y is from the top
-    // The battery widens with the number of guns. At a fixed span, a thirteen-gun ship packed every barrel into
-    // the same stretch of deck and they overlapped into one solid dark log — you could not count them, which is
-    // the entire point of drawing them.
-    const span = Math.min(0.68, 0.3 + n * 0.045);
+    // The battery widens with the number of guns, and THE SPREAD STOPS AT EIGHT. Past that the even spacing packs barrels tighter than they can be drawn and a
+    // thirteen-gun broadside renders as one dark fringe along the rail — uncountable, which is the whole thing
+    // it exists to do, and it looks like a bug rather than a battery. Eight readable cannons beat thirteen
+    // smeared into a bar, and the HUD states the real number anyway. A hand-placed battery is exempt: whoever
+    // placed it looked at the hull and knows what fits.
+    const drawn = Math.min(8, n);
+    const span = Math.min(0.68, 0.3 + drawn * 0.055);
     const out = [];
-    for (let i = 0; i < n; i += 1) {
-        const t = n === 1 ? 0.5 : i / (n - 1);
+    for (let i = 0; i < drawn; i += 1) {
+        // A LONE gun does not sit dead amidships. The crew sprite stands at exactly 0.5 and a single centred
+        // cannon lands behind it — drawing order now keeps it visible, but a barrel bisecting the captain still
+        // reads as a mistake. Nudged just off centre, which looks deliberate whichever way the hull faces.
+        const t = drawn === 1 ? 0.62 : i / (drawn - 1);
         out.push({ x: 0.5 - span / 2 + t * span, y });
     }
     return out;

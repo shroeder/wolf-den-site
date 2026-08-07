@@ -195,10 +195,14 @@ const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
 // How wide one cannon can be drawn without touching its neighbour. Measured off the real gap between the two
 // closest ports rather than assumed from the count, so a hand-placed battery with uneven spacing still fits.
 function gunWidthPct(ports) {
-    if (ports.length < 2) return 13;
+    // A ship with ONE gun has a whole deck to itself, so the lone cannon is drawn big — it is the entire
+    // visual proof of the Cannons track, and at the old shared 13% it read as a smudge on the rail. The
+    // ceiling for a real battery goes up too: 13% was tuned when the fallback packed guns tightly, and it
+    // left even a four-gun broadside looking like trim.
+    if (ports.length < 2) return 22;
     let gap = Infinity;
     for (let i = 1; i < ports.length; i += 1) gap = Math.min(gap, Math.abs(ports[i].x - ports[i - 1].x));
-    return Math.max(5, Math.min(13, gap * 100 * 0.92));
+    return Math.max(6, Math.min(16, gap * 100 * 0.92));
 }
 
 function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {

@@ -13503,7 +13503,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    "More barrels in the broadside" was a number in the HUD; these are the barrels. One per gun the ship owns,
    placed off the hull's own battery (gun-ports.js), each recoiling and flashing in sequence — a broadside is a
    ripple down the deck, not a single event. */
-.sbt-guns { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+/* ABOVE the crew (z-index 2), not below it. The crew sprite stands at left:50% and a small battery centres on
+   the same spot, so the single cannon a starting ship owns was rendering exactly behind a body and could not
+   be seen at all — the deck looked gunless while the HUD said "1 guns". A gun sits at the rail and the crew
+   works it from behind anyway, so this is also the truer order. */
+.sbt-guns { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .sbt-gun { position: absolute; width: var(--gw, 13%); aspect-ratio: 128 / 82; transform: translate(-50%, -70%); }
 /* The enemy's guns point at YOU, so the whole battery mirrors with the ship it belongs to. */
 .sbt-ship-foe .sbt-gun { transform: translate(-50%, -70%) scaleX(-1); }
