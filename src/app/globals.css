@@ -9954,7 +9954,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    sets no font-size at all and would inherit the body's 16px, putting a 10px marker on the largest art in the
    game. Any host that doesn't size its own text overrides --pip instead. */
 .el-pips {
-    --pip: 0.62em;
+    /* 0.74, not the 0.62 this shipped at first. On the real bag grid the marker was legible but visibly
+       lighter than the forge-rank badge on the opposite corner, and the shadow crescent — dark purple on a
+       dark card — was the case that suffered for it. This is still well inside the plate. */
+    --pip: 0.74em;
     position: absolute; left: -0.14em; bottom: -0.14em; z-index: 3;
     display: flex; align-items: center; pointer-events: none;
 }
@@ -13408,8 +13411,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
 .sby-chip b { font-weight: 900; color: #f2f6fa; }
 .sby-chip i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.sby-chip.is-guns i { background: #ffc43c; box-shadow: 0 0 6px rgba(255,196,60,0.8); }
 .sby-chip.is-hull i { background: #7ad39a; box-shadow: 0 0 6px rgba(90,210,140,0.7); }
+/* The gun count wears the deck cannon — the same sprite that gets drawn on the ship — instead of a yellow dot
+   that meant nothing until you were told what it meant. Matched to .sby-hullgrade so the two chips on a row
+   sit at the same weight; the warm glow keeps the chip reading as "guns" at a glance the colour used to. */
+.sby-gunicon { width: 18px; height: 18px; object-fit: contain; flex: none; margin: -2px 1px -2px -1px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)) drop-shadow(0 0 5px rgba(255,196,60,0.45)); }
+.sby-chip.is-guns { border-color: rgba(255,196,60,0.35); }
 /* The hull GRADE badge — boat level is base hull, so this is mostly a readout of how much boat somebody has
    built. The chip takes the grade's colour so the row is scannable before you read a single number. */
 .sby-hullgrade { width: 18px; height: 18px; object-fit: contain; flex: none; margin: -2px 1px -2px -1px;

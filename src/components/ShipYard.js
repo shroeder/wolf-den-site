@@ -161,7 +161,15 @@ function BattleRow({ e, busy, canFight, onFight }) {
                     <span className="sby-row-cls">{e.sub}</span>
                 </div>
                 <div className="sby-row-stats">
-                    <span className="sby-chip is-guns"><i /><b>{e.guns}</b> guns</span>
+                    {/* The gun count gets the same treatment the hull grade already had: a drawn cannon rather
+                        than a coloured dot. The dot carried no meaning — it was a legend entry you had to learn —
+                        and it sat next to a chip that was already showing real art, so the row read as half
+                        finished. This is the same deck cannon that gets drawn on the ship itself. */}
+                    <span className="sby-chip is-guns">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sby-gunicon" src="/images/sailing/deck-cannon.png" alt="" draggable="false" />
+                        <b>{e.guns}</b> guns
+                    </span>
                     {/* HULL, as a thing you can see. Boat level is base hull now, so this badge is mostly a
                         readout of how much boat somebody has actually built — which is the point: the weeks
                         you put into the boat should be legible on the row, not buried in a number. */}
