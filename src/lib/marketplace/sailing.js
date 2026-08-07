@@ -90,7 +90,7 @@ const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; 
 // Daily raid allowance: BASE + ship perks (Celestial Sovereign +1) + set bonus. Count-based so >1/day works.
 // Base raised 1 → 3: one raid a day made the whole raiding system a single tap you could miss entirely, and the
 // upgrade track + Dread Corsair bonus had almost nothing to sit on top of.
-const BASE_RAIDS_PER_DAY = 3;
+const BASE_RAIDS_PER_DAY = 5; // covers fleet AND member raids since they share one pool (was 3 + a separate 3)
 const raidsPerDay = (level = 1, setBonus = 0) => BASE_RAIDS_PER_DAY + boatPerks(level).bonusRaids + Math.max(0, setBonus);
 const raidsUsedToday = (row) => (row?.raid_used_today ? (row?.raid_count || 0) : 0); // count only counts if it's TODAY's
 // Full-set raid extras (Dread Corsair capstone): +1 raid/day and double raid-win gold. A COLLECTION set —
@@ -1682,9 +1682,24 @@ async function finishRaidBattle(buyerId, meta, res) {
             const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
             plunder = await getPetSystemPerk(buyerId, "sea_plunder");
         } catch { /* no companion, no plunder */ }
-        goldDelta = Math.round(RAID_WIN_GOLD() * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1));
+        // ── WHAT A RAID IS WORTH ──────────────────────────────────────────────────────────────────────
+        // Doubloons used to come only from the fleet, which was survivable while the two had separate daily
+        // allowances. Sharing one pool made it fatal: every raid was a battle you did not spend on the only
+        // currency that buys guns, ammunition and hull — so raiding quietly made you worse at raiding, and
+        // nobody would ever have chosen it.
+        //
+        // A raid pays BOTH now, scaled by how much heavier the ship you took on was. Running down a warship
+        // pays like a fleet rank; picking on a rowboat pays for the trouble and no more. `weight` is their
+        // broadside-and-hull against yours, clamped so neither end is silly.
+        const theirWeight = (meta.foe?.guns || 4) + (meta.foe?.hp || 140) / 40;
+        const myWeight = (meta.me?.guns || 4) + (meta.me?.hp || 140) / 40;
+        const weight = Math.max(0.5, Math.min(2.2, theirWeight / Math.max(1, myWeight)));
+        goldDelta = Math.round(RAID_WIN_GOLD() * weight * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1));
         await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
         spoils.push({ kind: "gold", n: goldDelta });
+        const doubloons = Math.max(2, Math.round(9 * weight));
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, doubloons]).catch(() => {});
+        spoils.push({ kind: "doubloons", n: doubloons });
         if (target && Math.random() < Math.min(0.16, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) {
             const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [target.id]).catch(() => []);
             const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity) && !isCollectionItem(d.id));
@@ -1791,14 +1806,20 @@ export async function getUnseenRaidDefenses(buyerId) {
 // Combat progression is bought with DOUBLOONS, not gold. Gold is minted by half the game — letting it buy
 // gunnery would mean the best warship in the Den belongs to whoever farms the most rather than to whoever
 // fights. Doubloons only come out of a ship battle, so the gun deck is paid for at sea.
-const FLEET_SORTIES_PER_DAY = 3;      // sorties against the fleet ladder, separate from the member raid
+// ONE ALLOWANCE FOR BOTH KINDS OF BATTLE. The fleet and member raids used to hold separate daily budgets —
+// 3 sorties here, 3-to-5 raids there — which meant they were never competing and neither choice cost anything.
+// A single pool makes every battle a decision: climb the ladder, or go and take somebody's cargo.
+//
+// It rides on the RAID counter (raid_count / raid_day) rather than a new one, so everything already attached
+// to it keeps working and now applies to both: the Celestial hull's +1, the Dread Corsair's +1, Cunning's
+// chance not to spend the battle at all, and buying another when you run out.
+const BASE_RAIDS_PER_DAY_NOTE = "see BASE_RAIDS_PER_DAY — raised when the fleet joined this pool";
 const COMBAT_COST_BASE = 18;          // doubloons for the first level of a combat track
 const COMBAT_COST_STEP = 1.55;        // each level costs this much more than the last
 export const combatUpgradeCost = (level = 0) => Math.round(COMBAT_COST_BASE * Math.pow(COMBAT_COST_STEP, Math.max(0, level)));
 
 const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || {};
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
-const fleetSortiesUsed = (row) => (row?.fleet_is_today ? (row?.fleet_count || 0) : 0);
 
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
 function combatView(row, boatLevel) {
@@ -1850,8 +1871,6 @@ function combatView(row, boatLevel) {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
             wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
             cleared: depth >= MAX_FLEET_RANK,
-            sortiesLeft: Math.max(0, FLEET_SORTIES_PER_DAY - fleetSortiesUsed(row)),
-            sortiesMax: FLEET_SORTIES_PER_DAY,
             ships: fleetView(depth),
         },
     };
@@ -1994,7 +2013,10 @@ export async function shipBattleOrder(buyerId, order) {
 export async function doFleetBattle(buyerId, rank = null) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
-    if (fleetSortiesUsed(row) >= FLEET_SORTIES_PER_DAY) return { ok: false, error: "no_sorties", ...(await getSailingState(buyerId)) };
+    if (readBattle(row)) return { ok: false, error: "battle_in_progress", ...(await getSailingState(buyerId)) };
+    const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    const extras = await equippedRaidExtras(buyerId);
+    if (raidsUsedToday(row) >= raidsPerDay(myBattleLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
     const depth = row?.fleet_depth || 0;
     // Default target is the next unbeaten rung; an explicit rank may only be one already sunk.
     const want = rank == null ? Math.min(MAX_FLEET_RANK, depth + 1) : Number(rank);
@@ -2009,13 +2031,15 @@ export async function doFleetBattle(buyerId, rank = null) {
     const foe = foeProfile(ship);
     const first = want > depth;
 
-    // The sortie is spent HERE, at the opening, not at the end — otherwise a fight you are losing can be
-    // abandoned by closing the tab and re-rolled for free.
+    // The battle is spent HERE, at the opening, not at the end — otherwise a fight you are losing can be
+    // abandoned by closing the tab and re-rolled for free. Cunning can save it, exactly as it does for a raid:
+    // one pool, one set of rules.
+    const dodged = Math.random() < raidDodgeChance(row?.raid_level || 0);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    await db.query(
+    if (!dodged) await db.query(
         `UPDATE mkt_sailing
-            SET fleet_count = CASE WHEN fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN fleet_count + 1 ELSE 1 END,
-                fleet_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
+            SET raid_count = CASE WHEN raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date THEN raid_count + 1 ELSE 1 END,
+                raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
 
     const crew = await petArtByBuyer([{ buyerId, petId: me?.featured_collectible }]);

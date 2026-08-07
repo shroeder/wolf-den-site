@@ -75,7 +75,7 @@ export default function BattleLab() {
             { id: "explosive", name: "Explosive Shell", icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but what lands starts a fire.", basic: false, price: 22, count: 3, loaded: ammo === "explosive" },
         ],
         loadout: ammo,
-        fleet: { depth: 6, best: 6, max: FLEET.length, wins: 9, losses: 3, cleared: false, sortiesLeft: 3, sortiesMax: 3, ships: fleetView(6) },
+        fleet: { depth: 6, best: 6, max: FLEET.length, wins: 9, losses: 3, cleared: false, ships: fleetView(6) },
     };
 
     return (
@@ -104,7 +104,7 @@ export default function BattleLab() {
                 </div>
             </section>
 
-            <ShipYard combat={combat} busy={false} onAct={({ action, rank }) => { if (action === "fleet_battle") fight(rank); }} />
+            <ShipYard combat={combat} raid={{ cap: 5, used: 1 }} gold={12000} busy={false} onAct={({ action, rank }) => { if (action === "fleet_battle") fight(rank); }} />
 
             {battle ? <ShipBattleScene battle={battle} busy={false} onOrder={order} onClose={() => { setBattle(null); setLive(null); }} /> : null}
         </div>

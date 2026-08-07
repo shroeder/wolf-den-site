@@ -152,8 +152,9 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
     if (!combat) return null;
     const purse = combat.doubloons || 0;
     const fleet = combat.fleet || {};
-    const fleetLeft = fleet.sortiesLeft || 0;
-    const raidLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
+    // ONE allowance covering both kinds of battle — the fleet and member raids draw from the same pool, so
+    // choosing between them is a real decision rather than two separate chores.
+    const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
 
     return (
         <section className="card sby">
@@ -164,7 +165,7 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             {/* BOTH allowances, together, in the same words. They used to be a "sortie" count in here and a
                 separate "raid" count in a call-to-action three screens up. */}
             <p className="sby-allowance">
-                <b>{fleetLeft}</b> fleet battle{fleetLeft === 1 ? "" : "s"} · <b>{raidLeft}</b> raid{raidLeft === 1 ? "" : "s"} left today
+                <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today — spend them on the fleet or on a rival
             </p>
 
             <div className="sbd-tabs" role="tablist">
@@ -215,9 +216,11 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             {active === "raid" ? (
                 <>
                     <p className="sby-sub">
-                        The same fight against a real member&apos;s ship. Win and you pocket gold and a small chance at a
-                        copy of one of their items — they lose nothing. Lose and you drop a little gold, and they take a
-                        cut for driving you off. The fattest holds are up top, ranked by what you can actually take.
+                        The same fight, against a real member&apos;s ship, out of the same daily allowance. Win and you
+                        take gold and doubloons — both scaled by how much heavier their ship was than yours — plus a
+                        small chance at a copy of one of their items. They lose nothing. Lose and you drop a little
+                        gold and they take a cut for driving you off. Riskier than the fleet, and the only place a
+                        piece of somebody else&apos;s gear can come from.
                     </p>
                     {!targets ? (
                         <p className="sby-sub">Scanning the horizon…</p>
@@ -226,7 +229,7 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                     ) : (
                         <div className="sby-fleet">
                             {targets.map((t) => (
-                                <RivalRow key={t.id} t={t} mine={targetsMine} busy={busy} canFight={raidLeft > 0}
+                                <RivalRow key={t.id} t={t} mine={targetsMine} busy={busy} canFight={battlesLeft > 0}
                                     onRaid={(id) => onAct({ action: "raid", target: id })} />
                             ))}
                         </div>
@@ -239,13 +242,14 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                     <p className="sby-sub">
                         Fought in order. Sinking one for the first time opens the next and pays the most — doubloons,
                         forge parts, treasure fragments, a chest from a flagship. Losing costs the battle and nothing else.
+                        Steady, and it is where the ladder is.
                     </p>
                     {fleet.cleared ? (
                         <div className="sby-cleared">The whole fleet is on the bottom. Admiral Vane included.</div>
                     ) : null}
                     <div className="sby-fleet">
                         {(fleet.ships || []).slice().reverse().map((s) => (
-                            <Rung key={s.rank} s={s} busy={busy} canFight={fleetLeft > 0}
+                            <Rung key={s.rank} s={s} busy={busy} canFight={battlesLeft > 0}
                                 onEngage={(rank) => onAct({ action: "fleet_battle", rank })} />
                         ))}
                     </div>

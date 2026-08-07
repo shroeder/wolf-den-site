@@ -907,7 +907,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {state.combat ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy}
                                 onClick={() => { setBattleTab("fleet"); yardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
-                                ⚔️ Ship battles — {(state.combat?.fleet?.sortiesLeft ?? 0) + Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
+                                ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
                         ) : null}
                         {state.combat ? <p className="sail-raid-wip">🚧 Ship battles are under construction — dev only.</p> : null}
