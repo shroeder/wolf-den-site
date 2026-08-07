@@ -236,31 +236,8 @@ export async function updateDraftBoss(bossId, { name, description, maxHp, reward
 }
 
 // Release a draft: ends any current live boss, goes live for `days`. Broadcasts everywhere unless notify=false.
-/**
- * @param {object} [opts]
- * @param {boolean} [opts.allowNoPrize] Release deliberately WITHOUT a raffle prize.
- *
- * A boss with no prize_name runs no raffle when it dies, and a boss that dies without a raffle is where the
- * Sythmara announcement went wrong: nobody could be drawn, so the kill broadcast fell back to the damage
- * champion and told 77 members the owner had won a giveaway. The announcement itself is fixed, but a boss
- * going live with nothing to hand out is the condition that put it in that state, and it is almost always an
- * oversight rather than a decision — the prize is set on a separate screen from the release button.
- *
- * So it has to be said out loud. Refusing here rather than in the web panel means the phone app is covered
- * too, without shipping a second copy of the rule to a codebase that has to be rebuilt and reinstalled.
- */
-export async function releaseBoss(bossId, { days = 7, notify = true, allowNoPrize = false } = {}) {
+export async function releaseBoss(bossId, { days = 7, notify = true } = {}) {
     const d = Math.max(1, Math.floor(Number(days) || 7));
-
-    if (!allowNoPrize) {
-        const pending = await db.queryOne(`SELECT prize_name FROM boss_event WHERE id = $1`, [bossId]).catch(() => null);
-        if (pending && !pending.prize_name) {
-            const err = new Error("No raffle prize is set for this boss, so nobody can win one when it dies. Set a prize first, or release again confirming you meant to run it without one.");
-            err.code = "no_prize";
-            throw err;
-        }
-    }
-
     await db.query(`UPDATE boss_event SET status = 'ended' WHERE status = 'live' AND id <> $1`, [bossId]).catch(() => {});
     const boss = await db.queryOne(
         `UPDATE boss_event SET status = 'live', started_at = NOW(), ends_at = NOW() + ($2::int || ' days')::interval, defeated_at = NULL
