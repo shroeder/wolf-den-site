@@ -25,15 +25,30 @@ const ARP_PATTERN = [0, 1, 2, 3, 2, 3, 1, 2]; // which chord tone plays on each 
 const TOWN_LEAD = { 0: 64, 3: 67, 8: 71, 11: 67, 16: 69, 19: 72, 24: 72, 27: 69 };
 // Raid lead — urgent, driving, higher register.
 const RAID_LEAD = { 0: 76, 2: 74, 4: 72, 6: 74, 8: 76, 12: 79, 16: 72, 18: 71, 20: 72, 24: 76, 26: 77, 28: 79 };
+// Sea battle — a SHANTY, not a chase. Dotted, swung-feeling phrases that land hard on the downbeat and hold,
+// so the loop has the sway of something sung on a deck rather than the flat urgency of the raid lead. It plays
+// under a fight where you sit and choose an order, so it has to stay listenable for a couple of minutes.
+const SEA_LEAD = { 0: 69, 4: 72, 6: 74, 8: 76, 14: 74, 16: 72, 20: 69, 22: 67, 24: 65, 28: 69, 30: 72 };
 
 const VIBES = {
     town: { bpm: 104, lpf: 1600, prog: ["C", "G", "Am", "F"], lead: TOWN_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.15, arpRelease: 0.55, master: 0.42 },
     tavern: { bpm: 76, lpf: 950, prog: ["Am", "F", "C", "G"], lead: null, arpType: "triangle", arpGain: 0.05, bassType: "sine", bassGain: 0.17, arpRelease: 0.95, master: 0.4 },
     // Raid — a fast, tense minor loop with a driving bass + urgent lead; kicks in while a town event is active.
     raid: { bpm: 144, lpf: 2500, prog: ["Am", "Em", "Dm", "E"], lead: RAID_LEAD, arpType: "triangle", arpGain: 0.06, bassType: "triangle", bassGain: 0.22, arpRelease: 0.28, master: 0.46 },
+    // Ship battle — swaggering minor sea shanty. Slower than the raid because a ship fight is turn-based: you
+    // sit and weigh four orders, and a 144bpm chase loop under that just nags. The heavy sawtooth bass is the
+    // swell under the hull; the open filter lets the lead ring out over it.
+    seabattle: { bpm: 112, lpf: 2200, prog: ["Am", "F", "C", "E"], lead: SEA_LEAD, arpType: "triangle", arpGain: 0.055, bassType: "sawtooth", bassGain: 0.17, arpRelease: 0.42, master: 0.44 },
 };
 
-export default function SceneMusic({ vibe = "town" }) {
+// `place` lets a scene put the toggle somewhere its own HUD isn't. The default top-right corner sits exactly
+// on top of the enemy's name plate in a ship battle, so that scene asks for the opposite corner.
+const PLACE = {
+    "top-right": { top: 10, right: 10 },
+    "bottom-left": { bottom: 10, left: 10 },
+};
+
+export default function SceneMusic({ vibe = "town", place = "top-right" }) {
     const [muted, setMuted] = useState(true);
     const started = useRef(false);
     const audio = useRef(null);
@@ -137,7 +152,7 @@ export default function SceneMusic({ vibe = "town" }) {
 
     return (
         <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? `Play ${vibe} music` : "Mute music"}
-            style={{ position: "absolute", top: 10, right: 10, zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
+            style={{ position: "absolute", ...(PLACE[place] || PLACE["top-right"]), zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
             {muted ? "🔇" : "🎵"}
         </button>
     );

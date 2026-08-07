@@ -2,6 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
+import SceneMusic from "@/components/SceneMusic";
+
+// Spoils get their sprite, not a word. `+340 gold` as plain text is a receipt; a coin with a number on it is a
+// reward. Only the kinds with art on disk appear here — anything else falls through to text, which is correct
+// rather than a gap (see public/images/ui).
+const REWARD_ART = {
+    gold: "/images/ui/coin.png",
+    goldLost: "/images/ui/coin.png",
+    chest: "/images/ui/chest.png",
+    parts: "/images/ui/parts.png",
+    seed: "/images/ui/seed.png",
+    item: "/images/ui/gear.png",
+};
+
+// Drifting sea spray. A fixed table rather than Math.random() so the server and the client agree on the first
+// paint — randomising these at render is a hydration mismatch, and the whole field is decorative anyway.
+const MOTES = [
+    { x: 4, d: 0, t: 13, z: 0.5 }, { x: 13, d: 3.5, t: 17, z: 0.8 }, { x: 21, d: 7, t: 11, z: 0.4 },
+    { x: 29, d: 1.5, t: 15, z: 0.7 }, { x: 38, d: 9, t: 19, z: 1 }, { x: 46, d: 5, t: 12, z: 0.5 },
+    { x: 55, d: 11, t: 16, z: 0.9 }, { x: 63, d: 2.5, t: 14, z: 0.6 }, { x: 71, d: 8, t: 18, z: 0.8 },
+    { x: 79, d: 4.5, t: 12, z: 0.4 }, { x: 87, d: 10, t: 16, z: 0.7 }, { x: 95, d: 6, t: 13, z: 0.55 },
+];
 
 // ── THE SHIP BATTLE ──────────────────────────────────────────────────────────────────────────────────────────
 // The first cut resolved the whole fight server-side and played it back. It looked fine and felt like nothing:
@@ -77,17 +99,27 @@ function Ship({ f, side, firing, hurt, low, sinking, burning }) {
 function Bar({ f, hp, max, side, rigged, burning }) {
     const pct = clampPct(hp, max);
     return (
-        <div className={`sbt-panel sbt-panel-${side}`}>
-            <div className="sbt-pname">
-                <b>{f?.name || "Ship"}</b>
-                <em>{f?.cls || (f?.level != null ? `boat level ${f.level}` : "")}</em>
+        <div className={`sbt-panel sbt-panel-${side}${pct <= 25 ? " is-critical" : ""}`}>
+            <div className="sbt-phead">
+                {/* The captain's face on the plate. A name and a number is a scoreboard; a face is an opponent. */}
+                {f?.rider ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="sbt-pface" src={f.rider} alt="" draggable="false" />
+                ) : <span className="sbt-pface is-blank" aria-hidden="true" />}
+                <div className="sbt-pname">
+                    <b>{f?.name || "Ship"}</b>
+                    <em>{f?.cls || (f?.level != null ? `boat level ${f.level}` : "")}</em>
+                </div>
             </div>
             <div className="sbt-hpbar">
+                {/* Two fills: the coloured one snaps to the new value, the pale one drains after it, so a hit
+                    reads as a chunk being taken off rather than a bar quietly being a bit shorter. */}
+                <span className="sbt-hpghost" style={{ width: `${pct}%` }} />
                 <span className={`sbt-hpfill is-${side}${pct <= 25 ? " is-low" : ""}`} style={{ width: `${pct}%` }} />
                 <b className="sbt-hpnum">{Math.max(0, Math.round(hp))} / {max}</b>
             </div>
             <div className="sbt-meta">
-                <span>{f?.guns} guns</span>
+                <span className="sbt-guns">{f?.guns} guns</span>
                 {f?.ammo ? <span className={`sbt-ammo is-${f.ammo}`}>{f.ammo}</span> : null}
                 {rigged ? <span className="sbt-flag is-rig">−{rigged} guns</span> : null}
                 {burning ? <span className="sbt-flag is-fire">burning</span> : null}
@@ -127,6 +159,18 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
     const [log, setLog] = useState([]);
     const [ready, setReady] = useState(false);
     const logRef = useRef(null);
+
+    // Open the log with the ship you are up against, so round one is not a blank panel over an empty sea. The
+    // log sits in the upper half of the screen and it is the only thing up there — it has to say something the
+    // moment the fight starts, and "here is who you are fighting and what they are carrying" is the line the
+    // player wants before choosing an order anyway.
+    useEffect(() => {
+        if (!foe?.name) return;
+        setLog((l) => (l.length ? l : [{
+            k: "open", side: "foe", big: true,
+            text: `${foe.name}${foe.cls ? ` — ${foe.cls}` : ""} · ${foe.guns} guns · ${foe.ammo || "round"} shot loaded.`,
+        }, ...(foe.flavor ? [{ k: "flavor", side: "foe", text: foe.flavor }] : [])]));
+    }, [foe?.name, foe?.cls, foe?.guns, foe?.ammo, foe?.flavor]);
 
     // A fresh batch of events (the answer to an order) → play it.
     useEffect(() => {
@@ -194,6 +238,13 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
         <div className="sbt-scene" role="dialog" aria-modal="true">
             <div className="sbt-sky" aria-hidden="true" />
             <div className="sbt-sea" aria-hidden="true" />
+            {/* AMBIENCE. The scene was two ships sitting still on a flat gradient with two thirds of the screen
+                empty above them — nothing on it moved between orders, which made a turn-based fight feel like a
+                paused one. Drifting spray and a slow swell give the sea something to do while you think. */}
+            <div className="sbt-motes" aria-hidden="true">
+                {MOTES.map((m, i) => <i key={i} style={{ left: `${m.x}%`, animationDelay: `${m.d}s`, animationDuration: `${m.t}s`, "--mz": m.z }} />)}
+            </div>
+            <SceneMusic vibe="seabattle" place="bottom-left" />
 
             <div className="sbt-hud">
                 <Bar f={me} hp={myHp} max={battle?.myMax} side="me" rigged={battle?.rigged?.me} burning={battle?.burning?.me} />
@@ -230,13 +281,21 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 ))}
             </div>
 
-            {/* ORDERS — the reason this is a fight rather than a cutscene. */}
+            {/* ORDERS — the reason this is a fight rather than a cutscene, so this is where the juice goes.
+                The icons were react-icons glyphs: one flat colour on a flat card, at the single moment the
+                player is actually deciding something. They are painted sprites now, and the card carries its
+                order's colour rather than being four identical dark rectangles. */}
             {phase === "orders" && !battle?.over ? (
                 <div className="sbt-orders">
+                    <div className="sbt-orders-call">Give the order</div>
                     {(battle?.orders || []).map((o) => (
                         <button key={o.id} type="button" className={`sbt-order is-${o.id}`} disabled={busy}
                             onClick={() => give(o.id)}>
-                            <Icon name={o.icon} className="sbt-order-ico" />
+                            <span className="sbt-order-shine" aria-hidden="true" />
+                            <span className="sbt-order-art" aria-hidden="true">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={`/images/sailing/orders/${o.id}.png`} alt="" draggable="false" />
+                            </span>
                             <b>{o.name}</b>
                             <em>{o.desc}</em>
                         </button>
@@ -273,7 +332,11 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                         {battle?.reward?.length ? (
                             <div className="sbt-rewards">
                                 {battle.reward.map((r, i) => (
-                                    <span key={i} className={`sbt-reward is-${r.kind}`}>
+                                    <span key={i} className={`sbt-reward is-${r.kind}`} style={{ animationDelay: `${0.12 + i * 0.09}s` }}>
+                                        {REWARD_ART[r.kind] ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img className="sbt-reward-art" src={REWARD_ART[r.kind]} alt="" draggable="false" />
+                                        ) : null}
                                         {r.kind === "doubloons" ? `+${r.n} doubloons`
                                             : r.kind === "gold" ? `+${r.n.toLocaleString()} gold`
                                             : r.kind === "goldLost" ? `−${r.n.toLocaleString()} gold`
