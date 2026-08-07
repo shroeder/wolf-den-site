@@ -13553,8 +13553,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     align-items: flex-end; gap: 2px; pointer-events: none; z-index: 2; }
 /* Sized against the SHIP rather than in pixels, so the crew keeps its proportion on any screen — and bigger:
    at 42px flat they were a detail on the boat rather than the person you are fighting. */
-.sbt-rider { width: 28%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.65)); }
-.sbt-pet { width: 18%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+/* 28% → 40%. The crew is the person you are fighting and at 28% of a hull they were a detail ON the boat
+   rather than a character standing on it — you could not tell your own hero from the captain opposite. The pet
+   scales with them so the pair still reads as a crew rather than a figure with a speck beside it. */
+.sbt-rider { width: 40%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.65)); }
+.sbt-pet { width: 26%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
 .sbt-ship-foe .sbt-crew { flex-direction: row-reverse; }
 /* ── THE GUNS ON DECK ─────────────────────────────────────────────────────────────────────────────────────
    "More barrels in the broadside" was a number in the HUD; these are the barrels. One per gun the ship owns,

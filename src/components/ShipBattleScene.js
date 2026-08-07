@@ -199,7 +199,7 @@ function gunWidthPct(ports) {
     // visual proof of the Cannons track, and at the old shared 13% it read as a smudge on the rail. The
     // ceiling for a real battery goes up too: 13% was tuned when the fallback packed guns tightly, and it
     // left even a four-gun broadside looking like trim.
-    if (ports.length < 2) return 22;
+    if (ports.length < 2) return 30;
     let gap = Infinity;
     for (let i = 1; i < ports.length; i += 1) gap = Math.min(gap, Math.abs(ports[i].x - ports[i - 1].x));
     return Math.max(6, Math.min(16, gap * 100 * 0.92));
