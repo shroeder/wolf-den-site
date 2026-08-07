@@ -590,7 +590,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // Open the raid picker and load the selectable targets (real passing members, best-gear-first).
     // Show the battle card on the RAIDS tab and load who is passing. There is no separate picker any more.
     const openRaid = useCallback(async () => {
-        setBattleTab("raid");
+        setBattleTab("battles");
         setYardOpen(true);
         setRaidTargets(null);
         try {
@@ -927,7 +927,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             says this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
                         {state.combat ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy}
-                                onClick={() => { setBattleTab("fleet"); setYardOpen(true); }}>
+                                onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
                                 ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
                         ) : null}
@@ -1065,7 +1065,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         any rival worth running down.
                     </p>
                     <button type="button" className="sail-cta sail-cta-raid" disabled={busy}
-                        onClick={() => { setBattleTab("fleet"); setYardOpen(true); }}>
+                        onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
                         Open the ship yard — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left today
                     </button>
                 </div>
@@ -1512,7 +1512,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
                             targets={raidTargets} targetsMine={raidMine}
                             tab={battleTab}
-                            onTab={(t) => { setBattleTab(t); if (t === "raid" && raidTargets === null) openRaid(); }}
+                            onTab={(t) => { setBattleTab(t); if (t === "battles" && raidTargets === null) openRaid(); }}
                             onAct={({ action, ...extra }) => act(action, extra)} />
                     </div>
                 </div>

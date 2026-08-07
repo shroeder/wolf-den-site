@@ -13211,30 +13211,94 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-mini.is-load { color: #06212b; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
 
 /* The ladder. Beaten rungs read as done, the next one is the one that matters. */
-.sby-fleet { display: grid; gap: 6px; }
-.sby-rung { display: grid; grid-template-columns: 34px auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
-    padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.09); }
-.sby-rung.is-beaten { opacity: 0.72; }
-.sby-rung.is-current { border-color: #ffd75e; background: rgba(255,215,94,0.1);
-    box-shadow: 0 0 0 1px rgba(255,215,94,0.25); }
-.sby-rung.is-boss .sby-rank { background: linear-gradient(160deg, #ffe89a, #f0b429 55%, #a97612); color: #2b1f06; }
-.sby-rung-art { width: 46px; height: 38px; object-fit: contain; flex: none;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
-.sby-rung.is-beaten .sby-rung-art { filter: grayscale(0.7) brightness(0.65); }
-.sby-rank { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
-    font-size: 0.8rem; font-weight: 900; color: #cdd3d8; background: rgba(0,0,0,0.35);
-    border: 1px solid rgba(255,255,255,0.12); font-variant-numeric: tabular-nums; }
-.sby-rung-body { min-width: 0; }
-.sby-rung-body b { display: block; font-size: 0.86rem; font-weight: 800; overflow: hidden;
+.sby-fleet { display: grid; gap: 9px; }
+
+/* ── ONE OPPONENT, ONE ROW ─────────────────────────────────────────────────────────────────────────────────
+   The fleet rung and the rival row were two different components with two different layouts, and the rival one
+   put its "pays like rank N" note in the same grid cell as the Battle button — on a phone the words ran under
+   the button and the stats wrapped three deep. One row now, one grid, and the numbers live in chips that
+   cannot collide with anything. */
+.sby-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 11px; align-items: center;
+    padding: 9px 11px 9px 9px; border-radius: 15px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+.sby-row.is-boss { border-color: rgba(255,205,120,0.55);
+    background: linear-gradient(180deg, rgba(255,200,80,0.14), rgba(255,150,30,0.03));
+    box-shadow: 0 0 18px rgba(255,180,60,0.16), inset 0 1px 0 rgba(255,235,190,0.2); }
+.sby-row.is-rival { border-color: rgba(120,200,255,0.34); }
+.sby-row.is-beaten { opacity: 0.78; }
+
+/* THE PORTRAIT — the ship with its captain standing on it, in one tile. This is the "who am I fighting"
+   answer, so it gets real size: a 34px face chip beside a 46px hull was two thumbnails, not a character. */
+.sby-port { position: relative; display: block; width: 84px; height: 68px; flex: none; border-radius: 12px;
+    overflow: hidden; background: radial-gradient(70% 70% at 50% 80%, rgba(70,140,190,0.28), rgba(4,12,20,0.55));
+    border: 1px solid rgba(255,255,255,0.1); }
+.sby-port.is-boss { background: radial-gradient(70% 70% at 50% 80%, rgba(255,160,50,0.26), rgba(30,10,4,0.6));
+    border-color: rgba(255,205,120,0.45); }
+.sby-port-ship { position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: 92%; height: 78%;
+    object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.55)); }
+/* Their captain, standing where they stand in the fight. Small, but it is a person and you can tell them apart. */
+.sby-port-crew { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: 26px; height: 26px;
+    object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+.sby-port.is-locked .sby-port-ship, .sby-port.is-locked .sby-port-crew { filter: grayscale(1) brightness(0.4); }
+.sby-port-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.2rem; }
+
+.sby-row-body { min-width: 0; }
+.sby-row-name { display: block; font-size: 0.92rem; font-weight: 900; color: #f2f6fa; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
-.sby-rung-body em { font-style: normal; font-size: 0.66rem; color: #8d96a0; }
-.sby-rung-stats { display: flex; gap: 8px; margin-top: 3px; font-size: 0.64rem; color: #7f868e; }
-.sby-done { font-size: 0.72rem; font-weight: 900; color: #8fe39a; white-space: nowrap; }
-.sby-engage { flex: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 900;
-    font-size: 0.78rem; color: #2b1f06; background: linear-gradient(180deg, #ffe488, #f3b23a); border: none;
-    white-space: nowrap; }
-.sby-engage:disabled { opacity: 0.45; cursor: default; }
+/* HOW HARD, in a word. A percentage is a number you have to interpret; this is the interpretation. */
+.sby-band { flex: none; padding: 2px 8px; border-radius: 999px; font-size: 0.58rem; font-weight: 900;
+    letter-spacing: 0.08em; text-transform: uppercase; }
+.sby-band.is-easy { color: #061a0e; background: linear-gradient(180deg, #a9f5c0, #57d98a); }
+.sby-band.is-fair { color: #06180f; background: linear-gradient(180deg, #c8f0a8, #8fd45e); }
+.sby-band.is-even { color: #1d1704; background: linear-gradient(180deg, #ffe9a4, #f0c452); }
+.sby-band.is-hard { color: #200d05; background: linear-gradient(180deg, #ffc38a, #f08a3c); }
+.sby-band.is-brutal { color: #fff; background: linear-gradient(180deg, #ff7a63, #d3301c); }
+
+.sby-row-sub { display: flex; align-items: center; gap: 6px; margin-top: 1px; min-width: 0;
+    font-size: 0.66rem; color: #93a3b4; }
+.sby-row-sub { flex-wrap: wrap; }
+.sby-row-cls { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sby-kind { flex: none; padding: 1px 6px; border-radius: 5px; font-size: 0.56rem; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase; }
+.sby-kind.is-fleet { color: #ffd9a0; background: rgba(255,190,90,0.16); }
+.sby-kind.is-rival { color: #9fd8ff; background: rgba(90,180,255,0.18); }
+
+/* The three numbers that decide the fight, as chips that cannot wrap into the button. */
+.sby-row-stats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.sby-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 5px; border-radius: 999px;
+    font-size: 0.6rem; font-weight: 700; color: #b9c6d4; white-space: nowrap;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); }
+.sby-chip b { font-weight: 900; color: #f2f6fa; }
+.sby-chip i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.sby-chip.is-guns i { background: #ffc43c; box-shadow: 0 0 6px rgba(255,196,60,0.8); }
+.sby-chip.is-hull i { background: #7ad39a; box-shadow: 0 0 6px rgba(90,210,140,0.7); }
+.sby-chip.is-ammo { text-transform: uppercase; letter-spacing: 0.04em; }
+.sby-chip.is-ammo i { background: #cdd3d8; }
+.sby-chip.is-ammo.is-chain i { background: #9fd0ff; }
+.sby-chip.is-ammo.is-grape i { background: #ffb0d0; }
+.sby-chip.is-ammo.is-explosive i { background: #ff9a6b; }
+
+.sby-row-go { display: grid; justify-items: center; gap: 3px; }
+.sby-row-pays { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+    color: #7f8b97; white-space: nowrap; }
+.sby-engage { flex: none; padding: 9px 12px; border-radius: 11px; cursor: pointer; font-weight: 900;
+    font-size: 0.76rem; color: #2b1f06; background: linear-gradient(180deg, #ffe488, #f3b23a); border: none;
+    white-space: nowrap; box-shadow: 0 3px 0 #b57f22; transition: transform .1s ease; }
+.sby-engage:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #b57f22; }
+.sby-engage.is-refight { color: #cdd3d8; background: rgba(255,255,255,0.08); box-shadow: none;
+    border: 1px solid rgba(255,255,255,0.18); }
+.sby-engage:disabled { opacity: 0.42; cursor: default; }
+/* A locked rung is not a dimmed gold button you nearly tapped — it is a different thing, and it should look
+   like one so the eye skips it on the way down the ladder. */
+.sby-engage.is-locked { color: #8d96a0; background: rgba(255,255,255,0.05); box-shadow: none;
+    border: 1px dashed rgba(255,255,255,0.2); opacity: 1; }
+.sby-cleared { padding: 10px 12px; border-radius: 12px; text-align: center; font-size: 0.82rem; font-weight: 800;
+    color: #ffd75e; background: rgba(255,215,94,0.1); border: 1px dashed rgba(255,215,94,0.45); }
+@media (max-width: 380px) {
+    .sby-row { grid-template-columns: 66px minmax(0, 1fr) auto; gap: 8px; }
+    .sby-port { width: 66px; height: 56px; }
+}
 .sby-sorties { font-size: 0.72rem; font-weight: 800; color: #8d96a0; }
 .sby-cleared { padding: 10px 12px; border-radius: 12px; text-align: center; font-size: 0.82rem; font-weight: 800;
     color: #ffd75e; background: rgba(255,215,94,0.1); border: 1px dashed rgba(255,215,94,0.45); }

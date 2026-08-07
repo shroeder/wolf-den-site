@@ -134,11 +134,19 @@ export function fleetReward(rank, { first = false } = {}) {
 // visible ahead of you (an unbeaten rung names what you are climbing toward) and nothing past the horizon.
 export function fleetView(depth = 0) {
     const next = Math.min(MAX_FLEET_RANK, depth + 1);
-    return FLEET.filter((f) => f.rank <= next).map((f) => ({
+    // Two ranks PAST the one you can fight, shown locked. The list is merged with member rivals now and sorted
+    // by difficulty — without the locked rungs the ladder just stopped, and a rival ranked above your depth
+    // appeared to be the next thing in a fleet that had apparently run out. Seeing what is behind the door is
+    // also the reason to keep climbing.
+    const show = Math.min(MAX_FLEET_RANK, next + 2);
+    return FLEET.filter((f) => f.rank <= show).map((f) => ({
         rank: f.rank, name: f.name, cls: f.cls, art: fleetArt(f), boss: Boolean(f.boss), flavor: f.flavor,
+        // The captain, so the picker can show the person on their deck rather than an empty hull.
+        crew: fleetCaptain(f),
         guns: f.guns, hp: f.hp, ammo: f.ammo,
         beaten: f.rank <= depth,
         current: f.rank === next && f.rank > depth,
+        locked: f.rank > next,
         reward: fleetReward(f.rank, { first: f.rank > depth }),
     }));
 }

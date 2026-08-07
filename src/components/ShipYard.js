@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { matchupOdds } from "@/lib/marketplace/ship-battle.js";
 import * as Gi from "react-icons/gi";
 
 // ── SHIP BATTLES: ONE HOME FOR THE WHOLE THING ───────────────────────────────────────────────────────────────
@@ -82,79 +83,121 @@ function Round({ a, purse, busy, onLoad, onBuy }) {
     );
 }
 
-function Rung({ s, busy, canFight, onEngage }) {
+// ONE OPPONENT, ONE ROW — whether it is a designed fleet ship or a real member.
+//
+// These were two different row components in two different tabs, and they could not be compared: the fleet had
+// a rank and no odds, rivals had odds and a "pays like rank N" footnote that overflowed into the Battle button
+// on a phone. Same fight, same allowance, same reward table — so it is one list, sorted by one difficulty.
+//
+// The PORTRAIT is the change you feel. It used to be a 34px face chip beside a small hull; now the captain
+// stands on their own deck in a single tile, the way they will when the fight opens. You are picking a
+// character, not reading a row of numbers.
+function Portrait({ art, rider, boss, locked }) {
     return (
-        <div className={`sby-rung${s.beaten ? " is-beaten" : ""}${s.current ? " is-current" : ""}${s.boss ? " is-boss" : ""}`}>
-            <span className="sby-rank">{s.rank}</span>
-            {s.art ? (
+        <span className={`sby-port${boss ? " is-boss" : ""}${locked ? " is-locked" : ""}`} aria-hidden="true">
+            {art ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="sby-rung-art" src={s.art} alt="" draggable="false" />
+                <img className="sby-port-ship" src={art} alt="" draggable="false" />
             ) : null}
-            <div className="sby-rung-body">
-                <b>{s.name}</b>
-                <em>{s.cls}{s.boss ? " · flagship" : ""}</em>
-                <div className="sby-rung-stats">
-                    <span>{s.guns} guns</span>
-                    <span>{s.hp} hull</span>
-                    <span>{s.ammo} shot</span>
-                    {s.reward?.doubloons ? <span>{s.reward.doubloons} ⛃</span> : null}
-                </div>
-            </div>
-            {s.beaten && !s.current ? (
-                <button type="button" className="sby-mini" disabled={busy || !canFight} onClick={() => onEngage(s.rank)}>
-                    Re-fight
-                </button>
-            ) : (
-                <button type="button" className="sby-engage" disabled={busy || !canFight} onClick={() => onEngage(s.rank)}>
-                    {canFight ? "Battle" : "None left"}
-                </button>
-            )}
-        </div>
+            {rider ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="sby-port-crew" src={rider} alt="" draggable="false" />
+            ) : null}
+            {locked ? <span className="sby-port-lock">🔒</span> : null}
+        </span>
     );
 }
 
-// A rival member's ship. Deliberately the SAME row as a fleet rung — rank chip, hull, the three numbers that
-// decide the fight, one button — because it is the same fight and reading it should take the same glance.
-function RivalRow({ t, mine, busy, canFight, onRaid }) {
-    const worse = (a, b) => (mine && a > b ? "is-worse" : undefined);
+// How hard this is, in one word and one colour, off the shared matchup read. A percentage alone is a number;
+// a word is a decision.
+const BANDS = [
+    { max: 0.20, key: "brutal", label: "Brutal" },
+    { max: 0.40, key: "hard", label: "Hard" },
+    { max: 0.62, key: "even", label: "Even" },
+    { max: 0.82, key: "fair", label: "Favoured" },
+    { max: 1.01, key: "easy", label: "Easy" },
+];
+const bandFor = (odds) => BANDS.find((b) => odds <= b.max) || BANDS[BANDS.length - 1];
+
+function BattleRow({ e, busy, canFight, onFight }) {
+    const band = bandFor(e.odds ?? 0.5);
+    const disabled = busy || !canFight || e.locked;
     return (
-        <div className="sby-rung is-rival">
-            {t.rider ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="sby-rival-face" src={t.rider} alt="" draggable="false" />
-            ) : <span className="sby-rank">@</span>}
-            {t.boat ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="sby-rung-art" src={t.boat} alt="" draggable="false" />
-            ) : null}
-            <div className="sby-rung-body">
-                <b>{t.name}</b>
-                <em>boat level {t.level}{t.topRarity ? ` · best ${t.topRarity}` : ""}</em>
-                <div className="sby-rung-stats">
-                    <span className={worse(t.guns, mine?.guns)}>{t.guns} guns</span>
-                    <span className={worse(t.hull, mine?.hull)}>{t.hull} hull</span>
-                    <span>{t.ammo} shot</span>
-                    {t.odds != null ? <span className={t.odds >= 60 ? "sby-odds is-good" : t.odds >= 35 ? "sby-odds" : "sby-odds is-bad"}>~{t.odds}%</span> : null}
-                    {t.rank ? <span>pays like rank {t.rank}</span> : null}
+        <div className={`sby-row is-${e.kind}${e.boss ? " is-boss" : ""}${e.locked ? " is-locked" : ""}${e.beaten ? " is-beaten" : ""}`}>
+            <Portrait art={e.art} rider={e.rider} boss={e.boss} locked={e.locked} />
+            <div className="sby-row-body">
+                {/* The name gets the whole line. Sharing it with the difficulty chip left about 150px for a
+                    title on a phone, which turned "The Cormorant" into "The Corm…" — the badge is a label,
+                    the name is the thing you are choosing between. */}
+                <b className="sby-row-name">{e.name}</b>
+                <div className="sby-row-sub">
+                    <span className={`sby-kind is-${e.kind}`}>{e.kind === "fleet" ? (e.boss ? "Flagship" : "Fleet") : "Rival"}</span>
+                    <span className={`sby-band is-${band.key}`}>{band.label}</span>
+                    <span className="sby-row-cls">{e.sub}</span>
+                </div>
+                <div className="sby-row-stats">
+                    <span className="sby-chip is-guns"><i /><b>{e.guns}</b> guns</span>
+                    <span className="sby-chip is-hull"><i /><b>{e.hull}</b> hull</span>
+                    <span className={`sby-chip is-ammo is-${e.ammo}`}><i /><b>{e.ammo}</b></span>
                 </div>
             </div>
-            <button type="button" className="sby-engage" disabled={busy || !canFight} onClick={() => onRaid(t.id)}>
-                {canFight ? "Battle" : "None left"}
-            </button>
+            <div className="sby-row-go">
+                <button type="button" className={`sby-engage${e.locked ? " is-locked" : e.beaten ? " is-refight" : ""}`} disabled={disabled}
+                    onClick={() => onFight(e)}>
+                    {e.locked ? "Locked" : !canFight ? "None left" : e.beaten ? "Re-fight" : "Battle"}
+                </button>
+                <span className="sby-row-pays">Tier {e.rank}</span>
+            </div>
         </div>
     );
 }
 
 export default function ShipYard({ combat, raid, gold, targets = null, targetsMine = null, busy, tab, onTab, onAct }) {
-    const [ownTab, setOwnTab] = useState("fleet");
+    const [ownTab, setOwnTab] = useState("battles");
     const active = tab || ownTab;
     const setTab = onTab || setOwnTab;
-    if (!combat) return null;
-    const purse = combat.doubloons || 0;
-    const fleet = combat.fleet || {};
+    const purse = combat?.doubloons || 0;
+    const fleet = combat?.fleet || {};
     // ONE allowance covering both kinds of battle — the fleet and member raids draw from the same pool, so
     // choosing between them is a real decision rather than two separate chores.
     const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
+
+    // ── THE ONE LIST ─────────────────────────────────────────────────────────────────────────────────────
+    // Fleet ships and member rivals, normalised onto a single difficulty scale and sorted together. A rival's
+    // ship is already matched to the fleet rank it most resembles (fleetRankForShip on the server), so that
+    // rank is the shared axis; matchupOdds gives every row the same read of how it will actually go against
+    // YOUR gun deck, which the fleet half never had.
+    //
+    // Sorted by that rank, then by odds, so the list climbs from what you can take to what will take you.
+    const myGuns = targetsMine?.guns ?? combat?.ship?.guns ?? 4;
+    const myHull = targetsMine?.hull ?? combat?.ship?.hp ?? 140;
+    const opponents = useMemo(() => {
+        const rows = [];
+        for (const f of fleet.ships || []) {
+            rows.push({
+                key: `f${f.rank}`, kind: "fleet", rank: f.rank, name: f.name,
+                sub: f.cls || "", art: f.art, rider: f.crew || null, boss: Boolean(f.boss),
+                guns: f.guns, hull: f.hp, ammo: f.ammo,
+                odds: matchupOdds({ myGuns, myHull, guns: f.guns, hull: f.hp }),
+                beaten: Boolean(f.beaten), locked: Boolean(f.locked),
+            });
+        }
+        for (const t of targets || []) {
+            rows.push({
+                key: `r${t.id}`, kind: "rival", id: t.id, rank: t.rank || 1, name: t.name,
+                sub: `boat level ${t.level}${t.topRarity ? ` · best ${t.topRarity}` : ""}`,
+                art: t.boat, rider: t.rider || null, boss: false,
+                guns: t.guns, hull: t.hull, ammo: t.ammo,
+                odds: t.odds != null ? t.odds / 100 : matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull }),
+                beaten: false, locked: false,
+            });
+        }
+        return rows.sort((a, b) => a.rank - b.rank || b.odds - a.odds);
+    }, [fleet.ships, targets, myGuns, myHull]);
+
+    // AFTER the hooks, never before: `combat` is null for anyone off the dev allow-list while ship battles are
+    // under construction, and returning early above useMemo changes the hook order between renders.
+    if (!combat) return null;
 
     return (
         <section className="card sby">
@@ -165,12 +208,11 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             {/* BOTH allowances, together, in the same words. They used to be a "sortie" count in here and a
                 separate "raid" count in a call-to-action three screens up. */}
             <p className="sby-allowance">
-                <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today — spend them on the fleet or on a rival
+                <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
             </p>
 
             <div className="sbd-tabs" role="tablist">
-                <button type="button" role="tab" aria-selected={active === "fleet"} className={active === "fleet" ? "is-on" : ""} onClick={() => setTab("fleet")}>Fleet</button>
-                <button type="button" role="tab" aria-selected={active === "raid"} className={active === "raid" ? "is-on" : ""} onClick={() => setTab("raid")}>Raids</button>
+                <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
                 <button type="button" role="tab" aria-selected={active === "ship"} className={active === "ship" ? "is-on" : ""} onClick={() => setTab("ship")}>Your ship</button>
                 <button type="button" role="tab" aria-selected={active === "ammo"} className={active === "ammo" ? "is-on" : ""} onClick={() => setTab("ammo")}>Ammunition</button>
             </div>
@@ -213,48 +255,29 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                 </>
             ) : null}
 
-            {active === "raid" ? (
+            {active === "battles" ? (
                 <>
-                    <p className="sby-sub">
-                        The same fight, against a real member&apos;s ship, out of the same daily allowance — and it
-                        pays out of the same table. Their ship is matched to the fleet rank it most resembles, so
-                        running down a warship pays like a warship. They lose nothing either way, and losing costs you
-                        the battle and nothing else. Every rival is a fresh opponent, which is what makes this the
-                        repeatable half once you have out-run the ladder.
-                    </p>
-                    {!targets ? (
-                        <p className="sby-sub">Scanning the horizon…</p>
-                    ) : !targets.length ? (
-                        <p className="sby-sub">No ships on the horizon right now — try again later.</p>
-                    ) : (
-                        <div className="sby-fleet">
-                            {targets.map((t) => (
-                                <RivalRow key={t.id} t={t} mine={targetsMine} busy={busy} canFight={battlesLeft > 0}
-                                    onRaid={(id) => onAct({ action: "raid", target: id })} />
-                            ))}
-                        </div>
-                    )}
-                </>
-            ) : null}
-
-            {active === "fleet" ? (
-                <>
-                    <p className="sby-sub">
-                        Fought in order. Sinking one for the first time opens the next and pays the most — doubloons,
-                        forge parts, treasure fragments, a chest from a flagship. Losing costs the battle and nothing else.
-                        Steady, and it is where the ladder is.
-                    </p>
                     {fleet.cleared ? (
                         <div className="sby-cleared">The whole fleet is on the bottom. Admiral Vane included.</div>
                     ) : null}
                     <div className="sby-fleet">
-                        {(fleet.ships || []).slice().reverse().map((s) => (
-                            <Rung key={s.rank} s={s} busy={busy} canFight={battlesLeft > 0}
-                                onEngage={(rank) => onAct({ action: "fleet_battle", rank })} />
+                        {opponents.map((e) => (
+                            <BattleRow key={e.key} e={e} busy={busy} canFight={battlesLeft > 0}
+                                onFight={(x) => onAct(x.kind === "fleet"
+                                    ? { action: "fleet_battle", rank: x.rank }
+                                    : { action: "raid", target: x.id })} />
                         ))}
                     </div>
+                    {targets === null ? <p className="sby-sub">Scanning the horizon for rivals…</p> : null}
+                    {/* One short line instead of two paragraphs. The old copy explained the reward table, the
+                        allowance and the matchmaking in eight sentences above the thing you came to tap. */}
+                    <p className="sby-sub">
+                        Fleet ships open in order; rivals are always out there. Same fight, same allowance, same
+                        spoils — losing costs the battle and nothing else.
+                    </p>
                 </>
             ) : null}
+
         </section>
     );
 }

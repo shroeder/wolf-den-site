@@ -369,3 +369,17 @@ export function simulateShipBattle(me, foe, { rng = Math.random, maxRounds = 24 
         rounds: events.filter((e) => e.type === "volley" && e.side === "me").length,
     };
 }
+
+// ── ONE DIFFICULTY SCALE FOR BOTH HALVES ─────────────────────────────────────────────────────────────────────
+// The fleet and member rivals were two lists you could not compare: the fleet had a designed rank and no odds,
+// rivals had odds and a "pays like rank N" note, and nothing told you whether rank 6 of the fleet was a harder
+// night than the member sitting above it. They are one list now, so they need one number.
+//
+// This is the read the raid picker was already doing inline — their broadside and hull against yours, gun
+// weighted heavier than hull because a gun deck decides an exchange faster than timber absorbs one. Lifted out
+// of sailing.js so the server and the row on screen cannot drift apart.
+export function matchupOdds({ myGuns = 4, myHull = 140, guns = 4, hull = 140 } = {}) {
+    const gunEdge = myGuns / Math.max(1, guns);
+    const hullEdge = myHull / Math.max(1, hull);
+    return Math.max(0.05, Math.min(0.95, 0.5 * gunEdge ** 1.4 * hullEdge ** 0.7));
+}

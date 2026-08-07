@@ -13,7 +13,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
          gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, initBattleState, resolveRound,
-         MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
+         MAX_ROUNDS, matchupOdds } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip } from "@/lib/marketplace/fleet.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
@@ -1592,9 +1592,8 @@ export async function getRaidTargets(buyerId, limit = 12) {
     // read of the matchup (their broadside and hull against yours) and it scales the loot score, so the top of
     // the list is the best prize you can actually take rather than the best prize that exists.
     const scored = list.map((t) => {
-        const gunEdge = myGuns / Math.max(1, t.guns);
-        const hullEdge = myHull / Math.max(1, t.hull);
-        const odds = Math.max(0.05, Math.min(0.95, 0.5 * (gunEdge ** 1.4) * (hullEdge ** 0.7)));
+        // Shared with the row on screen (ship-battle.js) so the fleet and rivals rank on ONE scale.
+        const odds = matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull });
         const loot = (t.gearRank + 1) * 10 + t.items;
         return { ...t, odds: Math.round(odds * 100), outgunned: t.guns > myGuns && t.hull > myHull, score: loot * odds };
     });
