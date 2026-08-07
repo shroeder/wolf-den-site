@@ -1817,14 +1817,29 @@ function combatView(row, boatLevel) {
             armor: Math.round(armorFor(hull) * 100),
             boatLevel,
         },
-        tracks: Object.values(COMBAT_TRACKS).map((t) => {
-            const level = row?.[t.col] || 0;
-            return {
-                key: t.key, name: t.name, icon: t.icon, desc: t.desc,
-                level, max: t.max, maxed: level >= t.max,
-                cost: level >= t.max ? null : combatUpgradeCost(level),
-            };
-        }),
+        tracks: [
+            ...Object.values(COMBAT_TRACKS).map((t) => {
+                const level = row?.[t.col] || 0;
+                return {
+                    key: t.key, name: t.name, icon: t.icon, desc: t.desc, currency: "doubloons",
+                    level, max: t.max, maxed: level >= t.max,
+                    cost: level >= t.max ? null : combatUpgradeCost(level),
+                };
+            }),
+            // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
+            // belongs with the guns rather than three cards away in the BOAT upgrade list, where it sat purely
+            // because it happens to be an older track bought with gold.
+            (() => {
+                const level = row?.raid_level || 0;
+                return {
+                    key: "cunning", name: "Cunning", icon: "GiSpyglass", action: "upgrade_raid", currency: "gold",
+                    desc: "Sea-dog nerve — a chance a raid does not use up your daily raid.",
+                    level, max: MAX_RAID_LEVEL, maxed: level >= MAX_RAID_LEVEL,
+                    cost: level >= MAX_RAID_LEVEL ? null : upgradeCost(level),
+                    effect: `${raidDodgePct(level)}% free`,
+                };
+            })(),
+        ],
         ammo: AMMO_LIST.map((a) => ({
             id: a.id, name: a.name, icon: a.icon, blurb: a.blurb, basic: a.basic, price: a.price,
             count: a.basic ? null : (Number(stock[a.id]) || 0),

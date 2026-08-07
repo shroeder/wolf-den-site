@@ -239,13 +239,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
     const [fishOpen, setFishOpen] = useState(false);       // the fishing scene (cast → bite → reel) is open
     const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
-    const [raidOpen, setRaidOpen] = useState(false);       // the raid target-picker modal is open
+    const [battleTab, setBattleTab] = useState("fleet");   // which tab the one battle card is showing
+    const yardRef = useRef(null);                          // ...so a CTA can bring you to it
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
-    // Lock the background from scrolling while any sailing modal is open (raid picker, raid battle, arrival).
-    useScrollLock(raidOpen || Boolean(shipBattle) || arriveModal || fishOpen);
+    // Lock the background from scrolling while a full-screen sailing modal is open (the battle, arrival, the
+    // rail). The raid picker used to be one of these; it is a tab on the battle card now.
+    useScrollLock(Boolean(shipBattle) || arriveModal || fishOpen);
 
     // Ask for location, fetch the real weather sky, and CACHE it for next load. We only swap the background LIVE
     // when the player explicitly hit "Enable" (applyLive) — never automatically, so the scene never changes out
@@ -516,8 +518,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
-                // A resolved battle — fleet sortie or member raid — plays out in the ship-battle scene.
-                if (d.battle) { setRaidOpen(false); setRaidTargets(null); setShipBattle(d.battle); }
+                // A resolved battle — fleet or rival — plays out in the ship-battle scene. Clearing the target
+                // list means the raids tab re-scans the horizon next time rather than offering a stale ship.
+                if (d.battle) { setRaidTargets(null); setShipBattle(d.battle); }
             }
             return d;
         } finally { setBusy(false); }
@@ -564,8 +567,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     }, [act]);
 
     // Open the raid picker and load the selectable targets (real passing members, best-gear-first).
+    // Show the battle card on the RAIDS tab and load who is passing. There is no separate picker any more.
     const openRaid = useCallback(async () => {
-        setRaidOpen(true);
+        setBattleTab("raid");
+        yardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         setRaidTargets(null);
         try {
             const r = await fetch("/api/marketplace/sailing", {
@@ -608,9 +613,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         { action: "upgrade_luck", icon: "👋", name: "Luck", data: state.luck,
             desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
             effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`, next: `${state.luck?.wavesNext ?? 0}` },
-        ...(state.raid?.enabled ? [{ action: "upgrade_raid", icon: "🏴‍☠️", name: "Raiding", data: state.raiding,
-            desc: <>Sea-dog cunning — a chance a raid <b>doesn&apos;t use up</b> your daily raid (raid again!).</>,
-            effLabel: "Free-raid chance", now: `${state.raiding?.pctNow ?? 0}%`, next: `${state.raiding?.pctNext ?? 0}%` }] : []),
     ];
     // Digging upgrade tracks (separate system) — gold-leveled; the tools unlock via excavation level.
     const pct = (v) => `${Math.round((v || 0) * 100)}%`;
@@ -900,16 +902,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                             ))}
                         </div>
-                        {/* RAIDING IS UNDER CONSTRUCTION — the whole surface is hidden unless the server says
-                            this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
-                        {!state.raid?.enabled ? null : state.raid?.available ? (
-                            <button className="sail-cta sail-cta-raid" disabled={busy} onClick={openRaid}>🏴‍☠️ Raid a passing ship</button>
-                        ) : (
-                            <button className="sail-cta sail-cta-raid is-reset" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
-                                {busy ? "…" : resetCost > 0 ? <>⚔️ Buy another raid — 🪙 {resetCost.toLocaleString()}</> : <>⚔️ Buy another raid — free (testing)</>}
+                        {/* SHIP BATTLES ARE UNDER CONSTRUCTION — the whole surface is hidden unless the server
+                            says this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
+                        {state.combat ? (
+                            <button className="sail-cta sail-cta-raid" disabled={busy}
+                                onClick={() => { setBattleTab("fleet"); yardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+                                ⚔️ Ship battles — {(state.combat?.fleet?.sortiesLeft ?? 0) + Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
-                        )}
-                        {state.raid?.enabled ? <p className="sail-raid-wip">🚧 Raiding is under construction — dev only. Being rebuilt as ship-to-ship battles.</p> : null}
+                        ) : null}
+                        {state.combat ? <p className="sail-raid-wip">🚧 Ship battles are under construction — dev only.</p> : null}
                     </div>
                 )}
 
@@ -950,19 +951,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <b>Digging</b><em>{dig?.stamina} digs left</em>
                             </button>
                         )}
-                        {liveStatus === "sailing" && state.raid?.enabled && (
-                            state.raid?.available ? (
-                                <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
-                                    <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
-                                    <b>Raid</b><em>a passing ship</em>
-                                </button>
-                            ) : (
-                                <button className="sail-act is-raid" disabled={busy || raidResetTooPoor} onClick={buyRaidReset}>
-                                    <span className="sail-act-ico" aria-hidden="true">⚔️</span>
-                                    <b>Raid</b><em>{busy ? "…" : resetCost > 0 ? `🪙 ${resetCost.toLocaleString()}` : "free"}</em>
-                                </button>
-                            )
-                        )}
+                        {liveStatus === "sailing" && state.combat ? (
+                            <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
+                                <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
+                                <b>Raid</b><em>a passing ship</em>
+                            </button>
+                        ) : null}
                     </div>
                 )}
                 {windSaved ? <div className="sail-windsave">🍃 Favorable! Your tailwind wasn&apos;t used up.</div> : null}
@@ -1031,8 +1025,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {/* SHIP BATTLES — the gun deck, the racks and the fleet ladder. Gated with raiding while the rework
                 is under construction: the server sends `combat: null` to everyone off the dev allow-list. */}
             {state.combat ? (
-                <ShipYard combat={state.combat} busy={busy}
-                    onAct={({ action, ...extra }) => act(action, extra)} />
+                <div ref={yardRef}>
+                    <ShipYard
+                        combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
+                        targets={raidTargets} targetsMine={raidMine}
+                        tab={battleTab}
+                        onTab={(t) => { setBattleTab(t); if (t === "raid" && raidTargets === null) openRaid(); }}
+                        onAct={({ action, ...extra }) => act(action, extra)} />
+                </div>
             ) : null}
 
             {/* The sea's collection — the Corsair chase, on the screen its raids and affinity land on. Above
@@ -1447,85 +1447,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     onLoadRecords={loadFishRecords}
                     onClose={() => setFishOpen(false)}
                 />
-            ) : null}
-
-            {/* RAID — target picker: choose WHO to raid (best-gear-first) with the stakes shown up front. */}
-            {raidOpen ? (
-                <div className="sail-reward-overlay" style={{ padding: 0, alignItems: "stretch" }}>
-                    <div className="card sail-recap sail-raid-pick" style={{ width: "100%", maxWidth: "none", height: "100dvh", maxHeight: "100dvh", margin: 0, borderRadius: 0, display: "flex", flexDirection: "column", overflowY: "auto", justifyContent: "flex-start" }}>
-                        <div className="sail-raid-crest" aria-hidden="true">🏴‍☠️</div>
-                        <h2 style={{ margin: "6px 0 2px" }}>Pick a ship to run down</h2>
-                        {/* YOUR gun deck, up top: this is a matchup now, and the numbers you are comparing
-                            against are the ones on your own ship. */}
-                        {raidMine ? (
-                            <div className="sail-raid-mine">
-                                <b>Your ship</b>
-                                <span>{raidMine.guns} guns</span>
-                                <span>{raidMine.hull} hull</span>
-                                <span className={`sbt-ammo is-${raidMine.ammo}`}>{raidMine.ammo} shot loaded</span>
-                            </div>
-                        ) : null}
-                        {/* One line of stakes. This was three stacked cards and a paragraph — most of a phone
-                            screen spent before the first ship you could actually pick. */}
-                        <p className="sail-raid-stakes">
-                            Win: <b>gold</b> + a {state.raid?.itemChance ?? 0.5}% shot at a copy of an item — they lose nothing.
-                            Lose: <b>{state.raid?.loseGold?.[0] ?? 10}–{state.raid?.loseGold?.[1] ?? 100} gold</b>, and they take a cut.
-                            {state.raid?.dodgePct ? <> Cunning: {state.raid.dodgePct}% this is free.</> : null}
-                        </p>
-                        {/* The FLEET lives on the gun deck, not here — but this is where somebody looking for a
-                            fight actually is, so it has a door. */}
-                        <button type="button" className="sail-raid-fleetlink" disabled={busy}
-                            onClick={() => { setRaidOpen(false); setRaidTargets(null); act("fleet_battle", {}); }}>
-                            ⚔️ Or take on the pirate fleet — {state.combat?.fleet?.sortiesLeft ?? 0} sortie
-                            {(state.combat?.fleet?.sortiesLeft ?? 0) === 1 ? "" : "s"} left today
-                        </button>
-                        <div className="sail-raid-list">
-                            {raidTargets === null ? (
-                                <div className="sail-raid-empty">Scanning the horizon…</div>
-                            ) : raidTargets.length === 0 ? (
-                                <div className="sail-raid-empty">No ships on the horizon right now — try again later.</div>
-                            ) : raidTargets.map((t) => (
-                                <div key={t.id} className="sail-raid-target">
-                                    <div className="sail-raid-face">
-                                        {t.rider ? (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={t.rider} alt="" className={`sail-raid-rider ${t.riderFlip ? "is-flip" : ""}`} />
-                                        ) : <span className="sail-raid-noface">🧑‍✈️</span>}
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={t.boat} alt="" className="sail-raid-boat" />
-                                    </div>
-                                    <div className="sail-raid-tinfo">
-                                        <div className="sail-raid-tname">{t.name} <span className="sail-raid-tlvl">Lv {t.level}</span></div>
-                                        {t.handle && t.handle !== t.name ? <div className="sail-raid-thandle muted">@{t.handle}</div> : null}
-                                        {/* What you are sailing into: their broadside, their hull, and what is
-                                            in their racks. A row that only shows the loot is half the decision. */}
-                                        <div className="sail-raid-tship">
-                                            <span className={raidMine && t.guns > raidMine.guns ? "is-worse" : undefined}>{t.guns} guns</span>
-                                            <span className={raidMine && t.hull > raidMine.hull ? "is-worse" : undefined}>{t.hull} hull</span>
-                                            <span className={`sbt-ammo is-${t.ammo}`}>{t.ammo}</span>
-                                            {t.odds != null ? (
-                                                <span className={`sail-raid-odds${t.odds >= 60 ? " is-good" : t.odds >= 35 ? "" : " is-bad"}`}>
-                                                    ~{t.odds}% your favour
-                                                </span>
-                                            ) : null}
-                                        </div>
-                                        {t.outgunned ? <div className="sail-raid-warn">Out-gunned and out-hulled — this one can hurt you</div> : null}
-                                        <div className="sail-raid-tgear">
-                                            {t.topRarity
-                                                ? <span className={`sail-raid-rar rar-${t.topRarity}`}>{t.topRarity}</span>
-                                                : <span className="muted">no gear</span>}
-                                            <span className="muted"> · 🎁 {t.items} item{t.items === 1 ? "" : "s"}</span>
-                                        </div>
-                                    </div>
-                                    <button className="sail-cta sail-cta-raid sail-raid-go" disabled={busy} onClick={() => act("raid", { target: t.id })}>
-                                        {busy ? "…" : "⚔️ Raid"}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        <button className="pill" disabled={busy} onClick={() => { setRaidOpen(false); setRaidTargets(null); setRaidMine(null); }}>Back out</button>
-                    </div>
-                </div>
             ) : null}
 
             {/* Arrival — "you reached the island!" modal (pops once per voyage, live or on return) */}

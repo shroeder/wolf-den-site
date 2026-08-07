@@ -13205,3 +13205,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-size: 0.83rem; font-weight: 800; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
 .sbd-tabs button.is-on { color: #0d1a22; background: linear-gradient(180deg, #9fe6ff, #55c8ee); border-color: transparent; }
 .sbd-blurb { margin: 0 0 11px; font-size: 0.76rem; line-height: 1.45; color: #8d96a0; }
+/* One battle card: both allowances stated together, rival rows shaped like fleet rungs. */
+.sby-allowance { margin: 2px 0 10px; font-size: 0.76rem; color: #9aa2ab; }
+.sby-allowance b { color: #ffd75e; font-weight: 900; }
+.sby-rung.is-rival { grid-template-columns: 34px auto minmax(0, 1fr) auto; }
+.sby-rival-face { width: 34px; height: 34px; border-radius: 9px; object-fit: cover; flex: none;
+    background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.14); }
+.sby-odds { font-weight: 800; color: #cdd3d8; }
+.sby-odds.is-good { color: #8fe39a; }
+.sby-odds.is-bad { color: #ff9a8a; }
+.sby-rung-stats .is-worse { color: #ff9a8a; font-weight: 800; }
+.sby-track-eff { display: block; margin-top: 2px; font-size: 0.66rem; font-weight: 800; color: #9fe6ff; }
+.sby-buy.is-gold { background: linear-gradient(180deg, #ffe488, #f3b23a); color: #2b1f06; }
