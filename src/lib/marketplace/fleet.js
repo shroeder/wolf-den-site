@@ -65,6 +65,8 @@ export const FLEET = [
         flavor: "The reason the fleet has a name. Vane has never had to fire a second broadside." },
 ];
 
+import { fleetDeck } from "@/lib/marketplace/deck-lines.js";
+
 export const MAX_FLEET_RANK = FLEET.length;
 // ── WHAT RANK IS THAT SHIP? ──────────────────────────────────────────────────────────────────────────────────
 // A member's ship is not a rung on the ladder, but it is comparable to one: it has guns and a hull. Matching it
@@ -83,6 +85,9 @@ export function fleetRankForShip({ guns = 4, hp = 140 } = {}) {
 }
 
 export const fleetArt = (ship) => (ship?.art ? `/images/fleet/${ship.art}.png` : null);
+// Where this hull's deck sits, so its captain stands ON the boat instead of above it. One number per ship
+// because one global percentage cannot fit fifteen different hulls — see deck-lines.js.
+export const fleetDeckOf = (ship) => fleetDeck(ship?.art);
 // The ship's CAPTAIN, who stands on its deck the way your hero stands on yours. A fleet battle against an
 // empty hull is scenery you shot at; a ship with somebody on it is an opponent you beat.
 // (scripts/gen-fleet-captains.mjs — drawn facing right, because the scene mirrors the enemy's crew.)

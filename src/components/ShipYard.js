@@ -240,6 +240,12 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                 separate "raid" count in a call-to-action three screens up. */}
             <p className="sby-allowance">
                 <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
+                {/* WHOSE IDEA THIS WAS. Ship battles being immersive and ship-centric — the fleet, the crews on
+                    deck, fighting as a ship rather than as a stat block — was Teegs's call, and the feature is
+                    built the way it is because of it. Credit belongs on the thing itself, not in a changelog. */}
+                <a className="sby-credit" href="/marketplace/u/teegs" title="Ship battles were Teegs's idea — that they should be immersive and ship-centric">
+                    an idea by <b>@teegs</b>
+                </a>
             </p>
 
             <div className="sbd-tabs" role="tablist">

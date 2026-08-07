@@ -13073,7 +13073,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @keyframes sbtFoam { 0% { transform: translateY(0) scale(.4); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-26px) scale(1.3); opacity: 0; } }
 
 /* THE VOLLEY — one ball per gun that bore, in a ragged stagger, misses splashing short. */
-.sbt-volley { position: absolute; top: 56%; left: 0; right: 0; height: 0; pointer-events: none; z-index: 4; }
+.sbt-volley { position: absolute; top: 62%; left: 0; right: 0; height: 0; pointer-events: none; z-index: 4; }
 /* The muzzle flash and smoke the guns were firing without. */
 .sbt-muzzle { position: absolute; top: -14px; width: 46px; height: 30px; border-radius: 50%;
     background: radial-gradient(circle at 50% 50%, rgba(255,232,160,0.95), rgba(255,150,40,0.5) 45%, transparent 72%);
@@ -13083,44 +13083,38 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @keyframes sbtMuzzle { 0% { opacity: 0; transform: scale(.4); } 12% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.9); } }
 
 /* THE SHOT.
-   It read as a pinball and then it stayed on screen: the flight keyframes ended at opacity 1 with a forwards
-   fill, so every ball parked at its landing point and hung there until the next phase unmounted the volley.
-   Three changes — it is iron rather than chrome (dark body, one hot rim-light, no fat glow), it is STRETCHED
-   along its travel so it reads as speed instead of a sphere, and it now DIES on impact into a burst rather
-   than sitting where it stopped. */
-.sbt-ball { position: absolute; top: var(--lane, 0px); width: 13px; height: 9px; border-radius: 50%;
-    background: radial-gradient(circle at 32% 26%, #a9a096, #47403a 55%, #14100c);
-    box-shadow: 0 0 4px rgba(255,190,110,0.55), inset -1px -1px 2px rgba(0,0,0,0.7); opacity: 0; }
-/* The impact: a hot flash and a ring of splinters, fired at the very end of the flight from the ball itself,
-   so it always lands exactly where the ball did without a second element to position. */
-.sbt-ball::after { content: ""; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px;
-    margin: -17px 0 0 -17px; border-radius: 50%; opacity: 0; pointer-events: none;
-    background: radial-gradient(circle, rgba(255,240,190,0.95), rgba(255,150,50,0.6) 38%, transparent 70%);
-    animation: sbtHitPop .34s ease-out forwards; animation-delay: .46s; }
-@keyframes sbtHitPop {
-    0% { opacity: 0; transform: scale(.2); }
-    22% { opacity: 1; transform: scale(1.15); }
-    100% { opacity: 0; transform: scale(2.1); }
-}
-.sbt-volley.to-foe .sbt-ball { left: 27%; animation: sbtFlyR .52s cubic-bezier(.3,0,.7,1) forwards; }
-.sbt-volley.to-me .sbt-ball { right: 27%; animation: sbtFlyL .52s cubic-bezier(.3,0,.7,1) forwards; }
-/* A real arc — up out of the muzzle, over, and DOWN onto the target. The last 8% is the ball being destroyed
-   by what it hit; without it the shot simply stopped existing wherever the animation left it. */
+   It was CSS: a 13x9 ellipse with a radial gradient, stretched further with scaleX(1.5) to fake speed, and a
+   34px radial-gradient "impact" fired off its ::after. On a phone that reads as a flat orange smear followed
+   by an orange pancake hanging in mid-air. A ball of iron is now a ball of iron — a real sprite, round, at a
+   fixed size, with no stretch and no glow disc. The consequence of it arriving lives on the HULL instead
+   (.sbt-hit), which is where damage actually happens. */
+.sbt-ball { position: absolute; top: var(--lane, 0px); width: 16px; height: 16px; opacity: 0;
+    background: url("/images/sailing/cannonball.png") center/contain no-repeat;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* A short motion streak BEHIND the ball rather than squashing the ball itself — stretching a sphere is what
+   made it read as a smear. */
+.sbt-ball::before { content: ""; position: absolute; top: 50%; width: 26px; height: 3px; margin-top: -1.5px;
+    border-radius: 2px; opacity: .55; }
+.sbt-volley.to-foe .sbt-ball::before { right: 60%; background: linear-gradient(90deg, transparent, rgba(255,215,160,0.5)); }
+.sbt-volley.to-me .sbt-ball::before { left: 60%; background: linear-gradient(270deg, transparent, rgba(255,215,160,0.5)); }
+.sbt-volley.to-foe .sbt-ball { left: 27%; animation: sbtFlyR .52s cubic-bezier(.35,0,.7,1) forwards; }
+.sbt-volley.to-me .sbt-ball { right: 27%; animation: sbtFlyL .52s cubic-bezier(.35,0,.7,1) forwards; }
+/* A FLATTER arc. The old one climbed 42px above two ships that are only ~120px tall, so the broadside sailed
+   over the masts like a mortar barrage instead of crossing between the hulls. */
 @keyframes sbtFlyR {
-    0% { opacity: 0; transform: translate(0,0) scale(.6) rotate(-8deg); }
+    0% { opacity: 0; transform: translate(0,0) scale(.7) rotate(0deg); }
     8% { opacity: 1; }
-    45% { transform: translate(20vw,-42px) scaleX(1.5) scaleY(1) rotate(-4deg); }
-    92% { opacity: 1; transform: translate(42vw,4px) scaleX(1.35) scaleY(.9) rotate(6deg); }
-    100% { opacity: 0; transform: translate(43vw,5px) scale(.6) rotate(8deg); }
+    45% { transform: translate(20vw,-16px) scale(1) rotate(180deg); }
+    92% { opacity: 1; transform: translate(42vw,2px) scale(1) rotate(400deg); }
+    100% { opacity: 0; transform: translate(43vw,3px) scale(.85) rotate(430deg); }
 }
 @keyframes sbtFlyL {
-    0% { opacity: 0; transform: translate(0,0) scale(.6) rotate(8deg); }
+    0% { opacity: 0; transform: translate(0,0) scale(.7) rotate(0deg); }
     8% { opacity: 1; }
-    45% { transform: translate(-20vw,-42px) scaleX(1.5) scaleY(1) rotate(4deg); }
-    92% { opacity: 1; transform: translate(-42vw,4px) scaleX(1.35) scaleY(.9) rotate(-6deg); }
-    100% { opacity: 0; transform: translate(-43vw,5px) scale(.6) rotate(-8deg); }
+    45% { transform: translate(-20vw,-16px) scale(1) rotate(-180deg); }
+    92% { opacity: 1; transform: translate(-42vw,2px) scale(1) rotate(-400deg); }
+    100% { opacity: 0; transform: translate(-43vw,3px) scale(.85) rotate(-430deg); }
 }
-.sbt-ball.is-miss::after { animation: none; opacity: 0; }
 .sbt-ball.is-rake { width: 15px; height: 15px; box-shadow: 0 0 18px rgba(255,170,60,1), inset -1px -1px 2px rgba(0,0,0,0.6); }
 /* A MISS falls short and throws a splash — the whole reason accuracy is a stat you can feel. */
 .sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
@@ -13239,6 +13233,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The coin as an inline price mark, on every buy button in the yard. */
 .sby-dbl { width: 15px; height: 15px; object-fit: contain; vertical-align: -3px; margin: 0 1px 0 3px; }
 .sby-sub { margin: 0; font-size: 0.78rem; line-height: 1.45; color: #8d96a0; }
+/* The credit. Small and to the right of the allowance — present without competing with the thing you came
+   here to do. Links to her profile, because a credit you cannot follow is decoration. */
+.sby-credit { float: right; font-size: 0.66rem; font-weight: 700; color: #8d96a0; text-decoration: none;
+    border-bottom: 1px dotted rgba(255,215,94,0.4); }
+.sby-credit b { color: #ffd75e; font-weight: 900; }
+@media (hover: hover) { .sby-credit:hover { color: #cdd3d8; } }
 
 /* The ship as it fights — the same four numbers the battle uses. */
 .sby-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
@@ -13420,14 +13420,76 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* ── CREW, LOG AND ORDERS ───────────────────────────────────────────────────────────────────────────────── */
 /* The captain and their pet on deck. A ship with nobody on it is a prop — this is the person you are fighting. */
-/* 42% put them up among the sails, silhouetted against red canvas and reading as cargo in the rigging. The
-   deck line across the fleet art sits at roughly a third of the square, so 32% stands them ON the boat and
-   against the wooden hull, where a dark sprite actually reads. */
-.sbt-crew { position: absolute; left: 50%; bottom: 32%; transform: translateX(-50%); display: flex;
+/* ONE NUMBER PER HULL, not one for all of them. At a global 32% the cutter's captain stood correctly and the
+   sloop's smuggler floated a body-length above his own boat — a sloop is mostly sail with the hull low in the
+   frame, a man-o'-war fills it. `--deck` comes off the ship (deck-lines.js), read from a contact sheet of all
+   fifteen with the crew composited at real size. */
+.sbt-crew { position: absolute; left: 50%; bottom: var(--deck, 30%); transform: translateX(-50%); display: flex;
     align-items: flex-end; gap: 2px; pointer-events: none; z-index: 2; }
-.sbt-rider { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.6)); }
-.sbt-pet { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+/* Sized against the SHIP rather than in pixels, so the crew keeps its proportion on any screen — and bigger:
+   at 42px flat they were a detail on the boat rather than the person you are fighting. */
+.sbt-rider { width: 28%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.65)); }
+.sbt-pet { width: 18%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
 .sbt-ship-foe .sbt-crew { flex-direction: row-reverse; }
+/* ── THE IMPACT ───────────────────────────────────────────────────────────────────────────────────────────
+   The shot arrived and the hull did nothing about it: the ball's own flash was the whole consequence, so a
+   ten-gun broadside and a one-gun graze looked identical on the receiving end. This is what a hit costs —
+   splinters off the timber and smoke that hangs and drifts rather than blinking out. */
+.sbt-hit { position: absolute; left: 50%; top: 52%; width: 0; height: 0; pointer-events: none; z-index: 5; }
+/* Smoke: two overlapping puffs on different clocks, so it billows instead of pulsing once. */
+.sbt-hit-smoke { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(210,205,195,0.75), rgba(120,115,110,0.45) 45%, transparent 70%);
+    opacity: 0; animation: sbtSmoke 1.15s ease-out forwards; }
+.sbt-hit-smoke.is-two { animation-delay: .12s; animation-duration: 1.4s; }
+@keyframes sbtSmoke {
+    0% { opacity: 0; transform: scale(.25) translate(0, 0); }
+    18% { opacity: .85; }
+    100% { opacity: 0; transform: scale(2.3) translate(6px, -26px); }
+}
+/* Splinters: oak shards thrown along a fixed spread (--a), tumbling as they go. */
+.sbt-splinter { position: absolute; left: -2px; top: -5px; width: 4px; height: 10px; border-radius: 1px;
+    background: linear-gradient(180deg, #d9b183, #7a5330 60%, #3e2814);
+    box-shadow: 0 0 3px rgba(0,0,0,0.55); opacity: 0;
+    transform: rotate(var(--a)) translateY(0); animation: sbtSplinter .62s cubic-bezier(.2,.7,.4,1) forwards; }
+@keyframes sbtSplinter {
+    0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(.6); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(-46px) scale(1) rotate(220deg); }
+}
+/* A rake or a boarding throws further and smokes heavier than a glancing hit. */
+.sbt-hit.is-heavy .sbt-splinter { width: 5px; height: 13px; animation-duration: .78s; }
+.sbt-hit.is-heavy .sbt-hit-smoke { width: 74px; height: 74px; left: -37px; top: -37px; }
+@keyframes sbtSplinterFar {
+    0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(.6); }
+    12% { opacity: 1; }
+    100% { opacity: 0; transform: rotate(var(--a)) translateY(-72px) scale(1.1) rotate(300deg); }
+}
+.sbt-hit.is-heavy .sbt-splinter { animation-name: sbtSplinterFar; }
+
+/* MUZZLE SMOKE — the flash was instantaneous, so a fired gun left no trace a beat later. This hangs. */
+.sbt-muzzle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 40px; height: 40px;
+    margin: -20px 0 0 -20px; border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(220,215,205,0.6), rgba(130,125,120,0.3) 50%, transparent 72%);
+    animation: sbtMuzzleSmoke 1.3s ease-out forwards .06s; }
+@keyframes sbtMuzzleSmoke {
+    0% { opacity: 0; transform: scale(.3); }
+    22% { opacity: .8; }
+    100% { opacity: 0; transform: scale(2.4) translate(0, -18px); }
+}
+
+/* EMBERS off a burning hull — a fire that only flickers in place reads as a decal stuck on the boat. */
+.sbt-ember { position: absolute; bottom: 4px; width: 3px; height: 3px; border-radius: 50%;
+    background: #ffcf7a; box-shadow: 0 0 6px rgba(255,170,60,0.95); opacity: 0;
+    animation: sbtEmber 1.9s linear infinite; }
+.sbt-ember { left: 22%; }
+.sbt-ember.is-two { left: 52%; animation-delay: .7s; animation-duration: 2.3s; }
+.sbt-ember.is-three { left: 78%; animation-delay: 1.3s; animation-duration: 1.6s; }
+@keyframes sbtEmber {
+    0% { opacity: 0; transform: translate(0, 0) scale(.6); }
+    15% { opacity: 1; }
+    100% { opacity: 0; transform: translate(9px, -42px) scale(1.1); }
+}
+
 /* Flames on a burning hull, so a fire is something you can SEE eating a ship, not just a number ticking. */
 .sbt-burning { position: absolute; left: 30%; right: 30%; bottom: 34%; height: 26px; z-index: 3; }
 .sbt-burning i { position: absolute; bottom: 0; width: 10px; height: 16px; border-radius: 50% 50% 40% 40%;

@@ -187,9 +187,15 @@ function Volley({ ev }) {
     );
 }
 
-function Ship({ f, side, firing, hurt, low, sinking, burning }) {
+// Where the splinters go. A fixed spread rather than Math.random() so a broadside looks the same shape every
+// time it lands — a burst that reshuffles every volley reads as noise, not as damage. Angles favour the sides
+// and up, because debris coming straight at the camera is invisible.
+const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
+
+function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {
     return (
-        <div className={`sbt-ship sbt-ship-${side}${firing ? " is-firing" : ""}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}`}>
+        <div className={`sbt-ship sbt-ship-${side}${firing ? " is-firing" : ""}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}`}
+            style={{ "--deck": `${f?.deck ?? 30}%` }}>
             <div className="sbt-hull">
                 {f?.art ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -208,7 +214,23 @@ function Ship({ f, side, firing, hurt, low, sinking, burning }) {
                             style={{ transform: (side === "foe") !== Boolean(f.riderFlip) ? "scaleX(-1)" : undefined }} />
                     ) : null}
                 </span>
-                {burning ? <span className="sbt-burning" aria-hidden="true"><i /><i /><i /></span> : null}
+                {/* THE IMPACT. The shot arrived and the hull did nothing about it — the ball's own flash was
+                    the entire consequence. One burst per volley rather than one per ball: a broadside is a
+                    single event on the receiving end, and ten separate puffs read as ten separate mistakes. */}
+                {hurt ? (
+                    <span className={`sbt-hit${heavy ? " is-heavy" : ""}`} aria-hidden="true">
+                        <i className="sbt-hit-smoke" />
+                        <i className="sbt-hit-smoke is-two" />
+                        {SPLINTERS.map((a, i) => <i key={i} className="sbt-splinter" style={{ "--a": `${a}deg`, animationDelay: `${i * 14}ms` }} />)}
+                    </span>
+                ) : null}
+                {burning ? (
+                    <span className="sbt-burning" aria-hidden="true">
+                        <i /><i /><i />
+                        {/* Embers climbing off the flames — a fire that only flickers in place reads as a decal. */}
+                        <b className="sbt-ember" /><b className="sbt-ember is-two" /><b className="sbt-ember is-three" />
+                    </span>
+                ) : null}
             </div>
             <span className="sbt-wake" aria-hidden="true" />
             {sinking ? <span className="sbt-foam" aria-hidden="true"><i /><i /><i /><i /><i /><i /></span> : null}
@@ -387,10 +409,14 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
             <div className={`sbt-shakewrap${shake ? (shake.big ? " is-quake" : " is-shake") : ""}`}>
                 <div className={`sbt-stage${lowAny ? " is-desperate" : ""}`}>
                     <Ship f={me} side="me" firing={fx?.side === "me" && phase === "play"}
-                        hurt={fx?.side === "foe" && phase === "play"} low={clampPct(myHp, battle?.myMax) <= 25}
+                        hurt={fx?.side === "foe" && phase === "play"}
+                        heavy={Boolean(fx?.side === "foe" && ((fx?.shots || []).some((x) => x.rake) || fx?.order === "board"))}
+                        low={clampPct(myHp, battle?.myMax) <= 25}
                         sinking={sinkingSide === "me"} burning={(battle?.burning?.me || 0) > 0} />
                     <Ship f={foe} side="foe" firing={fx?.side === "foe" && phase === "play"}
-                        hurt={fx?.side === "me" && phase === "play"} low={clampPct(foeHp, battle?.foeMax) <= 25}
+                        hurt={fx?.side === "me" && phase === "play"}
+                        heavy={Boolean(fx?.side === "me" && ((fx?.shots || []).some((x) => x.rake) || fx?.order === "board"))}
+                        low={clampPct(foeHp, battle?.foeMax) <= 25}
                         sinking={sinkingSide === "foe"} burning={(battle?.burning?.foe || 0) > 0} />
 
                     {phase === "play" && fx ? <Volley key={`v${fx.k}`} ev={fx} /> : null}
