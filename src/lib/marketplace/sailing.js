@@ -14,7 +14,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
-         gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, initBattleState, resolveRound,
+         gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, ordersFor, initBattleState, resolveRound,
          MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -2007,7 +2007,11 @@ const battleView = (st, meta) => ({
     gauge: st.gauge,
     rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
     burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
-    orders: ORDER_LIST.map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+    // Holes below the waterline, so the scene can show what is sinking you.
+    leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
+    // "Man the pumps" only exists while YOU are taking water — ordersFor decides, server-side, so the client
+    // cannot offer a pump on a dry ship and the server does not have to refuse one.
+    orders: ordersFor(st.myLeaks || 0).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
 });
 
 // Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.

@@ -6,7 +6,7 @@ import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
-import { shipProfile, foeProfile, initBattleState, resolveRound, ORDER_LIST, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveRound, ordersFor, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
 // Dev-only lab for the ship battle. The real thing is behind a login, a daily sortie limit and a gun deck you
@@ -32,8 +32,12 @@ export default function BattleLab() {
         myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
         round: st.round, maxRounds: MAX_ROUNDS, gauge: st.gauge,
         rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
+        leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
+        leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
         burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
-        orders: ORDER_LIST.map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+        // ordersFor, not ORDER_LIST — otherwise the lab can never show "Man the pumps" and the one order
+        // that needs testing against a live leak is the one you cannot reach here.
+        orders: ordersFor(st.myLeaks || 0).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
         events: events || [], over: Boolean(over), win, sunk, reward,
     });
 

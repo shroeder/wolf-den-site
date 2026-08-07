@@ -174,13 +174,36 @@ export const ORDERS = {
         desc: "Fire everything that bears." },
     rake: { id: "rake", name: "Rake the rigging", icon: "GiSailboat",
         desc: "Aim high — less damage, but their next broadside comes up short." },
-    brace: { id: "brace", name: "Brace", icon: "GiShieldBash",
-        desc: "Hold fire and take the volley on the armour — then hit harder next round." },
+    // BRACE IS GONE. Measured strictly dominated: 99.9% on pure broadside against a frigate fell to 75.5% for
+    // anyone who braced when hurt, because skipping an attack in a race to zero costs more than half a volley
+    // saves. Propping it up with a held broadside was patching a bad idea rather than replacing it.
+    hole: { id: "hole", name: "Hole her below the line", icon: "GiHole",
+        desc: "Aim for the waterline — a third less damage, but far more likely to open a leak." },
     board: { id: "board", name: "Close and board", icon: "GiCrossedSwords",
         desc: "All or nothing. Devastating if they are hurt, suicide if they are not." },
+    // Offered ONLY while taking on water (see ordersFor). A leak is not a stun — you may keep fighting and
+    // bleed instead. Losing a turn to something you never got to weigh in on is the thing that made Brace feel
+    // bad; choosing to lose one is a decision.
+    patch: { id: "patch", name: "Man the pumps", icon: "GiWaterRecycling",
+        desc: "Fight the water instead of the ship. Each hole has a good chance to close — not a certainty." },
 };
-export const ORDER_LIST = Object.values(ORDERS);
+export const ORDER_LIST = Object.values(ORDERS).filter((o) => o.id !== "patch");
 export const orderById = (id) => ORDERS[String(id || "broadside")] || ORDERS.broadside;
+
+// ── LEAKS ────────────────────────────────────────────────────────────────────────────────────────────────────
+// Any hit can open one; aiming for the waterline makes it six times likelier at a third less damage. A leak
+// takes a slice of MAX hull every round it stays open and they stack, so ignoring three is how you lose a
+// fight you were winning. Pumping clears each hole independently at 85% — a hole surviving the pumps is what
+// keeps the panic in it, and clearing all three at once is only about a 61% shot.
+export const LEAK_CHANCE = 0.05;        // any hit
+export const LEAK_CHANCE_AIMED = 0.30;  // the `hole` order
+export const HOLE_DAMAGE_MULT = 0.70;   // −30% for aiming low
+export const LEAK_TICK = 0.04;          // per leak, per round, of MAX hull
+export const PATCH_PER_HOLE = 0.85;
+export const MAX_LEAKS = 4;
+
+/** The orders available right now — `patch` only exists while that side is actually taking on water. */
+export const ordersFor = (leaks = 0) => (leaks > 0 ? Object.values(ORDERS) : ORDER_LIST);
 
 // The opening state of a fight. Kept small and JSON-safe: it is stored on the sailing row between rounds.
 export function initBattleState(me, foe, { rng = Math.random } = {}) {
@@ -188,19 +211,27 @@ export function initBattleState(me, foe, { rng = Math.random } = {}) {
     return {
         myHp: me.hp, foeHp: foe.hp, myMax: me.hp, foeMax: foe.hp,
         round: 0, myRig: 0, foeRig: 0, myFire: 0, foeFire: 0,
-        // `coiled` is the withheld broadside from a brace — one per side, spent on the next shot fired.
-        braced: false, trueAim: false, coiled: false, foeCoiled: false,
+        // Open holes below the waterline, per side. They tick every round until pumped out.
+        myLeaks: 0, foeLeaks: 0,
         gauge: rng() < myOdds ? "me" : "foe",
     };
 }
 
 // What the enemy does this round. Deliberately simple and readable rather than clever: they board when you are
-// hurt and they are not, rake when they are carrying chain, brace when they are nearly gone, and otherwise
-// fire. A foe with a visible reason for every order is one you can play against.
+// hurt and they are not, pump when they are taking water, go for the waterline when cornered, rake when
+// they are carrying chain, and otherwise fire. A foe with a visible reason for every order is playable.
 export function foeOrder(me, foe, st, { rng = Math.random } = {}) {
     const theirs = st.foeHp / Math.max(1, st.foeMax), mine = st.myHp / Math.max(1, st.myMax);
+    // THE ENEMY PUMPS, or leaks would simply be a guaranteed win against every ship on the ladder. They bail
+    // when the water is costing them more than a broadside would earn — the same call you are making.
+    if (st.foeLeaks > 0) {
+        const bleeding = st.foeLeaks * LEAK_TICK * st.foeMax;
+        if (st.foeLeaks >= 2 || (bleeding > st.foeHp * 0.12 && rng() < 0.7)) return "patch";
+    }
     if (theirs > 0.5 && mine < 0.35 && rng() < 0.6) return "board";
-    if (theirs < 0.22 && rng() < 0.45) return "brace";
+    // Was `brace` when nearly dead — a deleted order, which would have left the fleet doing nothing at low HP.
+    // Cornered ships go for the waterline instead: it is the move that can still turn a fight they are losing.
+    if (theirs < 0.22 && rng() < 0.5) return "hole";
     if (foe.ammo?.rigging && rng() < 0.35) return "rake";
     return "broadside";
 }
@@ -226,6 +257,19 @@ export function resolveRound(me, foe, state, order, { rng = Math.random } = {}) 
         st.myFire = Math.max(0, st.myFire - FIRE_DECAY);
     }
 
+    // WATER, before anyone fires. A leak takes its slice whether or not you get to act, which is what makes
+    // pumping urgent rather than optional — and unlike a fire it does NOT burn down on its own.
+    if (st.foeLeaks > 0 && st.foeHp > 0) {
+        const dmg = Math.max(1, Math.round(st.foeLeaks * LEAK_TICK * st.foeMax));
+        st.foeHp = Math.max(0, st.foeHp - dmg);
+        events.push({ type: "leak", side: "me", dmg, holes: st.foeLeaks, my: st.myHp, foe: st.foeHp });
+    }
+    if (st.myLeaks > 0 && st.myHp > 0 && st.foeHp > 0) {
+        const dmg = Math.max(1, Math.round(st.myLeaks * LEAK_TICK * st.myMax));
+        st.myHp = Math.max(0, st.myHp - dmg);
+        events.push({ type: "leak", side: "foe", dmg, holes: st.myLeaks, my: st.myHp, foe: st.foeHp });
+    }
+
     const act = (who) => {
         const mineTurn = who === "me";
         const att = mineTurn ? me : foe;
@@ -236,31 +280,25 @@ export function resolveRound(me, foe, state, order, { rng = Math.random } = {}) 
         const attHp = mineTurn ? st.myHp : st.foeHp;
         if (defHp <= 0 || attHp <= 0) return;
 
-        // BRACE HAS TO PAY FOR THE ROUND IT COSTS. It used to buy half of one incoming volley and +12%
-        // accuracy, which is a straight loss: skipping an attack lengthens the fight by a round, and you eat
-        // more total damage over that extra round than the half-volley saved. Simulated over 4,000 fights it
-        // was strictly dominated — 99.9% win rate on pure broadside against a frigate fell to 75.5% for anyone
-        // who braced when hurt. A move that punishes you for reading the fight correctly is a trap.
-        //
-        // So the shot you did not fire is not thrown away; it is held. The next broadside carries it, and the
-        // description finally means what it says — "then hit harder next round" was already the copy while the
-        // code only granted accuracy.
-        if (ord === "brace") {
-            if (mineTurn) { st.braced = true; st.trueAim = true; st.coiled = true; } else { st.foeBraced = true; st.foeCoiled = true; }
-            events.push({ type: "order", side: who, order: "brace", my: st.myHp, foe: st.foeHp });
+        // MAN THE PUMPS. Each hole is rolled on its own at 85%, so three holes clear together only about 61%
+        // of the time — a turn spent pumping that leaves you still taking water is the whole tension of the
+        // mechanic, and a guaranteed reset would make leaks a nuisance instead of a threat.
+        if (ord === "patch") {
+            const before = mineTurn ? st.myLeaks : st.foeLeaks;
+            let left = 0;
+            for (let h = 0; h < before; h += 1) if (rng() > PATCH_PER_HOLE) left += 1;
+            if (mineTurn) st.myLeaks = left; else st.foeLeaks = left;
+            events.push({ type: "order", side: who, order: "patch", sealed: before - left, holes: left,
+                my: st.myHp, foe: st.foeHp });
             return;
         }
 
         // Damage shape by order.
         const boarding = ord === "board";
         const raking = ord === "rake";
-        // The held broadside. 1.75x rather than a clean 2x: bracing still costs you a little on the exchange,
-        // so it stays a read of the fight rather than a rhythm you fall into — but it is now worth making.
-        const coiled = mineTurn ? st.coiled : st.foeCoiled;
-        const coilMult = coiled ? 1.75 : 1;
-        const powerMult = (boarding ? 2.1 : raking ? 0.66 : 1) * coilMult;
-        const accBonus = (mineTurn && st.trueAim ? 0.12 : 0) + (boarding ? 0.1 : 0);
-        const braceCut = mineTurn ? (st.foeBraced ? 0.5 : 1) : (st.braced ? 0.5 : 1);
+        const holing = ord === "hole";
+        const powerMult = boarding ? 2.1 : raking ? 0.66 : holing ? HOLE_DAMAGE_MULT : 1;
+        const accBonus = boarding ? 0.1 : 0;
         // Alongside and grappled: whoever boarded last round eats the answer at close range. This is the cost
         // that makes BOARD a decision rather than a button you always press.
         const exposedMult = mineTurn ? (st.foeExposed ? 1.6 : 1) : (st.exposed ? 1.6 : 1);
@@ -274,15 +312,26 @@ export function resolveRound(me, foe, state, order, { rng = Math.random } = {}) 
             let dmg = (SHOT_MIN + rng() * SHOT_VAR) * att.ammo.dmg * att.dmgMult * powerMult;
             if (rake) dmg *= 1.8;
             const armor = Math.max(0, def.armor * (1 - att.ammo.armorPierce));
-            dmg = dmg * (1 - armor) * def.dmgTaken * braceCut * exposedMult;
+            dmg = dmg * (1 - armor) * def.dmgTaken * exposedMult;
             const rounded = Math.max(1, Math.round(dmg));
             total += rounded;
             shots.push({ hit: true, dmg: rounded, rake });
         }
 
-        // The held shot is spent the moment it is fired — one brace buys one heavier broadside, never a stack.
-        if (mineTurn) { st.foeHp = Math.max(0, st.foeHp - total); st.trueAim = false; st.coiled = false; st.foeRig = 0; st.foeExposed = false; }
-        else { st.myHp = Math.max(0, st.myHp - total); st.myRig = 0; st.foeBraced = false; st.foeCoiled = false; st.exposed = false; }
+        // A HOLE BELOW THE WATERLINE. A FLAT roll per attack — 5% normally, 30% aiming low. Not per gun, and
+        // NOT conditional on the volley landing: gating it on a hit would quietly make the chance scale with
+        // accuracy, so a well-drilled crew would spring more leaks than the spec says and a poor one fewer.
+        // Pure chance means pure chance.
+        const chance = holing ? LEAK_CHANCE_AIMED : LEAK_CHANCE;
+        if (rng() < chance) {
+            if (mineTurn) st.foeLeaks = Math.min(MAX_LEAKS, st.foeLeaks + 1);
+            else st.myLeaks = Math.min(MAX_LEAKS, st.myLeaks + 1);
+            events.push({ type: "leaksprung", side: who, holes: mineTurn ? st.foeLeaks : st.myLeaks,
+                my: st.myHp, foe: st.foeHp });
+        }
+
+        if (mineTurn) { st.foeHp = Math.max(0, st.foeHp - total); st.foeRig = 0; st.foeExposed = false; }
+        else { st.myHp = Math.max(0, st.myHp - total); st.myRig = 0; st.exposed = false; }
 
         // Raking shreds rigging; a boarding action leaves you exposed for their answer.
         const riggingCut = (raking ? 0.34 : 0) + (att.ammo.rigging || 0);
@@ -305,7 +354,6 @@ export function resolveRound(me, foe, state, order, { rng = Math.random } = {}) 
     };
 
     if (st.gauge === "me") { act("me"); act("foe"); } else { act("foe"); act("me"); }
-    if (st.braced && st.round > 0) st.braced = false; // a brace covers one round
 
     const sunk = st.foeHp <= 0 ? "foe" : st.myHp <= 0 ? "me" : null;
     const outOfRounds = st.round >= MAX_ROUNDS;

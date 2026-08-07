@@ -312,11 +312,22 @@ function Bar({ f, hp, max, side, rigged, burning }) {
 function logLine(ev, me, foe) {
     const who = ev.side === "me" ? (me?.name || "You") : (foe?.name || "They");
     if (ev.type === "fire") return { side: ev.side, text: `Fire burns aboard ${ev.side === "me" ? (foe?.name || "them") : (me?.name || "you")} — ${ev.dmg}` };
-    if (ev.type === "order" && ev.order === "brace") return { side: ev.side, text: `${who} braces — holding fire, taking it on the armour` };
+    // Water gets its own lines: taking it, and fighting it. A leak that only showed up as HP quietly vanishing
+    // would read as a bug rather than as the thing you chose not to deal with.
+    if (ev.type === "leak") {
+        const victim = ev.side === "me" ? (foe?.name || "They") : (me?.name || "You");
+        return { side: ev.side, text: `${victim} ship${ev.side === "me" ? " is" : " are"} taking on water — ${ev.dmg} from ${ev.holes} hole${ev.holes === 1 ? "" : "s"}` };
+    }
+    if (ev.type === "leaksprung") return { side: ev.side, big: true, text: `A hole opens below ${ev.side === "me" ? (foe?.name || "their") : (me?.name || "your")} waterline — ${ev.holes} now` };
+    if (ev.type === "order" && ev.order === "patch") {
+        if (!ev.sealed) return { side: ev.side, text: `${who} man the pumps — and the water keeps coming (${ev.holes} still open)` };
+        return { side: ev.side, text: `${who} man the pumps — ${ev.sealed} hole${ev.sealed === 1 ? "" : "s"} closed${ev.holes ? `, ${ev.holes} still open` : ""}` };
+    }
     if (ev.type !== "volley") return null;
     const hits = (ev.shots || []).filter((s) => s.hit).length;
     const raked = (ev.shots || []).some((s) => s.rake);
-    const verb = ev.order === "board" ? "boards" : ev.order === "rake" ? "rakes the rigging" : "fires a broadside";
+    const verb = ev.order === "board" ? "boards" : ev.order === "rake" ? "rakes the rigging"
+        : ev.order === "hole" ? "fires low, at the waterline" : "fires a broadside";
     return {
         side: ev.side,
         text: `${who} ${verb} — ${hits}/${ev.guns} on target for ${ev.dmg}${raked ? ", RAKED" : ""}${ev.rigged ? ` · ${ev.rigged} of their guns silenced` : ""}`,
