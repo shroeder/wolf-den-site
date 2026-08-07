@@ -247,6 +247,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // the Raid tile out at sea and the entry button at the helm — used to call scrollIntoView, so tapping
     // either one just moved the page and left you to find what had changed. See the entry button below.
     const [yardOpen, setYardOpen] = useState(false);
+    const [collOpen, setCollOpen] = useState(false);   // Sea collections — a reference panel, closed by default
     const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
     const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
@@ -975,7 +976,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {liveStatus === "sailing" && state.combat ? (
                             <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
                                 <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
-                                <b>Raid</b><em>a passing ship</em>
+                                <b>Raid</b><em>{Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left</em>
                             </button>
                         ) : null}
                     </div>
@@ -1033,6 +1034,22 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
+            {/* The sea's collection sits OUTSIDE the stations and collapsed. It belonged to the Helm only by
+                accident of where it was pasted, and open it pushed the boat upgrades a screen down — but it is
+                a reference panel you check occasionally, not a station you work at. */}
+            {state.collections?.length ? (
+                <section className="card sail-collapse">
+                    <button type="button" className="sail-collapse-head" aria-expanded={collOpen} onClick={() => setCollOpen((o) => !o)}>
+                        <span>🏴‍☠️ Sea collections</span>
+                        <span className="sail-collapse-chev">{collOpen ? "▾" : "▸"}</span>
+                    </button>
+                    {collOpen ? (
+                        <CollectionPanel sets={state.collections} feature="sea" title="Sea collections"
+                            blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
+                    ) : null}
+                </section>
+            ) : null}
+
             {/* ── STATIONS ── the ship as a place you move around, not a page you scroll. */}
             <div className="sail-stations">
                 {[["helm", "⚓", "Helm", "Boat upgrades"], ["dig", "⛏️", "Dig Site", "Tools & excavation"], ["rail", "🎣", "The Rail", "Fishing"]].map(([k, ico, label, sub]) => (
@@ -1043,40 +1060,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             </div>
 
             {station === "helm" ? <>
-            {/* SHIP BATTLES — the gun deck, the racks and the fleet ladder. Gated with raiding while the rework
-                is under construction: the server sends `combat: null` to everyone off the dev allow-list. */}
-            {/* The DOOR, not the room. The yard itself is a full-screen interface (below) — inline it was a
-                tall four-tab card that the two entry points could only scrollIntoView, so tapping Raid read as
-                "the page moved" rather than "something opened". */}
-            {state.combat ? (
-                <div className="card sail-yard-door">
-                    <h3>⚔️ Ship battles</h3>
-                    {/* A fight you walked away from. The sortie is spent and no other battle can start until it
-                        ends, so it belongs out HERE, on the door, not behind it. */}
-                    {state.combat.openBattle && !shipBattle ? (
-                        <div className="sail-battle-resume">
-                            <span>You left a fight unfinished against <b>{state.combat.openBattle.foe?.name || "a ship"}</b>.</span>
-                            <button type="button" className="sby-engage" disabled={busy}
-                                onClick={() => setShipBattle(state.combat.openBattle)}>Back on deck</button>
-                        </div>
-                    ) : null}
-                    <p className="muted" style={{ margin: "2px 0 10px" }}>
-                        Your guns, your hull, the shot in the racks and the fifteen ships of the pirate fleet — plus
-                        any rival worth running down.
-                    </p>
-                    <button type="button" className="sail-cta sail-cta-raid" disabled={busy}
-                        onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
-                        Open the ship yard — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left today
-                    </button>
+            {/* NO SECOND DOOR. There was a full "Ship battles" card here with its own Open button, duplicating
+                the entry point that already sits above the stations — two buttons, same destination, one of
+                them buried a scroll further down. The only thing this card had that the other did not was the
+                unfinished-fight notice, which matters too much to lose, so that survives on its own. */}
+            {state.combat?.openBattle && !shipBattle ? (
+                <div className="card sail-battle-resume-card">
+                    <div className="sail-battle-resume">
+                        <span>You left a fight unfinished against <b>{state.combat.openBattle.foe?.name || "a ship"}</b>.</span>
+                        <button type="button" className="sby-engage" disabled={busy}
+                            onClick={() => setShipBattle(state.combat.openBattle)}>Back on deck</button>
+                    </div>
                 </div>
             ) : null}
 
-            {/* The sea's collection — the Corsair chase, on the screen its raids and affinity land on. Above
-                the upgrade card rather than inside it: a card nested in a card reads as a rendering mistake. */}
-            {state.collections?.length ? (
-                <CollectionPanel sets={state.collections} feature="sea" title="Sea collections"
-                    blurb="Find the pieces anywhere in the Den — the bonus is permanent and you never have to wear them." />
-            ) : null}
             {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}
             <section className="card" style={{ borderColor: "rgba(96,170,255,0.45)", background: "linear-gradient(180deg, rgba(70,130,220,0.08), transparent 40%)" }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(96,170,255,0.16)", border: "1px solid rgba(96,170,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛵ Sailing</div>

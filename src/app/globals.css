@@ -11971,6 +11971,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     color: #e6e9ec; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.22); }
 .sail-yard-close:hover { background: rgba(0,0,0,0.65); }
 
+/* The collapsed Sea-collections shelf, above the stations. */
+.sail-collapse { padding: 0; overflow: hidden; }
+.sail-collapse-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 12px 14px; cursor: pointer; background: none; border: none; color: #e8eef4;
+    font-size: 0.92rem; font-weight: 900; text-align: left; }
+.sail-collapse-chev { color: #8d96a0; font-size: 0.8rem; }
+.sail-collapse .card { margin: 0 10px 10px; }
+/* The unfinished-fight notice, now that it no longer rides inside a door card. */
+.sail-battle-resume-card { padding: 10px 12px; }
+.sail-battle-resume-card .sail-battle-resume { margin: 0; }
+
 /* An unfinished fight, and the reason a Battle tap declined. Both sit ABOVE the battle card, because both
    explain why the buttons underneath them are not doing what you just asked. */
 .sail-battle-resume { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px;
@@ -13163,9 +13174,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby { display: grid; gap: 12px; }
 .sby-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .sby-head h3 { margin: 0; font-size: 1.05rem; }
-.sby-purse { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
-    border-radius: 999px; font-weight: 900; font-size: 0.86rem; color: #9fe6ff;
-    background: rgba(120,220,255,0.14); border: 1px solid rgba(120,220,255,0.45); }
+/* THE PURSE. A thin outlined pill for the feature's entire economy read as a form field. This is a struck
+   brass plaque with the coin sitting proud of it — the number you are always checking should look like
+   treasure, not like an input. */
+.sby-purse { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 8px;
+    border-radius: 11px; font-size: 0.86rem; line-height: 1;
+    background: linear-gradient(180deg, #6b4f1c, #3a2a0c 62%, #241a07);
+    border: 1px solid rgba(255,205,120,0.55);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,235,190,0.35); }
+.sby-purse b { font-size: 1.02rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.75); }
+.sby-purse em { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #c9a961; }
+.sby-purse-coin { width: 26px; height: 26px; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* The coin as an inline price mark, on every buy button in the yard. */
+.sby-dbl { width: 15px; height: 15px; object-fit: contain; vertical-align: -3px; margin: 0 1px 0 3px; }
 .sby-sub { margin: 0; font-size: 0.78rem; line-height: 1.45; color: #8d96a0; }
 
 /* The ship as it fights — the same four numbers the battle uses. */
@@ -13240,6 +13263,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Their captain, standing where they stand in the fight. Small, but it is a person and you can tell them apart. */
 .sby-port-crew { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: 26px; height: 26px;
     object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.75)); }
+.sby-port.is-flipcrew .sby-port-crew { transform: translateX(-50%) scaleX(-1); }
 .sby-port.is-locked .sby-port-ship, .sby-port.is-locked .sby-port-crew { filter: grayscale(1) brightness(0.4); }
 .sby-port-lock { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.2rem; }
 

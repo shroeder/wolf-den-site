@@ -23,6 +23,12 @@ import * as Gi from "react-icons/gi";
 // Styling is in globals.css (this file has several components; a styled-jsx block would only reach the one
 // that owns it — see the sailing boards).
 
+// THE DOUBLOON. Was the Unicode character ⛃ — "black draughts king", not a coin, drawn by the operating
+// system, and rendered as a flat dark disc that read as a missing glyph. It is the only currency ship battles
+// mint and the only thing the Quartermaster takes, so it gets art.
+// eslint-disable-next-line @next/next/no-img-element
+const Dbl = ({ className = "sby-dbl" }) => <img className={className} src="/images/sailing/doubloon.png" alt="doubloons" draggable="false" />;
+
 const Icon = ({ name, className }) => {
     const C = Gi[name] || Gi.GiCannon;
     return <C className={className} aria-hidden="true" />;
@@ -47,7 +53,10 @@ function Track({ t, purse, gold, busy, onBuy }) {
                 <button type="button" className={`sby-buy${t.currency === "gold" ? " is-gold" : ""}`}
                     disabled={busy || !afford} onClick={() => onBuy(t)}
                     title={`Costs ${t.cost} ${t.currency === "gold" ? "gold" : "doubloons"}`}>
-                    {t.currency === "gold" ? `🪙 ${t.cost.toLocaleString()}` : `${t.cost} ⛃`}
+                    {t.currency === "gold"
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <><img className="sby-dbl" src="/images/ui/coin.png" alt="gold" draggable="false" />{t.cost.toLocaleString()}</>
+                        : <>{t.cost}<Dbl /></>}
                 </button>
             )}
         </div>
@@ -75,7 +84,7 @@ function Round({ a, purse, busy, onLoad, onBuy }) {
                 {a.basic ? null : (
                     <button type="button" className="sby-mini" disabled={busy || purse < a.price * 5}
                         onClick={() => onBuy(a.id, 5)} title={`5 rounds for ${a.price * 5} doubloons`}>
-                        Buy 5 · {a.price * 5} ⛃
+                        Buy 5 · {a.price * 5}<Dbl />
                     </button>
                 )}
             </div>
@@ -92,9 +101,9 @@ function Round({ a, purse, busy, onLoad, onBuy }) {
 // The PORTRAIT is the change you feel. It used to be a 34px face chip beside a small hull; now the captain
 // stands on their own deck in a single tile, the way they will when the fight opens. You are picking a
 // character, not reading a row of numbers.
-function Portrait({ art, rider, boss, locked }) {
+function Portrait({ art, rider, boss, locked, flipCrew }) {
     return (
-        <span className={`sby-port${boss ? " is-boss" : ""}${locked ? " is-locked" : ""}`} aria-hidden="true">
+        <span className={`sby-port${boss ? " is-boss" : ""}${locked ? " is-locked" : ""}${flipCrew ? " is-flipcrew" : ""}`} aria-hidden="true">
             {art ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="sby-port-ship" src={art} alt="" draggable="false" />
@@ -124,7 +133,11 @@ function BattleRow({ e, busy, canFight, onFight }) {
     const disabled = busy || !canFight || e.locked;
     return (
         <div className={`sby-row is-${e.kind}${e.boss ? " is-boss" : ""}${e.locked ? " is-locked" : ""}${e.beaten ? " is-beaten" : ""}`}>
-            <Portrait art={e.art} rider={e.rider} boss={e.boss} locked={e.locked} />
+            {/* FACING. Fleet hulls are drawn facing LEFT on purpose (fleet.js — the enemy sits on the right of
+                the battle stage) while every captain is drawn facing RIGHT so the scene's mirror turns them
+                toward you. Correct in the fight, wrong in a still portrait: the two ended up back to back. A
+                rival's boat and hero are both drawn facing right, so only the fleet rows need the flip. */}
+            <Portrait art={e.art} rider={e.rider} boss={e.boss} locked={e.locked} flipCrew={e.kind === "fleet"} />
             <div className="sby-row-body">
                 {/* The name gets the whole line. Sharing it with the difficulty chip left about 150px for a
                     title on a phone, which turned "The Cormorant" into "The Corm…" — the badge is a label,
@@ -203,7 +216,13 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
         <section className="card sby">
             <div className="sby-head">
                 <h3>Ship battles</h3>
-                <span className="sby-purse">{purse.toLocaleString()} ⛃ doubloons</span>
+                {/* The purse. A flat outlined pill for the feature's whole economy read as a form field; it is
+                    a struck-metal plaque now, with the coin itself doing the labelling. */}
+                <span className="sby-purse" title={`${purse.toLocaleString()} doubloons`}>
+                    <Dbl className="sby-purse-coin" />
+                    <b>{purse.toLocaleString()}</b>
+                    <em>doubloons</em>
+                </span>
             </div>
             {/* BOTH allowances, together, in the same words. They used to be a "sortie" count in here and a
                 separate "raid" count in a call-to-action three screens up. */}
