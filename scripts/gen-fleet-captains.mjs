@@ -24,7 +24,14 @@ const OUT = "public/images/fleet/crew";
 fs.mkdirSync(OUT, { recursive: true });
 
 const STYLE = "Painterly cel-shaded 2D video-game art, bold clean dark outlines, chunky readable silhouette, high contrast, vibrant colors, soft inner shading, fantasy action-RPG style.";
-const CUTOUT = "Full body, standing on deck in a ready stance, facing right. The ENTIRE figure must fit INSIDE the frame with clear empty space on all four sides — roughly 8% empty above the head and 6% below the feet, and no part of the character, weapon, coat or hat may touch any edge. ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO deck, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. No text, no words, no letters, no logo, no watermark, no border.";
+// The first pass asked for "full body" and enforced margins after the fact, and 9 of 15 still came back with
+// the legs stopping flat at the shin — no ankles, no feet. Margins were not the problem: trimming to the
+// content box and padding it gave every one of them a healthy 38px border, which is exactly why a margin
+// audit passed them. A bounding box cannot tell a complete figure from an amputated one that has been neatly
+// centred, and centring the truncation is what made it read as deliberate clipping on the ship.
+// So the lower body has to be demanded explicitly, and named part by part — this model will drop whatever the
+// prompt does not insist on.
+const CUTOUT = "FULL FIGURE, head to feet, standing on deck in a ready stance, facing right. The COMPLETE lower body MUST be drawn: hips, both thighs, both knees, both shins, both ankles and BOTH FEET/BOOTS fully visible and planted on the ground. Do NOT crop, cut, fade or omit the legs or feet, and do not stop the figure at the waist, thigh or shin — a half figure is wrong. The ENTIRE figure must fit INSIDE the frame with clear empty space on all four sides — roughly 8% empty above the head and 8% below the soles of the feet, and no part of the character, weapon, coat or hat may touch any edge. Draw the figure SMALLER rather than leaving any part of it out. ISOLATED as a clean die-cut sprite on a FULLY TRANSPARENT background (alpha channel) — absolutely NO backdrop, NO scenery, NO deck, NO ground, NO cast shadow, NO glow halo, NO white sticker rim. No text, no words, no letters, no logo, no watermark, no border.";
 const P = (s) => `A single PIRATE CAPTAIN character for a ship battle. ${s} ${STYLE} ${CUTOUT}`;
 
 // One per fleet ship (fleet.js). The three bosses are named characters and get the detail; the rest are the
@@ -68,7 +75,10 @@ for (const [k, prompt] of Object.entries(CAPTAINS)) {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
+        // `low` is where the amputated legs came from: at that tier the model routinely drops whatever is
+        // furthest from the focal point, and on a standing figure that is the feet. Anatomy completeness is
+        // the whole job here, so this is worth the ~4c a head.
+        body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", n: 1 }),
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 300)}`);
     const b64 = (await resp.json())?.data?.[0]?.b64_json;
