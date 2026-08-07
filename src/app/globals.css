@@ -13710,8 +13710,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    of both ships while the water underneath them was empty — it was covering the thing you came to watch and
    leaving the room it could have used. It hangs off the bottom of the stage now and grows upward, so a long
    round eats the empty sea first and only ever reaches the hulls if it genuinely has that much to say. */
-.sbt-logwrap { position: absolute; z-index: 5; left: 10px; right: 10px; bottom: 8px; display: flex;
-    flex-direction: column-reverse; align-items: center; gap: 5px; pointer-events: none; }
+/* CLOSED, IT IS JUST A PILL. Nothing but the toggle occupies the stage until you open the log, so the strip
+   it used to hold — over the masts at the top, over the order cards at the bottom — is free again. Right-hand
+   side, out of the way of both hulls. */
+.sbt-logwrap { position: absolute; z-index: 5; right: 10px; bottom: 8px; display: flex;
+    flex-direction: column-reverse; align-items: flex-end; gap: 5px; pointer-events: none; }
+/* Open, it takes the width it needs and sits above its own button. */
+.sbt-logwrap.is-open { left: 10px; align-items: stretch; }
 .sbt-logwrap.is-empty { display: none; }
 /* A SHIP'S LOG, not a console. It was bare text on a flat dark rectangle — the one panel in the fight that
    looked like debug output. Now it is parchment-toned, ruled like a ledger, with a rope-coloured edge and a

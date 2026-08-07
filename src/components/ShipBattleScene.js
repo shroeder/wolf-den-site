@@ -471,13 +471,21 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 the two ships you are trying to look at while choosing an order. So it is COLLAPSED by default
                 to the last couple of lines — enough to see what just happened — and taps open to the whole
                 fight. The information never goes away; it just stops being in front of the thing it describes. */}
-            <div className={`sbt-logwrap${log.length ? "" : " is-empty"}`}>
-                <div className={`sbt-log${logOpen ? " is-open" : ""}`} ref={logRef}>
-                    {log.map((l) => (
-                        <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
-                    ))}
-                </div>
-                {log.length > 2 ? (
+            {/* CLOSED BY DEFAULT, BEHIND ITS OWN BUTTON. The log has now covered the masts (anchored to the top)
+                and then the order cards (anchored to the bottom), because there is no free strip on a phone
+                between two ships and four buttons — every position it can hold is on top of something you need.
+                So it holds nothing until you ask for it: a pill that says how many lines are waiting, and the
+                log only exists on screen while it is open. The fight is the thing you watch; the transcript is
+                something you check. */}
+            <div className={`sbt-logwrap${log.length ? "" : " is-empty"}${logOpen ? " is-open" : ""}`}>
+                {logOpen ? (
+                    <div className="sbt-log is-open" ref={logRef}>
+                        {log.map((l) => (
+                            <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
+                        ))}
+                    </div>
+                ) : null}
+                {log.length ? (
                     <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}`} onClick={() => setLogOpen((o) => !o)}>
                         {logOpen ? "Hide log" : `Battle log · ${log.length}`}
                     </button>

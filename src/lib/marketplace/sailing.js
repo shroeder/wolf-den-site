@@ -1681,6 +1681,8 @@ export async function doRaid(buyerId, targetId = null) {
         { buyerId, petId: me?.featured_collectible },
         { buyerId: target.id, petId: target.featured_collectible },
     ]);
+    // Hand-placed batteries for both hulls, one query, same as the fleet path.
+    const savedPorts = await getSavedPorts().catch(() => ({}));
     const meta = {
         kind: "raid", targetId: target.id, dodged,
         targetName: target.display_name || target.alias,
@@ -1689,12 +1691,20 @@ export async function doRaid(buyerId, targetId = null) {
         foeProfile: { name: theirs.name, boatLevel: foeLevel, gunLevel: target.gun_level || 0,
             gunneryLevel: target.gunnery_level || 0, hullLevel: target.hull_level || 0,
             ammo: target.loadout || "round", art: boatArt(foeLevel) },
+        // DECK LINE AND GUNS, same as a fleet fight. This block had neither, so a rival battle drew no cannons
+        // at all and stood both crews at the fallback deck height rather than on their own hull — the fleet
+        // path got both when the guns were added and this one was simply missed. Two members fighting each
+        // other is the MORE common battle, so the version with no guns on it was the one most people saw.
         me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel,
+            deck: boatDeck(boatTier(myLevel)),
+            ports: portsWithSaved(savedPorts, `boat:${boatTier(myLevel)}`, boatDeck(boatTier(myLevel)), mine.guns),
             rider: me?.avatar_sprite_url || null,
             riderFlip: me?.avatar_sprite_flip === true,
             pet: crew[buyerId] || null },
         foe: { name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns, hp: theirs.hp,
             ammo: theirs.ammo.id, boss: false, mirror: true, flavor: "A passing ship, and everything they are carrying.",
+            deck: boatDeck(boatTier(foeLevel)),
+            ports: portsWithSaved(savedPorts, `boat:${boatTier(foeLevel)}`, boatDeck(boatTier(foeLevel)), theirs.guns),
             rider: target.avatar_sprite_url || null,
             riderFlip: target.avatar_sprite_flip === true,
             pet: crew[target.id] || null },
