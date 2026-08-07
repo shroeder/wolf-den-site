@@ -68,6 +68,51 @@ async function frame(buf) {
     return sharp(padded).resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
 }
 
+// ── FACING ───────────────────────────────────────────────────────────────────────────────────────────────────
+// This matters more than it looks. The battle scene MIRRORS the enemy's crew (ShipBattleScene passes
+// scaleX(-1) on the foe side) on the assumption that every sprite is drawn facing RIGHT — so one that comes
+// back facing left gets flipped to face AWAY from the ship it is fighting, and the captain stares off the back
+// of his own boat.
+//
+// The prompt asks for right-facing and the model obeys most of the time. The obvious next move is to detect
+// the strays automatically, and it does NOT work: a gpt-4o pass over these fifteen flipped twelve of them and
+// then still reported ten as left-facing — it contradicts itself on its own output. openai-image.js already
+// carries the same finding, measured against 452 labelled sprites ("the labels are wrong on clearly
+// directional creatures and meaningless on symmetrical ones"). A detector that is wrong two thirds of the time
+// does more damage than the defect it is chasing, because it silently reverses sprites that were correct.
+//
+// So facing is checked BY EYE on a contact sheet and corrected by hand:
+//     node scripts/gen-fleet-captains.mjs --sheet          # writes crew-sheet.png, five across, big enough to read
+//     node scripts/gen-fleet-captains.mjs --flip fleet_cutter
+if (args.includes("--flip")) {
+    if (!only.length) throw new Error("--flip needs at least one sprite key");
+    for (const k of only) {
+        const file = `${OUT}/${k}.png`;
+        if (!fs.existsSync(file)) { console.log("skip (missing):", k); continue; }
+        fs.writeFileSync(file, await sharp(fs.readFileSync(file)).flop().png().toBuffer());
+        console.log("flipped", k);
+    }
+    process.exit(0);
+}
+
+// A contact sheet is the only reliable way to audit this set — for facing, and for the amputated-legs defect
+// that a per-file margin check cannot see (a figure with no feet still measures a tidy border on all sides).
+if (args.includes("--sheet")) {
+    const keys = Object.keys(CAPTAINS).filter((k) => fs.existsSync(`${OUT}/${k}.png`));
+    const cell = 440, cols = 5, rows = Math.ceil(keys.length / cols);
+    const comp = [];
+    for (let i = 0; i < keys.length; i++) {
+        comp.push({
+            input: await sharp(`${OUT}/${keys[i]}.png`).resize(cell - 16, cell - 16, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
+            left: (i % cols) * cell + 8, top: Math.floor(i / cols) * cell + 8,
+        });
+    }
+    await sharp({ create: { width: cols * cell, height: rows * cell, channels: 4, background: { r: 252, g: 252, b: 253, alpha: 1 } } })
+        .composite(comp).png().toFile("crew-sheet.png");
+    console.log("wrote crew-sheet.png —", keys.join(" | "));
+    process.exit(0);
+}
+
 for (const [k, prompt] of Object.entries(CAPTAINS)) {
     if (only.length && !only.includes(k)) continue;
     const file = `${OUT}/${k}.png`;
@@ -84,6 +129,6 @@ for (const [k, prompt] of Object.entries(CAPTAINS)) {
     const b64 = (await resp.json())?.data?.[0]?.b64_json;
     if (!b64) throw new Error("no image for " + k);
     fs.writeFileSync(file, await frame(Buffer.from(b64, "base64")));
-    console.log("wrote", k, fs.statSync(file).size, "bytes");
+    console.log("wrote", k, fs.statSync(file).size, "bytes — CHECK FACING (--sheet), flip with --flip " + k);
 }
 console.log("done");
