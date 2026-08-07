@@ -2212,6 +2212,13 @@ export async function buyAmmo(buyerId, ammoId, qty = 5) {
 // Deliberately NOT stocked: the forty-five `source: "admin"` items. Those are the real-world store perks —
 // credit tokens, snack tokens, line-cutter, box breaks, grading — and letting anybody convert game currency
 // into real store credit is not a design decision, it is a hole in the till.
+//
+// ⚠️ AND THE SAME RULE REACHES TWO ITEMS THAT ARE STOCKED. The Elixir and the Sands do not LOOK like store
+// perks, but a charged item IS one — the charge is what you take to the counter — so an item that recharges or
+// un-cools one is a re-redemption token for real merchandise. Priced at 65 and 45 they were the admin hole
+// through a side door, and cheaper than a scroll. They are five figures now: reachable in principle, so the
+// shop is honest about them existing, and never an accident. Anything added here that touches `charged`,
+// `charges` or a cooldown on a charged item belongs in this bracket — check before you price it.
 export const LOCKER = {
     scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 120,
         blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
@@ -2219,10 +2226,10 @@ export const LOCKER = {
         blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
     pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 75,
         blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
-    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 65,
-        blurb: "Fully recharges a charged item — the in-store perks you thought were spent." },
-    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 45,
-        blurb: "Resets the cooldown on a charged item. Use the perk again today." },
+    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 12000,
+        blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },
+    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 9000,
+        blurb: "Use an in-store perk again today instead of waiting out its cooldown. Real merchandise." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
 
