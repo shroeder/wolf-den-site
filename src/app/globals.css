@@ -6824,8 +6824,12 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .social-empty { padding: 18px 6px; text-align: center; }
 /* Global (town/plaza) chat tab — a first-class feed with hero sprites + pretty timestamps and a pinned composer. */
 .social-global { display: flex; flex-direction: column; min-height: 100%; gap: 8px; }
-.social-global-feed { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; }
-.social-global-composer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 2px; background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 34%); }
+/* Room under the last message for the sticky composer to sit over. Without it the newest line was always the
+   one you could not read — it showed through the composer half-faded, which reads as the chat jumping. */
+.social-global-feed { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; padding-bottom: 14px; }
+.social-global-composer { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 10px 0 2px; /* Opaque by 60% rather than 34%: the transparent stretch let the newest message read through the composer,
+     which looked like the text was drifting rather than being covered. */
+    background: linear-gradient(180deg, transparent, var(--bg, #0e0e12) 60%); }
 .social-global-composer input { flex: 1 1 auto; min-width: 0; padding: 11px 13px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); color: inherit; font-size: 0.92rem; }
 .social-global-composer .btn-gold { flex: 0 0 auto; }
 .gchat-row { display: flex; gap: 9px; align-items: flex-start; }
