@@ -5,7 +5,7 @@ import { useState } from "react";
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
 import { shipProfile, foeProfile, initBattleState, resolveRound, ORDER_LIST, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
-import { FLEET, fleetView, fleetArt } from "@/lib/marketplace/fleet.js";
+import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
 // Dev-only lab for the ship battle. The real thing is behind a login, a daily sortie limit and a gun deck you
 // have to buy, so judging the scene by playing it costs a sortie and can only ever show the one matchup your
@@ -42,9 +42,12 @@ export default function BattleLab() {
         const meta = {
             rank,
             me: { name: meP.name, art: meP.art, guns: meP.guns, hp: meP.hp, ammo: meP.ammo.id, level: meP.boatLevel,
-                  rider: "/images/nav/boss.png", pet: null }, // stand-in for a hero sprite in the lab
+                  // A player's own rider is their hero sprite, which lives in the DB and has no file on disk. The
+                  // lab borrows an arena NPC so the deck holds a real character sprite at real proportions —
+                  // a UI glyph here would make the lab useless for judging how the crew sits on the boat.
+                  rider: "/images/arena/npc/veteran.webp", riderFlip: false, pet: null },
             foe: { name: foeP.name, cls: ship.cls, art: fleetArt(ship), guns: foeP.guns, hp: foeP.hp,
-                   ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false },
+                   ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false, rider: fleetCaptain(ship), riderFlip: false },
         };
         const st = initBattleState(meP, foeP);
         setLive({ me: meP, foe: foeP, state: st, meta });

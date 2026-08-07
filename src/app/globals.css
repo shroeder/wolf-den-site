@@ -13125,7 +13125,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* ── CREW, LOG AND ORDERS ───────────────────────────────────────────────────────────────────────────────── */
 /* The captain and their pet on deck. A ship with nobody on it is a prop — this is the person you are fighting. */
-.sbt-crew { position: absolute; left: 50%; bottom: 42%; transform: translateX(-50%); display: flex;
+/* 42% put them up among the sails, silhouetted against red canvas and reading as cargo in the rigging. The
+   deck line across the fleet art sits at roughly a third of the square, so 32% stands them ON the boat and
+   against the wooden hull, where a dark sprite actually reads. */
+.sbt-crew { position: absolute; left: 50%; bottom: 32%; transform: translateX(-50%); display: flex;
     align-items: flex-end; gap: 2px; pointer-events: none; z-index: 2; }
 .sbt-rider { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 3px 4px rgba(0,0,0,0.6)); }
 .sbt-pet { width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }

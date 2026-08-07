@@ -83,6 +83,10 @@ export function fleetRankForShip({ guns = 4, hp = 140 } = {}) {
 }
 
 export const fleetArt = (ship) => (ship?.art ? `/images/fleet/${ship.art}.png` : null);
+// The ship's CAPTAIN, who stands on its deck the way your hero stands on yours. A fleet battle against an
+// empty hull is scenery you shot at; a ship with somebody on it is an opponent you beat.
+// (scripts/gen-fleet-captains.mjs — drawn facing right, because the scene mirrors the enemy's crew.)
+export const fleetCaptain = (ship) => (ship?.art ? `/images/fleet/crew/${ship.art}.png` : null);
 export const fleetShip = (rank) => FLEET.find((f) => f.rank === Number(rank)) || null;
 
 // ── WHAT SINKING ONE PAYS ────────────────────────────────────────────────────────────────────────────────────
