@@ -64,10 +64,17 @@ export const COMBAT_TRACKS = {
         desc: "Oak and iron plate — more hit points, and every ball that lands hurts less." },
 };
 
-// Guns in a broadside. Everyone fires at least a pair, and the boat itself is a platform: a bigger hull carries
-// more guns even before you buy any, which is what "your overall ship level counts" means in practice.
+// Guns in a broadside.
+//
+// You start with ONE. It used to be three before you had bought anything, which meant the Cannons track — the
+// headline upgrade of the whole feature — moved you from 3 to 4 on the first purchase: a 33% bump you could
+// not see and did not feel. Starting at one makes the second gun an event, and every gun after it is visibly
+// another barrel on your deck now that they are drawn.
+//
+// The hull still contributes: a bigger boat is a bigger platform, which is what "your overall ship level
+// counts" means in practice.
 export const gunsFor = (gunLevel = 0, boatLevel = 1) =>
-    3 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel)) + Math.floor(Math.max(0, boatLevel - 1) / 6);
+    1 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel)) + Math.floor(Math.max(0, boatLevel - 1) / 6);
 
 // Chance a single gun hits. Gunnery is the lever; the boat contributes a little steadiness.
 export const accuracyFor = (gunneryLevel = 0, boatLevel = 1) =>

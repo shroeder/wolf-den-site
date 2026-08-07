@@ -69,3 +69,50 @@ export default function ChunkRecovery() {
     }, []);
     return null;
 }
+
+// ── HOLDING AN OLD BUILD THAT STILL LOADS ────────────────────────────────────────────────────────────────────
+// The chunk recovery above only fires when a chunk 404s. There is a second, nastier shape of the same problem:
+// the member's tab is hours old, every chunk it names still EXISTS on the CDN, and the code inside them is the
+// version with the bug you already fixed. They navigate client-side, hit the old render path, and crash — over
+// and over, against a deployment that is no longer current.
+//
+// That is exactly what happened with the Forge: the fix went out at 13:19 and members were still crashing at
+// 15:13 against `dpl_3bPJ…`, three deployments behind, because nothing ever made their tab go and get the new
+// one. There is no service worker involved; a long-lived tab is enough.
+//
+// So on ANY crash we ask the server which deployment is current. If it does not match the one this bundle was
+// built as, the member is holding a stale build and the correct response is the same as for a missing chunk:
+// reload once and land on the current code. Same one-per-minute guard, for the same reason — if the CURRENT
+// build is broken too, a reload loop would hide it.
+//
+// (Vercel's Skew Protection solves this properly at the platform level and is worth turning on; this is the
+// belt to that pair of braces, and it works on every host.)
+export async function recoverFromStaleBuild(err, where = "unknown") {
+    if (typeof window === "undefined") return false;
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID || "";
+    if (!mine) return false;                       // no id baked in — nothing to compare, do not guess
+    let last = 0;
+    try { last = Number(window.sessionStorage.getItem(KEY)) || 0; } catch { /* private mode */ }
+    if (Date.now() - last < COOLDOWN_MS) return false;
+
+    let current = "";
+    try {
+        const r = await fetch("/api/build-id", { cache: "no-store" });
+        current = (await r.json())?.id || "";
+    } catch { return false; }                      // offline or blocked — a crash screen beats a blind reload
+    if (!current || current === mine) return false;
+
+    try { window.sessionStorage.setItem(KEY, String(Date.now())); } catch { /* private mode */ }
+    try {
+        fetch("/api/client-error", {
+            method: "POST", keepalive: true, headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+                name: "StaleBuild", recovered: true, where,
+                message: `held ${mine}, current ${current}: ${String(err?.message || err || "crash")}`.slice(0, 400),
+                path: window.location.pathname + window.location.search,
+            }),
+        }).catch(() => {});
+    } catch { /* reporting is a bonus */ }
+    window.location.reload();
+    return true;
+}

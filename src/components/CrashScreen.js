@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { isChunkError, recoverFromChunkError } from "@/components/ChunkRecovery";
+import { isChunkError, recoverFromChunkError, recoverFromStaleBuild } from "@/components/ChunkRecovery";
 
 // ── WHEN A PAGE DIES ─────────────────────────────────────────────────────────────────────────────────────────
 // A React render error used to hand the member straight to the browser's own "This page couldn't load" — no
@@ -36,6 +36,11 @@ export default function CrashScreen({ error, reset, where = "page" }) {
         // open, so the build their HTML names no longer exists. Reloading fetches the current one and puts
         // them on the page they asked for. Showing them a crash screen for that is a bug in us, not the page.
         if (recoverFromChunkError(error, where)) return;
+        // The chunks may all still exist and the CODE still be old — a tab open since this morning crashing on
+        // a bug fixed at lunchtime. Ask which deployment is current; if this bundle is not it, reload instead of
+        // showing a crash screen for something already repaired. Async, so the report below still goes out if
+        // the build turns out to be current.
+        recoverFromStaleBuild(error, where).catch(() => {});
         fetch("/api/client-error", {
             method: "POST",
             headers: { "content-type": "application/json" },

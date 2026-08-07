@@ -13431,12 +13431,57 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-rider { width: 28%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.65)); }
 .sbt-pet { width: 18%; height: auto; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
 .sbt-ship-foe .sbt-crew { flex-direction: row-reverse; }
+/* ── THE GUNS ON DECK ─────────────────────────────────────────────────────────────────────────────────────
+   "More barrels in the broadside" was a number in the HUD; these are the barrels. One per gun the ship owns,
+   placed off the hull's own battery (gun-ports.js), each recoiling and flashing in sequence — a broadside is a
+   ripple down the deck, not a single event. */
+.sbt-guns { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.sbt-gun { position: absolute; width: var(--gw, 13%); aspect-ratio: 128 / 82; transform: translate(-50%, -70%); }
+/* The enemy's guns point at YOU, so the whole battery mirrors with the ship it belongs to. */
+.sbt-ship-foe .sbt-gun { transform: translate(-50%, -70%) scaleX(-1); }
+.sbt-gun-barrel { position: absolute; inset: 0;
+    background: url("/images/sailing/deck-cannon.png") center/contain no-repeat;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+.sbt-gun.is-firing .sbt-gun-barrel { animation: sbtGunRecoil .34s ease both; }
+@keyframes sbtGunRecoil {
+    0% { transform: translateX(0); } 22% { transform: translateX(-22%); } 100% { transform: translateX(0); }
+}
+/* Muzzle flash and smoke at the barrel's mouth — the right-hand end, because the sprite points right. */
+.sbt-gun-flash { position: absolute; left: 88%; top: 34%; width: 90%; height: 90%; transform: translate(-10%, -50%);
+    border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(255,246,214,0.95), rgba(255,168,48,0.6) 40%, transparent 70%);
+    animation: sbtGunFlash .3s ease-out both; }
+@keyframes sbtGunFlash {
+    0% { opacity: 0; transform: translate(-10%,-50%) scale(.2); }
+    18% { opacity: 1; transform: translate(-10%,-50%) scale(1.1); }
+    100% { opacity: 0; transform: translate(-10%,-50%) scale(1.8); }
+}
+.sbt-gun-smoke { position: absolute; left: 96%; top: 34%; width: 110%; height: 110%; transform: translate(-10%, -50%);
+    border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, rgba(225,220,210,0.6), rgba(140,135,130,0.3) 50%, transparent 72%);
+    animation: sbtGunSmoke 1.1s ease-out both .05s; }
+@keyframes sbtGunSmoke {
+    0% { opacity: 0; transform: translate(-10%,-50%) scale(.25); }
+    25% { opacity: .8; }
+    100% { opacity: 0; transform: translate(38%,-90%) scale(2.1); }
+}
+
 /* ── THE IMPACT ───────────────────────────────────────────────────────────────────────────────────────────
    The shot arrived and the hull did nothing about it: the ball's own flash was the whole consequence, so a
    ten-gun broadside and a one-gun graze looked identical on the receiving end. This is what a hit costs —
    splinters off the timber and smoke that hangs and drifts rather than blinking out. */
 .sbt-hit { position: absolute; left: 50%; top: 52%; width: 0; height: 0; pointer-events: none; z-index: 5; }
 /* Smoke: two overlapping puffs on different clocks, so it billows instead of pulsing once. */
+.sbt-hit-flash { position: absolute; left: -18px; top: -18px; width: 36px; height: 36px; border-radius: 50%;
+    opacity: 0; mix-blend-mode: screen;
+    background: radial-gradient(circle, #fffdf2 0%, rgba(255,214,140,0.85) 32%, rgba(255,150,50,0.35) 58%, transparent 74%);
+    animation: sbtHitFlash .16s ease-out forwards; }
+.sbt-hit.is-heavy .sbt-hit-flash { left: -26px; top: -26px; width: 52px; height: 52px; animation-duration: .22s; }
+@keyframes sbtHitFlash {
+    0% { opacity: 0; transform: scale(.2); }
+    30% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.5); }
+}
 .sbt-hit-smoke { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%;
     background: radial-gradient(circle, rgba(210,205,195,0.75), rgba(120,115,110,0.45) 45%, transparent 70%);
     opacity: 0; animation: sbtSmoke 1.15s ease-out forwards; }

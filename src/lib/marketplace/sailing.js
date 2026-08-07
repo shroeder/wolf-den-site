@@ -18,6 +18,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simu
          MAX_ROUNDS, matchupOdds } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
+import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -2079,13 +2080,16 @@ export async function doFleetBattle(buyerId, rank = null) {
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})) },
         foeProfile: { ...ship, fleet: true },
         me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
-            // Your own hull's deck line, so your hero stands on the boat rather than hovering over it.
+            // Your own hull's deck line, so your hero stands on the boat rather than hovering over it, and the
+            // battery it carries — one drawn cannon per gun you actually own.
             deck: boatDeck(boatTier(mine.boatLevel)),
+            ports: boatGunPorts(boatTier(mine.boatLevel), mine.guns),
             rider: me?.avatar_sprite_url || null,
             riderFlip: me?.avatar_sprite_flip === true,
             pet: crew[buyerId] || null },
         foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id,
             boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false, deck: fleetDeckOf(ship),
+            ports: fleetGunPorts(ship.art, foe.guns),
             // Their captain on deck, mirrored by the scene so they face your ship.
             rider: fleetCaptain(ship), riderFlip: false, pet: null },
     };

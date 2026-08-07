@@ -192,7 +192,21 @@ function Volley({ ev }) {
 // and up, because debris coming straight at the camera is invisible.
 const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
 
+// How wide one cannon can be drawn without touching its neighbour. Measured off the real gap between the two
+// closest ports rather than assumed from the count, so a hand-placed battery with uneven spacing still fits.
+function gunWidthPct(ports) {
+    if (ports.length < 2) return 13;
+    let gap = Infinity;
+    for (let i = 1; i < ports.length; i += 1) gap = Math.min(gap, Math.abs(ports[i].x - ports[i - 1].x));
+    return Math.max(5, Math.min(13, gap * 100 * 0.92));
+}
+
 function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {
+    // THE GUNS, drawn. `f.ports` is the hull's own battery (gun-ports.js) already trimmed to how many guns the
+    // ship actually has, so the deck shows exactly what the HUD claims and an upgrade is a barrel you can point
+    // at. They fire in sequence rather than together — a broadside is a ripple down the deck, and the stagger
+    // here matches the one the audio uses.
+    const ports = f?.ports || [];
     return (
         <div className={`sbt-ship sbt-ship-${side}${firing ? " is-firing" : ""}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}`}
             style={{ "--deck": `${f?.deck ?? 30}%` }}>
@@ -219,9 +233,28 @@ function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {
                     single event on the receiving end, and ten separate puffs read as ten separate mistakes. */}
                 {hurt ? (
                     <span className={`sbt-hit${heavy ? " is-heavy" : ""}`} aria-hidden="true">
+                        {/* The moment the shot lands. Small and FAST — 160ms — because the last version of this
+                            was a 34px radial gradient that hung around as an orange pancake. A flash you barely
+                            register is what sells an impact; one you can look at is a bug. */}
+                        <i className="sbt-hit-flash" />
                         <i className="sbt-hit-smoke" />
                         <i className="sbt-hit-smoke is-two" />
                         {SPLINTERS.map((a, i) => <i key={i} className="sbt-splinter" style={{ "--a": `${a}deg`, animationDelay: `${i * 14}ms` }} />)}
+                    </span>
+                ) : null}
+                {ports.length ? (
+                    // Guns shrink as they multiply. Overlapping barrels read as one dark bar across the hull;
+                    // the width is derived from the actual spacing between the ports so they always separate.
+                    <span className="sbt-guns" aria-hidden="true"
+                        style={{ "--gw": `${gunWidthPct(ports)}%` }}>
+                        {ports.map((g, i) => (
+                            <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}`}
+                                style={{ left: `${g.x * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 48}ms` }}>
+                                <i className="sbt-gun-barrel" />
+                                {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 48}ms` }} /> : null}
+                                {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 48}ms` }} /> : null}
+                            </span>
+                        ))}
                     </span>
                 ) : null}
                 {burning ? (

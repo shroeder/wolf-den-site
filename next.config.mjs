@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // The deployment this bundle was built as. A long-lived tab whose chunks all still exist can be several
+    // deploys behind and keep crashing on code that was fixed hours ago (see recoverFromStaleBuild) — comparing
+    // this against /api/build-id is how the client finds that out.
+    env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_DEPLOYMENT_ID || "dev" },
     trailingSlash: false,
     images: {
         remotePatterns: [

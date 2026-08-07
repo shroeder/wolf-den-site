@@ -64,7 +64,16 @@ export async function POST(request) {
                 if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
                 return noStore({ backgroundUrl: await generateBossBackground(body.bossId, body.prompt) });
             }
-            if (action === "release") return noStore({ boss: await releaseBoss(body.bossId, { days: body.days, notify: body.notify !== false }) });
+            // allowNoPrize is the caller SAYING OUT LOUD that a prize-less boss is intended. Without it the
+            // release is refused with code "no_prize" so a client can show the reason and offer to confirm.
+            if (action === "release") {
+                try {
+                    return noStore({ boss: await releaseBoss(body.bossId, { days: body.days, notify: body.notify !== false, allowNoPrize: body.allowNoPrize === true }) });
+                } catch (e) {
+                    if (e?.code === "no_prize") return noStore({ error: "no_prize", message: e.message }, { status: 409 });
+                    throw e;
+                }
+            }
             if (action === "setPrize") {
                 if (!body.bossId) return noStore({ error: "missing_boss" }, { status: 400 });
                 return noStore(await setBossPrize(body.bossId, { name: body.prizeName, imageUrl: body.prizeImageUrl, squareId: body.prizeSquareId }));

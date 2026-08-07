@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
+import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
+import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
 import { shipProfile, foeProfile, initBattleState, resolveRound, ORDER_LIST, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
@@ -45,9 +47,12 @@ export default function BattleLab() {
                   // A player's own rider is their hero sprite, which lives in the DB and has no file on disk. The
                   // lab borrows an arena NPC so the deck holds a real character sprite at real proportions —
                   // a UI glyph here would make the lab useless for judging how the crew sits on the boat.
-                  rider: "/images/arena/npc/veteran.webp", riderFlip: false, pet: null },
+                  rider: "/images/arena/npc/veteran.webp", riderFlip: false, pet: null,
+                  deck: boatDeck(5), ports: boatGunPorts(5, meP.guns) },
             foe: { name: foeP.name, cls: ship.cls, art: fleetArt(ship), guns: foeP.guns, hp: foeP.hp,
-                   ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false, rider: fleetCaptain(ship), riderFlip: false },
+                   ammo: foeP.ammo.id, boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false,
+                   rider: fleetCaptain(ship), riderFlip: false,
+                   deck: fleetDeck(ship.art), ports: fleetGunPorts(ship.art, foeP.guns) },
         };
         const st = initBattleState(meP, foeP);
         setLive({ me: meP, foe: foeP, state: st, meta });

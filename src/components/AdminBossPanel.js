@@ -25,9 +25,30 @@ export default function AdminBossPanel() {
             body: body ? JSON.stringify(body) : undefined,
         });
         const d = await r.json().catch(() => null);
-        if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
+        if (!r.ok) {
+            const err = new Error(d?.message || d?.error || `HTTP ${r.status}`);
+            err.code = d?.error || "";
+            throw err;
+        }
         return d;
     }, [key]);
+
+    // The server refuses a prize-less release with code "no_prize". That is not an error to show and give up
+    // on — it is a question. Answer it here so releasing without a raffle is a thing someone chose, not a
+    // thing that quietly happened, which is how a boss died with nothing to hand out and the kill
+    // announcement ended up crediting the owner with winning a giveaway that never ran.
+    const releaseBoss = useCallback(async (b) => {
+        if (!confirm(`Release "${b.name}"? This notifies EVERYONE (Discord, web + phone push).`)) return;
+        try {
+            await act(() => api("POST", { action: "release", bossId: b.id, days }), "Released + notifications sent!");
+        } catch (e) {
+            if (e?.code !== "no_prize") return;
+            if (!confirm(`${e.message}
+
+Release "${b.name}" with NO raffle prize?`)) return;
+            await act(() => api("POST", { action: "release", bossId: b.id, days, allowNoPrize: true }), "Released with no raffle prize.");
+        }
+    }, [api, days]);
 
     const load = useCallback(async () => {
         try { const d = await api("GET"); setBosses(d.bosses || []); setErr(""); } catch (e) { setErr(e.message); }
@@ -84,7 +105,7 @@ export default function AdminBossPanel() {
                             <div className="account-hub-actions">
                                 <button type="button" className="button" disabled={busy} onClick={() => act(() => api("POST", { action: "art", bossId: b.id, prompt: prompts[b.id] ?? b.description }), "Art generated.")}>{b.image_url ? "🎨 Regenerate art" : "🎨 Generate art"}</button>
                                 <label className="cart-field" style={{ maxWidth: 110 }}><span>Live for (days)</span><input type="number" value={days} onChange={(e) => setDays(e.target.value)} /></label>
-                                <button type="button" className="btn-gold" disabled={busy} onClick={() => { if (confirm(`Release "${b.name}"? This notifies EVERYONE (Discord, web + phone push).`)) act(() => api("POST", { action: "release", bossId: b.id, days }), "Released + notifications sent!"); }}>🚀 Release + notify</button>
+                                <button type="button" className="btn-gold" disabled={busy} onClick={() => releaseBoss(b)}>🚀 Release + notify</button>
                             </div>
                         </>
                     ) : b.status === "live" ? (
