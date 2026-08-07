@@ -719,7 +719,7 @@ export function describeStats(stats = {}) {
 export const SEA_META = {
     broadside: { label: "Broadside", icon: "🗡️", desc: "Your ship's cannons hit harder in a raid." },
     ironclad: { label: "Ironclad", icon: "🛡️", desc: "Your hull takes less damage from enemy volleys in a raid." },
-    plunder: { label: "Plunder", icon: "⚓", desc: "Better odds to copy a foe's item when you win a raid." },
+    plunder: { label: "Plunder", icon: "⚓", desc: "A fatter purse from every raid you win — up to +50%." },
     bounty: { label: "Bounty", icon: "💰", desc: "More gold from raid wins and the Gold Merchant." },
     dredge: { label: "Dredge", icon: "⛏️", desc: "Higher chance your dig tools proc while excavating." },
     trove: { label: "Trove", icon: "🔱", desc: "Dig up more treasure fragments per excavation." },

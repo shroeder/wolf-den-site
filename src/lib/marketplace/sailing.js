@@ -14,7 +14,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
          gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, initBattleState, resolveRound,
          MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
-import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt } from "@/lib/marketplace/fleet.js";
+import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetRankForShip } from "@/lib/marketplace/fleet.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -70,9 +70,9 @@ const BOAT_TIERS = 11;
 
 // ── RAIDS ── once/day you can raid a passing ship: a full-screen auto-battle. Win → gold (+ a rare item copy);
 // lose → shed some gold. The "Raiding" upgrade track gives a small chance the daily raid isn't consumed.
-const RAID_WIN_GOLD = () => 25 + randInt(51);   // 25–75 gold on a win
-const RAID_LOSS_MIN = 10, RAID_LOSS_MAX = 100;   // 10–100 gold lost on a loss
-const RAID_ITEM_COPY_CHANCE = 0.005;             // 0.5% to copy one random item of theirs (they keep it)
+// The old raid reward design (flat win gold, a gold penalty on defeat, a 0.5% chance to copy one of their
+// items) is gone — a raid pays out of the FLEET table now, matched to the rank the rival's ship resembles.
+// One reward design, so there is one thing to balance rather than two pulling against each other.
 // ── RAIDING IS UNDER CONSTRUCTION ────────────────────────────────────────────────────────────────────────────
 // Raids are being rebuilt as SHIP battles — cannons, hull, ammunition, a raiding currency and a board — and the
 // old player-vs-player version is live while that happens. Rather than rip it out (and lose the working sim,
@@ -109,9 +109,9 @@ const raidResetCost = (resetsToday = 0) => (RAID_RESET_PAID ? Math.round(RAID_RE
 const BADGE_RAID_MARAUDER = 25, BADGE_RAID_SCOURGE = 100, BADGE_DIG_EXCAVATOR = 50, BADGE_VOYAGER = 100;
 // Raid DEFENSE: when an attacker loses, the defender earns this cut of what the attacker lost, plus a small
 // chance at gear (rarity weighted toward the bottom, up to epic). Badges are hard — you must be raided + win.
-const DEFENSE_GOLD_PCT = 0.20;
-const DEFENSE_GEAR_CHANCE = 0.05;
-const DEFENSE_GEAR_WEIGHTS = { common: 70, rare: 24, epic: 6 };
+// The defender's cut was a share of the raider's gold penalty. There is no penalty any more — losing costs
+// the battle and nothing else, as it does against the fleet — so there is nothing to take a share OF. The
+// defender still gets the report and the badges for driving somebody off.
 const BADGE_RAID_DEFENDER = 10, BADGE_RAID_BASTION = 50;
 // Milestone thresholds for the newer sailing badges (waving, marine encounters, early voyages).
 const BADGE_WAVE_FRIENDLY = 25, BADGE_WAVE_AMBASSADOR = 100, BADGE_WAVE_BELOVED = 500;
@@ -314,7 +314,10 @@ function seaEffects(sea = {}) {
         // Raiding
         raidDmgMult: 1 + Math.min(0.4, (sea.broadside || 0) * 0.02),     // Broadside: +2% raid volley damage/pt (cap +40%)
         raidDmgReduction: Math.min(0.45, (sea.ironclad || 0) * 0.015),   // Ironclad: −1.5% incoming raid damage/pt (cap −45%)
-        raidCopyBonus: (sea.plunder || 0) * 0.0025,                      // Plunder: +0.25% item-copy/pt (total capped in doRaid)
+        // Plunder used to raise the odds of copying a beaten crew's gear. That reward is gone, so rather than
+        // leave the stat dead — and the Dread Corsair set advertising a bonus that does nothing — it now
+        // fattens what a raid actually pays: +2% per point on the purse, capped at +50%.
+        plunderBonus: Math.min(0.5, (sea.plunder || 0) * 0.02),
         goldBonus: Math.min(0.6, (sea.bounty || 0) * 0.03),             // Bounty: +3% raid/merchant gold/pt (cap +60%)
         // Digging
         digProcBonus: Math.min(0.18, (sea.dredge || 0) * 0.01),         // Dredge: +1% dig-tool proc/pt (cap +18%)
@@ -1033,7 +1036,8 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
                 usedToday: used >= cap, available: enabled && used < cap, used, cap,
                 dodgePct: raidDodgePct(raidLevel),
                 canStun: boatPerks(level).raidStun,
-                winGold: [25, 75], loseGold: [RAID_LOSS_MIN, RAID_LOSS_MAX], itemChance: RAID_ITEM_COPY_CHANCE * 100,
+                // Raids pay out of the fleet table now — the client reads the reward off the target row
+                // rather than being told a flat range that no longer exists.
                 // Buy-another-raid: cost escalates with each reset that day (free while testing).
                 reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
             };
@@ -1571,9 +1575,11 @@ export async function getRaidTargets(buyerId, limit = 12) {
             rider: r.avatar_sprite_url || r.avatar_url || null,
             riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
             items: g.count, topRarity: g.topRarity, gearRank: g.topRank,
-            // Their SHIP, in the same two numbers your own gun deck reports.
+            // Their SHIP, in the same two numbers your own gun deck reports — plus the fleet rank it fights
+            // like, which is also exactly what beating it pays.
             guns: gunsFor(r.gun_level || 0, level), hull: hullFor(r.hull_level || 0, level),
             ammo: r.loadout || "round",
+            rank: fleetRankForShip({ guns: gunsFor(r.gun_level || 0, level), hp: hullFor(r.hull_level || 0, level) }),
         };
     });
     // What YOU are bringing — needed before the sort, because the sort depends on it.
@@ -1665,90 +1671,53 @@ export async function doRaid(buyerId, targetId = null) {
     return { ok: true, battle: { ...battleView(state, meta), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
 
-// Paying out a finished RAID — the purse, the copied item, the defender's cut, the badges. Called once, from
-// shipBattleOrder, after the state row is cleared.
+// Paying out a finished RAID. ONE REWARD POOL: a rival's ship is matched to the fleet rank it most resembles
+// and paid out of the same table as everything else. The old raid-specific design — a flat 25-75 gold, a 0.5%
+// chance to copy one of their items, a gold penalty on defeat and a cut of that penalty to the defender — is
+// gone. Two reward designs meant two things to balance against each other forever, and the raid half was the
+// weaker of them: it could not pay doubloons, so raiding made you worse at raiding.
+//
+// What that costs, said plainly: there is no longer any way to take a piece of another member's gear. That was
+// the most distinctive thing about a raid, and it is the price of having one reward design.
+//
+// Losing costs the battle and nothing else, exactly as it does against the fleet. No gold penalty means there
+// is nothing to pay a defender a share OF, so the defender's bounty goes with it — they still get the report
+// and the badges for driving somebody off.
 async function finishRaidBattle(buyerId, meta, res) {
-    const target = await db.queryOne(`SELECT ${RAID_TARGET_COLS} FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id WHERE b.id = $1`, [meta.targetId]).catch(() => null);
-    const me = await db.queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const mySea = await equippedSeaAffinity(buyerId).catch(() => ({}));
-    const seaEff = seaEffects(mySea);
-    const raidExtras = await equippedRaidExtras(buyerId);
     const spoils = [];
-    let goldDelta = 0, itemWon = null;
-
     if (res.win) {
-        let plunder = 0;
-        try {
-            const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
-            plunder = await getPetSystemPerk(buyerId, "sea_plunder");
-        } catch { /* no companion, no plunder */ }
-        // ── WHAT A RAID IS WORTH ──────────────────────────────────────────────────────────────────────
-        // Doubloons used to come only from the fleet, which was survivable while the two had separate daily
-        // allowances. Sharing one pool made it fatal: every raid was a battle you did not spend on the only
-        // currency that buys guns, ammunition and hull — so raiding quietly made you worse at raiding, and
-        // nobody would ever have chosen it.
-        //
-        // A raid pays BOTH now, scaled by how much heavier the ship you took on was. Running down a warship
-        // pays like a fleet rank; picking on a rowboat pays for the trouble and no more. `weight` is their
-        // broadside-and-hull against yours, clamped so neither end is silly.
-        const theirWeight = (meta.foe?.guns || 4) + (meta.foe?.hp || 140) / 40;
-        const myWeight = (meta.me?.guns || 4) + (meta.me?.hp || 140) / 40;
-        const weight = Math.max(0.5, Math.min(2.2, theirWeight / Math.max(1, myWeight)));
-        goldDelta = Math.round(RAID_WIN_GOLD() * weight * (1 + seaEff.goldBonus + plunder / 100) * (raidExtras.doubleGold ? 2 : 1));
-        await awardXp(buyerId, "sail_raid_win", { points: 30, gold: goldDelta }).catch(() => {});
-        spoils.push({ kind: "gold", n: goldDelta });
-        const doubloons = Math.max(2, Math.round(9 * weight));
-        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, doubloons]).catch(() => {});
-        spoils.push({ kind: "doubloons", n: doubloons });
-        if (target && Math.random() < Math.min(0.16, RAID_ITEM_COPY_CHANCE + seaEff.raidCopyBonus)) {
-            const rows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [target.id]).catch(() => []);
-            const pool = rows.map((r) => itemById(r.item_id)).filter((d) => d && !isTradeLocked(d.rarity) && !isCollectionItem(d.id));
-            const item = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
-            if (item) {
-                const g = await grantItem(buyerId, item.id, "raid").catch(() => null);
-                itemWon = { id: item.id, name: item.name, rarity: item.rarity, isNew: !!g?.granted };
-                spoils.push({ kind: "item", name: item.name });
-            }
+        const rank = fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp });
+        const reward = fleetReward(rank, { first: true });
+        // Plunder (sea affinity, chiefly the Dread Corsair set) fattens the purse off a beaten crew.
+        const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
+        const bonus = 1 + seaEffects(sea).plunderBonus;
+        for (const k of ["doubloons", "gold", "xp", "fragments"]) {
+            if (reward[k]) reward[k] = Math.max(1, Math.round(reward[k] * bonus));
         }
+        const paid = await payFleetReward(buyerId, reward);
+        spoils.push(...paid);
+
         const wonRow = await db.queryOne(`UPDATE mkt_sailing SET raids_won = COALESCE(raids_won, 0) + 1 WHERE buyer_id = $1 RETURNING raids_won`, [buyerId]).catch(() => null);
         const wins = wonRow?.raids_won || 0;
         if (wins >= BADGE_RAID_MARAUDER) await grantEventBadge(buyerId, "raid_marauder").catch(() => {});
         if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
         if (res.state.myHp >= res.state.myMax) await grantEventBadge(buyerId, "raid_untouchable").catch(() => {});
-        if (itemWon) await grantEventBadge(buyerId, "raid_plunderer").catch(() => {});
         if (wins >= COSMETIC_WARBORN_WINS) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'warborn') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
-        await dropSeedFrom(buyerId, "sail_raid").catch(() => {});
-    } else if (target) {
-        const loss = RAID_LOSS_MIN + randInt(RAID_LOSS_MAX - RAID_LOSS_MIN + 1);
-        await db.query(`UPDATE mkt_buyer SET gold = GREATEST(0, gold - $2), updated_at = NOW() WHERE id = $1`, [buyerId, loss]).catch(() => {});
-        await logCoin(buyerId, -loss, "raid_loss", { meta: { foe: meta.targetName } }).catch(() => {});
-        goldDelta = -loss;
-        spoils.push({ kind: "goldLost", n: loss });
-
-        const bounty = Math.round(loss * DEFENSE_GOLD_PCT);
-        if (bounty > 0) {
-            await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [target.id, bounty]).catch(() => {});
-            await logCoin(target.id, bounty, "raid_defense", { meta: { attacker: me?.display_name || me?.alias } }).catch(() => {});
-        }
-        let defGear = null;
-        if (Math.random() < DEFENSE_GEAR_CHANCE) {
-            const rarity = weightedPickW(DEFENSE_GEAR_WEIGHTS);
-            const pool = randomDropPool((it) => it.rarity === rarity);
-            const gearDef = pool.length ? pool[randInt(pool.length)] : null;
-            if (gearDef) { await grantItem(target.id, gearDef.id, "raid_defense").catch(() => {}); defGear = gearDef.id; }
-        }
-        await db.query(`INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, gear_item_id) VALUES ($1, $2, $3, $4)`, [target.id, buyerId, bounty, defGear]).catch(() => {});
+    } else if (meta.targetId) {
+        // The defender is told they drove somebody off, and it counts toward their badges — but there is no
+        // purse attached, because the raider no longer loses one.
+        await db.query(`INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, gear_item_id) VALUES ($1, $2, 0, NULL)`, [meta.targetId, buyerId]).catch(() => {});
         const defRow = await db.queryOne(
             `INSERT INTO mkt_sailing (buyer_id, raids_defended) VALUES ($1, 1)
              ON CONFLICT (buyer_id) DO UPDATE SET raids_defended = COALESCE(mkt_sailing.raids_defended, 0) + 1 RETURNING raids_defended`,
-            [target.id]
+            [meta.targetId]
         ).catch(() => null);
         const defended = defRow?.raids_defended || 0;
-        if (defended >= BADGE_RAID_DEFENDER) await grantEventBadge(target.id, "raid_defender").catch(() => {});
-        if (defended >= BADGE_RAID_BASTION) await grantEventBadge(target.id, "raid_bastion").catch(() => {});
+        if (defended >= BADGE_RAID_DEFENDER) await grantEventBadge(meta.targetId, "raid_defender").catch(() => {});
+        if (defended >= BADGE_RAID_BASTION) await grantEventBadge(meta.targetId, "raid_bastion").catch(() => {});
     }
     if (meta.dodged) spoils.push({ kind: "free", n: 1 });
-    await trackActivity(buyerId, "sail_raid", { outcome: res.win ? "win" : "lose", foe: meta.targetName, gold: goldDelta, item: itemWon?.name ?? null }).catch(() => {});
+    await trackActivity(buyerId, "sail_raid", { outcome: res.win ? "win" : "lose", foe: meta.targetName, rank: res.win ? fleetRankForShip({ guns: meta.foe?.guns, hp: meta.foe?.hp }) : null }).catch(() => {});
     return spoils;
 }
 

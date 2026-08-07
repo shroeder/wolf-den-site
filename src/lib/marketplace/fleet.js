@@ -66,6 +66,22 @@ export const FLEET = [
 ];
 
 export const MAX_FLEET_RANK = FLEET.length;
+// ── WHAT RANK IS THAT SHIP? ──────────────────────────────────────────────────────────────────────────────────
+// A member's ship is not a rung on the ladder, but it is comparable to one: it has guns and a hull. Matching it
+// to the nearest fleet rank lets a RAID pay out of the same reward table as everything else, so there is one
+// reward design in the game rather than two that have to be balanced against each other forever.
+//
+// Compared on both dimensions because either alone lies — a gunboat with no hull and a fat trader with two
+// cannons are not the same problem, and averaging them separately would rank both as "middling".
+export function fleetRankForShip({ guns = 4, hp = 140 } = {}) {
+    let best = FLEET[0], bestGap = Infinity;
+    for (const f of FLEET) {
+        const gap = Math.abs(f.guns - guns) / 4 + Math.abs(f.hp - hp) / 200;
+        if (gap < bestGap) { bestGap = gap; best = f; }
+    }
+    return best.rank;
+}
+
 export const fleetArt = (ship) => (ship?.art ? `/images/fleet/${ship.art}.png` : null);
 export const fleetShip = (rank) => FLEET.find((f) => f.rank === Number(rank)) || null;
 

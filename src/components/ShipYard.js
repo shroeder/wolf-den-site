@@ -135,7 +135,7 @@ function RivalRow({ t, mine, busy, canFight, onRaid }) {
                     <span className={worse(t.hull, mine?.hull)}>{t.hull} hull</span>
                     <span>{t.ammo} shot</span>
                     {t.odds != null ? <span className={t.odds >= 60 ? "sby-odds is-good" : t.odds >= 35 ? "sby-odds" : "sby-odds is-bad"}>~{t.odds}%</span> : null}
-                    <span>{t.items} items</span>
+                    {t.rank ? <span>pays like rank {t.rank}</span> : null}
                 </div>
             </div>
             <button type="button" className="sby-engage" disabled={busy || !canFight} onClick={() => onRaid(t.id)}>
@@ -216,11 +216,11 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             {active === "raid" ? (
                 <>
                     <p className="sby-sub">
-                        The same fight, against a real member&apos;s ship, out of the same daily allowance. Win and you
-                        take gold and doubloons — both scaled by how much heavier their ship was than yours — plus a
-                        small chance at a copy of one of their items. They lose nothing. Lose and you drop a little
-                        gold and they take a cut for driving you off. Riskier than the fleet, and the only place a
-                        piece of somebody else&apos;s gear can come from.
+                        The same fight, against a real member&apos;s ship, out of the same daily allowance — and it
+                        pays out of the same table. Their ship is matched to the fleet rank it most resembles, so
+                        running down a warship pays like a warship. They lose nothing either way, and losing costs you
+                        the battle and nothing else. Every rival is a fresh opponent, which is what makes this the
+                        repeatable half once you have out-run the ladder.
                     </p>
                     {!targets ? (
                         <p className="sby-sub">Scanning the horizon…</p>
