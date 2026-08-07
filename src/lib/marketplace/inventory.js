@@ -2,7 +2,9 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getMemberMetrics, progressForRule, syncEarnedBadges } from "@/lib/marketplace/badges.js";
-import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, isCollectionItem, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { EQUIP_SLOTS, ITEMS, describeStats, describeSea, describeFarm, describeDepth, itemById, itemFitsSlot, sumItemStats, isTradeLocked } from "@/lib/marketplace/items.js";
+import { COLLECTION_PIECES, pieceById } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements } from "@/lib/marketplace/item-element.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
@@ -304,9 +306,10 @@ export async function getInventory(buyerId) {
                 // equipped item's UNFORGED self and called a downgrade a sidegrade.
                 forgeBonus: enh?.statBonus && Object.keys(enh.statBonus).length ? enh.statBonus : null,
                 util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
-                // A trophy, not gear: the bag draws it as a collected piece and hides Equip / Sell / Salvage,
-                // all three of which the server now refuses anyway.
-                collectionPiece: isCollectionItem(def.id) };
+                // Trophies are not items any more, so nothing in this bag can be one and the flag is always
+                // false. Kept on the payload so the client's existing branches stay valid until they are cleaned
+                // up; the collections panel reads mkt_user_collection directly.
+                collectionPiece: false };
         })
         .filter(Boolean)
         .sort((a, z) => (a.sort || 100) - (z.sort || 100));
@@ -315,6 +318,23 @@ export async function getInventory(buyerId) {
     // The gold shop: xp_shop items you don't own yet. effectiveCost folds in an active coupon so the price
     // shown + affordability match what the buy actually charges (canAfford on FULL price was a bug — an item
     // you could afford at half price still read "need more").
+    // The shop sells GEAR and the nine COLLECTION pieces priced in gold. Trophies live in their own table now,
+    // so they have to be concatenated in explicitly — leaving them to ITEMS would have quietly emptied nine
+    // shelves. A trophy shows no slot and no combat stats, because it has neither.
+    const ownedPieceIds = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    const shopPieces = COLLECTION_PIECES.filter((p) => p.source === "xp_shop" && !ownedPieceIds.has(p.id))
+        .map((p) => {
+            const cost = Math.max(0, p.xpCost || 0);
+            const effectiveCost = couponedPrice(coupon, cost);
+            const set = setForItem(p.id);
+            return {
+                id: p.id, name: p.name, slot: null, rarity: p.rarity, icon: p.icon, reqLevel: null,
+                stats: null, statsText: "", sea: p.sea || null, depth: p.depth || null, signature: null,
+                farmText: p.farm ? describeFarm(p.farm) : null,
+                setName: set?.name || null, setId: set?.id || null, collectionPiece: true,
+                cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
+            };
+        });
     const shop = ITEMS.filter((i) => i.source === "xp_shop" && !ownedIds.has(i.id))
         .map((i) => {
             const cost = Math.max(0, i.xpCost || 0);
@@ -328,14 +348,18 @@ export async function getInventory(buyerId) {
                 cost, effectiveCost, discounted: effectiveCost < cost, canAfford: gold >= effectiveCost, shop: true,
             };
         })
+        .concat(shopPieces)
         // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
         .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds]), coupon };
+    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
 export async function buyItem(buyerId, itemId) {
+    // A shop shelf can hold a trophy as well as gear. Same gold, same coupon, different bag on the way out.
+    const piece = pieceById(itemId);
+    if (piece) return buyPiece(buyerId, piece);
     const item = itemById(itemId);
     if (!item || item.source !== "xp_shop") return { ok: false, error: "not_for_sale" };
     const base = Math.max(0, item.xpCost || 0);
@@ -352,6 +376,24 @@ export async function buyItem(buyerId, itemId) {
     return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
 }
 
+// Buying a COLLECTION piece. Deliberately a sibling of buyItem rather than a branch inside it: the two share a
+// price and a coupon and nothing else — a trophy is never equipped, never sold back, and owning it is the whole
+// transaction.
+async function buyPiece(buyerId, piece) {
+    if (piece.source !== "xp_shop") return { ok: false, error: "not_for_sale" };
+    const already = await getOwnedPieceIds(buyerId).catch(() => []);
+    if (already.includes(piece.id)) return { ok: false, error: "already_owned" };
+    const cp = await previewShopCoupon(buyerId, Math.max(0, piece.xpCost || 0));
+    const cost = cp.price;
+    const row = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+    if (!row) return { ok: false, error: "not_enough_gold" };
+    await logCoin(buyerId, -cost, "buy_gear", { meta: { name: piece.name }, balanceAfter: row.gold }).catch(() => {});
+    if (cp.pct > 0) await consumeShopCoupon(buyerId);
+    await grantPiece(buyerId, piece.id, "xp_shop");
+    await trackActivity(buyerId, "buy_gear", { itemId: piece.id, name: piece.name, cost, couponPct: cp.pct || 0 });
+    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
+}
+
 // Sell an owned item back for gold. Unequips it first if worn, credits the rarity sell value, and records
 // the sale so a 'level' item never auto-re-grants itself (which would be an infinite gold farm). Charged
 // real-world-perk items can't be sold.
@@ -362,7 +404,6 @@ export async function sellItem(buyerId, itemId) {
     if (item.charged) return { ok: false, error: "not_sellable" };
     // Selling a collection piece would silently delete a permanent bonus for a handful of gold. There is no
     // version of that trade anybody takes on purpose.
-    if (isCollectionItem(itemId)) return { ok: false, error: "collection_piece" };
     const value = sellValueOf(item);
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
@@ -392,8 +433,6 @@ export async function equipItem(buyerId, slot, itemId) {
     const item = itemById(itemId);
     if (!item) throw new Error("Unknown item.");
     // A collection piece is a trophy, not gear: its bonus is already yours for owning it, so a slot spent on
-    // one buys nothing and costs whatever it displaced. See isCollectionItem in items.js.
-    if (isCollectionItem(itemId)) throw new Error("That's a collection piece — its bonus is already yours, no need to wear it.");
     if (!itemFitsSlot(item, slot)) throw new Error(`That doesn't go in the ${slot} slot.`);
     const owned = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     if (!owned) throw new Error("You don't own that item.");

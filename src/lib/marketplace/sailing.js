@@ -7,7 +7,9 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
-import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool, affinityItemIds, isCollectionItem } from "@/lib/marketplace/items.js";
+import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
+import { sumPieceSea } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds } from "@/lib/marketplace/collection-owned.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -286,11 +288,14 @@ export async function equippedSeaAffinity(buyerId) {
         db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         getOwnedItemIds(buyerId).catch(() => []),
     ]);
-    // Worn gear's sea affixes, PLUS the affix on every Corsair piece you own — those can't be equipped at all,
-    // so the loadout alone would drop them and the collection panel's "+4 Tailwind" would be a lie.
-    const gear = sumItemSea(affinityItemIds(Object.values(bySlot || {}), ownedIds));
-    for (const k in sea) sea[k] += gear[k] || 0;
-    const setSea = setSeaBonus(ownedIds);
+    // Worn gear's sea affixes, PLUS the affix on every Corsair piece you own. Trophies cannot be equipped at
+    // all, so the loadout alone would drop them and the collection panel's "+4 Tailwind" would be a lie. They
+    // come from their own table now, so the two are summed separately rather than through one id list.
+    const ownedPieces = await getOwnedPieceIds(buyerId).catch(() => []);
+    const gear = sumItemSea(Object.values(bySlot || {}));
+    const trophySea = sumPieceSea(ownedPieces);
+    for (const k in sea) sea[k] += (gear[k] || 0) + (trophySea[k] || 0);
+    const setSea = setSeaBonus(ownedPieces);
     for (const k in sea) sea[k] += setSea[k] || 0;
     const petId = me?.featured_collectible;
     const pet = petId ? collectibleById(petId) : null;
@@ -1210,11 +1215,13 @@ export async function getSailingState(buyerId, skyKey = null) {
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
     // The Corsair collection, fetched here where awaiting is allowed, then handed to the view builder.
     const collections = await (async () => {
-        const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+        const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
             import("@/lib/marketplace/sets.js"),
-            import("@/lib/marketplace/inventory.js"),
+            import("@/lib/marketplace/collection-owned.js"),
         ]);
-        return collectionsForFeature("sea", await getOwnedItemIds(buyerId).catch(() => []));
+        // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
+        // report every set as 0 collected.
+        return collectionsForFeature("sea", await ownedPieces(buyerId).catch(() => []));
     })().catch(() => []);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
@@ -1928,8 +1935,8 @@ async function payFleetReward(buyerId, reward) {
         let roll = Math.random() * total;
         let rarity = "common";
         for (const [k, w] of Object.entries(weights)) { roll -= w; if (roll <= 0) { rarity = k; break; } }
-        // isCollectionItem is excluded on purpose — collection pieces are earned by their own set, never dropped.
-        const pool = randomDropPool((i) => i.rarity === rarity && !isCollectionItem(i.id) && !i.charged);
+        // No trophy filter needed: collection pieces are not items any more, so they cannot be in this pool.
+        const pool = randomDropPool((i) => i.rarity === rarity && !i.charged);
         const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
         if (pick) {
             await grantItem(buyerId, pick.id, "ship_battle").catch(() => {});

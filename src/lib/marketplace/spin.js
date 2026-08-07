@@ -7,6 +7,8 @@ import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedIds, getOwnedItemIds } from "@/lib/marketplace/inventory.js";
 import { itemById, describeStats } from "@/lib/marketplace/items.js";
+import { pieceById } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { setWheelBonus, setWheelRespinChance } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
@@ -227,7 +229,14 @@ async function rollMiniWheel(buyerId) {
 }
 
 const gearSprite = (id) => `/images/spin/gear/${id === "wg_ring" ? "wg-gauntlet" : id.replace("_", "-")}.png`;
-const gearCard = (id) => { const it = itemById(id); return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "rare", sprite: gearSprite(id), slot: it?.slot || null, stats: it?.stats ? describeStats(it.stats) : "" }; };
+// The board's ten Wheelwarden pieces are TROPHIES now, so they resolve out of collection-pieces.js rather than
+// ITEMS. A trophy has no slot and no combat stats — it pays for being owned — so the card shows neither.
+const gearCard = (id) => {
+    const pc = pieceById(id);
+    if (pc) return { id, name: pc.name, rarity: pc.rarity, sprite: gearSprite(id), slot: null, stats: "" };
+    const it = itemById(id);
+    return { id, name: it?.name || "Wheel Gear", rarity: it?.rarity || "rare", sprite: gearSprite(id), slot: it?.slot || null, stats: it?.stats ? describeStats(it.stats) : "" };
+};
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i -= 1) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 // The BONUS GAME is a MATCH-3: a board of face-down tiles, THREE of every gear on it (so the end reveal is
@@ -235,7 +244,12 @@ const shuffle = (a) => { for (let i = a.length - 1; i > 0; i -= 1) { const j = M
 // the FIRST gear to reach three (by their own flip order) is what they win. The board is kept SERVER-SIDE so
 // tiles stay hidden — the client flips one at a time via `bonusFlip`, and the win is granted there.
 async function rollBonusGame(buyerId) {
-    const chosen = shuffle([...WHEEL_GEAR]).slice(0, BOARD_ITEMS);
+    // Never board a piece they already hold: ownership is permanent and binary, so winning a duplicate is a
+    // bonus round that pays nothing. Falls back to the full list once the set is complete, so the game still
+    // runs rather than erroring on an empty board.
+    const ownedSet = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    const fresh = WHEEL_GEAR.filter((id) => !ownedSet.has(id));
+    const chosen = shuffle([...(fresh.length >= BOARD_ITEMS ? fresh : WHEEL_GEAR)]).slice(0, BOARD_ITEMS);
     const tiles = shuffle(chosen.flatMap((id) => [id, id, id]));
     await db.query(`UPDATE mkt_buyer SET spin_bonus = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ board: tiles, flipped: [], done: false, need: 3 })]).catch(() => {});
     return { size: tiles.length, need: 3, roster: chosen.map(gearCard) };
@@ -257,7 +271,7 @@ export async function bonusFlip(buyerId, index) {
     let winner = null; let fullBoard = null;
     if (count >= (g.need || 3)) {
         g.done = true;
-        await grantItem(buyerId, revealedId, "wheel_bonus").catch(() => {});
+        await grantPiece(buyerId, revealedId, "wheel_bonus").catch(() => {});
         await trackActivity(buyerId, "spin_bonus_win", { item: revealedId }).catch(() => {});
         winner = gearCard(revealedId);
         fullBoard = g.board.map(gearCard);
@@ -391,11 +405,13 @@ export async function getSpinState(buyerId) {
         isOwner: isOwner(buyerId), // owner-only free-reset button (debugging)
         // The Wheelwarden chase — ten wheel-exclusive pieces, shown on the wheel that drops them.
         collections: await (async () => {
-            const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+            const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
                 import("@/lib/marketplace/sets.js"),
-                import("@/lib/marketplace/inventory.js"),
+                import("@/lib/marketplace/collection-owned.js"),
             ]);
-            return collectionsForFeature("wheel", await getOwnedItemIds(buyerId).catch(() => []));
+            // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
+        // report every set as 0 collected.
+        return collectionsForFeature("wheel", await ownedPieces(buyerId).catch(() => []));
         })().catch(() => []),
         jackpotPot: await getJackpotPot(), // shared progressive MAJOR JACKPOT
         wheel: (() => {

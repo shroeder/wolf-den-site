@@ -178,11 +178,13 @@ export async function farmNeighbours(viewerId, { limit = 8 } = {}) {
 
 // The farm's own collection sets, for the permanent panel on the farm screen. Owned-based (see sets.js).
 async function farmCollections(buyerId) {
-    const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+    const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
         import("@/lib/marketplace/sets.js"),
-        import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/collection-owned.js"),
     ]);
-    return collectionsForFeature("farm", await getOwnedItemIds(buyerId).catch(() => []));
+    // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
+        // report every set as 0 collected.
+        return collectionsForFeature("farm", await ownedPieces(buyerId).catch(() => []));
 }
 
 // Resolve a farm owner by @alias (for inspecting someone else's farm). Returns { id, name, alias } or null.

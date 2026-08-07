@@ -1,10 +1,12 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, isCollectionItem, STAT_META, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
+import { pieceById } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -253,7 +255,6 @@ export async function salvageItem(buyerId, itemId) {
     if (equippedSet.has(itemId)) return { ok: false, error: "equipped" };
     // A collection piece is a permanent bonus wearing an item's clothes. Melting one down for 40% of its parts
     // would quietly delete that bonus, and nobody makes that trade knowingly.
-    if (isCollectionItem(itemId)) return { ok: false, error: "collection_piece" };
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
     // Mark it SOLD (same as selling) so an auto-granted LEVEL item is never re-granted — otherwise you could
@@ -269,7 +270,10 @@ export async function salvageItem(buyerId, itemId) {
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost salvage odds
     // Blacksmith's Regalia salvage bonus — OWNED, not worn (it is a collection). The same read feeds the drop
     // roll at the bottom of this function, so the set is queried once.
-    const ownedReg = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, REGALIA_IDS]).catch(() => [])).map((r) => r.item_id));
+    // Regalia lives in mkt_user_collection now, not the item bag. Narrowed to the regalia ids on purpose —
+    // getOwnedPieceIds returns EVERY trophy you hold, and counting a Delver's lamp toward the salvage bonus
+    // would hand out the full-set perk to anyone with five pieces of anything.
+    const ownedReg = new Set((await getOwnedPieceIds(buyerId).catch(() => [])).filter((id) => REGALIA_IDS.includes(id)));
     const rb = regaliaBonus(ownedReg.size);
     let n = randInt(cfg.min, cfg.max);
     let doubled = false;
@@ -299,7 +303,7 @@ export async function salvageItem(buyerId, itemId) {
     // Rare Regalia piece drop (the "salvaging set" loop) — only pieces you don't own yet.
     let regaliaDrop = null;
     const unowned = REGALIA_IDS.filter((r) => !ownedReg.has(r));
-    if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantItem(buyerId, pick, "forge").catch(() => {}); regaliaDrop = itemById(pick)?.name || pick; }
+    if (unowned.length && Math.random() < REGALIA_DROP) { const pick = unowned[Math.floor(Math.random() * unowned.length)]; await grantPiece(buyerId, pick, "forge").catch(() => {}); regaliaDrop = pieceById(pick)?.name || pick; }
     // Salvaging is done in bulk — 585 times a week — so this reads small per action and lands as 5% of all XP.
     const xp = 4 + cfg.tier * 3;
     await awardXp(buyerId, "craft_salvage", { points: xp, gold: 0 }).catch(() => {});
@@ -469,13 +473,9 @@ export async function getForgeState(buyerId) {
             util: describeUtil(enh?.util),
         };
     };
-    // Collection pieces are NOT salvage stock. salvageItem() has always refused them (see the guard above), but
-    // this list never filtered them, so the Forge sat there offering you a Forgeplate that "yields Tempered
-    // Steel" and the tap came back as an error. Every other surface in the game already gets this right — the
-    // bag hides Equip/Sell/Salvage on them, the auction and trade both drop them — this was the one list that
-    // still described a trophy as raw material.
+    // No trophy filter: mkt_user_item holds gear only now, so a Forgeplate cannot appear in this list at all.
     const salvage = (ownedRows || []).map((r) => r.item_id)
-        .filter((id) => !equippedIds.has(id) && !isCollectionItem(id))
+        .filter((id) => !equippedIds.has(id))
         .map(dress).filter(Boolean)
         .map((d) => { const cfg = SALVAGE[d.rarity] || SALVAGE.common; return { ...d, salvageMin: cfg.min, salvageMax: cfg.max }; })
         .sort((a, b) => b.salvageTier - a.salvageTier || a.name.localeCompare(b.name));

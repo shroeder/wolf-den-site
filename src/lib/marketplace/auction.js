@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { itemById, describeStats, describeFarm, describeSea, describeDepth, STAT_META, EQUIP_SLOTS, isTradeLocked, isCollectionItem } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeFarm, describeSea, describeDepth, STAT_META, EQUIP_SLOTS, isTradeLocked } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -146,7 +146,7 @@ export async function getSellableItems(buyerId) {
     const listedSet = new Set(listed.map((r) => r.item_id));
     // Collection pieces are excluded: they're never equipped now, so without this every trophy would sit at the
     // top of the sell list — and auctioning one silently deletes the permanent bonus owning it pays.
-    const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id) && !isTradeLocked(itemById(id).rarity) && !isCollectionItem(id));
+    const sellableIds = owned.map((r) => r.item_id).filter((id) => !equippedSet.has(id) && !listedSet.has(id) && itemById(id) && !isTradeLocked(itemById(id).rarity));
     const enh = await enhanceDetailsFor(buyerId, sellableIds).catch(() => ({}));
     return sellableIds
         .map((id) => {
@@ -253,7 +253,6 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
     const it = itemById(itemId);
     if (!it) return { ok: false, error: "unknown_item" };
     if (isTradeLocked(it.rarity)) return { ok: false, error: "item_bound" }; // Ascendant+ is bound — can't be auctioned
-    if (isCollectionItem(itemId)) return { ok: false, error: "collection_piece" }; // owning it IS the bonus — see items.js
     const p = Math.floor(Number(price) || 0);
     if (p < MIN_PRICE || p > MAX_PRICE) return { ok: false, error: "bad_price" };
     const d = DURATIONS.includes(Number(days)) ? Number(days) : 3;

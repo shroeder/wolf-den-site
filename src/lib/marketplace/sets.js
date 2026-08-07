@@ -1,6 +1,11 @@
 import "server-only";
 
-import { itemById, describeStats, describeSea, describeFarm, describeDepth, registerCollectionItems, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, describeSea, describeFarm, describeDepth, SEA_META, DEPTH_META } from "@/lib/marketplace/items.js";
+import { pieceById } from "@/lib/marketplace/collection-pieces.js";
+
+// A set's members are gear OR trophies, and after the collection migration the two live in different tables.
+// This is the only place that has to care: everything downstream just wants a name, a rarity and an icon.
+const defOf = (id) => itemById(id) || pieceById(id);
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 
@@ -231,9 +236,10 @@ export const ITEM_SETS = [
 const fullNeed = (set) => set.full || set.items.length;
 
 const SET_BY_ID = Object.fromEntries(ITEM_SETS.map((s) => [s.id, s]));
-// Tell items.js which ids are trophies rather than gear, so equip / sell / salvage can refuse them without
-// importing this module (which imports items.js — the cycle this registration exists to avoid).
-registerCollectionItems(ITEM_SETS.filter((s) => s.collection).flatMap((s) => s.items));
+// There is nothing to register any more. Trophies used to be ITEMS that equip / sell / salvage / auction /
+// trade each had to remember to refuse, and this line published the list of ids for them to check against.
+// They are their own table now (collection-pieces.js), so a piece id simply does not resolve as an item and
+// the category error is impossible rather than merely forbidden.
 const SET_BY_ITEM = {};
 for (const set of ITEM_SETS) for (const id of set.items) SET_BY_ITEM[id] = set;
 
@@ -472,7 +478,7 @@ export function getSetsOverview(equippedIds, ownedIds) {
     const visible = ITEM_SETS.filter((s) => !s.ownerOnly || s.items.some((id) => own.has(id) || eq.has(id)));
     return visible.map((set) => {
         const pieces = set.items.map((id) => {
-            const it = itemById(id);
+            const it = defOf(id);
             const sig = signatureFor(id);
             return {
                 id,

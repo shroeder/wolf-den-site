@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, describeStats, isTradeLocked, isCollectionItem } from "@/lib/marketplace/items.js";
+import { itemById, describeStats, isTradeLocked } from "@/lib/marketplace/items.js";
 import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -113,7 +113,6 @@ export async function listTradeableItems(viewerId, { q = "", rarity = null, limi
         const it = itemById(r.item_id);
         if (!it) continue;
         if (isTradeLocked(it.rarity)) continue; // Ascendant+ is bound — never browsable for trade
-        if (isCollectionItem(r.item_id)) continue; // a collection piece pays its bonus for being OWNED — trading it away deletes that
         if (rarity && it.rarity !== rarity) continue;
         if (query && !it.name.toLowerCase().includes(query) && !(r.alias || "").toLowerCase().includes(query)) continue;
         const det = enhMap.get(`${r.buyer_id}|${r.item_id}`);
@@ -229,10 +228,6 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
     // Ascendant+ gear is bound — it can't be traded either way.
     const lockedId = [...oItems, ...rItems].find((id) => isTradeLocked(itemById(id)?.rarity));
     if (lockedId) return { ok: false, error: "item_bound", itemName: itemById(lockedId)?.name || lockedId };
-    // Collection pieces pay their bonus for being OWNED, not worn — handing one over silently deletes a permanent
-    // upgrade for the giver, the same reason sell and salvage refuse them. See isCollectionItem in items.js.
-    const collId = [...oItems, ...rItems].find((id) => isCollectionItem(id));
-    if (collId) return { ok: false, error: "collection_piece", itemName: itemById(collId)?.name || collId };
 
     // Pets: offered must be MY earned+tradeable pets the recipient doesn't already own; requested must be
     // THEIR earned+tradeable pets I don't already own.
@@ -337,13 +332,8 @@ export async function respondTrade(userId, offerId, action) {
     const offeredItems = Array.isArray(o.offered_items) ? o.offered_items : [];
     const requestedItems = Array.isArray(o.requested_items) ? o.requested_items : [];
     const [mineStill, theirsStill] = await Promise.all([ownedSet(o.from_buyer_id, offeredItems), ownedSet(userId, requestedItems)]);
-    // An offer written before collection pieces stopped being tradeable would still swap one away. Void it —
-    // the proposer gets their escrow back and nobody loses a permanent bonus to a stale offer.
-    if ([...offeredItems, ...requestedItems].some((id) => isCollectionItem(id))) {
-        await db.query(`UPDATE mkt_trade_offer SET status='void', resolved_at=NOW() WHERE id=$1 AND status='pending'`, [offerId]).catch(() => {});
-        await refund(o);
-        return { ok: false, error: "collection_piece" };
-    }
+    // A trophy can no longer BE in an offer — it is not an item, so ownedSet() below will not find it and the
+    // stale-offer path voids it anyway. The dedicated guard is gone with the category.
     // If either side no longer holds what they committed (sold/traded/shattered since), void the stale
     // offer and refund the escrow instead of leaving it dangling.
     if (offeredItems.some((id) => !mineStill.has(id))) {

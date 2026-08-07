@@ -237,6 +237,17 @@ export async function openChest(buyerId, tier) {
     // everything common→mythic comes from the normal loot pool. This lets a chest's spread span both tiers
     // (e.g. an Ascendant chest that under-rolls to mythic still grants a real mythic item).
     const isEliteRarity = rarity === "ascendant" || rarity === "eternal";
+    // The four Corsair trophies come out of chests and used to be in CHEST_POOL because they were items. They
+    // are their own table now, so a chest has to ask for them explicitly or the set becomes unobtainable.
+    // Rolled at the same rarity, uncommonly, and never a duplicate.
+    if (!isEliteRarity) {
+        const { rollPieceDrop } = await import("@/lib/marketplace/collection-owned.js");
+        const trophy = await rollPieceDrop(buyerId, { source: "chest", rarity, chance: 0.12 }).catch(() => null);
+        if (trophy) {
+            return { ok: true, remaining: dec.count, piece: true,
+                item: { id: trophy.id, name: trophy.name, rarity: trophy.rarity, slot: null, icon: trophy.icon, stats: null, reqLevel: null, signature: null, charged: false, chargeReward: null } };
+        }
+    }
     const pool = isEliteRarity ? ELITE_POOL : CHEST_POOL;
     // Prefer the rolled rarity; if you own them all, widen to any un-owned pool item before falling to dust.
     let candidates = pool.filter((i) => i.rarity === rarity && !owned.has(i.id));

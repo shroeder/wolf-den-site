@@ -253,7 +253,6 @@ export const ITEMS = [
     { id: "cinder_axe", name: "Cinder Axe", slot: "main_hand", rarity: "epic", icon: "GiFireAxe", flavor: "Still warm from the forge.", stats: { might: 22 }, sea: { broadside: 5 }, depth: { hew: 4 }, reqLevel: 34, source: "chest", sort: 203 },
     { id: "storm_katana", name: "Stormedge Katana", slot: "main_hand", rarity: "legendary", icon: "GiKatana", flavor: "Lightning follows the blade.", stats: { might: 16, crit_power: 14 }, sea: { broadside: 6 }, depth: { hew: 5 }, reqLevel: 60, source: "chest", sort: 204 },
     { id: "reapers_scythe", name: "Reaper's Scythe", slot: "main_hand", rarity: "legendary", icon: "GiScythe", flavor: "It only asks once.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 66, source: "chest", sort: 205 },
-    { id: "heavens_trident", name: "Heaven's Trident", slot: "main_hand", rarity: "mythic", icon: "GiTrident", flavor: "Forged for a god of storms.", stats: { might: 24, crit_power: 16 }, sea: { plunder: 8 }, reqLevel: 92, source: "chest", sort: 206 },
     // -- Off hand --
     { id: "oak_buckler", name: "Oak Buckler", slot: "off_hand", rarity: "common", icon: "GiWoodFrame", flavor: "Humble oak — doubles as a harvest tray.", stats: { ferocity: 7, fortune: 4 }, farm: { harvestLuck: 4 }, reqLevel: 5, source: "chest", sort: 210 },
     { id: "spiked_shield", name: "Spiked Shield", slot: "off_hand", rarity: "rare", icon: "GiShieldBash", flavor: "Defense that bites back.", stats: { might: 5, ferocity: 11 }, reqLevel: 20, source: "chest", sort: 211 },
@@ -297,7 +296,6 @@ export const ITEMS = [
     // -- Rings --
     { id: "band_valor", name: "Band of Valor", slot: "ring", rarity: "common", icon: "GiRing", flavor: "A soldier's first ring — later, a farmer's.", stats: { might: 7, ferocity: 4 }, farm: { fertPower: 4 }, reqLevel: 6, source: "chest", sort: 270 },
     { id: "ring_embers", name: "Ring of Embers", slot: "ring", rarity: "rare", icon: "GiFireRing", flavor: "Warm to the touch.", stats: { might: 11, crit_chance: 5 }, reqLevel: 24, source: "chest", sort: 271 },
-    { id: "fortune_signet", name: "Signet of Fortune", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "The house always wins.", stats: { fortune: 22 }, sea: { bounty: 6 }, depth: { crucible: 4 }, reqLevel: 36, source: "chest", sort: 272 },
     { id: "ring_titans", name: "Ring of Titans", slot: "ring", rarity: "legendary", icon: "GiPowerRing", flavor: "Power beyond measure.", stats: { might: 16, crit_power: 14 }, reqLevel: 66, source: "chest", sort: 273 },
     { id: "kings_eternal", name: "Eternal King's Ring", slot: "ring", rarity: "mythic", icon: "GiBigDiamondRing", flavor: "Worn by every ruler who mattered.", stats: { might: 13, fortune: 27 }, reqLevel: 98, source: "chest", sort: 274 },
 
@@ -347,7 +345,6 @@ export const ITEMS = [
     // -- Belt --
     { id: "chain_belt", name: "Chain Belt", slot: "belt", rarity: "common", icon: "GiBelt", flavor: "Links that hold.", stats: { might: 5, ferocity: 6 }, reqLevel: 6, source: "chest", sort: 360 },
     { id: "runners_sash", name: "Runner's Sash", slot: "belt", rarity: "rare", icon: "GiBlackBelt", flavor: "Light on the waist.", stats: { ferocity: 16 }, reqLevel: 20, source: "chest", sort: 361 },
-    { id: "girded_plate", name: "Girded Plate", slot: "belt", rarity: "epic", icon: "GiBeltArmor", flavor: "Cinch the armor down.", stats: { might: 22 }, sea: { trove: 5 }, depth: { nerve: 4 }, reqLevel: 40, source: "chest", sort: 362 },
     { id: "kings_sash", name: "King's Sash", slot: "belt", rarity: "legendary", icon: "GiBelt", flavor: "Gilded and grand.", stats: { might: 14, fortune: 16 }, reqLevel: 62, source: "chest", sort: 363 },
     { id: "world_girdle", name: "Girdle of the World", slot: "belt", rarity: "mythic", icon: "GiBlackBelt", flavor: "It holds up more than your pants.", stats: { ferocity: 40 }, reqLevel: 92, source: "chest", sort: 364 },
     // -- Rings --
@@ -368,7 +365,6 @@ export const ITEMS = [
     // -- Off hand --
     { id: "fire_ward", name: "Fire Ward", slot: "off_hand", rarity: "common", icon: "GiFireShield", flavor: "Warm to hold.", stats: { ferocity: 7, crit_power: 4 }, reqLevel: 5, source: "chest", sort: 410 },
     { id: "frost_barrier", name: "Frost Barrier", slot: "off_hand", rarity: "rare", icon: "GiIceGolem", flavor: "A wall of ice.", stats: { might: 5, ferocity: 11 }, sea: { ironclad: 5 }, reqLevel: 20, source: "chest", sort: 411 },
-    { id: "orb_of_tides", name: "Orb of Tides", slot: "off_hand", rarity: "epic", icon: "GiFloatingCrystal", flavor: "The sea answers it.", stats: { ferocity: 8, fortune: 14 }, sea: { dredge: 5 }, reqLevel: 34, source: "chest", sort: 412 },
     { id: "worldshield", name: "Worldshield", slot: "off_hand", rarity: "mythic", icon: "GiWorld", flavor: "It carries the sky.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 92, source: "chest", sort: 413 },
     // -- Helmet --
     { id: "iron_hood", name: "Iron Hood", slot: "helmet", rarity: "common", icon: "GiHood", flavor: "Keeps your head down.", stats: { ferocity: 7, fortune: 4 }, reqLevel: 4, source: "chest", sort: 420 },
@@ -534,7 +530,6 @@ export const ITEMS = [
     { id: "wings_of_dawn", name: "Wings of Dawn", slot: "back", rarity: "legendary", icon: "GiAngelWings", flavor: "First light, given form.", stats: { fortune: 15, crit_chance: 15 }, reqLevel: 48, source: "chest", sort: 815 },
     { id: "oblivion_wings", name: "Wings of Oblivion", slot: "back", rarity: "mythic", icon: "GiBatwingEmblem", flavor: "They blot out the sun.", stats: { ferocity: 25, crit_power: 15 }, reqLevel: 92, source: "chest", sort: 816 },
     // -- Gold shop --
-    { id: "merchants_cape", name: "Merchant's Cape", slot: "back", rarity: "rare", icon: "GiWingCloak", flavor: "Lined with lucky coin.", stats: { fortune: 16 }, sea: { tailwind: 4 }, reqLevel: 10, source: "xp_shop", xpCost: 1400, sort: 820 },
     { id: "gilded_mantle", name: "Gilded Mantle", slot: "back", rarity: "epic", icon: "GiCondorEmblem", flavor: "Wealth worn well.", stats: { might: 12, fortune: 10 }, reqLevel: 26, source: "xp_shop", xpCost: 3200, sort: 821 },
     { id: "celestial_cloak", name: "Celestial Cloak", slot: "back", rarity: "legendary", icon: "GiCurlyWing", flavor: "Cut from the night sky.", stats: { crit_chance: 12, crit_power: 18 }, reqLevel: 46, source: "xp_shop", xpCost: 14000, sort: 822 },
     { id: "void_shroud", name: "Void Shroud", slot: "back", rarity: "mythic", icon: "GiFalconMoon", flavor: "It drinks the light.", stats: { ferocity: 20, fortune: 20 }, reqLevel: 90, source: "xp_shop", xpCost: 90000, sort: 823 },
@@ -555,37 +550,14 @@ export const ITEMS = [
     // -- FARM GEAR SETS -- utility pieces with FARM affixes (weak in combat, strong in the garden). Bought with
     // gold in the gear shop. Full-set capstones apply in farm-crops.js. See ITEM_SETS in sets.js.
     // Harvester's Garb — reaping & harvest gold; full set = a chance each harvest yields DOUBLE.
-    { id: "harvesters_hat", name: "Harvester's Sun Hat", slot: "helmet", rarity: "rare", icon: "GiFarmer", flavor: "Wide brim, wider yield — the sun works for you now.", stats: { fortune: 6, ferocity: 4 }, farm: { growSpeed: 4 }, reqLevel: 8, source: "xp_shop", xpCost: 700, sort: 930 },
-    { id: "reapers_girdle", name: "Reaper's Girdle", slot: "belt", rarity: "rare", icon: "GiRolledCloth", flavor: "A sheaf-binder's belt, hung with twine and a whetstone.", stats: { fortune: 5, might: 5 }, farm: { goldHarvest: 6 }, reqLevel: 8, source: "xp_shop", xpCost: 800, sort: 931 },
-    { id: "sheafbound_cloak", name: "Sheafbound Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Woven from the last golden stalks of autumn.", stats: { fortune: 8, crit_chance: 4 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2200, sort: 932 },
-    { id: "amber_grain_pendant", name: "Amber Grain Pendant", slot: "amulet", rarity: "epic", icon: "GiAmberMosquito", flavor: "A single wheat-berry, sealed in honey-gold amber.", stats: { fortune: 9, ferocity: 3 }, farm: { goldHarvest: 7 }, reqLevel: 14, source: "xp_shop", xpCost: 2400, sort: 933 },
     // Forager's Kit — finding & nurturing seeds; full set = crops grow 15% faster.
-    { id: "foragers_basket", name: "Forager's Basket", slot: "off_hand", rarity: "rare", icon: "GiBasket", flavor: "Never comes home empty — there's always one more seed.", stats: { ferocity: 6, fortune: 4 }, farm: { seedLuck: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 750, sort: 934 },
-    { id: "clover_signet", name: "Clover Signet", slot: "ring", rarity: "rare", icon: "GiClover", flavor: "A pressed four-leaf clover set under glass.", stats: { fortune: 7, crit_chance: 3 }, farm: { seedLuck: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 850, sort: 935 },
-    { id: "deep_seed_pouch", name: "Deep Seed Pouch", slot: "belt", rarity: "epic", icon: "GiSwapBag", flavor: "Bottomless — the good soil's secrets travel with you.", stats: { fortune: 6, might: 4 }, farm: { growSpeed: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2100, sort: 936 },
-    { id: "foxglove_charm", name: "Foxglove Charm", slot: "amulet", rarity: "epic", icon: "GiThreeLeaves", flavor: "Wildflower magic, carried close to the heart.", stats: { fortune: 8, crit_chance: 3 }, farm: { harvestLuck: 5 }, reqLevel: 14, source: "xp_shop", xpCost: 2300, sort: 937 },
 
     // ===== BLACKSMITH'S REGALIA (source: "forge") — the "salvaging set". Pieces drop rarely from salvaging at
     // the Forge (owner-only); wearing 3/5 boosts your salvage output. Not sold, not level-granted.
-    { id: "regalia_visor", name: "Smith's Visor", slot: "helmet", rarity: "epic", icon: "GiVisoredHelm", flavor: "Soot-blackened, its slit glows with hearthlight.", stats: { crit_chance: 8, ferocity: 10 }, forgeSet: true, source: "forge", sort: 950 },
-    { id: "regalia_plate", name: "Forgeplate", slot: "chest", rarity: "epic", icon: "GiBreastplate", flavor: "Hammered from a hundred salvaged blades.", stats: { might: 8, ferocity: 14 }, forgeSet: true, source: "forge", sort: 951 },
-    { id: "regalia_girdle", name: "Ember Girdle", slot: "belt", rarity: "epic", icon: "GiBelt", flavor: "Warm to the touch, always.", stats: { might: 10, fortune: 8 }, forgeSet: true, source: "forge", sort: 952 },
-    { id: "regalia_boots", name: "Cinderstride Boots", slot: "boots", rarity: "epic", icon: "GiLeatherBoot", flavor: "Leave faintly glowing footprints on cold stone.", stats: { ferocity: 18 }, forgeSet: true, source: "forge", sort: 953 },
-    { id: "regalia_cloak", name: "Bellows Cloak", slot: "back", rarity: "epic", icon: "GiCape", flavor: "Billows like a forge fire catching air.", stats: { fortune: 12, crit_power: 8 }, forgeSet: true, source: "forge", sort: 954 },
 
     // ── Wheel-exclusive gear — only from the Prize Wheel's match-3 BONUS GAME (source "wheel_bonus"). RARE
     // (blue) on purpose — a fun pull, not the strong purple/epic gear we don't normally hand out. AI sprites in
     // mkt_item_sprite (mig250/251). Not in any other drop table. ──
-    { id: "wg_helm", name: "Dire Wolf Helm", slot: "helmet", rarity: "rare", icon: "GiWolfHead", flavor: "Won from the wheel — the pack marches with you.", stats: { might: 6, crit_chance: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 970 },
-    { id: "wg_blade", name: "Fanged Saber", slot: "main_hand", rarity: "rare", icon: "GiSaber", flavor: "A lucky pull with a keen edge.", stats: { might: 12, crit_power: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 971 },
-    { id: "wg_shield", name: "Wolfcrest Aegis", slot: "off_hand", rarity: "rare", icon: "GiShield", flavor: "Fortune favors the guarded.", stats: { ferocity: 9, might: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 972 },
-    { id: "wg_cloak", name: "Nightprowler Cloak", slot: "back", rarity: "rare", icon: "GiCape", flavor: "Slips through the dark like a rumor.", stats: { might: 6, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 973 },
-    { id: "wg_amulet", name: "Wolf-Fang Amulet", slot: "amulet", rarity: "rare", icon: "GiFangs", flavor: "Still warm from the wheel's glow.", stats: { crit_power: 9, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 974 },
-    { id: "wg_ring", name: "Ironclaw Band", slot: "ring", rarity: "rare", icon: "GiClaws", flavor: "A clawed circlet, wheel-forged.", stats: { might: 6, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 975 },
-    { id: "wg_chest", name: "Wolfhide Cuirass", slot: "chest", rarity: "rare", icon: "GiChestArmor", flavor: "Supple hide, steel where it counts.", stats: { ferocity: 11, might: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 976 },
-    { id: "wg_belt", name: "Fangbite Belt", slot: "belt", rarity: "rare", icon: "GiBelt", flavor: "Buckled with a snarling wolf.", stats: { might: 7, fortune: 5 }, reqLevel: 5, source: "wheel_bonus", sort: 977 },
-    { id: "wg_boots", name: "Prowler Boots", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Quiet on any trail.", stats: { ferocity: 11 }, reqLevel: 5, source: "wheel_bonus", sort: 978 },
-    { id: "wg_axe", name: "Moonhowl Axe", slot: "main_hand", rarity: "rare", icon: "GiBattleAxe", flavor: "It hums under a full moon.", stats: { might: 13, crit_chance: 4 }, reqLevel: 5, source: "wheel_bonus", sort: 979 },
 
     // ── THE DEPTHS SETS ── three sets, one per verb the Mine actually asks of you, carrying DEPTH affinity
     // (see DEPTH_META). They were ownerOnly until the mine launched; now they drop like any other gear, with
@@ -595,22 +567,10 @@ export const ITEMS = [
     // make you better at the tunnel, not better at the boss, or the mine becomes the only way to gear up.
 
     // DELVING — the push-your-luck descent. Nerve keeps the roof up, Lodesense finds the good rock.
-    { id: "dv_lamp_helm", name: "Deeplamp Helm", slot: "helmet", rarity: "rare", icon: "GiMiningHelmet", flavor: "The flame gutters when the air goes bad. Listen to it.", stats: { ferocity: 6, fortune: 4 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", sort: 980 },
-    { id: "dv_rope_belt", name: "Knotted Descent Belt", slot: "belt", rarity: "rare", icon: "GiRope", flavor: "Forty feet of rope and every knot tied twice.", stats: { might: 5, ferocity: 5 }, depth: { nerve: 4 }, reqLevel: 8, source: "mining", sort: 981 },
-    { id: "dv_lodestone", name: "Lodestone Pendant", slot: "amulet", rarity: "epic", icon: "GiCompass", flavor: "It pulls toward the richest rock. Follow it, not your gut.", stats: { fortune: 9 }, depth: { lodesense: 5 }, reqLevel: 16, source: "mining", sort: 982 },
-    { id: "dv_shoring_pack", name: "Shoring Pack", slot: "back", rarity: "epic", icon: "GiBackpack", flavor: "Timber, wedges, and the discipline to stop and use them.", stats: { ferocity: 8, might: 4 }, depth: { nerve: 5, lodesense: 3 }, reqLevel: 16, source: "mining", sort: 983 },
 
     // MINING — the seam at the rock face. Hew is yield, Prospecting is what else the rock was hiding.
-    { id: "rb_maul", name: "Rockbreaker's Maul", slot: "main_hand", rarity: "epic", icon: "GiWarPick", flavor: "Not a weapon. It has simply never been told that.", stats: { might: 14 }, depth: { hew: 6 }, reqLevel: 14, source: "mining", sort: 984 },
-    { id: "rb_gauntlet", name: "Hewer's Gauntlets", slot: "off_hand", rarity: "rare", icon: "GiGauntlet", flavor: "Leather worn to the shape of a haft.", stats: { might: 7, crit_power: 5 }, depth: { hew: 4 }, reqLevel: 8, source: "mining", sort: 985 },
-    { id: "rb_assay_ring", name: "Assayer's Ring", slot: "ring", rarity: "epic", icon: "GiRingedBeam", flavor: "Rubbed on the stone, it tells you what you're standing in.", stats: { fortune: 10 }, depth: { prospect: 5 }, reqLevel: 16, source: "mining", sort: 986 },
-    { id: "rb_hobnails", name: "Hobnailed Treads", slot: "boots", rarity: "rare", icon: "GiLeatherBoot", flavor: "Iron studs bite the scree so you don't.", stats: { ferocity: 9 }, depth: { prospect: 3, hew: 2 }, reqLevel: 8, source: "mining", sort: 987 },
 
     // SMELTING — the furnace. Bellows is extra parts, Crucible is what survives the slag.
-    { id: "fd_apron", name: "Founder's Scale Apron", slot: "chest", rarity: "epic", icon: "GiLeatherVest", flavor: "Scarred by forty years of sparks and not one burn through.", stats: { ferocity: 10, might: 4 }, depth: { bellows: 5 }, reqLevel: 16, source: "mining", sort: 988 },
-    { id: "fd_tongs", name: "Long Crucible Tongs", slot: "off_hand", rarity: "epic", icon: "GiTongs", flavor: "Long enough to keep your eyebrows.", stats: { might: 6, crit_chance: 6 }, depth: { crucible: 5 }, reqLevel: 16, source: "mining", sort: 989 },
-    { id: "fd_bellows_charm", name: "Bellows Charm", slot: "amulet", rarity: "rare", icon: "GiWindHole", flavor: "A scrap of the old forge's leather, kept for luck.", stats: { fortune: 7 }, depth: { bellows: 4 }, reqLevel: 8, source: "mining", sort: 990 },
-    { id: "fd_slagsifter", name: "Slagsifter's Ring", slot: "ring", rarity: "rare", icon: "GiRing", flavor: "Everyone else throws the clinker out.", stats: { fortune: 8 }, depth: { crucible: 4 }, reqLevel: 8, source: "mining", sort: 991 },
 ];
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
@@ -669,22 +629,10 @@ export function itemById(id) {
 // They are also not SELLABLE or SALVAGEABLE. The bonus follows the piece, so parting with one silently removes
 // a permanent upgrade, and there is no version of that trade a player would knowingly take for 40 parts.
 //
-// The list is derived from sets.js at import time rather than hand-maintained here — a second list of ids is a
-// second thing to forget when a set gains a piece.
-// The ids themselves are REGISTERED by sets.js when it loads, rather than read from it here: items.js is
-// imported BY sets.js, so importing back would be a cycle. One list, one owner, no second place to forget.
-let COLLECTION_ITEM_IDS = new Set();
-export function registerCollectionItems(ids) { COLLECTION_ITEM_IDS = new Set(ids || []); }
-export const isCollectionItem = (itemId) => COLLECTION_ITEM_IDS.has(itemId);
-
-// The list every AFFINITY aggregate (farm / sea / depth) should sum over: what you WEAR, plus every collection
-// piece you OWN. Collection pieces can't be equipped, so summing the loadout alone silently drops their own
-// affix block — the Merchant's Cape would show "+4 Tailwind" on the collection panel and grant nothing. A set's
-// TIERS were already moved to ownership; the affix printed on the piece has to move with them or the piece is
-// the only thing in the game whose stat line is decorative. Union'd through a Set so a stale equipment row
-// (there shouldn't be one) can never count a piece twice.
-export const affinityItemIds = (equippedIds = [], ownedIds = []) =>
-    [...new Set([...(equippedIds || []).filter(Boolean), ...(ownedIds || []).filter((id) => isCollectionItem(id))])];
+// COLLECTION PIECES USED TO LIVE HERE. They were ITEMS with a registry of ids that equip / sell / salvage /
+// auction / trade / drop-pools each had to check against, and the rule only held while every author remembered
+// it. They are their own table now — see collection-pieces.js — so a trophy id does not resolve as an item and
+// there is nothing left to guard against.
 
 export function itemFitsSlot(item, slot) {
     if (!item) return false;

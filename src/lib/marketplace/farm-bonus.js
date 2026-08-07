@@ -4,7 +4,9 @@ import { db } from "@/lib/db";
 import { BUFF_CAP, emptyFarmBuffs } from "@/lib/marketplace/decorations.js";
 import { placedDecoBuffs } from "@/lib/marketplace/farm-decorations.js";
 import { getOwnedItemIds, getEquippedIds } from "@/lib/marketplace/inventory.js";
-import { sumItemFarm, affinityItemIds } from "@/lib/marketplace/items.js";
+import { sumItemFarm } from "@/lib/marketplace/items.js";
+import { sumPieceFarm } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds } from "@/lib/marketplace/collection-owned.js";
 import { setFarmBonus } from "@/lib/marketplace/sets.js";
 import { collectibleById, petFarmPassive } from "@/lib/marketplace/collectibles.js";
 import { getBadgeFarm } from "@/lib/marketplace/badges.js";
@@ -33,10 +35,15 @@ export async function farmBonuses(buyerId) {
         getOwnedItemIds(buyerId).catch(() => []), // (b2) the farm COLLECTION sets count what you own, not what you wear
     ]);
     const equippedList = Object.values(bySlot || {});
-    const gearFarm = sumItemFarm(affinityItemIds(equippedList, ownedIds));
+    // Worn gear's farm affixes plus every Harvester/Forager trophy you own. Trophies live in their own table
+    // and cannot be worn, so the two are summed from two sources and added together.
+    const ownedPieces = await getOwnedPieceIds(buyerId).catch(() => []);
+    const gearFarm = sumItemFarm(equippedList);
+    const trophyFarm = sumPieceFarm(ownedPieces);
+    for (const k of Object.keys(trophyFarm)) gearFarm[k] = (gearFarm[k] || 0) + trophyFarm[k];
     // (b2) FARM set tiers (Harvester / Forager). COLLECTION sets: owning the piece is what counts, so this
     // reads the owned list — nobody has to keep a farming loadout to farm well any more.
-    const setFarm = setFarmBonus(ownedIds);
+    const setFarm = setFarmBonus(ownedPieces);
     const utilFarm = utilTotals.farm || {};
     // (a) decorations + (b) equipped gear farm affixes + (b2) farm set bonuses + (d) farm/pet badges + (e) forge attunements
     for (const k of Object.keys(out)) out[k] = (deco[k] || 0) + (gearFarm[k] || 0) + (setFarm[k] || 0) + (badgeFarm[k] || 0) + (utilFarm[k] || 0);

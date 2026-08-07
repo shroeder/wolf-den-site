@@ -148,20 +148,23 @@ async function computeDepthAffinity(buyerId) {
     // silently dropped forever. (That exact bug cost sailing four of its eight effects for months.)
     const depth = { nerve: 0, lodesense: 0, hew: 0, prospect: 0, bellows: 0, crucible: 0 };
     if (!buyerId) return depth;
-    const [{ sumItemDepth, affinityItemIds }, { setDepthBonus }, { getEquippedIds, getOwnedItemIds }] = await Promise.all([
+    const [{ sumItemDepth }, { setDepthBonus }, { getEquippedIds }, { sumPieceDepth }, { getOwnedPieceIds }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/sets.js"),
         import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/collection-pieces.js"),
+        import("@/lib/marketplace/collection-owned.js"),
     ]);
     // getEquippedIds returns a {slot → id} OBJECT, not an array. Iterating it directly is a known landmine here.
     const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
-    const ownedIds = await getOwnedItemIds(buyerId).catch(() => []);
     // Delver / Rockbreaker / Founder are things you assembled, not a kit you swap in to go mining — so BOTH
-    // halves read ownership for them: the per-piece affix (affinityItemIds, since a trophy can't be worn) and
-    // the set tiers. Ordinary mining gear still has to be equipped for its affix to count.
-    const gear = sumItemDepth(affinityItemIds(Object.values(bySlot || {}), ownedIds));
-    for (const k in depth) depth[k] += gear[k] || 0;
-    const set = setDepthBonus(ownedIds);
+    // halves read ownership for them: the per-piece affix (a trophy can't be worn) and the set tiers.
+    // Ordinary mining gear still has to be equipped for its affix to count.
+    const ownedPieces = await getOwnedPieceIds(buyerId).catch(() => []);
+    const gear = sumItemDepth(Object.values(bySlot || {}));
+    const trophyDepth = sumPieceDepth(ownedPieces);
+    for (const k in depth) depth[k] += (gear[k] || 0) + (trophyDepth[k] || 0);
+    const set = setDepthBonus(ownedPieces);
     for (const k in depth) depth[k] += set[k] || 0;
 
     const me = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -481,10 +484,18 @@ async function grantMiningGear(buyerId, depth) {
     const { rarity, order } = rollGearRarity(depth);
     // Try what you rolled first, then walk the rest of the band as a fallback for an exhausted pool.
     const ladder = [rarity, ...order.filter((x) => x !== rarity)];
-    const [{ randomDropPool, featurePool }, { grantItem }] = await Promise.all([
+    const [{ randomDropPool, featurePool }, { grantItem }, { rollPieceDrop }] = await Promise.all([
         import("@/lib/marketplace/items.js"),
         import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/collection-owned.js"),
     ]);
+    // THE DEPTHS TROPHIES FIRST. Delver / Rockbreaker / Founder are the mine's own collections and they used
+    // to ride along in featurePool because they were items. They are not any more, so without this branch the
+    // only feature that hands them out would silently stop and twelve pieces would be unobtainable — the exact
+    // failure the migration had to avoid. Rolled ahead of ordinary gear at the SAME rarity so the mine's own
+    // sets stay the reason to go deep, and never twice: rollPieceDrop skips anything already owned.
+    const trophy = await rollPieceDrop(buyerId, { source: "mining", rarity, chance: 0.5 }).catch(() => null);
+    if (trophy) return { id: trophy.id, name: trophy.name, rarity: trophy.rarity, icon: trophy.icon || null, slot: null, stats: null, piece: true };
     const owned = new Set((await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((r) => r.item_id));
     for (const rarity of ladder) {
         // The general pool PLUS the mine's own gear. randomDropPool excludes ownerOnly items — correct for
@@ -789,11 +800,13 @@ export async function getMiningState(buyerId) {
     // The mine's three COLLECTIONS (Delver / Rockbreaker / Founder), shown permanently on the Smeltery tab —
     // their bonuses land down here, so this is where the chase belongs.
     const collections = await (async () => {
-        const [{ collectionsForFeature }, { getOwnedItemIds }] = await Promise.all([
+        const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
             import("@/lib/marketplace/sets.js"),
-            import("@/lib/marketplace/inventory.js"),
+            import("@/lib/marketplace/collection-owned.js"),
         ]);
-        return collectionsForFeature("depths", await getOwnedItemIds(buyerId).catch(() => []));
+        // Collections count TROPHIES, which live in mkt_user_collection — reading the item bag here would
+        // report every set as 0 collected.
+        return collectionsForFeature("depths", await ownedPieces(buyerId).catch(() => []));
     })().catch(() => []);
     return {
         unlocked: true,
