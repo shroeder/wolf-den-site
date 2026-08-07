@@ -742,19 +742,14 @@ export default function FarmClient({ initial, viewingAlias }) {
     const groundShift = view === "inside" ? 13 : 0; // barn straw floor sits lower; controls moved out of the way so we can drop the animals further
     const petGroundY = (y) => Math.min(97, y + groundShift);
 
-    // Immersive "full screen" farm: a CSS overlay that fills the viewport (works everywhere incl. iOS). We do NOT
-    // use the native Fullscreen API — it renders ONLY the scene element's subtree, which hid the decorate tray and
-    // every modal (they're position:fixed siblings at higher z-index) so nothing was clickable in fullscreen. The
-    // CSS overlay (z 9995) keeps those siblings on top and fully interactive, exactly like windowed mode.
+    // Full screen is GONE. It was a CSS overlay pinned over the viewport and it had accumulated a special case
+    // everywhere it touched — its own control row, its own backdrop path, its own height rule — for a view of the
+    // same farm. The windowed scene is the farm now.
     const sceneWrapRef = useRef(null);
-    const [fullscreen, setFullscreen] = useState(false);
-    const toggleFullscreen = useCallback(() => setFullscreen((v) => !v), []);
-    // In fullscreen the field fills the fixed container exactly (100% of it) rather than 100dvh, which on mobile
-    // overflows past the visible area and clips the bottom of the farm.
-    const sceneHeight = fullscreen ? "100%" : "min(52vh, 420px)";
 
-    // Scene control pills (Backdrop / Decorate / Full screen). Rendered in a TOOLBAR BELOW the scene when windowed
-    // (so they never cover the animals standing on the floor), and as a bottom overlay row when full screen.
+    const sceneHeight = "min(52vh, 420px)";
+
+    // Scene control pills (Backdrop / Decorate), in a toolbar above the scene so they never cover the animals.
     const CTRL_PILL = { display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 13px", borderRadius: 999, fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: "0 3px 12px rgba(0,0,0,0.4)", backdropFilter: "blur(2px)", WebkitTapHighlightColor: "transparent", whiteSpace: "nowrap" };
     const sceneControls = (
         <>
@@ -768,14 +763,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                     <span style={{ fontSize: 16 }} aria-hidden="true">🪴</span>Decorate
                 </button>
             ) : null}
-            <button type="button" onClick={toggleFullscreen} title={fullscreen ? "Exit full screen" : "Full screen"} style={{ ...CTRL_PILL, border: "1px solid rgba(255,255,255,0.25)", background: "linear-gradient(180deg, rgba(40,40,44,0.96), rgba(24,24,28,0.96))", color: "#e6e6ea", marginLeft: fullscreen ? "auto" : undefined }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {fullscreen
-                        ? <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3" />
-                        : <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m10 0h3a2 2 0 0 0 2-2v-3" />}
-                </svg>
-                {fullscreen ? "Exit" : "Full screen"}
-            </button>
         </>
     );
 
@@ -1013,19 +1000,19 @@ export default function FarmClient({ initial, viewingAlias }) {
                 pasture, these act ON it, so they belong together.
                 It used to sit below, on the reasoning that controls over the pasture would cover the animals.
                 But "not on top of" and "underneath" are different things: underneath put Backdrop, Decorate
-                and Full screen below a scene roughly a phone-screen tall, so you scrolled past the whole farm
+                below a scene roughly a phone-screen tall, so you scrolled past the whole farm
                 to reach the buttons that change how the farm looks. Above it, nothing is covered and nothing
-                has to be hunted. (Fullscreen keeps its floating overlay row at the bottom of the scene.) */}
-            {!fullscreen && view !== "art" ? (
+                has to be hunted. */}
+            {view !== "art" ? (
                 <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>{sceneControls}</div>
             ) : null}
-            <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: fullscreen ? "fixed" : "relative", inset: fullscreen ? 0 : undefined, height: fullscreen ? "100dvh" : undefined, zIndex: fullscreen ? 9995 : undefined, borderRadius: fullscreen ? 0 : 16, overflow: "hidden", background: fullscreen ? "#0a0f07" : undefined }}>
-                <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", height: fullscreen ? "100%" : undefined, overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
+            <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
+                <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
                         style={{
                             // The field is as wide as the painting so you can scroll/pan sideways to see all of it —
-                            // in both windowed AND fullscreen (fullscreen just makes the scene taller).
+                            // at whatever height the scene is.
                             // The Garden is now a WIDE scrolling field like Outside/Inside. It used to be pinned
                             // to the viewport, so eight beds shared one phone screen and had to be shrunk to
                             // fit — small and crowded, with the whole horizontal scroll going unused. At 190%
@@ -1036,13 +1023,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                             boxShadow: "inset 0 -30px 60px rgba(0,0,0,0.12)", userSelect: "none", transition: "background 1.2s ease",
                         }}
                     >
-                        {/* Backdrop — windowed: full height, natural width (its width sets the scrollable field).
-                            Fullscreen: a single cover filling the viewport, no horizontal scroll. */}
+                        {/* Backdrop — full height, natural width (its width sets the scrollable field). */}
                         {bgUrl ? (
-                            fullscreen ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={bgUrl} alt="" aria-hidden="true" draggable={false} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", userSelect: "none", pointerEvents: "none" }} />
-                            ) : (view === "outside" || view === "inside") ? (
+                            (view === "outside" || view === "inside") ? (
                                 // Outside/Inside: repeat the backdrop 3× with the mirror trick [A A' A] so it scrolls as one
                                 // seamless wide scene (Garden stays a single image because crops sit at fixed positions).
                                 <div className="farm-bg-tiled" aria-hidden="true">
@@ -1188,10 +1171,6 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
                 {/* Weather effects only in the open pasture (Outside) — not indoors or in the garden view */}
                 {showWeather ? <FarmWeather condition={wx.condition} /> : null}
-                {/* Full-screen only: the controls sit as a bottom overlay row (there's no "below the scene" here). */}
-                {fullscreen ? (
-                    <div style={{ position: "absolute", left: 10, right: 10, bottom: 10, zIndex: 9998, display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>{sceneControls}</div>
-                ) : null}
                 {/* Persistent lock/move toggle — top-right of the scene. Governs dragging plots + decorations on
                     your own farm, so you can arrange them without overlap. Default is movable. */}
                 {farm.mine && (garden || (farm.decorations && (((farm.placements?.length || 0) > 0) || decorating))) ? (
