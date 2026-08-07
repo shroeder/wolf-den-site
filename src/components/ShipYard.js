@@ -131,6 +131,11 @@ function Portrait({ art, rider, boss, locked, flipCrew }) {
 
 // How hard this is, in one word and one colour, off the shared matchup read. A percentage alone is a number;
 // a word is a decision.
+//
+// But a word ALONE is a legend you have to be taught. "Favoured" and "Brutal" in coloured pills told you there
+// was a scale without telling you what it measured or which end you were on — the first thing asked about them
+// was what they meant. So the word now carries its own number: "Favoured 71%" needs no key, and the five words
+// stay because a number is a fact while a word is a decision.
 const BANDS = [
     { max: 0.20, key: "brutal", label: "Brutal" },
     { max: 0.40, key: "hard", label: "Hard" },
@@ -139,6 +144,9 @@ const BANDS = [
     { max: 1.01, key: "easy", label: "Easy" },
 ];
 const bandFor = (odds) => BANDS.find((b) => odds <= b.max) || BANDS[BANDS.length - 1];
+// Never 0% or 100%: matchupOdds already clamps to 5–95, and a rounded "100%" would promise a win the sim can
+// still take away from you.
+const oddsPct = (odds) => Math.round(Math.max(0.05, Math.min(0.95, odds ?? 0.5)) * 100);
 
 function BattleRow({ e, busy, canFight, onFight }) {
     const band = bandFor(e.odds ?? 0.5);
@@ -157,7 +165,10 @@ function BattleRow({ e, busy, canFight, onFight }) {
                 <b className="sby-row-name">{e.name}</b>
                 <div className="sby-row-sub">
                     <span className={`sby-kind is-${e.kind}`}>{e.kind === "fleet" ? (e.boss ? "Flagship" : "Fleet") : "Rival"}</span>
-                    <span className={`sby-band is-${band.key}`}>{band.label}</span>
+                    <span className={`sby-band is-${band.key}`}
+                        title={`${band.label} — you are given a ${oddsPct(e.odds)}% chance of winning this fight, from your guns and hull against theirs`}>
+                        {band.label} <b>{oddsPct(e.odds)}%</b>
+                    </span>
                     <span className="sby-row-cls">{e.sub}</span>
                 </div>
                 <div className="sby-row-stats">
@@ -299,6 +310,13 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                     {fleet.cleared ? (
                         <div className="sby-cleared">The whole fleet is on the bottom. Admiral Vane included.</div>
                     ) : null}
+                    {/* Says what the coloured word on every row IS. The pills read as a scale without ever
+                        saying what they measured or which end was good — the number on each one carries most
+                        of that now, and this one line closes it. */}
+                    <p className="sby-oddskey">
+                        The colour on each opponent is <b>your chance of winning</b> — worked out from your guns
+                        and hull against theirs.
+                    </p>
                     <div className="sby-fleet">
                         {opponents.map((e) => (
                             <BattleRow key={e.key} e={e} busy={busy} canFight={battlesLeft > 0}

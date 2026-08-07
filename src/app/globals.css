@@ -13394,6 +13394,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-band.is-even { color: #1d1704; background: linear-gradient(180deg, #ffe9a4, #f0c452); }
 .sby-band.is-hard { color: #200d05; background: linear-gradient(180deg, #ffc38a, #f08a3c); }
 .sby-band.is-brutal { color: #fff; background: linear-gradient(180deg, #ff7a63, #d3301c); }
+/* The percentage rides INSIDE the pill, a shade heavier than its word — the word is the decision, the number
+   is the proof. Same ink as the pill so it never turns into a second colour to decode. */
+.sby-band b { font-weight: 900; opacity: 0.82; margin-left: 1px; }
+/* One line above the list saying what the colours measure. Small and quiet: it is a caption, not a warning. */
+.sby-oddskey { margin: 0 0 8px; font-size: 0.7rem; line-height: 1.4; color: #93a3b4; }
+.sby-oddskey b { color: #cfe0ef; font-weight: 800; }
 
 .sby-row-sub { display: flex; align-items: center; gap: 6px; margin-top: 1px; min-width: 0;
     font-size: 0.66rem; color: #93a3b4; }
