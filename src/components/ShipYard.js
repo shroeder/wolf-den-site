@@ -34,7 +34,7 @@ const Icon = ({ name, className }) => {
     return <C className={className} aria-hidden="true" />;
 };
 
-function Track({ t, purse, gold, busy, onBuy }) {
+export function Track({ t, purse, gold, busy, onBuy }) {
     const afford = t.cost != null && (t.currency === "gold" ? (gold ?? 0) : purse) >= t.cost;
     return (
         <div className="sby-track">
@@ -232,31 +232,13 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
 
             <div className="sbd-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
-                <button type="button" role="tab" aria-selected={active === "ship"} className={active === "ship" ? "is-on" : ""} onClick={() => setTab("ship")}>Your ship</button>
                 <button type="button" role="tab" aria-selected={active === "ammo"} className={active === "ammo" ? "is-on" : ""} onClick={() => setTab("ammo")}>Ammunition</button>
             </div>
 
-            {active === "ship" ? (
-                <>
-                    <div className="sby-stats">
-                        <div className="sby-stat"><b>{combat.ship.guns}</b><em>guns</em></div>
-                        <div className="sby-stat"><b>{combat.ship.accuracy}%</b><em>accuracy</em></div>
-                        <div className="sby-stat"><b>{combat.ship.hp}</b><em>hull</em></div>
-                        <div className="sby-stat"><b>{combat.ship.armor}%</b><em>armour</em></div>
-                    </div>
-                    <p className="sby-sub">
-                        Your boat level (currently {combat.ship.boatLevel}) lifts all four — a bigger hull is a better gun
-                        platform. Doubloons are the only thing that buys the rest, and the only place they come from is a
-                        ship battle.
-                    </p>
-                    <div className="sby-tracks">
-                        {(combat.tracks || []).map((t) => (
-                            <Track key={t.key} t={t} purse={purse} gold={gold} busy={busy}
-                                onBuy={(track) => onAct(track.action ? { action: track.action } : { action: "upgrade_combat", track: track.key })} />
-                        ))}
-                    </div>
-                </>
-            ) : null}
+            {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
+                The page already has a structure for upgrades — one station per thing you improve — and raiding
+                simply had no seat at it. The tracks moved to the Gun Deck station; this modal is for choosing
+                an opponent and loading the racks, both of which you do right now. */}
 
             {active === "ammo" ? (
                 <>

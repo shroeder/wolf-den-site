@@ -8,7 +8,7 @@ import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
 import ShipBattleScene from "@/components/ShipBattleScene";
-import ShipYard from "@/components/ShipYard";
+import ShipYard, { Track as ShipTrack } from "@/components/ShipYard";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
@@ -205,7 +205,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
-    const [showForms, setShowForms] = useState(false);
+    // The next form you have not reached — drives the "N levels to go" line and the rail's highlight.
+    const nextForm = (state.forms || []).find((f) => !f.unlocked) || null;
     // Which STATION of the ship you're standing at. Everything below the scene used to be one continuous
     // scroll — boat upgrades, then excavation, then tools, then forms — so upgrading was a hunt through a
     // document, and the tools sat at the very bottom of the longest section where nobody found them.
@@ -1052,7 +1053,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* ── STATIONS ── the ship as a place you move around, not a page you scroll. */}
             <div className="sail-stations">
-                {[["helm", "⚓", "Helm", "Boat upgrades"], ["dig", "⛏️", "Dig Site", "Tools & excavation"], ["rail", "🎣", "The Rail", "Fishing"]].map(([k, ico, label, sub]) => (
+                {[["helm", "⚓", "Helm", "Boat upgrades"],
+                  ...(state.combat ? [["guns", "💣", "Gun Deck", "Raiding upgrades"]] : []),
+                  ["dig", "⛏️", "Dig Site", "Tools & excavation"], ["rail", "🎣", "The Rail", "Fishing"]].map(([k, ico, label, sub]) => (
                     <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub}>
                         <span aria-hidden="true">{ico}</span>{label}
                     </button>
@@ -1100,6 +1103,30 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             </section>
 
+            </> : null}
+
+            {station === "guns" && state.combat ? <>
+                <section className="card">
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(255,150,60,0.16)", border: "1px solid rgba(255,150,60,0.5)", color: "#ffbe7a", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>💣 Raiding</div>
+                    <h2 style={{ margin: "0 0 2px" }}>Gun deck</h2>
+                    <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem", lineHeight: 1.5 }}>
+                        Your ship as it actually fights. Boat level {state.combat.ship.boatLevel} lifts all four —
+                        a bigger hull is a better gun platform. Doubloons buy the rest, and the only place they
+                        come from is a ship battle.
+                    </p>
+                    <div className="sby-stats">
+                        <div className="sby-stat"><b>{state.combat.ship.guns}</b><em>guns</em></div>
+                        <div className="sby-stat"><b>{state.combat.ship.accuracy}%</b><em>accuracy</em></div>
+                        <div className="sby-stat"><b>{state.combat.ship.hp}</b><em>hull</em></div>
+                        <div className="sby-stat"><b>{state.combat.ship.armor}%</b><em>armour</em></div>
+                    </div>
+                    <div className="sby-tracks" style={{ marginTop: 12 }}>
+                        {(state.combat.tracks || []).map((t) => (
+                            <ShipTrack key={t.key} t={t} purse={state.combat.doubloons || 0} gold={state.gold} busy={busy}
+                                onBuy={(track) => act(track.action || "upgrade_combat", track.action ? {} : { track: track.key })} />
+                        ))}
+                    </div>
+                </section>
             </> : null}
 
             {station === "dig" ? <>
@@ -1261,32 +1288,38 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {station === "helm" ? <>
             {/* Boat forms — collapsed by default, below the upgrades. 8 milestones, each a new hull + a perk. */}
             <section className="card sail-forms">
-                <button type="button" onClick={() => setShowForms((v) => !v)} aria-expanded={showForms} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left", padding: 0 }}>
+                {/* NOT A COLLAPSED LIST. Eight hulls with real art, hidden behind a chevron nobody opened —
+                    the boat's whole progression was the least visible thing on the page. It is a RAIL now:
+                    every form in a row you can scroll, the one you sail lit and scaled up, the next one
+                    highlighted as the thing to reach, the rest silhouetted so the shape still teases. Tapping
+                    any of them opens the same detail card as before. */}
+                <div className="sail-formrail-head">
                     <h2 style={{ margin: 0 }}>Boat forms</h2>
-                    <span className="muted" style={{ fontSize: "0.78rem" }}>Form {state.tier}/{state.boatTiers}</span>
-                    <span aria-hidden="true" style={{ marginLeft: "auto", color: "#ffd75e", fontSize: 12, transform: showForms ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▾</span>
-                </button>
-                {showForms ? (
-                    <>
-                        <p className="muted" style={{ margin: "6px 0 12px", fontSize: "0.8rem" }}>Every 10 levels your boat takes a new form and unlocks a permanent perk. You&apos;re <b>Lv {level}</b> · Form <b>{state.tier}/{state.boatTiers}</b>.</p>
-                        <div className="sail-forms-list">
-                            {(state.forms || []).map((f) => (
-                                <button type="button" className={`sail-form${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}`} key={f.level} onClick={() => setInspectForm(f)}>
-                                    <span className="sail-form-art">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={f.art} alt="" className={`${f.unlocked ? "" : "is-locked"} boat-aura-${f.tier}`} />
-                                        {f.unlocked ? null : <span className="sail-form-lock">🔒</span>}
-                                    </span>
-                                    <div className="sail-form-body">
-                                        <div className="sail-form-name">{f.name} <span className="muted">· Lv {f.level}</span>{f.current ? <span className="sail-form-cur">current</span> : null}</div>
-                                        <div className="muted sail-form-perk">{f.perk}</div>
-                                    </div>
-                                    <span className="sail-form-chev" aria-hidden="true" style={{ color: "#ffd75e" }}>▸</span>
-                                </button>
-                            ))}
-                        </div>
-                    </>
+                    <span className="sail-formrail-count">Form {state.tier} / {state.boatTiers}</span>
+                </div>
+                <p className="muted" style={{ margin: "4px 0 10px", fontSize: "0.78rem", lineHeight: 1.45 }}>
+                    Every 10 levels your boat takes a new hull and a permanent perk.
+                    {nextForm ? <> Next: <b style={{ color: "#ffd75e" }}>{nextForm.name}</b> at <b>Lv {nextForm.level}</b> — {Math.max(0, nextForm.level - level)} level{nextForm.level - level === 1 ? "" : "s"} to go.</> : <> You are sailing the final form.</>}
+                </p>
+                {nextForm ? (
+                    <div className="sail-formrail-bar" aria-label={`${level} of ${nextForm.level} levels to ${nextForm.name}`}>
+                        <span style={{ width: `${Math.max(4, Math.min(100, Math.round(((level - (state.tier - 1) * 10) / 10) * 100)))}%` }} />
+                    </div>
                 ) : null}
+                <div className="sail-formrail">
+                    {(state.forms || []).map((f) => (
+                        <button type="button" key={f.level} onClick={() => setInspectForm(f)}
+                            className={`sail-formcard${f.unlocked ? " is-unlocked" : ""}${f.current ? " is-current" : ""}${nextForm && f.level === nextForm.level ? " is-next" : ""}`}>
+                            <span className="sail-formcard-art">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={f.art} alt="" className={`${f.unlocked ? "" : "is-locked"} boat-aura-${f.tier}`} />
+                            </span>
+                            <span className="sail-formcard-name">{f.unlocked ? f.name : `Lv ${f.level}`}</span>
+                            {f.current ? <span className="sail-formcard-tag">sailing</span>
+                                : nextForm && f.level === nextForm.level ? <span className="sail-formcard-tag is-next">next</span> : null}
+                        </button>
+                    ))}
+                </div>
             </section>
             </> : null}
 

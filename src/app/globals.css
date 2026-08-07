@@ -11332,12 +11332,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    longest section. Same tab idiom as the farm's Garden/Outside/Inside, so there's nothing new to learn. */
 .sail-stations { display: flex; gap: 6px; padding: 5px; margin: 12px 0 10px; border-radius: 14px;
     background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); }
-.sail-stations button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 6px; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer; border: none;
-    background: transparent; color: #a8b6c8; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
-.sail-stations button > span { font-size: 16px; }
-.sail-stations button.on { background: linear-gradient(180deg, #7ec8ff, #3f8fd0); color: #06283d;
-    box-shadow: 0 2px 6px rgba(63,143,208,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+.sail-stations button { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 10px 4px; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer; border: 1px solid transparent;
+    background: transparent; color: #93a3b4; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.sail-stations button > span { font-size: 15px; }
+/* WHITE on deep blue, not dark ink on mid blue. The selected tab was the lowest-contrast pair in the row —
+   the one element that has to be unmistakable at a glance. A lit rim and a glow do the rest. */
+.sail-stations button.on { color: #fff; border-color: rgba(160,215,255,0.85);
+    background: linear-gradient(180deg, #2f7fc4, #14507f);
+    box-shadow: 0 0 14px rgba(90,175,255,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+.sail-stations button.on > span { filter: drop-shadow(0 0 5px rgba(150,215,255,0.9)); }
 @media (hover: hover) { .sail-stations button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0f8; } }
 /* The Rail's at-a-glance numbers. */
 .sail-railstats { display: flex; gap: 8px; }
@@ -11970,6 +11974,42 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     border-radius: 50%; display: grid; place-items: center; font-size: 1rem; line-height: 1; cursor: pointer;
     color: #e6e9ec; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.22); }
 .sail-yard-close:hover { background: rgba(0,0,0,0.65); }
+
+/* ── BOAT FORMS AS A RAIL ─────────────────────────────────────────────────────────────────────────────────
+   Eight painted hulls behind a chevron nobody opened. The boat's whole progression was the least visible thing
+   on the page; now it is a scrollable row you can see without asking, with the hull you sail lit and scaled up
+   and the next one flagged as the thing to reach. */
+.sail-formrail-head { display: flex; align-items: baseline; gap: 10px; }
+.sail-formrail-count { margin-left: auto; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.06em;
+    text-transform: uppercase; color: #ffd75e; }
+.sail-formrail-bar { position: relative; height: 7px; margin: 0 0 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
+.sail-formrail-bar > span { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #4aa3ff, #9fd8ff); box-shadow: 0 0 10px rgba(90,175,255,0.7); }
+.sail-formrail { display: flex; gap: 9px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none;
+    scroll-snap-type: x proximity; }
+.sail-formrail::-webkit-scrollbar { display: none; }
+.sail-formcard { position: relative; flex: 0 0 auto; width: 92px; display: grid; justify-items: center; gap: 4px;
+    padding: 9px 6px 8px; border-radius: 14px; cursor: pointer; scroll-snap-align: center;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.1); transition: transform .14s ease, border-color .14s ease; }
+.sail-formcard-art { display: grid; place-items: center; width: 100%; height: 56px; }
+.sail-formcard-art img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* Locked hulls stay as SILHOUETTES rather than being hidden — the shape is the advertisement. */
+.sail-formcard-art img.is-locked { filter: brightness(0.22) grayscale(1); opacity: 0.85; }
+.sail-formcard-name { font-size: 0.64rem; font-weight: 800; color: #93a3b4; text-align: center; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.sail-formcard.is-unlocked .sail-formcard-name { color: #dbe4ee; }
+/* The hull you are actually sailing: bigger, lit, and unmistakable in the row. */
+.sail-formcard.is-current { border-color: rgba(120,200,255,0.75); transform: scale(1.06);
+    background: linear-gradient(180deg, rgba(90,175,255,0.2), rgba(20,80,127,0.06));
+    box-shadow: 0 0 18px rgba(90,175,255,0.35), inset 0 1px 0 rgba(255,255,255,0.2); }
+.sail-formcard.is-next { border-color: rgba(255,205,120,0.6);
+    background: linear-gradient(180deg, rgba(255,190,90,0.14), rgba(255,150,30,0.03)); }
+.sail-formcard-tag { padding: 1px 7px; border-radius: 999px; font-size: 0.53rem; font-weight: 900;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #06283d;
+    background: linear-gradient(180deg, #9fd8ff, #4aa3ff); }
+.sail-formcard-tag.is-next { color: #2b1f06; background: linear-gradient(180deg, #ffe488, #f3b23a); }
 
 /* The collapsed Sea-collections shelf, above the stations. */
 .sail-collapse { padding: 0; overflow: hidden; }
