@@ -64,6 +64,8 @@ const MISS = { key: "miss", score: 0, label: "MISS", color: GRADE_COLOR.miss };
 const gradeFor = (dist, widen = 0) => BANDS.find((b) => dist <= b.max + widen) || MISS;
 const STRIKES = 6;
 
+// Worst → best, so the bulk chips read in the order you would clear them out.
+const RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal"];
 const EMPTY_FORGE = { parts: [], salvage: [], enhance: [], upgrades: [], dailies: [], regalia: null, hearthBg: null };
 
 export default function BlacksmithClient({ initial }) {
@@ -76,6 +78,7 @@ export default function BlacksmithClient({ initial }) {
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
     const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
+    const [bulk, setBulk] = useState(null);           // the rarity awaiting a "melt them all" confirm
     const [toast, setToast] = useState(null);
     const [reforgeFor, setReforgeFor] = useState(null); // the item whose element you're reforging (opens the picker)
     const [reforgeFx, setReforgeFx] = useState(null);   // the post-reforge reveal { item, elements, dual }
@@ -103,6 +106,27 @@ export default function BlacksmithClient({ initial }) {
         const r = await post({ action: "combine", tier }, `cb-${tier}`);
         if (r?.ok) { (r.doubled ? SFX.pixel : SFX.perfect)(); if (r.doubled) setToast({ kind: "ok", text: "⚗️ Transmuter's Boon — the combine yielded 2!" }); }
     }, [post]);
+
+    // BULK. Melting forty commons one confirm at a time is the real cost of playing the Forge, and combining
+    // a stack of sixty filings is twelve identical taps. Both loop the single-item server paths, so the rolls
+    // are the same — this only removes the repetition.
+    const doCombineAll = useCallback(async (tier) => {
+        const r = await post({ action: "combine_all", tier }, `cba-${tier}`);
+        if (r?.ok) {
+            SFX.perfect();
+            setToast({ kind: "ok", text: `Combined ${r.runs}× → ${r.made} ${parts[tier]?.name || "next tier"}${r.doubled ? ` · ${r.doubled} doubled!` : ""}` });
+        } else if (r?.error) setToast({ kind: "err", text: "Not enough to combine." });
+    }, [post, parts]);
+
+    const doSalvageAll = useCallback(async (rarity) => {
+        const r = await post({ action: "salvage_all", rarity }, `sva-${rarity}`);
+        setBulk(null);
+        if (r?.ok) {
+            SFX.perfect();
+            const got = (r.parts || []).map((x) => `${x.n} ${parts[x.tier - 1]?.name || `T${x.tier}`}`).join(" · ");
+            setToast({ kind: "ok", text: `Salvaged ${r.count} ${rarity} — ${got}${r.regaliaDrops?.length ? ` · ${r.regaliaDrops.join(", ")}!` : ""}` });
+        } else if (r?.error) setToast({ kind: "err", text: r.error === "nothing_to_salvage" ? "Nothing spare of that rarity." : "Couldn't salvage those." });
+    }, [post, parts]);
 
     const doUpgrade = useCallback(async (key) => {
         const r = await post({ action: "upgrade", key }, `up-${key}`);
@@ -160,6 +184,11 @@ export default function BlacksmithClient({ initial }) {
 
     const parts = forge.parts || [];
     const salvage = forge.salvage || [];
+    // How many of each rarity a bulk melt would take. Enhanced and charged pieces are held back by the server,
+    // so they are held back here too — a chip that promises 12 and melts 9 is worse than no chip.
+    const bulkCounts = Object.entries(
+        salvage.reduce((acc, it) => { if (!it.level && !it.charged) acc[it.rarity] = (acc[it.rarity] || 0) + 1; return acc; }, {})
+    ).filter(([, n]) => n > 1).sort((a, z) => (RARITY_ORDER.indexOf(a[0]) - RARITY_ORDER.indexOf(z[0])));
     const enhance = forge.enhance || [];
     const reforge = forge.reforge || { items: [], elements: [], dualChance: 12 };
     const powerScrolls = forge.powerScrolls || 0;
@@ -259,6 +288,13 @@ export default function BlacksmithClient({ initial }) {
                                 <b>{p.count}</b>
                                 <span className="forge-part-name">{p.name}</span>
                             </span>
+                            {p.canCombine && Math.floor(p.count / (forge.combineCost || 5)) > 1 ? (
+                                <button type="button" className="forge-combineall" disabled={Boolean(busy)}
+                                    onClick={() => doCombineAll(p.tier)}
+                                    title={`Combine every set of ${forge.combineCost} — ${Math.floor(p.count / (forge.combineCost || 5))} of them`}>
+                                    {busy === `cba-${p.tier}` ? "…" : `All ×${Math.floor(p.count / (forge.combineCost || 5))}`}
+                                </button>
+                            ) : null}
                             {p.canCombine ? (
                                 <button type="button" className="forge-combine" disabled={Boolean(busy)} onClick={() => doCombine(p.tier)} title={`Combine ${forge.combineCost} ${p.name} into 1 ${parts[p.tier]?.name || "next tier"}`}>
                                     {busy === `cb-${p.tier}` ? "…" : (
@@ -365,6 +401,21 @@ export default function BlacksmithClient({ initial }) {
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
                 ) : tab === "salvage" ? (
+                    <>
+                    {/* MELT A WHOLE RARITY. Counted off the same list the grid renders, so the number on the
+                        chip is exactly what will go — and anything equipped, enhanced or in-store is excluded
+                        server-side, which is why the counts here can be lower than what you own. */}
+                    {bulkCounts.length ? (
+                        <div className="forge-bulk">
+                            <span className="forge-bulk-label">Salvage all</span>
+                            {bulkCounts.map(([rar, n]) => (
+                                <button key={rar} type="button" className="forge-bulk-chip" style={{ "--rc": rc(rar) }}
+                                    disabled={Boolean(busy)} onClick={() => { ac(); setBulk({ rarity: rar, n }); }}>
+                                    {busy === `sva-${rar}` ? "…" : <>{rar} <b>{n}</b></>}
+                                </button>
+                            ))}
+                        </div>
+                    ) : null}
                     <div className="forge-grid">
                         {salvage.length ? salvage.map((it) => (
                             <button key={it.id} type="button" className="forge-card is-salvage" style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)} onClick={() => { ac(); setSalvaging(it); }}>
@@ -380,6 +431,7 @@ export default function BlacksmithClient({ initial }) {
                             </button>
                         )) : <div className="forge-empty">Nothing spare to salvage — every item you own is equipped.</div>}
                     </div>
+                    </>
                 ) : tab === "attune" ? (
                     <>
                         <p className="forge-panel-sub">Reforge a piece&apos;s <b>elemental affinity</b> to match the boss&apos;s weekly weakness. Small chance ({reforge.dualChance}%) it keeps the old element AND adds the new one — a rare <b>dual-affinity</b> piece that matches two elements.</p>
@@ -430,6 +482,26 @@ export default function BlacksmithClient({ initial }) {
             {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHandChance={forge.steadyHandChance || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
             {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} equipped={(forge.enhance || []).find((e) => e.slot === salvaging.slot) || null} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
+            {/* Melting a whole rarity is irreversible and can be dozens of items, so it names the number and
+                says out loud what it is protecting before it runs. */}
+            {bulk ? (
+                <div className="forge-mg-scrim" role="dialog" aria-label={`Salvage all ${bulk.rarity}`}
+                    onClick={(e) => { if (e.target === e.currentTarget) setBulk(null); }}>
+                    <div className="forge-sv forge-bulk-confirm" style={{ "--rc": rc(bulk.rarity) }}>
+                        <div className="forge-bulk-title">Salvage all <span style={{ color: rc(bulk.rarity) }}>{bulk.rarity}</span>?</div>
+                        <p className="forge-bulk-sub">
+                            <b>{bulk.n}</b> spare {bulk.rarity} piece{bulk.n === 1 ? "" : "s"} melted down for parts. This cannot be undone.
+                        </p>
+                        <p className="forge-bulk-keep">Keeps anything equipped, enhanced, or carrying an in-store reward.</p>
+                        <div className="forge-bulk-acts">
+                            <button type="button" className="forge-reforge-cancel" onClick={() => setBulk(null)}>Cancel</button>
+                            <button type="button" className="forge-strike big" disabled={Boolean(busy)} onClick={() => doSalvageAll(bulk.rarity)}>
+                                {busy ? "Melting…" : `Melt ${bulk.n}`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {enhanceResult ? <EnhanceResultModal res={enhanceResult} onClose={() => setEnhanceResult(null)} /> : null}
 
@@ -1148,6 +1220,27 @@ const FORGE_CSS = `
 .forge-sv-odds span { font-size: 10.5px; font-weight: 700; color: #cdb89f; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 3px 9px; }
 .forge-sv-odds span.rare { color: #ffd75e; border-color: rgba(255,215,94,0.4); background: rgba(255,215,94,0.1); }
 .forge-sv .forge-strike { margin-top: 14px; }
+
+/* ── BULK SALVAGE + BULK COMBINE ──────────────────────────────────────────────────────────────────────────
+   Clearing a bag one confirm at a time was the real cost of playing the Forge. The chips count off the SAME
+   list the grid below them renders, so the number on a chip is exactly what will go. */
+.forge-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 0 0 11px; }
+.forge-bulk-label { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #8d96a0; }
+.forge-bulk-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+    cursor: pointer; font-size: 0.72rem; font-weight: 800; text-transform: capitalize; color: var(--rc);
+    background: color-mix(in srgb, var(--rc) 14%, transparent); border: 1px solid color-mix(in srgb, var(--rc) 55%, transparent); }
+.forge-bulk-chip b { font-size: 0.8rem; font-weight: 900; color: #fff; }
+.forge-bulk-chip:disabled { opacity: 0.5; cursor: default; }
+.forge-bulk-confirm { text-align: center; padding: 20px 18px; }
+.forge-bulk-title { font-size: 1.15rem; font-weight: 900; text-transform: capitalize; }
+.forge-bulk-sub { margin: 8px 0 4px; font-size: 0.86rem; line-height: 1.5; color: #cdd3d8; }
+.forge-bulk-keep { margin: 0 0 4px; font-size: 0.72rem; line-height: 1.45; color: #8d96a0; }
+.forge-bulk-acts { display: flex; gap: 10px; justify-content: center; align-items: center; margin-top: 6px; }
+.forge-bulk-acts .forge-strike.big { margin-top: 0; }
+/* "All ×N" beside the single combine — only appears when there is more than one set to run. */
+.forge-combineall { flex: none; padding: 6px 10px; border-radius: 9px; cursor: pointer; font-size: 0.68rem;
+    font-weight: 900; color: #ffd28a; background: rgba(255,190,90,0.14); border: 1px solid rgba(255,190,90,0.45); }
+.forge-combineall:disabled { opacity: 0.5; cursor: default; }
 .forge-sv-result { text-align: center; padding: 6px 4px 2px; }
 .forge-sv-reward { display: inline-flex; flex-direction: column; align-items: center; animation: forgeReveal .5s cubic-bezier(.2,1.5,.35,1) both; }
 .forge-sv-rewardimg { width: 92px; height: 92px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) drop-shadow(0 0 18px color-mix(in srgb, var(--rc) 50%, transparent)); animation: forgeRewardBob 2.4s ease-in-out infinite; }

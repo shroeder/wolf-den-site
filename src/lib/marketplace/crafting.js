@@ -334,6 +334,75 @@ export async function combineParts(buyerId, tier) {
     return { ok: true, made: t + 1, madeCount: made, doubled: made > 1, ...(await getForgeState(buyerId)) };
 }
 
+// ── BULK: melt every spare piece of one rarity ───────────────────────────────────────────────────────────────
+// Clearing a bag one tap at a time is the actual cost of playing the Forge — forty commons is forty confirms.
+//
+// What it deliberately WON'T touch, because bulk is where an accident is expensive and irreversible:
+//   • anything EQUIPPED (salvageItem refuses these anyway)
+//   • anything ENHANCED — you spent parts putting them in; a bulk button should never be the thing that
+//     decides a +7 was junk
+//   • anything CHARGED — those are in-store perks with real-world value attached
+// Each piece still goes through salvageItem(), so every roll, bonus, daily and Regalia drop behaves exactly as
+// it does one at a time. This is a loop, not a second implementation of salvaging.
+export async function salvageAllOfRarity(buyerId, rarity) {
+    if (!buyerId || !SALVAGE[rarity]) return { ok: false, error: "bad_rarity" };
+    const [ownedRows, equipped, enhRows] = await Promise.all([
+        db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        getEquippedIds(buyerId).catch(() => ({})),
+        db.query(`SELECT item_id FROM mkt_item_enhance WHERE buyer_id = $1 AND level > 0`, [buyerId]).catch(() => []),
+    ]);
+    const equippedSet = new Set(Object.values(equipped || {}));
+    const enhanced = new Set((enhRows || []).map((r) => r.item_id));
+    const targets = (ownedRows || [])
+        .map((r) => r.item_id)
+        .filter((id) => {
+            const it = itemById(id);
+            return it && it.rarity === rarity && !equippedSet.has(id) && !enhanced.has(id) && !it.charged;
+        });
+    if (!targets.length) return { ok: false, error: "nothing_to_salvage", ...(await getForgeState(buyerId)) };
+
+    const parts = {};
+    const names = [];
+    const drops = [];
+    let doubled = 0;
+    for (const id of targets) {
+        const r = await salvageItem(buyerId, id).catch(() => null);
+        if (!r?.ok) continue;                       // already gone, or refused — skip it, never abort the batch
+        names.push(itemById(id)?.name || id);
+        // salvageItem returns `gained` as ONE {tier, n} and reports a Keen Eye bonus part separately as a
+        // bare tier number. Both have to be tallied or the recap under-reports what actually landed.
+        if (r.gained) parts[r.gained.tier] = (parts[r.gained.tier] || 0) + (r.gained.n || 0);
+        if (r.bonusTier) parts[r.bonusTier] = (parts[r.bonusTier] || 0) + 1;
+        if (r.doubled) doubled += 1;
+        if (r.regaliaDrop) drops.push(r.regaliaDrop);
+    }
+    return {
+        ok: true, count: names.length, names, rarity, doubled,
+        parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n })).sort((a, b) => a.tier - b.tier),
+        regaliaDrops: drops,
+        ...(await getForgeState(buyerId)),
+    };
+}
+
+// ── BULK: combine every set of five at one tier ──────────────────────────────────────────────────────────────
+// Same reasoning as above — a stack of 60 Iron Filings is twelve identical taps. Loops the real combineParts so
+// Transmuter's Boon and the Forge Yield attunement still roll per combine rather than being averaged away.
+export async function combineAllAtTier(buyerId, tier) {
+    const t = Number(tier);
+    if (!buyerId || !(t >= 1 && t < MAX_TIER)) return { ok: false, error: "bad_tier" };
+    const have = await db.queryOne(`SELECT count FROM mkt_salvage_part WHERE buyer_id = $1 AND tier = $2`, [buyerId, t]).catch(() => null);
+    const runs = Math.floor((have?.count || 0) / COMBINE_COST);
+    if (runs < 1) return { ok: false, error: "not_enough", ...(await getForgeState(buyerId)) };
+    let made = 0, doubled = 0;
+    for (let i = 0; i < runs; i += 1) {
+        const r = await combineParts(buyerId, t).catch(() => null);
+        if (!r?.ok) break;                          // ran out mid-loop (shouldn't happen) — stop cleanly
+        made += r.madeCount || 1;
+        if (r.doubled) doubled += 1;
+    }
+    return { ok: true, runs, made, doubled, from: t, to: t + 1, ...(await getForgeState(buyerId)) };
+}
+
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
