@@ -12894,8 +12894,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     box-shadow: inset 0 0 120px 30px rgba(120,0,0,0.35); }
 
 .sbt-ship { position: absolute; bottom: 16%; width: min(46%, 240px); }
-.sbt-ship-me { left: 0%; }
-.sbt-ship-foe { right: 0%; }
+.sbt-ship-me { left: 1.5%; }
+.sbt-ship-foe { right: 1.5%; }
 .sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; }
 .sbt-ship-foe .sbt-hull { animation-delay: -1.6s; }
 @keyframes sbtBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
@@ -12920,11 +12920,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     35% { transform: translateY(6px) rotate(-9deg); opacity: 1; }
     100% { transform: translateY(150px) rotate(-26deg); opacity: 0; }
 }
+/* The enemy is drawn facing LEFT, so bow-down tips it counter-clockwise — which is both what a ship going
+   down by the bow does and the direction that keeps it on screen instead of swinging off the right edge. */
 .sbt-ship-foe.is-sinking { animation-name: sbtSinkFoe; }
 @keyframes sbtSinkFoe {
     0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-    35% { transform: translateY(6px) rotate(9deg); opacity: 1; }
-    100% { transform: translateY(150px) rotate(26deg); opacity: 0; }
+    35% { transform: translateY(6px) rotate(-9deg); opacity: 1; }
+    100% { transform: translateY(150px) rotate(-26deg); opacity: 0; }
 }
 .sbt-foam { position: absolute; inset: auto 0 -4px 0; height: 40px; }
 .sbt-foam i { position: absolute; bottom: 0; width: 12px; height: 12px; border-radius: 50%;
@@ -13190,3 +13192,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .equip-card.is-trophy { border-style: dashed; opacity: 0.94; }
 .equip-card-trophy { font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
 .sbt-log.is-empty { display: none; }
+@media (min-width: 900px) {
+    /* A battle between two ships at opposite ends of a widescreen is two ships, not a battle. */
+    .sbt-stage { max-width: 900px; left: 50%; transform: translateX(-50%); }
+    .sbt-log, .sbt-orders { max-width: 900px; margin-left: auto; margin-right: auto; }
+    .sbt-hud { max-width: 900px; margin: 0 auto; }
+}
