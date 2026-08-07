@@ -593,6 +593,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // Open the raid picker and load the selectable targets (real passing members, best-gear-first).
     // Show the battle card on the RAIDS tab and load who is passing. There is no separate picker any more.
     const openRaid = useCallback(async () => {
+        // AN UNFINISHED FIGHT OWNS THIS BUTTON. Tapping Raid mid-battle used to open the opponent list, which
+        // is the one thing you cannot act on — you have a fight in progress, every other opponent is refused
+        // by the server, and the way back was a resume banner further down the page that you had to know to
+        // scroll for. If a battle is open, Raid means "back on deck".
+        const open = stateRef.current?.combat?.openBattle;
+        if (open) { setShipBattle(open); return; }
         setBattleTab("battles");
         setYardOpen(true);
         setRaidTargets(null);

@@ -13130,34 +13130,61 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    by an orange pancake hanging in mid-air. A ball of iron is now a ball of iron — a real sprite, round, at a
    fixed size, with no stretch and no glow disc. The consequence of it arriving lives on the HULL instead
    (.sbt-hit), which is where damage actually happens. */
+/* THE BALL IS THREE THINGS, AND ONLY ONE OF THEM SPINS.
+   It used to be one element carrying the sprite, the trail and a 430° rotation all at once — so the 26px
+   motion streak whirled around the ball on the end of an invisible arm and the whole thing read as a thrown
+   hammer rather than a round shot. The mover translates, the shot spins inside it, and the trail follows the
+   direction of travel without ever going round. */
 .sbt-ball { position: absolute; top: var(--lane, 0px); width: 16px; height: 16px; opacity: 0;
-    background: url("/images/sailing/cannonball.png") center/contain no-repeat;
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); }
+/* The iron itself. Spins on its own axis — visible because the sprite has a highlight and pitting, and slow
+   enough (a bit over one turn across the whole flight) to read as tumbling shot rather than a fan blade. */
+.sbt-ball::after { content: ""; position: absolute; inset: 0;
+    background: url("/images/sailing/cannonball.png") center/contain no-repeat;
+    animation: sbtBallSpin .52s linear forwards; animation-delay: inherit; }
+@keyframes sbtBallSpin { from { transform: rotate(0deg); } to { transform: rotate(400deg); } }
 /* A short motion streak BEHIND the ball rather than squashing the ball itself — stretching a sphere is what
-   made it read as a smear. */
+   made it read as a smear. It TILTS with the arc instead of spinning: up off the muzzle, level at the apex,
+   down onto the target. That tilt is what sells the trajectory — a ball on a straight line with a spinning
+   streak reads as neither. Origin is the ball's centre so the streak pivots on the shot, not on its own tail. */
 .sbt-ball::before { content: ""; position: absolute; top: 50%; width: 26px; height: 3px; margin-top: -1.5px;
-    border-radius: 2px; opacity: .55; }
-.sbt-volley.to-foe .sbt-ball::before { right: 60%; background: linear-gradient(90deg, transparent, rgba(255,215,160,0.5)); }
-.sbt-volley.to-me .sbt-ball::before { left: 60%; background: linear-gradient(270deg, transparent, rgba(255,215,160,0.5)); }
+    border-radius: 2px; opacity: .55; animation: sbtTrailTilt .52s cubic-bezier(.35,0,.7,1) forwards;
+    animation-delay: inherit; }
+.sbt-volley.to-foe .sbt-ball::before { right: 60%; transform-origin: 100% 50%; background: linear-gradient(90deg, transparent, rgba(255,215,160,0.5)); }
+.sbt-volley.to-me .sbt-ball::before { left: 60%; transform-origin: 0% 50%; background: linear-gradient(270deg, transparent, rgba(255,215,160,0.5)); }
+/* Mirrored for the incoming side: the same climb-then-fall, read right to left. */
+.sbt-volley.to-me .sbt-ball::before { animation-name: sbtTrailTiltL; }
+@keyframes sbtTrailTilt {
+    0% { transform: rotate(-15deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(11deg); }
+}
+@keyframes sbtTrailTiltL {
+    0% { transform: rotate(15deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(-11deg); }
+}
 .sbt-volley.to-foe .sbt-ball { left: 27%; animation: sbtFlyR .52s cubic-bezier(.35,0,.7,1) forwards; }
 .sbt-volley.to-me .sbt-ball { right: 27%; animation: sbtFlyL .52s cubic-bezier(.35,0,.7,1) forwards; }
 /* A FLATTER arc. The old one climbed 42px above two ships that are only ~120px tall, so the broadside sailed
    over the masts like a mortar barrage instead of crossing between the hulls. */
+/* Translate and scale only — the spin lives on ::after now. A deeper climb than the flat version too: at 16px
+   over a 43vw crossing the shot was travelling in a nearly straight line, and an arc you cannot see is an arc
+   the tilting trail has nothing to follow. */
 @keyframes sbtFlyR {
-    0% { opacity: 0; transform: translate(0,0) scale(.7) rotate(0deg); }
+    0% { opacity: 0; transform: translate(0,0) scale(.7); }
     8% { opacity: 1; }
-    45% { transform: translate(20vw,-16px) scale(1) rotate(180deg); }
-    92% { opacity: 1; transform: translate(42vw,2px) scale(1) rotate(400deg); }
-    100% { opacity: 0; transform: translate(43vw,3px) scale(.85) rotate(430deg); }
+    45% { transform: translate(20vw,-26px) scale(1); }
+    92% { opacity: 1; transform: translate(42vw,2px) scale(1); }
+    100% { opacity: 0; transform: translate(43vw,4px) scale(.85); }
 }
 @keyframes sbtFlyL {
-    0% { opacity: 0; transform: translate(0,0) scale(.7) rotate(0deg); }
+    0% { opacity: 0; transform: translate(0,0) scale(.7); }
     8% { opacity: 1; }
-    45% { transform: translate(-20vw,-16px) scale(1) rotate(-180deg); }
-    92% { opacity: 1; transform: translate(-42vw,2px) scale(1) rotate(-400deg); }
-    100% { opacity: 0; transform: translate(-43vw,3px) scale(.85) rotate(-430deg); }
+    45% { transform: translate(-20vw,-26px) scale(1); }
+    92% { opacity: 1; transform: translate(-42vw,2px) scale(1); }
+    100% { opacity: 0; transform: translate(-43vw,4px) scale(.85); }
 }
-.sbt-ball.is-rake { width: 15px; height: 15px; box-shadow: 0 0 18px rgba(255,170,60,1), inset -1px -1px 2px rgba(0,0,0,0.6); }
+/* Rake shot glows. The shadow moves to ::after with the sprite — on the mover it drew a box around a round
+   ball, which is the same class of mistake as the spinning trail. */
+.sbt-ball.is-rake { width: 15px; height: 15px; }
+.sbt-ball.is-rake::after { filter: drop-shadow(0 0 6px rgba(255,170,60,0.95)) drop-shadow(0 0 12px rgba(255,140,40,0.7)); }
 /* A MISS falls short and throws a splash — the whole reason accuracy is a stat you can feel. */
 .sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
 .sbt-volley.to-me .sbt-ball.is-miss { animation-name: sbtMissL; }
