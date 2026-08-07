@@ -12,9 +12,20 @@ export const PET_MAX_LEVEL = 5;
 export const PET_XP_SHARE = 0.12; // 12% of member XP flows to the equipped pet (was 25%)
 export const PET_TRICKLE_PER_DAY = 5; // passive XP/day while equipped — the big "free maxing" lever (was 20)
 
-// Base quadratic ramp: reach Lv L ≈ 150·(L-1)² XP. Multiplied per rarity below (common ~3mo → legendary ~6mo
-// at a moderate pace). NOTE: raising the ramp DOES re-level existing pets down — intended (leveling was easy).
-const PET_BASE_THRESHOLDS = [0, 150, 600, 1350, 2400];
+// Base quadratic ramp: reach Lv L ≈ 750·(L-1)² XP. Multiplied per rarity below.
+//
+// RAISED 5x ON 2026-08-07, because the ramp was nowhere near the intent. A mythic pet was meant to be about a
+// month of consistent play; the first member to max a legendary did it in SEVEN AND A HALF DAYS, averaging 710
+// pet XP a day, and walked away with the Radiant Phoenix — a mythic that exists to mark exactly that
+// achievement. At that pace the old ramp put a common pet at three days and an eternal at fifteen.
+//
+// At 5x and the same measured pace: common 17 days, epic 29, legendary 37, mythic 47. The chase is a chase.
+//
+// NOBODY WAS DE-LEVELLED. Because the new thresholds are exactly 5x the old ones at every level, multiplying
+// each pet's stored XP by 5 preserves both the level AND the fraction of progress toward the next one:
+// xp >= T is equivalent to 5xp >= 5T, and (xp−T[L])/(T[L+1]−T[L]) is unchanged when both parts are scaled.
+// Migration 341 does exactly that, once. Anyone mid-bar stayed mid-bar at the same percentage.
+const PET_BASE_THRESHOLDS = [0, 750, 3000, 6750, 12000];
 export const PET_XP_RARITY_MULT = { common: 1, rare: 1.3, epic: 1.7, legendary: 2.2, mythic: 2.8, ascendant: 3.6, eternal: 4.6, celestial: 5.8, primordial: 7 };
 export function petRarityMult(rarity) { return PET_XP_RARITY_MULT[rarity] || 1; }
 function rarityOf(petId) { return collectibleById(petId)?.rarity; }
