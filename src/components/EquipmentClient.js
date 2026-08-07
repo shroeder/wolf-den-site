@@ -356,7 +356,9 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     // Trophies are not gear. They live in their own section below the bag: you cannot wear, sell, salvage or
     // trade one, so listing them among the things you can is the screen telling you something untrue.
     const gearItems = (data.items || []).filter((i) => !i.collectionPiece);
-    const trophyItems = (data.items || []).filter((i) => i.collectionPiece);
+    // Trophies come down as their OWN list now that they are not items — filtering the bag for them returned
+    // nothing the moment they moved out of it, which is what emptied everyone's collections on screen.
+    const trophyItems = data.pieces || [];
     // Your OWNED copies, by id — these carry forgeBonus, util and enhanceLevel, which the bare ITEMS
     // definition does not. The compare panel has to weigh the equipped piece as YOU have it, not as it ships.
     //

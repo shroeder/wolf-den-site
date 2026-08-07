@@ -352,7 +352,19 @@ export async function getInventory(buyerId) {
         // One clean progression: rarity, then price, then level — no more "worst again" as you scroll.
         .sort((a, z) => (RARITY_RANK[a.rarity] ?? 9) - (RARITY_RANK[z.rarity] ?? 9) || a.cost - z.cost || (a.reqLevel || 0) - (z.reqLevel || 0));
     const equippedList = Object.values(bySlot);
-    return { items, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
+    // THE TROPHIES YOU OWN. They stopped being items, which is right — but the bag screen built its Trophies
+    // section by FILTERING the bag, so the moment they left it the section emptied and members watched
+    // collections they had nearly finished disappear. They come down as their own list now.
+    const pieces = [...ownedPieceIds]
+        .map((id) => { const p = pieceById(id); if (!p) return null; const set = setForItem(id);
+            return { id, name: p.name, rarity: p.rarity, icon: p.icon, flavor: p.flavor || null,
+                sea: p.sea || null, farm: p.farm || null, depth: p.depth || null,
+                seaText: p.sea ? describeSea(p.sea) : null, farmText: p.farm ? describeFarm(p.farm) : null,
+                depthText: p.depth ? describeDepth(p.depth) : null,
+                setName: set?.name || null, setId: set?.id || null, collectionPiece: true }; })
+        .filter(Boolean)
+        .sort((a, z) => String(a.setName || "").localeCompare(String(z.setName || "")) || a.name.localeCompare(z.name));
+    return { items, pieces, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
