@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doFleetBattle, shipBattleOrder, buyAmmo, setLoadout, upgradeCombat } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doFleetBattle, shipBattleOrder, buyAmmo, buyLocker, setLoadout, upgradeCombat } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -57,6 +57,7 @@ export async function POST(request) {
                 case "fleet_battle": return noStore(await doFleetBattle(g.buyer.id, body.rank ?? null));
                 case "battle_order": return noStore(await shipBattleOrder(g.buyer.id, body.order));
                 case "buy_ammo": return noStore(await buyAmmo(g.buyer.id, body.ammo, body.qty));
+                case "buy_locker": return noStore(await buyLocker(g.buyer.id, body.id));
                 case "set_loadout": return noStore(await setLoadout(g.buyer.id, body.ammo));
                 case "upgrade_combat": return noStore(await upgradeCombat(g.buyer.id, body.track));
                 case "upgrade_dig": return noStore(await upgradeDig(g.buyer.id, body.track));

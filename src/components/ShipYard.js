@@ -302,6 +302,42 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                                 onBuy={(ammo, qty) => onAct({ action: "buy_ammo", ammo, qty })} />
                         ))}
                     </div>
+
+                    {/* THE PRIZE LOCKER — the first thing doubloons buy that is not the ship itself. Sits under
+                        the racks rather than in its own tab because it is the same act: spending plunder, on the
+                        one screen where you already have the purse open. */}
+                    {(combat.locker || []).length ? (
+                        <>
+                            <h3 className="sby-lockerhead">The prize locker</h3>
+                            <p className="sby-sub">
+                                Plunder buys more than powder. Chests you would otherwise wait on a level for, and the
+                                only scroll in the game that lets you choose a piece of gear&apos;s element.
+                            </p>
+                            <div className="sby-locker">
+                                {combat.locker.map((l) => (
+                                    <button key={l.id} type="button" className={`sby-lockeritem${l.canAfford ? "" : " is-poor"}`}
+                                        disabled={busy || !l.canAfford}
+                                        onClick={() => onAct({ action: "buy_locker", id: l.id })}>
+                                        {/* The shared reward-kind sprites, which exist on disk. Per-tier chest art
+                                            is served dynamically to the chest opener and has no static path to
+                                            point at from here. */}
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="sby-lockerart" alt="" draggable="false"
+                                            src={l.kind === "chest" ? "/images/ui/chest.png" : "/images/ui/potion.png"} />
+                                        <span className="sby-lockerbody">
+                                            <b>{l.name}</b>
+                                            <em>{l.blurb}</em>
+                                        </span>
+                                        <span className="sby-lockerprice">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src="/images/sailing/doubloon.png" alt="" draggable="false" />
+                                            {l.price}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    ) : null}
                 </>
             ) : null}
 

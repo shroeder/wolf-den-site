@@ -1870,6 +1870,13 @@ function combatView(row, boatLevel) {
             loaded: loaded.id === a.id,
         })),
         loadout: loaded.id,
+        // The prize locker: what a purse of doubloons can be spent on outside the ship itself. Affordability is
+        // resolved here so the panel and the purchase agree — a tile that looks buyable and then refuses is the
+        // bug this avoids.
+        locker: LOCKER_LIST.map((l) => ({
+            id: l.id, name: l.name, blurb: l.blurb, price: l.price, kind: l.kind, tier: l.tier || null,
+            canAfford: (row?.doubloons || 0) >= l.price,
+        })),
         fleet: {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
             wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
@@ -2172,6 +2179,61 @@ export async function buyAmmo(buyerId, ammoId, qty = 5) {
     ).catch(() => {});
     await trackActivity(buyerId, "buy_ammo", { ammo: def.id, n, cost }).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// ── THE PRIZE LOCKER ─────────────────────────────────────────────────────────────────────────────────────────
+// Doubloons only ever bought the three combat tracks and ammo, which made them a closed loop: you fought to
+// buy the things that make you fight. Nothing outside sailing ever wanted them, so a full purse was just a
+// number on a panel once the tracks were maxed.
+//
+// These two sinks were chosen because each fills a hole that actually exists rather than inventing a want:
+//
+//   CHESTS — level-up chests were cut to the cadence the Rewards Track advertises (a Gold Chest every tenth
+//   level, see chests.js), which was the honest number but left a real gap where a dependable chest source
+//   used to be. This refills it with something EARNED BY PLAYING rather than by levelling, and plunder buying
+//   plunder is the one thing a pirate's purse should obviously do.
+//
+//   ENCHANT SCROLLS — permanently add an element to a piece of gear, and until now they dropped ONLY from
+//   chests. So the item that feeds the elemental affinity system (and the gear markers members just asked
+//   for) was the one thing nobody could deliberately go and get. This is the first route to one that is a
+//   decision rather than luck, and it ties ship combat to gear progression — the cross-system link the
+//   currency was missing.
+//
+// Priced off what a battle actually pays: roughly a dozen doubloons a win, so an Iron chest is two or three
+// fights, a Gold chest most of a week, and a scroll is a genuine save-up.
+export const LOCKER = {
+    chest_iron: { id: "chest_iron", kind: "chest", tier: "iron", name: "Iron Chest", price: 30, blurb: "Ship's stores. Reliable, and yours in two good fights." },
+    chest_gold: { id: "chest_gold", kind: "chest", tier: "gold", name: "Gold Chest", price: 75, blurb: "The captain's own. Worth saving for." },
+    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 110, blurb: "Adds an element to a piece of gear — permanently. The only way to buy one." },
+};
+export const LOCKER_LIST = Object.values(LOCKER);
+
+/** Buy one thing out of the prize locker with doubloons. */
+export async function buyLocker(buyerId, id) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = LOCKER[String(id)];
+    if (!def) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
+    // Charge FIRST and conditionally, so two taps on a slow connection cannot buy two chests for one purse.
+    // neon() has no transactions, so the guard has to live in the UPDATE itself rather than around it.
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, def.price]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    // Granted after the charge landed. If a grant were to fail the member is out the doubloons, which is why
+    // both paths below are the same calls the rest of the game already uses rather than bespoke SQL.
+    if (def.kind === "chest") {
+        await addChests(buyerId, { [def.tier]: 1 }, { source: "doubloon_locker", meta: { id: def.id } }).catch(() => {});
+    } else {
+        await db.query(
+            `INSERT INTO mkt_user_consumable (buyer_id, consumable_id, count) VALUES ($1, $2, 1)
+             ON CONFLICT (buyer_id, consumable_id) DO UPDATE SET count = mkt_user_consumable.count + 1`,
+            [buyerId, def.consumable]
+        ).catch(() => {});
+    }
+    await trackActivity(buyerId, "buy_locker", { id: def.id, cost: def.price }).catch(() => {});
+    return { ok: true, bought: def.name, ...(await getSailingState(buyerId)) };
 }
 
 // What is in the racks for the next battle. Loading a type you have none of is refused here rather than

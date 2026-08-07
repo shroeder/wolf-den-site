@@ -13846,3 +13846,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-rung-stats .is-worse { color: #ff9a8a; font-weight: 800; }
 .sby-track-eff { display: block; margin-top: 2px; font-size: 0.66rem; font-weight: 800; color: #9fe6ff; }
 .sby-buy.is-gold { background: linear-gradient(180deg, #ffe488, #f3b23a); color: #2b1f06; }
+
+/* ── THE PRIZE LOCKER ─────────────────────────────────────────────────────────────────────────────────────
+   Doubloons spent on something other than the ship. Rows rather than a grid: each item needs a sentence to
+   explain what it is for, and three tiles of wrapped small print is how the gun-deck stat boxes went wrong. */
+.sby-lockerhead { margin: 16px 0 2px; font-size: 0.95rem; font-weight: 900; color: #ffe28a; }
+.sby-locker { display: grid; gap: 7px; }
+.sby-lockeritem { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 11px; align-items: center;
+    width: 100%; text-align: left; padding: 9px 11px; border-radius: 12px; cursor: pointer; font: inherit;
+    background: linear-gradient(180deg, rgba(38,26,12,0.9), rgba(14,9,4,0.9));
+    border: 1px solid rgba(196,150,88,0.42); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
+.sby-lockeritem:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+.sby-lockeritem.is-poor { opacity: 0.5; cursor: default; }
+.sby-lockerart { width: 42px; height: 42px; flex: none; object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); }
+.sby-lockerbody { min-width: 0; }
+.sby-lockerbody b { display: block; font-size: 0.9rem; font-weight: 900; color: #fff4e2; }
+.sby-lockerbody em { display: block; font-style: normal; font-size: 0.72rem; line-height: 1.35; color: #b9a892; }
+.sby-lockerprice { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 5px 11px;
+    border-radius: 999px; font-size: 0.86rem; font-weight: 900; color: #2a1a06;
+    background: linear-gradient(180deg, #ffe27a, #e0a63a); border: 1px solid rgba(255,240,190,0.7); }
+.sby-lockerprice img { width: 17px; height: 17px; object-fit: contain; }
