@@ -7,36 +7,32 @@ import { getSetting } from "@/lib/settings.js";
 // path can import activeXpMultiplier without pulling in a dependency cycle. The donate/grant actions live in
 // happy-hour.js. Both share the same catalog constants below.
 
-// Extra multiplier ADDED to base_mult once the shared pool crosses each gold threshold.
-export const BREAKPOINTS = [
-    { at: 0, add: 0 },
-    { at: 5000, add: 1 },
-    { at: 15000, add: 2 },
-    { at: 40000, add: 3 },
-];
+// ONE THRESHOLD, ONE MULTIPLIER. The pack donates until the rally fills, that summons a x2 event, and that is
+// the whole mechanic.
+//
+// It used to be a ladder — x2 base, then +1 at a 5,000 pool, +2 at 15,000, +3 at 40,000 — and the ladder did
+// not survive contact with the rally that feeds it. RALLY_TRIGGER was also 15,000, and a rally handed its pool
+// to the event it summoned, so every rally event was born holding exactly enough to satisfy the +2 rung and
+// opened at x4: the ceiling, instantly, before anyone could donate a coin toward it. The meter the event was
+// built around was already full at second one. Measured on the 2026-08-08 event: eight members spent eight days
+// filling the rally, it fired at x4, and NOBODY donated during the two hours it ran, because there was nothing
+// left to buy. One flat multiplier is what the ladder was pretending to be.
+export const HAPPY_HOUR_MULT = 2;
 export const RALLY_KEY = "hh_rally_gold";
+// When the current rally cycle began. Donations are tallied from here so the members who summoned an event get
+// the credit on it — see collectRallyDonors in happy-hour.js.
+export const RALLY_SINCE_KEY = "hh_rally_since";
 export const RALLY_TRIGGER = 15000;
+export const HAPPY_HOUR_HOURS = 2;
 
 export async function getActiveEvent() {
     return db.queryOne(`SELECT * FROM mkt_happy_hour WHERE ends_at > NOW() ORDER BY started_at DESC LIMIT 1`).catch(() => null);
 }
 
+// Flat, and deliberately ignores base_mult/pool_gold — older rows carry a ladder value that no longer means
+// anything, and the pool is now just a record of what the pack chipped in to summon this.
 export function eventMultiplier(ev) {
-    if (!ev) return 1;
-    const pool = Number(ev.pool_gold) || 0;
-    let add = 0;
-    for (const b of BREAKPOINTS) if (pool >= b.at) add = b.add;
-    return (Number(ev.base_mult) || 2) + add;
-}
-
-// The next breakpoint to chase (null once maxed), for the donation meter.
-export function nextBreakpoint(ev) {
-    const pool = Number(ev.pool_gold) || 0;
-    for (let i = 0; i < BREAKPOINTS.length; i += 1) {
-        const b = BREAKPOINTS[i];
-        if (pool < b.at) return { at: b.at, mult: (Number(ev.base_mult) || 2) + b.add, remaining: b.at - pool, from: BREAKPOINTS[i - 1]?.at || 0 };
-    }
-    return null;
+    return ev ? HAPPY_HOUR_MULT : 1;
 }
 
 // ── Cached XP multiplier for the hot awardXp path (events change slowly; a short TTL avoids a query per XP).
@@ -84,10 +80,9 @@ export async function getHappyHourState(buyerId) {
         resource: ev.resource,
         endsAt: ev.ends_at,
         endsInSecs: Math.max(0, Math.floor((new Date(ev.ends_at).getTime() - Date.now()) / 1000)),
+        // What the pack chipped in to summon this. A record, not a lever — it no longer moves the multiplier.
         pool: Number(ev.pool_gold) || 0,
         multiplier: eventMultiplier(ev),
-        baseMult: Number(ev.base_mult) || 2,
-        next: nextBreakpoint(ev),
         myDonation,
         nextReward,
         gold: gold?.gold || 0,
@@ -96,15 +91,16 @@ export async function getHappyHourState(buyerId) {
 }
 
 // ── Admin actions (db only) ────────────────────────────────────────────────────────────────────────
-export async function startHappyHour({ hours = 2, baseMult = 2, startPool = 0 } = {}) {
-    const h = Math.max(1, Math.min(24, Math.floor(Number(hours) || 2)));
-    const base = Math.max(2, Math.min(3, Math.floor(Number(baseMult) || 2)));
+// No baseMult argument: a Happy Hour is x2, always. `startPool` is the gold the rally raised to summon it and
+// is stored for the recap only. Returns the row so the caller can credit its donors.
+export async function startHappyHour({ hours = HAPPY_HOUR_HOURS, startPool = 0 } = {}) {
+    const h = Math.max(1, Math.min(24, Math.floor(Number(hours) || HAPPY_HOUR_HOURS)));
     const pool = Math.max(0, Math.floor(Number(startPool) || 0));
     const ev = await db
-        .queryOne(`INSERT INTO mkt_happy_hour (kind, resource, base_mult, pool_gold, ends_at) VALUES ('happy_hour', 'xp', $1, $2, NOW() + ($3 || ' hours')::interval) RETURNING *`, [base, pool, String(h)])
+        .queryOne(`INSERT INTO mkt_happy_hour (kind, resource, base_mult, pool_gold, ends_at) VALUES ('happy_hour', 'xp', $1, $2, NOW() + ($3 || ' hours')::interval) RETURNING *`, [HAPPY_HOUR_MULT, pool, String(h)])
         .catch(() => null);
     invalidateEventCache();
-    return { ok: Boolean(ev), endsAt: ev?.ends_at, baseMult: base, hours: h };
+    return { ok: Boolean(ev), event: ev, endsAt: ev?.ends_at, multiplier: HAPPY_HOUR_MULT, hours: h };
 }
 
 export async function endHappyHour() {

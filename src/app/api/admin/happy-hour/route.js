@@ -24,7 +24,8 @@ export async function GET(request) {
     });
 }
 
-// POST — { action: "start", hours, baseMult } | { action: "end" } | { action: "addPool", amount }.
+// POST — { action: "start", hours } | { action: "end" } | { action: "addPool", amount }.
+// No multiplier knob: a Happy Hour is x2, always (see HAPPY_HOUR_MULT).
 export async function POST(request) {
     return withRequestLogging(request, "POST /api/admin/happy-hour", async ({ logger, internalError }) => {
         const authError = await requireAdminAccess(request, "marketplace.manage", logger);
@@ -32,7 +33,7 @@ export async function POST(request) {
         try {
             const body = await request.json().catch(() => ({}));
             const action = String(body?.action || "");
-            if (action === "start") return noStore(await startHappyHour({ hours: body.hours, baseMult: body.baseMult }));
+            if (action === "start") return noStore(await startHappyHour({ hours: body.hours }));
             if (action === "end") return noStore(await endHappyHour());
             if (action === "addPool") return noStore(await addToHappyHourPool(body.amount));
             return noStore({ error: "unknown_action" }, { status: 400 });

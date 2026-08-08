@@ -352,7 +352,15 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         // This is exactly the case the `gold` parameter already exists for: trades pass gold: 0 "so we don't
         // hand out spendable currency for a payout we already paid the customer for". A scroll is the same
         // shape — they PAID gold for it; handing gold back is refunding the purchase and then some.
-        await awardXp(buyerId, "consumable", { points: e.amount, gold: 0, meta: { consumable: id } }).catch(() => {});
+        //
+        // flat: true — and NOT for the same reason as gold: 0. A scroll is bought at a FIXED gold price for a
+        // FIXED amount of XP, but the XP used to ride Happy Hour while the price did not, which made the shop a
+        // gold→XP arbitrage that paid four times as much for the same coin. On 2026-08-08 one member spent his
+        // whole week's gold — 27,500 — on nine scrolls inside a 4x window, bought and used back-to-back over
+        // thirteen minutes, and took 48,048 XP out of it against the ~12,000 the same gold buys normally. There
+        // is no cap or cooldown on buying them, so the only limit was his balance. The scroll IS the reward; it
+        // should not compound with a buff that exists to reward playing.
+        await awardXp(buyerId, "consumable", { points: e.amount, gold: 0, flat: true, meta: { consumable: id } }).catch(() => {});
         applied = `+${e.amount.toLocaleString()} XP`;
     } else if (e.type === "strikes") {
         // Expire at the next STORE-LOCAL (America/Chicago) midnight — the same boundary the boss swing counter

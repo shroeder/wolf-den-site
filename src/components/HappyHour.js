@@ -9,8 +9,8 @@ function fmtLeft(secs) {
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-// Global banner shown while a Happy Hour is live: the current multiplier, a countdown, a donation meter to
-// the next breakpoint, and a "donate gold to push it higher" control. Self-hides when no event is active.
+// Global banner shown while a Happy Hour is live: the multiplier and a countdown. With no event live it shows
+// the RALLY meter instead — donate gold, fill the bar, summon a x2 for the whole server. Self-hides otherwise.
 export default function HappyHour({ compact = false }) {
     const [st, setSt] = useState(null);
     const [secs, setSecs] = useState(0);
@@ -44,7 +44,9 @@ export default function HappyHour({ compact = false }) {
             setSt(d); setAmount("");
             if (d.triggered) setMsg({ ok: true, text: "🎉 You summoned Happy Hour!" });
             else if (d.rewards?.length) setMsg({ ok: true, text: `Donation reward: ${d.rewards.join(", ")}!` });
-            else if (d.active) setMsg({ ok: true, text: `Donated ${amt.toLocaleString()}! Now ×${d.multiplier}.` });
+            // A live event has nothing left to raise, so this went into the NEXT rally. Say so — "donated!" with
+            // no visible meter movement reads as the gold having vanished.
+            else if (d.active) setMsg({ ok: true, text: `Donated ${amt.toLocaleString()} toward the next Happy Hour!` });
             else setMsg({ ok: true, text: `Donated ${amt.toLocaleString()} to the rally!` });
             if (d.active) setSecs(d.endsInSecs || secs);
         } else setMsg({ ok: false, text: d?.error === "not_enough_gold" ? "Not enough gold." : "Couldn't donate." });

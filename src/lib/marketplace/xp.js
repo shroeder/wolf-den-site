@@ -100,21 +100,30 @@ export async function memberHangoutMult(buyerId) {
     return rows.reduce((m, r) => m * (Number(r.magnitude) || 1), 1);
 }
 
-export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null } = {}) {
+// `flat` — pay exactly the number on the tin, ignoring every earn-rate buff.
+//
+// The buffs above exist to reward PLAYING: swing at the boss during Happy Hour and the swing is worth more.
+// That logic breaks for anything you BUY at a fixed price, because the price does not move with the buff. XP
+// scrolls are sold for a fixed amount of gold and grant a fixed amount of XP, so riding the multiplier turned
+// the shop into a gold→XP arbitrage: 27,500 gold bought ~12,000 XP normally and 48,048 XP during a 4x, with no
+// cap or cooldown on how many you could buy back-to-back. The scroll IS the reward; it should not compound with
+// a buff meant for effort. The STOCKADE penalty is deliberately still applied — it is a punishment, not a buff,
+// and buying your way around it is exactly what it is there to prevent.
+export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
     if (base <= 0) return null;
     // Happy Hour multiplies all XP (which cascades to the gold + the equipped pet's 25% share below).
-    const mult = await activeXpMultiplier().catch(() => 1);
+    const mult = flat ? 1 : await activeXpMultiplier().catch(() => 1);
     // The shared Town's prosperity gives EVERY member a standing % boost to XP & gold earned (Town Development).
-    const town = await getTownBonuses(Date.now()).catch(() => ({ xpPct: 0, goldPct: 0 }));
+    const town = flat ? { xpPct: 0, goldPct: 0 } : await getTownBonuses(Date.now()).catch(() => ({ xpPct: 0, goldPct: 0 }));
     const xpMult = 1 + (town.xpPct || 0) / 100;
     const goldMult = 1 + (town.goldPct || 0) / 100;
     // MARKET DAY — while the PHYSICAL Wolf Den store is open, every member earns bonus XP. Ties the game to real
     // store hours (and quietly rewards playing when you could pop in). Pure function of the clock — no DB cost.
-    const marketMult = 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
+    const marketMult = flat ? 1 : 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
     // Town HANGOUT buff — a personal +5% to XP & gold you earn after chilling in the plaza for 3 min (2h timer).
-    const hangout = await memberHangoutMult(buyerId).catch(() => 1);
+    const hangout = flat ? 1 : await memberHangoutMult(buyerId).catch(() => 1);
     // THE STOCKADE's Mark of Shame: a flat -10% to everything earned while serving. Applied last, on both XP
     // and gold, so it bites through every buff above it rather than being cancelled out by a good Happy Hour.
     const shame = await stockadeMultiplier(buyerId).catch(() => 1);
