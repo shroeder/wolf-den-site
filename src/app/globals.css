@@ -13896,7 +13896,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    visible consequence at all. Now it throws a column of water where it fell: a rising plume, a spreading
    ring on the surface, and droplets thrown out sideways. Placed at the end of the miss arc rather than on
    the ship, because the whole point is that it did NOT reach them. */
-.sbt-splash { position: absolute; z-index: 4; pointer-events: none; width: 74px; height: 74px;
+/* BEHIND the ships, not in front. At z-index 4 the plume drew over the hull it fell beside, which reads as
+   water in front of the boat — wrong way round, and it hid the ship at the exact moment you were looking to
+   see whether the shot had landed. Below the hulls now, so it rises out of the sea behind them. */
+.sbt-splash { position: absolute; z-index: 0; pointer-events: none; width: 74px; height: 74px;
     transform: translate(-50%, -60%); }
 .sbt-splash i { position: absolute; left: 50%; bottom: 0; width: 15px; height: 40px; margin-left: -7.5px;
     border-radius: 50% 50% 40% 40%; background: linear-gradient(180deg, rgba(228,246,255,0.95), rgba(120,190,230,0.35));
@@ -13941,3 +13944,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     font-weight: 800; color: #ffd9a0; text-decoration: none; text-align: center;
     background: rgba(255,205,120,0.08); border: 1px dashed rgba(255,205,120,0.4); }
 .sby-gunlab:hover { background: rgba(255,205,120,0.16); }
+
+/* Leave the fight. Sits with the other chrome in the in-flow row, deliberately quiet — it is an exit, not an
+   action you are being encouraged to take — but always reachable, which it was not at all before. */
+.sbt-leave { pointer-events: auto; padding: 4px 12px; border-radius: 999px; font-size: 0.62rem; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; color: #cdd6df;
+    background: rgba(8,14,22,0.86); border: 1px solid rgba(255,255,255,0.22); }
+.sbt-leave:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+/* Leave the fight. Sits with the other chrome in the in-flow row, deliberately quiet — it is an exit, not
+   something to encourage — but always reachable, which it was not at all before. */
+.sbt-leave { pointer-events: auto; padding: 4px 12px; border-radius: 999px; font-size: 0.62rem; font-weight: 900;
+    letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; color: #cdd6df;
+    background: rgba(8,14,22,0.86); border: 1px solid rgba(255,255,255,0.22); }
+.sbt-leave:hover { color: #fff; border-color: rgba(255,255,255,0.4); }

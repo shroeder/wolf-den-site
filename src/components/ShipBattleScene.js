@@ -483,6 +483,16 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                     middle, orders below — so the two chrome buttons live in the one strip that is genuinely
                     free, in flow, where neither can land on anything. */}
                 <SceneMusic vibe="seabattle" place="inline" />
+                {/* A WAY OUT, at any point. `onClose` existed but was only wired to the result screen, so once a
+                    fight opened there was no leaving it until it ended — and a battle can run twelve rounds.
+                    Nothing is forfeited: the fight is stored server-side and the sortie is already spent, so
+                    this closes the window and the sailing page hands it straight back. */}
+                {onClose ? (
+                    <button type="button" className="sbt-leave" onClick={onClose}
+                        title={battle?.over ? "Close" : "Leave — this fight will be waiting for you"}>
+                        {battle?.over ? "Close" : "Leave fight"}
+                    </button>
+                ) : null}
                 {logOpen ? (
                     <div className="sbt-log is-open" ref={logRef}>
                         {log.map((l) => (
