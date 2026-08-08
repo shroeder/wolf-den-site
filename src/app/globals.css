@@ -13137,62 +13137,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-foam i:nth-child(5) { left: 70%; animation-delay: .35s; }
 .sbt-foam i:nth-child(6) { left: 82%; animation-delay: .65s; }
 @keyframes sbtFoam { 0% { transform: translateY(0) scale(.4); opacity: 0; } 30% { opacity: .9; } 100% { transform: translateY(-26px) scale(1.3); opacity: 0; } }
-
-/* THE VOLLEY — one ball per gun that bore, in a ragged stagger, misses splashing short. */
-.sbt-volley { position: absolute; top: 62%; left: 0; right: 0; height: 0; pointer-events: none; z-index: 4; }
-/* The muzzle flash and smoke the guns were firing without. */
-.sbt-muzzle { position: absolute; top: -14px; width: 46px; height: 30px; border-radius: 50%;
-    background: radial-gradient(circle at 50% 50%, rgba(255,232,160,0.95), rgba(255,150,40,0.5) 45%, transparent 72%);
-    opacity: 0; animation: sbtMuzzle .5s ease-out forwards; }
-.sbt-volley.to-foe .sbt-muzzle { left: 24%; }
-.sbt-volley.to-me .sbt-muzzle { right: 24%; }
 @keyframes sbtMuzzle { 0% { opacity: 0; transform: scale(.4); } 12% { opacity: 1; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.9); } }
-
-/* THE SHOT.
-   It was CSS: a 13x9 ellipse with a radial gradient, stretched further with scaleX(1.5) to fake speed, and a
-   34px radial-gradient "impact" fired off its ::after. On a phone that reads as a flat orange smear followed
-   by an orange pancake hanging in mid-air. A ball of iron is now a ball of iron — a real sprite, round, at a
-   fixed size, with no stretch and no glow disc. The consequence of it arriving lives on the HULL instead
-   (.sbt-hit), which is where damage actually happens. */
-/* THE BALL IS THREE THINGS, AND ONLY ONE OF THEM SPINS.
-   It used to be one element carrying the sprite, the trail and a 430° rotation all at once — so the 26px
-   motion streak whirled around the ball on the end of an invisible arm and the whole thing read as a thrown
-   hammer rather than a round shot. The mover translates, the shot spins inside it, and the trail follows the
-   direction of travel without ever going round. */
-/* THE SHOT NO LONGER FLIES. The travelling ball was the weakest thing in the fight and every fix bought a new
-   defect — it read as a thrown hammer, then as a smear, then as a ball on an arc that did not match its own
-   trail, and a miss needed a third path again. None of that was ever the point: a broadside is guns going off
-   and timber breaking, not a projectile you follow across a phone screen at sixteen pixels.
-   So the guns flash, the hull answers 210ms later, and the eye fills in the middle — which is how every game
-   that does this well has always done it. The markup stays (the ball elements still render the muzzle lane and
-   the shot count drives the audio stagger); only the drawing of the ball itself is gone, so nothing downstream
-   had to be unpicked to try this. */
-.sbt-ball { display: none; }
-/* The iron itself. Spins on its own axis — visible because the sprite has a highlight and pitting, and slow
-   enough (a bit over one turn across the whole flight) to read as tumbling shot rather than a fan blade. */
-.sbt-ball::after { content: ""; position: absolute; inset: 0;
-    background: url("/images/sailing/cannonball.png") center/contain no-repeat;
-    animation: sbtBallSpin .52s linear forwards; animation-delay: inherit; }
 @keyframes sbtBallSpin { from { transform: rotate(0deg); } to { transform: rotate(400deg); } }
-/* A short motion streak BEHIND the ball rather than squashing the ball itself — stretching a sphere is what
-   made it read as a smear. It TILTS with the arc instead of spinning: up off the muzzle, level at the apex,
-   down onto the target. That tilt is what sells the trajectory — a ball on a straight line with a spinning
-   streak reads as neither. Origin is the ball's centre so the streak pivots on the shot, not on its own tail. */
-.sbt-ball::before { content: ""; position: absolute; top: 50%; width: 26px; height: 3px; margin-top: -1.5px;
-    border-radius: 2px; opacity: .55; animation: sbtTrailTilt .52s cubic-bezier(.35,0,.7,1) forwards;
-    animation-delay: inherit; }
-.sbt-volley.to-foe .sbt-ball::before { right: 60%; transform-origin: 100% 50%; background: linear-gradient(90deg, transparent, rgba(255,215,160,0.5)); }
-.sbt-volley.to-me .sbt-ball::before { left: 60%; transform-origin: 0% 50%; background: linear-gradient(270deg, transparent, rgba(255,215,160,0.5)); }
-/* Mirrored for the incoming side: the same climb-then-fall, read right to left. */
-.sbt-volley.to-me .sbt-ball::before { animation-name: sbtTrailTiltL; }
 @keyframes sbtTrailTilt {
     0% { transform: rotate(-15deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(11deg); }
 }
 @keyframes sbtTrailTiltL {
     0% { transform: rotate(15deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(-11deg); }
 }
-.sbt-volley.to-foe .sbt-ball { left: 27%; animation: sbtFlyR .52s cubic-bezier(.35,0,.7,1) forwards; }
-.sbt-volley.to-me .sbt-ball { right: 27%; animation: sbtFlyL .52s cubic-bezier(.35,0,.7,1) forwards; }
 /* A FLATTER arc. The old one climbed 42px above two ships that are only ~120px tall, so the broadside sailed
    over the masts like a mortar barrage instead of crossing between the hulls. */
 /* Translate and scale only — the spin lives on ::after now. A deeper climb than the flat version too: at 16px
@@ -13212,19 +13164,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     92% { opacity: 1; transform: translate(-42vw,2px) scale(1); }
     100% { opacity: 0; transform: translate(-43vw,4px) scale(.85); }
 }
-/* Rake shot glows. The shadow moves to ::after with the sprite — on the mover it drew a box around a round
-   ball, which is the same class of mistake as the spinning trail. */
-.sbt-ball.is-rake { width: 15px; height: 15px; }
-.sbt-ball.is-rake::after { filter: drop-shadow(0 0 6px rgba(255,170,60,0.95)) drop-shadow(0 0 12px rgba(255,140,40,0.7)); }
-/* A MISS falls short and throws a splash — the whole reason accuracy is a stat you can feel. */
-.sbt-volley.to-foe .sbt-ball.is-miss { animation-name: sbtMissR; }
-.sbt-volley.to-me .sbt-ball.is-miss { animation-name: sbtMissL; }
-/* A MISS FLIES A DIFFERENT ARC, SO ITS TRAIL NEEDS A DIFFERENT TILT. The hit crosses nearly flat and lands at
-   +2px; a miss climbs half again as high and then plunges 34px into the sea. One shared tilt tuned for the hit
-   left the streak sitting almost level while the ball dropped out from under it — the same class of mismatch
-   as the spinning trail, just quieter. This one follows the plunge down. */
-.sbt-volley.to-foe .sbt-ball.is-miss::before { animation-name: sbtTrailMissR; }
-.sbt-volley.to-me .sbt-ball.is-miss::before { animation-name: sbtTrailMissL; }
 @keyframes sbtTrailMissR {
     0% { transform: rotate(-22deg); } 45% { transform: rotate(0deg); } 100% { transform: rotate(34deg); }
 }
@@ -13245,17 +13184,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     88% { opacity: 1; transform: translate(-28vw,26px) scale(.85); }
     100% { opacity: 0; transform: translate(-29vw,34px) scale(1.5); }
 }
-
-/* THE DAMAGE NUMBER — the payoff for the order you just gave, so it lands like one: it punches in oversized,
-   settles, then rises away. Was a modest 1.5rem drifting up 34px, which is the visual weight of a tooltip. */
-.sbt-float { position: absolute; top: 34%; z-index: 7; font-size: 2.5rem; font-weight: 900; line-height: 1;
-    color: #ffe07a; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
-    text-shadow: 0 3px 0 rgba(0,0,0,0.7), 0 0 22px rgba(255,180,40,0.85);
-    animation: sbtFloat 1.15s cubic-bezier(.2,1.4,.35,1) forwards; }
-.sbt-float.on-foe { right: 14%; }
-.sbt-float.on-me { left: 14%; color: #ff9a8a; text-shadow: 0 3px 0 rgba(0,0,0,0.7), 0 0 22px rgba(255,70,50,0.8); }
-.sbt-float b { display: block; margin-top: 2px; font-size: 0.78rem; letter-spacing: 0.16em; color: #fff;
-    text-shadow: 0 0 12px rgba(255,150,40,0.95); animation: sbtCrit .5s ease-out both .12s; }
 @keyframes sbtFloat {
     0% { opacity: 0; transform: translateY(16px) scale(.5); }
     18% { opacity: 1; transform: translateY(0) scale(1.35); }
@@ -13662,12 +13590,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     100% { opacity: 0; transform: rotate(var(--a)) translateY(-72px) scale(1.1) rotate(300deg); }
 }
 .sbt-hit.is-heavy .sbt-splinter { animation-name: sbtSplinterFar; }
-
-/* MUZZLE SMOKE — the flash was instantaneous, so a fired gun left no trace a beat later. This hangs. */
-.sbt-muzzle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 40px; height: 40px;
-    margin: -20px 0 0 -20px; border-radius: 50%; opacity: 0;
-    background: radial-gradient(circle, rgba(220,215,205,0.6), rgba(130,125,120,0.3) 50%, transparent 72%);
-    animation: sbtMuzzleSmoke 1.3s ease-out forwards .06s; }
 @keyframes sbtMuzzleSmoke {
     0% { opacity: 0; transform: scale(.3); }
     22% { opacity: .8; }
@@ -13705,32 +13627,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-flag { font-weight: 800; }
 .sbt-flag.is-rig { color: #9fd0ff; }
 .sbt-flag.is-fire { color: #ff9a6b; }
-
-/* THE LOG — a number that flashes for 900ms is not information.
-   It lives in the SKY now, floating over the empty upper half instead of taking a strip off the bottom. That
-   band was the dead space on the screen and the log is the one thing that always has something to say. */
-/* COLLAPSED by default. A line lands per exchange, so by round three the full history was a wall of text
-   sitting directly over the two ships you are trying to read while choosing an order. Two lines is enough to
-   see what just happened; the toggle below opens the rest.
-   The wrapper is what carries the absolute position — the toggle used to be positioned off the same 96px
-   origin with a hand-computed offset, which put it on top of the last log line the moment the padding or the
-   line-height moved. Stacked in a wrapper it simply sits under whatever height the log currently is. */
-/* AT THE BOTTOM OF THE SEA, NOT ACROSS THE MASTS. Anchored to top:96px the log sat straight over the rigging
-   of both ships while the water underneath them was empty — it was covering the thing you came to watch and
-   leaving the room it could have used. It hangs off the bottom of the stage now and grows upward, so a long
-   round eats the empty sea first and only ever reaches the hulls if it genuinely has that much to say. */
-/* CLOSED, IT IS JUST A PILL. Nothing but the toggle occupies the stage until you open the log, so the strip
-   it used to hold — over the masts at the top, over the order cards at the bottom — is free again. Right-hand
-   side, out of the way of both hulls. */
-/* IN NORMAL FLOW, DIRECTLY AFTER THE HUD. Absolute positioning is what kept putting this on top of things:
-   top:8 covered the enemy's name, top:96 covered the masts, bottom:8 covered the order cards, and top:106 was
-   a number measured off the dev lab, whose HUD is shorter than the real page's — so it landed inside the cards
-   again. There is no magic offset that is right on every screen. Sitting after the HUD in the document means
-   it CANNOT overlap it, on any device, without anyone having to measure anything.
-   The open log still floats, anchored to this wrapper, so reading it never shoves the ships down the page. */
-.sbt-logwrap { position: relative; z-index: 6; margin: 6px 10px 0; display: flex; align-items: center;
-    justify-content: space-between; gap: 8px; pointer-events: none; }
-.sbt-logwrap > button { pointer-events: auto; }
 /* Present but inert until there is something to read — see the note on the toggle. */
 .sbt-logtoggle.is-idle { opacity: 0.45; cursor: default; }
 .sbt-log { position: absolute; top: calc(100% + 5px); left: 0; right: 0; }
@@ -13767,68 +13663,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-logline.is-foe { color: #ff9c8a; }
 .sbt-logline.is-big { font-weight: 900; color: #ffd75e; letter-spacing: 0.01em;
     text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 12px rgba(255,200,80,0.45); }
-
-/* ORDERS — the reason this is a fight rather than a cutscene, so this is where the juice goes.
-   Four identical dark rectangles with a one-colour react-icons glyph is what a settings menu looks like, at
-   the single moment in the fight where the player is actually deciding something. Each card now carries its
-   own order's colour end to end — rim, inner glow, title, sprite halo — so the choice reads as four different
-   things at a glance instead of four rows of text. */
-.sbt-orders { position: relative; z-index: 6; display: grid; grid-template-columns: 1fr 1fr; gap: 9px;
-    padding: 0 10px 12px; }
-.sbt-orders-call { grid-column: 1 / -1; text-align: center; font-size: 0.7rem; font-weight: 900;
-    letter-spacing: 0.22em; text-transform: uppercase; color: #ffd75e; text-shadow: 0 0 12px rgba(255,200,60,0.5);
-    animation: sbtCall 2.2s ease-in-out infinite; }
 @keyframes sbtCall { 0%,100% { opacity: 0.65; } 50% { opacity: 1; } }
-/* Art ABOVE the words on a phone. Side by side, two cards across a 393px screen leaves ~110px for the title,
-   which wraps "Rake the rigging" onto two lines and knocks every card out of alignment with its neighbour. */
-.sbt-order { position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr;
-    grid-template-areas: "art" "name" "desc"; align-content: start; justify-items: start; row-gap: 2px;
-    padding: 10px 12px 11px; border-radius: 15px; cursor: pointer; text-align: left; color: #f2f6fa;
-    background:
-        radial-gradient(80% 120% at 0% 50%, var(--ord-glow), transparent 62%),
-        linear-gradient(180deg, rgba(255,255,255,0.11), rgba(255,255,255,0.02));
-    border: 1.5px solid var(--ord-rim);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.16);
-    transition: transform .12s cubic-bezier(.2,1.4,.4,1), box-shadow .16s ease, filter .16s ease; }
-.sbt-order b { grid-area: name; font-size: 0.9rem; font-weight: 900; letter-spacing: 0.01em;
-    color: var(--ord-ink); text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
-.sbt-order em { grid-area: desc; font-style: normal; font-size: 0.64rem; line-height: 1.32; color: #a8b8c8; }
-.sbt-order:disabled { opacity: 0.45; cursor: default; }
-/* The sprite. Sized to be the loudest thing on the card, because it is the thing you aim at. */
-.sbt-order-art { grid-area: art; display: grid; place-items: center; width: 54px; height: 54px; }
-.sbt-order-art img { width: 100%; height: 100%; object-fit: contain;
-    filter: drop-shadow(0 0 10px var(--ord-glow)) drop-shadow(0 2px 3px rgba(0,0,0,0.55));
-    animation: sbtOrderFloat 3.6s ease-in-out infinite; }
-.sbt-order.is-rake .sbt-order-art img { animation-delay: -.9s; }
-.sbt-order.is-brace .sbt-order-art img { animation-delay: -1.8s; }
-.sbt-order.is-board .sbt-order-art img { animation-delay: -2.7s; }
-@keyframes sbtOrderFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-3px) rotate(-2deg); } }
-/* A slow highlight crossing the card, so the row is alive while you are reading it. */
-.sbt-order-shine { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-    background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.16) 48%, transparent 58%);
-    transform: translateX(-120%); animation: sbtShine 5.2s ease-in-out infinite; }
-.sbt-order.is-rake .sbt-order-shine { animation-delay: 1.3s; }
-.sbt-order.is-brace .sbt-order-shine { animation-delay: 2.6s; }
-.sbt-order.is-board .sbt-order-shine { animation-delay: 3.9s; }
 @keyframes sbtShine { 0%, 62% { transform: translateX(-120%); } 84%, 100% { transform: translateX(120%); } }
-.sbt-order:active:not(:disabled) { transform: scale(0.96); filter: brightness(1.25); }
-@media (hover: hover) {
-    .sbt-order:hover:not(:disabled) { transform: translateY(-2px);
-        box-shadow: 0 8px 22px rgba(0,0,0,0.5), 0 0 0 1px var(--ord-rim), inset 0 1px 0 rgba(255,255,255,0.22); }
-}
-/* Once there is room for a title on one line, the sprite moves beside the words and the card gets shorter. */
-@media (min-width: 560px) {
-    .sbt-order { grid-template-columns: 58px 1fr; grid-template-areas: "art name" "art desc";
-        align-content: center; column-gap: 11px; padding-left: 10px; }
-    .sbt-order-art { width: 58px; height: 58px; }
-}
-/* One colour per order, set once and reused by rim, glow, title and sprite halo. */
-.sbt-order.is-broadside { --ord-rim: rgba(255,196,60,0.75); --ord-glow: rgba(255,170,40,0.30); --ord-ink: #ffd75e; }
-.sbt-order.is-rake      { --ord-rim: rgba(110,190,255,0.75); --ord-glow: rgba(70,160,255,0.30); --ord-ink: #9fd8ff; }
-.sbt-order.is-brace     { --ord-rim: rgba(110,230,150,0.75); --ord-glow: rgba(50,200,110,0.28); --ord-ink: #8fe8a8; }
-.sbt-order.is-board     { --ord-rim: rgba(255,110,90,0.8);  --ord-glow: rgba(255,70,50,0.30);  --ord-ink: #ff9e8a; }
 
-/* The stage gives up room to the log and the orders — the fight is the top half now. */
+/* The stage gives up room to the log and the aim bar — the fight is the top half now. */
 .sbt-shakewrap { flex: 1 1 auto; min-height: 30vh; }
 .sail-raid-stakes { margin: 6px 0 8px; font-size: 0.74rem; line-height: 1.5; color: #9aa2ab; }
 .sail-raid-stakes b { color: #ffd75e; }
@@ -13847,10 +13685,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @media (min-width: 900px) {
     /* A battle between two ships at opposite ends of a widescreen is two ships, not a battle. */
     .sbt-stage { max-width: 900px; left: 50%; transform: translateX(-50%); }
-    .sbt-orders { max-width: 900px; margin-left: auto; margin-right: auto; }
-    /* The log is absolutely positioned now, and `margin: auto` does nothing for that — it stretched the full
-       width of a desktop window while the HUD above it stayed capped at 900. Centre it explicitly. */
-    .sbt-logwrap { width: min(900px, calc(100% - 20px)); margin-left: auto; margin-right: auto; }
+    .sbt-aimbar { max-width: 900px; margin-left: auto; margin-right: auto; }
+    /* The log hangs off the chrome row, which is in flow — centre the row and the log comes with it. */
+    .sbt-chrome { width: min(900px, calc(100% - 20px)); margin-left: auto; margin-right: auto; }
     .sbt-hud { max-width: 900px; margin: 0 auto; }
 }
 /* Tab pills shared by the sailing boards and the gun deck. They lived in SailingBoards' scoped <style jsx>,
@@ -13893,54 +13730,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border-radius: 999px; font-size: 0.86rem; font-weight: 900; color: #2a1a06;
     background: linear-gradient(180deg, #ffe27a, #e0a63a); border: 1px solid rgba(255,240,190,0.7); }
 .sby-lockerprice img { width: 17px; height: 17px; object-fit: contain; }
-
-
-/* ── A MISS LANDS IN THE SEA ──────────────────────────────────────────────────────────────────────────────
-   A shot that missed used to simply stop existing, so accuracy — a stat you buy with doubloons — had no
-   visible consequence at all. Now it throws a column of water where it fell: a rising plume, a spreading
-   ring on the surface, and droplets thrown out sideways. Placed at the end of the miss arc rather than on
-   the ship, because the whole point is that it did NOT reach them. */
-/* BEHIND the ships, not in front. At z-index 4 the plume drew over the hull it fell beside, which reads as
-   water in front of the boat — wrong way round, and it hid the ship at the exact moment you were looking to
-   see whether the shot had landed. Below the hulls now, so it rises out of the sea behind them. */
-.sbt-splash { position: absolute; z-index: 0; pointer-events: none; width: 74px; height: 74px;
-    transform: translate(-50%, -60%); }
-.sbt-splash i { position: absolute; left: 50%; bottom: 0; width: 15px; height: 40px; margin-left: -7.5px;
-    border-radius: 50% 50% 40% 40%; background: linear-gradient(180deg, rgba(228,246,255,0.95), rgba(120,190,230,0.35));
-    animation: sbtPlume .62s cubic-bezier(.15,.8,.4,1) both; }
 @keyframes sbtPlume {
     0% { transform: scaleY(0.15) scaleX(0.7); opacity: 0; }
     28% { transform: scaleY(1.15) scaleX(1); opacity: 1; }
     100% { transform: scaleY(0.2) scaleX(1.5); opacity: 0; }
 }
-/* The ring left on the surface — what tells you the sea took it. */
-.sbt-splash b { position: absolute; left: 50%; bottom: -3px; width: 54px; height: 14px; margin-left: -27px;
-    border-radius: 50%; border: 2px solid rgba(214,240,255,0.75); border-top-color: transparent;
-    animation: sbtRing .66s ease-out both; }
 @keyframes sbtRing {
     0% { transform: scale(0.25); opacity: 0; }
     30% { opacity: 0.95; }
     100% { transform: scale(1.5); opacity: 0; }
 }
-/* Droplets. A fixed spread, not Math.random(), so every splash is the same shape — a burst that reshuffles
-   each time reads as noise rather than as water. */
-.sbt-splash u { position: absolute; left: 50%; bottom: 8px; width: 5px; height: 5px; margin-left: -2.5px;
-    border-radius: 50%; background: rgba(228,246,255,0.95);
-    animation: sbtDrop .6s cubic-bezier(.2,.7,.5,1) both; animation-delay: var(--dd, 0ms); }
 @keyframes sbtDrop {
     0% { transform: translate(0,0) scale(1); opacity: 0; }
     18% { opacity: 1; }
     100% { transform: translate(calc(var(--dx) * 1px), calc(var(--dy) * 1px)) scale(0.4); opacity: 0; }
 }
-
-/* An order you cannot give right now — the pump on a dry ship. Present so the board never rearranges, plainly
-   inert so it never looks like something that failed to work. */
-.sbt-order.is-unavailable { opacity: 0.34; filter: saturate(0.4); cursor: default; }
-.sbt-order.is-unavailable .sbt-order-shine { display: none; }
-
-/* The order board while a volley resolves: still there, still the same size, plainly not accepting taps. */
-.sbt-orders.is-waiting { opacity: 0.55; filter: saturate(0.75); }
-.sbt-orders.is-waiting .sbt-order-shine { display: none; }
 
 /* Owner-only entry point to the gun placement lab, from the gun deck. Quiet — it is a workshop door, not a
    feature — but present, because a tool you have to type a URL to reach is not a tool. */
@@ -14049,3 +13853,163 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .tw-stock-plate { display: block; text-align: center; line-height: 1.25; max-width: 168px; }
 .tw-stock-plate b { display: block; }
 .tw-stock-plate em { display: block; font-style: italic; font-size: 0.72em; opacity: 0.9; font-weight: 700; }
+
+/* ══ SHIP BATTLE — AIMING ═══════════════════════════════════════════════════════════════════════════════════
+   The fight stopped being four order cards under two boats. Every gun is laid by TAPPING the part of the ship
+   you want it to hit, so the ships themselves are the controls and the only thing left along the bottom is a
+   read-out of what is under your finger and the button that commits the volley.
+
+   Consequences for the layout: the ships get bigger and sit higher (they are targets now, not an illustration),
+   the chrome moves into a corner, and everything that used to be drawn per-volley is drawn per-GUN. */
+
+/* Ships as targets: wider, and lifted clear of the aim bar. */
+.sbt-ship { width: min(50%, 340px); bottom: 22%; }
+.sbt-ship.is-aimable .sbt-hull { cursor: crosshair; }
+.sbt-aimlayer { position: absolute; inset: 0; z-index: 6; appearance: none; -webkit-appearance: none;
+    background: transparent; border: 0; padding: 0; margin: 0; cursor: crosshair; }
+/* No focus ring around a whole ship — it lights its own zones instead. */
+.sbt-aimlayer:focus { outline: none; }
+.sbt-aimlayer:focus-visible { outline: 2px dashed rgba(255,214,140,0.7); outline-offset: -6px; }
+
+/* THE PART UNDER YOUR FINGER, shaped like the part rather than boxed over it. */
+.sbt-zone { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.sbt-zone i { position: absolute; background: var(--tint, #ffd28a); opacity: 0.34;
+    box-shadow: 0 0 10px 1px var(--tint, #ffd28a) inset; }
+.sbt-zone.is-preview { animation: sbtZonePulse 1.1s ease-in-out infinite; }
+@keyframes sbtZonePulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
+
+/* DAMAGE ON THE HULL ITSELF — canvas going dark and ragged, a rudder shot away. Clipped to the measured zone
+   so it lands on the actual sails rather than over a rectangle of sky. */
+.sbt-dmg { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.sbt-dmg.is-sails i { position: absolute; background: rgba(12,16,22,0.72);
+    opacity: calc(var(--torn, 0) * 0.85);
+    -webkit-mask-image: repeating-linear-gradient(122deg, #000 0 6px, transparent 6px 11px);
+    mask-image: repeating-linear-gradient(122deg, #000 0 6px, transparent 6px 11px); }
+.sbt-dmg.is-rudder i { position: absolute; background: rgba(8,10,14,0.72); }
+
+/* A GUN THAT IS GONE. Dark, canted over on its carriage and no longer able to fire — the whole point of
+   aiming at a gun deck is that you can see the barrel you took off her. */
+.sbt-gun.is-damaged .sbt-gun-barrel { filter: brightness(0.7) saturate(0.6); }
+.sbt-gun.is-dead .sbt-gun-barrel { filter: brightness(0.32) saturate(0.15) blur(0.3px);
+    transform: rotate(14deg) translateY(12%); }
+.sbt-ship-foe .sbt-gun.is-dead .sbt-gun-barrel { transform: rotate(-14deg) translateY(12%); }
+
+/* GUNS ALREADY LAID. One pip per aiming point, in the colour of the round loaded into it. */
+.sbt-mark { position: absolute; z-index: 7; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+    border-radius: 50%; border: 2px solid rgba(0,0,0,0.5); cursor: pointer;
+    background: radial-gradient(circle at 34% 30%, #fff6e0, var(--mtint, #ffd28a) 62%);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.28), 0 3px 8px rgba(0,0,0,0.5);
+    display: grid; place-items: center; animation: sbtMarkIn 0.22s ease-out both; }
+.sbt-mark b { font-size: 0.72rem; font-weight: 900; color: #23160a; }
+.sbt-mark.is-round { --mtint: #ffd28a; }
+.sbt-mark.is-chain { --mtint: #9fd0ff; }
+.sbt-mark.is-grape { --mtint: #ffb0d0; }
+.sbt-mark.is-explosive { --mtint: #ff9a6b; }
+.sbt-mark.is-repair { --mtint: #8fe6a6; border-style: dashed; }
+@keyframes sbtMarkIn { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* THEIR AIM, ON YOUR SHIP — a thin crosshair sitting where their last volley was laid. */
+.sbt-incoming { position: absolute; z-index: 6; width: 30px; height: 30px; margin: -15px 0 0 -15px;
+    border-radius: 50%; border: 2px dashed rgba(255,96,96,0.8); pointer-events: none;
+    animation: sbtIncoming 1.6s ease-in-out infinite; }
+.sbt-incoming::after { content: ""; position: absolute; inset: 44% 10%; border-top: 2px solid rgba(255,96,96,0.55); }
+@keyframes sbtIncoming { 0%, 100% { transform: scale(1); opacity: 0.75; } 50% { transform: scale(1.18); opacity: 0.35; } }
+@keyframes sbtFly { from { transform: translate(var(--fx), var(--fy)); } to { transform: translate(var(--tx), var(--ty)); } }
+@keyframes sbtArc { 0% { transform: translateY(0); } 50% { transform: translateY(-38px); } 100% { transform: translateY(0); } }
+@keyframes sbtSplash2 { from { transform: scale(0.3); opacity: 0.95; } to { transform: scale(1.5) translateY(-8px); opacity: 0; } }
+@keyframes sbtSplashRing { from { transform: scale(0.3); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
+@keyframes sbtSplashDrop { from { transform: translate(0, 0); opacity: 1; }
+    to { transform: translate(calc(var(--dx) * 1px), calc(var(--dy) * 1px)); opacity: 0; } }
+
+/* ── SYSTEMS ON THE PANELS ───────────────────────────────────────────────────────────────────────────────
+   Pips, not numbers: the question is whether she has anything left to shoot off, which is a shape. */
+.sbt-sys { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.sbt-panel-foe .sbt-sys { justify-content: flex-end; }
+.sbt-syschip { display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 999px;
+    background: rgba(0,0,0,0.32); font-size: 0.66rem; color: #cfe3f5; }
+.sbt-syschip.is-out { color: #ff8f7a; background: rgba(120,20,10,0.35); }
+.sbt-sysicon { font-size: 0.85rem; opacity: 0.9; }
+.sbt-syschip i { width: 5px; height: 9px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+.sbt-syschip i.is-up { background: #8fd0ff; box-shadow: 0 0 4px rgba(140,210,255,0.6); }
+.sbt-syschip em { font-style: normal; font-weight: 800; }
+
+/* ── CHROME IN THE CORNER ────────────────────────────────────────────────────────────────────────────────
+   Music, the way out and the transcript. These used to hold a row of their own between the ships and the
+   orders; there are no orders now and the ships want the room, so they sit in the top corner. */
+.sbt-chrome { position: relative; z-index: 20; display: flex; align-items: flex-start; justify-content: flex-end;
+    gap: 6px; padding: 0 8px 4px; }
+.sbt-chrome .sbt-leave, .sbt-chrome .sbt-logtoggle { padding: 5px 10px; font-size: 0.72rem; }
+.sbt-chrome .sbt-log { position: absolute; top: 32px; right: 8px; z-index: 22; width: min(78vw, 340px); max-height: 40vh; }
+
+/* ── THE AIM BAR ─────────────────────────────────────────────────────────────────────────────────────────
+   The only control on the screen. What is under your finger, the guns you have laid, and FIRE. */
+.sbt-aimbar { position: relative; z-index: 12; display: grid; gap: 6px 10px; padding: 8px 10px;
+    grid-template-columns: 1fr auto; grid-template-areas: "read fire" "rail fire";
+    background: linear-gradient(180deg, rgba(6,14,24,0.55), rgba(6,14,24,0.9));
+    border-top: 1px solid rgba(255,214,140,0.16);
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+.sbt-aimbar.is-waiting { opacity: 0.55; pointer-events: none; }
+.sbt-zoneread { grid-area: read; display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.sbt-zoneread .sbt-zoneicon { font-size: 1.5rem; color: var(--tint, #9fb6cc); flex: none; }
+.sbt-zoneread b { display: block; color: var(--tint, #f2e2c4); font-size: 0.86rem; line-height: 1.15; }
+.sbt-zoneread em { display: block; font-style: normal; font-size: 0.7rem; color: #a9bccd; line-height: 1.25; }
+.sbt-zoneread.is-idle b { color: #f2e2c4; }
+
+.sbt-gunrail { grid-area: rail; display: flex; gap: 5px; flex-wrap: wrap; }
+.sbt-gunpip { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #7f93a6;
+    font-size: 0.95rem; padding: 0; }
+.sbt-gunpip.is-laid { color: #23160a; background: var(--mtint, #ffd28a); border-color: rgba(0,0,0,0.4); }
+.sbt-gunpip.is-round { --mtint: #ffd28a; }
+.sbt-gunpip.is-chain { --mtint: #9fd0ff; }
+.sbt-gunpip.is-grape { --mtint: #ffb0d0; }
+.sbt-gunpip.is-explosive { --mtint: #ff9a6b; }
+.sbt-gunpip.is-repair { --mtint: #8fe6a6; }
+.sbt-gunpip.is-dead { opacity: 0.3; color: #ff8f7a; }
+
+.sbt-fire { grid-area: fire; align-self: center; min-width: 104px; padding: 10px 14px; border-radius: 12px;
+    background: linear-gradient(180deg, #4a2c14, #2a1709); border: 1px solid rgba(255,190,110,0.3);
+    color: #8b7a66; text-align: center; }
+.sbt-fire.is-ready { background: linear-gradient(180deg, #ffb347, #e0761c); border-color: #ffd9a0;
+    color: #2a1400; animation: sbtFireReady 1.6s ease-in-out infinite; }
+.sbt-fire b { display: block; font-size: 1.02rem; font-weight: 900; letter-spacing: 0.08em; }
+.sbt-fire em { display: block; font-style: normal; font-size: 0.66rem; opacity: 0.85; }
+@keyframes sbtFireReady { 0%, 100% { box-shadow: 0 0 14px rgba(255,150,50,0.35); } 50% { box-shadow: 0 0 24px rgba(255,180,80,0.65); } }
+
+/* ── THE RACK ────────────────────────────────────────────────────────────────────────────────────────────
+   Opens on the gun you just laid: aim, then load. Sits above the bar so it never covers a ship. */
+.sbt-rack { position: absolute; left: 8px; right: 8px; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    z-index: 16; padding: 8px; border-radius: 12px; background: rgba(8,16,26,0.96);
+    border: 1px solid rgba(255,214,140,0.22); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: sbtRackIn 0.16s ease-out both; }
+@keyframes sbtRackIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.sbt-rack-for { display: block; font-size: 0.7rem; color: #ffd28a; margin-bottom: 6px; font-weight: 700; }
+.sbt-rack-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.sbt-shotpick { padding: 7px 4px; border-radius: 10px; background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); color: #d8e6f2; display: grid; gap: 1px; place-items: center; }
+.sbt-shotpick svg { font-size: 1.15rem; }
+.sbt-shotpick b { font-size: 0.62rem; font-weight: 700; }
+.sbt-shotpick em { font-style: normal; font-size: 0.62rem; opacity: 0.8; }
+.sbt-shotpick.is-round { color: #ffd28a; }
+.sbt-shotpick.is-chain { color: #9fd0ff; }
+.sbt-shotpick.is-grape { color: #ffb0d0; }
+.sbt-shotpick.is-explosive { color: #ff9a6b; }
+.sbt-shotpick.is-on { border-color: currentColor; background: rgba(255,255,255,0.14); }
+.sbt-shotpick.is-out { opacity: 0.32; }
+.sbt-rack-done { margin-top: 6px; width: 100%; padding: 6px; border-radius: 8px; font-size: 0.72rem;
+    background: rgba(255,255,255,0.08); color: #cfe0ee; }
+
+/* A one-line answer to a tap that could not do anything. Silence reads as a broken control. */
+.sbt-hint { position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 18;
+    padding: 6px 12px; border-radius: 999px; background: rgba(10,18,28,0.94); color: #ffd28a;
+    font-size: 0.74rem; border: 1px solid rgba(255,214,140,0.3); animation: sbtRackIn 0.16s ease-out both; }
+
+/* Phones: the bar is the one thing that must never eat the stage, so it stays compact and the ships lift. */
+@media (max-width: 520px) {
+    .sbt-ship { width: min(47%, 280px); bottom: 24%; }
+    .sbt-aimbar { padding: 6px 8px; }
+    .sbt-zoneread em { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .sbt-fire { min-width: 88px; padding: 8px 10px; }
+    .sbt-gunpip { width: 27px; height: 27px; }
+}

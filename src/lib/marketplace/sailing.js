@@ -13,9 +13,10 @@ import { getOwnedPieceIds, getOwnedSetIds } from "@/lib/marketplace/collection-o
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile, simulateShipBattle,
-         gunsFor, accuracyFor, hullFor, armorFor, ORDER_LIST, ordersFor, initBattleState, resolveRound,
-         MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
+import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
+         gunsFor, accuracyFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAssignments,
+         SAILS_MAX, RUDDER_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
+import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { getSavedPorts, portsWithSaved } from "@/lib/marketplace/gun-ports-store.js";
@@ -1644,7 +1645,7 @@ export async function doRaid(buyerId, targetId = null) {
     const openNow = readBattle(row);
     if (openNow) {
         return { ok: true, resumed: true,
-            battle: { ...battleView(openNow.state, openNow.meta), events: [], over: false },
+            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
@@ -1658,7 +1659,7 @@ export async function doRaid(buyerId, targetId = null) {
         db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         equippedSeaAffinity(buyerId),
     ]);
-    const fired = await consumeAmmo(buyerId, row);
+    const fired = openingLoadout(row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
     const theirs = shipProfile({
         name: target.display_name || target.alias || "Rival ship", boatLevel: foeLevel,
@@ -1711,7 +1712,7 @@ export async function doRaid(buyerId, targetId = null) {
     };
     const state = initBattleState(mine, theirs);
     await saveBattle(buyerId, state, meta);
-    return { ok: true, battle: { ...battleView(state, meta), events: [], over: false }, ...(await getSailingState(buyerId)) };
+    return { ok: true, battle: { ...battleView(state, meta, { row }), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
 
 // Paying out a finished RAID. ONE REWARD POOL: a rival's ship is matched to the fleet rank it most resembles
@@ -1896,7 +1897,7 @@ function combatView(row, boatLevel) {
         // A battle you walked away from — closed the tab, locked the phone, reloaded. The sortie is already
         // spent, so this fight is the only one you have; handing it back on every state read is what lets the
         // screen put you straight back on deck instead of leaving a saved fight nobody can reach.
-        openBattle: (() => { const b = readBattle(row); return b ? { ...battleView(b.state, b.meta), events: [], over: false } : null; })(),
+        openBattle: (() => { const b = readBattle(row); return b ? { ...battleView(b.state, b.meta, { row }), events: [], over: false } : null; })(),
     };
 }
 
@@ -1916,18 +1917,14 @@ async function myShipProfile(buyerId, row, name) {
     });
 }
 
-// Spend a round of the loaded ammunition (basic types are free and infinite). Returns the id actually fired,
-// falling back to round shot when the racks are empty rather than refusing the battle — nobody is ever unable
-// to fight because they are out of the fancy stuff.
-async function consumeAmmo(buyerId, row) {
-    const id = String(row?.loadout || "round");
-    const def = ammoById(id);
-    if (def.basic) return def.id;
-    if (ammoCount(row, id) <= 0) return "round";
-    const stock = { ...ammoStock(row), [id]: Math.max(0, (Number(ammoStock(row)[id]) || 0) - 1) };
-    await db.query(`UPDATE mkt_sailing SET ammo = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(stock)]).catch(() => {});
-    return def.id;
-}
+// WHAT THE GUNS START LOADED WITH. This used to SPEND a round of the loaded ammunition here, at the opening,
+// because a battle fired one type from first broadside to last. Every gun is loaded individually now and the
+// stock is walked down shot by shot inside shipBattleVolley — so this is only the default the scene offers,
+// and a captain who never touches the rack picker fights the whole battle on round shot for free.
+const openingLoadout = (row) => {
+    const def = ammoById(row?.loadout || "round");
+    return def.basic || ammoCount(row, def.id) > 0 ? def.id : "round";
+};
 
 // Pay out a fleet win. Deliberately a HAND of things, most of which spend somewhere else in the game — the
 // fleet should move whatever else you are working on, not just its own counter.
@@ -2006,7 +2003,10 @@ const withGuns = (side, saved) => {
         : `boat:${boatTier(side.level || 1)}`;
     return { ...side, deck, ports: side.ports?.length ? side.ports : portsWithSaved(saved, art, deck, side.guns || 1) };
 };
-const battleView = (st, meta, saved = {}) => ({
+// EVERYTHING THE SCENE NEEDS TO LET YOU AIM. The client hit-tests taps against the same measured zone maps the
+// server resolves with (ship-zones.js), so the aiming is instant and the arbitration is still ours: what comes
+// back here is which zones each hull HAS, what state its systems are in, and what is in the racks.
+const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
     me: withGuns(meta.me, saved),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
@@ -2018,21 +2018,34 @@ const battleView = (st, meta, saved = {}) => ({
             : meta.foe,
         saved,
     ),
-    myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
+    myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
     round: st.round, maxRounds: MAX_ROUNDS,
     gauge: st.gauge,
-    rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
-    burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
+    burning: { me: st.me.fire || 0, foe: st.foe.fire || 0 },
     // Holes below the waterline, so the scene can show what is sinking you.
-    leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
-    // "Man the pumps" only exists while YOU are taking water — ordersFor decides, server-side, so the client
-    // cannot offer a pump on a dry ship and the server does not have to refuse one.
-    // ALL FIVE, ALWAYS, with the pump marked unavailable until you are actually taking water. Sending four
-    // orders and then five the moment a leak opened made the whole grid reflow mid-fight — cards moving under
-    // a thumb that is already reaching for one. A stable board that dims what you cannot use beats a board
-    // that rearranges itself.
-    orders: ordersFor(1).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc,
-        available: o.id !== "patch" || (st.myLeaks || 0) > 0 })),
+    leaks: { me: st.me.leaks || 0, foe: st.foe.leaks || 0 },
+    // WHAT EACH SHIP HAS LEFT TO LOSE. Canvas, steering and every individual barrel — the scene draws these on
+    // the hulls themselves (a shredded sail, a dismounted gun), which is what makes aiming somewhere other
+    // than the hull legible without a stat block.
+    sys: {
+        me: { sails: st.me.sails, rudder: st.me.rudder, guns: st.me.guns },
+        foe: { sails: st.foe.sails, rudder: st.foe.rudder, guns: st.foe.guns },
+    },
+    caps: { sails: SAILS_MAX, rudder: RUDDER_MAX, gun: GUN_HP },
+    // Which parts each hull actually has, measured off its own art. A hull whose sprite has no rudder cells
+    // must not offer a rudder to aim at — the tap would resolve to nothing and read as a broken control.
+    zones: {
+        me: zonesOn(zoneKeyFromArt(meta.me?.art, meta.me?.level)),
+        foe: zonesOn(zoneKeyFromArt(meta.foe?.art, meta.foe?.level)),
+    },
+    zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, blurb: z.blurb })),
+    // THE RACKS, per shot. Ammunition used to be one type chosen before the battle and spent once; now a gun
+    // is loaded when you lay it, so the scene needs to know what is left as you spend it.
+    rack: AMMO_LIST.map((a) => ({
+        id: a.id, name: a.name, icon: a.icon, basic: a.basic, tint: a.id,
+        count: a.basic ? null : Number(ammoStock(row)[a.id]) || 0,
+    })),
+    loadout: row?.loadout || "round",
 });
 
 // Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.
@@ -2045,29 +2058,63 @@ async function saveBattle(buyerId, state, meta) {
     await db.query(`UPDATE mkt_sailing SET battle_state = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
         [buyerId, state ? JSON.stringify({ state, meta }) : null]).catch(() => {});
 }
+// A SAVED FIGHT FROM THE OLD SHAPE IS NOT RESUMABLE. Battles used to store `myHp`/`foeRig`/`myLeaks` flat on
+// the state; a targeted fight stores two sides with their own sails, rudder and per-gun condition. There is
+// nothing sensible to migrate a half-fought broadside battle INTO — so a pre-targeting state is dropped, which
+// hands the player a fresh fight rather than a screen that cannot draw itself. `v` is the version marker.
 const readBattle = (row) => {
     const b = row?.battle_state;
     if (!b) return null;
     const parsed = typeof b === "string" ? (() => { try { return JSON.parse(b); } catch { return null; } })() : b;
-    return parsed?.state && parsed?.meta ? parsed : null;
+    if (!parsed?.state || !parsed?.meta) return null;
+    return parsed.state.v === 2 && parsed.state.me && parsed.state.foe ? parsed : null;
 };
 
-// GIVE AN ORDER — one exchange, then the fight waits again. When it ends, this is also where the spoils are
-// paid, exactly once, because the state row is cleared in the same breath.
-export async function shipBattleOrder(buyerId, order) {
+// COMMIT THE VOLLEY — every gun you laid fires at once, they answer, and the fight waits again. When it ends,
+// this is also where the spoils are paid, exactly once, because the state row is cleared in the same breath.
+//
+// NOTHING THE CLIENT SENDS IS TRUSTED. It may name a gun that is already dismounted, a zone this hull does not
+// have, or a rack it emptied two rounds ago — sanitizeAssignments corrects each of those to an honest round
+// shot at the hull rather than refusing the volley, because a fight that will not resolve is worse than a shot
+// that went somewhere dull.
+export async function shipBattleVolley(buyerId, assignments) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
     const { me, foe } = profilesFrom(open.meta);
-    const res = resolveRound(me, foe, open.state, order);
+
+    // THE RACKS ARE SPENT HERE, ONE ROUND PER GUN. Ammunition used to be a single type consumed when the
+    // battle opened; a gun is loaded individually now, so the stock is walked down shot by shot and anything
+    // the racks cannot cover quietly becomes round shot — you are never unable to fire.
+    const stock = { ...ammoStock(row) };
+    const spent = {};
+    const foeZones = [...zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)), "guns"];
+    const laid = sanitizeAssignments(open.state, "me", assignments, {
+        zonesAllowed: foeZones,
+        ammoAvailable: (id) => {
+            const def = ammoById(id);
+            if (def.basic) return true;
+            if ((Number(stock[id]) || 0) <= 0) return false;
+            stock[id] = (Number(stock[id]) || 0) - 1;
+            spent[id] = (spent[id] || 0) + 1;
+            return true;
+        },
+    });
+    if (Object.keys(spent).length) {
+        await db.query(`UPDATE mkt_sailing SET ammo = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify(stock)]).catch(() => {});
+    }
+
+    const res = resolveVolley(me, foe, open.state, laid);
 
     if (!res.over) {
         await saveBattle(buyerId, res.state, open.meta);
+        const after = await readRow(buyerId);
         return {
             ok: true,
-            battle: { ...battleView(res.state, open.meta), events: res.events, over: false,
-                yourOrder: res.myOrder, theirOrder: res.theirOrder },
+            battle: { ...battleView(res.state, open.meta, { row: after }), events: res.events, over: false,
+                yourAim: res.mine, theirAim: res.theirs },
             ...(await getSailingState(buyerId)),
         };
     }
@@ -2082,9 +2129,9 @@ export async function shipBattleOrder(buyerId, order) {
     return {
         ok: true,
         battle: {
-            ...battleView(res.state, meta), events: res.events, over: true,
+            ...battleView(res.state, meta, { row: await readRow(buyerId) }), events: res.events, over: true,
             win: res.win, sunk: res.sunk, reward,
-            yourOrder: res.myOrder, theirOrder: res.theirOrder,
+            yourAim: res.mine, theirAim: res.theirs,
         },
         ...(await getSailingState(buyerId)),
     };
@@ -2103,7 +2150,7 @@ export async function doFleetBattle(buyerId, rank = null) {
     const openNow = readBattle(row);
     if (openNow) {
         return { ok: true, resumed: true,
-            battle: { ...battleView(openNow.state, openNow.meta), events: [], over: false },
+            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
     const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
@@ -2118,7 +2165,7 @@ export async function doFleetBattle(buyerId, rank = null) {
     if (!ship) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
 
     const me = await db.queryOne(`SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, avatar_url, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const fired = await consumeAmmo(buyerId, row);
+    const fired = openingLoadout(row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
     const foe = foeProfile(ship);
     const first = want > depth;
@@ -2165,10 +2212,10 @@ export async function doFleetBattle(buyerId, rank = null) {
     await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, ammo: fired, first }).catch(() => {});
     await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
 
-    return { ok: true, battle: { ...battleView(state, meta), events: [], over: false }, ...(await getSailingState(buyerId)) };
+    return { ok: true, battle: { ...battleView(state, meta, { row }), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
 
-// Paying out a finished FLEET battle — called once, from shipBattleOrder, after the state row is cleared.
+// Paying out a finished FLEET battle — called once, from shipBattleVolley, after the state row is cleared.
 async function finishFleetBattle(buyerId, meta, res) {
     const want = meta.rank, first = meta.first;
     const row = await readRow(buyerId);
@@ -2198,11 +2245,11 @@ async function finishFleetBattle(buyerId, meta, res) {
 }
 
 // ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────
-export async function buyAmmo(buyerId, ammoId, qty = 5) {
+export async function buyAmmo(buyerId, ammoId, qty = 10) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = AMMO[String(ammoId)];
     if (!def || def.basic) return { ok: false, error: "bad_ammo", ...(await getSailingState(buyerId)) };
-    const n = Math.max(1, Math.min(50, Number(qty) || 5));
+    const n = Math.max(1, Math.min(200, Number(qty) || 10));
     const cost = def.price * n;
     const row = await readRow(buyerId);
     if ((row?.doubloons || 0) < cost) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };

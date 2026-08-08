@@ -1589,7 +1589,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 next question is "who next?" — while one resumed from the door returns you to the page. */}
             {shipBattle ? (
                 <ShipBattleScene battle={shipBattle} busy={busy}
-                    onOrder={async (order) => { const d = await act("battle_order", { order }); if (d?.battle) setShipBattle(d.battle); }}
+                    onVolley={async (aim) => { const d = await act("battle_volley", { aim }); if (d?.battle) setShipBattle(d.battle); }}
                     onClose={() => setShipBattle(null)} />
             ) : null}
 

@@ -6,7 +6,8 @@ import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
-import { shipProfile, foeProfile, initBattleState, resolveRound, ordersFor, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveVolley, AMMO_LIST, SAILS_MAX, RUDDER_MAX, GUN_HP, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
+import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
 // Dev-only lab for the ship battle. The real thing is behind a login, a daily sortie limit and a gun deck you
@@ -27,18 +28,30 @@ export default function BattleLab() {
 
     const [live, setLive] = useState(null); // { me, foe, state, meta }
 
+    // The scene reads exactly what the server would have sent it, so what the lab shows is what a real
+    // fight shows — including which zones each hull owns and what is left in the racks.
     const view = (st, meta, events, over, win, sunk, reward) => ({
         kind: "fleet", rank: meta.rank, first: true, me: meta.me, foe: meta.foe,
-        myHp: st.myHp, foeHp: st.foeHp, myMax: st.myMax, foeMax: st.foeMax,
+        myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
         round: st.round, maxRounds: MAX_ROUNDS, gauge: st.gauge,
-        rigged: { me: st.myRig || 0, foe: st.foeRig || 0 },
-        leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
-        leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
-        burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
-        // ordersFor, not ORDER_LIST — otherwise the lab can never show "Man the pumps" and the one order
-        // that needs testing against a live leak is the one you cannot reach here.
-        orders: ordersFor(1).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc, available: o.id !== 'patch' || (st.myLeaks || 0) > 0 })),
+        leaks: { me: st.me.leaks || 0, foe: st.foe.leaks || 0 },
+        burning: { me: st.me.fire || 0, foe: st.foe.fire || 0 },
+        sys: {
+            me: { sails: st.me.sails, rudder: st.me.rudder, guns: st.me.guns },
+            foe: { sails: st.foe.sails, rudder: st.foe.rudder, guns: st.foe.guns },
+        },
+        caps: { sails: SAILS_MAX, rudder: RUDDER_MAX, gun: GUN_HP },
+        zones: {
+            me: zonesOn(zoneKeyFromArt(meta.me.art, meta.me.level)),
+            foe: zonesOn(zoneKeyFromArt(meta.foe.art, meta.foe.level)),
+        },
+        zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, blurb: z.blurb })),
+        // The lab is not short of powder: exotics are stocked so every round can be tried against every zone.
+        rack: AMMO_LIST.map((a) => ({ id: a.id, name: a.name, icon: a.icon, basic: a.basic, count: a.basic ? null : 99 })),
+        loadout: ammo,
         events: events || [], over: Boolean(over), win, sunk, reward,
+        // Their last aim, so the lab shows the incoming crosshairs on your own hull exactly as a real fight does.
+        theirAim: meta.theirAim || [],
     });
 
     const fight = (rank) => {
@@ -63,11 +76,11 @@ export default function BattleLab() {
         setBattle(view(st, meta, [], false));
     };
 
-    const order = (id) => {
+    const volley = (aim) => {
         if (!live) return;
-        const r = resolveRound(live.me, live.foe, live.state, id);
-        setLive((l) => ({ ...l, state: r.state }));
-        setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
+        const r = resolveVolley(live.me, live.foe, live.state, aim);
+        setLive((l) => ({ ...l, state: r.state, meta: { ...l.meta, theirAim: r.theirs } }));
+        setBattle(view(r.state, { ...live.meta, theirAim: r.theirs }, r.events, r.over, r.win, r.sunk,
             r.over && r.win ? [{ kind: "doubloons", n: 14 }, { kind: "gold", n: 320 }] : []));
     };
 
@@ -118,7 +131,7 @@ export default function BattleLab() {
 
             <ShipYard combat={combat} raid={{ cap: 5, used: 1 }} gold={12000} busy={false} onAct={({ action, rank }) => { if (action === "fleet_battle") fight(rank); }} />
 
-            {battle ? <ShipBattleScene battle={battle} busy={false} onOrder={order} onClose={() => { setBattle(null); setLive(null); }} /> : null}
+            {battle ? <ShipBattleScene battle={battle} busy={false} onVolley={volley} onClose={() => { setBattle(null); setLive(null); }} /> : null}
         </div>
     );
 }

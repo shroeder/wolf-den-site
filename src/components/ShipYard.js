@@ -300,8 +300,9 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
             {active === "ammo" ? (
                 <>
                     <p className="sby-sub">
-                        One round of whatever is loaded is spent per battle. Round shot never runs out — the rest are
-                        stock, and when the racks are empty the guns fall back to round shot rather than refusing to fire.
+                        A round is spent PER GUN, per shot — pick one when you lay that gun in a battle and it comes out
+                        of these racks. What is LOADED here is only the default. Round shot never runs out; the rest are
+                        stock, and an empty rack just means that gun fires round shot instead of refusing.
                     </p>
                     <div className="sby-ammo">
                         {(combat.ammo || []).map((a) => (
