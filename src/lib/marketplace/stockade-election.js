@@ -9,17 +9,22 @@ import { placeInStockade, releaseFromStockade, getOccupant } from "@/lib/marketp
 // existed for caught cheaters; this turns it into a running piece of town theatre.
 //
 // THE CYCLE, and it runs itself — there is no cron:
-//   1. A poll opens and stands for ONE DAY.
+//   1. A poll is ALWAYS open, and it stands for one day.
 //   2. Anyone may nominate a member (with a crime) and everyone gets ONE vote.
-//   3. When the day is up, the most-voted member is put in the stockade for THREE DAYS.
-//   4. When their sentence ends they are released and the next poll opens.
+//   3. When the day is up the most-voted member goes into the stockade — which frees whoever was already in
+//      it — and the next poll opens in the same breath.
+//
+// THE POLL USED TO STOP WHILE SOMEBODY WAS SERVING, and the sentence ran three days: so for three days out of
+// every four the booth was shut, and the first thing that happened after launch was a player hunting the plaza
+// for it. The sentence is now exactly as long as the poll that follows it, which makes the two halves one
+// rhythm — a day in the stocks while the town decides who replaces you — and the booth is never closed.
 //
 // Every one of those transitions happens inside `getElection`, which is called by the town page. A cron would
 // be a second thing to keep alive for a feature whose whole clock is "somebody looked at the town" — and a
 // stockade nobody is looking at does not need to advance.
 
 export const POLL_HOURS = 24;
-export const SENTENCE_DAYS = 3;
+export const SENTENCE_HOURS = 24;   // exactly one poll long — see the cycle above
 export const NOMINATE_COST = 250;   // gold, so putting a name up costs something and the board stays funny
 export const MAX_NOMINEES = 12;
 
@@ -81,10 +86,12 @@ async function settleElection(election) {
     await db.query(
         `UPDATE mkt_stockade_election
             SET settled_at = NOW(), winner_id = $2, winner_crime = $3,
-                serves_until = NOW() + ($4 || ' days')::interval
+                serves_until = NOW() + ($4 || ' hours')::interval
           WHERE id = $1`,
-        [election.id, top.buyer_id, top.crime, String(SENTENCE_DAYS)]
+        [election.id, top.buyer_id, top.crime, String(SENTENCE_HOURS)]
     ).catch(() => {});
+    // Putting the new winner in RELEASES whoever was already there — placeInStockade clears any other occupant
+    // as its first act — so the handover needs no separate release and the stocks are never empty for a moment.
     await placeInStockade(top.buyer_id, { reason: top.crime }).catch(() => {});
     return top;
 }
@@ -92,26 +99,12 @@ async function settleElection(election) {
 /**
  * The live state of the whole cycle, and the thing that advances it.
  *
- * Returns `{ phase, election, nominees, myVote, myNomination, occupant, servesUntil }` where phase is:
- *   "voting"  a poll is open and you can nominate and vote
- *   "serving" somebody is in the stockade and the next poll opens when they are let out
+ * `phase` is always "voting" — there is always a poll — and the occupant, if there is one, rides ALONGSIDE it
+ * rather than instead of it. It used to be one or the other, which is what shut the booth for days at a time.
  */
 export async function getElection(viewerId = null) {
-    // 1. Is a sentence being served? If it has expired, let them out and move on.
-    const serving = await db.queryOne(
-        `SELECT * FROM mkt_stockade_election
-          WHERE settled_at IS NOT NULL AND winner_id IS NOT NULL AND serves_until > NOW()
-          ORDER BY id DESC LIMIT 1`
-    ).catch(() => null);
-    if (serving) {
-        const occupant = await getOccupant().catch(() => null);
-        return {
-            phase: "serving", election: null, nominees: [], myVote: null, myNomination: null,
-            occupant, crime: serving.winner_crime, servesUntil: serving.serves_until,
-            sentenceDays: SENTENCE_DAYS, crimes: CRIMES,
-        };
-    }
-    // A sentence that has run out: release, then fall through and open the next poll.
+    // 1. A sentence that has run out: let them out. (A sentence that ends because somebody NEW was voted in is
+    //    handled by the placement itself — see settleElection.)
     const expired = await db.queryOne(
         `SELECT winner_id FROM mkt_stockade_election
           WHERE settled_at IS NOT NULL AND winner_id IS NOT NULL AND serves_until <= NOW()
@@ -127,12 +120,25 @@ export async function getElection(viewerId = null) {
         `SELECT * FROM mkt_stockade_election WHERE settled_at IS NULL ORDER BY id DESC LIMIT 1`
     ).catch(() => null);
     if (election && new Date(election.closes_at) <= new Date()) {
-        const winner = await settleElection(election);
-        if (winner) return getElection(viewerId);
-        election = null;
+        await settleElection(election);
+        election = null;   // and straight into the next one, below
     }
     if (!election) election = await openElection();
-    if (!election) return { phase: "voting", election: null, nominees: [], crimes: CRIMES };
+
+    // Who is in the stocks right now, if anyone. This travels WITH the open poll: the plaza shows the pillory
+    // and the booth side by side, and the ballot can name who the town is voting to replace.
+    const serving = await db.queryOne(
+        `SELECT winner_crime, serves_until FROM mkt_stockade_election
+          WHERE settled_at IS NOT NULL AND winner_id IS NOT NULL AND serves_until > NOW()
+          ORDER BY id DESC LIMIT 1`
+    ).catch(() => null);
+    const occupant = await getOccupant().catch(() => null);
+    const standing = {
+        occupant, crime: serving?.winner_crime || occupant?.reason || null,
+        servesUntil: serving?.serves_until || null,
+    };
+
+    if (!election) return { phase: "voting", election: null, nominees: [], crimes: CRIMES, ...standing };
 
     const nominees = await db.query(
         `SELECT n.buyer_id, n.crime, b.display_name, b.alias, b.avatar_sprite_url, b.avatar_url,
@@ -162,7 +168,10 @@ export async function getElection(viewerId = null) {
             crime: n.crime, votes: Number(n.votes) || 0,
             art: n.avatar_sprite_url || n.avatar_url || null,
         })),
-        myVote, myNomination, crimes: CRIMES, sentenceDays: SENTENCE_DAYS, nominateCost: NOMINATE_COST,
+        myVote, myNomination, crimes: CRIMES, nominateCost: NOMINATE_COST,
+        sentenceHours: SENTENCE_HOURS,
+        sentenceLabel: SENTENCE_HOURS === 24 ? "a day" : `${SENTENCE_HOURS} hours`,
+        ...standing,
     };
 }
 
@@ -214,13 +223,13 @@ export async function castVote(viewerId, nomineeId) {
  * occupant gets there — Jinxx volunteered publicly and named her own crime, which is a better opening than
  * any election could have produced.
  */
-export async function sentenceDirectly(buyerId, crime, days = SENTENCE_DAYS) {
+export async function sentenceDirectly(buyerId, crime, hours = SENTENCE_HOURS) {
     if (!buyerId) return { ok: false, error: "no_target" };
     await db.query(`UPDATE mkt_stockade_election SET settled_at = NOW() WHERE settled_at IS NULL`).catch(() => {});
     await db.query(
         `INSERT INTO mkt_stockade_election (closes_at, settled_at, winner_id, winner_crime, serves_until)
-         VALUES (NOW(), NOW(), $1, $2, NOW() + ($3 || ' days')::interval)`,
-        [buyerId, String(crime || randomCrime()).slice(0, 90), String(days)]
+         VALUES (NOW(), NOW(), $1, $2, NOW() + ($3 || ' hours')::interval)`,
+        [buyerId, String(crime || randomCrime()).slice(0, 90), String(hours)]
     ).catch(() => {});
     return placeInStockade(buyerId, { reason: crime });
 }
