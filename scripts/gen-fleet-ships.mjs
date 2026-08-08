@@ -41,7 +41,10 @@ const SHIPS = [
     { key: "fleet_boss_tithe", boss: true, prompt: "THE BLACK TITHE — a huge black ship of the line, three gun decks of bronze cannons, black sails edged in dull gold, a hooded skeletal tax-collector figurehead holding scales. Grim, enormous, oppressive." },
     { key: "fleet_razee", prompt: "A razee warship — a ship of the line cut down by one deck for speed. Heavy hull, low profile, oversized sail plan, chain-shot bundles stacked on deck, dark red and black." },
     { key: "fleet_ghost", prompt: "A ghostly derelict brig: translucent pale blue-green glowing hull, shredded phantom sails, no crew visible, drifting green witch-fire along the rigging, eerie and beautiful." },
-    { key: "fleet_bomb", prompt: "A bomb vessel built around one colossal iron mortar amidships, squat reinforced hull, shell racks, blast-scarred deck planking, stubby masts pushed to the ends." },
+    // "COLOSSAL" and "built around" were taken literally: the mortar came back bigger than the hull carrying
+    // it, sitting on the deck like a prop rather than a weapon a ship could mount. It is a ketch with a heavy
+    // mortar ON it now, with the size stated in relation to the deck so the model has a bound to work to.
+    { key: "fleet_bomb", prompt: "A squat two-masted bomb ketch. A heavy short iron mortar sits in a reinforced well amidships, angled up — the mortar is SMALL relative to the ship, no taller than the deck rail and about one fifth of the hull's length, mounted low and set INTO the deck rather than towering over it. Reinforced hull, shell racks along the bulwark, blast-scarred planking, stubby masts pushed to the ends. The SHIP is the subject and dominates the frame; the mortar is one piece of equipment on it." },
     { key: "fleet_manowar", prompt: "A towering man-o'-war, three full decks of guns, white sails with a naval crest, ornate gilded stern gallery, pristine and overwhelming in scale." },
     { key: "fleet_boss_sovereign", boss: true, prompt: "ADMIRAL VANE'S SOVEREIGN — the fleet flagship. A vast black-and-gold warship with four decks of guns, blood-red sails bearing a golden crown, a crowned sea-dragon figurehead, lanterns blazing along the stern. Awe-inspiring, unmistakably the final ship." },
 ];
