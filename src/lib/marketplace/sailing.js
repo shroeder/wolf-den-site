@@ -14,7 +14,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAim,
+         gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAim,
          SAILS_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
@@ -1770,6 +1770,12 @@ function combatView(row, boatLevel) {
                     key: t.key, name: t.name, icon: t.icon, desc: t.desc, currency: "doubloons",
                     level, max: t.max, maxed: level >= t.max,
                     cost: level >= t.max ? null : combatUpgradeCost(level),
+                    // WHAT THE LEVEL YOU OWN IS ACTUALLY WORTH. Cunning has carried a live figure ("1.8% free")
+                    // since it moved into this list and the three combat tracks had none, so the only way to
+                    // find out what a level of Gunnery had bought you was to open a battle and squint at it.
+                    effect: t.key === "guns" ? `${gunsFor(level)} guns`
+                        : t.key === "gunnery" ? `${Math.round(accuracyFor(level, boatLevel) * 100)}% to hit · ${Math.round(rakeFor(level) * 100)}% rake`
+                        : `${hullFor(level, boatLevel)} hit points · ${Math.round(armorFor(level) * 100)}% armour`,
                 };
             }),
             // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
