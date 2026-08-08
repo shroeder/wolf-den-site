@@ -274,7 +274,11 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         a designed pirate or another member's gun deck, whichever it draws. */}
                     <button type="button" className="sby-find" disabled={busy || battlesLeft <= 0}
                         onClick={() => onAct({ action: "battle" })}>
-                        <Icon name="GiSpyglass" className="sby-find-ico" />
+                        {/* A PAINTED SPYGLASS, not a glyph. This is the button the whole panel exists to get
+                            you to press, and it was the one thing on the screen still drawn as a flat outline
+                            while the tracks, the rounds and the coin were all objects. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sby-find-ico" src="/images/sailing/find-fight.png" alt="" draggable="false" />
                         {/* The words are ONE grid cell. Left loose beside the icon they were two, so the
                             subtitle wrapped into the 42px icon column and came out one word per line. */}
                         <span className="sby-find-words">
@@ -300,7 +304,10 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         the bottom of the screen, under the thing you actually came here to press, not in a
                         dashed banner above it. */}
                     <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
-                        <Icon name="GiCannon" className="sby-gunlab-ico" />
+                        {/* The Cannons track sprite, reused — it is literally a stack of cannons and this is
+                            where you go to place them. Nothing to draw. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sby-gunlab-ico" src="/images/sailing/tracks/guns.png" alt="" draggable="false" />
                         <span>
                             <b>Gun placement</b>
                             <em>Set where the cannons sit on each hull</em>

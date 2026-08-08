@@ -14049,8 +14049,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-find:disabled { cursor: default; color: #7d7466;
     background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
     border-color: rgba(255,255,255,0.12); box-shadow: none; }
-.sby-find-ico { font-size: 2rem; justify-self: center;
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+.sby-find-ico { width: 42px; height: 42px; object-fit: contain; justify-self: center;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
 .sby-find-words { min-width: 0; }
 .sby-find b { display: block; font-size: 1.06rem; font-weight: 900; letter-spacing: 0.01em; line-height: 1.2; }
 .sby-find em { display: block; font-style: normal; font-size: 0.74rem; font-weight: 700; line-height: 1.35;
@@ -14177,7 +14177,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid rgba(255,201,94,0.28); }
 .sby-gunlab:hover { background: linear-gradient(180deg, rgba(255,201,94,0.16), rgba(255,201,94,0.06));
     border-color: rgba(255,201,94,0.5); }
-.sby-gunlab-ico { font-size: 1.4rem; color: #ffd28a; }
+.sby-gunlab-ico { width: 26px; height: 26px; object-fit: contain;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 .sby-gunlab b { display: block; font-size: 0.84rem; color: #ffd9a0; }
 .sby-gunlab em { display: block; font-style: normal; font-size: 0.7rem; color: #93a3b3; }
 .sby-gunlab i { font-style: normal; font-size: 1.1rem; color: #ffd28a; opacity: 0.7; }
