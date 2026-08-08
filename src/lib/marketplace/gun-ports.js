@@ -48,7 +48,7 @@ function fallbackPorts(deckPct, n) {
  * Returns at most `n` — a twelve-gun man-o'-war with five placed ports draws five rather than inventing seven.
  */
 export function gunPortsFor(art, deckPct, n) {
-    const count = Math.max(0, Math.min(24, Math.floor(n) || 0));
+    const count = Math.max(0, Math.min(7, Math.floor(n) || 0)); // 7 = the hard gun cap
     if (!count) return [];
     const placed = GUN_PORTS[art];
     if (placed?.length) return placed.slice(0, count);

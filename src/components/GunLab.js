@@ -26,7 +26,8 @@ export default function GunLab() {
     const [showFallback, setShowFallback] = useState(true);
     // How many guns to preview. A hull is placed once and then serves every gun count, so the thing you are
     // really deciding is where barrels one through N sit — and the only way to see that is to change N.
-    const [preview, setPreview] = useState(6);
+    // Defaults to the CAP: place the full battery first and the smaller counts are just its opening subset.
+    const [preview, setPreview] = useState(7);
     const [status, setStatus] = useState("");
     const [busy, setBusy] = useState(false);
     const [loaded, setLoaded] = useState(false);
@@ -138,7 +139,10 @@ export default function GunLab() {
                     at six can look absurd at one — the lone starting gun is the one most members will ever see. */}
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
                     <span className="muted" style={{ fontSize: "0.78rem" }}>preview guns</span>
-                    {[1, 2, 3, 4, 6, 8, 10, 13].map((n) => (
+                    {/* Stops at SEVEN because seven is the cap now (COMBAT_TRACKS.guns.max is 6, plus the free
+                        one). Offering 8, 10 and 13 was asking you to place batteries no ship can ever field —
+                        which is exactly the wasted work that made the cap necessary in the first place. */}
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
                         <button key={n} type="button" className={`sby-mini${preview === n ? " is-load" : ""}`} onClick={() => setPreview(n)}>{n}</button>
                     ))}
                 </div>
