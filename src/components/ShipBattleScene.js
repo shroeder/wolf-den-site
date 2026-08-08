@@ -86,7 +86,7 @@ function sfxFire(guns = 4) {
                 g.gain.setValueAtTime(0.22, t.currentTime);
                 g.gain.exponentialRampToValueAtTime(0.0001, t.currentTime + 0.26);
                 o.connect(g); g.connect(t.destination); o.start(); o.stop(t.currentTime + 0.28);
-            }, i * 48);
+            }, i * 90);
         }
     } catch { /* audio is a bonus */ }
 }
@@ -180,7 +180,7 @@ function Volley({ ev }) {
                 <i
                     key={i}
                     className={`sbt-ball${s.hit ? "" : " is-miss"}${s.rake ? " is-rake" : ""}`}
-                    style={{ animationDelay: `${i * 52}ms`, "--lane": `${((i % 4) - 1.5) * 11}px` }}
+                    style={{ animationDelay: `${i * 90}ms`, "--lane": `${((i % 4) - 1.5) * 11}px` }}
                 />
             ))}
             {/* EVERY MISS LANDS SOMEWHERE. A shot that missed simply stopped existing, so accuracy — a stat you
@@ -190,11 +190,11 @@ function Volley({ ev }) {
             {shots.map((s, i) => (s.hit ? null : (
                 <span key={`sp${i}`} className="sbt-splash"
                     style={{ [dir === "to-foe" ? "left" : "right"]: `${62 + (i % 3) * 6}%`,
-                        bottom: `${16 + ((i % 4) - 1.5) * 5}%`, animationDelay: `${i * 52}ms` }}>
-                    <i style={{ animationDelay: `${i * 52 + 300}ms` }} />
-                    <b style={{ animationDelay: `${i * 52 + 300}ms` }} />
+                        bottom: `${16 + ((i % 4) - 1.5) * 5}%`, animationDelay: `${i * 90}ms` }}>
+                    <i style={{ animationDelay: `${i * 90 + 300}ms` }} />
+                    <b style={{ animationDelay: `${i * 90 + 300}ms` }} />
                     {SPRAY.map((d, k) => (
-                        <u key={k} style={{ "--dx": d[0], "--dy": d[1], "--dd": `${i * 52 + 320}ms` }} />
+                        <u key={k} style={{ "--dx": d[0], "--dy": d[1], "--dd": `${i * 90 + 320}ms` }} />
                     ))}
                 </span>
             )))}
@@ -222,15 +222,19 @@ function gunWidthPct(ports) {
     return Math.max(6, Math.min(16, gap * 100 * 0.92));
 }
 
-function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {
+function Ship({ f, side, firing, hurt, heavy, low, sinking, burning, leaks = 0, hpFrac = 1 }) {
     // THE GUNS, drawn. `f.ports` is the hull's own battery (gun-ports.js) already trimmed to how many guns the
     // ship actually has, so the deck shows exactly what the HUD claims and an upgrade is a barrel you can point
     // at. They fire in sequence rather than together — a broadside is a ripple down the deck, and the stagger
     // here matches the one the audio uses.
     const ports = f?.ports || [];
     return (
-        <div className={`sbt-ship sbt-ship-${side}${firing ? " is-firing" : ""}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}`}
-            style={{ "--deck": `${f?.deck ?? 30}%` }}>
+        // SHE SITS LOWER AS SHE TAKES IT. A ship at 8% hull floated exactly as high as one at full, so the
+        // only evidence of a fight going badly was a bar at the top of the screen. `--settle` is how far the
+        // hull has dropped toward the waterline — nothing at full health, most of a hull-height when she is
+        // nearly gone — and it makes a losing fight something you can see from the ships alone.
+        <div className={`sbt-ship sbt-ship-${side}${firing ? " is-firing" : ""}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}${leaks ? " is-leaking" : ""}`}
+            style={{ "--deck": `${f?.deck ?? 30}%`, "--settle": `${Math.round((1 - Math.max(0, Math.min(1, hpFrac))) * 26)}px` }}>
             <div className="sbt-hull">
                 {f?.art ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -270,11 +274,21 @@ function Ship({ f, side, firing, hurt, heavy, low, sinking, burning }) {
                         style={{ "--gw": `${gunWidthPct(ports)}%` }}>
                         {ports.map((g, i) => (
                             <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}`}
-                                style={{ left: `${g.x * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 48}ms` }}>
+                                style={{ left: `${g.x * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 90}ms` }}>
                                 <i className="sbt-gun-barrel" />
-                                {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 48}ms` }} /> : null}
-                                {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 48}ms` }} /> : null}
+                                {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 90}ms` }} /> : null}
+                                {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 90}ms` }} /> : null}
                             </span>
+                        ))}
+                    </span>
+                ) : null}
+                {/* ONE GUSH PER HOLE. A leak was a number in the log and a slice of HP; now every hole she is
+                    carrying throws water out of the hull, so "taking on water" is a thing you watch rather
+                    than read. Spread along the waterline so three holes look like three. */}
+                {leaks > 0 ? (
+                    <span className="sbt-leaks" aria-hidden="true">
+                        {Array.from({ length: Math.min(4, leaks) }).map((_, i) => (
+                            <i key={i} style={{ left: `${28 + i * 15}%`, animationDelay: `${i * 260}ms` }} />
                         ))}
                     </span>
                 ) : null}
@@ -368,6 +382,8 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
     const [log, setLog] = useState([]);
     const [ready, setReady] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
+    // One floating number per gun that connected, cleared when the round advances.
+    const [pops, setPops] = useState([]);
     const logRef = useRef(null);
 
     // Open the log with the ship you are up against, so round one is not a blank panel over an empty sea. The
@@ -411,9 +427,18 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
 
         if (ev.type === "volley") {
             setFx({ k: `${battle?.round}-${step}`, ...ev });
+            setPops([]);
             // The guns go off as the balls leave, and the timber cracks when they arrive — the 440ms below is
             // the flight time the shot animation is built around, so picture and sound land together.
             sfxFire(ev.guns || (ev.shots || []).length);
+            // EACH GUN LANDS ITS OWN HIT. The volley resolved as one lump — every barrel fired, then a single
+            // number appeared — so a seven-gun broadside felt exactly like a one-gun one. Each hit now throws
+            // its own damage number on the beat of the gun that fired it, so you SEE the broadside arrive in
+            // pieces and a bigger battery is visibly bigger rather than just a larger total.
+            const shotsFired = ev.shots || [];
+            const pops = shotsFired.map((sh, i) => (sh.hit ? setTimeout(() => {
+                setPops((list) => [...list.slice(-11), { k: `${battle?.round}-${step}-${i}`, side: ev.side, dmg: sh.dmg, rake: sh.rake, lane: (i % 4) - 1.5 }]);
+            }, 210 + i * 90) : null)).filter(Boolean);
             const land = setTimeout(() => {
                 setMyHp(ev.my); setFoeHp(ev.foe);
                 const shots = ev.shots || [];
@@ -421,10 +446,10 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 const heavy = shots.some((s) => s.rake) || ev.order === "board";
                 if (hits) sfxHit(heavy || hits >= 4); else if (shots.length) sfxSplash();
                 if (hits) setShake({ k: step, big: heavy });
-            }, 210);
+            }, 210 + Math.max(0, (shotsFired.length - 1)) * 90);
             const clearShake = setTimeout(() => setShake(null), 900);
-            const next = setTimeout(() => setStep((v) => v + 1), 900);
-            return () => { clearTimeout(land); clearTimeout(clearShake); clearTimeout(next); };
+            const next = setTimeout(() => setStep((v) => v + 1), 900 + Math.max(0, (shotsFired.length - 1)) * 90);
+            return () => { pops.forEach(clearTimeout); clearTimeout(land); clearTimeout(clearShake); clearTimeout(next); };
         }
         setMyHp(ev.my); setFoeHp(ev.foe);
         const next = setTimeout(() => setStep((v) => v + 1), 720);
@@ -516,18 +541,30 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                         hurt={fx?.side === "foe" && phase === "play"}
                         heavy={Boolean(fx?.side === "foe" && ((fx?.shots || []).some((x) => x.rake) || fx?.order === "board"))}
                         low={clampPct(myHp, battle?.myMax) <= 25}
-                        sinking={sinkingSide === "me"} burning={(battle?.burning?.me || 0) > 0} />
+                        sinking={sinkingSide === "me"} burning={(battle?.burning?.me || 0) > 0}
+                        leaks={battle?.leaks?.me || 0} hpFrac={(myHp || 0) / Math.max(1, battle?.myMax || 1)} />
                     <Ship f={foe} side="foe" firing={fx?.side === "foe" && phase === "play"}
                         hurt={fx?.side === "me" && phase === "play"}
                         heavy={Boolean(fx?.side === "me" && ((fx?.shots || []).some((x) => x.rake) || fx?.order === "board"))}
                         low={clampPct(foeHp, battle?.foeMax) <= 25}
-                        sinking={sinkingSide === "foe"} burning={(battle?.burning?.foe || 0) > 0} />
+                        sinking={sinkingSide === "foe"} burning={(battle?.burning?.foe || 0) > 0}
+                        leaks={battle?.leaks?.foe || 0} hpFrac={(foeHp || 0) / Math.max(1, battle?.foeMax || 1)} />
 
                     {phase === "play" && fx ? <Volley key={`v${fx.k}`} ev={fx} /> : null}
-                    {phase === "play" && fx?.dmg ? (
+                    {/* PER GUN. The single lump total is gone — each barrel that connects throws its own
+                        number, on its own beat, staggered down the deck with the gun that fired it. A
+                        seven-gun broadside now arrives as seven hits you can count instead of one figure
+                        that happened to be larger. Raking shots come in hot and named. */}
+                    {phase === "play" ? pops.map((pp) => (
+                        <span key={pp.k} className={`sbt-pop ${pp.side === "me" ? "on-foe" : "on-me"}${pp.rake ? " is-rake" : ""}`}
+                            style={{ "--lane": `${pp.lane * 26}px` }}>
+                            −{pp.dmg}{pp.rake ? <b>RAKE</b> : null}
+                        </span>
+                    )) : null}
+                    {/* The order's own headline, kept for BOARD — a boarding action is one event, not a volley. */}
+                    {phase === "play" && fx?.dmg && fx.order === "board" ? (
                         <span key={`d${fx.k}`} className={`sbt-float ${fx.side === "me" ? "on-foe" : "on-me"}`}>
-                            −{fx.dmg}
-                            {(fx.shots || []).some((s) => s.rake) ? <b>RAKED</b> : fx.order === "board" ? <b>BOARDED</b> : null}
+                            −{fx.dmg}<b>BOARDED</b>
                         </span>
                     ) : null}
                 </div>

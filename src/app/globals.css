@@ -13086,7 +13086,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    other overlap in the middle and the bowsprit ends up inside the enemy's hull. */
 .sbt-ship-me { left: 0; }
 .sbt-ship-foe { right: 0; }
-.sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; }
+/* --settle rides on the hull, so a ship low on health sits nearer the waterline. It is a translate rather
+   than a mask because the sea is a flat gradient here — sinking her INTO it would mean clipping the sprite
+   against a horizon that does not exist. Dropping her is the read that works. */
+.sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; transform: translateY(var(--settle, 0px));
+    transition: transform .5s ease; }
 .sbt-ship-foe .sbt-hull { animation-delay: -1.6s; }
 @keyframes sbtBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
 .sbt-boat { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.55)); }
@@ -13958,3 +13962,38 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; color: #cdd6df;
     background: rgba(8,14,22,0.86); border: 1px solid rgba(255,255,255,0.22); }
 .sbt-leave:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+
+/* ── ONE NUMBER PER GUN ───────────────────────────────────────────────────────────────────────────────────
+   A broadside used to land as a single total, so seven barrels felt like one. Each connecting gun throws its
+   own figure on the beat it fired, offset into lanes so a fast volley stacks into a readable column rather
+   than a pile in one spot. Smaller than the old lump total on purpose — these are individual hits, and the
+   drama is in there being SEVEN of them. */
+.sbt-pop { position: absolute; top: 34%; z-index: 7; font-size: 1.5rem; font-weight: 900; line-height: 1;
+    color: #ffe07a; font-variant-numeric: tabular-nums; pointer-events: none;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.7), 0 0 14px rgba(255,180,40,0.75);
+    transform: translateY(var(--lane, 0px));
+    animation: sbtPop 1s cubic-bezier(.2,1.3,.35,1) forwards; }
+.sbt-pop.on-foe { right: 18%; }
+.sbt-pop.on-me { left: 18%; }
+.sbt-pop.is-rake { color: #ff9c5e; font-size: 1.75rem; text-shadow: 0 2px 0 rgba(0,0,0,0.75), 0 0 18px rgba(255,120,40,0.9); }
+.sbt-pop b { display: block; font-size: 0.42em; letter-spacing: 0.16em; color: #ffd0a8; }
+@keyframes sbtPop {
+    0% { opacity: 0; transform: translateY(var(--lane, 0px)) scale(1.5); }
+    18% { opacity: 1; transform: translateY(var(--lane, 0px)) scale(1); }
+    70% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(calc(var(--lane, 0px) - 34px)) scale(0.9); }
+}
+
+/* ── WATER COMING IN ──────────────────────────────────────────────────────────────────────────────────────
+   One gush per hole she is carrying, spread along the waterline so three holes read as three. A leak was
+   previously a log line and a slice of HP — nothing on the ship itself said she was filling up. */
+.sbt-leaks { position: absolute; left: 0; right: 0; bottom: 14%; height: 30px; pointer-events: none; z-index: 2; }
+.sbt-leaks i { position: absolute; bottom: 0; width: 9px; height: 22px; margin-left: -4.5px; border-radius: 40%;
+    background: linear-gradient(180deg, rgba(226,246,255,0.9), rgba(120,190,230,0.15));
+    animation: sbtGush 1.5s ease-in-out infinite; }
+@keyframes sbtGush {
+    0%, 100% { transform: scaleY(0.55) translateY(2px); opacity: 0.55; }
+    45% { transform: scaleY(1.25) translateY(-4px); opacity: 1; }
+}
+/* A ship carrying holes rocks unevenly — she is heavier on one side than she was. */
+.sbt-ship.is-leaking .sbt-hull { animation-duration: 2.4s; }

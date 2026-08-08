@@ -24,12 +24,11 @@ export const GUN_PORTS = {
 // Guns spread evenly across the middle of the hull, sitting on its own measured deck line.
 function fallbackPorts(deckPct, n) {
     const y = 1 - deckPct / 100;          // deck line is measured from the BOTTOM; y is from the top
-    // The battery widens with the number of guns, and THE SPREAD STOPS AT EIGHT. Past that the even spacing packs barrels tighter than they can be drawn and a
-    // thirteen-gun broadside renders as one dark fringe along the rail — uncountable, which is the whole thing
-    // it exists to do, and it looks like a bug rather than a battery. Eight readable cannons beat thirteen
-    // smeared into a bar, and the HUD states the real number anyway. A hand-placed battery is exempt: whoever
-    // placed it looked at the hull and knows what fits.
-    const drawn = Math.min(8, n);
+    // The battery widens with the number of guns, and stops at SEVEN — which is now the hard cap on guns
+    // themselves (COMBAT_TRACKS.guns.max is 6, plus the free one). Nine barrels did not fit on the narrower
+    // hulls: the placement tool ran out of rail before it ran out of guns, and the spread packed them into an
+    // uncountable dark fringe, which defeats the one job drawing them has.
+    const drawn = Math.min(7, n);
     const span = Math.min(0.68, 0.3 + drawn * 0.055);
     const out = [];
     for (let i = 0; i < drawn; i += 1) {

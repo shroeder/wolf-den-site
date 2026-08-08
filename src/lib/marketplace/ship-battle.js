@@ -56,7 +56,10 @@ export const ammoById = (id) => AMMO[String(id || "round")] || AMMO.round;
 // Tracks are capped low and deliberately cheap-feeling per level: the interesting decision is meant to be what
 // you LOAD, not how many times you tapped Upgrade.
 export const COMBAT_TRACKS = {
-    guns: { key: "guns", col: "gun_level", max: 8, name: "Cannons", icon: "GiCannon",
+    // SIX LEVELS, so gunsFor caps at SEVEN barrels. Eight levels meant nine guns, and nine will not fit on
+    // the narrower hulls — the placement tool ran out of rail before it ran out of guns. A cap you can
+    // actually draw beats a number that only exists in the HUD.
+    guns: { key: "guns", col: "gun_level", max: 6, name: "Cannons", icon: "GiCannon",
         desc: "More barrels in the broadside — every gun is another roll to hit." },
     gunnery: { key: "gunnery", col: "gunnery_level", max: 8, name: "Gunnery", icon: "GiTargeting",
         desc: "A drilled crew lays the guns truer — better accuracy, and more raking hits." },
