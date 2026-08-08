@@ -622,10 +622,28 @@ export default function TownClient({ initial }) {
     const [stockOpen, setStockOpen] = useState(false);
     const [stockade, setStockade] = useState(null);
     const [stockBusy, setStockBusy] = useState(false);
+    const [voteOpen, setVoteOpen] = useState(false);
+    const [nomTarget, setNomTarget] = useState("");
+    const [nomCrime, setNomCrime] = useState("");
+    // Nominating and voting both come back with the refreshed election, so one handler covers the pair.
+    const stockPost = async (body) => {
+        setStockBusy(true);
+        try {
+            const r = await fetch("/api/marketplace/stockade", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+            const d = await r.json().catch(() => ({}));
+            if (d?.phase) setStockade((prev) => ({ ...(prev || {}), election: d }));
+            else if (d?.error) setStockFlash(d.error === "insufficient_gold" ? "Not enough gold — a nomination costs 250."
+                : d.error === "already_nominated" ? "You have already put a name up this session."
+                : d.error === "already_up" ? "They are already on the board."
+                : d.error === "no_such_member" ? "No member by that handle." : "That did not take.");
+        } finally { setStockBusy(false); }
+    };
     const [stockFlash, setStockFlash] = useState(null);
     useEffect(() => {
         let dead = false;
-        fetch("/api/marketplace/stockade").then((r) => r.json()).then((d) => { if (!dead) setStockade(d?.occupant ? d : null); }).catch(() => {});
+        // The whole payload, not just the occupied case. It used to drop everything when nobody was in the
+        // stockade — which is exactly when the ELECTION is running and the plaza has the most to show.
+        fetch("/api/marketplace/stockade").then((r) => r.json()).then((d) => { if (!dead) setStockade(d || null); }).catch(() => {});
         return () => { dead = true; };
     }, []);
     // Projectiles + the splats they leave. Fired OPTIMISTICALLY on tap, before the request resolves: a lobbed
@@ -1339,6 +1357,19 @@ export default function TownClient({ initial }) {
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
                     {/* The Stockade — only stands while someone is actually in it */}
+                    {/* THE VOTING BOOTH. Stands in the plaza only while a poll is open, which is exactly when the
+                        stockade itself is empty — so the corner always has something in it and the two never
+                        collide. Jinxx's idea; the town decides who goes in the pillory. */}
+                    {!stockade?.occupant && stockade?.election?.phase === "voting" ? (
+                        <button type="button" className="tw-npc-btn tw-votebooth" style={{ left: "76%", top: `${GROUND + 6}%` }}
+                            onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
+                            <span className="tw-npc-bubble">🗳️ Who goes in the stockade?</span>
+                            <span className="tw-booth-art" aria-hidden="true">
+                                <i className="tw-booth-roof" /><i className="tw-booth-post" /><i className="tw-booth-post is-r" />
+                                <b className="tw-booth-box" />
+                            </span>
+                        </button>
+                    ) : null}
                     {stockade?.occupant ? (
                         <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>
                             <span className="tw-npc-bubble">⛓️ {stockade.occupant.name}</span>
@@ -1544,6 +1575,49 @@ export default function TownClient({ initial }) {
             ) : null}
 
             {/* The Stockade — shame / pelt the occupant, three of each a day */}
+            {/* THE BALLOT. Everyone gets one vote and may change it; putting a NAME up costs gold, which is the
+                only thing keeping the board short and funny rather than everyone nominating everyone. */}
+            {voteOpen && stockade?.election?.phase === "voting" ? (
+                <div className="tw-roster" onClick={() => setVoteOpen(false)} role="presentation">
+                    <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>
+                        <div className="tw-roster-head"><strong>🗳️ The Stockade Ballot</strong><button type="button" onClick={() => setVoteOpen(false)} aria-label="Close">✕</button></div>
+                        <p className="tw-stock-reason">
+                            The town votes. Whoever leads when the poll closes spends {stockade.election.sentenceDays} days
+                            in the pillory — then it all happens again.
+                        </p>
+                        {stockFlash ? <div className="tw-merchant-flash">{stockFlash}</div> : null}
+                        <div className="tw-ballot">
+                            {stockade.election.nominees?.length ? stockade.election.nominees.map((n) => (
+                                <button key={n.id} type="button"
+                                    className={`tw-ballot-row${stockade.election.myVote === n.id ? " is-mine" : ""}`}
+                                    disabled={stockBusy} onClick={() => stockPost({ kind: "vote", target: n.id })}>
+                                    {n.art ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={n.art} alt="" draggable="false" />
+                                    ) : <span className="tw-ballot-blank" aria-hidden="true" />}
+                                    <span className="tw-ballot-body">
+                                        <b>{n.name}</b>
+                                        <em>&ldquo;{n.crime}&rdquo;</em>
+                                    </span>
+                                    <span className="tw-ballot-votes">{n.votes}</span>
+                                </button>
+                            )) : <p className="muted" style={{ margin: 0 }}>Nobody has been accused yet. Someone has to start it.</p>}
+                        </div>
+                        {/* Put a name up. The crime is optional — leave it blank and the charge sheet picks one. */}
+                        {!stockade.election.myNomination ? (
+                            <div className="tw-nominate">
+                                <input value={nomTarget} onChange={(e) => setNomTarget(e.target.value)} placeholder="Their @handle" aria-label="Who to nominate" />
+                                <input value={nomCrime} onChange={(e) => setNomCrime(e.target.value)} placeholder="Their crime (optional)" aria-label="The crime" />
+                                <button type="button" className="button primary" disabled={stockBusy || !nomTarget.trim()}
+                                    onClick={() => stockPost({ kind: "nominate", target: nomTarget.trim().replace(/^@/, ""), crime: nomCrime.trim() || null })}>
+                                    Accuse — 🪙 {stockade.election.nominateCost}
+                                </button>
+                            </div>
+                        ) : <p className="muted" style={{ margin: "8px 0 0", fontSize: "0.8rem" }}>You have made your accusation this round.</p>}
+                    </div>
+                </div>
+            ) : null}
+
             {stockOpen && stockade?.occupant ? (
                 <div className="tw-roster" onClick={() => setStockOpen(false)} role="presentation">
                     <div className="tw-roster-panel" onClick={(e) => e.stopPropagation()}>

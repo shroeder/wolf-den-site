@@ -13997,3 +13997,37 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 }
 /* A ship carrying holes rocks unevenly — she is heavier on one side than she was. */
 .sbt-ship.is-leaking .sbt-hull { animation-duration: 2.4s; }
+
+/* ── THE VOTING BOOTH ─────────────────────────────────────────────────────────────────────────────────────
+   A medieval polling stand in the plaza, built from shapes rather than a sprite so it can go in tonight and
+   be redrawn later without touching the layout. Stands only while a poll is open — which is exactly when the
+   stockade beside it is empty, so the corner is never bare and the two never collide. */
+.tw-votebooth .tw-booth-art { position: relative; display: block; width: 62px; height: 66px; }
+.tw-booth-roof { position: absolute; left: -4px; right: -4px; top: 0; height: 16px;
+    background: linear-gradient(180deg, #8d5a34, #5d3820); border-radius: 4px 4px 0 0;
+    clip-path: polygon(8% 100%, 0 40%, 50% 0, 100% 40%, 92% 100%); }
+.tw-booth-post { position: absolute; left: 4px; top: 14px; width: 6px; bottom: 0;
+    background: linear-gradient(180deg, #7a4f2e, #4a2d18); border-radius: 2px; }
+.tw-booth-post.is-r { left: auto; right: 4px; }
+.tw-booth-box { position: absolute; left: 12px; right: 12px; bottom: 6px; height: 30px;
+    background: linear-gradient(180deg, #a9713f, #6b4123); border: 1px solid #3a2211; border-radius: 3px;
+    box-shadow: inset 0 6px 0 -4px rgba(0,0,0,0.45); }
+/* The slot you post a ballot through. */
+.tw-booth-box::after { content: ""; position: absolute; left: 30%; right: 30%; top: 7px; height: 3px;
+    background: #2a170a; border-radius: 2px; }
+
+/* The ballot itself. Rows are buttons — voting IS tapping the person. */
+.tw-ballot { display: grid; gap: 6px; margin-top: 8px; }
+.tw-ballot-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    width: 100%; text-align: left; padding: 8px 10px; border-radius: 11px; cursor: pointer; font: inherit;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: inherit; }
+.tw-ballot-row.is-mine { border-color: rgba(124,232,164,0.7); background: rgba(124,232,164,0.12); }
+.tw-ballot-row img, .tw-ballot-blank { width: 38px; height: 38px; border-radius: 9px; object-fit: contain;
+    background: rgba(0,0,0,0.3); flex: none; }
+.tw-ballot-body { min-width: 0; }
+.tw-ballot-body b { display: block; font-size: 0.9rem; }
+.tw-ballot-body em { display: block; font-style: normal; font-size: 0.76rem; color: #b9a892; }
+.tw-ballot-votes { font-size: 1.1rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
+.tw-nominate { display: grid; gap: 6px; margin-top: 10px; }
+.tw-nominate input { padding: 9px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.05); color: inherit; font-size: 0.9rem; }

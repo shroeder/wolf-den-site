@@ -167,8 +167,14 @@ export async function getElection(viewerId = null) {
 }
 
 /** Put a name up. Costs gold, one per member per election, and never yourself unless you volunteer. */
-export async function nominate(viewerId, targetId, crime = null) {
-    if (!viewerId || !targetId) return { ok: false, error: "bad_target" };
+export async function nominate(viewerId, target, crime = null) {
+    if (!viewerId || !target) return { ok: false, error: "bad_target" };
+    // The booth asks for an @handle because that is what members know each other by; ids never appear in the
+    // UI. Accept either, so the field is forgiving about the leading @ and about case.
+    const targetId = /^[0-9a-f-]{36}$/i.test(String(target))
+        ? String(target)
+        : (await db.queryOne(`SELECT id FROM mkt_buyer WHERE lower(alias) = lower($1)`, [String(target).replace(/^@/, "")]).catch(() => null))?.id;
+    if (!targetId) return { ok: false, error: "no_such_member" };
     const state = await getElection(viewerId);
     if (state.phase !== "voting" || !state.election) return { ok: false, error: "no_election" };
     if (state.myNomination) return { ok: false, error: "already_nominated" };
