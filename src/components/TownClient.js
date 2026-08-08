@@ -1364,10 +1364,8 @@ export default function TownClient({ initial }) {
                         <button type="button" className="tw-npc-btn tw-votebooth" style={{ left: "76%", top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
                             <span className="tw-npc-bubble">🗳️ Who goes in the stockade?</span>
-                            <span className="tw-booth-art" aria-hidden="true">
-                                <i className="tw-booth-roof" /><i className="tw-booth-post" /><i className="tw-booth-post is-r" />
-                                <b className="tw-booth-box" />
-                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="tw-booth-art" src="/images/town/vote-booth.png" alt="" draggable="false" />
                         </button>
                     ) : null}
                     {stockade?.occupant ? (
