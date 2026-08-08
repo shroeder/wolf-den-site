@@ -2304,15 +2304,15 @@ export async function buyAmmo(buyerId, ammoId, qty = 10) {
 // shop is honest about them existing, and never an accident. Anything added here that touches `charged`,
 // `charges` or a cooldown on a charged item belongs in this bracket — check before you price it.
 export const LOCKER = {
-    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 120,
+    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 1000,
         blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
-    scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 90,
+    scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 500,
         blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
-    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 75,
+    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 150,
         blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
-    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 12000,
+    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 5000,
         blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },
-    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 9000,
+    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 5000,
         blurb: "Use an in-store perk again today instead of waiting out its cooldown. Real merchandise." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
