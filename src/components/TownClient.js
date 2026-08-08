@@ -47,6 +47,14 @@ const PROJECT_ART = { prosperity: "prosperity", depth: "townscape", tavern: "tav
 const isEmoteMsg = (s) => Boolean(s && [...s.trim()].length <= 4 && !/[a-z0-9]/i.test(s) && /\p{Extended_Pictographic}/u.test(s));
 // Compact "time left" for the hangout buff pill (e.g. 5400 → "1h 30m", 240 → "4m").
 const fmtLeft = (secs) => { const s = Math.max(0, Math.round(secs || 0)); const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return h ? `${h}h ${m}m` : `${Math.max(1, m)}m`; };
+// When the next poll opens, on the closed booth's sign. A sentence never runs more than a few days, so the
+// weekday and the hour say it without a date anyone has to work out.
+const fmtWhen = (t) => {
+    if (!t) return "soon";
+    const d = new Date(t);
+    if (Number.isNaN(d.getTime())) return "soon";
+    return d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
+};
 
 // Rarity colors/labels for the gear-gamble reveal (Tier 1-4 = common/rare/epic/legendary).
 const RARITY_META = {
@@ -1357,9 +1365,11 @@ export default function TownClient({ initial }) {
                     </button>
                     {/* Town Crier — shouts rotating live news; tap to open the Town Hall */}
                     {/* The Stockade — only stands while someone is actually in it */}
-                    {/* THE VOTING BOOTH. Stands in the plaza only while a poll is open, which is exactly when the
-                        stockade itself is empty — so the corner always has something in it and the two never
-                        collide. Jinxx's idea; the town decides who goes in the pillory. */}
+                    {/* THE VOTING BOOTH. Jinxx's idea; the town decides who goes in the pillory.
+                        IT STANDS WHETHER OR NOT A POLL IS OPEN. It used to appear only while one was — which is
+                        exactly the three days nobody could see it, because a sentence runs for three — and the
+                        first thing that happened was a player hunting the plaza for a booth that had silently
+                        gone. A shut booth with a sign is a schedule; an absent booth is a bug. */}
                     {!stockade?.occupant && stockade?.election?.phase === "voting" ? (
                         <button type="button" className="tw-npc-btn tw-votebooth" style={{ left: "76%", top: `${GROUND + 6}%` }}
                             onClick={(e) => { e.stopPropagation(); setVoteOpen(true); }} aria-label="The voting booth">
@@ -1367,6 +1377,19 @@ export default function TownClient({ initial }) {
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img className="tw-booth-art" src="/images/town/vote-booth.png" alt="" draggable="false" />
                         </button>
+                    ) : null}
+                    {/* CLOSED, because somebody is already in the stocks. Stands aside from the stockade rather
+                        than in its place — the pillory is the joke and keeps the corner. Not a button: there is
+                        nothing to tap, and a control that does nothing is worse than a sign. */}
+                    {stockade?.occupant && stockade?.election?.phase === "serving" ? (
+                        <span className="tw-npc-btn tw-votebooth is-closed" style={{ left: "89%", top: `${GROUND + 6}%` }}>
+                            <span className="tw-npc-bubble tw-booth-shut">
+                                <b>🗳️ Poll closed</b>
+                                <em>Back {fmtWhen(stockade.election.servesUntil)}</em>
+                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="tw-booth-art" src="/images/town/vote-booth.png" alt="" draggable="false" />
+                        </span>
                     ) : null}
                     {stockade?.occupant ? (
                         <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>

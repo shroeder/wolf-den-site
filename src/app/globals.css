@@ -14080,3 +14080,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby .sby-mini.is-load { color: #2a1400; background: linear-gradient(180deg, #ffc95e, #e08a1c); }
 .sby .sby-round.is-loaded { border-color: rgba(255,201,94,0.75);
     box-shadow: 0 0 0 1px rgba(255,201,94,0.35), 0 0 18px -8px rgba(255,180,60,0.8); }
+
+/* THE SHUT VOTING BOOTH. Same prop, visibly out of service — greyed and set back, with the reopening time on
+   its own plate. It stands beside the stockade rather than in place of it. */
+.tw-votebooth.is-closed { cursor: default; opacity: 0.86; }
+.tw-votebooth.is-closed .tw-booth-art { width: 52px; height: 56px; filter: grayscale(0.75) brightness(0.62); }
+.tw-booth-shut { display: block; text-align: center; line-height: 1.25; max-width: 150px; }
+.tw-booth-shut b { display: block; color: #cfd6de; }
+.tw-booth-shut em { display: block; font-style: normal; font-size: 0.72em; font-weight: 700; color: #ffd75e; }
