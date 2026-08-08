@@ -72,22 +72,52 @@ function noise(a, { dur = 0.4, type = "lowpass", freq = 900, q = 1, gain = 0.3, 
     src.start(); src.stop(a.currentTime + dur);
 }
 // A BROADSIDE — not one bang but `guns` staggered cracks, so eleven guns sound like eleven guns.
-function sfxFire(guns = 4) {
+// EVERY ORDER HAS ITS OWN VOICE. All four used to fire the identical stack of cracks, so choosing an order
+// changed the numbers and nothing you could hear — the loudest thing in the fight was indifferent to the one
+// decision you make in it. Each now bends the same cannon into a different shape:
+//   broadside  the honest full-throated bark
+//   rake       higher and thinner, aimed up into the rigging rather than into the hull
+//   hole       lower and heavier, a shot punched down at the waterline
+//   board      one crash rather than a row — grapnels and boots, not a broadside
+const ORDER_VOICE = {
+    broadside: { top: 1500, low: 120, bottom: 38, gain: 0.22, dur: 0.34 },
+    rake:      { top: 2600, low: 210, bottom: 90, gain: 0.15, dur: 0.26 },
+    hole:      { top: 1000, low: 82,  bottom: 26, gain: 0.28, dur: 0.44 },
+    board:     { top: 900,  low: 150, bottom: 44, gain: 0.26, dur: 0.5 },
+};
+function sfxFire(guns = 4, order = "broadside") {
     const a = ac(); if (!a) return;
+    const v = ORDER_VOICE[order] || ORDER_VOICE.broadside;
     try {
-        const n = Math.max(1, Math.min(8, guns));
+        // Boarding is ONE event — a row of staggered cracks is the sound of guns, and boarding fires none.
+        const n = order === "board" ? 1 : Math.max(1, Math.min(7, guns));
         for (let i = 0; i < n; i++) {
             setTimeout(() => {
                 const t = ac(); if (!t) return;
-                noise(t, { dur: 0.34, freq: 1500, sweepTo: 180, gain: 0.16 });
+                noise(t, { dur: v.dur, freq: v.top, sweepTo: order === "rake" ? 600 : 180, gain: v.gain * 0.72 });
                 const o = t.createOscillator(), g = t.createGain();
-                o.type = "sine"; o.frequency.setValueAtTime(120, t.currentTime);
-                o.frequency.exponentialRampToValueAtTime(38, t.currentTime + 0.22);
-                g.gain.setValueAtTime(0.22, t.currentTime);
-                g.gain.exponentialRampToValueAtTime(0.0001, t.currentTime + 0.26);
-                o.connect(g); g.connect(t.destination); o.start(); o.stop(t.currentTime + 0.28);
+                o.type = order === "board" ? "sawtooth" : "sine";
+                o.frequency.setValueAtTime(v.low, t.currentTime);
+                o.frequency.exponentialRampToValueAtTime(v.bottom, t.currentTime + v.dur * 0.65);
+                g.gain.setValueAtTime(v.gain, t.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.0001, t.currentTime + v.dur * 0.78);
+                o.connect(g); g.connect(t.destination); o.start(); o.stop(t.currentTime + v.dur * 0.85);
             }, i * 90);
         }
+    } catch { /* audio is a bonus */ }
+}
+// WATER COMING IN, as a sound. A hole opening was silent, which made the single most dramatic thing that can
+// happen in a fight the only one you could miss while looking away.
+function sfxLeak() {
+    const a = ac(); if (!a) return;
+    try {
+        noise(a, { dur: 0.9, type: "lowpass", freq: 500, sweepTo: 1800, gain: 0.2 });
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = "sine"; o.frequency.setValueAtTime(300, a.currentTime);
+        o.frequency.exponentialRampToValueAtTime(70, a.currentTime + 0.5);
+        g.gain.setValueAtTime(0.18, a.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.6);
+        o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.62);
     } catch { /* audio is a bonus */ }
 }
 // SHOT INTO A HULL — timber, not metal: a short low crack with a woody band-pass on the noise.
@@ -206,6 +236,10 @@ function Volley({ ev }) {
 // time it lands — a burst that reshuffles every volley reads as noise, not as damage. Angles favour the sides
 // and up, because debris coming straight at the camera is invisible.
 // Droplet vectors for a splash — fixed, so every one is the same shape.
+// Crew shouts. Deliberately loud and slightly silly — a hole below the waterline is the most dramatic thing
+// that happens in this fight and it was previously a grey line in a log that is closed by default.
+const SHOUTS_HIT = ["We holed her!", "Right on the waterline!", "She's taking it on!", "Below the line — she's open!", "Hull's opened up!"];
+const SHOUTS_TAKEN = ["We're holed!", "Water in the hold!", "She's coming in fast!", "Below the line — man the pumps!", "We're taking it on!"];
 const SPRAY = [[-26,-20],[-15,-30],[0,-34],[15,-30],[26,-20],[-20,-8],[20,-8]];
 const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
 
@@ -384,6 +418,9 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
     const [logOpen, setLogOpen] = useState(false);
     // One floating number per gun that connected, cleared when the round advances.
     const [pops, setPops] = useState([]);
+    // What the crew yell when the water starts coming in. Two tables, because "we holed them" and "we are
+    // holed" are opposite feelings and one shared line would land wrong half the time.
+    const [shout, setShout] = useState(null);
     const logRef = useRef(null);
 
     // Open the log with the ship you are up against, so round one is not a blank panel over an empty sea. The
@@ -428,9 +465,10 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
         if (ev.type === "volley") {
             setFx({ k: `${battle?.round}-${step}`, ...ev });
             setPops([]);
+            setShout(null);
             // The guns go off as the balls leave, and the timber cracks when they arrive — the 440ms below is
             // the flight time the shot animation is built around, so picture and sound land together.
-            sfxFire(ev.guns || (ev.shots || []).length);
+            sfxFire(ev.guns || (ev.shots || []).length, ev.order);
             // EACH GUN LANDS ITS OWN HIT. The volley resolved as one lump — every barrel fired, then a single
             // number appeared — so a seven-gun broadside felt exactly like a one-gun one. Each hit now throws
             // its own damage number on the beat of the gun that fired it, so you SEE the broadside arrive in
@@ -450,6 +488,20 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
             const clearShake = setTimeout(() => setShake(null), 900);
             const next = setTimeout(() => setStep((v) => v + 1), 900 + Math.max(0, (shotsFired.length - 1)) * 90);
             return () => { pops.forEach(clearTimeout); clearTimeout(land); clearTimeout(clearShake); clearTimeout(next); };
+        }
+        // A HOLE OPENING IS THE LOUDEST MOMENT IN THE FIGHT, so it gets a shout and a sound rather than a line
+        // of grey text in a log that is closed by default. The crew say what happened; you do not have to read
+        // anything to know a ship is filling up.
+        if (ev.type === "leaksprung") {
+            sfxLeak();
+            setShout({ k: `${battle?.round}-${step}`, side: ev.side,
+                text: ev.side === "me" ? SHOUTS_HIT[Math.floor(Math.random() * SHOUTS_HIT.length)]
+                    : SHOUTS_TAKEN[Math.floor(Math.random() * SHOUTS_TAKEN.length)] });
+        }
+        if (ev.type === "order" && ev.order === "patch") {
+            setShout({ k: `${battle?.round}-${step}`, side: ev.side,
+                text: ev.sealed ? (ev.holes ? "Plugged one — she's still coming in!" : "Holes plugged! She's tight again!")
+                    : "Pumps aren't holding — she's still taking it!" });
         }
         setMyHp(ev.my); setFoeHp(ev.foe);
         const next = setTimeout(() => setStep((v) => v + 1), 720);
@@ -555,6 +607,10 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                         number, on its own beat, staggered down the deck with the gun that fired it. A
                         seven-gun broadside now arrives as seven hits you can count instead of one figure
                         that happened to be larger. Raking shots come in hot and named. */}
+                    {/* The shout, over the ship it happened to. Cleared on the next volley so it never lingers. */}
+                    {shout ? (
+                        <span key={shout.k} className={`sbt-shout ${shout.side === "me" ? "on-foe" : "on-me"}`}>{shout.text}</span>
+                    ) : null}
                     {phase === "play" ? pops.map((pp) => (
                         <span key={pp.k} className={`sbt-pop ${pp.side === "me" ? "on-foe" : "on-me"}${pp.rake ? " is-rake" : ""}`}
                             style={{ "--lane": `${pp.lane * 26}px` }}>
