@@ -326,6 +326,16 @@ export default function GameNav() {
 
     // The full, categorized grid menu — organized so you can see everything at once.
     const SECTIONS = [
+        // FIRST, not last. These two were on the scroll bar only — and that bar runs off the side of the
+        // screen, so anything on it is invisible unless you already know to swipe. Moving them into the menu
+        // was not enough on its own: at the BOTTOM, under "You", you have to scroll past every room in the
+        // game to reach the two pages that exist to tell you what the game is and what changed in it. They
+        // are the answer to "I don't know where to go", so they go where you land.
+        { title: "Start here", items: [
+            { href: "/marketplace/changelog", emoji: "📜", label: "What's New", sub: "Every recent change" },
+            { href: "/marketplace/guide", emoji: "🧭", label: "The Pathfinder", sub: "Learn the Den" },
+            { href: "/marketplace/play", emoji: "🎮", label: "Game Home", sub: "The hub" },
+        ] },
         { title: "Play", items: [
             ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town", sub: "Gather & raid" }] : []),
             { href: "/marketplace/boss", emoji: "⚔️", label: "Boss Fight", sub: "Join the raid" },
@@ -364,13 +374,6 @@ export default function GameNav() {
             { href: "/marketplace/inbox", emoji: "✉️", label: "Inbox", sub: "Messages" },
         ] },
         { title: "You", items: [
-            { href: "/marketplace/play", emoji: "🎮", label: "Game Home", sub: "The hub" },
-            // What's New and the Guide were on the SCROLL BAR only. That bar runs off the side of the screen,
-            // so anything on it is in practice invisible unless you already know to swipe for it — which is
-            // the exact complaint that got the changelog written in the first place: members could not find
-            // out what had changed. Both belong in the menu, where you go when you are looking for something.
-            { href: "/marketplace/changelog", emoji: "📜", label: "What's New", sub: "Every recent change" },
-            { href: "/marketplace/guide", emoji: "🧭", label: "The Pathfinder", sub: "Learn the Den" },
             { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize", sub: "Avatar & card look" },
             { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Settings & account" },
         ] },
