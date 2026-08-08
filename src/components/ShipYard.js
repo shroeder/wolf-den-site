@@ -13,7 +13,6 @@ import * as Gi from "react-icons/gi";
 // It is one screen now, and one word. Everything is a BATTLE. The only thing that changes is who you fight:
 //   BATTLE  one button; the server matches you with a pirate or a member near your own guns and hull
 //   YOUR SHIP  every combat upgrade in one list, each showing what it costs in
-//   YOUR SHIP  every combat upgrade in one list, each showing what it costs in
 //   AMMUNITION what is in the racks
 //
 // The two daily allowances are still separate (they are different activities with different economies) but
@@ -151,14 +150,6 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                 <button type="button" role="tab" aria-selected={active === "ammo"} className={active === "ammo" ? "is-on" : ""} onClick={() => setTab("ammo")}>Ammunition</button>
             </div>
 
-            {/* THE WAY IN TO THE GUN PLACEMENT TOOL. It has existed and been owner-only for a while, and the only
-                way to reach it was to know and type the URL — which is not a tool, it is a secret. This whole
-                panel is already owner-gated (combat is null for everyone else), so the link is safe here and
-                this is the screen you are on when you notice a ship's guns sitting wrong. */}
-            <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
-                Gun placement — set where cannons sit on each hull →
-            </a>
-
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
                 The page already has a structure for upgrades — one station per thing you improve — and raiding
                 simply had no seat at it. The tracks moved to the Gun Deck station; this modal is for choosing
@@ -167,9 +158,9 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
             {active === "ammo" ? (
                 <>
                     <p className="sby-sub">
-                        A round is spent PER GUN, per shot — pick one when you lay that gun in a battle and it comes out
-                        of these racks. What is LOADED here is only the default. Round shot never runs out; the rest are
-                        stock, and an empty rack just means that gun fires round shot instead of refusing.
+                        One round is spent per volley, and you pick it when you pick your target — this is only what
+                        the guns are loaded with by default. Round shot never runs out. The rest are stock, and an
+                        empty rack simply means that volley fires round shot instead of refusing.
                     </p>
                     <div className="sby-ammo">
                         {(combat.ammo || []).map((a) => (
@@ -227,22 +218,33 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                     <button type="button" className="sby-find" disabled={busy || battlesLeft <= 0}
                         onClick={() => onAct({ action: "battle" })}>
                         <Icon name="GiSpyglass" className="sby-find-ico" />
-                        <b>{battlesLeft > 0 ? "Find a fight" : "No battles left today"}</b>
-                        <em>{battlesLeft > 0
-                            ? "Someone your own size — a pirate or a rival captain"
-                            : "They come back at midnight"}</em>
+                        {/* The words are ONE grid cell. Left loose beside the icon they were two, so the
+                            subtitle wrapped into the 42px icon column and came out one word per line. */}
+                        <span className="sby-find-words">
+                            <b>{battlesLeft > 0 ? "Find a fight" : "No battles left today"}</b>
+                            <em>{battlesLeft > 0
+                                ? "Someone your own size — a pirate or a rival captain"
+                                : "They come back at midnight"}</em>
+                        </span>
                     </button>
 
                     <div className="sby-record">
-                        <span><b>{fleet.wins || 0}</b> won</span>
-                        <span><b>{fleet.losses || 0}</b> lost</span>
-                        <span><b>{fleet.best || 0}</b> deepest tier sunk</span>
+                        <span><b>{fleet.wins || 0}</b><em>won</em></span>
+                        <span><b>{fleet.losses || 0}</b><em>lost</em></span>
+                        <span><b>{fleet.best || 0}</b><em>best tier</em></span>
                     </div>
 
                     <p className="sby-sub">
                         You are matched on your <b>guns and hull</b>, so a fight is always close to fair — with the
                         occasional heavyweight to keep it honest. Losing costs the battle and nothing else.
                     </p>
+
+                    {/* The gun placement tool. Owner-only and useful, but it is a WORKSHOP door — it belongs at
+                        the bottom of the screen, under the thing you actually came here to press, not in a
+                        dashed banner above it. */}
+                    <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
+                        Gun placement — where cannons sit on each hull →
+                    </a>
                 </>
             ) : null}
 

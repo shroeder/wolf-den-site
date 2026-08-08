@@ -91,12 +91,12 @@ export default function BattleLab() {
             { key: "gunnery", name: "Gunnery", icon: "GiTargeting", desc: "A drilled crew lays the guns truer — better accuracy, and more raking hits.", level: 4, max: 8, maxed: false, cost: 66 },
             { key: "hull", name: "Hull", icon: "GiShipWheel", desc: "Oak and iron plate — more hit points, and every ball that lands hurts less.", level: 8, max: 8, maxed: true, cost: null },
         ],
-        ammo: [
-            { id: "round", name: "Round Shot", icon: "GiCannonBall", blurb: "Solid iron. No tricks, no waste — and you never run out.", basic: true, price: 0, count: null, loaded: ammo === "round" },
-            { id: "chain", name: "Chain Shot", icon: "GiChainedHeart", blurb: "Two balls on a chain, tumbling through the rigging.", basic: false, price: 12, count: 8, loaded: ammo === "chain" },
-            { id: "grape", name: "Grapeshot", icon: "GiCannonShot", blurb: "Murder on a light hull, useless against armour.", basic: false, price: 14, count: 0, loaded: ammo === "grape" },
-            { id: "explosive", name: "Explosive Shell", icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but what lands starts a fire.", basic: false, price: 22, count: 3, loaded: ammo === "explosive" },
-        ],
+        // STRAIGHT OFF THE REAL TABLE. This was a hand-typed copy and it had drifted — old prices, and blurbs
+        // still describing fires and rigging damage that no longer exist. A lab that lies is worse than no lab.
+        ammo: AMMO_LIST.map((a) => ({
+            id: a.id, name: a.name, icon: a.icon, blurb: a.blurb, basic: a.basic, price: a.price,
+            count: a.basic ? null : 8, loaded: ammo === a.id,
+        })),
         loadout: ammo,
         fleet: { depth: 6, best: 6, max: FLEET.length, wins: 9, losses: 3, cleared: false, ships: fleetView(6) },
     };

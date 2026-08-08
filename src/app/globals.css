@@ -14032,3 +14032,51 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .sbt-fire { min-width: 88px; padding: 8px 10px; }
     .sbt-target.is-gun { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
 }
+
+/* ══ SHIP BATTLES — FINDING A FIGHT ═════════════════════════════════════════════════════════════════════════
+   The tab is one button and a record now. Both shipped with markup and NO stylesheet, which is exactly what
+   that looks like: a white system button with the icon welded to the label, and three numbers running into
+   each other on one line. This is the pass that should have gone with them. */
+
+/* THE ONE ACTION ON THE SCREEN. It is the whole tab, so it is sized like it: a spyglass, what you are about to
+   do, and what you will get. */
+.sby-find { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 12px; width: 100%;
+    margin: 2px 0 12px; padding: 14px 16px; border-radius: 14px; cursor: pointer; text-align: left;
+    color: #2a1400; background: linear-gradient(180deg, #ffc95e, #e08a1c);
+    border: 1px solid #ffe4ad; box-shadow: 0 6px 18px -6px rgba(255,170,60,0.6), inset 0 1px 0 rgba(255,255,255,0.45); }
+.sby-find:hover:not(:disabled) { background: linear-gradient(180deg, #ffd67e, #eb9422);
+    box-shadow: 0 8px 22px -6px rgba(255,170,60,0.75), inset 0 1px 0 rgba(255,255,255,0.5); }
+.sby-find:disabled { cursor: default; color: #7d7466;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    border-color: rgba(255,255,255,0.12); box-shadow: none; }
+.sby-find-ico { font-size: 2rem; justify-self: center;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35)); }
+.sby-find-words { min-width: 0; }
+.sby-find b { display: block; font-size: 1.06rem; font-weight: 900; letter-spacing: 0.01em; line-height: 1.2; }
+.sby-find em { display: block; font-style: normal; font-size: 0.74rem; font-weight: 700; line-height: 1.35;
+    opacity: 0.82; margin-top: 2px; }
+
+/* YOUR RECORD — three struck plaques, in the same family as the purse. Was three spans on one line, so it
+   read "2 won0 lost2 deepest tier sunk". */
+.sby-record { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 12px; }
+.sby-record span { display: grid; gap: 1px; justify-items: center; padding: 9px 6px; border-radius: 11px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.1); }
+.sby-record b { font-size: 1.18rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums;
+    line-height: 1.1; }
+.sby-record em { font-style: normal; font-size: 0.64rem; font-weight: 800; letter-spacing: 0.06em;
+    text-transform: uppercase; color: #8d96a0; }
+
+/* The workshop door, at the bottom and quiet. It is a tool, not an action. */
+.sby-gunlab { margin-top: 12px; }
+
+/* The tabs are shared with the sailing boards, which are blue. This panel is gold from the purse down, and a
+   cyan pill in the middle of it read as a control borrowed from another screen. Scoped to this card only. */
+.sby .sbd-tabs button.is-on { color: #2a1400; background: linear-gradient(180deg, #ffc95e, #e08a1c); }
+
+/* The Load button and the loaded-round outline were the sailing boards' cyan, on a panel that is gold from the
+   purse down — they read as controls borrowed from another screen. Scoped to this card, so the boards keep
+   their own colour. */
+.sby .sby-mini.is-load { color: #2a1400; background: linear-gradient(180deg, #ffc95e, #e08a1c); }
+.sby .sby-round.is-loaded { border-color: rgba(255,201,94,0.75);
+    box-shadow: 0 0 0 1px rgba(255,201,94,0.35), 0 0 18px -8px rgba(255,180,60,0.8); }
