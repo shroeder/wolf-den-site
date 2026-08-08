@@ -14162,3 +14162,31 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sby-founder-close:active { transform: translateY(2px); box-shadow: 0 1px 0 #b4611a; }
 @keyframes sbyFounderFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sbyFounderPop { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+/* THE HEADER STAYS ON ONE LINE. The medallion arrived after the purse, which carries margin-left:auto, and on a
+   390px phone the three of them totalled a few pixels too many — so the tribute wrapped onto a line of its own
+   and sat there looking like a stray avatar. The coin already says what the number is, so the word beside it is
+   the thing that gives way. */
+.sby-head { flex-wrap: nowrap; }
+.sby-head h3 { min-width: 0; }
+@media (max-width: 430px) {
+    .sby-purse em { display: none; }
+    .sby-founder { width: 38px; height: 38px; }
+}
+
+/* THE WORKSHOP DOOR, as a button rather than a dashed banner. It is a tool and it should look like a tool —
+   quiet, but built. */
+.sby-gunlab { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 10px;
+    margin-top: 12px; padding: 10px 12px; border-radius: 12px; text-decoration: none; text-align: left;
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,201,94,0.28); }
+.sby-gunlab:hover { background: linear-gradient(180deg, rgba(255,201,94,0.16), rgba(255,201,94,0.06));
+    border-color: rgba(255,201,94,0.5); }
+.sby-gunlab-ico { font-size: 1.4rem; color: #ffd28a; }
+.sby-gunlab b { display: block; font-size: 0.84rem; color: #ffd9a0; }
+.sby-gunlab em { display: block; font-style: normal; font-size: 0.7rem; color: #93a3b3; }
+.sby-gunlab i { font-style: normal; font-size: 1.1rem; color: #ffd28a; opacity: 0.7; }
+
+/* Buying a round: one or five, side by side, and a plain reason when neither is possible. */
+.sby-buyrow { display: flex; gap: 5px; }
+.sby-short { font-size: 0.64rem; font-weight: 800; color: #ff9c8a; text-align: right; }

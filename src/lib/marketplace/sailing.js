@@ -17,6 +17,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAim,
          SAILS_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
+import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { getSavedPorts, portsWithSaved } from "@/lib/marketplace/gun-ports-store.js";
@@ -967,7 +968,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = []) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1052,7 +1053,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         })(),
         // SHIP BATTLES — the gun deck, the racks, the fleet ladder and the purse. Gated with raiding while the
         // rework is under construction; a member outside the allow-list gets null and renders nothing.
-        combat: raidsEnabled(buyerId) ? combatView(row, level) : null,
+        combat: raidsEnabled(buyerId) ? combatView(row, level, consumableArt) : null,
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1216,6 +1217,9 @@ export async function getSailingState(buyerId, skyKey = null) {
     // Pick the random horizon backdrop HERE (server-side) so it's baked into the first paint — the client no
     // longer flips from a default to the chosen one on load.
     const sky = SKY_BGS[Math.floor(Math.random() * SKY_BGS.length)];
+    // The Doubloon Shop sells real consumables, so it needs their real sprites. Fetched HERE, where
+    // awaiting is allowed, and handed to the view builder like every other art map.
+    const consumableArt = await consumableSpriteMap().catch(() => ({}));
     // The Corsair collection, fetched here where awaiting is allowed, then handed to the view builder.
     const collections = await (async () => {
         const [{ collectionsForFeature }, { getOwnedPieceIds: ownedPieces }] = await Promise.all([
@@ -1226,7 +1230,7 @@ export async function getSailingState(buyerId, skyKey = null) {
         // report every set as 0 collected.
         return collectionsForFeature("sea", await ownedPieces(buyerId).catch(() => []));
     })().catch(() => []);
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections), gold: goldRow?.gold || 0, fleet, sky, sea };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1746,7 +1750,7 @@ const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || 
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
 
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
-function combatView(row, boatLevel) {
+function combatView(row, boatLevel, consumableArt = {}) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -1804,6 +1808,10 @@ function combatView(row, boatLevel) {
         locker: LOCKER_LIST.map((l) => ({
             id: l.id, name: l.name, blurb: l.blurb, price: l.price, kind: l.kind, tier: l.tier || null,
             canAfford: (row?.doubloons || 0) >= l.price,
+            // ITS OWN PAINTED ART. Every one of these is a real consumable with a sprite in
+            // mkt_consumable_sprite, and the shop was drawing the generic teal potion for all five — so the
+            // counter showed the same bottle of mystery liquid five times, priced from 75 to 12,000.
+            art: (l.consumable && consumableArt[l.consumable]) || null,
         })),
         fleet: {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,

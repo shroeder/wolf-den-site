@@ -106,10 +106,27 @@ function Round({ a, purse, busy, onLoad, onBuy }) {
                     <button type="button" className="sby-mini is-load" disabled={busy || out} onClick={() => onLoad(a.id)}>Load</button>
                 )}
                 {a.basic ? null : (
-                    <button type="button" className="sby-mini" disabled={busy || purse < a.price * 5}
-                        onClick={() => onBuy(a.id, 5)} title={`5 rounds for ${a.price * 5} doubloons`}>
-                        Buy 5 · {a.price * 5}<Dbl />
-                    </button>
+                    <>
+                        {/* BUY ONE. The smallest purchase on the counter was a pack of five, which at 40-70
+                            doubloons is several battles' pay — so a captain with a starting purse could not buy
+                            any ammunition at all, and the button just sat there greyed out. A round is spent
+                            per volley now, so a single one is a real thing to own. */}
+                        <div className="sby-buyrow">
+                            <button type="button" className="sby-mini" disabled={busy || purse < a.price}
+                                onClick={() => onBuy(a.id, 1)} title={`One round for ${a.price} doubloons`}>
+                                1 · {a.price}<Dbl />
+                            </button>
+                            <button type="button" className="sby-mini" disabled={busy || purse < a.price * 5}
+                                onClick={() => onBuy(a.id, 5)} title={`5 rounds for ${a.price * 5} doubloons`}>
+                                5 · {a.price * 5}<Dbl />
+                            </button>
+                        </div>
+                        {/* And SAY why, when neither is affordable. A dimmed button with no reason is the
+                            question this answered when it was asked out loud. */}
+                        {purse < a.price ? (
+                            <span className="sby-short">{a.price - purse} more needed</span>
+                        ) : null}
+                    </>
                 )}
             </div>
         </div>
@@ -207,7 +224,7 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                                             point at from here. */}
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img className="sby-lockerart" alt="" draggable="false"
-                                            src="/images/ui/potion.png" />
+                                            src={l.art || "/images/ui/potion.png"} />
                                         <span className="sby-lockerbody">
                                             <b>{l.name}</b>
                                             <em>{l.blurb}</em>
@@ -283,7 +300,12 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         the bottom of the screen, under the thing you actually came here to press, not in a
                         dashed banner above it. */}
                     <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
-                        Gun placement — where cannons sit on each hull →
+                        <Icon name="GiCannon" className="sby-gunlab-ico" />
+                        <span>
+                            <b>Gun placement</b>
+                            <em>Set where the cannons sit on each hull</em>
+                        </span>
+                        <i aria-hidden="true">→</i>
                     </a>
                 </>
             ) : null}

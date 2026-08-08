@@ -17,11 +17,17 @@ const OUT = "public/images/sailing/doubloon.png";
 const force = process.argv.includes("--force");
 if (fs.existsSync(OUT) && !force) { console.log("skip (exists) — pass --force to redraw"); process.exit(0); }
 
+// NOT GOLD. The first version was "warm antique gold with brass and amber tones", which is what a doubloon
+// historically is and exactly the problem: the game's other currency is a gold coin, the two sat side by side
+// in the same panel, and a purse of doubloons read as a purse of gold. This is a piece of eight now — tarnished
+// SILVER, cold grey with dark oxidation in the struck relief — which cannot be mistaken for the gold coin at
+// 16px. The skull keeps it a pirate's money.
 const PROMPT = [
-    "A single gold PIRATE DOUBLOON coin seen face-on at a slight three-quarter tilt, thick and chunky with a",
-    "milled edge, a worn skull-and-crossed-cutlasses stamped into its face and a faint ring of old lettering",
-    "around the rim. Warm antique gold with brass and amber tones, a bright specular highlight on the upper",
-    "left and deep shadow in the struck relief so it reads as METAL.",
+    "A single tarnished SILVER pirate coin — a piece of eight — seen face-on at a slight three-quarter tilt,",
+    "thick and chunky with a milled edge, a worn skull-and-crossed-cutlasses stamped into its face and a faint",
+    "ring of old lettering around the rim. COLD SILVER AND PEWTER, cool grey with blue-grey shadows and dark",
+    "blackened oxidation settled into the struck relief, a bright white specular highlight on the upper left so",
+    "it reads as old METAL. Absolutely NOT gold, NOT brass, NOT yellow, NOT amber — a silver coin.",
     "Painterly cel-shaded 2D video-game icon art, bold clean dark outlines, chunky readable silhouette, high",
     "contrast, vibrant saturated colors, fantasy action-RPG style.",
     // Same framing contract as every other die-cut sprite — the model overshoots the frame unless told the
