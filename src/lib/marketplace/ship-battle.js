@@ -41,22 +41,22 @@ import { zoneById } from "@/lib/marketplace/ship-zones.js";
 export const AMMO = {
     round: {
         id: "round", name: "Round Shot", basic: true, price: 0,
-        icon: "GiCannonBall", blurb: "Solid iron. No tricks, no waste — and you never run out.",
+        icon: "GiCannonBall", blurb: "Solid iron, and you never run out.",
         dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {},
     },
     chain: {
         id: "chain", name: "Chain Shot", basic: false, price: 8,
-        icon: "GiChainedHeart", blurb: "Two balls on a chain, tumbling end over end. Aimed at canvas it takes a whole suit of sails at once.",
+        icon: "GiChainedHeart", blurb: "Shreds canvas — takes a whole suit of sails at once.",
         dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 },
     },
     grape: {
         id: "grape", name: "Grapeshot", basic: false, price: 9,
-        icon: "GiCannonShot", blurb: "A bag of small shot that sweeps a gun deck clear. Useless against armour, murder on a crew.",
+        icon: "GiCannonShot", blurb: "Dismounts cannons. Armour stops it dead.",
         dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 },   // counts double on a gun deck
     },
     explosive: {
         id: "explosive", name: "Explosive Shell", basic: false, price: 14,
-        icon: "GiBurningEmbers", blurb: "A fused shell. Wild off the muzzle, and it goes through armour plate that stops solid iron dead.",
+        icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but it goes through plate.",
         dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {},
     },
 };

@@ -13337,16 +13337,29 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* Ammunition: a rack you load from, not a list of upgrades. */
 .sby-ammo { display: grid; gap: 7px; }
-.sby-round { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+.sby-round { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: center;
+    grid-template-areas: "ico body" "acts acts";
     padding: 9px 11px; border-radius: 12px; background: rgba(255,255,255,0.035);
     border: 1px solid rgba(255,255,255,0.1); }
+.sby-round-ico { grid-area: ico; }
+.sby-round-body { grid-area: body; }
+/* Stock on the left, everything you can press on the right, all on one line. */
+.sby-round-acts { grid-area: acts; display: flex; flex-direction: row; align-items: center; gap: 6px;
+    margin-top: 2px; }
+.sby-round-acts .sby-count { margin-right: auto; }
+@media (min-width: 560px) {
+    /* Room for the old shape once there is room for it. */
+    .sby-round { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ico body acts"; }
+    .sby-round-acts { margin-top: 0; }
+    .sby-round-acts .sby-count { margin-right: 0; }
+}
 .sby-round.is-loaded { border-color: #55c8ee; background: rgba(85,200,238,0.12); }
 .sby-round-ico { width: 26px; height: 26px; color: #ffd28a; }
 .sby-round.is-loaded .sby-round-ico { color: #9fe6ff; }
 .sby-round-body { min-width: 0; }
 .sby-round-body b { display: block; font-size: 0.84rem; font-weight: 800; }
 .sby-round-body em { font-style: normal; font-size: 0.67rem; line-height: 1.35; color: #8d96a0; }
-.sby-round-acts { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+
 .sby-count { font-size: 0.68rem; font-weight: 800; color: #cdd3d8; white-space: nowrap; }
 .sby-count.is-out { color: #ff9a8a; }
 .sby-mini { padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 0.68rem; font-weight: 800;

@@ -192,9 +192,8 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
             {active === "ammo" ? (
                 <>
                     <p className="sby-sub">
-                        One round is spent per volley, and you pick it when you pick your target — this is only what
-                        the guns are loaded with by default. Round shot never runs out. The rest are stock, and an
-                        empty rack simply means that volley fires round shot instead of refusing.
+                        One round per volley, picked when you pick your target — this is just the default.
+                        An empty rack falls back to round shot, which never runs out.
                     </p>
                     <div className="sby-ammo">
                         {(combat.ammo || []).map((a) => (
