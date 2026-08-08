@@ -82,15 +82,17 @@ export const COOK_TRACKS = {
     season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance the dish pays out TWICE — double whatever it makes." },
     // "boost", not "pct": the other three are ROLLS the card labels "Chance", and Big Pot is not a roll —
     // every level is felt on every cook. Labelling it "Chance 30%" would have read as a 30%% shot at nothing.
-    // BIG POT AIMS HIGHER, IT DOES NOT MAKE MORE. As a +% to quantity it was Seasoning wearing a hat: almost
-    // every reward this game hands out is quantity ONE, so "+24% of 1" resolved through the probabilistic
-    // rounding into "a 24% chance of getting 2" — which is precisely what Seasoning already does, at 24%, for
-    // 3,600 gold instead of 6,400. Two tracks, one effect, and the redundant one cost nearly double.
+    // BIG POT FEEDS THE HALL. Finding an axis for this took two goes, both wrong for the same reason:
+    //   · as +% QUANTITY it was Seasoning — nearly every reward here is quantity ONE, so "+24% of 1" resolved
+    //     through probabilistic rounding into "a 24% chance of 2", which is Seasoning's effect at Seasoning's
+    //     odds for nearly double the gold
+    //   · as a lift to the reward RUNG it was Heat, which already sells "one tier better than the recipe" —
+    //     tier versus rung is a distinction only this file can see, and a player reads both as "better stuff"
     //
-    // Quantity was the wrong axis because Seasoning owns it. The free axis is QUALITY: which rung of the
-    // tier's reward ladder you land on. Big Pot now lifts that, so a big pot is how you fish a better thing
-    // out of the tier rather than a second copy of a worse one.
-    batch:  { max: MAX_TRACK, per: 0.05, cap: 0.25, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "A deeper pot reaches the good stuff — better rewards from the same dish." },
+    // Quantity belongs to Seasoning, quality to Heat, and ingredients to Larder. The axis nothing touches is
+    // what COOKING ITSELF is worth: a bigger pot feeds more people, so the cook learns more. It is the only
+    // track that pays out even on a dish whose reward you did not want, which is a real reason to buy it.
+    batch:  { max: MAX_TRACK, per: 0.10, cap: 0.50, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "A bigger pot feeds the whole hall — more cooking XP from every dish." },
     larder: { max: MAX_TRACK, per: 0.07, cap: 0.35, kind: "pct", name: "Larder",    icon: "/images/cooking/track-larder.png", desc: "Chance a cook doesn't use up its ingredients at all." },
 };
 export const TRACK_COL = { heat: "heat_level", season: "season_level", batch: "batch_level", larder: "larder_level" };
@@ -909,8 +911,8 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // serve() folds the second helping and the pot size into one number, and rounds PROBABILISTICALLY: at +30%
     // a two-part reward is 2.6, which pays 3 about sixty percent of the time instead of always truncating to 2.
     // Flat rounding would have thrown away the entire upgrade on every reward small enough to matter.
-    // No longer a quantity multiplier — see the Big Pot note on the track table. Kept as a name so the two
-    // uses below read clearly: `serve` is now portions only, and the lift goes to the reward ladder.
+    // Big Pot no longer touches quantity — see the note on the track table. It rides on cooking XP now, so
+    // `serve` is portions only and potLift is applied where the XP is worked out.
     const potLift = trackValue("batch", row?.batch_level);
     const potMult = 1;
     const serve = (n) => {
@@ -934,7 +936,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
         const ladder = tierMeta(tier).rewards;
-        const rung = rungFor(q, ladder.length, (petBonus.hot_hands || 0) + potLift);
+        const rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
         const r = ladder[rung];
         const lbl = rewardLabel(r, {
             consumables: conSprites,
@@ -985,7 +987,8 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind, rung: rung + 1, rungs: ladder.length }, sprite: spriteMap[rec.id] || null };
     }
 
-    const xp = Math.round(8 * tier * (0.7 + q * 0.6));
+    // Big Pot rides here — the one axis Seasoning, Heat and Larder all leave alone.
+    const xp = Math.round(8 * tier * (0.7 + q * 0.6) * (1 + potLift));
     await db.query(
         `UPDATE mkt_kitchen
             SET cook_xp = cook_xp + $2,
