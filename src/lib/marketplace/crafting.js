@@ -560,8 +560,21 @@ export async function getForgeState(buyerId) {
     const enhance = Object.values(bySlot).map((id) => { const d = dress(id); if (!d) return null; const c = enhanceCost(itemById(id), d.level); const maxed = d.level >= MAX_FORGE_LEVEL; return { ...d, cost: c, have: parts[c.tier] || 0, affordable: (parts[c.tier] || 0) >= c.qty, maxed }; }).filter(Boolean).sort((a, b) => b.level - a.level || a.slot.localeCompare(b.slot));
     const partList = PART_TIERS.map((p) => ({ ...p, count: parts[p.tier] || 0, canCombine: (parts[p.tier] || 0) >= COMBINE_COST && p.tier < MAX_TIER }));
     // Blacksmith's Regalia collection (the salvaging set).
-    const ownedIdSet = new Set((ownedRows || []).map((r) => r.item_id));
-    const regaliaPieces = REGALIA_IDS.map((id) => { const it = itemById(id); return { id, name: it?.name || id, slot: it?.slot, icon: it?.icon, sprite: spriteMap[id] || null, owned: ownedIdSet.has(id) }; });
+    //
+    // READ THE COLLECTION TABLE, not the gear table. This asked mkt_user_item whether you owned a Forgeplate —
+    // and pieces moved OUT of mkt_user_item into mkt_user_collection, which is exactly what the comment on the
+    // salvage list nine lines above says. That list got fixed in the migration and this did not, so the panel
+    // reported 0/5 to everybody who owned pieces (3 members do; Luke holds the Forgeplate and the Cinderstride
+    // Boots, both `source: migrated`, so the migration itself carried them over correctly).
+    //
+    // It was NOT only cosmetic: regFound also feeds the salvageOdds preview below, so the double-part odds the
+    // Forge quoted you were the odds for owning nothing. The salvage itself was always right — salvageItem
+    // reads getOwnedPieceIds — so members with pieces were being paid the bonus while being told they had none.
+    //
+    // itemById is null for these ids now too (they are pieces, not items), which is why name/slot/icon came
+    // back as the raw id. pieceById is the registry that still knows them.
+    const ownedPieceSet = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    const regaliaPieces = REGALIA_IDS.map((id) => { const p = pieceById(id); return { id, name: p?.name || id, rarity: p?.rarity || null, icon: p?.icon || null, flavor: p?.flavor || null, sprite: spriteMap[id] || null, owned: ownedPieceSet.has(id) }; });
     const regFound = regaliaPieces.filter((r) => r.owned).length;
     const regaliaTiers = [
         { need: 3, effect: "+10% double-parts chance on salvage", active: regFound >= 3 },
