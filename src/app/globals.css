@@ -13934,3 +13934,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The order board while a volley resolves: still there, still the same size, plainly not accepting taps. */
 .sbt-orders.is-waiting { opacity: 0.55; filter: saturate(0.75); }
 .sbt-orders.is-waiting .sbt-order-shine { display: none; }
+
+/* Owner-only entry point to the gun placement lab, from the gun deck. Quiet — it is a workshop door, not a
+   feature — but present, because a tool you have to type a URL to reach is not a tool. */
+.sby-gunlab { display: block; margin: 8px 0 2px; padding: 8px 11px; border-radius: 10px; font-size: 0.76rem;
+    font-weight: 800; color: #ffd9a0; text-decoration: none; text-align: center;
+    background: rgba(255,205,120,0.08); border: 1px dashed rgba(255,205,120,0.4); }
+.sby-gunlab:hover { background: rgba(255,205,120,0.16); }

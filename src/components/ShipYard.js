@@ -284,6 +284,14 @@ export default function ShipYard({ combat, raid, gold, targets = null, targetsMi
                 <button type="button" role="tab" aria-selected={active === "ammo"} className={active === "ammo" ? "is-on" : ""} onClick={() => setTab("ammo")}>Ammunition</button>
             </div>
 
+            {/* THE WAY IN TO THE GUN PLACEMENT TOOL. It has existed and been owner-only for a while, and the only
+                way to reach it was to know and type the URL — which is not a tool, it is a secret. This whole
+                panel is already owner-gated (combat is null for everyone else), so the link is safe here and
+                this is the screen you are on when you notice a ship's guns sitting wrong. */}
+            <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
+                Gun placement — set where cannons sit on each hull →
+            </a>
+
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
                 The page already has a structure for upgrades — one station per thing you improve — and raiding
                 simply had no seat at it. The tracks moved to the Gun Deck station; this modal is for choosing
