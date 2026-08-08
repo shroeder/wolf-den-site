@@ -14043,3 +14043,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     78% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-14px) scale(0.96); }
 }
+
+/* The stockade plaque carries the CHARGE as well as the name — the crime is the whole joke, and it was hidden
+   behind a tap. Two lines, the crime quieter and italicised so the name still reads first at plaza size. */
+.tw-stock-plate { display: block; text-align: center; line-height: 1.25; max-width: 168px; }
+.tw-stock-plate b { display: block; }
+.tw-stock-plate em { display: block; font-style: italic; font-size: 0.72em; opacity: 0.9; font-weight: 700; }

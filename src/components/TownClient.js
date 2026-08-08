@@ -1370,7 +1370,13 @@ export default function TownClient({ initial }) {
                     ) : null}
                     {stockade?.occupant ? (
                         <button type="button" className="tw-npc-btn tw-stockade" style={{ left: "76%", top: `${GROUND + 6}%` }} onClick={(e) => { e.stopPropagation(); setStockOpen(true); }} aria-label={`The Stockade — ${stockade.occupant.name}`}>
-                            <span className="tw-npc-bubble">⛓️ {stockade.occupant.name}</span>
+                            {/* THE CHARGE, not just the name. The plaque said who was in it and left the funniest
+                                half of the feature — what they are accused of — hidden behind a tap. The crime is
+                                the whole joke, so it goes on the sign. */}
+                            <span className="tw-npc-bubble tw-stock-plate">
+                                <b>⛓️ {stockade.occupant.name}</b>
+                                {stockade.occupant.reason ? <em>&ldquo;{stockade.occupant.reason}&rdquo;</em> : null}
+                            </span>
                             {stockade.occupant.artUrl ? (
                                 // The combined picture: them drawn INTO the boards, one image.
                                 // eslint-disable-next-line @next/next/no-img-element

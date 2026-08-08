@@ -365,6 +365,12 @@ export default function GameNav() {
         ] },
         { title: "You", items: [
             { href: "/marketplace/play", emoji: "🎮", label: "Game Home", sub: "The hub" },
+            // What's New and the Guide were on the SCROLL BAR only. That bar runs off the side of the screen,
+            // so anything on it is in practice invisible unless you already know to swipe for it — which is
+            // the exact complaint that got the changelog written in the first place: members could not find
+            // out what had changed. Both belong in the menu, where you go when you are looking for something.
+            { href: "/marketplace/changelog", emoji: "📜", label: "What's New", sub: "Every recent change" },
+            { href: "/marketplace/guide", emoji: "🧭", label: "The Pathfinder", sub: "Learn the Den" },
             { href: "/marketplace/customize", emoji: "🧑‍🎨", label: "Customize", sub: "Avatar & card look" },
             { href: "/marketplace/profile", emoji: "👤", label: "Profile", sub: "Settings & account" },
         ] },
