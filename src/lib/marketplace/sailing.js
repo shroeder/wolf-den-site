@@ -14,7 +14,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAim,
+         gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -2000,7 +2000,7 @@ const readBattle = (row) => {
 // cleared in the same breath.
 //
 // NOTHING THE CLIENT SENDS IS TRUSTED. It may name a zone this hull does not have, a cannon that is already
-// wreckage, or a rack it emptied two rounds ago — sanitizeAim corrects each of those to an honest round shot
+// wreckage, or a rack it emptied two rounds ago — sanitizeAims corrects each of those to an honest round shot
 // at the hull rather than refusing the volley, because a fight that will not resolve is worse than a shot
 // that went somewhere dull.
 export async function shipBattleVolley(buyerId, aim) {
@@ -2010,19 +2010,19 @@ export async function shipBattleVolley(buyerId, aim) {
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
     const { me, foe } = profilesFrom(open.meta);
 
-    // ONE ROUND OF AMMUNITION PER VOLLEY, spent here rather than when the battle opened — you choose what to
-    // load when you choose where to shoot, so this is the only place that knows. An empty rack is not a
-    // refusal: it quietly becomes round shot, and you are never unable to fire.
+    // ONE ROUND OF AMMUNITION PER GUN, spent here rather than when the battle opened — you choose what each
+    // gun carries when you lay it, so this is the only place that knows. The stock is walked down shot by shot
+    // and anything the racks cannot cover quietly becomes round shot: you are never unable to fire.
     const stock = { ...ammoStock(row) };
-    let spent = null;
-    const laid = sanitizeAim(open.state, "me", aim, {
+    let spent = false;
+    const laid = sanitizeAims(open.state, "me", aim, {
         zonesAllowed: zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)),
         ammoAvailable: (id) => {
             const def = ammoById(id);
             if (def.basic) return true;
             if ((Number(stock[id]) || 0) <= 0) return false;
             stock[id] = (Number(stock[id]) || 0) - 1;
-            spent = id;
+            spent = true;
             return true;
         },
     });

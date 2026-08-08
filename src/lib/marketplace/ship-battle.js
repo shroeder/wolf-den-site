@@ -24,9 +24,10 @@ import { zoneById } from "@/lib/marketplace/ship-zones.js";
 
 // ── AMMUNITION ───────────────────────────────────────────────────────────────────────────────────────────────
 // Round shot is unlocked forever and never runs out, so nobody is ever unable to fight. The others are stock
-// you buy with doubloons and spend ONE OF PER VOLLEY — the reason the currency keeps mattering after the gun
-// deck is full. It briefly cost one per GUN, back when guns were laid individually; a seven-gun ship firing
-// shells for twelve rounds emptied a purse in a single sortie, which is a price nobody pays twice.
+// you buy with doubloons and spend one of PER GUN — the reason the currency keeps mattering after the gun deck
+// is full. Prices are per BALL accordingly: a seven-gun broadside of shells is 42 doubloons, which is meant to
+// be a decision rather than a habit. Guns you did not lay individually fire round shot, so the bill is always
+// something you chose.
 //
 // Each type is a real trade, not a strictly-better ladder — and now each one is also a shot you point at a
 // particular PART of a ship, so what it is good against matters as much as what it does:
@@ -45,17 +46,17 @@ export const AMMO = {
         dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {},
     },
     chain: {
-        id: "chain", name: "Chain Shot", basic: false, price: 8,
+        id: "chain", name: "Chain Shot", basic: false, price: 3,
         icon: "GiChainedHeart", blurb: "Shreds canvas — takes a whole suit of sails at once.",
         dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 },
     },
     grape: {
-        id: "grape", name: "Grapeshot", basic: false, price: 9,
+        id: "grape", name: "Grapeshot", basic: false, price: 3,
         icon: "GiCannonShot", blurb: "Dismounts cannons. Armour stops it dead.",
         dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 },   // counts double on a gun deck
     },
     explosive: {
-        id: "explosive", name: "Explosive Shell", basic: false, price: 14,
+        id: "explosive", name: "Explosive Shell", basic: false, price: 6,
         icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but it goes through plate.",
         dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {},
     },
@@ -245,12 +246,12 @@ export function initBattleState(me, foe, { rng = Math.random } = {}) {
 // field — a zone this hull does not have, a cannon that is already wreckage, ammunition that is not in the
 // racks. None of that is a rejection, it is a correction: a fight that refuses to resolve because one field was
 // stale is a worse outcome than a volley that went somewhere ordinary.
-export function sanitizeAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}) {
+function oneAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}) {
     const them = who === "me" ? st.foe : st.me;
     let zone = String(raw?.zone || "hull");
     if (!["sails", "hull", "guns"].includes(zone)) zone = "hull";
     if (zonesAllowed && !zonesAllowed.includes(zone)) zone = "hull";
-    // Canvas already in rags is not a target — it would be a volley spent on nothing at all.
+    // Canvas already in rags is not a target — it would be a shot spent on nothing at all.
     if (zone === "sails" && them.sails <= 0) zone = "hull";
     let target = null;
     if (zone === "guns") {
@@ -263,29 +264,70 @@ export function sanitizeAim(st, who, raw, { zonesAllowed = null, ammoAvailable =
     return { zone, target, ammo };
 }
 
+/**
+ * EVERY GUN GETS ITS OWN ORDER, and the whole broadside no longer has to go to one place.
+ *
+ * The first cut of this fired everything at a single target, because laying seven guns one at a time is
+ * bookkeeping. But a gun deck that can only ever do ONE job a round throws away the actual decision — chain
+ * into her canvas while grape takes a cannon off her is a plan, and "all of it at the hull" is not.
+ *
+ * The simple case stays one tap: guns you did not lay FOLLOW the first target you picked. Splitting is opt-in
+ * and costs one extra tap per gun, so a player who wants to point and fire still points and fires — and the
+ * scene shows the followers in the count on the marker, so what is on screen is what will happen.
+ *
+ * Followers carry ROUND SHOT whatever is loaded. Ammunition is spent per gun now, and quietly spending five
+ * shells because somebody tapped once with shells selected is the kind of bill nobody agrees to.
+ */
+export function sanitizeAims(st, who, list, opts = {}) {
+    const s = who === "me" ? st.me : st.foe;
+    const live = s.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
+    const byGun = new Map();
+    for (const raw of Array.isArray(list) ? list : []) {
+        const gun = Number(raw?.gun);
+        if (!live.includes(gun) || byGun.has(gun)) continue;
+        byGun.set(gun, oneAim(st, who, raw, opts));
+    }
+    const lead = byGun.size ? byGun.values().next().value : oneAim(st, who, {}, {});
+    return live.map((gun) => {
+        const own = byGun.get(gun);
+        return own ? { gun, ...own } : { gun, ...lead, ammo: "round", follower: true };
+    });
+}
+
 // ── WHAT THE ENEMY DOES ──────────────────────────────────────────────────────────────────────────────────────
 // Deliberately readable rather than clever: cut your canvas early while it is worth cutting, break up a gun
-// deck that outnumbers theirs, and otherwise put iron into the hull. A foe whose shot has a visible reason is
-// one you can plan against — and their aim is shown on your ship before it lands.
-export function foeAim(me, foe, st, { rng = Math.random } = {}) {
+// deck that outnumbers theirs, and otherwise put iron into the hull. A foe whose shots have a visible reason is
+// one you can plan against.
+export function foeAims(me, foe, st, { rng = Math.random } = {}) {
     const mine = st.me, theirs = st.foe;
     const ammo = foe.ammo?.id || "round";
+    const live = theirs.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
     const myGunsUp = gunsReady(mine);
-    const r = rng();
-    // Canvas first, and only while there is plenty of it — shredding the last suit is worth less than damage.
-    if (mine.sails > SAILS_MAX / 2 && r < 0.3) return { zone: "sails", target: null, ammo };
-    // They pick on a gun deck bigger than their own, which is the same call a player makes.
-    if (myGunsUp >= 4 && myGunsUp >= gunsReady(theirs) && r < 0.5) {
-        const up = mine.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
-        return { zone: "guns", target: up[Math.floor(rng() * up.length)] ?? null, ammo };
-    }
-    return { zone: "hull", target: null, ammo };
+
+    // THEY SPLIT THEIR BROADSIDE TOO, or the player would be the only captain on the water who can. Most of it
+    // goes into the hull; a couple of guns peel off for canvas while there is plenty of it, and a big deck
+    // spares one or two to break up a bigger one. Rolled per gun, so their volley reads differently each round
+    // without ever being incoherent — you can see what they went for on your own ship afterwards.
+    let sailsTaken = 0, gunsTaken = 0;
+    return live.map((gun) => {
+        const r = rng();
+        if (mine.sails > SAILS_MAX / 2 && sailsTaken < 2 && r < 0.3) {
+            sailsTaken += 1;
+            return { gun, zone: "sails", target: null, ammo };
+        }
+        if (myGunsUp >= 4 && myGunsUp >= live.length && gunsTaken < 2 && r < 0.5) {
+            gunsTaken += 1;
+            const up = mine.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
+            return { gun, zone: "guns", target: up[Math.floor(rng() * up.length)] ?? null, ammo };
+        }
+        return { gun, zone: "hull", target: null, ammo };
+    });
 }
 
 // ── ONE ROUND ────────────────────────────────────────────────────────────────────────────────────────────────
 // Both broadsides go off in weather-gauge order, each at the one part its captain chose. Pure — the caller
 // persists whatever comes back — and `rng` is injectable so a fight can be replayed exactly in the lab.
-export function resolveVolley(me, foe, state, aim, { rng = Math.random } = {}) {
+export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) {
     const st = {
         v: 3, round: state.round, gauge: state.gauge,
         me: { ...state.me, guns: [...state.me.guns] },
@@ -294,27 +336,29 @@ export function resolveVolley(me, foe, state, aim, { rng = Math.random } = {}) {
     const events = [];
     st.round += 1;
 
-    const mine = sanitizeAim(st, "me", aim);
-    const theirs = foeAim(me, foe, st, { rng });
+    const mine = sanitizeAims(st, "me", aims);
+    const theirs = foeAims(me, foe, st, { rng });
 
-    const fire = (who, order) => {
+    const fire = (who, orders) => {
         const att = who === "me" ? me : foe;
         const def = who === "me" ? foe : me;
         const mySide = who === "me" ? st.me : st.foe;
         const theirSide = who === "me" ? st.foe : st.me;
         if (mySide.hp <= 0 || theirSide.hp <= 0) return;
 
-        const zone = zoneById(order.zone);
-        const ammo = ammoById(order.ammo);
+        // Evasion is read ONCE for the volley, not per gun: every ball in a broadside leaves while she is
+        // still under the sail she had when it started. Shredding her canvas pays off from the NEXT round.
         const evasion = evasionOf(theirSide.sails);
-        const chance = hitChance(att, zone, ammo, evasion);
-        const guns = mySide.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
 
         const shots = [];
         let total = 0;
         const after = [];
-        for (const gun of guns) {
-            if (rng() > chance) { shots.push({ gun, hit: false }); continue; }
+        for (const order of orders) {
+            const gun = order.gun;
+            const zone = zoneById(order.zone);
+            const ammo = ammoById(order.ammo);
+            const chance = hitChance(att, zone, ammo, evasion);
+            if (rng() > chance) { shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false }); continue; }
             const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
             let dmg = (SHOT_MIN + rng() * SHOT_VAR) * ammo.dmg * att.dmgMult * zone.dmg;
             if (rake) dmg *= 1.8;
@@ -322,7 +366,7 @@ export function resolveVolley(me, foe, state, aim, { rng = Math.random } = {}) {
             dmg = Math.max(1, Math.round(dmg * (1 - armor) * def.dmgTaken));
             total += dmg;
             theirSide.hp = Math.max(0, theirSide.hp - dmg);
-            const shot = { gun, hit: true, dmg, rake };
+            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, rake };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
             // is especially good at — which is where chain and grape earn their price. Round shot is never
@@ -348,8 +392,7 @@ export function resolveVolley(me, foe, state, aim, { rng = Math.random } = {}) {
         }
 
         events.push({
-            type: "volley", side: who, zone: order.zone, target: order.target, ammo: ammo.id,
-            shots, dmg: total, guns: guns.length, chance, hp: hpPair(st),
+            type: "volley", side: who, shots, dmg: total, guns: orders.length, hp: hpPair(st),
         });
         for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
     };

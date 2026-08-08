@@ -14199,3 +14199,20 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* Buying a round: one or five, side by side, and a plain reason when neither is possible. */
 .sby-buyrow { display: flex; gap: 5px; }
 .sby-short { font-size: 0.64rem; font-weight: 800; color: #ff9c8a; text-align: right; }
+
+/* THE GUN RAIL. One pip per barrel, coloured by the round it carries — a split broadside has to be readable
+   before it fires, and tapping a pip is the undo. */
+.sbt-gunrail { grid-area: rack; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.sbt-gunpip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; padding: 0;
+    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #7f93a6;
+    font-size: 0.9rem; }
+.sbt-gunpip.is-laid { color: #23160a; background: var(--mtint, #ffd28a); border-color: rgba(0,0,0,0.4); }
+.sbt-gunpip.is-round { --mtint: #ffd28a; }
+.sbt-gunpip.is-chain { --mtint: #9fd0ff; }
+.sbt-gunpip.is-grape { --mtint: #ffb0d0; }
+.sbt-gunpip.is-explosive { --mtint: #ff9a6b; }
+
+/* The bar now carries a read-out, the rack, the rail and FIRE, so the rack and rail share a row. */
+.sbt-aimbar { grid-template-areas: "read fire" "rack fire" "rail fire"; }
+.sbt-rack-row { grid-area: rack; }
+.sbt-gunrail { grid-area: rail; }

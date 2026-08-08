@@ -204,7 +204,7 @@ function gunWidthPct(ports) {
 }
 
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
-function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targets = null, aimed = null,
+function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targets = null,
                 onPick = null, firing = false, hullRef = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
@@ -291,19 +291,21 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                 <span className="sbt-targets">
                     {/* The region itself, outlined, once you have chosen it — so a chip that says SAILS shows
                         you WHICH canvas without being a button the size of a mainsail. */}
-                    {targets.filter((t) => t.box && aimed === t.key).map((t) => (
+                    {targets.filter((t) => t.box && t.laid).map((t) => (
                         <i key={`ring${t.key}`} className="sbt-zonering" aria-hidden="true"
                             style={{ left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }} />
                     ))}
                     {targets.map((t) => (
                         <button key={t.key} type="button"
-                            className={`sbt-target is-${t.zone}${aimed === t.key ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}`}
+                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}`}
                             style={{ left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
                             onClick={(e) => { e.stopPropagation(); onPick?.(t); }}
                             title={`${t.name} — ${Math.round(t.chance * 100)}% to hit`}>
                             <span className="sbt-target-tag">
                                 <Icon name={t.icon} />
-                                <b>{Math.round(t.chance * 100)}%</b>
+                                {/* The COUNT once guns are on it, the odds until then — a marker reading "×3"
+                                    is the only thing that makes a split broadside legible before it fires. */}
+                                <b>{t.laid ? `×${t.laid}` : `${Math.round(t.chance * 100)}%`}</b>
                             </span>
                         </button>
                     ))}
@@ -364,10 +366,13 @@ function logLine(ev, me, foe) {
     if (ev.type !== "volley") return null;
     const shots = ev.shots || [];
     const hits = shots.filter((s) => s.hit).length;
-    const where = zoneById(ev.zone).name.toLowerCase();
+    // A split broadside has no single "where", so the line lists what it was aimed at.
+    const tally = {};
+    for (const sh of shots) tally[sh.zone] = (tally[sh.zone] || 0) + 1;
+    const where = Object.entries(tally).map(([z, n]) => `${n}×${zoneById(z).name.toLowerCase()}`).join(", ");
     return {
         side: ev.side,
-        text: `${nameOf(ev.side)} fire ${shots.length} gun${shots.length === 1 ? "" : "s"} at her ${where} — ${hits} on target for ${ev.dmg}`,
+        text: `${nameOf(ev.side)} fire ${shots.length} gun${shots.length === 1 ? "" : "s"} — ${where} — ${hits} on target for ${ev.dmg}`,
         big: shots.some((s) => s.rake),
     };
 }
@@ -394,7 +399,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
     // ── AIM ──────────────────────────────────────────────────────────────────────────────────────────────────
     // One target for the whole broadside, and one round loaded behind it.
-    const [aimed, setAimed] = useState(null);        // the marker key you picked
+    // ONE ORDER PER GUN, in the order you gave them. Guns you do not lay follow the FIRST target you picked
+    // (the server does the same), so pointing the whole broadside somewhere is still a single tap and splitting
+    // it is opt-in — one extra tap per gun you want doing something else.
+    const [aim, setAim] = useState([]);             // [{ gun, zone, target, ammo }]
     const [ammo, setAmmo] = useState(battle?.loadout || "round");
     const [taught, setTaught] = useState(true);
 
@@ -451,13 +459,31 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         return out;
     }, [foe, battle, foeSys, caps, ammo]);
 
-    const picked = useMemo(() => targets.find((t) => t.key === aimed) || null, [targets, aimed]);
+    const myGuns = battle?.sys?.me?.guns || [];
+    const liveGuns = useMemo(() => myGuns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0), [myGuns]);
+    const nextGun = useMemo(() => liveGuns.find((g) => !aim.some((a) => a.gun === g)), [liveGuns, aim]);
+    // The last order you gave is what the read-out talks about.
+    const picked = useMemo(() => {
+        const last = aim[aim.length - 1];
+        return last ? targets.find((t) => t.zone === last.zone && (t.target ?? null) === (last.target ?? null)) || null : null;
+    }, [aim, targets]);
 
-    // Keep the aim honest when the board changes under it — a cannon you were pointed at can be wreckage by the
-    // time you look again, and a marker that no longer exists must not stay selected.
+    /** How many guns end up at this marker, followers included — what the count on it has to say. */
+    const gunsAt = useCallback((zone, target) => {
+        const same = (a) => a.zone === zone && (a.target ?? null) === (target ?? null);
+        const own = aim.filter(same).length;
+        const isLead = aim.length > 0 && same(aim[0]);
+        return own + (isLead ? Math.max(0, liveGuns.length - aim.length) : 0);
+    }, [aim, liveGuns]);
+
+    // Keep the orders honest when the board changes under them — a cannon you laid a gun on can be wreckage by
+    // the time you look again, and an order against something that no longer exists must not survive.
     useEffect(() => {
-        if (aimed && !targets.some((t) => t.key === aimed)) setAimed(null);
-    }, [targets, aimed]);
+        setAim((list) => {
+            const ok = list.filter((a) => targets.some((t) => t.zone === a.zone && (t.target ?? null) === (a.target ?? null)));
+            return ok.length === list.length ? list : ok;
+        });
+    }, [targets]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -467,6 +493,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         setTaught(true);
         try { window.localStorage.setItem(TAUGHT_KEY, "1"); } catch { /* private mode */ }
     }, []);
+
+    // Every marker, plus the number of guns that will fire at it — followers included. Computed here rather
+    // than in Ship so the ring, the chip and the read-out all agree on one count.
+    const markers = useMemo(() => targets.map((t) => ({ ...t, laid: gunsAt(t.zone, t.target) })), [targets, gunsAt]);
 
     // Where each hull sits on the stage, in pixels — needed to fly a ball from a muzzle to a cannon.
     const measure = useCallback(() => {
@@ -500,10 +530,17 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
     const pick = useCallback((t) => {
         if (phase !== "aim" || busy || battle?.over) return;
-        setAimed(t.key);
+        if (nextGun == null) return;   // every gun is already laid
+        setAim((list) => [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }]);
         sfxPick();
         if (!taught) dismissTeach();
-    }, [phase, busy, battle?.over, taught, dismissTeach]);
+    }, [phase, busy, battle?.over, nextGun, ammo, taught, dismissTeach]);
+
+    /** Take a gun back off its target. The gun rail is the undo. */
+    const clearGun = useCallback((gun) => {
+        setAim((list) => list.filter((a) => a.gun !== gun));
+        sfxPick();
+    }, []);
 
     // Open the log with the ship you are up against, so round one is not a blank panel over an empty sea.
     useEffect(() => {
@@ -533,12 +570,17 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         if (phase !== "play" || step < 0) return undefined;
         if (step >= events.length) {
             if (battle?.over) { setPhase(battle?.sunk ? "sinking" : "result"); return undefined; }
-            const t = setTimeout(() => { setPhase("aim"); setBalls([]); setPops([]); }, 300);
+            const t = setTimeout(() => { setPhase("aim"); setAim([]); setBalls([]); setPops([]); }, 300);
             return () => clearTimeout(t);
         }
         const ev = events[step];
         const line = logLine(ev, me, foe);
-        if (line) setLog((l) => [...l.slice(-40), { ...line, k: `${battle?.round}-${step}` }]);
+        // KEYED, not appended — an effect that runs twice (StrictMode in development, any re-render of the same
+        // exchange) was adding the same line a second time under the same key.
+        if (line) {
+            const lk = `${battle?.round}-${step}`;
+            setLog((l) => [...l.slice(-40).filter((x) => x.k !== lk), { ...line, k: lk }]);
+        }
         const timers = [];
 
         if (ev.type === "volley") {
@@ -552,18 +594,18 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
             shots.forEach((s, i) => {
                 const at = i * 100;
                 timers.push(setTimeout(() => {
-                    sfxGun(ev.ammo);
+                    sfxGun(s.ammo);
                     const ports = (from === "me" ? me : foe)?.ports || [];
                     const p = ports[s.gun];
                     const muzzle = fromBox && p
                         ? { x: fromBox.x + p.x * fromBox.w, y: fromBox.y + p.y * fromBox.h }
                         : fromBox ? { x: fromBox.x + fromBox.w / 2, y: fromBox.y + fromBox.h * 0.55 } : null;
-                    const land = pointOn(to, ev.zone, s.target ?? ev.target);
+                    const land = pointOn(to, s.zone, s.target);
                     if (muzzle && land) {
                         const end = s.hit ? land : { x: muzzle.x + (land.x - muzzle.x) * 0.72, y: Math.max(land.y, (boxes?.h || 400) * 0.78) };
                         const key = `${battle?.round}-${step}-${i}`;
                         setBalls((b) => [...b.slice(-14).filter((x) => x.k !== key), {
-                            k: key, from: muzzle, to: end, hit: s.hit, ammo: ev.ammo, rake: s.rake,
+                            k: key, from: muzzle, to: end, hit: s.hit, ammo: s.ammo, rake: s.rake,
                         }]);
                     }
                 }, at));
@@ -611,10 +653,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
     const fire = useCallback(() => {
-        if (!picked || busy) return;
+        if (!aim.length || busy) return;
         setBalls([]);
-        onVolley?.({ zone: picked.zone, target: picked.target, ammo });
-    }, [picked, busy, ammo, onVolley]);
+        onVolley?.(aim);
+    }, [aim, busy, onVolley]);
 
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
@@ -671,8 +713,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         low={clampPct(foeHp, battle?.foeMax) <= 25}
                         sinking={sinkingSide === "foe"} hpFrac={(foeHp || 0) / Math.max(1, battle?.foeMax || 1)}
                         sys={foeSys} caps={caps} firing={firingSide === "foe"}
-                        targets={phase === "aim" && !battle?.over ? targets : null}
-                        aimed={aimed} onPick={pick} />
+                        targets={phase === "aim" && !battle?.over ? markers : null}
+                        onPick={pick} />
 
                     {balls.map((b) => (
                         <span key={b.k} className={`sbt-ball2 is-${b.ammo}${b.hit ? "" : " is-miss"}${b.rake ? " is-rake" : ""}`}
@@ -707,7 +749,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         <Icon name={picked?.icon || "GiTargeting"} className="sbt-zoneicon" />
                         <div>
                             <b>{picked ? picked.name : "Pick your target"}</b>
-                            <em>{picked ? picked.effect : "Tap a part of her ship — the number on each is your chance to hit it."}</em>
+                            <em>{picked
+                                ? `${picked.effect}${nextGun == null ? "" : "  ·  tap again to send another gun"}`
+                                : "Tap a part of her ship. Tap another to split the broadside."}</em>
                         </div>
                         {picked ? <span className="sbt-odds">{Math.round(picked.chance * 100)}%</span> : null}
                     </div>
@@ -731,10 +775,27 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         </div>
                     ) : null}
 
-                    <button type="button" className={`sbt-fire${picked ? " is-ready" : ""}`}
-                        disabled={!picked || busy || phase !== "aim"} onClick={fire}>
+                    {/* THE GUN RAIL. One pip per barrel, in the colour of the round it carries, so a split
+                        broadside is visible before it goes off — and tapping a pip takes that gun back. */}
+                    <div className="sbt-gunrail">
+                        {liveGuns.map((g) => {
+                            const a = aim.find((x) => x.gun === g);
+                            const at = a ? targets.find((t) => t.zone === a.zone && (t.target ?? null) === (a.target ?? null)) : null;
+                            return (
+                                <button key={g} type="button"
+                                    className={`sbt-gunpip${a ? ` is-laid is-${a.ammo}` : ""}`}
+                                    disabled={!a || phase !== "aim"} onClick={() => clearGun(g)}
+                                    title={a ? `Gun ${g + 1} — ${at?.name || a.zone}` : `Gun ${g + 1} — follows the first order`}>
+                                    <Icon name="GiCannon" />
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <button type="button" className={`sbt-fire${aim.length ? " is-ready" : ""}`}
+                        disabled={!aim.length || busy || phase !== "aim"} onClick={fire}>
                         <b>FIRE</b>
-                        <em>{picked ? `${battle?.sys?.me?.guns?.filter((h) => h > 0).length || 1} guns` : "no target"}</em>
+                        <em>{aim.length ? `${liveGuns.length} gun${liveGuns.length === 1 ? "" : "s"}` : "no target"}</em>
                     </button>
                 </div>
             ) : null}
