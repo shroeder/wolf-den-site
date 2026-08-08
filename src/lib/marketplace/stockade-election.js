@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { placeInStockade, releaseFromStockade, getOccupant } from "@/lib/marketplace/stockade.js";
+import { checkText } from "@/lib/marketplace/text-filter.js";
 
 // ── THE STOCKADE ELECTION ────────────────────────────────────────────────────────────────────────────────────
 // Jinxx's idea, more or less verbatim: "a fun little bit to nominate someone for being in display in the town
@@ -189,6 +190,11 @@ export async function nominate(viewerId, target, crime = null) {
     if (state.myNomination) return { ok: false, error: "already_nominated" };
     if (state.nominees.length >= MAX_NOMINEES) return { ok: false, error: "board_full" };
     if (state.nominees.some((n) => n.id === targetId)) return { ok: false, error: "already_up" };
+    // CHECK THE CHARGE BEFORE CHARGING FOR IT. This text goes up on the town square, under somebody else's
+    // name, for a day — written by a third party who is not the person it describes. Rejected on save, and
+    // before the gold comes out, so a blocked nomination costs nothing to retry.
+    const crimeCheck = checkText(crime);
+    if (!crimeCheck.clean) return { ok: false, error: "bad_crime", message: crimeCheck.reason };
     // Charged with the balance guard inside the UPDATE — neon() has no transactions, so a double-tap on a slow
     // connection would otherwise put two names up for one payment.
     const paid = await db.queryOne(

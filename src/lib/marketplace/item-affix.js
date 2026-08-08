@@ -10,7 +10,11 @@ import { db } from "@/lib/db";
 // feature via getEquippedUtilTotals so the affix actually DOES something. Rides with the item on trade/auction.
 
 export const UTIL_MAX = 5;              // an attunement levels 1..5
-export const UTIL_BASE_CHANCE = 0.04;   // base per-enhance chance to attune (rare); grade + the Attunement forge upgrade raise it
+// Base per-enhance chance to attune; grade + the Attunement forge upgrade raise it. Every contributor was cut
+// to 0.4x on 2026-08-08 — stacked up they reached 22.5% a swing (0.04 base + 0.06 pixel + 5x2.5% track), so a
+// "rare bonus" landed on roughly one enhance in four and everything ended up attuned. Now it tops out at 9%.
+// Nothing else feeds this chance (no pet or badge grants `attune`), so scaling these three is exact.
+export const UTIL_BASE_CHANCE = 0.016;
 
 // bucket tells getEquippedUtilTotals where the value goes; `stat` is the sub-key inside farm/sea buckets.
 // per = value per level, cap = max value. Farm/pet/raid/forge values are PERCENT; sea values are POINTS.

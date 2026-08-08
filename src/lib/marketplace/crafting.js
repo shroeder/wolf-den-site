@@ -104,7 +104,7 @@ export const FORGE_UPGRADES = {
     masters_touch: { name: "Master's Touch", desc: "Chance an enhancement rolls TWICE the gains.", max: 5, per: 0.015, base: 400, unit: "%" },
     steady_hand: { name: "Steady Hand", desc: "Chance a slip won't break your combo when you enhance.", max: 5, per: 0.05, base: 350, unit: "%" },
     transmute: { name: "Transmuter's Boon", desc: "Chance a combine yields TWO parts instead of one (+1% per level).", max: 5, per: 0.01, base: 300, unit: "%" },
-    attune: { name: "Attunement", desc: "Chance an enhancement ATTUNES the piece — rolling a rare bonus stat for a spin-off feature (farm, pet XP, raids, sailing or the forge). +2.5% per level.", max: 5, per: 0.025, base: 500, unit: "%" },
+    attune: { name: "Attunement", desc: "Chance an enhancement ATTUNES the piece — rolling a rare bonus stat for a spin-off feature (farm, pet XP, raids, sailing or the forge). +1% per level.", max: 5, per: 0.01, base: 500, unit: "%" },
 };
 // Themed icon + short effect label per perk, so the Perks list renders with the shared upgrade UI (like ship/dig/farm).
 const UPG_EMOJI = { efficient: "🛠️", keen_eye: "👁️", masters_touch: "✨", steady_hand: "🖐️", transmute: "⚗️", attune: "🔮" };
@@ -469,7 +469,8 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const bestGrade = (GRADE_RANK[grade] || 0) > (GRADE_RANK[cur?.best_grade] || 0) ? grade : cur?.best_grade || grade;
     // RARE ATTUNEMENT ROLL — a lucky enhance can add (or level up) a bonus utility affix that helps a spin-off
     // feature. Base chance + a bonus for a flawless strike + the Attunement forge upgrade. One affix per item.
-    const utilChance = UTIL_BASE_CHANCE + (grade === "pixel" ? 0.06 : grade === "perfect" ? 0.03 : 0) + chance(upg, "attune", bf);
+    // Grade bonuses cut to 0.4x with the rest of the attunement rate — see UTIL_BASE_CHANCE.
+    const utilChance = UTIL_BASE_CHANCE + (grade === "pixel" ? 0.024 : grade === "perfect" ? 0.012 : 0) + chance(upg, "attune", bf);
     const { next: nextUtil, result: utilRoll } = rollUtil(parseUtil(cur?.util), utilChance);
     const utilJson = nextUtil ? JSON.stringify(nextUtil) : null;
     await db

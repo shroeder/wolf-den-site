@@ -74,7 +74,12 @@ export default function BlacksmithClient({ initial }) {
     const [loading, setLoading] = useState(!initial);
     const [forbidden, setForbidden] = useState(false);
     const [busy, setBusy] = useState(null);
-    const [tab, setTab] = useState("enhance");
+    // ?tab= deep-links a specific bench. Using an Enchantment Scroll from your stash lands here on Attune —
+    // the scroll's whole interface (every piece you own, pick one, pick an element) already lives on that tab.
+    const [tab, setTab] = useState(() => {
+        const want = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+        return ["enhance", "salvage", "attune", "upgrades"].includes(want) ? want : "enhance";
+    });
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
     const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal

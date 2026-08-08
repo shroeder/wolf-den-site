@@ -2766,7 +2766,10 @@ async function finishDig(buyerId, board) {
     for (const it of foundItems) await grantConsumable(buyerId, it.id, 1).catch(() => {});
     const itemTally = {};
     for (const it of foundItems) itemTally[it.id] = (itemTally[it.id] || 0) + 1;
-    const itemsHaul = Object.entries(itemTally).map(([id, n]) => ({ id, n, name: CONSUMABLES[id]?.name || id, emoji: CONSUMABLES[id]?.emoji || "🎁" }));
+    // Every consumable has its own painted sprite in mkt_consumable_sprite; the recap was showing the emoji
+    // fallback (a generic 🎁 for anything unmapped) for things that have real art sitting right there.
+    const digArt = await consumableSpriteMap().catch(() => ({}));
+    const itemsHaul = Object.entries(itemTally).map(([id, n]) => ({ id, n, name: CONSUMABLES[id]?.name || id, emoji: CONSUMABLES[id]?.emoji || "🎁", art: digArt[id] || null }));
     const won = earned > 0 || foundItems.length > 0;
     // Merge into the current per-tier hold.
     const counts = { ...((row && typeof row.fragments_json === "object" && row.fragments_json) || {}) };
@@ -2814,7 +2817,7 @@ async function finishDig(buyerId, board) {
     const fullyUnearthed = uncovered >= total;
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
-    const relic = relicFound ? { id: relicFound, name: CONSUMABLES[relicFound]?.name || relicFound, emoji: CONSUMABLES[relicFound]?.emoji || "🎁", desc: CONSUMABLES[relicFound]?.desc || "" } : null;
+    const relic = relicFound ? { id: relicFound, name: CONSUMABLES[relicFound]?.name || relicFound, emoji: CONSUMABLES[relicFound]?.emoji || "🎁", art: digArt[relicFound] || null, desc: CONSUMABLES[relicFound]?.desc || "" } : null;
     return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
 }
 async function persistDig(buyerId, board) {

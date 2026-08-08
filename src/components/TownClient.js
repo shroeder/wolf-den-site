@@ -623,18 +623,42 @@ export default function TownClient({ initial }) {
     const [stockade, setStockade] = useState(null);
     const [stockBusy, setStockBusy] = useState(false);
     const [voteOpen, setVoteOpen] = useState(false);
-    const [nomTarget, setNomTarget] = useState("");
+    // WHO you are accusing is a MEMBER, not a string. It used to be a bare "Their @handle" box, which asked
+    // you to already know how somebody spells their handle and answered a typo with "No member by that handle"
+    // — the one question the server could have answered for you. Now it searches as you type and you pick a
+    // hero card, so the target is chosen rather than recalled and cannot be wrong.
+    const [nomPick, setNomPick] = useState(null);   // the chosen member row
+    const [nomQuery, setNomQuery] = useState("");
+    const [nomHits, setNomHits] = useState([]);
+    const [nomSeeking, setNomSeeking] = useState(false);
     const [nomCrime, setNomCrime] = useState("");
+    useEffect(() => {
+        const q = nomQuery.trim();
+        if (nomPick || q.length < 2) { setNomHits([]); return undefined; }
+        let dead = false;
+        setNomSeeking(true);
+        // Debounced — a keystroke-per-request would hammer the directory for no benefit.
+        const t = setTimeout(() => {
+            fetch(`/api/marketplace/members?q=${encodeURIComponent(q)}`, { cache: "no-store" })
+                .then((r) => r.json())
+                .then((d) => { if (!dead) setNomHits((d?.members || []).slice(0, 6)); })
+                .catch(() => { if (!dead) setNomHits([]); })
+                .finally(() => { if (!dead) setNomSeeking(false); });
+        }, 220);
+        return () => { dead = true; clearTimeout(t); };
+    }, [nomQuery, nomPick]);
     // Nominating and voting both come back with the refreshed election, so one handler covers the pair.
     const stockPost = async (body) => {
         setStockBusy(true);
         try {
             const r = await fetch("/api/marketplace/stockade", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
             const d = await r.json().catch(() => ({}));
-            if (d?.phase) setStockade((prev) => ({ ...(prev || {}), election: d }));
+            if (d?.phase) { setStockade((prev) => ({ ...(prev || {}), election: d })); setNomPick(null); setNomQuery(""); setNomCrime(""); }
             else if (d?.error) setStockFlash(d.error === "insufficient_gold" ? "Not enough gold — a nomination costs 250."
                 : d.error === "already_nominated" ? "You have already put a name up this session."
                 : d.error === "already_up" ? "They are already on the board."
+                // The server hands back its own sentence for a rejected charge — it knows WHY it said no.
+                : d.error === "bad_crime" ? (d.message || "Keep the charge clean.")
                 : d.error === "no_such_member" ? "No member by that handle." : "That did not take.");
         } finally { setStockBusy(false); }
     };
@@ -1613,10 +1637,34 @@ export default function TownClient({ initial }) {
                         {/* Put a name up. The crime is optional — leave it blank and the charge sheet picks one. */}
                         {!stockade.election.myNomination ? (
                             <div className="tw-nominate">
-                                <input value={nomTarget} onChange={(e) => setNomTarget(e.target.value)} placeholder="Their @handle" aria-label="Who to nominate" />
+                                {nomPick ? (
+                                    <div className="tw-nom-picked">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={nomPick.avatarUrl} alt="" draggable="false" />
+                                        <span className="tw-nom-picked-body"><b>{nomPick.displayLabel}</b><em>@{nomPick.alias} · Lv {nomPick.level}</em></span>
+                                        <button type="button" className="tw-nom-clear" aria-label="Pick someone else"
+                                            onClick={() => { setNomPick(null); setNomQuery(""); }}>✕</button>
+                                    </div>
+                                ) : (
+                                    <div className="tw-nom-search">
+                                        <input value={nomQuery} onChange={(e) => setNomQuery(e.target.value)}
+                                            placeholder="Search the Den for who did it…" aria-label="Who to nominate" autoComplete="off" />
+                                        {nomQuery.trim().length >= 2 ? (
+                                            <div className="tw-nom-hits">
+                                                {nomHits.length ? nomHits.map((m) => (
+                                                    <button key={m.id} type="button" className="tw-nom-hit" onClick={() => { setNomPick(m); setNomHits([]); }}>
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img src={m.avatarUrl} alt="" draggable="false" />
+                                                        <span className="tw-nom-hit-body"><b>{m.displayLabel}</b><em>@{m.alias} · Lv {m.level}</em></span>
+                                                    </button>
+                                                )) : <span className="tw-nom-empty">{nomSeeking ? "Searching…" : "Nobody by that name."}</span>}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
                                 <input value={nomCrime} onChange={(e) => setNomCrime(e.target.value)} placeholder="Their crime (optional)" aria-label="The crime" />
-                                <button type="button" className="button primary" disabled={stockBusy || !nomTarget.trim()}
-                                    onClick={() => stockPost({ kind: "nominate", target: nomTarget.trim().replace(/^@/, ""), crime: nomCrime.trim() || null })}>
+                                <button type="button" className="button primary" disabled={stockBusy || !nomPick}
+                                    onClick={() => stockPost({ kind: "nominate", target: nomPick.id, crime: nomCrime.trim() || null })}>
                                     Accuse — 🪙 {stockade.election.nominateCost}
                                 </button>
                             </div>

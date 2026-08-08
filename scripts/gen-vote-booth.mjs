@@ -27,12 +27,21 @@ const DIE_CUT = "A SINGLE object, centred, drawn ENTIRELY INSIDE the frame with 
     + "sticker rim, NO circular badge or frame behind it.";
 const NEGATIVE = "No text, no words, no letters, no numbers, no signage, no logo, no watermark, no border.";
 
-// Reads at ~62px in the plaza, so the silhouette has to carry it: a peaked roof on two posts over a barrel
-// with a slot. No lettering — the model writes on any sign it is given, and a banner would be a sign.
-const SUBJECT = "A medieval wooden VOTING BOOTH: a small peaked shingled canopy on two carved timber posts, "
-    + "standing over a stout oak ballot barrel bound with iron hoops and a dark slot cut across its lid. A few "
-    + "rolled paper ballots poke out of the slot and one lies against the base. Weathered oak, iron banding, "
-    + "a scrap of deep red cloth draped over one post.";
+// Reads at ~62px in the plaza, so the SILHOUETTE has to carry it — and the first draw lost on exactly that.
+// A shingled canopy on two posts standing over an iron-hooped barrel is a WISHING WELL: that is the shape the
+// eye resolves at thumbnail size no matter what the ballots are doing, and it got read as a well on sight.
+// So the barrel and the canopy-on-posts are both gone. What replaces them is a shape a well cannot have — a
+// TALL, NARROW, FLAT-FRONTED upright box you stand at, taller than it is wide, with a drawn-back curtain and
+// a slotted ballot chest on a writing shelf. Vertical and boxy, against a plaza of round and squat fixtures.
+// No lettering — the model writes on any sign it is given, and a banner would be a sign.
+const SUBJECT = "A medieval wooden VOTING BOOTH: a TALL NARROW upright wooden stall, clearly taller than it is "
+    + "wide, like a market kiosk or a confessional — a flat panelled front, an open doorway on the front face "
+    + "with a heavy deep-red curtain drawn back and tied to one side, and a small slanted writing shelf across "
+    + "the opening at waist height. On the shelf sits a small iron-bound ballot chest with a dark slot cut in "
+    + "its lid, a quill beside it, and a couple of rolled paper ballots. A flat plank awning caps the top. "
+    + "Weathered oak boards, iron nail-heads, iron corner bands. "
+    + "NOT a well: no barrel, no round tub, no hooped cask, no rope, no winch, no crank, no bucket, no stone "
+    + "rim, no pitched shingled roof carried on open posts.";
 
 const PROMPT = `${SUBJECT} ${DIE_CUT} ${HOUSE} Must read clearly at 62 pixels tall — strong outline, few large shapes, no fine detail. ${NEGATIVE}`;
 

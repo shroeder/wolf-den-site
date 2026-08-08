@@ -312,6 +312,16 @@ export default function BossFightClient() {
                     )}
                     {you ? (
                         <>
+                            {/* WHERE YOUR STRIKES COME FROM. Most strike-granting gear does it through a
+                                signature or a set capstone, neither of which appears on the item's stat line —
+                                so "my boots say they give a strike and I only get one" was unanswerable from
+                                anywhere in the UI. Now the cap shows its own arithmetic. */}
+                            {you.strikeSources?.length > 1 ? (
+                                <div className="boss2-strikesrc">
+                                    <strong>{you.strikeCap}</strong> strike{you.strikeCap === 1 ? "" : "s"} a day
+                                    <span className="muted"> = {you.strikeSources.map((s) => `${s.label} +${s.n}`).join(" · ")}</span>
+                                </div>
+                            ) : null}
                             <div className="boss2-you">
                                 <span className="muted">Your damage: <strong>{(you.dmg || 0).toLocaleString()}</strong></span>
                                 <span className="boss2-tix">🎟️ {you.tickets || 0} tickets</span>

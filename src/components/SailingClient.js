@@ -136,6 +136,13 @@ function FragmentIcon({ size = 20, className = "", art = "/images/sailing/fragme
     );
 }
 
+// The best shard tier actually sitting in the hold, for any place that shows a total. `fragmentTiers` arrives
+// worst-first, so the last entry with a count is the prize; an empty hold falls back to wooden.
+function bestHeldFragArt(state) {
+    const held = (state?.fragmentTiers || []).filter((f) => f.count > 0);
+    return held[held.length - 1]?.art || "/images/sailing/fragment-wooden.png";
+}
+
 // Tailwind gust FX: a screen flash, a burst of horizontal SPEED LINES ripping past (the main "we just surged"
 // cue), and a few leaves/debris for texture — all streaming left-to-right across the scene.
 function WindGust() {
@@ -1356,7 +1363,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             this modal, so a long haul must never be able to push it off the bottom. */}
                         <div className="sail-recap-body">
                         <div className={`sail-recap-hero ${result.won ? "is-win" : "is-fail"}`}>
-                            {result.won ? <span className="sail-recap-frag"><FragmentIcon size={70} art={(result.haul && result.haul[0]?.art) || "/images/sailing/fragment-wooden.png"} /></span> : <span className="sail-recap-rock">🪨</span>}
+                            {/* THE SHARD YOU ACTUALLY DUG UP. `haul` is sorted best-tier-first, so haul[0] is the
+                                prize — but the old fallback painted a WOODEN shard whenever haul was empty,
+                                which is every items-only dig, so a haul with no fragments in it still showed a
+                                wooden fragment as its hero. No fragments now means no fragment sprite. */}
+                            {result.won
+                                ? <span className="sail-recap-frag"><FragmentIcon size={70} art={result.haul?.[0]?.art || result.relic?.art || result.items?.find((i) => i.art)?.art || "/images/sailing/dig-chest.png"} /></span>
+                                : <span className="sail-recap-rock">🪨</span>}
                         </div>
                         <h2 style={{ margin: "4px 0" }}>{result.won
                             ? (result.fullArtifact ? "Chest unearthed! 🎁" : "Chest partly uncovered")
@@ -1385,19 +1398,25 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     <b className="sail-recap-pos" style={{ color: h.color }}>+{h.n}</b>
                                 </div>
                             )) : null}
+                            {/* Every consumable has painted art in mkt_consumable_sprite. These rows were
+                                rendering the emoji fallback instead — a generic gift glyph for anything the
+                                emoji table didn't cover — next to shard rows that DO use their sprite. */}
                             {result.items?.length ? result.items.map((it) => (
                                 <div className="sail-recap-row" key={it.id}>
-                                    <span><span style={{ fontSize: "1rem" }}>{it.emoji}</span> {it.name}</span>
+                                    <span>{it.art ? <FragmentIcon size={16} art={it.art} /> : <span style={{ fontSize: "1rem" }}>{it.emoji}</span>} {it.name}</span>
                                     <b className="sail-recap-pos" style={{ color: "#7cffb2" }}>+{it.n}</b>
                                 </div>
                             )) : null}
                             {result.relic ? (
                                 <div className="sail-recap-row sail-recap-relic" title={result.relic.desc}>
-                                    <span><span style={{ fontSize: "1rem" }}>{result.relic.emoji}</span> {result.relic.name} <span className="muted">· rare relic!</span></span>
+                                    <span>{result.relic.art ? <FragmentIcon size={16} art={result.relic.art} /> : <span style={{ fontSize: "1rem" }}>{result.relic.emoji}</span>} {result.relic.name} <span className="muted">· rare relic!</span></span>
                                     <b className="sail-recap-pos" style={{ color: "#ffd75e" }}>+1</b>
                                 </div>
                             ) : null}
-                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} /> {state.fragments}</b></div>
+                            {/* The hold total was always drawn with the WOODEN shard, whatever you were holding —
+                                so a recap could show a gold shard as its hero and a wooden one on the line
+                                directly beneath it. Use the best tier actually in the hold. */}
+                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} art={bestHeldFragArt(state)} /> {state.fragments}</b></div>
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
                         </div>
                         </div>

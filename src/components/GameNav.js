@@ -103,11 +103,21 @@ export default function GameNav() {
     // and a non-owner simply has no Mine in the menu with nothing to see.
     const [mine, setMine] = useState(false);
     const [mineTrips, setMineTrips] = useState(0);
+    // SMELTS COUNT TOO. The badge only ever counted digs, so a member sitting on a full ore stash with no trips
+    // left saw a bare Mine entry and no reason to open it — the furnace half of the feature was invisible from
+    // the menu. `partsReady` is what the ore would actually smelt INTO (not raw ore), so the number promises
+    // something real rather than lighting up for 2 Iron Ore that cannot make a single filing.
+    const [minePartsReady, setMinePartsReady] = useState(0);
     useEffect(() => {
         let dead = false;
         fetch("/api/marketplace/mining", { cache: "no-store", credentials: "same-origin" })
             .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) { setMine(true); setMineTrips(Number(d?.trips?.left) || 0); } })
+            .then((d) => {
+                if (dead || !d?.unlocked) return;
+                setMine(true);
+                setMineTrips(Number(d?.trips?.left) || 0);
+                setMinePartsReady(Number(d?.partsReady) || 0);
+            })
             .catch(() => { /* no mine, no menu entry */ });
         return () => { dead = true; };
     }, [pathname]);
@@ -311,7 +321,10 @@ export default function GameNav() {
         }
         // The Mine, the Dungeons and the Arena all hand out a daily allowance and all three were silent about
         // it — the only features in the menu with something waiting and no way to know from here.
-        if (href === "/marketplace/mining" && mineTrips > 0) return { badge: mineTrips, title: `${plural(mineTrips, "trip")} down the mine` };
+        if (href === "/marketplace/mining" && mineTrips + minePartsReady > 0) {
+            const bits = [mineTrips > 0 ? `${plural(mineTrips, "trip")} down the mine` : null, minePartsReady > 0 ? `${plural(minePartsReady, "part")} ready to smelt` : null].filter(Boolean);
+            return { badge: mineTrips + minePartsReady, title: bits.join(" · ") };
+        }
         if (href === "/marketplace/dungeons" && delveRuns > 0) return { badge: delveRuns, title: `${plural(delveRuns, "dungeon")} you haven't run today` };
         if (href === "/marketplace/arena" && arenaFights > 0) return { badge: arenaFights, title: `${plural(arenaFights, "challenge")} left today` };
         if (href === "/marketplace/fishing" && castsLeft > 0) return { badge: castsLeft, title: `${plural(castsLeft, "cast")} left today` };

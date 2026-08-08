@@ -61,6 +61,23 @@ function dailyStrikeCap({ extraStrike = 0, equippedIds = {}, bonusStrikes = 0 })
     return DAILY_ATTACKS + (extraStrike || 0) + signatureStrikeBonus(equippedIds) + setCapstoneStrikeBonus(equippedIds) + (bonusStrikes || 0);
 }
 
+// The same sum, ITEMISED, so a member can see where their strikes come from. Gear that grants a strike does it
+// through one of four different mechanisms — a raw `extra_strike` stat, an item SIGNATURE, a full-set capstone,
+// or a potion — and only the stat one is printed on the item card. Thunderstride Boots, for instance, list
+// "+12 Might, +18 Ferocity" and grant their extra strike through the Thunderstep signature, so a member wearing
+// them had no way to confirm the boots were doing anything and reasonably concluded they were broken.
+function strikeSources({ extraStrike = 0, equippedIds = {}, bonusStrikes = 0 }) {
+    const sig = signatureStrikeBonus(equippedIds);
+    const capstone = setCapstoneStrikeBonus(equippedIds);
+    return [
+        { label: "Base", n: DAILY_ATTACKS },
+        { label: "Gear & pets", n: extraStrike || 0 },
+        { label: "Gear signatures", n: sig },
+        { label: "Set capstones", n: capstone },
+        { label: "Potions", n: bonusStrikes || 0 },
+    ].filter((s) => s.n > 0);
+}
+
 // The equipped pet's "extra strike" perk is a CHANCE (scales 20%→100% with pet level). Resolve it to 0/1 for
 // TODAY with a DETERMINISTIC per-day roll (same buyer + same Chicago date → same result), so the shown "attacks
 // left" and the enforcer always agree, and it can't be re-rolled by refreshing. Lv5 (100%) → always +1.
@@ -527,7 +544,8 @@ export async function getBossState(buyerId = null) {
             activeBoosts(buyerId).catch(() => []),
             getPetCombatBonus(buyerId).catch(() => ({ stats: {} })),
         ]);
-        const dailyCap = dailyStrikeCap({ extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0) + petExtraStrikeToday(buyerId, myPet?.proc?.extraStrikeChance || 0), equippedIds: myIds, bonusStrikes });
+        const capArgs = { extraStrike: (myStats.extra_strike || 0) + (myPet?.stats?.extra_strike || 0) + petExtraStrikeToday(buyerId, myPet?.proc?.extraStrikeChance || 0), equippedIds: myIds, bonusStrikes };
+        const dailyCap = dailyStrikeCap(capArgs);
         const mine = roster.find((r) => r.you);
         const dmg = mine?.dmg || 0;
         const goldRow = await db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(xp, 0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
@@ -542,7 +560,7 @@ export async function getBossState(buyerId = null) {
         // number you see for yourself is the same number everyone else sees for you — no more mismatches.
         const myDmgTickets = mine?.dmgTickets ?? Math.floor(dmg / divisor);
         const myFortuneTickets = mine?.fortuneTickets ?? fortuneTickets(myPet?.stats?.fortune || 0, boss);
-        you = { attacksLeft: Math.max(0, dailyCap - used), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        you = { attacksLeft: Math.max(0, dailyCap - used), strikeCap: dailyCap, strikeSources: strikeSources(capArgs), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
