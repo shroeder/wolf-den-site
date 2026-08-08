@@ -265,18 +265,14 @@ function oneAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}
 }
 
 /**
- * EVERY GUN GETS ITS OWN ORDER, and the whole broadside no longer has to go to one place.
+ * EVERY GUN GETS ITS OWN ORDER. Nothing is assigned for you.
  *
- * The first cut of this fired everything at a single target, because laying seven guns one at a time is
- * bookkeeping. But a gun deck that can only ever do ONE job a round throws away the actual decision — chain
- * into her canvas while grape takes a cannon off her is a plan, and "all of it at the hull" is not.
+ * There was briefly a "followers" rule — guns you had not laid tagged along with the first target you picked,
+ * so pointing the whole broadside somewhere stayed a single tap. It was the wrong trade: it meant a tap did
+ * something to five other guns, and the deck kept committing itself to one place, which is the exact thing
+ * splitting the broadside exists to stop. A gun fires where you sent it or it does not fire.
  *
- * The simple case stays one tap: guns you did not lay FOLLOW the first target you picked. Splitting is opt-in
- * and costs one extra tap per gun, so a player who wants to point and fire still points and fires — and the
- * scene shows the followers in the count on the marker, so what is on screen is what will happen.
- *
- * Followers carry ROUND SHOT whatever is loaded. Ammunition is spent per gun now, and quietly spending five
- * shells because somebody tapped once with shells selected is the kind of bill nobody agrees to.
+ * Ammunition is per gun, so an order carries its own round too.
  */
 export function sanitizeAims(st, who, list, opts = {}) {
     const s = who === "me" ? st.me : st.foe;
@@ -285,13 +281,10 @@ export function sanitizeAims(st, who, list, opts = {}) {
     for (const raw of Array.isArray(list) ? list : []) {
         const gun = Number(raw?.gun);
         if (!live.includes(gun) || byGun.has(gun)) continue;
-        byGun.set(gun, oneAim(st, who, raw, opts));
+        byGun.set(gun, { gun, ...oneAim(st, who, raw, opts) });
     }
-    const lead = byGun.size ? byGun.values().next().value : oneAim(st, who, {}, {});
-    return live.map((gun) => {
-        const own = byGun.get(gun);
-        return own ? { gun, ...own } : { gun, ...lead, ammo: "round", follower: true };
-    });
+    // Kept in gun order rather than tap order so the volley reads down the deck as it plays.
+    return live.filter((g) => byGun.has(g)).map((g) => byGun.get(g));
 }
 
 // ── WHAT THE ENEMY DOES ──────────────────────────────────────────────────────────────────────────────────────
@@ -400,14 +393,23 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) 
     if (st.gauge === "me") { fire("me", mine); fire("foe", theirs); }
     else { fire("foe", theirs); fire("me", mine); }
 
+    // IT ENDS WHEN A SHIP GOES DOWN. There used to be a fourteen-round limit and a winner decided on which
+    // hull had the greater share of itself left, which is how a fight both captains were still fighting got
+    // called a draw and handed to somebody — "broke off and ran after 14 rounds" while both decks still had
+    // guns. Two ships in range of each other resolve it.
+    //
+    // The ONE exception is a fight that cannot resolve: if neither deck has a gun left standing, nothing can
+    // happen for the rest of time, so it is called there on the healthier hull. That is a stalemate, not a
+    // clock — nobody can die, which is the only case the rule has to cover.
     const sunk = st.foe.hp <= 0 ? "foe" : st.me.hp <= 0 ? "me" : null;
-    const outOfRounds = st.round >= MAX_ROUNDS;
-    const over = Boolean(sunk) || outOfRounds;
-    const win = sunk === "foe" || (!sunk && outOfRounds && st.me.hp / st.me.max >= st.foe.hp / st.foe.max);
-    return { events, state: st, over, win, sunk, mine, theirs };
+    const gunless = gunsReady(st.me) === 0 && gunsReady(st.foe) === 0;
+    const over = Boolean(sunk) || gunless;
+    const win = sunk === "foe" || (!sunk && gunless && st.me.hp / st.me.max >= st.foe.hp / st.foe.max);
+    return { events, state: st, over, win, sunk, stalemate: !sunk && gunless, mine, theirs };
 }
 
-export const MAX_ROUNDS = 14;
+// Kept only so a screen can say how long a fight has run; nothing ends on it any more.
+export const MAX_ROUNDS = null;
 
 // ── HOW A MATCHUP WILL ACTUALLY GO ───────────────────────────────────────────────────────────────────────────
 // Matchmaking needs one number for "is this a fair fight", and the first version of this was a ratio of guns

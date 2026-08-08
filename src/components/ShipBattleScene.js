@@ -468,13 +468,18 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         return last ? targets.find((t) => t.zone === last.zone && (t.target ?? null) === (last.target ?? null)) || null : null;
     }, [aim, targets]);
 
-    /** How many guns end up at this marker, followers included — what the count on it has to say. */
-    const gunsAt = useCallback((zone, target) => {
-        const same = (a) => a.zone === zone && (a.target ?? null) === (target ?? null);
-        const own = aim.filter(same).length;
-        const isLead = aim.length > 0 && same(aim[0]);
-        return own + (isLead ? Math.max(0, liveGuns.length - aim.length) : 0);
-    }, [aim, liveGuns]);
+    /** How many guns are on this marker. Every one of them was put there by hand — nothing follows anything. */
+    const gunsAt = useCallback((zone, target) => (
+        aim.filter((a) => a.zone === zone && (a.target ?? null) === (target ?? null)).length
+    ), [aim]);
+    const allLaid = liveGuns.length > 0 && aim.length >= liveGuns.length;
+    // WHAT THIS VOLLEY COSTS, before you fire it. Every gun carries its own round, so tapping four times with
+    // grape selected buys four grape — visible in the rail as colour, but the bill should be a number.
+    const volleyCost = useMemo(() => aim.reduce((sum, a) => {
+        const r = rack.find((x) => x.id === a.ammo);
+        return sum + (r && !r.basic ? (r.price || 0) : 0);
+    }, 0), [aim, rack]);
+    const leftToLay = Math.max(0, liveGuns.length - aim.length);
 
     // Keep the orders honest when the board changes under them — a cannon you laid a gun on can be wreckage by
     // the time you look again, and an order against something that no longer exists must not survive.
@@ -653,10 +658,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [log]);
 
     const fire = useCallback(() => {
-        if (!aim.length || busy) return;
+        if (!allLaid || busy) return;
         setBalls([]);
         onVolley?.(aim);
-    }, [aim, busy, onVolley]);
+    }, [aim, allLaid, busy, onVolley]);
 
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
@@ -749,9 +754,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         <Icon name={picked?.icon || "GiTargeting"} className="sbt-zoneicon" />
                         <div>
                             <b>{picked ? picked.name : "Pick your target"}</b>
-                            <em>{picked
-                                ? `${picked.effect}${nextGun == null ? "" : "  ·  tap again to send another gun"}`
-                                : "Tap a part of her ship. Tap another to split the broadside."}</em>
+                            <em>{allLaid ? picked?.effect || "Every gun is laid."
+                                : picked ? `${picked.effect}  ·  ${leftToLay} gun${leftToLay === 1 ? "" : "s"} still to lay`
+                                : "Tap a part of her ship — one gun each tap."}</em>
                         </div>
                         {picked ? <span className="sbt-odds">{Math.round(picked.chance * 100)}%</span> : null}
                     </div>
@@ -792,10 +797,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         })}
                     </div>
 
-                    <button type="button" className={`sbt-fire${aim.length ? " is-ready" : ""}`}
-                        disabled={!aim.length || busy || phase !== "aim"} onClick={fire}>
-                        <b>FIRE</b>
-                        <em>{aim.length ? `${liveGuns.length} gun${liveGuns.length === 1 ? "" : "s"}` : "no target"}</em>
+                    {/* EVERY GUN, THEN FIRE. Nothing follows anything, so a barrel with no order would simply
+                        not go off — better to wait for it than to waste it silently. */}
+                    <button type="button" className={`sbt-fire${allLaid ? " is-ready" : ""}`}
+                        disabled={!allLaid || busy || phase !== "aim"} onClick={fire}>
+                        <b>{allLaid ? "FIRE" : `${aim.length}/${liveGuns.length}`}</b>
+                        <em>{allLaid
+                            ? `${liveGuns.length} gun${liveGuns.length === 1 ? "" : "s"}${volleyCost ? ` · ${volleyCost}` : ""}`
+                            : `lay ${leftToLay} more`}</em>
                     </button>
                 </div>
             ) : null}
@@ -839,9 +848,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                             {win ? (battle?.sunk === "foe" ? "Sunk!" : "Victory") : (battle?.sunk === "me" ? "Sent to the bottom" : "Driven off")}
                         </div>
                         <p className="sbt-result-line">
-                            {win
-                                ? <>{foe.name} {battle?.sunk === "foe" ? "went down by the bow" : "broke off and ran"} after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>
-                                : <>{foe.name} had the better of it after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>}
+                            {battle?.sunk
+                                ? (win
+                                    ? <>{foe.name} went down by the bow after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>
+                                    : <>{foe.name} put you under after {battle?.round} round{battle?.round === 1 ? "" : "s"}.</>)
+                                : <>Not a gun left standing on either deck after {battle?.round} round{battle?.round === 1 ? "" : "s"} — {win ? "you were the healthier ship" : `${foe.name} was the healthier ship`}.</>}
                         </p>
                         {battle?.reward?.length ? (
                             <div className="sbt-rewards">

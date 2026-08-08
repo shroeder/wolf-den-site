@@ -15,7 +15,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
-         SAILS_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
+         SAILS_MAX, GUN_HP, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
@@ -1948,7 +1948,7 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
         saved,
     ),
     myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
-    round: st.round, maxRounds: MAX_ROUNDS,
+    round: st.round,
     gauge: st.gauge,
     // WHAT EACH SHIP HAS LEFT TO LOSE. Canvas and every individual barrel — the scene draws both on the
     // hulls themselves (shredded sails, a dismounted gun), which is what makes aiming somewhere other than
@@ -1967,7 +1967,7 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, effect: z.effect, blurb: z.blurb })),
     // THE RACKS. One round is spent per volley, so the scene shows what is left as you pick.
     rack: AMMO_LIST.map((a) => ({
-        id: a.id, name: a.name, icon: a.icon, basic: a.basic, tint: a.id,
+        id: a.id, name: a.name, icon: a.icon, basic: a.basic, tint: a.id, price: a.price,
         count: a.basic ? null : Number(ammoStock(row)[a.id]) || 0,
     })),
     loadout: row?.loadout || "round",

@@ -6,7 +6,7 @@ import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
-import { shipProfile, foeProfile, initBattleState, resolveVolley, AMMO_LIST, SAILS_MAX, GUN_HP, MAX_ROUNDS } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveVolley, AMMO_LIST, SAILS_MAX, GUN_HP } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
@@ -35,7 +35,7 @@ export default function BattleLab() {
         // The same number the server sends, so the odds on every marker are the odds in the dice.
         myAccuracy: meta.acc ?? 0.7,
         myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
-        round: st.round, maxRounds: MAX_ROUNDS, gauge: st.gauge,
+        round: st.round, gauge: st.gauge,
         sys: {
             me: { sails: st.me.sails, guns: st.me.guns },
             foe: { sails: st.foe.sails, guns: st.foe.guns },
