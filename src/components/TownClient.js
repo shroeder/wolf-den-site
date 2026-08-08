@@ -1662,10 +1662,15 @@ export default function TownClient({ initial }) {
                                 {flying.map((f) => (
                                     <span key={f.id} className="tw-fruit-fly" style={{ "--from": `${f.from}px`, "--to": `${f.to}px`, "--spin": `${f.spin}deg`, animationDelay: `${f.delay}ms` }} aria-hidden="true">🍅</span>
                                 ))}
-                                {/* The charge sheet, nailed up beside him. */}
+                                {/* THE CHARGE SHEET, nailed up beside them — and it reads the ACTUAL charge now.
+                                    It was hardcoded to "EXPLOITATION & ABUSE / attempted to ruin the game for
+                                    the wolf pack", which was right when the stockade only ever held a caught
+                                    cheater. The town elects people into it now on joke charges, so a board
+                                    that always says the same grave thing is both wrong and unfunny — the crime
+                                    is the whole joke and the sign is where you read it. */}
                                 <div className="tw-stock-sign">
-                                    <div className="tw-stock-sign-title">EXPLOITATION<br />&amp; ABUSE</div>
-                                    <div className="tw-stock-sign-body">attempted to ruin the game for the wolf pack</div>
+                                    <div className="tw-stock-sign-title">BY ORDER<br />OF THE DEN</div>
+                                    <div className="tw-stock-sign-body">{stockade.occupant.reason || "conduct unbecoming"}</div>
                                 </div>
                             </div>
                             <div className="tw-stock-name">{stockade.occupant.name}</div>
