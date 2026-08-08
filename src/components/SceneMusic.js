@@ -46,6 +46,10 @@ const VIBES = {
 const PLACE = {
     "top-right": { top: 10, right: 10 },
     "bottom-left": { bottom: 10, left: 10 },
+    // "inline" opts OUT of absolute positioning entirely, so a scene can place this button in its own layout
+    // instead of guessing a corner. The ship battle needs it: every corner of that scene is occupied by
+    // something, and a fallback to top-right put the toggle on the enemy's name.
+    inline: null,
 };
 
 export default function SceneMusic({ vibe = "town", place = "top-right" }) {
@@ -152,7 +156,7 @@ export default function SceneMusic({ vibe = "town", place = "top-right" }) {
 
     return (
         <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? `Play ${vibe} music` : "Mute music"}
-            style={{ position: "absolute", ...(PLACE[place] || PLACE["top-right"]), zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
+            style={{ ...(place === "inline" ? { position: "static", flex: "0 0 auto" } : { position: "absolute", ...(PLACE[place] || PLACE["top-right"]) }), zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
             {muted ? "🔇" : "🎵"}
         </button>
     );

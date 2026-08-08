@@ -13713,16 +13713,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* CLOSED, IT IS JUST A PILL. Nothing but the toggle occupies the stage until you open the log, so the strip
    it used to hold — over the masts at the top, over the order cards at the bottom — is free again. Right-hand
    side, out of the way of both hulls. */
-/* TOP-RIGHT OF THE STAGE, and this is the last time it moves. Anchored to the top it covered the masts;
-   anchored to the bottom it covered the order cards. The one genuinely empty strip in this scene is the band
-   between the HUD and the ships, so the toggle lives there and the log opens downward into the water — which
-   is the only region of the stage nothing else occupies. 106px clears the HUD cards: at top:8 it sat straight
-   over the enemy's name, which is the third thing this button has managed to cover. */
-.sbt-logwrap { position: absolute; z-index: 6; right: 10px; top: 106px; display: flex;
-    flex-direction: column-reverse; align-items: flex-end; gap: 5px; pointer-events: none; }
-/* Open, it takes the width it needs and hangs under its own button. */
-.sbt-logwrap.is-open { left: 10px; align-items: stretch; }
-.sbt-logwrap.is-empty { display: none; }
+/* IN NORMAL FLOW, DIRECTLY AFTER THE HUD. Absolute positioning is what kept putting this on top of things:
+   top:8 covered the enemy's name, top:96 covered the masts, bottom:8 covered the order cards, and top:106 was
+   a number measured off the dev lab, whose HUD is shorter than the real page's — so it landed inside the cards
+   again. There is no magic offset that is right on every screen. Sitting after the HUD in the document means
+   it CANNOT overlap it, on any device, without anyone having to measure anything.
+   The open log still floats, anchored to this wrapper, so reading it never shoves the ships down the page. */
+.sbt-logwrap { position: relative; z-index: 6; margin: 6px 10px 0; display: flex; align-items: center;
+    justify-content: space-between; gap: 8px; pointer-events: none; }
+.sbt-logwrap > button { pointer-events: auto; }
+.sbt-log { position: absolute; top: calc(100% + 5px); left: 0; right: 0; }
+
 /* A SHIP'S LOG, not a console. It was bare text on a flat dark rectangle — the one panel in the fight that
    looked like debug output. Now it is parchment-toned, ruled like a ledger, with a rope-coloured edge and a
    gold seam along the top so it reads as a page pinned to the deck. */
@@ -13838,7 +13839,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .sbt-orders { max-width: 900px; margin-left: auto; margin-right: auto; }
     /* The log is absolutely positioned now, and `margin: auto` does nothing for that — it stretched the full
        width of a desktop window while the HUD above it stayed capped at 900. Centre it explicitly. */
-    .sbt-logwrap { left: 50%; right: auto; transform: translateX(-50%); width: min(900px, calc(100% - 20px)); }
+    .sbt-logwrap { width: min(900px, calc(100% - 20px)); margin-left: auto; margin-right: auto; }
     .sbt-hud { max-width: 900px; margin: 0 auto; }
 }
 /* Tab pills shared by the sailing boards and the gun deck. They lived in SailingBoards' scoped <style jsx>,

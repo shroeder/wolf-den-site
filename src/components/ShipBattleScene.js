@@ -445,7 +445,6 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
             <div className="sbt-motes" aria-hidden="true">
                 {MOTES.map((m, i) => <i key={i} style={{ left: `${m.x}%`, animationDelay: `${m.d}s`, animationDuration: `${m.t}s`, "--mz": m.z }} />)}
             </div>
-            <SceneMusic vibe="seabattle" place="top-left" />
 
             <div className="sbt-hud">
                 <Bar f={me} hp={myHp} max={battle?.myMax} side="me" rigged={battle?.rigged?.me} burning={battle?.burning?.me} />
@@ -454,6 +453,31 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                     <em>{battle?.gauge === "me" ? "you hold the gauge" : "they hold the gauge"}</em>
                 </div>
                 <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" rigged={battle?.rigged?.foe} burning={battle?.burning?.foe} />
+            </div>
+
+            {/* CLOSED BY DEFAULT, BEHIND ITS OWN BUTTON. The log has now covered the masts (anchored to the top)
+                and then the order cards (anchored to the bottom), because there is no free strip on a phone
+                between two ships and four buttons — every position it can hold is on top of something you need.
+                So it holds nothing until you ask for it: a pill that says how many lines are waiting, and the
+                log only exists on screen while it is open. The fight is the thing you watch; the transcript is
+                something you check. */}
+            <div className={`sbt-logwrap${logOpen ? " is-open" : ""}`}>
+                {/* Music shares this row. Every corner of this scene is occupied — HUD at the top, ships in the
+                    middle, orders below — so the two chrome buttons live in the one strip that is genuinely
+                    free, in flow, where neither can land on anything. */}
+                <SceneMusic vibe="seabattle" place="inline" />
+                {logOpen ? (
+                    <div className="sbt-log is-open" ref={logRef}>
+                        {log.map((l) => (
+                            <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
+                        ))}
+                    </div>
+                ) : null}
+                {log.length ? (
+                    <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}`} onClick={() => setLogOpen((o) => !o)}>
+                        {logOpen ? "Hide log" : `Battle log · ${log.length}`}
+                    </button>
+                ) : null}
             </div>
 
             <div className={`sbt-shakewrap${shake ? (shake.big ? " is-quake" : " is-shake") : ""}`}>
@@ -484,26 +508,6 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 the two ships you are trying to look at while choosing an order. So it is COLLAPSED by default
                 to the last couple of lines — enough to see what just happened — and taps open to the whole
                 fight. The information never goes away; it just stops being in front of the thing it describes. */}
-            {/* CLOSED BY DEFAULT, BEHIND ITS OWN BUTTON. The log has now covered the masts (anchored to the top)
-                and then the order cards (anchored to the bottom), because there is no free strip on a phone
-                between two ships and four buttons — every position it can hold is on top of something you need.
-                So it holds nothing until you ask for it: a pill that says how many lines are waiting, and the
-                log only exists on screen while it is open. The fight is the thing you watch; the transcript is
-                something you check. */}
-            <div className={`sbt-logwrap${log.length ? "" : " is-empty"}${logOpen ? " is-open" : ""}`}>
-                {logOpen ? (
-                    <div className="sbt-log is-open" ref={logRef}>
-                        {log.map((l) => (
-                            <p key={l.k} className={`sbt-logline is-${l.side}${l.big ? " is-big" : ""}`}>{l.text}</p>
-                        ))}
-                    </div>
-                ) : null}
-                {log.length ? (
-                    <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}`} onClick={() => setLogOpen((o) => !o)}>
-                        {logOpen ? "Hide log" : `Battle log · ${log.length}`}
-                    </button>
-                ) : null}
-            </div>
 
             {/* ORDERS — the reason this is a fight rather than a cutscene, so this is where the juice goes.
                 The icons were react-icons glyphs: one flat colour on a flat card, at the single moment the
