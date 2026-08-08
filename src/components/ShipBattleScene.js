@@ -533,15 +533,20 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 The icons were react-icons glyphs: one flat colour on a flat card, at the single moment the
                 player is actually deciding something. They are painted sprites now, and the card carries its
                 order's colour rather than being four identical dark rectangles. */}
-            {phase === "orders" && !battle?.over ? (
-                <div className="sbt-orders">
+            {/* THE BOARD STAYS PUT WHILE THE VOLLEY PLAYS. This used to unmount the whole order block the moment
+                you tapped and remount it when the round finished — so the controls vanished, the page got
+                shorter, everything below jumped up, and then it all came back. Rendered continuously now and
+                simply made inert during the exchange: the layout never moves, and the cards visibly go quiet
+                while the guns are talking. Only a finished battle removes them, because then they are done. */}
+            {!battle?.over ? (
+                <div className={`sbt-orders${phase === "orders" ? "" : " is-waiting"}`}>
                     <div className="sbt-orders-call">Give the order</div>
                     {(battle?.orders || []).map((o) => (
                         // `available` is false for the pump until you are taking water. Dimmed and inert rather
                         // than removed, so the grid never reflows under a thumb mid-fight.
                         <button key={o.id} type="button"
                             className={`sbt-order is-${o.id}${o.available === false ? " is-unavailable" : ""}`}
-                            disabled={busy || o.available === false}
+                            disabled={busy || o.available === false || phase !== "orders"}
                             onClick={() => give(o.id)}>
                             <span className="sbt-order-shine" aria-hidden="true" />
                             <span className="sbt-order-art" aria-hidden="true">

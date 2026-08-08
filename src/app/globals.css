@@ -13103,8 +13103,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* A DARK waterline, not a white one. This was a white radial ellipse, which on a dark sea read as a lit
    shadow under a floating boat rather than as a hull sitting IN water — it was the thing that made the ships
    look pasted onto the background. Dark and tighter: it reads as displaced water beneath the keel. */
-.sbt-wake { position: absolute; left: 14%; right: 14%; bottom: -4px; height: 8px; border-radius: 50%;
-    background: radial-gradient(50% 100% at 50% 50%, rgba(2,10,20,0.5), transparent 72%); }
+/* NO WAKE AT ALL. It was a white ellipse (a lit shadow under a floating boat), then a dark one, and neither
+   earned its place — the hull sprites already sit on the sea convincingly and anything drawn under them just
+   reads as a smudge the ship is hovering over. Removed rather than tuned again. */
+.sbt-wake { display: none; }
 
 /* SINKING — bow down, slow, and the sea closes over it. */
 .sbt-ship.is-sinking { animation: sbtSink 2.6s cubic-bezier(.55,0,.85,.4) forwards; }
@@ -13928,3 +13930,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    inert so it never looks like something that failed to work. */
 .sbt-order.is-unavailable { opacity: 0.34; filter: saturate(0.4); cursor: default; }
 .sbt-order.is-unavailable .sbt-order-shine { display: none; }
+
+/* The order board while a volley resolves: still there, still the same size, plainly not accepting taps. */
+.sbt-orders.is-waiting { opacity: 0.55; filter: saturate(0.75); }
+.sbt-orders.is-waiting .sbt-order-shine { display: none; }
