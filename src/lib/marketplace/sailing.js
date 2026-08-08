@@ -2027,7 +2027,12 @@ const battleView = (st, meta, saved = {}) => ({
     leaks: { me: st.myLeaks || 0, foe: st.foeLeaks || 0 },
     // "Man the pumps" only exists while YOU are taking water — ordersFor decides, server-side, so the client
     // cannot offer a pump on a dry ship and the server does not have to refuse one.
-    orders: ordersFor(st.myLeaks || 0).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+    // ALL FIVE, ALWAYS, with the pump marked unavailable until you are actually taking water. Sending four
+    // orders and then five the moment a leak opened made the whole grid reflow mid-fight — cards moving under
+    // a thumb that is already reaching for one. A stable board that dims what you cannot use beats a board
+    // that rearranges itself.
+    orders: ordersFor(1).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc,
+        available: o.id !== "patch" || (st.myLeaks || 0) > 0 })),
 });
 
 // Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.

@@ -37,7 +37,7 @@ export default function BattleLab() {
         burning: { me: st.myFire || 0, foe: st.foeFire || 0 },
         // ordersFor, not ORDER_LIST — otherwise the lab can never show "Man the pumps" and the one order
         // that needs testing against a live leak is the one you cannot reach here.
-        orders: ordersFor(st.myLeaks || 0).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc })),
+        orders: ordersFor(1).map((o) => ({ id: o.id, name: o.name, icon: o.icon, desc: o.desc, available: o.id !== 'patch' || (st.myLeaks || 0) > 0 })),
         events: events || [], over: Boolean(over), win, sunk, reward,
     });
 

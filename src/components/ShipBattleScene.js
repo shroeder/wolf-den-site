@@ -183,6 +183,21 @@ function Volley({ ev }) {
                     style={{ animationDelay: `${i * 52}ms`, "--lane": `${((i % 4) - 1.5) * 11}px` }}
                 />
             ))}
+            {/* EVERY MISS LANDS SOMEWHERE. A shot that missed simply stopped existing, so accuracy — a stat you
+                spend doubloons on — had no visible consequence. Now the sea takes it: a plume, a ring and
+                droplets, short of the target so it reads as fallen short rather than blocked. Staggered with
+                the gun that fired it, so a ragged broadside throws a ragged row of splashes. */}
+            {shots.map((s, i) => (s.hit ? null : (
+                <span key={`sp${i}`} className="sbt-splash"
+                    style={{ [dir === "to-foe" ? "left" : "right"]: `${62 + (i % 3) * 6}%`,
+                        bottom: `${16 + ((i % 4) - 1.5) * 5}%`, animationDelay: `${i * 52}ms` }}>
+                    <i style={{ animationDelay: `${i * 52 + 300}ms` }} />
+                    <b style={{ animationDelay: `${i * 52 + 300}ms` }} />
+                    {SPRAY.map((d, k) => (
+                        <u key={k} style={{ "--dx": d[0], "--dy": d[1], "--dd": `${i * 52 + 320}ms` }} />
+                    ))}
+                </span>
+            )))}
         </span>
     );
 }
@@ -190,6 +205,8 @@ function Volley({ ev }) {
 // Where the splinters go. A fixed spread rather than Math.random() so a broadside looks the same shape every
 // time it lands — a burst that reshuffles every volley reads as noise, not as damage. Angles favour the sides
 // and up, because debris coming straight at the camera is invisible.
+// Droplet vectors for a splash — fixed, so every one is the same shape.
+const SPRAY = [[-26,-20],[-15,-30],[0,-34],[15,-30],[26,-20],[-20,-8],[20,-8]];
 const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
 
 // How wide one cannon can be drawn without touching its neighbour. Measured off the real gap between the two
@@ -473,11 +490,14 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                         ))}
                     </div>
                 ) : null}
-                {log.length ? (
-                    <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}`} onClick={() => setLogOpen((o) => !o)}>
-                        {logOpen ? "Hide log" : `Battle log · ${log.length}`}
-                    </button>
-                ) : null}
+                {/* ALWAYS RENDERED, never conditional. This used to appear only once the log had lines in it, so
+                    the row silently grew a button partway through round one and the layout under it shifted —
+                    the same class of thing as orders coming and going. It is disabled and dimmed when there is
+                    nothing to read instead, so the chrome stays exactly where it was when you last looked. */}
+                <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}${log.length ? "" : " is-idle"}`}
+                    disabled={!log.length} onClick={() => setLogOpen((o) => !o)}>
+                    {logOpen ? "Hide log" : `Battle log${log.length ? ` · ${log.length}` : ""}`}
+                </button>
             </div>
 
             <div className={`sbt-shakewrap${shake ? (shake.big ? " is-quake" : " is-shake") : ""}`}>
@@ -517,7 +537,11 @@ export default function ShipBattleScene({ battle, busy, onOrder, onClose }) {
                 <div className="sbt-orders">
                     <div className="sbt-orders-call">Give the order</div>
                     {(battle?.orders || []).map((o) => (
-                        <button key={o.id} type="button" className={`sbt-order is-${o.id}`} disabled={busy}
+                        // `available` is false for the pump until you are taking water. Dimmed and inert rather
+                        // than removed, so the grid never reflows under a thumb mid-fight.
+                        <button key={o.id} type="button"
+                            className={`sbt-order is-${o.id}${o.available === false ? " is-unavailable" : ""}`}
+                            disabled={busy || o.available === false}
                             onClick={() => give(o.id)}>
                             <span className="sbt-order-shine" aria-hidden="true" />
                             <span className="sbt-order-art" aria-hidden="true">

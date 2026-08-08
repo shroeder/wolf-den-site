@@ -13100,8 +13100,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-ship.is-hurt .sbt-hull { animation: sbtHurt .3s ease; }
 @keyframes sbtHurt { 0%,100% { filter: none; } 40% { filter: brightness(1.9) saturate(0.4); } }
 .sbt-ship.is-low .sbt-hull { filter: drop-shadow(0 0 12px rgba(255,90,60,0.55)); }
-.sbt-wake { position: absolute; left: 8%; right: 8%; bottom: -6px; height: 10px; border-radius: 50%;
-    background: radial-gradient(50% 100% at 50% 50%, rgba(255,255,255,0.35), transparent 70%); }
+/* A DARK waterline, not a white one. This was a white radial ellipse, which on a dark sea read as a lit
+   shadow under a floating boat rather than as a hull sitting IN water — it was the thing that made the ships
+   look pasted onto the background. Dark and tighter: it reads as displaced water beneath the keel. */
+.sbt-wake { position: absolute; left: 14%; right: 14%; bottom: -4px; height: 8px; border-radius: 50%;
+    background: radial-gradient(50% 100% at 50% 50%, rgba(2,10,20,0.5), transparent 72%); }
 
 /* SINKING — bow down, slow, and the sea closes over it. */
 .sbt-ship.is-sinking { animation: sbtSink 2.6s cubic-bezier(.55,0,.85,.4) forwards; }
@@ -13722,6 +13725,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-logwrap { position: relative; z-index: 6; margin: 6px 10px 0; display: flex; align-items: center;
     justify-content: space-between; gap: 8px; pointer-events: none; }
 .sbt-logwrap > button { pointer-events: auto; }
+/* Present but inert until there is something to read — see the note on the toggle. */
+.sbt-logtoggle.is-idle { opacity: 0.45; cursor: default; }
 .sbt-log { position: absolute; top: calc(100% + 5px); left: 0; right: 0; }
 
 /* A SHIP'S LOG, not a console. It was bare text on a flat dark rectangle — the one panel in the fight that
@@ -13882,3 +13887,44 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border-radius: 999px; font-size: 0.86rem; font-weight: 900; color: #2a1a06;
     background: linear-gradient(180deg, #ffe27a, #e0a63a); border: 1px solid rgba(255,240,190,0.7); }
 .sby-lockerprice img { width: 17px; height: 17px; object-fit: contain; }
+
+
+/* ── A MISS LANDS IN THE SEA ──────────────────────────────────────────────────────────────────────────────
+   A shot that missed used to simply stop existing, so accuracy — a stat you buy with doubloons — had no
+   visible consequence at all. Now it throws a column of water where it fell: a rising plume, a spreading
+   ring on the surface, and droplets thrown out sideways. Placed at the end of the miss arc rather than on
+   the ship, because the whole point is that it did NOT reach them. */
+.sbt-splash { position: absolute; z-index: 4; pointer-events: none; width: 74px; height: 74px;
+    transform: translate(-50%, -60%); }
+.sbt-splash i { position: absolute; left: 50%; bottom: 0; width: 15px; height: 40px; margin-left: -7.5px;
+    border-radius: 50% 50% 40% 40%; background: linear-gradient(180deg, rgba(228,246,255,0.95), rgba(120,190,230,0.35));
+    animation: sbtPlume .62s cubic-bezier(.15,.8,.4,1) both; }
+@keyframes sbtPlume {
+    0% { transform: scaleY(0.15) scaleX(0.7); opacity: 0; }
+    28% { transform: scaleY(1.15) scaleX(1); opacity: 1; }
+    100% { transform: scaleY(0.2) scaleX(1.5); opacity: 0; }
+}
+/* The ring left on the surface — what tells you the sea took it. */
+.sbt-splash b { position: absolute; left: 50%; bottom: -3px; width: 54px; height: 14px; margin-left: -27px;
+    border-radius: 50%; border: 2px solid rgba(214,240,255,0.75); border-top-color: transparent;
+    animation: sbtRing .66s ease-out both; }
+@keyframes sbtRing {
+    0% { transform: scale(0.25); opacity: 0; }
+    30% { opacity: 0.95; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+/* Droplets. A fixed spread, not Math.random(), so every splash is the same shape — a burst that reshuffles
+   each time reads as noise rather than as water. */
+.sbt-splash u { position: absolute; left: 50%; bottom: 8px; width: 5px; height: 5px; margin-left: -2.5px;
+    border-radius: 50%; background: rgba(228,246,255,0.95);
+    animation: sbtDrop .6s cubic-bezier(.2,.7,.5,1) both; animation-delay: var(--dd, 0ms); }
+@keyframes sbtDrop {
+    0% { transform: translate(0,0) scale(1); opacity: 0; }
+    18% { opacity: 1; }
+    100% { transform: translate(calc(var(--dx) * 1px), calc(var(--dy) * 1px)) scale(0.4); opacity: 0; }
+}
+
+/* An order you cannot give right now — the pump on a dry ship. Present so the board never rearranges, plainly
+   inert so it never looks like something that failed to work. */
+.sbt-order.is-unavailable { opacity: 0.34; filter: saturate(0.4); cursor: default; }
+.sbt-order.is-unavailable .sbt-order-shine { display: none; }
