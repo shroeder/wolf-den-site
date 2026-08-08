@@ -173,7 +173,7 @@ export const SYSTEM_PERK_CAP = {
     sea_dredge: 20,     // treasure instead of a fish
     sea_plunder: 35,    // raid + sea-merchant gold
     kitchen_heat: 25,   // tier bump
-    kitchen_larder: 25, // free ingredients
+    kitchen_larder: 12, // free ingredients — halved with the Larder track; the two stack into one roll
     kitchen_portion: 30, // second helping — doubles the whole reward, so it stays under a third
     kitchen_prep: 35,    // an extra prepped ingredient; cheapest of the kitchen perks, so the loosest
     recipe_nose: 40,    // multiplies drop odds that are already small
