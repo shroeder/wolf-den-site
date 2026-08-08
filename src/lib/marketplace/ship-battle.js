@@ -277,12 +277,27 @@ function oneAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}
 export function sanitizeAims(st, who, list, opts = {}) {
     const s = who === "me" ? st.me : st.foe;
     const live = s.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
+    if (!live.length) return [];
+
+    // ONE ORDER, NOT A LIST, is what an older client sends — and for a week it was the only shape there was.
+    // Dropping it on the floor made a volley where NOTHING fired: no balls, no damage, no reason on screen.
+    // A client that has not been reloaded still gets the fight it asked for, aimed the way it asked for it.
+    const orders = Array.isArray(list) ? list
+        : (list && typeof list === "object") ? live.map((gun) => ({ ...list, gun }))
+        : [];
+
     const byGun = new Map();
-    for (const raw of Array.isArray(list) ? list : []) {
+    for (const raw of orders) {
         const gun = Number(raw?.gun);
         if (!live.includes(gun) || byGun.has(gun)) continue;
         byGun.set(gun, { gun, ...oneAim(st, who, raw, opts) });
     }
+
+    // A BROADSIDE THAT FIRES NOTHING IS ALWAYS A BUG, never an outcome. Whatever arrived — a stale shape, gun
+    // numbers from a fight that has moved on, an empty array — a ship with guns loosed off SOMETHING. Round
+    // shot at the hull is the honest default: it costs nothing, so a fallback can never spend a rack.
+    if (!byGun.size) return live.map((gun) => ({ gun, ...oneAim(st, who, {}, {}) }));
+
     // Kept in gun order rather than tap order so the volley reads down the deck as it plays.
     return live.filter((g) => byGun.has(g)).map((g) => byGun.get(g));
 }
