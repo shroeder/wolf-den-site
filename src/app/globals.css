@@ -14088,3 +14088,77 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .tw-booth-shut { display: block; text-align: center; line-height: 1.25; max-width: 150px; }
 .tw-booth-shut b { display: block; color: #cfd6de; }
 .tw-booth-shut em { display: block; font-style: normal; font-size: 0.72em; font-weight: 700; color: #ffd75e; }
+
+/* ══ SHIP BATTLES — COLOUR, AND TEEGS'S MEDALLION ═══════════════════════════════════════════════════════════
+   The panel was one gold button on a flat black card: correct, and colourless. The sea is under it now, each
+   round carries its own colour, and the credit is enshrined rather than parked at the end of a line. */
+
+/* The card sits on water. A deep sea wash under the standard card, with a gold hairline along the top so the
+   panel reads as belonging to the doubloon economy rather than to the page. */
+.sby { position: relative; overflow: hidden;
+    background:
+        radial-gradient(120% 80% at 15% -10%, rgba(90,170,230,0.16), transparent 60%),
+        linear-gradient(180deg, rgba(12,32,52,0.95), rgba(8,16,26,0.98)); }
+.sby::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,201,94,0.75), transparent); }
+
+/* THE RECORD, in three colours rather than three golds — won, lost and how deep you have been are three
+   different facts and they were all reading as the same one. */
+.sby-record span:nth-child(1) b { color: #7ce6a2; }
+.sby-record span:nth-child(2) b { color: #ff9c8a; }
+.sby-record span:nth-child(3) b { color: #ffd75e; }
+
+/* EACH ROUND ITS OWN COLOUR. Four identical dark rectangles meant the one thing that told them apart was the
+   word at the top; the rack now reads at a glance, and the sprite sits on a wash of its own round. */
+.sby-round { border-left: 3px solid var(--rd, rgba(255,255,255,0.12));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--rd, #ffd28a) 12%, transparent), rgba(255,255,255,0.03) 45%); }
+.sby-round.is-round { --rd: #ffd28a; }
+.sby-round.is-chain { --rd: #9fd0ff; }
+.sby-round.is-grape { --rd: #ffb0d0; }
+.sby-round.is-explosive { --rd: #ff9a6b; }
+.sby-round b { color: var(--rd, #f2e2c4); }
+/* The sprite replaced a flat glyph, so it gets room and a shadow to sit in. */
+.sby-round-ico { width: 46px; height: 46px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)) drop-shadow(0 0 10px color-mix(in srgb, var(--rd, #ffd28a) 40%, transparent)); }
+
+/* ── THE MEDALLION ───────────────────────────────────────────────────────────────────────────────────────
+   Teegs's hero, enshrined on the panel she thought up. Same treatment the Forge gives Alstier1, in sea colours
+   instead of forge colours. */
+.sby-founder { width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
+    overflow: hidden; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 30%, #12324e, #06131f);
+    border: 2px solid rgba(255,201,94,0.45);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.6), 0 0 14px rgba(90,170,230,0.25);
+    transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s, border-color .18s; }
+.sby-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+.sby-founder:hover, .sby-founder:focus-visible { transform: scale(1.12) rotate(-3deg); outline: none;
+    border-color: rgba(255,225,150,0.85); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 18px rgba(255,201,94,0.5); }
+
+.sby-founder-scrim { position: fixed; inset: 0; z-index: 4200; display: grid; place-items: center; padding: 20px;
+    background: rgba(4,10,18,0.74); backdrop-filter: blur(3px); animation: sbyFounderFade .2s ease both; }
+.sby-founder-card { position: relative; max-width: 340px; width: 100%; text-align: center;
+    padding: 22px 22px 18px; border-radius: 18px;
+    background: linear-gradient(180deg, #0f2a44, #071523); border: 1px solid rgba(255,201,94,0.42);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(70,150,220,0.28);
+    animation: sbyFounderPop .32s cubic-bezier(.2,1.4,.35,1) both; }
+.sby-founder-hero { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden;
+    display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 28%, #143451, #05101b);
+    border: 3px solid rgba(255,201,94,0.45);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 14px rgba(0,0,0,0.6), 0 0 20px rgba(90,170,230,0.3); }
+.sby-founder-hero img { width: 108%; height: 108%; object-fit: contain; object-position: center 6%; display: block;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+.sby-founder-kicker { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 900;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffd28a; }
+.sby-founder-name { margin: 3px 0 8px; font-size: 1.35rem; font-weight: 900; color: #ffe6bb;
+    text-shadow: 0 2px 8px rgba(255,180,60,0.45); }
+.sby-founder-body { margin: 0 0 14px; font-size: 13px; line-height: 1.55; color: #d6e4f0; }
+.sby-founder-body b { color: #ffd28a; }
+.sby-founder-link { display: block; margin: 0 0 10px; font-size: 12px; font-weight: 800; color: #9fd0ff; }
+.sby-founder-close { width: 100%; padding: 10px; border-radius: 11px; border: none; cursor: pointer;
+    font-weight: 900; font-size: 13px; color: #2a1405; background: linear-gradient(180deg, #ffd06a, #ff9a2e);
+    box-shadow: 0 3px 0 #b4611a; }
+.sby-founder-close:active { transform: translateY(2px); box-shadow: 0 1px 0 #b4611a; }
+@keyframes sbyFounderFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sbyFounderPop { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }

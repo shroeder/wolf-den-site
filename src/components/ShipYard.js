@@ -3,6 +3,17 @@
 import { useState } from "react";
 import * as Gi from "react-icons/gi";
 
+// ── Permanent credit: ship battles were Teegs's idea — that they should be immersive and ship-centric, fought
+// as a SHIP rather than as a stat block, which is the whole reason the feature is shaped the way it is. Her
+// actual AI hero sprite is enshrined on the panel as a medallion; tapping it tells the story. Hard-coded to her
+// sprite blob on purpose so the tribute never breaks if her account or sprite changes — this is a fixed
+// dedication, not live data. (Same treatment as Alstier1 in the Forge.)
+const FOUNDER = {
+    name: "Teegs",
+    handle: "teegs",
+    sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/sprite/1786159889111-616545.webp",
+};
+
 // ── SHIP BATTLES: ONE HOME FOR THE WHOLE THING ───────────────────────────────────────────────────────────────
 // This started as two features wearing one engine. The FLEET lived here and called a fight a "sortie" you
 // "engage"; RAIDS lived in a big call-to-action near the top of the sailing page, opened a separate
@@ -76,8 +87,11 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 function Round({ a, purse, busy, onLoad, onBuy }) {
     const out = !a.basic && (a.count || 0) <= 0;
     return (
-        <div className={`sby-round${a.loaded ? " is-loaded" : ""}`}>
-            <Icon name={a.icon} className="sby-round-ico" />
+        // The round carries its own COLOUR as well as its own sprite — the four rows were four identical dark
+        // rectangles, so the one thing that distinguishes them (which round it is) was doing no work at all.
+        <div className={`sby-round is-${a.id}${a.loaded ? " is-loaded" : ""}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="sby-round-ico" src={`/images/sailing/ammo/${a.id}.png`} alt="" draggable="false" />
             <div className="sby-round-body">
                 <b>{a.name}</b>
                 <em>{a.blurb}</em>
@@ -109,6 +123,7 @@ function Round({ a, purse, busy, onLoad, onBuy }) {
 
 export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }) {
     const [ownTab, setOwnTab] = useState("battles");
+    const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
     const active = tab || ownTab;
     const setTab = onTab || setOwnTab;
     const purse = combat?.doubloons || 0;
@@ -132,17 +147,19 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                     <b>{purse.toLocaleString()}</b>
                     <em>doubloons</em>
                 </span>
+                {/* Teegs's medallion — her hero, permanently enshrined for dreaming this feature up. */}
+                <button type="button" className="sby-founder" onClick={() => setFounderOpen(true)}
+                    title={`Ship battles — an idea by ${FOUNDER.name}`} aria-label={`About ship battles — an idea by ${FOUNDER.name}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" />
+                </button>
             </div>
             {/* BOTH allowances, together, in the same words. They used to be a "sortie" count in here and a
                 separate "raid" count in a call-to-action three screens up. */}
+            {/* The credit used to be a dotted-underline link parked on the end of this line. It is a medallion
+                in the header now — see FOUNDER — the way the Forge enshrines Alstier1. */}
             <p className="sby-allowance">
                 <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
-                {/* WHOSE IDEA THIS WAS. Ship battles being immersive and ship-centric — the fleet, the crews on
-                    deck, fighting as a ship rather than as a stat block — was Teegs's call, and the feature is
-                    built the way it is because of it. Credit belongs on the thing itself, not in a changelog. */}
-                <a className="sby-credit" href="/marketplace/u/teegs" title="Ship battles were Teegs's idea — that they should be immersive and ship-centric">
-                    an idea by <b>@teegs</b>
-                </a>
             </p>
 
             <div className="sbd-tabs" role="tablist">
@@ -206,6 +223,29 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         </>
                     ) : null}
                 </>
+            ) : null}
+
+            {founderOpen ? (
+                <div className="sby-founder-scrim" role="dialog" aria-modal="true" onClick={() => setFounderOpen(false)}>
+                    <div className="sby-founder-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="sby-founder-hero">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" />
+                        </div>
+                        <div className="sby-founder-kicker">
+                            <Icon name="GiPirateFlag" /> Founder&apos;s Tribute
+                        </div>
+                        <h3 className="sby-founder-name">{FOUNDER.name}</h3>
+                        <p className="sby-founder-body">
+                            Ship battles were <b>{FOUNDER.name}&apos;s</b> idea — that they should be immersive and
+                            ship-centric, fought as a <b>ship</b> rather than as a stat block. Every gun on the deck,
+                            every crew on the rail and every hull on the horizon traces back to her. Her captain is
+                            enshrined here as thanks.
+                        </p>
+                        <a className="sby-founder-link" href={`/marketplace/u/${FOUNDER.handle}`}>Visit @{FOUNDER.handle}</a>
+                        <button type="button" className="sby-founder-close" onClick={() => setFounderOpen(false)}>Back to the deck</button>
+                    </div>
+                </div>
             ) : null}
 
             {active === "battles" ? (
