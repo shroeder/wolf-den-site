@@ -157,8 +157,14 @@ export default function GunLab() {
                         <button key={i} type="button" title={`${g.x}, ${g.y} — tap to remove`}
                             onClick={(e) => { e.stopPropagation(); if (placed.length) removeAt(i); }}
                             style={{ position: "absolute", left: `${g.x * 100}%`, top: `${g.y * 100}%`, width: 34, height: 24,
-                                transform: "translate(-50%, -70%)", border: placed.length ? "1px solid #ffd75e" : "1px dashed rgba(255,255,255,0.4)",
+                                border: placed.length ? "1px solid #ffd75e" : "1px dashed rgba(255,255,255,0.4)",
                                 borderRadius: 4, background: `url("/images/sailing/deck-cannon.png") center/contain no-repeat`,
+                                // FLEET HULLS FACE LEFT (fleet.js draws them that way on purpose — the enemy
+                                // stands on the right of the battle stage) and the battle mirrors their guns
+                                // to match. The lab did not, so you were placing right-facing cannons along a
+                                // left-facing ship: the preview disagreed with the thing it is previewing,
+                                // which makes judging a position almost impossible.
+                                transform: isBoat ? "translate(-50%, -70%)" : "translate(-50%, -70%) scaleX(-1)",
                                 cursor: placed.length ? "pointer" : "crosshair", padding: 0 }} />
                     ))}
                 </div>
