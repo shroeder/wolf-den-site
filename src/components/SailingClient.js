@@ -30,7 +30,7 @@ const DECK = { 1: 26, 2: 24, 3: 27, 4: 17, 5: 31, 6: 33, 7: 30, 8: 31, 9: 30, 10
 const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
 // The actions that open a fight. A refusal from any of these has to be SAID — a battle button that silently
 // does nothing reads as a broken build, which is precisely how it read.
-const BATTLE_ACTIONS = new Set(["fleet_battle", "raid"]);
+const BATTLE_ACTIONS = new Set(["battle"]);
 // An uncovered chest cell shows ITS SLICE of the real chest sprite (positioned like a sprite-sheet), so the
 // tiles assemble into one recognizable treasure chest as you dig it out.
 function chestSlice(cp) {
@@ -250,8 +250,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // either one just moved the page and left you to find what had changed. See the entry button below.
     const [yardOpen, setYardOpen] = useState(false);
     const [collOpen, setCollOpen] = useState(false);   // Sea collections — a reference panel, closed by default
-    const [raidTargets, setRaidTargets] = useState(null);  // null = loading, [] = none, [...] = pickable ships
-    const [raidMine, setRaidMine] = useState(null);        // YOUR gun deck, so the picker reads as a matchup
     const [shipBattle, setShipBattle] = useState(null);    // the resolved SHIP battle → drives the ship-battle scene
     const [battleMsg, setBattleMsg] = useState(null);      // why a Battle tap did nothing — see act()'s error branch
     const [arriveModal, setArriveModal] = useState(false); // "you reached the island!" modal (once per voyage)
@@ -544,7 +542,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
                 // A resolved battle — fleet or rival — plays out in the ship-battle scene. Clearing the target
                 // list means the raids tab re-scans the horizon next time rather than offering a stale ship.
-                if (d.battle) { setRaidTargets(null); setShipBattle(d.battle); setBattleMsg(null); }
+                if (d.battle) { setShipBattle(d.battle); setBattleMsg(null); }
             }
             return d;
         } finally { setBusy(false); }
@@ -590,26 +588,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         act(action, payload);
     }, [act]);
 
-    // Open the raid picker and load the selectable targets (real passing members, best-gear-first).
-    // Show the battle card on the RAIDS tab and load who is passing. There is no separate picker any more.
+    // THE DOOR TO A FIGHT. There is no opponent list to load any more: the server matches you when you
+    // press Battle, so this only has to put you on the right tab.
     const openRaid = useCallback(async () => {
-        // AN UNFINISHED FIGHT OWNS THIS BUTTON. Tapping Raid mid-battle used to open the opponent list, which
-        // is the one thing you cannot act on — you have a fight in progress, every other opponent is refused
-        // by the server, and the way back was a resume banner further down the page that you had to know to
-        // scroll for. If a battle is open, Raid means "back on deck".
+        // AN UNFINISHED FIGHT OWNS THIS BUTTON. Tapping Raid mid-battle used to open the opponent list,
+        // which is the one thing you cannot act on — you have a fight in progress and every other opponent
+        // is refused by the server. If a battle is open, Raid means "back on deck".
         const open = stateRef.current?.combat?.openBattle;
         if (open) { setShipBattle(open); return; }
         setBattleTab("battles");
         setYardOpen(true);
-        setRaidTargets(null);
-        try {
-            const r = await fetch("/api/marketplace/sailing", {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "raid_targets" }),
-            });
-            const d = await r.json().catch(() => ({}));
-            setRaidTargets(Array.isArray(d.targets) ? d.targets : []);
-            setRaidMine(d.me || null);
-        } catch { setRaidTargets([]); }
     }, []);
 
     // Buy back today's raid (escalating cost) and jump straight into the target picker on success.
@@ -1576,9 +1564,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
                         <ShipYard
                             combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
-                            targets={raidTargets} targetsMine={raidMine}
                             tab={battleTab}
-                            onTab={(t) => { setBattleTab(t); if (t === "battles" && raidTargets === null) openRaid(); }}
+                            onTab={setBattleTab}
                             onAct={({ action, ...extra }) => act(action, extra)} />
                     </div>
                 </div>

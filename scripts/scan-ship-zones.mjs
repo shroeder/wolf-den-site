@@ -1,14 +1,15 @@
 // ── WHERE THE PARTS OF A SHIP ARE, MEASURED OFF THE ART ──────────────────────────────────────────────────────
-// Targeting needs to know which bit of a ship a tap landed on: her sails, her hull, her rudder, her magazine.
-// Hand-authoring that for 26 hulls is 26 chances to be wrong and a fresh job every time one is redrawn — so
-// nothing here is hand-placed. This reads the actual PNG and works the areas out of the pixels:
+// Targeting needs to know which bit of a ship a tap landed on: her canvas, or her timber. Hand-authoring that
+// for 26 hulls is 26 chances to be wrong and a fresh job every time one is redrawn — so nothing here is
+// hand-placed. This reads the actual PNG and works the areas out of the pixels:
 //
 //   • the DECK LINE (deck-lines.js) already says where the deck sits on each hull, and that one number splits
 //     the sprite cleanly: everything opaque above it is canvas and rigging, everything below it is ship.
-//   • the STERN is found by thickness. A bow tapers to a cutwater and a stern is a blunt transom, so the hull's
-//     end with more timber in it is the back — that is the end the RUDDER hangs off.
-//   • the MAGAZINE is the deepest, most central part of the hull, shifted aft the way a real powder store is:
-//     small, buried, and the reason a lucky shot ends a fight early.
+//   • the HULL BOX — the extent of the timber alone — comes back with it, because the marker a player taps is
+//     drawn around the part rather than over the individual cells, and a bowsprit must not stretch it.
+//
+// The third target, her GUNS, is not measured here at all: gun-ports.js already places every barrel on every
+// hull at runtime, so each cannon is its own little target for free.
 //
 // Output is a GRID, not polygons: one character per cell of a 28×28 lattice over the sprite box. Hit-testing a
 // tap is then two divisions and a lookup — no geometry library on a phone — and a zone can be any shape the
@@ -105,8 +106,8 @@ function zonesFor(count, box, deckPct) {
         }
     }
 
-    // 2. The hull's own extent, which is what the rudder and the magazine are measured against — NOT the sprite
-    //    box, which a bowsprit or a topmast can stretch a long way past the ship.
+    // 2. The hull's own extent — NOT the sprite box, which a bowsprit or a topmast can stretch a long way past
+    //    the ship. This is what the tappable marker is drawn around.
     let hMinX = GRID, hMaxX = 0, hMinY = GRID, hMaxY = 0, hullCells = 0;
     for (let gy = 0; gy < GRID; gy += 1) for (let gx = 0; gx < GRID; gx += 1) {
         if (cell[gy * GRID + gx] !== "h") continue;
@@ -116,54 +117,11 @@ function zonesFor(count, box, deckPct) {
     }
     if (!hullCells) return { rows: cell, stern, hull: 0 };
 
-    // 3. THE RUDDER hangs off the stern, below the waterline — the aft-most timber in the bottom half of the
-    //    hull. Kept deliberately small: it is the hardest thing on the ship to hit and that is the whole point
-    //    of aiming at it.
-    // A THIN HULL STILL NEEDS A RUDDER YOU CAN HIT. The sloop's stern is two cells of timber, and a one-cell
-    // target on a phone is a target nobody can tap — the zone would exist in the maths and not in the hands.
-    // So the band widens until it owns a few cells, and only then stops.
-    const hullW = hMaxX - hMinX + 1, hullH = hMaxY - hMinY + 1;
-    const MIN_RUDDER = 5;
-    const paintRudder = (widthFrac, deepFrac) => {
-        const rudW = Math.max(2, Math.round(hullW * widthFrac));
-        const from = stern.side === "right" ? hMaxX - rudW + 1 : hMinX;
-        const to = stern.side === "right" ? hMaxX : hMinX + rudW - 1;
-        let n = 0;
-        for (let gy = hMinY + Math.floor(hullH * deepFrac); gy <= hMaxY; gy += 1) {
-            for (let gx = from; gx <= to; gx += 1) {
-                const i = gy * GRID + gx;
-                if (cell[i] === "h" || cell[i] === "r") { cell[i] = "r"; n += 1; }
-            }
-        }
-        return n;
-    };
-    let rudderCells = paintRudder(0.13, 0.4);
-    for (const [w, d] of [[0.18, 0.3], [0.24, 0.2], [0.3, 0.1]]) {
-        if (rudderCells >= MIN_RUDDER) break;
-        rudderCells = paintRudder(w, d);
-    }
-
-    // 4. THE POWDER STORE. Buried amidships and a little aft, in the bottom of the hold — two cells by two, so
-    //    it is a genuine gamble rather than a fifth ordinary target.
-    const magX = Math.round(hMinX + hullW * (stern.side === "right" ? 0.58 : 0.34));
-    const magY = Math.round(hMinY + hullH * 0.55);
-    for (let gy = magY; gy <= Math.min(hMaxY, magY + 1); gy += 1) {
-        for (let gx = magX; gx <= Math.min(hMaxX, magX + 1); gx += 1) {
-            const i = gy * GRID + gx;
-            if (cell[i] === "h" || cell[i] === "r") cell[i] = "p";
-        }
-    }
-
-    // 5. NOTHING MAY BE UNTARGETABLE. A hull whose deck line swallowed its own rudder, or a sloop drawn so low
-    //    that the magazine landed outside the timber, would leave a tap on that zone doing nothing at all —
-    //    which reads as a broken button rather than a missing feature. Fall back to the middle of the hull.
-    const has = (c) => cell.some((v) => v === c);
-    if (!has("p")) { const i = (hMinY + Math.floor(hullH / 2)) * GRID + Math.round((hMinX + hMaxX) / 2); if (cell[i] !== ".") cell[i] = "p"; }
-    if (!has("r")) {
-        const gx = stern.side === "right" ? hMaxX : hMinX;
-        for (let gy = hMaxY; gy >= hMinY; gy -= 1) { const i = gy * GRID + gx; if (cell[i] === "h") { cell[i] = "r"; break; } }
-    }
-    return { rows: cell, stern, hull: hullCells };
+    // TWO ZONES, NOT FIVE. A rudder and a powder store were measured here too, and both were cut: a rudder had
+    // no effect anyone could name, and a magazine that ends a fight on a lucky ball is a coin toss wearing a
+    // target. What is left is what a player can reason about — canvas above the deck, timber below it — plus the
+    // GUNS, which are not in this grid at all because gun-ports.js already places every barrel at runtime.
+    return { rows: cell, stern, hull: hullCells, box: { x: hMinX, y: hMinY, w: hMaxX - hMinX + 1, h: hMaxY - hMinY + 1 } };
 }
 
 const toRows = (cell) => {
@@ -174,7 +132,7 @@ const toRows = (cell) => {
 
 // ── THE CONTACT SHEET ────────────────────────────────────────────────────────────────────────────────────────
 // Tinted zones over every hull at once. The numbers cannot be reviewed by reading them; this can.
-const TINT = { h: [214, 158, 74], s: [96, 170, 235], r: [104, 214, 132], p: [232, 92, 92] };
+const TINT = { h: [214, 158, 74], s: [96, 170, 235] };
 async function overlay(file, rows, size = 210) {
     const base = await sharp(file).resize(size, size, { fit: "contain", background: { r: 12, g: 22, b: 38, alpha: 1 } }).toBuffer();
     const px = Buffer.alloc(size * size * 4, 0);
@@ -210,7 +168,7 @@ async function main() {
         const { count, box } = await cellsOf(resolve(ROOT, t.file));
         const { rows: cell, stern, hull } = zonesFor(count, box, t.deck);
         const rows = toRows(cell);
-        const tally = { s: 0, h: 0, r: 0, p: 0 };
+        const tally = { s: 0, h: 0 };
         for (const c of cell) if (tally[c] != null) tally[c] += 1;
         out[t.key] = { facing: stern.side === "right" ? "left" : "right", rows };
         console.log(`${t.key.padEnd(22)} deck ${String(t.deck).padStart(2)}  stern ${stern.side.padEnd(5)} ` +
@@ -224,7 +182,7 @@ async function main() {
 
     const file = `// GENERATED by scripts/scan-ship-zones.mjs — do not hand-edit. Re-run it when a hull is redrawn.
 //
-// One 28×28 grid per hull, measured off the sprite's own pixels: "." nothing, "s" sails and rigging, "h" hull,
+// One 28×28 grid per hull, measured off the sprite's own pixels: "." nothing, "s" sails and rigging, "h" hull.
 // "r" rudder, "p" powder store. \`facing\` is the way the art is drawn, which is what tells the scene whether a
 // mirrored hull needs its grid mirrored with it.
 //

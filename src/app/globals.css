@@ -13854,68 +13854,95 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .tw-stock-plate b { display: block; }
 .tw-stock-plate em { display: block; font-style: italic; font-size: 0.72em; opacity: 0.9; font-weight: 700; }
 
-/* ══ SHIP BATTLE — AIMING ═══════════════════════════════════════════════════════════════════════════════════
-   The fight stopped being four order cards under two boats. Every gun is laid by TAPPING the part of the ship
-   you want it to hit, so the ships themselves are the controls and the only thing left along the bottom is a
-   read-out of what is under your finger and the button that commits the volley.
+/* ══ SHIP BATTLE — PICKING A TARGET ═════════════════════════════════════════════════════════════════════════
+   The fight is no longer four order cards under two boats, and it is no longer a gun-by-gun assignment either.
+   Her ship IS the control: three kinds of marker sit on the parts you can hit, each carrying the real odds of
+   hitting it, and the whole broadside goes wherever you tapped.
 
-   Consequences for the layout: the ships get bigger and sit higher (they are targets now, not an illustration),
-   the chrome moves into a corner, and everything that used to be drawn per-volley is drawn per-GUN. */
+   Consequences for the layout: the ships get the screen (they are the board), the chrome moves into its own
+   row, and the only bar left is what you picked, the rack, and FIRE. */
 
-/* Ships as targets: wider, and lifted clear of the aim bar. */
 .sbt-ship { width: min(50%, 340px); bottom: 22%; }
-.sbt-ship.is-aimable .sbt-hull { cursor: crosshair; }
-.sbt-aimlayer { position: absolute; inset: 0; z-index: 6; appearance: none; -webkit-appearance: none;
-    background: transparent; border: 0; padding: 0; margin: 0; cursor: crosshair; }
-/* No focus ring around a whole ship — it lights its own zones instead. */
-.sbt-aimlayer:focus { outline: none; }
-.sbt-aimlayer:focus-visible { outline: 2px dashed rgba(255,214,140,0.7); outline-offset: -6px; }
 
-/* THE PART UNDER YOUR FINGER, shaped like the part rather than boxed over it. */
-.sbt-zone { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-.sbt-zone i { position: absolute; background: var(--tint, #ffd28a); opacity: 0.34;
-    box-shadow: 0 0 10px 1px var(--tint, #ffd28a) inset; }
-.sbt-zone.is-preview { animation: sbtZonePulse 1.1s ease-in-out infinite; }
-@keyframes sbtZonePulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
+/* ── THE TARGETS ─────────────────────────────────────────────────────────────────────────────────────────
+   A clean shape around the part, not a stencil of the measured cells — a player is choosing between three
+   things, not painting a mask. Dashed and quiet until you pick one, then it lights and locks. */
+/* The layer the markers live on: pinned to the SHIP box, which does not bob, rather than to the hull,
+   which does. Same coordinates either way — the sprite fills both. */
+.sbt-targets { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+.sbt-targets > * { pointer-events: auto; }
+.sbt-target { position: absolute; z-index: 8; transform: translate(-50%, -50%); padding: 0;
+    background: transparent; border: 0; cursor: pointer; }
+/* A thumb is bigger than a chip — but only a little. At -12px the seven cannon chips on a rail grew
+   into one continuous bar that swallowed the taps meant for the sails above them. */
+.sbt-target::after { content: ""; position: absolute; inset: -6px; }
 
-/* DAMAGE ON THE HULL ITSELF — canvas going dark and ragged, a rudder shot away. Clipped to the measured zone
-   so it lands on the actual sails rather than over a rectangle of sky. */
+/* THE CHIP — an icon and the odds. This is the whole tutorial: "sails 88%, that cannon 50%" says what the
+   trade is without a word of explanation. */
+.sbt-target-tag { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px;
+    background: rgba(6,12,20,0.86); border: 1.5px solid color-mix(in srgb, var(--tint, #ffd28a) 62%, transparent);
+    color: var(--tint, #ffd28a); font-size: 0.68rem; font-weight: 800; line-height: 1.2; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5); transition: transform .12s ease, background .12s ease; }
+.sbt-target-tag svg { font-size: 0.95rem; }
+.sbt-target:hover .sbt-target-tag, .sbt-target:focus-visible .sbt-target-tag { transform: scale(1.08); outline: none; }
+.sbt-target.is-on .sbt-target-tag { background: var(--tint, #ffd28a); color: #1b1004; border-color: rgba(0,0,0,0.45);
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 18px -2px var(--tint, #ffd28a); animation: sbtTargetOn 1.6s ease-in-out infinite; }
+@keyframes sbtTargetOn { 0%, 100% { box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 12px -2px var(--tint, #ffd28a); }
+    50% { box-shadow: 0 0 0 2px rgba(0,0,0,0.35), 0 0 24px 1px var(--tint, #ffd28a); } }
+
+/* A CANNON CHIP CARRIES NO NUMBER until you choose it. Every gun on a ship has the same odds, so printing
+   "50%" seven times along a rail was seven copies of one fact — and at that width the chips ran together into
+   a single bar you could not read as separate targets. Bare barrels, and the one you pick says the number. */
+.sbt-target.is-gun .sbt-target-tag { padding: 3px; border-radius: 50%; }
+.sbt-target.is-gun .sbt-target-tag svg { font-size: 0.82rem; }
+.sbt-target.is-gun .sbt-target-tag b { display: none; }
+.sbt-target.is-gun.is-on .sbt-target-tag { padding: 3px 8px; border-radius: 999px; }
+.sbt-target.is-gun.is-on .sbt-target-tag b { display: inline; }
+
+/* THE REGION, outlined, once chosen. Never a button: it would swallow the cannon chips sitting on the deck. */
+.sbt-zonering { position: absolute; z-index: 6; pointer-events: none; border-radius: 14px;
+    border: 2px dashed color-mix(in srgb, var(--tint, #ffd28a) 80%, transparent);
+    background: color-mix(in srgb, var(--tint, #ffd28a) 12%, transparent); }
+/* ── DAMAGE YOU CAN SEE ──────────────────────────────────────────────────────────────────────────────────
+   Canvas going dark and ragged, clipped to the measured sails; a dismounted gun canted over on its carriage. */
 .sbt-dmg { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .sbt-dmg.is-sails i { position: absolute; background: rgba(12,16,22,0.72);
     opacity: calc(var(--torn, 0) * 0.85);
     -webkit-mask-image: repeating-linear-gradient(122deg, #000 0 6px, transparent 6px 11px);
     mask-image: repeating-linear-gradient(122deg, #000 0 6px, transparent 6px 11px); }
-.sbt-dmg.is-rudder i { position: absolute; background: rgba(8,10,14,0.72); }
-
-/* A GUN THAT IS GONE. Dark, canted over on its carriage and no longer able to fire — the whole point of
-   aiming at a gun deck is that you can see the barrel you took off her. */
 .sbt-gun.is-damaged .sbt-gun-barrel { filter: brightness(0.7) saturate(0.6); }
 .sbt-gun.is-dead .sbt-gun-barrel { filter: brightness(0.32) saturate(0.15) blur(0.3px);
     transform: rotate(14deg) translateY(12%); }
 .sbt-ship-foe .sbt-gun.is-dead .sbt-gun-barrel { transform: rotate(-14deg) translateY(12%); }
 
-/* GUNS ALREADY LAID. One pip per aiming point, in the colour of the round loaded into it. */
-.sbt-mark { position: absolute; z-index: 7; width: 26px; height: 26px; margin: -13px 0 0 -13px;
-    border-radius: 50%; border: 2px solid rgba(0,0,0,0.5); cursor: pointer;
-    background: radial-gradient(circle at 34% 30%, #fff6e0, var(--mtint, #ffd28a) 62%);
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.28), 0 3px 8px rgba(0,0,0,0.5);
-    display: grid; place-items: center; animation: sbtMarkIn 0.22s ease-out both; }
-.sbt-mark b { font-size: 0.72rem; font-weight: 900; color: #23160a; }
-.sbt-mark.is-round { --mtint: #ffd28a; }
-.sbt-mark.is-chain { --mtint: #9fd0ff; }
-.sbt-mark.is-grape { --mtint: #ffb0d0; }
-.sbt-mark.is-explosive { --mtint: #ff9a6b; }
-.sbt-mark.is-repair { --mtint: #8fe6a6; border-style: dashed; }
-@keyframes sbtMarkIn { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-/* THEIR AIM, ON YOUR SHIP — a thin crosshair sitting where their last volley was laid. */
-.sbt-incoming { position: absolute; z-index: 6; width: 30px; height: 30px; margin: -15px 0 0 -15px;
-    border-radius: 50%; border: 2px dashed rgba(255,96,96,0.8); pointer-events: none;
-    animation: sbtIncoming 1.6s ease-in-out infinite; }
-.sbt-incoming::after { content: ""; position: absolute; inset: 44% 10%; border-top: 2px solid rgba(255,96,96,0.55); }
-@keyframes sbtIncoming { 0%, 100% { transform: scale(1); opacity: 0.75; } 50% { transform: scale(1.18); opacity: 0.35; } }
+/* ── THE SHOT ────────────────────────────────────────────────────────────────────────────────────────────
+   Every ball flies from the muzzle that fired it to the timber it was sent to, in stage pixels handed down
+   from a measurement of both hulls. Two elements: the outer runs the line, the inner arcs over it. */
+.sbt-ball2 { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 8; pointer-events: none;
+    animation: sbtFly 460ms linear forwards; }
+.sbt-ball2 i { position: absolute; width: 11px; height: 11px; margin: -5px 0 0 -5px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #ffe9c0, #6b4a24 70%, #241708);
+    box-shadow: 0 0 8px 2px rgba(255,180,90,0.45);
+    animation: sbtArc 460ms ease-in-out forwards; }
+.sbt-ball2.is-chain i { background: radial-gradient(circle at 34% 30%, #eaf6ff, #6f8fae 70%, #1b2836);
+    box-shadow: 0 0 8px 2px rgba(140,200,255,0.5); }
+.sbt-ball2.is-grape i { width: 8px; height: 8px; background: radial-gradient(circle at 34% 30%, #ffd9ec, #a86a86 70%);
+    box-shadow: 0 0 7px 2px rgba(255,150,200,0.45); }
+.sbt-ball2.is-explosive i { width: 13px; height: 13px;
+    background: radial-gradient(circle at 34% 30%, #fff0c2, #ff7a2a 60%, #6a1e05);
+    box-shadow: 0 0 12px 4px rgba(255,140,60,0.6); }
+.sbt-ball2.is-rake i { box-shadow: 0 0 14px 5px rgba(255,220,120,0.8); }
 @keyframes sbtFly { from { transform: translate(var(--fx), var(--fy)); } to { transform: translate(var(--tx), var(--ty)); } }
 @keyframes sbtArc { 0% { transform: translateY(0); } 50% { transform: translateY(-38px); } 100% { transform: translateY(0); } }
+
+.sbt-splash2 { position: absolute; z-index: 4; width: 0; height: 0; pointer-events: none; }
+.sbt-splash2 i { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(210,240,255,0.85), rgba(140,200,240,0) 70%);
+    animation: sbtSplash2 620ms ease-out 440ms both; }
+.sbt-splash2 b { position: absolute; width: 40px; height: 12px; margin: -6px 0 0 -20px; border-radius: 50%;
+    border: 2px solid rgba(200,235,255,0.6); animation: sbtSplashRing 700ms ease-out 440ms both; }
+.sbt-splash2 u { position: absolute; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%;
+    background: rgba(225,245,255,0.9); animation: sbtSplashDrop 620ms ease-out 460ms both; }
 @keyframes sbtSplash2 { from { transform: scale(0.3); opacity: 0.95; } to { transform: scale(1.5) translateY(-8px); opacity: 0; } }
 @keyframes sbtSplashRing { from { transform: scale(0.3); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
 @keyframes sbtSplashDrop { from { transform: translate(0, 0); opacity: 1; }
@@ -13933,39 +13960,40 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-syschip i.is-up { background: #8fd0ff; box-shadow: 0 0 4px rgba(140,210,255,0.6); }
 .sbt-syschip em { font-style: normal; font-weight: 800; }
 
-/* ── CHROME IN THE CORNER ────────────────────────────────────────────────────────────────────────────────
-   Music, the way out and the transcript. These used to hold a row of their own between the ships and the
-   orders; there are no orders now and the ships want the room, so they sit in the top corner. */
+/* ── CHROME IN ITS OWN ROW ───────────────────────────────────────────────────────────────────────────────
+   Music, the way out and the transcript. Pinned to a fixed offset they landed on top of the enemy's panel,
+   whose height varies with the system pips; in flow they cannot collide with anything. */
 .sbt-chrome { position: relative; z-index: 20; display: flex; align-items: flex-start; justify-content: flex-end;
     gap: 6px; padding: 0 8px 4px; }
 .sbt-chrome .sbt-leave, .sbt-chrome .sbt-logtoggle { padding: 5px 10px; font-size: 0.72rem; }
 .sbt-chrome .sbt-log { position: absolute; top: 32px; right: 8px; z-index: 22; width: min(78vw, 340px); max-height: 40vh; }
 
 /* ── THE AIM BAR ─────────────────────────────────────────────────────────────────────────────────────────
-   The only control on the screen. What is under your finger, the guns you have laid, and FIRE. */
+   What you picked and what it does, the rack, and FIRE. Nothing else. */
 .sbt-aimbar { position: relative; z-index: 12; display: grid; gap: 6px 10px; padding: 8px 10px;
-    grid-template-columns: 1fr auto; grid-template-areas: "read fire" "rail fire";
+    grid-template-columns: 1fr auto; grid-template-areas: "read fire" "rack fire";
     background: linear-gradient(180deg, rgba(6,14,24,0.55), rgba(6,14,24,0.9));
     border-top: 1px solid rgba(255,214,140,0.16);
     padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 .sbt-aimbar.is-waiting { opacity: 0.55; pointer-events: none; }
 .sbt-zoneread { grid-area: read; display: flex; align-items: center; gap: 8px; min-height: 40px; }
 .sbt-zoneread .sbt-zoneicon { font-size: 1.5rem; color: var(--tint, #9fb6cc); flex: none; }
-.sbt-zoneread b { display: block; color: var(--tint, #f2e2c4); font-size: 0.86rem; line-height: 1.15; }
-.sbt-zoneread em { display: block; font-style: normal; font-size: 0.7rem; color: #a9bccd; line-height: 1.25; }
+.sbt-zoneread b { display: block; color: var(--tint, #f2e2c4); font-size: 0.88rem; line-height: 1.15; }
+.sbt-zoneread em { display: block; font-style: normal; font-size: 0.72rem; color: #a9bccd; line-height: 1.25; }
 .sbt-zoneread.is-idle b { color: #f2e2c4; }
+.sbt-odds { margin-left: auto; font-size: 1.05rem; font-weight: 900; color: var(--tint, #ffd28a); }
 
-.sbt-gunrail { grid-area: rail; display: flex; gap: 5px; flex-wrap: wrap; }
-.sbt-gunpip { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #7f93a6;
-    font-size: 0.95rem; padding: 0; }
-.sbt-gunpip.is-laid { color: #23160a; background: var(--mtint, #ffd28a); border-color: rgba(0,0,0,0.4); }
-.sbt-gunpip.is-round { --mtint: #ffd28a; }
-.sbt-gunpip.is-chain { --mtint: #9fd0ff; }
-.sbt-gunpip.is-grape { --mtint: #ffb0d0; }
-.sbt-gunpip.is-explosive { --mtint: #ff9a6b; }
-.sbt-gunpip.is-repair { --mtint: #8fe6a6; }
-.sbt-gunpip.is-dead { opacity: 0.3; color: #ff8f7a; }
+.sbt-rack-row { grid-area: rack; display: flex; gap: 6px; }
+.sbt-shotpick { display: inline-flex; align-items: center; gap: 4px; padding: 5px 9px; border-radius: 999px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #d8e6f2; }
+.sbt-shotpick svg { font-size: 1.05rem; }
+.sbt-shotpick em { font-style: normal; font-size: 0.66rem; opacity: 0.85; font-weight: 800; }
+.sbt-shotpick.is-round { color: #ffd28a; }
+.sbt-shotpick.is-chain { color: #9fd0ff; }
+.sbt-shotpick.is-grape { color: #ffb0d0; }
+.sbt-shotpick.is-explosive { color: #ff9a6b; }
+.sbt-shotpick.is-on { border-color: currentColor; background: rgba(255,255,255,0.15); }
+.sbt-shotpick.is-out { opacity: 0.3; }
 
 .sbt-fire { grid-area: fire; align-self: center; min-width: 104px; padding: 10px 14px; border-radius: 12px;
     background: linear-gradient(180deg, #4a2c14, #2a1709); border: 1px solid rgba(255,190,110,0.3);
@@ -13976,40 +14004,31 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-fire em { display: block; font-style: normal; font-size: 0.66rem; opacity: 0.85; }
 @keyframes sbtFireReady { 0%, 100% { box-shadow: 0 0 14px rgba(255,150,50,0.35); } 50% { box-shadow: 0 0 24px rgba(255,180,80,0.65); } }
 
-/* ── THE RACK ────────────────────────────────────────────────────────────────────────────────────────────
-   Opens on the gun you just laid: aim, then load. Sits above the bar so it never covers a ship. */
-.sbt-rack { position: absolute; left: 8px; right: 8px; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-    z-index: 16; padding: 8px; border-radius: 12px; background: rgba(8,16,26,0.96);
-    border: 1px solid rgba(255,214,140,0.22); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    animation: sbtRackIn 0.16s ease-out both; }
-@keyframes sbtRackIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.sbt-rack-for { display: block; font-size: 0.7rem; color: #ffd28a; margin-bottom: 6px; font-weight: 700; }
-.sbt-rack-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.sbt-shotpick { padding: 7px 4px; border-radius: 10px; background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12); color: #d8e6f2; display: grid; gap: 1px; place-items: center; }
-.sbt-shotpick svg { font-size: 1.15rem; }
-.sbt-shotpick b { font-size: 0.62rem; font-weight: 700; }
-.sbt-shotpick em { font-style: normal; font-size: 0.62rem; opacity: 0.8; }
-.sbt-shotpick.is-round { color: #ffd28a; }
-.sbt-shotpick.is-chain { color: #9fd0ff; }
-.sbt-shotpick.is-grape { color: #ffb0d0; }
-.sbt-shotpick.is-explosive { color: #ff9a6b; }
-.sbt-shotpick.is-on { border-color: currentColor; background: rgba(255,255,255,0.14); }
-.sbt-shotpick.is-out { opacity: 0.32; }
-.sbt-rack-done { margin-top: 6px; width: 100%; padding: 6px; border-radius: 8px; font-size: 0.72rem;
-    background: rgba(255,255,255,0.08); color: #cfe0ee; }
+/* ── THE ONE-TIME EXPLANATION ────────────────────────────────────────────────────────────────────────────
+   Shown on the first fight and never again. The markers carry the odds and the bar names the effect, so this
+   only has to say that the ship itself is the control. */
+/* Over the SKY, not over the ships. Anchored to the bottom it sat on top of the hull it was describing. */
+.sbt-teach { position: absolute; left: 50%; transform: translateX(-50%); z-index: 30;
+    top: calc(env(safe-area-inset-top, 0px) + 148px); width: min(92vw, 400px);
+    padding: 12px 14px; border-radius: 14px; background: rgba(8,16,26,0.97);
+    border: 1px solid rgba(255,214,140,0.28); box-shadow: 0 14px 40px rgba(0,0,0,0.6);
+    animation: sbtTeachIn 0.2s ease-out both; }
+@keyframes sbtTeachIn { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.sbt-teach > b { display: block; color: #ffd75e; font-size: 0.95rem; }
+.sbt-teach > p { margin: 3px 0 8px; font-size: 0.78rem; color: #c3d3e2; }
+.sbt-teach ul { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.sbt-teach li { display: grid; grid-template-columns: 20px auto 1fr; align-items: center; gap: 7px;
+    font-size: 0.74rem; color: #b8c8d8; }
+.sbt-teach li svg { color: var(--tint, #ffd28a); font-size: 1.05rem; }
+.sbt-teach li b { color: var(--tint, #ffd28a); }
+.sbt-teach button { width: 100%; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 0.8rem;
+    background: linear-gradient(180deg, #ffb347, #e0761c); color: #2a1400; }
 
-/* A one-line answer to a tap that could not do anything. Silence reads as a broken control. */
-.sbt-hint { position: absolute; left: 50%; transform: translateX(-50%);
-    bottom: calc(150px + env(safe-area-inset-bottom, 0px)); z-index: 18;
-    padding: 6px 12px; border-radius: 999px; background: rgba(10,18,28,0.94); color: #ffd28a;
-    font-size: 0.74rem; border: 1px solid rgba(255,214,140,0.3); animation: sbtRackIn 0.16s ease-out both; }
-
-/* Phones: the bar is the one thing that must never eat the stage, so it stays compact and the ships lift. */
+/* Phones: the bar must never eat the stage, so it stays compact and the ships lift clear of it. */
 @media (max-width: 520px) {
     .sbt-ship { width: min(47%, 280px); bottom: 24%; }
     .sbt-aimbar { padding: 6px 8px; }
     .sbt-zoneread em { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .sbt-fire { min-width: 88px; padding: 8px 10px; }
-    .sbt-gunpip { width: 27px; height: 27px; }
+    .sbt-target.is-gun { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
 }

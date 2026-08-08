@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, doRaid, getRaidTargets, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doFleetBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -50,11 +50,11 @@ export async function POST(request) {
                 case "upgrade_rarity": return noStore(await upgradeRarity(g.buyer.id));
                 case "upgrade_luck": return noStore(await upgradeLuck(g.buyer.id));
                 case "upgrade_raid": return noStore(await upgradeRaid(g.buyer.id));
-                case "raid_targets": return noStore({ ok: true, ...(await getRaidTargets(g.buyer.id)) });
                 case "raid_reset": return noStore(await resetRaid(g.buyer.id));
-                case "raid": return noStore(await doRaid(g.buyer.id, body.target));
                 // Ship battles (under construction — every one of these refuses off the allow-list).
-                case "fleet_battle": return noStore(await doFleetBattle(g.buyer.id, body.rank ?? null));
+                // ONE way into a fight: the server matches you. `fleet_battle`, `raid` and `raid_targets`
+                // are gone with the opponent list they served.
+                case "battle": return noStore(await doBattle(g.buyer.id));
                 case "battle_volley": return noStore(await shipBattleVolley(g.buyer.id, body.aim));
                 case "buy_ammo": return noStore(await buyAmmo(g.buyer.id, body.ammo, body.qty));
                 case "buy_locker": return noStore(await buyLocker(g.buyer.id, body.id));

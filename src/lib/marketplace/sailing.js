@@ -14,8 +14,8 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAssignments,
-         SAILS_MAX, RUDDER_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
+         gunsFor, accuracyFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAim,
+         SAILS_MAX, GUN_HP, MAX_ROUNDS, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -1530,16 +1530,6 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
                 COALESCE(s.hull_level,0) AS hull_level, COALESCE(s.loadout,'round') AS loadout`;
 const RAID_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
 
-// Pick a random passing player to raid — a real member with a hero. They're a target only; they lose nothing.
-async function pickRaidTarget(buyerId) {
-    return db.queryOne(
-        `SELECT ${RAID_TARGET_COLS}
-           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
-          WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
-          ORDER BY random() LIMIT 1`,
-        [buyerId]
-    ).catch(() => null);
-}
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {
     if (!targetId) return null;
@@ -1551,88 +1541,6 @@ async function raidTargetById(buyerId, targetId) {
     ).catch(() => null);
 }
 
-// The selectable-target list for the raid picker: real passing members, the SHIP you would be fighting (guns
-// and hull, from their gun deck) and a hint of the hold you would be plundering (item count + best rarity).
-// Sorted by the loot, because that is what you are choosing between — but the guns are shown, because that is
-// what decides whether you get it.
-// `limit` is how many rivals make the horizon — a handful, not everyone who has ever sailed.
-export async function getRaidTargets(buyerId, limit = 4) {
-    if (!raidsEnabled(buyerId)) return { targets: [], me: null }; // under construction — see raidsEnabled
-    const rows = await db.query(
-        `SELECT ${RAID_TARGET_COLS}
-           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
-          WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
-          ORDER BY b.last_seen_at DESC NULLS LAST LIMIT 40`,
-        [buyerId]
-    ).catch(() => []);
-    if (!rows.length) return [];
-    // Their INVENTORY used to be read here — every candidate's whole item list, to find their best piece for
-    // the "worth it" half of the sort and the "best legendary" on the row. A raid pays out of the fleet table
-    // now, so none of that changes anything, and the query was scanning forty members' bags to decide nothing.
-    const list = rows.map((r) => {
-        const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
-        return {
-            id: r.id, name: r.display_name || r.alias, handle: r.alias, level, boat: boatArt(level),
-            rider: r.avatar_sprite_url || r.avatar_url || null,
-            riderFlip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
-            // `items` / `topRarity` deliberately NOT sent: nothing about their inventory affects a raid any more.
-            // Their SHIP, in the same two numbers your own gun deck reports — plus the fleet rank it fights
-            // like, which is also exactly what beating it pays.
-            guns: gunsFor(r.gun_level || 0), hull: hullFor(r.hull_level || 0, level),
-            hullGrade: hullGrade(hullFor(r.hull_level || 0, level)),
-            ammo: r.loadout || "round",
-            rank: fleetRankForShip({ guns: gunsFor(r.gun_level || 0), hp: hullFor(r.hull_level || 0, level) }),
-        };
-    });
-    // What YOU are bringing — needed before the sort, because the sort depends on it.
-    const mine = await readRow(buyerId);
-    const myLevel = boatLevelFromUpgrades(mine?.speed_level || 0, mine?.luck_level || 0, mine?.rarity_level || 0, mine?.find_level || 0, mine?.raid_level || 0);
-    const myGuns = gunsFor(mine?.gun_level || 0), myHull = hullFor(mine?.hull_level || 0, myLevel);
-
-    // WORTH IT × WINNABLE, not just worth it. Sorting on loot alone put the heaviest ship in the Den at the
-    // top of a brand-new captain's list, which is the one raid a day they have to spend. `odds` is a rough
-    // read of the matchup (their broadside and hull against yours) and it scales the loot score, so the top of
-    // the list is the best prize you can actually take rather than the best prize that exists.
-    // THEIR GEAR NO LONGER MATTERS HERE. The old raid could copy one of their items, so the list was sorted by
-    // "worth it × winnable" — how good their best piece was, scaled by your odds — and every row advertised
-    // "best legendary". That reward is gone: a raid pays out of the FLEET table now, matched to the rank their
-    // SHIP resembles, and their wardrobe has nothing to do with it. Leaving the rarity on the row was the
-    // screen promising loot that cannot drop, and leaving it in the sort was ordering the list by a number
-    // that stopped meaning anything.
-    const scored = list.map((t) => {
-        // Shared with the row on screen (ship-battle.js) so the fleet and rivals rank on ONE scale.
-        const odds = matchupOdds({ myGuns, myHull, guns: t.guns, hull: t.hull });
-        return { ...t, odds: Math.round(odds * 100), outgunned: t.guns > myGuns && t.hull > myHull };
-    });
-
-    // ── A FEW SHIPS ON THE HORIZON, NOT A DIRECTORY ──────────────────────────────────────────────────────
-    // This used to hand back the top twelve, which sat above fifteen fleet rungs and made the battle list a
-    // scroll rather than a choice. It is a HORIZON: you see the handful of ships that happen to be passing.
-    //
-    // Weighted toward your OWN rank, because a list of people you cannot beat is the same as no list, and a
-    // list of people who cannot fight back is boring. Weight falls off with the square of the rank gap, so
-    // near matches dominate without a hard cutoff — an occasional heavyweight still drifts past, which is
-    // what makes checking the horizon worth doing.
-    //
-    // Re-rolled on every scan on purpose: the copy says you are scanning the horizon, and ships that never
-    // change are a directory wearing a nautical hat.
-    const myRank = fleetRankForShip({ guns: myGuns, hp: myHull });
-    const pool = scored.map((t) => ({ t, w: 1 / (1 + (t.rank - myRank) ** 2) }));
-    const picked = [];
-    while (picked.length < Math.min(limit, scored.length) && pool.length) {
-        let roll = Math.random() * pool.reduce((sum, p) => sum + p.w, 0);
-        let i = pool.findIndex((p) => (roll -= p.w) <= 0);
-        if (i < 0) i = pool.length - 1;
-        picked.push(pool.splice(i, 1)[0].t);
-    }
-    // Shown easiest first so the merged list still reads as a ladder once the fleet is folded in.
-    picked.sort((a, z) => a.rank - z.rank || z.odds - a.odds);
-
-    return {
-        targets: picked,
-        me: { guns: myGuns, hull: myHull, ammo: mine?.loadout || "round", level: myLevel },
-    };
-}
 
 // A fighter's non-zero equipped stats, in display order, for the battle card.
 // Run the once-a-day raid: a SHIP battle against another member's boat and gun deck. Win → gold (+ a chance to
@@ -1651,7 +1559,10 @@ export async function doRaid(buyerId, targetId = null) {
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const raidExtras = await equippedRaidExtras(buyerId); // Dread Corsair: +1 raid/day, double win gold
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, raidExtras.bonusRaids)) return { ok: false, error: "no_raid", ...(await getSailingState(buyerId)) };
-    const target = (await raidTargetById(buyerId, targetId)) || (targetId ? null : await pickRaidTarget(buyerId));
+    // ALWAYS AN EXPLICIT OPPONENT. There used to be a "pick anybody" fallback here for the case where the
+    // player had not chosen from the list; matchmaking always names who it found, so an unnamed raid is now a
+    // bug rather than a shrug.
+    const target = await raidTargetById(buyerId, targetId);
     if (!target) return { ok: false, error: "no_target", ...(await getSailingState(buyerId)) };
 
     const foeLevel = boatLevelFromUpgrades(target.speed_level, target.luck_level, target.rarity_level, target.find_level, target.raid_level);
@@ -2007,6 +1918,10 @@ const withGuns = (side, saved) => {
 // server resolves with (ship-zones.js), so the aiming is instant and the arbitration is still ours: what comes
 // back here is which zones each hull HAS, what state its systems are in, and what is in the racks.
 const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
+    // YOUR GUNNERY, so the scene can put a real hit percentage on every target marker. It is the same number
+    // the server will roll against (hitChance in ship-battle.js) rather than a client-side guess at it — a
+    // marker that advertises 74% and then resolves at something else is worse than showing nothing.
+    myAccuracy: shipProfile(meta.meProfile || {}).accuracy,
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
     me: withGuns(meta.me, saved),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
@@ -2021,26 +1936,22 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
     round: st.round, maxRounds: MAX_ROUNDS,
     gauge: st.gauge,
-    burning: { me: st.me.fire || 0, foe: st.foe.fire || 0 },
-    // Holes below the waterline, so the scene can show what is sinking you.
-    leaks: { me: st.me.leaks || 0, foe: st.foe.leaks || 0 },
-    // WHAT EACH SHIP HAS LEFT TO LOSE. Canvas, steering and every individual barrel — the scene draws these on
-    // the hulls themselves (a shredded sail, a dismounted gun), which is what makes aiming somewhere other
-    // than the hull legible without a stat block.
+    // WHAT EACH SHIP HAS LEFT TO LOSE. Canvas and every individual barrel — the scene draws both on the
+    // hulls themselves (shredded sails, a dismounted gun), which is what makes aiming somewhere other than
+    // the hull legible without reading a stat block.
     sys: {
-        me: { sails: st.me.sails, rudder: st.me.rudder, guns: st.me.guns },
-        foe: { sails: st.foe.sails, rudder: st.foe.rudder, guns: st.foe.guns },
+        me: { sails: st.me.sails, guns: st.me.guns },
+        foe: { sails: st.foe.sails, guns: st.foe.guns },
     },
-    caps: { sails: SAILS_MAX, rudder: RUDDER_MAX, gun: GUN_HP },
-    // Which parts each hull actually has, measured off its own art. A hull whose sprite has no rudder cells
-    // must not offer a rudder to aim at — the tap would resolve to nothing and read as a broken control.
+    caps: { sails: SAILS_MAX, gun: GUN_HP },
+    // Which parts each hull actually has, measured off its own art — a marker for a part the sprite does
+    // not have would be a button that does nothing.
     zones: {
         me: zonesOn(zoneKeyFromArt(meta.me?.art, meta.me?.level)),
         foe: zonesOn(zoneKeyFromArt(meta.foe?.art, meta.foe?.level)),
     },
-    zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, blurb: z.blurb })),
-    // THE RACKS, per shot. Ammunition used to be one type chosen before the battle and spent once; now a gun
-    // is loaded when you lay it, so the scene needs to know what is left as you spend it.
+    zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, effect: z.effect, blurb: z.blurb })),
+    // THE RACKS. One round is spent per volley, so the scene shows what is left as you pick.
     rack: AMMO_LIST.map((a) => ({
         id: a.id, name: a.name, icon: a.icon, basic: a.basic, tint: a.id,
         count: a.basic ? null : Number(ammoStock(row)[a.id]) || 0,
@@ -2058,50 +1969,50 @@ async function saveBattle(buyerId, state, meta) {
     await db.query(`UPDATE mkt_sailing SET battle_state = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
         [buyerId, state ? JSON.stringify({ state, meta }) : null]).catch(() => {});
 }
-// A SAVED FIGHT FROM THE OLD SHAPE IS NOT RESUMABLE. Battles used to store `myHp`/`foeRig`/`myLeaks` flat on
-// the state; a targeted fight stores two sides with their own sails, rudder and per-gun condition. There is
-// nothing sensible to migrate a half-fought broadside battle INTO — so a pre-targeting state is dropped, which
-// hands the player a fresh fight rather than a screen that cannot draw itself. `v` is the version marker.
+// A SAVED FIGHT FROM AN OLDER SHAPE IS NOT RESUMABLE. The state has been through three shapes now — flat
+// `myHp`/`myLeaks`, then two sides with rudders and leaks, and now two sides with canvas and guns. There is
+// nothing sensible to migrate a half-fought battle INTO, so anything but the current `v` is dropped and the
+// player gets a fresh fight instead of a screen that cannot draw itself.
 const readBattle = (row) => {
     const b = row?.battle_state;
     if (!b) return null;
     const parsed = typeof b === "string" ? (() => { try { return JSON.parse(b); } catch { return null; } })() : b;
     if (!parsed?.state || !parsed?.meta) return null;
-    return parsed.state.v === 2 && parsed.state.me && parsed.state.foe ? parsed : null;
+    return parsed.state.v === 3 && parsed.state.me && parsed.state.foe ? parsed : null;
 };
 
-// COMMIT THE VOLLEY — every gun you laid fires at once, they answer, and the fight waits again. When it ends,
-// this is also where the spoils are paid, exactly once, because the state row is cleared in the same breath.
+// COMMIT THE VOLLEY — your whole broadside goes at the part you picked, they answer, and the fight waits
+// again. When it ends, this is also where the spoils are paid, exactly once, because the state row is
+// cleared in the same breath.
 //
-// NOTHING THE CLIENT SENDS IS TRUSTED. It may name a gun that is already dismounted, a zone this hull does not
-// have, or a rack it emptied two rounds ago — sanitizeAssignments corrects each of those to an honest round
-// shot at the hull rather than refusing the volley, because a fight that will not resolve is worse than a shot
+// NOTHING THE CLIENT SENDS IS TRUSTED. It may name a zone this hull does not have, a cannon that is already
+// wreckage, or a rack it emptied two rounds ago — sanitizeAim corrects each of those to an honest round shot
+// at the hull rather than refusing the volley, because a fight that will not resolve is worse than a shot
 // that went somewhere dull.
-export async function shipBattleVolley(buyerId, assignments) {
+export async function shipBattleVolley(buyerId, aim) {
     if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
     const { me, foe } = profilesFrom(open.meta);
 
-    // THE RACKS ARE SPENT HERE, ONE ROUND PER GUN. Ammunition used to be a single type consumed when the
-    // battle opened; a gun is loaded individually now, so the stock is walked down shot by shot and anything
-    // the racks cannot cover quietly becomes round shot — you are never unable to fire.
+    // ONE ROUND OF AMMUNITION PER VOLLEY, spent here rather than when the battle opened — you choose what to
+    // load when you choose where to shoot, so this is the only place that knows. An empty rack is not a
+    // refusal: it quietly becomes round shot, and you are never unable to fire.
     const stock = { ...ammoStock(row) };
-    const spent = {};
-    const foeZones = [...zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)), "guns"];
-    const laid = sanitizeAssignments(open.state, "me", assignments, {
-        zonesAllowed: foeZones,
+    let spent = null;
+    const laid = sanitizeAim(open.state, "me", aim, {
+        zonesAllowed: zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)),
         ammoAvailable: (id) => {
             const def = ammoById(id);
             if (def.basic) return true;
             if ((Number(stock[id]) || 0) <= 0) return false;
             stock[id] = (Number(stock[id]) || 0) - 1;
-            spent[id] = (spent[id] || 0) + 1;
+            spent = id;
             return true;
         },
     });
-    if (Object.keys(spent).length) {
+    if (spent) {
         await db.query(`UPDATE mkt_sailing SET ammo = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
             [buyerId, JSON.stringify(stock)]).catch(() => {});
     }
@@ -2137,6 +2048,83 @@ export async function shipBattleVolley(buyerId, assignments) {
     };
 }
 
+// ── FINDING A FIGHT ──────────────────────────────────────────────────────────────────────────────────────────
+// One button. You do not pick an opponent off a list any more and you do not climb a ladder rung by rung — you
+// press Battle and the sea hands you somebody your own size.
+//
+// The list was the wrong shape for two reasons. It made the first decision of the feature a comparison of
+// fifteen rows before you had fought once, and it meant the fleet had to be unlocked IN ORDER while rivals were
+// always available — two halves of one button obeying different rules.
+//
+// "Your own size" is NOT the rank a ship resembles. That was the first attempt and it was measured wrong:
+// fleetRankForShip matches on raw guns and hull, but a designed pirate of the same size also carries better
+// gunnery and armour, so an "equal" match was one a plain broadside won 2% of the time. The sim said a mid
+// build met its fair fight two rungs below its own number, and a fresh boat three.
+//
+// So the match is made on the ODDS instead — matchupOdds, the same read the opponent rows used to print on
+// themselves — and aimed a little in the PLAYER'S favour. This is a reward-bearing fight against the world,
+// not a ladder: an even coin toss every time is not what "found you a fight" should feel like.
+const TARGET_ODDS = 0.56;   // a shade in your favour
+const SHORTLIST = 7;        // how many of the closest matches go in the hat
+const RIVAL_WEIGHT = 1.5;   // a real ship is a better story than a designed one, when there is one your size
+
+async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myArmour) {
+    const rivals = await db.query(
+        `SELECT ${RAID_TARGET_COLS}
+           FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
+          WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+          ORDER BY random() LIMIT 30`,
+        [buyerId]
+    ).catch(() => []);
+
+    // NEAREST FIRST, not "near enough". Weighting every candidate by its distance from the target reads well
+    // and fails badly at the edges: a brand-new captain with one gun is outmatched by the entire fleet, every
+    // distance is large and similar, and the weights flatten into a lottery — measured at a 10% win rate,
+    // with rank 15 turning up as often as rank 2. Shortlisting the CLOSEST few and drawing from those is
+    // fair wherever you stand, because it asks who is nearest rather than who is close.
+    const dist = (o) => Math.abs(o - TARGET_ODDS);
+    const mine = { myGuns, myHull, myAcc: myAccuracy, myArmor: myArmour };
+    const all = FLEET.map((f) => ({
+        kind: "fleet", rank: f.rank, boost: 1,
+        // +0.1 on their accuracy, the same lift foeProfile gives a designed ship when it actually fights.
+        d: dist(matchupOdds({ ...mine, guns: f.guns, hull: f.hp, acc: Math.min(0.96, f.accuracy + 0.1), armor: f.armor })),
+    }));
+    for (const r of rivals) {
+        const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
+        const guns = gunsFor(r.gun_level || 0), hull = hullFor(r.hull_level || 0, level);
+        all.push({
+            kind: "rival", id: r.id, boost: RIVAL_WEIGHT,
+            d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level), armor: armorFor(r.hull_level || 0) })),
+        });
+    }
+    all.sort((a, z) => a.d - z.d);
+    const shortlist = all.slice(0, SHORTLIST).map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
+    let roll = Math.random() * shortlist.reduce((sum, p) => sum + p.w, 0);
+    return shortlist.find((p) => (roll -= p.w) <= 0) || shortlist[0];
+}
+
+/** THE ONE WAY INTO A FIGHT. Matches you, then opens the battle — the two paths underneath (a designed fleet
+ *  ship, another member's ship) are unchanged, because the fight itself never cared which it was. */
+export async function doBattle(buyerId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    // An unfinished fight owns this button — the sortie is already spent on it, so hand it straight back.
+    const openNow = readBattle(row);
+    if (openNow) {
+        return { ok: true, resumed: true,
+            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
+            ...(await getSailingState(buyerId)) };
+    }
+    const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
+    const extras = await equippedRaidExtras(buyerId);
+    if (raidsUsedToday(row) >= raidsPerDay(myLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
+
+    const myGuns = gunsFor(row?.gun_level || 0), myHull = hullFor(row?.hull_level || 0, myLevel);
+    const match = await matchOpponent(buyerId, myGuns, myHull,
+        accuracyFor(row?.gunnery_level || 0, myLevel), armorFor(row?.hull_level || 0));
+    return match.kind === "rival" ? doRaid(buyerId, match.id) : doFleetBattle(buyerId, match.rank);
+}
+
 // ── A SORTIE AGAINST THE FLEET ───────────────────────────────────────────────────────────────────────────────
 // Fight the next rank down the ladder, or re-fight one already sunk for a reduced purse. Win and the ladder
 // advances; lose and you have spent a sortie and nothing else — the fleet never takes a rung back.
@@ -2157,10 +2145,10 @@ export async function doFleetBattle(buyerId, rank = null) {
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myBattleLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
     const depth = row?.fleet_depth || 0;
-    // Default target is the next unbeaten rung; an explicit rank may only be one already sunk.
+    // Matchmaking always names a rank; an unqualified call falls back to the next unbeaten rung. No rung is
+    // locked any more — being handed a ship your own size IS the progression.
     const want = rank == null ? Math.min(MAX_FLEET_RANK, depth + 1) : Number(rank);
     if (!Number.isFinite(want) || want < 1 || want > MAX_FLEET_RANK) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
-    if (want > depth + 1) return { ok: false, error: "locked", ...(await getSailingState(buyerId)) };
     const ship = fleetShip(want);
     if (!ship) return { ok: false, error: "bad_rank", ...(await getSailingState(buyerId)) };
 

@@ -24,17 +24,16 @@ import { zoneById } from "@/lib/marketplace/ship-zones.js";
 
 // ── AMMUNITION ───────────────────────────────────────────────────────────────────────────────────────────────
 // Round shot is unlocked forever and never runs out, so nobody is ever unable to fight. The others are stock
-// you buy with doubloons and spend PER SHOT — the reason the currency keeps mattering after the gun deck is
-// full. Prices dropped by four when that changed: they were set when a battle spent exactly one round of the
-// one type you had loaded, and a seven-gun ship firing shells for twelve rounds would have emptied a purse in
-// a single sortie at the old numbers.
+// you buy with doubloons and spend ONE OF PER VOLLEY — the reason the currency keeps mattering after the gun
+// deck is full. It briefly cost one per GUN, back when guns were laid individually; a seven-gun ship firing
+// shells for twelve rounds emptied a purse in a single sortie, which is a price nobody pays twice.
 //
 // Each type is a real trade, not a strictly-better ladder — and now each one is also a shot you point at a
 // particular PART of a ship, so what it is good against matters as much as what it does:
 //   round     the honest default — nothing special, nothing wasted
 //   chain     tumbles through canvas: the shot for sails, and next to useless in the hold
-//   grape     sweeps a deck: it dismounts guns and murders a thin hull, and armour stops it dead
-//   explosive heavy and inaccurate, it starts fires — and it is what you load if you are aiming at the magazine
+//   grape     sweeps a deck: the round for dismounting a cannon, and armour stops it dead
+//   explosive heavy and inaccurate, and the only round that punches through a heavy ship's armour
 //
 // `sys` is the extra damage the shot does to the SYSTEM it lands on, over the one point every hit does. That is
 // where a loaded rack earns its price now: chain does not out-damage round shot, it out-WRECKS it, in the one
@@ -43,22 +42,22 @@ export const AMMO = {
     round: {
         id: "round", name: "Round Shot", basic: true, price: 0,
         icon: "GiCannonBall", blurb: "Solid iron. No tricks, no waste — and you never run out.",
-        dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, fire: 0, sys: {},
+        dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {},
     },
     chain: {
-        id: "chain", name: "Chain Shot", basic: false, price: 3,
-        icon: "GiChainedHeart", blurb: "Two balls on a chain, tumbling end over end. Aimed at canvas it takes the whole suit of sails.",
-        dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, fire: 0, sys: { sails: 2, rudder: 1 },
+        id: "chain", name: "Chain Shot", basic: false, price: 8,
+        icon: "GiChainedHeart", blurb: "Two balls on a chain, tumbling end over end. Aimed at canvas it takes a whole suit of sails at once.",
+        dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 },
     },
     grape: {
-        id: "grape", name: "Grapeshot", basic: false, price: 3,
+        id: "grape", name: "Grapeshot", basic: false, price: 9,
         icon: "GiCannonShot", blurb: "A bag of small shot that sweeps a gun deck clear. Useless against armour, murder on a crew.",
-        dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, fire: 0, sys: { guns: 1 },
+        dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 },   // counts double on a gun deck
     },
     explosive: {
-        id: "explosive", name: "Explosive Shell", basic: false, price: 6,
-        icon: "GiBurningEmbers", blurb: "A fused shell. Wild off the muzzle — but the one shot you want in their magazine.",
-        dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, fire: 0.4, sys: { powder: 1 },
+        id: "explosive", name: "Explosive Shell", basic: false, price: 14,
+        icon: "GiBurningEmbers", blurb: "A fused shell. Wild off the muzzle, and it goes through armour plate that stops solid iron dead.",
+        dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {},
     },
 };
 export const AMMO_LIST = Object.values(AMMO);
@@ -68,10 +67,10 @@ export const ammoById = (id) => AMMO[String(id || "round")] || AMMO.round;
 // Tracks are capped low and deliberately cheap-feeling per level: the interesting decision is meant to be what
 // you LOAD, not how many times you tapped Upgrade.
 export const COMBAT_TRACKS = {
-    // SIX LEVELS, so gunsFor caps at SEVEN barrels. Eight levels meant nine guns, and nine will not fit on
+    // FIVE LEVELS on top of the two you start with, so gunsFor still caps at SEVEN barrels. Nine will not fit on
     // the narrower hulls — the placement tool ran out of rail before it ran out of guns. A cap you can
     // actually draw beats a number that only exists in the HUD.
-    guns: { key: "guns", col: "gun_level", max: 6, name: "Cannons", icon: "GiCannon",
+    guns: { key: "guns", col: "gun_level", max: 5, name: "Cannons", icon: "GiCannon",
         desc: "More barrels in the broadside — every gun is another roll to hit." },
     gunnery: { key: "gunnery", col: "gunnery_level", max: 8, name: "Gunnery", icon: "GiTargeting",
         desc: "A drilled crew lays the guns truer — better accuracy, and more raking hits." },
@@ -79,7 +78,11 @@ export const COMBAT_TRACKS = {
         desc: "Oak and iron plate — more hit points, and every ball that lands hurts less." },
 };
 
-// Guns in a broadside. ONE, plus one per level of the Cannons track. Nothing else.
+// Guns in a broadside. TWO, plus one per level of the Cannons track. Nothing else.
+//
+// It started at ONE and that was measured unplayable: a single gun cannot sink even the first pirate on the
+// ladder inside the round limit, so the opening fight of the feature was arithmetic nobody could win. The cap
+// is still SEVEN — the most barrels a hull can be drawn carrying — so the track gave up a level instead.
 //
 // This started at 3 and also handed out a free gun per six boat levels, which meant a level-37 captain who had
 // never touched the Cannons track sailed with SEVEN guns — the headline upgrade of the whole feature was
@@ -90,7 +93,7 @@ export const COMBAT_TRACKS = {
 // is the platform; the guns are the thing you decided to buy, and now they are the only thing you can point at
 // on your own deck and count.
 export const gunsFor = (gunLevel = 0) =>
-    1 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel));
+    2 + Math.max(0, Math.min(COMBAT_TRACKS.guns.max, gunLevel));
 
 // Chance a single gun hits, before the part of the ship it is aimed at and before the target's own handling.
 // Gunnery is the lever; the boat contributes a little steadiness.
@@ -132,17 +135,20 @@ export const armorFor = (hullLevel = 0) => Math.min(0.4, Math.max(0, hullLevel) 
 
 // Damage one ball does before armour. Guns are the count, not the calibre — calibre is the ammunition.
 const SHOT_MIN = 5, SHOT_VAR = 9;
-// A fire is lit at FIRE_START and burns down by FIRE_DECAY a round. It is a wound that gets better, not a
-// second gun deck that never stops firing.
-const FIRE_START = 7, FIRE_DECAY = 2;
 
-// ── THE SYSTEMS A SHIP CAN LOSE ──────────────────────────────────────────────────────────────────────────────
-// Hull points are not the only thing a ball can take off a ship. Canvas, steering and the guns themselves each
-// have their own small pool, and losing one changes how the rest of the fight goes rather than moving you
-// closer to zero — which is what makes aiming somewhere other than the hull ever worth doing.
-export const SAILS_MAX = 4;      // suits of canvas. Chain shot takes two at a time.
-export const RUDDER_MAX = 3;     // hits to unship a rudder. Small pool: it is a hard target to begin with.
-export const GUN_HP = 2;         // hits to dismount one cannon. Grape does both at once.
+// ── THE TWO THINGS THAT ARE NOT HIT POINTS ───────────────────────────────────────────────────────────────────
+// Canvas and the guns themselves each have a small pool, and taking one changes how the REST of the fight goes
+// rather than only moving a bar — which is the whole reason to aim anywhere other than the hull.
+//
+// There were briefly two more (a rudder and a powder store) and both are gone: nobody could say in one line
+// what a rudder did, and a magazine that ends a fight on one lucky ball is a coin toss wearing a target.
+export const SAILS_MAX = 6;      // hits to strip her canvas. Chain takes two at a time, so three volleys of it.
+export const GUN_HP = 4;         // hits to dismount one cannon. Grape counts double.
+//
+// BOTH OF THESE WERE HALVED, and measured back up. With one target for the whole broadside, concentrating
+// seven guns on a two-hit cannon dismounted one or two a round: a mid build went from 0% to 89% against rank
+// nine on that alone, which is not a decision, it is a switch. Deeper pools mean breaking something is a
+// COMMITMENT of several volleys rather than a free action.
 
 // Build the combat profile a ship brings to a battle. `sea` is the sailing affinity block (broadside/ironclad).
 // AMMUNITION IS NO LONGER PART OF THE PROFILE. It used to be baked in here — one type for the whole battle, its
@@ -186,225 +192,127 @@ export function foeProfile(foe) {
     };
 }
 
-
-// ── AIMING: THE PART YOU ACTUALLY PLAY ───────────────────────────────────────────────────────────────────────
-// This started as one order a round — broadside, rake, hole her, board — chosen off four cards under the
-// ships. It worked, and it was still one decision per round no matter how many guns you had bought, which made
-// the Cannons track a number that changed someone else's arithmetic.
+// ── AIMING: THE PART YOU ACTUALLY PLAY ───────────────────────────────────────────────────────────────────────
+// This started as one order a round — broadside, rake, hole her, board — chosen off four cards under the ships.
+// It worked, and it was still one decision per round no matter what you had bought.
 //
-// Now you lay EVERY GUN yourself. Tap a part of her and the next crew is told to aim there; tap again for the
-// next; give a gun a different round out of the rack if it suits the target. Nothing fires until you commit,
-// and then the whole volley goes at once. Seven guns is seven decisions, which is what a gun deck should be.
+// Now you pick a PLACE. Tap her sails, her hull, or one particular cannon; load something other than round shot
+// if it suits; fire. The whole broadside goes where you pointed it. Three targets, one tap, and the trade
+// between them is legible from the hit percentage on each marker (see ship-zones.js for what each one does).
 //
-// The zones and their odds live in ship-zones.js — this file is what happens when the ball arrives.
+// It briefly went further than this — a target per GUN, plus crews you could send below to pump and repair —
+// and that was too much: your cannons are on YOUR ship, so laying each one individually is bookkeeping, not
+// aiming. One volley, one place.
+
+// ── HOW HARD SHE IS TO HIT ───────────────────────────────────────────────────────────────────────────────────
+// Evasion is the reason to shoot at canvas. A ship under full sail is genuinely awkward to lay a gun on; one
+// with her sails in rags is a target sitting still. This is the payoff for a shot that did almost no damage —
+// it makes every shot after it better, which is the only "setup" move in the fight and the whole reason the
+// three targets are a decision rather than a menu.
 //
-// A crew can also be sent to YOUR OWN ship instead: to the pumps, to the rigging, to a dismounted gun. That is
-// where "man the pumps" went. It is no longer a button that costs you the round — it costs you ONE GUN, which
-// is a price you set yourself, and the rest of the broadside still fires.
-export const REPAIR = {
-    hull: { id: "hull", name: "Man the pumps", verb: "at the pumps" },
-    sails: { id: "sails", name: "Bend on new canvas", verb: "in the rigging" },
-    rudder: { id: "rudder", name: "Ship a new rudder", verb: "at the tiller" },
-    guns: { id: "guns", name: "Remount a gun", verb: "on the gun deck" },
-};
+// NOTHING TICKS. Leaks, fires and the crews that fought them are gone: damage over time meant the number on
+// the bar moved for reasons you did not do and could not watch, and repairing meant spending a gun on
+// undoing rather than on doing. A hit hurts when it lands, and that is all.
+export const BASE_EVADE = 0.04;
+export const evasionOf = (sails = SAILS_MAX) =>
+    BASE_EVADE + 0.2 * (Math.max(0, sails) / SAILS_MAX);
 
-// ── WATER, FIRE AND HANDLING ─────────────────────────────────────────────────────────────────────────────────
-// A hole below the waterline takes a slice of MAX hull every round it stays open, and they stack — ignoring
-// three is how you lose a fight you were winning. Water does NOT burn down on its own the way a fire does: the
-// only thing that closes a hole is a crew sent to the pumps, and each hole is rolled on its own at 85%, so
-// three holes clear together only about 61% of the time.
-export const LEAK_TICK = 0.04;          // per hole, per round, of MAX hull
-export const PATCH_PER_HOLE = 0.85;
-export const MAX_LEAKS = 4;
-
-// EVASION — how hard this ship is to hit, and the reason to shoot at canvas. A ship under full sail with her
-// rudder shipped is genuinely awkward to lay a gun on; one with her sails in rags and no steering is a target.
-// This is the payoff for a shot that did almost no damage: it makes every later shot better.
-export const BASE_EVADE = 0.03;
-export const evasionOf = (sails = SAILS_MAX, rudder = RUDDER_MAX) =>
-    BASE_EVADE + 0.16 * (Math.max(0, sails) / SAILS_MAX) + 0.06 * (Math.max(0, rudder) / RUDDER_MAX);
-
-/** One gun's chance to land on one part of one ship. Everything that decides a shot is in this line. */
+/** One gun's chance to land on one part of one ship. Everything that decides a shot is in this line, and the
+ *  scene shows the result of it on every target marker — that percentage IS the explanation of the trade. */
 export function hitChance(att, zone, ammo, evasion) {
     const base = Math.max(0.15, Math.min(0.97, (att?.accuracy || 0.6) + (ammo?.accuracy || 0)));
     return Math.max(0.05, Math.min(0.97, base * (zone?.aim ?? 1) * (1 - evasion)));
 }
 
-// THE MAGAZINE GOING UP. A share of MAX hull rather than a flat number, so it is a disaster on a sloop and a
-// very bad day on a man-o'-war rather than an instant kill on both. Explosive shell in the hold is worse again,
-// which is the one place that round is unambiguously the right pick.
-export const POWDER_BLAST = 0.22;
-
-const side = (st, who) => (who === "me" ? st.me : st.foe);
-const other = (who) => (who === "me" ? "foe" : "me");
-const hpPair = (st) => ({ me: st.me.hp, foe: st.foe.hp });
 const gunsReady = (s) => s.guns.reduce((n, hp) => n + (hp > 0 ? 1 : 0), 0);
+const hpPair = (st) => ({ me: st.me.hp, foe: st.foe.hp });
 
 // The opening state of a fight. Kept JSON-safe: it is stored on the sailing row between rounds.
 export function initBattleState(me, foe, { rng = Math.random } = {}) {
     const fresh = (p) => ({
-        hp: p.hp, max: p.hp, fire: 0, leaks: 0,
-        sails: SAILS_MAX, rudder: RUDDER_MAX,
+        hp: p.hp, max: p.hp, sails: SAILS_MAX,
         guns: Array.from({ length: Math.max(1, p.guns) }, () => GUN_HP),
     });
-    // The weather gauge — who fires first — leans to the lighter, handier ship.
+    // Who fires first, leaning to the lighter, handier ship.
     const myOdds = 0.5 + Math.max(-0.18, Math.min(0.18, (foe.guns - me.guns) * 0.02));
-    return { v: 2, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
+    return { v: 3, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
-// The scene sends a list of assignments and the server re-derives every one of them: a gun that does not exist,
-// a gun that is dismounted, two crews on one barrel, a zone this hull does not have, ammunition that is not in
-// the racks. None of that is a rejection — it is a correction, because a fight refusing to resolve because one
-// entry was stale is a worse outcome than that entry quietly becoming an honest round shot at the hull.
-export function sanitizeAssignments(st, who, list, { zonesAllowed = null, ammoAvailable = null } = {}) {
-    const s = side(st, who);
-    const seen = new Set();
-    const out = [];
-    for (const raw of Array.isArray(list) ? list : []) {
-        const gun = Number(raw?.gun);
-        if (!Number.isInteger(gun) || gun < 0 || gun >= s.guns.length) continue;
-        if (s.guns[gun] <= 0 || seen.has(gun)) continue;
-        seen.add(gun);
-        const at = raw?.at === "self" ? "self" : "them";
-        let zone = String(raw?.zone || "hull");
-        if (at === "self") {
-            if (!REPAIR[zone]) zone = "hull";
-        } else {
-            if (zonesAllowed && !zonesAllowed.includes(zone)) zone = "hull";
-            if (!["hull", "sails", "rudder", "guns", "powder"].includes(zone)) zone = "hull";
-        }
-        let ammo = String(raw?.ammo || "round");
-        if (at === "self") ammo = "round";
-        else if (ammoAvailable && !ammoAvailable(ammo)) ammo = "round";
-        const target = Number.isInteger(Number(raw?.target)) ? Number(raw.target) : null;
-        out.push({ gun, at, zone, ammo, target });
+// One aim per volley: a part, optionally a particular cannon, and what is loaded. The server re-derives every
+// field — a zone this hull does not have, a cannon that is already wreckage, ammunition that is not in the
+// racks. None of that is a rejection, it is a correction: a fight that refuses to resolve because one field was
+// stale is a worse outcome than a volley that went somewhere ordinary.
+export function sanitizeAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}) {
+    const them = who === "me" ? st.foe : st.me;
+    let zone = String(raw?.zone || "hull");
+    if (!["sails", "hull", "guns"].includes(zone)) zone = "hull";
+    if (zonesAllowed && !zonesAllowed.includes(zone)) zone = "hull";
+    // Canvas already in rags is not a target — it would be a volley spent on nothing at all.
+    if (zone === "sails" && them.sails <= 0) zone = "hull";
+    let target = null;
+    if (zone === "guns") {
+        const up = them.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
+        if (!up.length) zone = "hull";
+        else target = up.includes(Number(raw?.target)) ? Number(raw.target) : up[0];
     }
-    return out;
+    let ammo = String(raw?.ammo || "round");
+    if (ammoAvailable && !ammoAvailable(ammo)) ammo = "round";
+    return { zone, target, ammo };
 }
 
 // ── WHAT THE ENEMY DOES ──────────────────────────────────────────────────────────────────────────────────────
-// Deliberately readable rather than clever: they bail when they are filling up, re-rig when they cannot dodge,
-// break up your gun deck when you have more barrels than they do, and otherwise put iron into the hull. A foe
-// whose every shot has a visible reason is one you can plan against, which is the whole point of showing their
-// aim on your ship before it lands.
-export function foeAssignments(me, foe, st, { rng = Math.random } = {}) {
-    const s = st.foe, enemy = st.me;
-    const crews = [];
-    for (let i = 0; i < s.guns.length; i += 1) if (s.guns[i] > 0) crews.push(i);
-    const out = [];
+// Deliberately readable rather than clever: cut your canvas early while it is worth cutting, break up a gun
+// deck that outnumbers theirs, and otherwise put iron into the hull. A foe whose shot has a visible reason is
+// one you can plan against — and their aim is shown on your ship before it lands.
+export function foeAim(me, foe, st, { rng = Math.random } = {}) {
+    const mine = st.me, theirs = st.foe;
     const ammo = foe.ammo?.id || "round";
-
-    // REPAIRS FIRST, and never with the whole deck. Two crews at the pumps while you shoot at them is how a
-    // fleet ship loses a fight it was winning, so they spend at most a third of their guns on damage control.
-    const spare = Math.max(0, Math.floor(crews.length / 3));
-    let spent = 0;
-    if (s.leaks >= 2 && spent < spare) { out.push({ gun: crews[spent], at: "self", zone: "hull", ammo: "round", target: null }); spent += 1; }
-    else if (s.leaks === 1 && s.hp < s.max * 0.5 && spent < spare) { out.push({ gun: crews[spent], at: "self", zone: "hull", ammo: "round", target: null }); spent += 1; }
-    if (s.sails === 0 && spent < spare && rng() < 0.6) { out.push({ gun: crews[spent], at: "self", zone: "sails", ammo: "round", target: null }); spent += 1; }
-
-    // Then the guns that are left, laid at you. MOSTLY AT THE HULL, and this is a balance decision as much as a
-    // characterisation one: a fleet ship firing a third of its broadside into your gun deck strips a SEVEN-gun
-    // player far faster than the same tactic strips an eleven-gun enemy, so an AI that snipes as eagerly as a
-    // player should is not "smart", it is a ship with more barrels than you exploiting the fact.
-    //
-    // Measured: at a third, a mid build's deck was empty by round six and rank 5 fell from a fair fight to 27%.
-    // They still go for the guns — they just do it like an opponent rather than like an optimiser, and they only
-    // bother when they have the broadside to spare.
-    const myGunsUp = gunsReady(enemy);
-    const canBully = crews.length >= 6 && myGunsUp >= 4;
-    for (let i = spent; i < crews.length; i += 1) {
-        const r = rng();
-        let zone = "hull";
-        let target = null;
-        if (enemy.sails > 0 && r < 0.14) zone = "sails";
-        else if (canBully && r < 0.26) {
-            zone = "guns";
-            // Always at a gun that is still up — a broadside aimed at wreckage is the sort of thing that makes
-            // an opponent look broken rather than beaten.
-            const up = enemy.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
-            target = up[Math.floor(rng() * up.length)] ?? null;
-        } else if (enemy.rudder > 0 && r < 0.32) zone = "rudder";
-        else if (r < 0.35 && s.hp < s.max * 0.35) zone = "powder";  // cornered ships take the long shot
-        out.push({ gun: crews[i], at: "them", zone, ammo, target });
+    const myGunsUp = gunsReady(mine);
+    const r = rng();
+    // Canvas first, and only while there is plenty of it — shredding the last suit is worth less than damage.
+    if (mine.sails > SAILS_MAX / 2 && r < 0.3) return { zone: "sails", target: null, ammo };
+    // They pick on a gun deck bigger than their own, which is the same call a player makes.
+    if (myGunsUp >= 4 && myGunsUp >= gunsReady(theirs) && r < 0.5) {
+        const up = mine.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
+        return { zone: "guns", target: up[Math.floor(rng() * up.length)] ?? null, ammo };
     }
-    return out;
+    return { zone: "hull", target: null, ammo };
 }
 
 // ── ONE ROUND ────────────────────────────────────────────────────────────────────────────────────────────────
-// Fires burn, water comes in, then both sides work their assignments in weather-gauge order. Pure — the caller
+// Both broadsides go off in weather-gauge order, each at the one part its captain chose. Pure — the caller
 // persists whatever comes back — and `rng` is injectable so a fight can be replayed exactly in the lab.
-export function resolveVolley(me, foe, state, assignments, { rng = Math.random } = {}) {
-    const st = { v: 2, round: state.round, gauge: state.gauge, me: { ...state.me, guns: [...state.me.guns] }, foe: { ...state.foe, guns: [...state.foe.guns] } };
+export function resolveVolley(me, foe, state, aim, { rng = Math.random } = {}) {
+    const st = {
+        v: 3, round: state.round, gauge: state.gauge,
+        me: { ...state.me, guns: [...state.me.guns] },
+        foe: { ...state.foe, guns: [...state.foe.guns] },
+    };
     const events = [];
     st.round += 1;
 
-    const mine = sanitizeAssignments(st, "me", assignments);
-    const theirs = foeAssignments(me, foe, st, { rng });
+    const mine = sanitizeAim(st, "me", aim);
+    const theirs = foeAim(me, foe, st, { rng });
 
-    // Fires first — a shell landed last round is still working.
-    for (const who of ["foe", "me"]) {
-        const s = side(st, who);
-        if (s.fire > 0 && s.hp > 0 && side(st, other(who)).hp > 0) {
-            s.hp = Math.max(0, s.hp - s.fire);
-            events.push({ type: "burn", victim: who, dmg: s.fire, hp: hpPair(st) });
-            s.fire = Math.max(0, s.fire - FIRE_DECAY);
-        }
-    }
-    // Then the water, before anyone fires. A hole takes its slice whether or not you get to act, which is what
-    // makes a crew at the pumps urgent rather than optional.
-    for (const who of ["foe", "me"]) {
-        const s = side(st, who);
-        if (s.leaks > 0 && s.hp > 0 && side(st, other(who)).hp > 0) {
-            const dmg = Math.max(1, Math.round(s.leaks * LEAK_TICK * s.max));
-            s.hp = Math.max(0, s.hp - dmg);
-            events.push({ type: "flood", victim: who, dmg, holes: s.leaks, hp: hpPair(st) });
-        }
-    }
-
-    const work = (who, list) => {
+    const fire = (who, order) => {
         const att = who === "me" ? me : foe;
         const def = who === "me" ? foe : me;
-        const mySide = side(st, who), theirSide = side(st, other(who));
+        const mySide = who === "me" ? st.me : st.foe;
+        const theirSide = who === "me" ? st.foe : st.me;
         if (mySide.hp <= 0 || theirSide.hp <= 0) return;
 
-        // DAMAGE CONTROL. A crew at the pumps is a gun that does not fire — the cost is paid in broadside, not
-        // in a round you were never asked about.
-        for (const a of list.filter((x) => x.at === "self")) {
-            if (a.zone === "hull") {
-                const before = mySide.leaks;
-                let left = 0;
-                for (let h = 0; h < before; h += 1) if (rng() > PATCH_PER_HOLE) left += 1;
-                mySide.leaks = left;
-                events.push({ type: "repair", side: who, sys: "hull", sealed: before - left, left, hp: hpPair(st) });
-            } else if (a.zone === "sails") {
-                const before = mySide.sails;
-                mySide.sails = Math.min(SAILS_MAX, mySide.sails + 2);
-                events.push({ type: "repair", side: who, sys: "sails", gained: mySide.sails - before, hp: hpPair(st) });
-            } else if (a.zone === "rudder") {
-                const before = mySide.rudder;
-                mySide.rudder = Math.min(RUDDER_MAX, mySide.rudder + 1);
-                events.push({ type: "repair", side: who, sys: "rudder", gained: mySide.rudder - before, hp: hpPair(st) });
-            } else if (a.zone === "guns") {
-                const down = mySide.guns.findIndex((hp) => hp <= 0);
-                if (down >= 0) mySide.guns[down] = 1;
-                events.push({ type: "repair", side: who, sys: "guns", gained: down >= 0 ? 1 : 0, index: down, hp: hpPair(st) });
-            }
-        }
+        const zone = zoneById(order.zone);
+        const ammo = ammoById(order.ammo);
+        const evasion = evasionOf(theirSide.sails);
+        const chance = hitChance(att, zone, ammo, evasion);
+        const guns = mySide.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
 
-        const shooting = list.filter((x) => x.at === "them");
-        if (!shooting.length) return;
-
-        const evasion = evasionOf(theirSide.sails, theirSide.rudder);
         const shots = [];
         let total = 0;
-        const after = [];   // things that happen once the volley has landed, in the order they happened
-
-        for (const a of shooting) {
-            const zone = zoneById(a.zone);
-            const ammo = ammoById(a.ammo);
-            if (rng() > hitChance(att, zone, ammo, evasion)) { shots.push({ gun: a.gun, zone: a.zone, ammo: ammo.id, hit: false }); continue; }
-
+        const after = [];
+        for (const gun of guns) {
+            if (rng() > chance) { shots.push({ gun, hit: false }); continue; }
             const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
             let dmg = (SHOT_MIN + rng() * SHOT_VAR) * ammo.dmg * att.dmgMult * zone.dmg;
             if (rake) dmg *= 1.8;
@@ -412,64 +320,40 @@ export function resolveVolley(me, foe, state, assignments, { rng = Math.random }
             dmg = Math.max(1, Math.round(dmg * (1 - armor) * def.dmgTaken));
             total += dmg;
             theirSide.hp = Math.max(0, theirSide.hp - dmg);
+            const shot = { gun, hit: true, dmg, rake };
 
-            const shot = { gun: a.gun, zone: a.zone, ammo: ammo.id, hit: true, dmg, rake };
-
-            // WHAT THE SHOT BROKE, over and above the hole it made. One point of system damage for landing,
-            // plus whatever this round is especially good at — that is where chain and grape earn their price.
+            // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
+            // is especially good at — which is where chain and grape earn their price. Round shot is never
+            // wasted, it just does not specialise.
             const bonus = (ammo.sys && ammo.sys[zone.sys]) || 0;
-            const wreck = 1 + bonus;
             if (zone.sys === "sails" && theirSide.sails > 0) {
-                theirSide.sails = Math.max(0, theirSide.sails - wreck);
+                theirSide.sails = Math.max(0, theirSide.sails - (1 + bonus));
                 shot.wrecked = "sails";
-                if (theirSide.sails === 0) after.push({ type: "wreck", victim: other(who), sys: "sails" });
-            } else if (zone.sys === "rudder" && theirSide.rudder > 0) {
-                theirSide.rudder = Math.max(0, theirSide.rudder - wreck);
-                shot.wrecked = "rudder";
-                if (theirSide.rudder === 0) {
-                    // NO STEERING, NO GAUGE. A ship that cannot answer her helm cannot hold the weather gauge —
-                    // so the rudder is the shot that buys you the first broadside for the rest of the fight.
-                    st.gauge = who;
-                    after.push({ type: "wreck", victim: other(who), sys: "rudder" });
-                }
+                if (theirSide.sails === 0) after.push({ type: "wreck", victim: who === "me" ? "foe" : "me", sys: "sails" });
             } else if (zone.sys === "guns") {
-                const up = theirSide.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
-                const pick = up.includes(a.target) ? a.target : up[Math.floor(rng() * up.length)];
-                if (pick != null) {
-                    theirSide.guns[pick] = Math.max(0, theirSide.guns[pick] - wreck);
+                // ONE CANNON, THE ONE YOU PICKED. Shots used to roll onto the next gun still standing once
+                // the target was wreckage, so a single volley could walk down a whole battery — the overflow
+                // was worth more than the shot. A ball into a dismounted gun is a ball wasted, which is what
+                // makes committing the broadside a real risk.
+                const pick = order.target;
+                if (pick != null && theirSide.guns[pick] > 0) {
+                    theirSide.guns[pick] = Math.max(0, theirSide.guns[pick] - (1 + bonus));
                     shot.wrecked = "guns"; shot.target = pick;
-                    if (theirSide.guns[pick] === 0) after.push({ type: "wreck", victim: other(who), sys: "guns", index: pick });
+                    if (theirSide.guns[pick] === 0) after.push({ type: "wreck", victim: who === "me" ? "foe" : "me", sys: "guns", index: pick });
                 }
-            } else if (zone.sys === "powder") {
-                // THE MAGAZINE. Almost nobody hits it — and when somebody does, the fight changes shape.
-                const blast = Math.max(1, Math.round(theirSide.max * POWDER_BLAST * (ammo.id === "explosive" ? 1.6 : 1)));
-                theirSide.hp = Math.max(0, theirSide.hp - blast);
-                theirSide.fire = FIRE_START;
-                const up = theirSide.guns.map((hp, k) => (hp > 0 ? k : -1)).filter((k) => k >= 0);
-                if (up.length) theirSide.guns[up[Math.floor(rng() * up.length)]] = 0;
-                theirSide.leaks = Math.min(MAX_LEAKS, theirSide.leaks + 1);
-                shot.blast = blast;
-                total += blast;
-                after.push({ type: "blast", victim: other(who), dmg: blast, hp: hpPair(st) });
             }
-
-            // A hole below the waterline. Rolled per landed shot now rather than once per volley: a ball in the
-            // hull is what opens a ship up, so the chance belongs to the ball.
-            if (zone.leak && rng() < zone.leak && theirSide.leaks < MAX_LEAKS) {
-                theirSide.leaks += 1;
-                shot.leak = true;
-                after.push({ type: "leaksprung", victim: other(who), holes: theirSide.leaks, hp: hpPair(st) });
-            }
-            if (ammo.fire && rng() < ammo.fire) theirSide.fire = Math.min(FIRE_START, theirSide.fire + FIRE_START);
             shots.push(shot);
         }
 
-        events.push({ type: "volley", side: who, shots, dmg: total, guns: shooting.length, hp: hpPair(st) });
+        events.push({
+            type: "volley", side: who, zone: order.zone, target: order.target, ammo: ammo.id,
+            shots, dmg: total, guns: guns.length, chance, hp: hpPair(st),
+        });
         for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
     };
 
-    if (st.gauge === "me") { work("me", mine); work("foe", theirs); }
-    else { work("foe", theirs); work("me", mine); }
+    if (st.gauge === "me") { fire("me", mine); fire("foe", theirs); }
+    else { fire("foe", theirs); fire("me", mine); }
 
     const sunk = st.foe.hp <= 0 ? "foe" : st.me.hp <= 0 ? "me" : null;
     const outOfRounds = st.round >= MAX_ROUNDS;
@@ -480,16 +364,19 @@ export function resolveVolley(me, foe, state, assignments, { rng = Math.random }
 
 export const MAX_ROUNDS = 14;
 
-// ── ONE DIFFICULTY SCALE FOR BOTH HALVES ─────────────────────────────────────────────────────────────────────
-// The fleet and member rivals were two lists you could not compare: the fleet had a designed rank and no odds,
-// rivals had odds and a "pays like rank N" note, and nothing told you whether rank 6 of the fleet was a harder
-// night than the member sitting above it. They are one list now, so they need one number.
+// ── HOW A MATCHUP WILL ACTUALLY GO ───────────────────────────────────────────────────────────────────────────
+// Matchmaking needs one number for "is this a fair fight", and the first version of this was a ratio of guns
+// and hull with a couple of exponents on it. It was measured badly wrong at the top: a maxed captain served
+// ships this said were a 58% proposition won 93% of them, because the two things that scale hardest with
+// investment — GUNNERY and ARMOUR — were not in it at all.
 //
-// This is the read the raid picker was already doing inline — their broadside and hull against yours, gun
-// weighted heavier than hull because a gun deck decides an exchange faster than timber absorbs one. Lifted out
-// of sailing.js so the server and the row on screen cannot drift apart.
-export function matchupOdds({ myGuns = 4, myHull = 140, guns = 4, hull = 140 } = {}) {
-    const gunEdge = myGuns / Math.max(1, guns);
-    const hullEdge = myHull / Math.max(1, hull);
-    return Math.max(0.05, Math.min(0.95, 0.5 * gunEdge ** 1.4 * hullEdge ** 0.7));
+// This is the same arithmetic the battle runs, collapsed: how many rounds each side needs to sink the other,
+// which is a thing you can reason about. Equal ships give 0.5, and the number means what it says.
+export function matchupOdds({ myGuns = 4, myHull = 140, myAcc = 0.7, myArmor = 0,
+                              guns = 4, hull = 140, acc = 0.7, armor = 0 } = {}) {
+    const myDps = Math.max(0.1, myGuns * myAcc * (1 - armor));
+    const theirDps = Math.max(0.1, guns * acc * (1 - myArmor));
+    const roundsIneed = hull / myDps;
+    const roundsTheyNeed = myHull / theirDps;
+    return Math.max(0.05, Math.min(0.95, roundsTheyNeed / (roundsIneed + roundsTheyNeed)));
 }
