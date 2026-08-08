@@ -13716,8 +13716,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* TOP-RIGHT OF THE STAGE, and this is the last time it moves. Anchored to the top it covered the masts;
    anchored to the bottom it covered the order cards. The one genuinely empty strip in this scene is the band
    between the HUD and the ships, so the toggle lives there and the log opens downward into the water — which
-   is the only region of the stage nothing else occupies. */
-.sbt-logwrap { position: absolute; z-index: 6; right: 10px; top: 8px; display: flex;
+   is the only region of the stage nothing else occupies. 106px clears the HUD cards: at top:8 it sat straight
+   over the enemy's name, which is the third thing this button has managed to cover. */
+.sbt-logwrap { position: absolute; z-index: 6; right: 10px; top: 106px; display: flex;
     flex-direction: column-reverse; align-items: flex-end; gap: 5px; pointer-events: none; }
 /* Open, it takes the width it needs and hangs under its own button. */
 .sbt-logwrap.is-open { left: 10px; align-items: stretch; }

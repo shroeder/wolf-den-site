@@ -178,14 +178,14 @@ export const ORDERS = {
     // anyone who braced when hurt, because skipping an attack in a race to zero costs more than half a volley
     // saves. Propping it up with a held broadside was patching a bad idea rather than replacing it.
     hole: { id: "hole", name: "Hole her below the line", icon: "GiHole",
-        desc: "Aim for the waterline — a third less damage, but far more likely to open a leak." },
+        desc: "A third less damage — but far likelier to hole them." },
     board: { id: "board", name: "Close and board", icon: "GiCrossedSwords",
         desc: "All or nothing. Devastating if they are hurt, suicide if they are not." },
     // Offered ONLY while taking on water (see ordersFor). A leak is not a stun — you may keep fighting and
     // bleed instead. Losing a turn to something you never got to weigh in on is the thing that made Brace feel
     // bad; choosing to lose one is a decision.
     patch: { id: "patch", name: "Man the pumps", icon: "GiWaterRecycling",
-        desc: "Fight the water instead of the ship. Each hole has a good chance to close — not a certainty." },
+        desc: "Fight the water, not the ship. Each hole may close — no promises." },
 };
 export const ORDER_LIST = Object.values(ORDERS).filter((o) => o.id !== "patch");
 export const orderById = (id) => ORDERS[String(id || "broadside")] || ORDERS.broadside;
