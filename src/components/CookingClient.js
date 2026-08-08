@@ -445,7 +445,8 @@ export default function CookingClient({ initial }) {
                             </div>
                             <p className="muted sail-upg-desc">{t.desc}</p>
                             <div className="sail-upg-effect">
-                                <span>{t.kind === "pct" ? "Chance" : t.kind === "boost" ? "Serving" : "Extra"}</span>
+                                {/* "Serving" described the old quantity boost. Big Pot lifts reward QUALITY now, so the row has to say what it moves. */}
+                                <span>{t.kind === "pct" ? "Chance" : t.kind === "boost" ? "Quality" : "Extra"}</span>
                                 <b>
                                     {fmtEffect(t, t.valueNow)}
                                     {t.maxed ? null : <> → <span className="sail-upg-next">{fmtEffect(t, t.valueNext)}</span></>}

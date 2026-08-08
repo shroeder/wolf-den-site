@@ -82,7 +82,15 @@ export const COOK_TRACKS = {
     season: { max: MAX_TRACK, per: 0.08, cap: 0.40, kind: "pct", name: "Seasoning", icon: "/images/cooking/track-season.png", desc: "Chance the dish pays out TWICE — double whatever it makes." },
     // "boost", not "pct": the other three are ROLLS the card labels "Chance", and Big Pot is not a roll —
     // every level is felt on every cook. Labelling it "Chance 30%" would have read as a 30%% shot at nothing.
-    batch:  { max: MAX_TRACK, per: 0.06, cap: 0.30, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "Every dish comes out bigger — more of whatever it makes." },
+    // BIG POT AIMS HIGHER, IT DOES NOT MAKE MORE. As a +% to quantity it was Seasoning wearing a hat: almost
+    // every reward this game hands out is quantity ONE, so "+24% of 1" resolved through the probabilistic
+    // rounding into "a 24% chance of getting 2" — which is precisely what Seasoning already does, at 24%, for
+    // 3,600 gold instead of 6,400. Two tracks, one effect, and the redundant one cost nearly double.
+    //
+    // Quantity was the wrong axis because Seasoning owns it. The free axis is QUALITY: which rung of the
+    // tier's reward ladder you land on. Big Pot now lifts that, so a big pot is how you fish a better thing
+    // out of the tier rather than a second copy of a worse one.
+    batch:  { max: MAX_TRACK, per: 0.05, cap: 0.25, kind: "boost", name: "Big Pot",   icon: "/images/cooking/track-pot.png",    desc: "A deeper pot reaches the good stuff — better rewards from the same dish." },
     larder: { max: MAX_TRACK, per: 0.07, cap: 0.35, kind: "pct", name: "Larder",    icon: "/images/cooking/track-larder.png", desc: "Chance a cook doesn't use up its ingredients at all." },
 };
 export const TRACK_COL = { heat: "heat_level", season: "season_level", batch: "batch_level", larder: "larder_level" };
@@ -901,7 +909,10 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // serve() folds the second helping and the pot size into one number, and rounds PROBABILISTICALLY: at +30%
     // a two-part reward is 2.6, which pays 3 about sixty percent of the time instead of always truncating to 2.
     // Flat rounding would have thrown away the entire upgrade on every reward small enough to matter.
-    const potMult = 1 + trackValue("batch", row?.batch_level);
+    // No longer a quantity multiplier — see the Big Pot note on the track table. Kept as a name so the two
+    // uses below read clearly: `serve` is now portions only, and the lift goes to the reward ladder.
+    const potLift = trackValue("batch", row?.batch_level);
+    const potMult = 1;
     const serve = (n) => {
         const exact = Math.max(0, Number(n) || 0) * portions * potMult;
         const whole = Math.floor(exact);
@@ -923,7 +934,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
         const ladder = tierMeta(tier).rewards;
-        const rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        const rung = rungFor(q, ladder.length, (petBonus.hot_hands || 0) + potLift);
         const r = ladder[rung];
         const lbl = rewardLabel(r, {
             consumables: conSprites,
