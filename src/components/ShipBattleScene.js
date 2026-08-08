@@ -192,6 +192,14 @@ const Icon = ({ name, className }) => {
     return <C className={className} aria-hidden="true" />;
 };
 const clampPct = (v, max) => Math.max(0, Math.min(100, Math.round((v / Math.max(1, max)) * 100)));
+
+// THE PART, AS AN OBJECT. Each thing you can shoot at is labelled with a painted sprite rather than a glyph —
+// a sail, a plank, a cannon. Two were already on disk; the canvas was drawn for this.
+const PART_ART = {
+    sails: "/images/sailing/part-sails.png",
+    hull: "/images/sailing/tracks/hull.png",
+    guns: "/images/sailing/deck-cannon.png",
+};
 const shipKey = (f) => zoneKeyFromArt(f?.art, f?.level);
 
 // How wide one cannon can be drawn without touching its neighbour. Measured off the real gap between the two
@@ -289,23 +297,29 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                 sail and genuinely difficult for a single cannon. The markers hold still; the ship does not. */}
             {targets ? (
                 <span className="sbt-targets">
-                    {/* The region itself, outlined, once you have chosen it — so a chip that says SAILS shows
-                        you WHICH canvas without being a button the size of a mainsail. */}
-                    {targets.filter((t) => t.box && t.laid).map((t) => (
-                        <i key={`ring${t.key}`} className="sbt-zonering" aria-hidden="true"
-                            style={{ left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }} />
-                    ))}
                     {targets.map((t) => (
                         <button key={t.key} type="button"
-                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}`}
-                            style={{ left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
+                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}`}
+                            style={t.box
+                                ? { left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }
+                                : { left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
+                            disabled={t.dead}
                             onClick={(e) => { e.stopPropagation(); onPick?.(t); }}
                             title={`${t.name} — ${Math.round(t.chance * 100)}% to hit`}>
-                            <span className="sbt-target-tag">
-                                <Icon name={t.icon} />
-                                {/* The COUNT once guns are on it, the odds until then — a marker reading "×3"
-                                    is the only thing that makes a split broadside legible before it fires. */}
-                                <b>{t.laid ? `×${t.laid}` : `${Math.round(t.chance * 100)}%`}</b>
+                            {/* THE PART ITSELF, outlined. It is here before you touch anything: you should be
+                                able to see what a ship is made of and what state each piece is in without
+                                having to prod it first. */}
+                            <span className="sbt-target-skin" aria-hidden="true" />
+                            <span className="sbt-plaque">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="sbt-plaque-art" src={PART_ART[t.zone]} alt="" draggable="false" />
+                                <span className="sbt-plaque-body">
+                                    {/* WHAT IT HAS LEFT. Every piece has hit points and none of them were on
+                                        screen — you were aiming at a part with no idea whether one more ball
+                                        would take it off her. */}
+                                    <span className="sbt-plaque-hp" style={{ "--w": `${t.hpPct}%` }}><i /></span>
+                                    <b>{t.laid ? `×${t.laid}` : `${Math.round(t.chance * 100)}%`}</b>
+                                </span>
                             </span>
                         </button>
                     ))}
@@ -429,30 +443,41 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         const att = { accuracy: battle.myAccuracy ?? 0.7 };
         const shot = ammoById(ammo);
         const out = [];
+        // THE RIGGING IS NOT THE SAILS. zoneBox returns the extent of every lit pixel in the zone, and a topmast
+        // pennant or a bowsprit line stretches that far past the ship — so the canvas region came out as a
+        // rectangle wider than the hull and, once the ships were scaled up, ran clean off the side of the
+        // screen. Clamped to the timber underneath it, which is the shape a player reads as "her sails".
+        const hullBox = zoneBox(key, "hull", { mirror });
         for (const id of ["sails", "hull"]) {
-            if (id === "sails" && (foeSys?.sails ?? 1) <= 0) continue;   // nothing left to shred
-            const box = zoneBox(key, id, { mirror });
+            let box = zoneBox(key, id, { mirror });
             if (!box) continue;
+            if (id === "sails" && hullBox) {
+                const x = Math.max(box.x, hullBox.x), right = Math.min(box.x + box.w, hullBox.x + hullBox.w);
+                if (right > x) box = { ...box, x, w: right - x, cx: x + (right - x) / 2 };
+            }
+            // Canvas in rags STAYS on the board, greyed and crossed — the ship should not quietly lose a part
+            // between rounds. It just cannot be aimed at any more.
+            const dead = id === "sails" && (foeSys?.sails ?? 1) <= 0;
+            const hpPct = id === "sails"
+                ? clampPct(foeSys?.sails ?? 0, caps?.sails || 6)
+                : clampPct(battle.foeHp ?? 0, battle.foeMax || 1);
             out.push({
-                key: id, kind: "zone", zone: id, target: null,
+                key: id, kind: "zone", zone: id, target: null, dead,
                 name: ZONES[id].name, icon: ZONES[id].icon, tint: ZONES[id].tint, effect: ZONES[id].effect,
-                // The CHIP sits clear of the deck line, where the cannon chips live: canvas is tagged high,
-                // timber low. The BOX comes along for the ring that outlines the region once it is picked.
-                // Well clear of the deck line either way: canvas is tagged high in the rigging, timber down at
-                // the waterline. The cannon chips own the middle band, and three chips fighting for the same
-                // forty pixels is how you get a tap that hits the wrong thing.
-                x: box.cx, y: id === "sails" ? box.y + box.h * 0.16 : box.y + box.h * 0.9,
-                box,
+                x: box.cx, y: box.cy, box, hpPct,
                 chance: hitChance(att, ZONES[id], shot, evasion),
             });
         }
         const ports = foe?.ports || [];
         ports.forEach((p, i) => {
-            if ((foeSys?.guns?.[i] ?? 1) <= 0) return;                   // already wreckage
+            const hp = foeSys?.guns?.[i] ?? caps?.gun ?? 4;
+            // A DISMOUNTED GUN STAYS ON THE BOARD, crossed out. Removing it made the deck quietly change shape
+            // between rounds; leaving it there is how you see what you have already done to her.
             out.push({
-                key: `gun${i}`, kind: "gun", zone: "guns", target: i,
+                key: `gun${i}`, kind: "gun", zone: "guns", target: i, dead: hp <= 0,
                 name: `${ZONES.guns.name} ${i + 1}`, icon: ZONES.guns.icon, tint: ZONES.guns.tint, effect: ZONES.guns.effect,
                 x: p.x * 100, y: p.y * 100, box: null,
+                hpPct: clampPct(hp, caps?.gun || 4),
                 chance: hitChance(att, ZONES.guns, shot, evasion),
             });
         });
@@ -534,7 +559,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     }, [boxes, me, foe]);
 
     const pick = useCallback((t) => {
-        if (phase !== "aim" || busy || battle?.over) return;
+        if (phase !== "aim" || busy || battle?.over || t.dead) return;
         if (nextGun == null) return;   // every gun is already laid
         setAim((list) => [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }]);
         sfxPick();
@@ -751,7 +776,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
             {!battle?.over ? (
                 <div className={`sbt-aimbar${phase === "aim" ? "" : " is-waiting"}`}>
                     <div className={`sbt-zoneread${picked ? "" : " is-idle"}`} style={{ "--tint": picked?.tint || "#9fb6cc" }}>
-                        <Icon name={picked?.icon || "GiTargeting"} className="sbt-zoneicon" />
+                        {picked
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img className="sbt-zoneart" src={PART_ART[picked.zone]} alt="" draggable="false" />
+                            : <Icon name="GiTargeting" className="sbt-zoneicon" />}
                         <div>
                             <b>{picked ? picked.name : "Pick your target"}</b>
                             <em>{allLaid ? picked?.effect || "Every gun is laid."
@@ -790,8 +818,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                                 <button key={g} type="button"
                                     className={`sbt-gunpip${a ? ` is-laid is-${a.ammo}` : ""}`}
                                     disabled={!a || phase !== "aim"} onClick={() => clearGun(g)}
-                                    title={a ? `Gun ${g + 1} — ${at?.name || a.zone}` : `Gun ${g + 1} — follows the first order`}>
-                                    <Icon name="GiCannon" />
+                                    title={a ? `Gun ${g + 1} — ${at?.name || a.zone}` : `Gun ${g + 1} — not laid yet`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/images/sailing/deck-cannon.png" alt="" draggable="false" />
                                 </button>
                             );
                         })}
