@@ -9,7 +9,6 @@ import { levelForXp } from "@/lib/marketplace/xp-curve.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
-import { stockadeMultiplier } from "@/lib/marketplace/stockade-penalty.js";
 
 // Loyalty XP + levels. Meaningful actions award XP; a user's level is derived from their total.
 // awardXp is best-effort and never throws into the action that triggered it.
@@ -107,8 +106,7 @@ export async function memberHangoutMult(buyerId) {
 // scrolls are sold for a fixed amount of gold and grant a fixed amount of XP, so riding the multiplier turned
 // the shop into a gold→XP arbitrage: 27,500 gold bought ~12,000 XP normally and 48,048 XP during a 4x, with no
 // cap or cooldown on how many you could buy back-to-back. The scroll IS the reward; it should not compound with
-// a buff meant for effort. The STOCKADE penalty is deliberately still applied — it is a punishment, not a buff,
-// and buying your way around it is exactly what it is there to prevent.
+// a buff meant for effort.
 export async function awardXp(buyerId, action, { points = null, gold = undefined, dedupeKey = null, dailyCap = null, meta = null, flat = false } = {}) {
     if (!buyerId) return null;
     const base = points != null ? Math.round(points) : XP_ACTIONS[action] || 0;
@@ -124,14 +122,16 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     const marketMult = flat ? 1 : 1 + (storeStatus().open ? MARKET_DAY_XP_BONUS : 0);
     // Town HANGOUT buff — a personal +5% to XP & gold you earn after chilling in the plaza for 3 min (2h timer).
     const hangout = flat ? 1 : await memberHangoutMult(buyerId).catch(() => 1);
-    // THE STOCKADE's Mark of Shame: a flat -10% to everything earned while serving. Applied last, on both XP
-    // and gold, so it bites through every buff above it rather than being cancelled out by a good Happy Hour.
-    const shame = await stockadeMultiplier(buyerId).catch(() => 1);
-    const pts = Math.round(base * mult * xpMult * marketMult * hangout * shame);
+    // The Stockade used to take a flat -10% off everything earned while serving, applied here on both XP and
+    // gold. It is gone. The pillory is a joke the town plays on you and the whole feature is meant to be fun;
+    // docking someone's earnings for a day turns being laughed at into being punished for it. The locked Mark
+    // of Shame badge stays — that IS the shaming, and it costs nothing. Also removes a DB round-trip that ran
+    // on every single XP award in the game to answer "no" for almost everybody, almost every time.
+    const pts = Math.round(base * mult * xpMult * marketMult * hangout);
     // Gold is UNLINKED from XP: by default it still tracks XP 1:1 (purchases, donations, boss, quests…), but a
     // caller can pass an explicit `gold` amount — e.g. TRADES award XP only (gold: 0), so we don't hand out
     // spendable currency for a payout we already paid the customer for. Town gold-boost rides on top of gold only.
-    const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout * shame;
+    const goldBase = (gold === undefined ? base * mult : Number(gold) * mult) * hangout;
     const goldDelta = Math.max(0, Math.round(goldBase * goldMult));
 
     // Per-action daily cap — enforced ATOMICALLY in the insert so rapid/concurrent awards can't slip past it

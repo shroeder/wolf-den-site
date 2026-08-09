@@ -3,11 +3,9 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { STOCKADE_PENALTY, stockadeMultiplier } from "@/lib/marketplace/stockade-penalty.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
 import sharp from "sharp";
 
-export { STOCKADE_PENALTY, stockadeMultiplier };
 
 // ── THE STOCKADE ─────────────────────────────────────────────────────────────────────────────────────────────
 //

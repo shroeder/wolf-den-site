@@ -1682,7 +1682,7 @@ export default function TownClient({ initial }) {
 
                         {stockade.isOccupant ? (
                             <p className="tw-stock-self">
-                                You&rsquo;re the one in the stockade. −10% XP, coin and boss damage until you&rsquo;re let out.
+                                You&rsquo;re the one in the stockade. It costs you nothing — just stand there and take it.
                             </p>
                         ) : (
                             <div className="tw-stock-actions">
