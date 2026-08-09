@@ -14485,3 +14485,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .bh-domain-art { width: 19px; height: 19px; object-fit: contain; flex: none;
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
 @media (max-width: 400px) { .bh-stat-art { width: 26px; height: 26px; } }
+
+/* ══ SHIP BATTLE — WHAT SHE IS ABOUT TO DO ══════════════════════════════════════════════════════════════════
+   Her guns are laid when the round OPENS now, and these are the marks. You used to commit the whole broadside
+   blind and learn what she went for afterwards, which made her a dice roll wearing a captain's hat. Seeing
+   three barrels bearing on your canvas is the decision the fight was missing: press the attack, or spend a
+   round taking those guns off her first.
+
+   Red, pulsing, and on YOUR hull — the one place nothing else is drawn, so it cannot be confused with the
+   targets you are laying on hers. */
+.sbt-incoming { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
+.sbt-inc { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
+    width: 30px; height: 30px; }
+.sbt-inc-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px dashed rgba(255,120,110,0.85);
+    box-shadow: 0 0 12px rgba(255,90,80,0.55), inset 0 0 10px rgba(255,90,80,0.35);
+    animation: sbtIncoming 1.5s ease-in-out infinite; }
+.sbt-inc b { position: relative; font-size: 0.76rem; font-weight: 900; color: #fff;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.85), 0 0 8px rgba(255,90,80,0.9); }
+@keyframes sbtIncoming {
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.14); opacity: 1; }
+}

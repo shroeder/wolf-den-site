@@ -6,7 +6,7 @@ import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
-import { shipProfile, foeProfile, initBattleState, resolveVolley, AMMO_LIST, SAILS_MAX, GUN_HP } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveVolley, foeAims, AMMO_LIST, SAILS_MAX, GUN_HP } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
@@ -34,6 +34,9 @@ export default function BattleLab() {
         kind: "fleet", rank: meta.rank, first: true, me: meta.me, foe: meta.foe,
         // The same number the server sends, so the odds on every marker are the odds in the dice.
         myAccuracy: meta.acc ?? 0.7,
+        // What the server sends so the aiming screen can predict damage and show her plan.
+        stats: { me: { armor: 0.14, dmgMult: 1, dmgTaken: 1 }, foe: { armor: 0.05, dmgMult: 1, dmgTaken: 1 } },
+        theirNext: Array.isArray(st.theirNext) ? st.theirNext : null,
         myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
         round: st.round, gauge: st.gauge,
         sys: {
@@ -70,13 +73,16 @@ export default function BattleLab() {
                    deck: fleetDeck(ship.art), ports: fleetGunPorts(ship.art, foeP.guns) },
         };
         const st = initBattleState(meP, foeP);
+        // The lab has to plan her round the same way the server does, or the intent marks never appear here.
+        st.theirNext = foeAims(meP, foeP, st);
         setLive({ me: meP, foe: foeP, state: st, meta });
         setBattle(view(st, meta, [], false));
     };
 
     const volley = (aim) => {
         if (!live) return;
-        const r = resolveVolley(live.me, live.foe, live.state, aim);
+        const r = resolveVolley(live.me, live.foe, live.state, aim, { foeOrders: live.state.theirNext });
+        if (!r.over) r.state.theirNext = foeAims(live.me, live.foe, r.state);
         setLive((l) => ({ ...l, state: r.state }));
         setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
             r.over && r.win ? [{ kind: "doubloons", n: 14 }, { kind: "gold", n: 320 }] : []));

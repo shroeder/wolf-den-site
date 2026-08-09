@@ -15,7 +15,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
-         SAILS_MAX, GUN_HP, matchupOdds, hullGrade } from "@/lib/marketplace/ship-battle.js";
+         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
@@ -1626,6 +1626,7 @@ export async function doRaid(buyerId, targetId = null) {
             pet: crew[target.id] || null },
     };
     const state = initBattleState(mine, theirs);
+    state.theirNext = planFoeRound(state, mine, theirs);
     await saveBattle(buyerId, state, meta);
     return { ok: true, battle: { ...battleView(state, meta, { row }), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
@@ -1936,6 +1937,10 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     // the server will roll against (hitChance in ship-battle.js) rather than a client-side guess at it — a
     // marker that advertises 74% and then resolves at something else is worse than showing nothing.
     myAccuracy: shipProfile(meta.meProfile || {}).accuracy,
+    // WHAT SHE IS TRAINING ON, this round, before you commit. Rolled when the round opened (planFoeRound) and
+    // held on the state, so what you are shown is the order she will actually fire — not a guess, and not a
+    // second roll that could disagree with the one that resolves.
+    theirNext: Array.isArray(st.theirNext) ? st.theirNext : null,
     // ARMOUR AND THE DAMAGE MULTIPLIERS, so the aiming screen can predict what a shot would do rather than
     // only how likely it is to land. Armour existed and was doing real work — up to 28% off every ball from
     // the Hull track, modified per ammunition by its pierce — and had never once appeared on screen, so the
@@ -1999,6 +2004,23 @@ async function saveBattle(buyerId, state, meta) {
 // `myHp`/`myLeaks`, then two sides with rudders and leaks, and now two sides with canvas and guns. There is
 // nothing sensible to migrate a half-fought battle INTO, so anything but the current `v` is dropped and the
 // player gets a fresh fight instead of a screen that cannot draw itself.
+// SHE LAYS HER GUNS WHEN THE ROUND OPENS, not when it resolves.
+//
+// Her orders used to be rolled inside resolveVolley, at the instant the shooting started — so you committed
+// your whole broadside blind and only learned what she had gone for afterwards. She was a dice roll wearing a
+// captain's hat. Deciding her aim up front and SHOWING it is the difference between a battle and a slot
+// machine: you can see three barrels bearing on your canvas and choose to press the attack anyway, or spend a
+// round taking those guns off her first.
+//
+// Stored on the battle state as `theirNext`. Nothing else about the state changed, and readBattle only checks
+// `v === 3`, so a fight saved before this simply has no plan and the resolver rolls one the old way.
+function planFoeRound(meState, meProfile, foeProfile2) {
+    try {
+        const orders = foeAims(meProfile, foeProfile2, meState);
+        return Array.isArray(orders) ? orders : null;
+    } catch { return null; }
+}
+
 const readBattle = (row) => {
     const b = row?.battle_state;
     if (!b) return null;
@@ -2043,9 +2065,11 @@ export async function shipBattleVolley(buyerId, aim) {
             [buyerId, JSON.stringify(stock)]).catch(() => {});
     }
 
-    const res = resolveVolley(me, foe, open.state, laid);
+    const res = resolveVolley(me, foe, open.state, laid, { foeOrders: open.state.theirNext });
 
     if (!res.over) {
+        // Her orders for the round you are about to aim into, rolled against the deck she just left you with.
+        res.state.theirNext = planFoeRound(res.state, me, foe);
         await saveBattle(buyerId, res.state, open.meta);
         const after = await readRow(buyerId);
         return {
@@ -2221,6 +2245,7 @@ export async function doFleetBattle(buyerId, rank = null) {
             rider: fleetCaptain(ship), riderFlip: false, pet: null },
     };
     const state = initBattleState(mine, foe);
+    state.theirNext = planFoeRound(state, mine, foe);
     await saveBattle(buyerId, state, meta);
 
     await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, ammo: fired, first }).catch(() => {});

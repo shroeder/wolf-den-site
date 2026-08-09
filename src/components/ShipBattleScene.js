@@ -212,7 +212,7 @@ function gunWidthPct(ports) {
 
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
 function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targets = null,
-                onPick = null, firing = false, hullRef = null }) {
+                onPick = null, firing = false, hullRef = null, incoming = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
     const mirror = Boolean(f?.mirror);
@@ -294,6 +294,30 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                 OUTSIDE the hull, deliberately. Inside it they inherited the swell — the whole ship bobs and
                 rolls a degree either way — so every target was a moving one, which is merely annoying for a
                 sail and genuinely difficult for a single cannon. The markers hold still; the ship does not. */}
+            {/* WHERE HER GUNS ARE POINTED, on your ship, before you commit. You used to send your whole
+                broadside blind and find out afterwards — she was a dice roll rather than an opponent.
+                Marks are placed on the part with the count of barrels bearing on it, because "three on
+                your canvas" is the decision; which of her guns it is does not matter. */}
+            {incoming?.length ? (
+                <span className="sbt-incoming" aria-hidden="true">
+                    {incoming.map((inc) => {
+                        const spot = inc.zone === "guns" && inc.target != null
+                            ? (f?.ports || [])[inc.target]
+                            : null;
+                        const b = spot ? null : zoneBox(key, inc.zone, { mirror });
+                        const pos = spot
+                            ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }
+                            : b ? { left: `${b.cx}%`, top: `${b.cy}%` } : null;
+                        if (!pos) return null;
+                        return (
+                            <span key={`${inc.zone}-${inc.target ?? "z"}`} className="sbt-inc" style={pos}>
+                                <i className="sbt-inc-ring" />
+                                <b>{inc.n}</b>
+                            </span>
+                        );
+                    })}
+                </span>
+            ) : null}
             {targets ? (
                 <span className="sbt-targets">
                     {targets.map((t) => (
@@ -416,6 +440,20 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const me = battle?.me || {};
     const foe = battle?.foe || {};
     const events = useMemo(() => battle?.events || [], [battle?.events]);
+
+    // WHAT SHE IS ABOUT TO DO. Her orders are rolled when the round opens and sent with the battle, so this
+    // is the volley that will actually land — not a prediction. Grouped by part, because "three barrels on
+    // your canvas" is the decision; which specific gun is hers is not.
+    const incoming = useMemo(() => {
+        const plan = battle?.theirNext;
+        if (!Array.isArray(plan) || !plan.length) return [];
+        const byZone = new Map();
+        for (const o of plan) {
+            const k = `${o.zone}:${o.target ?? ""}`;
+            byZone.set(k, { zone: o.zone, target: o.target ?? null, n: (byZone.get(k)?.n || 0) + 1 });
+        }
+        return [...byZone.values()];
+    }, [battle?.theirNext]);
 
     // WHAT JUST HAPPENED, held still so you can read it.
     //
@@ -836,6 +874,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         </div>
                     ) : null}
                     <Ship f={me} side="me" hullRef={meHullRef}
+                        incoming={phase === "aim" && !battle?.over ? incoming : null}
                         hurt={hitFx?.side === "me"} heavy={Boolean(hitFx?.side === "me" && hitFx.heavy)}
                         low={clampPct(myHp, battle?.myMax) <= 25}
                         sinking={sinkingSide === "me"} hpFrac={(myHp || 0) / Math.max(1, battle?.myMax || 1)}

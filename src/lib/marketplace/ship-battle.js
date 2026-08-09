@@ -349,7 +349,7 @@ export function foeAims(me, foe, st, { rng = Math.random } = {}) {
 // ── ONE ROUND ────────────────────────────────────────────────────────────────────────────────────────────────
 // Both broadsides go off in weather-gauge order, each at the one part its captain chose. Pure — the caller
 // persists whatever comes back — and `rng` is injectable so a fight can be replayed exactly in the lab.
-export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) {
+export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrders = null } = {}) {
     const st = {
         v: 3, round: state.round, gauge: state.gauge,
         me: { ...state.me, guns: [...state.me.guns] },
@@ -359,7 +359,13 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) 
     st.round += 1;
 
     const mine = sanitizeAims(st, "me", aims);
-    const theirs = foeAims(me, foe, st, { rng });
+    // HER ORDERS MAY ALREADY BE WRITTEN. She now lays her guns when the round OPENS rather than when it
+    // resolves, so the player can see what she is training on before committing their own broadside — that is
+    // the whole decision the fight was missing. Rolling here is the fallback for a battle saved before this
+    // existed, and for any caller that does not plan ahead; the arithmetic is identical either way.
+    const theirs = Array.isArray(foeOrders) && foeOrders.length
+        ? sanitizeAims(st, "foe", foeOrders)
+        : foeAims(me, foe, st, { rng });
 
     const fire = (who, orders) => {
         const att = who === "me" ? me : foe;
