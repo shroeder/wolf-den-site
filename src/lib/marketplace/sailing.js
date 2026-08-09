@@ -1936,6 +1936,18 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     // the server will roll against (hitChance in ship-battle.js) rather than a client-side guess at it — a
     // marker that advertises 74% and then resolves at something else is worse than showing nothing.
     myAccuracy: shipProfile(meta.meProfile || {}).accuracy,
+    // ARMOUR AND THE DAMAGE MULTIPLIERS, so the aiming screen can predict what a shot would do rather than
+    // only how likely it is to land. Armour existed and was doing real work — up to 28% off every ball from
+    // the Hull track, modified per ammunition by its pierce — and had never once appeared on screen, so the
+    // whole grape-versus-explosive decision was being made against a stat the player could not see.
+    stats: (() => {
+        const mine = shipProfile(meta.meProfile || {});
+        const theirs = meta.foe || {};
+        return {
+            me: { armor: mine.armor || 0, dmgMult: mine.dmgMult ?? 1, dmgTaken: mine.dmgTaken ?? 1 },
+            foe: { armor: theirs.armor ?? 0.05, dmgMult: 1, dmgTaken: 1 },
+        };
+    })(),
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
     me: withGuns(meta.me, saved),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so

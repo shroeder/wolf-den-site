@@ -139,6 +139,20 @@ export const armorFor = (hullLevel = 0) => Math.min(0.4, Math.max(0, hullLevel) 
 // Damage one ball does before armour. Guns are the count, not the calibre — calibre is the ammunition.
 const SHOT_MIN = 5, SHOT_VAR = 9;
 
+// WHAT THIS SHOT WOULD DO, on average, before the dice.
+//
+// The same arithmetic resolveVolley runs, with the roll replaced by its mean — exported so the aiming screen
+// predicts with the engine's formula rather than a second copy that can drift. This exists so the read-out
+// can put a damage number next to the hit chance: change the ammunition and BOTH move, which is how a player
+// discovers that grape is punished by armour and explosive eats through it. Nothing has to say so in words.
+export const AVG_SHOT = SHOT_MIN + SHOT_VAR / 2;
+export function expectedDamage(att, def, zone, ammo) {
+    if (!zone || !ammo) return 0;
+    const base = AVG_SHOT * (ammo.dmg || 1) * (att?.dmgMult ?? 1) * (zone.dmg || 1);
+    const armor = Math.max(0, (def?.armor || 0) * (1 - (ammo.armorPierce || 0)));
+    return Math.max(1, Math.round(base * (1 - armor) * (def?.dmgTaken ?? 1)));
+}
+
 // ── THE TWO THINGS THAT ARE NOT HIT POINTS ───────────────────────────────────────────────────────────────────
 // Canvas and the guns themselves each have a small pool, and taking one changes how the REST of the fight goes
 // rather than only moving a bar — which is the whole reason to aim anywhere other than the hull.

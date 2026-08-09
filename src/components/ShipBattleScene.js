@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import * as Gi from "react-icons/gi";
 import SceneMusic from "@/components/SceneMusic";
 import { ZONES, ZONE_LIST, zoneById, zoneBox, zoneRects, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
-import { hitChance, evasionOf, ammoById } from "@/lib/marketplace/ship-battle.js";
+import { hitChance, evasionOf, ammoById, expectedDamage } from "@/lib/marketplace/ship-battle.js";
 
 // Spoils get their sprite, not a word. `+340 gold` as plain text is a receipt; a coin with a number on it is a
 // reward. Only the kinds with art on disk appear here — anything else falls through to text, which is correct
@@ -484,7 +484,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         if (!key || !battle) return [];
         const mirror = Boolean(foe?.mirror);
         const evasion = evasionOf(foeSys?.sails ?? caps?.sails ?? 4);
-        const att = { accuracy: battle.myAccuracy ?? 0.7 };
+        const att = { accuracy: battle.myAccuracy ?? 0.7, dmgMult: battle.stats?.me?.dmgMult ?? 1 };
+        const def = battle.stats?.foe || { armor: 0, dmgTaken: 1 };
         const shot = ammoById(ammo);
         const out = [];
         // THE RIGGING IS NOT THE SAILS. zoneBox returns the extent of every lit pixel in the zone, and a topmast
@@ -510,6 +511,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                 name: ZONES[id].name, icon: ZONES[id].icon, tint: ZONES[id].tint, effect: ZONES[id].effect,
                 x: box.cx, y: box.cy, box, hpPct,
                 chance: hitChance(att, ZONES[id], shot, evasion),
+                dmg: expectedDamage(att, def, ZONES[id], shot),
             });
         }
         const ports = foe?.ports || [];
@@ -523,6 +525,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                 x: p.x * 100, y: p.y * 100, box: null,
                 hpPct: clampPct(hp, caps?.gun || 4),
                 chance: hitChance(att, ZONES.guns, shot, evasion),
+                dmg: expectedDamage(att, def, ZONES.guns, shot),
             });
         });
         return out;
@@ -878,7 +881,17 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                                 : picked ? `${picked.effect}  ·  ${leftToLay} gun${leftToLay === 1 ? "" : "s"} still to lay`
                                 : "Tap a part of her ship — one gun each tap."}</em>
                         </div>
-                        {picked ? <span className="sbt-odds">{Math.round(picked.chance * 100)}%</span> : null}
+                        {/* TWO NUMBERS, BOTH LIVE. The odds moved with the ammunition already; the damage
+                            never did, so half of every ammunition decision was invisible. Now switching to
+                            explosive drops the percentage and lifts the damage in the same glance, and grape
+                            into a plated hull visibly loses — which is the armour system explaining itself
+                            without a word about armour. */}
+                        {picked ? (
+                            <span className="sbt-read-nums">
+                                <span className="sbt-odds">{Math.round(picked.chance * 100)}%</span>
+                                <span className="sbt-expect">~{picked.dmg}<i>dmg</i></span>
+                            </span>
+                        ) : null}
                     </div>
 
                     {/* THE RACK. Only if you actually have something other than solid shot — otherwise it is a

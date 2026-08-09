@@ -14448,3 +14448,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .sbt-recap-cols { gap: 7px; }
     .sbt-recap-col { padding: 5px 6px; }
 }
+
+/* Odds and expected damage, together. The percentage always moved with the ammunition; the damage never did,
+   so half of every ammunition decision was invisible. Side by side they teach the trade wordlessly — explosive
+   drops the odds and lifts the damage in one glance, grape into a plated hull visibly loses. */
+.sbt-read-nums { display: grid; justify-items: end; gap: 1px; line-height: 1; }
+.sbt-expect { font-size: 0.82rem; font-weight: 800; color: #ffd28a; font-variant-numeric: tabular-nums; }
+.sbt-expect i { font-style: normal; font-size: 0.62em; letter-spacing: 0.08em; color: #b9a07a; margin-left: 2px; }
