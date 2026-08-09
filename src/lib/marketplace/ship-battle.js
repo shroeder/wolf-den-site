@@ -365,8 +365,12 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) 
             const gun = order.gun;
             const zone = zoneById(order.zone);
             const ammo = ammoById(order.ammo);
+            // EVERY SHOT CARRIES ITS OWN ODDS, hit or miss. Without this a miss is just a miss, and the
+            // player cannot tell a 90% shot they got unlucky on from a 35% shot they should never have taken
+            // — which is the difference between bad luck and a bad decision, and the whole of learning to
+            // play. The number is already computed to roll against; it just used to be thrown away.
             const chance = hitChance(att, zone, ammo, evasion);
-            if (rng() > chance) { shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false }); continue; }
+            if (rng() > chance) { shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false, chance, evasion }); continue; }
             const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
             let dmg = (SHOT_MIN + rng() * SHOT_VAR) * ammo.dmg * att.dmgMult * zone.dmg;
             if (rake) dmg *= 1.8;
@@ -374,7 +378,7 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random } = {}) 
             dmg = Math.max(1, Math.round(dmg * (1 - armor) * def.dmgTaken));
             total += dmg;
             theirSide.hp = Math.max(0, theirSide.hp - dmg);
-            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, rake };
+            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, rake, chance, evasion };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
             // is especially good at — which is where chain and grape earn their price. Round shot is never

@@ -405,6 +405,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const [ready, setReady] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
     const [pops, setPops] = useState([]);
+    // Where each ball came down, keyed by shot. A ref, not state: it is written while the volley is playing
+    // and read 460ms later by the same sequence — putting it in state would re-render the scene mid-flight
+    // for a value nothing is allowed to draw yet.
+    const landings = useRef({});
     const [shout, setShout] = useState(null);
     const [balls, setBalls] = useState([]);
     const [hitFx, setHitFx] = useState(null);
@@ -637,18 +641,31 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         setBalls((b) => [...b.slice(-14).filter((x) => x.k !== key), {
                             k: key, from: muzzle, to: end, hit: s.hit, ammo: s.ammo, rake: s.rake,
                         }]);
+                        // Where the ball ENDED — the outcome gets drawn there rather than in a corner, so the
+                        // number and the hole are the same event. Kept on the ball so both stay in step.
+                        landings.current[key] = end;
                     }
                 }, at));
                 timers.push(setTimeout(() => {
+                    const pk = `${battle?.round}-${step}-${i}`;
+                    const at2 = landings.current[pk] || null;
                     if (s.hit) {
                         setHitFx({ side: to, heavy: Boolean(s.rake) });
                         sfxHit(Boolean(s.rake));
                         setShake({ k: `${step}-${i}`, big: Boolean(s.rake) });
-                        const pk = `${battle?.round}-${step}-${i}`;
                         setPops((list) => [...list.slice(-11).filter((x) => x.k !== pk), {
-                            k: pk, side: ev.side, dmg: s.dmg, rake: s.rake, lane: (i % 4) - 1.5,
+                            k: pk, side: ev.side, dmg: s.dmg, rake: s.rake, lane: (i % 4) - 1.5, at: at2, zone: s.zone,
                         }]);
-                    } else sfxSplash();
+                    } else {
+                        sfxSplash();
+                        // A MISS USED TO BE SILENT — a splash sound and a ball that fell short, with nothing
+                        // to read. Now it says so, and says what the shot's odds WERE, because that is the
+                        // difference between "unlucky" and "you should not have taken that shot". It is the
+                        // one number that teaches you to aim.
+                        setPops((list) => [...list.slice(-11).filter((x) => x.k !== pk), {
+                            k: pk, side: ev.side, miss: true, chance: s.chance, lane: (i % 4) - 1.5, at: at2, zone: s.zone,
+                        }]);
+                    }
                 }, at + 460));
             });
             const done = shots.length * 100 + 620;
@@ -763,9 +780,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         <span key={shout.k} className={`sbt-shout ${shout.side === "me" ? "on-foe" : "on-me"}`}>{shout.text}</span>
                     ) : null}
                     {phase === "play" ? pops.map((pp) => (
-                        <span key={pp.k} className={`sbt-pop ${pp.side === "me" ? "on-foe" : "on-me"}${pp.rake ? " is-rake" : ""}`}
-                            style={{ "--lane": `${pp.lane * 26}px` }}>
-                            −{pp.dmg}{pp.rake ? <b>RAKE</b> : null}
+                        <span key={pp.k}
+                            className={`sbt-pop${pp.at ? " is-at" : pp.side === "me" ? " on-foe" : " on-me"}${pp.rake ? " is-rake" : ""}${pp.miss ? " is-miss" : ""}`}
+                            style={pp.at
+                                ? { left: pp.at.x, top: pp.at.y, "--lane": `${pp.lane * 22}px` }
+                                : { "--lane": `${pp.lane * 26}px` }}>
+                            {pp.miss
+                                ? <>MISS{pp.chance != null ? <b>{Math.round(pp.chance * 100)}% shot</b> : null}</>
+                                : <>−{pp.dmg}{pp.rake ? <b>RAKE ×1.8</b> : null}</>}
                         </span>
                     )) : null}
                 </div>
