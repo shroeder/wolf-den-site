@@ -1,3 +1,7 @@
+// EVERY STAT CARRIES ITS OWN DRAWN SPRITE. This panel was ~30 OS emoji in a grid, which renders differently on
+// every device, carries none of the game's style, and reads as a settings screen rather than a character
+// sheet. `art` is the sprite (scripts/gen-bonus-icons.mjs, one family, one ink weight); `icon` is kept for
+// chat and log lines, where the operating system is already doing the drawing.
 // Display metadata for badge bonuses — shared by the Badges page hero + the badge cards. Client-safe (pure
 // data, no server-only imports). Mirrors the four bonus domains in badges.js (BADGE_BONUSES) and labels each
 // stat the way its own system names it.
@@ -5,60 +9,70 @@ export const BONUS_DOMAINS = ["combat", "sea", "farm", "forge", "depth"];
 
 export const BONUS_META = {
     combat: {
+        // The domain head reuses a representative sprite from the same family — one look, no extra art.
+        art: "/images/bonus/might.png",
         label: "Combat", icon: "⚔️", accent: "#ff8a4c", blurb: "buffs your daily boss strike",
         stats: {
-            might: { icon: "⚔️", label: "Might", suffix: "" },
-            crit_chance: { icon: "🎯", label: "Crit Chance", suffix: "%" },
-            crit_power: { icon: "💥", label: "Crit Power", suffix: "%" },
+            might: { art: "/images/bonus/might.png", icon: "⚔️", label: "Might", suffix: "" },
+            crit_chance: { art: "/images/bonus/crit_chance.png", icon: "🎯", label: "Crit Chance", suffix: "%" },
+            crit_power: { art: "/images/bonus/crit_power.png", icon: "💥", label: "Crit Power", suffix: "%" },
         },
     },
     sea: {
+        // The domain head reuses a representative sprite from the same family — one look, no extra art.
+        art: "/images/bonus/broadside.png",
         label: "Sailing", icon: "⚓", accent: "#55d3ff", blurb: "powers raids, digging & voyages",
         stats: {
-            broadside: { icon: "💣", label: "Raid Damage", suffix: "" },
-            ironclad: { icon: "🛡️", label: "Ship Armor", suffix: "" },
-            plunder: { icon: "🏴‍☠️", label: "Plunder", suffix: "" },
-            bounty: { icon: "🪙", label: "Sea Gold", suffix: "" },
-            dredge: { icon: "⛏️", label: "Dig Luck", suffix: "" },
-            trove: { icon: "💎", label: "Fragments", suffix: "" },
+            broadside: { art: "/images/bonus/broadside.png", icon: "💣", label: "Raid Damage", suffix: "" },
+            ironclad: { art: "/images/bonus/ironclad.png", icon: "🛡️", label: "Ship Armor", suffix: "" },
+            plunder: { art: "/images/bonus/plunder.png", icon: "🏴‍☠️", label: "Plunder", suffix: "" },
+            bounty: { art: "/images/bonus/bounty.png", icon: "🪙", label: "Sea Gold", suffix: "" },
+            dredge: { art: "/images/bonus/dredge.png", icon: "⛏️", label: "Dig Luck", suffix: "" },
+            trove: { art: "/images/bonus/trove.png", icon: "💎", label: "Fragments", suffix: "" },
             // Labelled by its EFFECT, not its name: "+3 Tailwind" reads as "three tailwinds a day" because a
             // tailwind is also a once-daily action you spend. It's actually −1% voyage time per point (cap −15%),
             // so the point value already IS the percentage — show that instead.
-            tailwind: { icon: "🌬️", label: "Voyage Speed", suffix: "%" },
-            angling: { icon: "🎣", label: "Angling", suffix: "" },
+            tailwind: { art: "/images/bonus/tailwind.png", icon: "🌬️", label: "Voyage Speed", suffix: "%" },
+            angling: { art: "/images/bonus/angling.png", icon: "🎣", label: "Angling", suffix: "" },
         },
     },
     farm: {
+        // The domain head reuses a representative sprite from the same family — one look, no extra art.
+        art: "/images/bonus/goldHarvest.png",
         label: "Farming", icon: "🌾", accent: "#7ed57e", blurb: "boosts your farm",
         stats: {
-            growSpeed: { icon: "🌱", label: "Grow Speed", suffix: "%" },
-            seedLuck: { icon: "🍀", label: "Seed Luck", suffix: "%" },
-            harvestLuck: { icon: "🎁", label: "Harvest Luck", suffix: "%" },
-            petXp: { icon: "🐾", label: "Pet XP", suffix: "%" },
-            fertPower: { icon: "💧", label: "Fertilizer", suffix: "%" },
-            goldHarvest: { icon: "🪙", label: "Farm Gold", suffix: "%" },
+            growSpeed: { art: "/images/bonus/growSpeed.png", icon: "🌱", label: "Grow Speed", suffix: "%" },
+            seedLuck: { art: "/images/bonus/seedLuck.png", icon: "🍀", label: "Seed Luck", suffix: "%" },
+            harvestLuck: { art: "/images/bonus/harvestLuck.png", icon: "🎁", label: "Harvest Luck", suffix: "%" },
+            petXp: { art: "/images/bonus/petXp.png", icon: "🐾", label: "Pet XP", suffix: "%" },
+            fertPower: { art: "/images/bonus/fertPower.png", icon: "💧", label: "Fertilizer", suffix: "%" },
+            goldHarvest: { art: "/images/bonus/goldHarvest.png", icon: "🪙", label: "Farm Gold", suffix: "%" },
         },
     },
     depth: {
+        // The domain head reuses a representative sprite from the same family — one look, no extra art.
+        art: "/images/bonus/hew.png",
         label: "The Mine", icon: "⛏️", accent: "#ffb45e", blurb: "powers delving, mining & smelting",
         stats: {
             // Labelled by EFFECT, not by name — the same call sea affinity's tailwind entry made. "+4 Nerve"
             // means nothing at a glance; "Roof Safety" says what the points buy you.
-            nerve: { icon: "🪨", label: "Roof Safety", suffix: "" },
-            lodesense: { icon: "🧭", label: "Seam Quality", suffix: "" },
-            hew: { icon: "⛏️", label: "Ore Yield", suffix: "" },
-            prospect: { icon: "🔦", label: "Find Odds", suffix: "" },
-            bellows: { icon: "🌬️", label: "Extra Parts", suffix: "" },
-            crucible: { icon: "⚗️", label: "Slag Luck", suffix: "" },
+            nerve: { art: "/images/bonus/nerve.png", icon: "🪨", label: "Roof Safety", suffix: "" },
+            lodesense: { art: "/images/bonus/lodesense.png", icon: "🧭", label: "Seam Quality", suffix: "" },
+            hew: { art: "/images/bonus/hew.png", icon: "⛏️", label: "Ore Yield", suffix: "" },
+            prospect: { art: "/images/bonus/prospect.png", icon: "🔦", label: "Find Odds", suffix: "" },
+            bellows: { art: "/images/bonus/bellows.png", icon: "🌬️", label: "Extra Parts", suffix: "" },
+            crucible: { art: "/images/bonus/crucible.png", icon: "⚗️", label: "Slag Luck", suffix: "" },
         },
     },
     forge: {
+        // The domain head reuses a representative sprite from the same family — one look, no extra art.
+        art: "/images/bonus/efficient.png",
         label: "Forge", icon: "🔨", accent: "#ffb020", blurb: "improves your smithing odds",
         stats: {
-            efficient: { icon: "🛠️", label: "Salvage", suffix: "%" },
-            keen_eye: { icon: "👁️", label: "Bonus Part", suffix: "%" },
-            masters_touch: { icon: "✨", label: "Double Forge", suffix: "%" },
-            steady_hand: { icon: "🖐️", label: "Combo Save", suffix: "%" },
+            efficient: { art: "/images/bonus/efficient.png", icon: "🛠️", label: "Salvage", suffix: "%" },
+            keen_eye: { art: "/images/bonus/keen_eye.png", icon: "👁️", label: "Bonus Part", suffix: "%" },
+            masters_touch: { art: "/images/bonus/masters_touch.png", icon: "✨", label: "Double Forge", suffix: "%" },
+            steady_hand: { art: "/images/bonus/steady_hand.png", icon: "🖐️", label: "Combo Save", suffix: "%" },
         },
     },
 };

@@ -610,16 +610,29 @@ function ReforgeReveal({ fx, onClose }) {
     return (
         <div className="forge-mg-scrim" role="dialog" aria-label="Reforged" onClick={onClose}>
             <div className={`forge-reforge-fx${fx.dual || fx.enchant ? " is-dual" : ""}`} onClick={(e) => e.stopPropagation()}>
-                {fx.enchant ? <div className="forge-reforge-badge">🪄 ENCHANTED! 🪄</div> : fx.dual ? <div className="forge-reforge-badge">✨ DUAL AFFINITY! ✨</div> : null}
+                {/* THE PIECE IS THE POINT. This was a large empty panel with a 20px item icon floating in the
+                    middle of it and the moment described underneath in a sentence. The gear now fills the
+                    space it earned, and the elements it carries are our own drawn sprites rather than the
+                    operating system's emoji — the same art the bag and the gear cards already use. */}
+                {fx.enchant ? <div className="forge-reforge-badge">ENCHANTED</div> : fx.dual ? <div className="forge-reforge-badge">DUAL AFFINITY</div> : null}
                 <ItemArt id={fx.item.id} icon={fx.item.icon} className="forge-reforge-fxart" alt={fx.item.name} />
                 <div className="forge-reforge-fxname">{fx.item.name}</div>
                 <div className="forge-reforge-fxels">
                     {(fx.elements || []).map((k) => {
-                        const e = ELEMENT_META[k] || { emoji: "◇", label: k, color: "#ccc" };
-                        return <span key={k} className="forge-elem-chip big" style={{ color: e.color, borderColor: e.color }}>{e.emoji} {e.label}</span>;
+                        const e = ELEMENT_META[k] || { label: k, color: "#ccc" };
+                        return (
+                            <span key={k} className="forge-elem-chip big" style={{ color: e.color, borderColor: e.color }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="forge-elem-art" src={`/images/elements/${k}.png`} alt="" draggable="false" />
+                                {e.label}
+                            </span>
+                        );
                     })}
                 </div>
-                <div className="forge-reforge-fxsub">{fx.enchant ? `A new affinity bound in — it now matches ${(fx.elements || []).length} elements.` : fx.dual ? "It now matches BOTH elements — twice the weeks it shines." : "Affinity reforged."}</div>
+                {/* The count is the whole news — say it as a number, not as a clause. */}
+                <div className="forge-reforge-fxsub">{fx.enchant
+                    ? <>Now matches <b>{(fx.elements || []).length}</b> elements</>
+                    : fx.dual ? <>Matches <b>both</b> — twice the weeks it shines</> : "Affinity reforged"}</div>
                 <button type="button" className="forge-strike big" onClick={onClose}>Done</button>
             </div>
         </div>
@@ -1151,13 +1164,22 @@ const FORGE_CSS = `
 .forge-reforge-cancel { flex: 0 0 auto; padding: 11px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); color: #d8cbb8; font-weight: 800; font-size: 13px; cursor: pointer; }
 .forge-reforge-go { flex: 1 1 auto; padding: 11px 16px; border-radius: 12px; border: none; background: linear-gradient(180deg,#ffe488,#f0a83a); color: #2a1000; font-weight: 900; font-size: 13.5px; cursor: pointer; box-shadow: 0 3px 12px rgba(240,168,58,0.45); }
 .forge-reforge-go:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
-.forge-reforge-fx { width: min(340px, 92vw); text-align: center; border-radius: 20px; padding: 22px; background: radial-gradient(120% 100% at 50% 0%, rgba(70,40,16,0.98), rgba(16,10,6,0.99)); border: 1px solid rgba(255,196,110,0.5); box-shadow: 0 18px 50px rgba(0,0,0,0.65); display: flex; flex-direction: column; align-items: center; gap: 8px; animation: forgeAttunePop .45s ease both; }
+.forge-reforge-fx { width: min(340px, 92vw); text-align: center; border-radius: 20px; padding: 20px 20px 18px; background: radial-gradient(120% 100% at 50% 0%, rgba(70,40,16,0.98), rgba(16,10,6,0.99)); border: 1px solid rgba(255,196,110,0.5); box-shadow: 0 18px 50px rgba(0,0,0,0.65); display: flex; flex-direction: column; align-items: center; gap: 10px; animation: forgeAttunePop .45s ease both; }
 .forge-reforge-fx.is-dual { border-color: rgba(184,120,255,0.7); box-shadow: 0 18px 50px rgba(0,0,0,0.65), 0 0 40px rgba(150,90,255,0.4); }
-.forge-reforge-badge { font-size: 14px; font-weight: 900; letter-spacing: 0.05em; color: #e6ccff; text-shadow: 0 0 12px rgba(184,120,255,0.8); }
-.forge-reforge-fxart { width: 92px; height: 92px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.55)); }
-.forge-reforge-fxname { font-size: 16px; font-weight: 900; color: #fff; }
-.forge-reforge-fxels { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.forge-reforge-fxsub { font-size: 12px; color: #cbb99a; }
+.forge-reforge-badge { font-size: 11px; font-weight: 900; letter-spacing: 0.22em; color: #e6ccff; text-shadow: 0 0 12px rgba(184,120,255,0.8); }
+/* THE PIECE FILLS THE PANEL. .item-art-img is sized in EM so it scales with whatever glyph box it lands in —
+   which in a modal that sets no font-size meant a 20px sprite floating in the middle of a 92px hole, with the
+   panel's height coming from empty space. Sized in percent here, and bigger, because on this screen the gear
+   IS the moment. */
+.forge-reforge-fxart { width: 132px; height: 132px; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.6)); }
+.forge-reforge-fxart .item-art-img { width: 100%; height: 100%; object-fit: contain; }
+.forge-reforge-fxart svg { width: 100%; height: 100%; }
+.forge-reforge-fxname { font-size: 19px; font-weight: 900; color: #fff; line-height: 1.15; }
+.forge-reforge-fxels { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+/* Our own drawn element art, not the OS emoji — the same sprites the bag and the gear cards use. */
+.forge-elem-art { width: 17px; height: 17px; object-fit: contain; margin-right: 5px; vertical-align: -3px; }
+.forge-reforge-fxsub { font-size: 12.5px; color: #cbb99a; }
+.forge-reforge-fxsub b { color: #ffd75e; font-size: 1.15em; }
 .forge-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10062; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center;
     background: linear-gradient(180deg, rgba(40,22,10,0.98), rgba(22,12,6,0.98)); border: 1px solid #ff9a3c; border-radius: 14px; padding: 12px 20px; box-shadow: 0 12px 40px rgba(0,0,0,0.6); color: #ffe0b0; max-width: 92vw; animation: forgePop .35s cubic-bezier(.2,1.3,.3,1) both; }
 .forge-toast.is-err { border-color: #e05b6a; color: #ffc9ce; }

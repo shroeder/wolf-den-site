@@ -14475,3 +14475,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     color: inherit; font: inherit; font-size: 0.9rem; }
 .farm-findfarm::placeholder { color: #9a8f7f; }
 .farm-findfarm:focus { outline: none; border-color: rgba(255,215,110,0.6); background: rgba(255,215,110,0.08); }
+
+/* BADGE POWER — our own art in the stat grid. Thirty OS emoji rendered differently on every device and
+   carried none of the game's style; the panel read as a settings screen rather than a character sheet. One
+   drawn family (scripts/gen-bonus-icons.mjs), sized a touch larger than the glyphs were because a painted
+   sprite needs the room to be legible where a flat emoji did not. */
+.bh-stat-art { width: 30px; height: 30px; object-fit: contain; display: block; margin: 0 auto 1px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+.bh-domain-art { width: 19px; height: 19px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+@media (max-width: 400px) { .bh-stat-art { width: 26px; height: 26px; } }

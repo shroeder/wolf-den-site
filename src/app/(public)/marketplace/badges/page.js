@@ -49,11 +49,17 @@ export default async function BadgesPage() {
                         <div className="bh-domains">
                             {domains.map((d) => (
                                 <div key={d.domain} className="bh-domain" style={{ "--acc": d.accent }}>
-                                    <div className="bh-domain-head"><span className="bh-domain-ico">{d.icon}</span><b>{d.label}</b><em>{d.blurb}</em></div>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <div className="bh-domain-head">{d.art ? <img className="bh-domain-art" src={d.art} alt="" /> : <span className="bh-domain-ico">{d.icon}</span>}<b>{d.label}</b><em>{d.blurb}</em></div>
                                     <div className="bh-domain-tiles">
                                         {d.stats.map((s) => (
                                             <div key={s.key} className="bh-stat">
-                                                <span className="bh-stat-ico">{s.icon}</span>
+                                                {/* OUR ART, NOT THE OS'S. Thirty emoji in a grid render
+                                                    differently on every device and carry none of the game's
+                                                    style — the panel read as a settings screen rather than a
+                                                    character sheet. */}
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                {s.art ? <img className="bh-stat-art" src={s.art} alt="" /> : <span className="bh-stat-ico">{s.icon}</span>}
                                                 <span className="bh-stat-val">+{s.value}{s.suffix}</span>
                                                 <span className="bh-stat-lab">{s.label}</span>
                                             </div>
