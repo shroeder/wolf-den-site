@@ -210,8 +210,45 @@ function gunWidthPct(ports) {
     return Math.max(6, Math.min(16, gap * 100 * 0.92));
 }
 
+// ── HITS, COUNTED IN THE THING BEING HIT ─────────────────────────────────────────────────────────────────────
+// Every part of a ship was reading as a bar: a gold pill across the hull, a blue pill on the masts, a draining
+// meter on each cannon. A bar answers "what fraction", and the question in front of the player is "how many
+// more balls" — a count, which wants to be counted. So each part shows one sprite per hit: oak planks for the
+// hull, canvas for the sails, iron plate for a gun's mount.
+//
+// Both halves are drawn. The spent ones are not hidden or dimmed, they are the WRECKED sprite — splintered
+// timber, canvas in rags — so a strip reads "four boards left, and look what I have already taken off her"
+// in one glance. That second half is the part no bar has ever been able to show.
+const PIPS = {
+    hull: ["/images/sailing/hits/plank.png", "/images/sailing/hits/plank-gone.png"],
+    sails: ["/images/sailing/hits/sail.png", "/images/sailing/hits/sail-gone.png"],
+    guns: ["/images/sailing/hits/iron.png", "/images/sailing/hits/iron-gone.png"],
+};
+// How many pips before the strip wraps. A hull runs from ten planks to twenty-two, so a fixed row length
+// either wraps a small hull pointlessly or stacks a big one into a four-row slab that swamps the ship it is
+// describing. TWO COURSES, always: it holds one shape all fight, it stays narrower than the hull it sits on,
+// and two strakes of planking is what the side of a boat actually looks like.
+const pipRow = (zone, cap) => (zone === "hull" ? Math.ceil(cap / 2) : zone === "guns" ? 4 : 6);
+
+function HitStrip({ zone, left, max, style = null, label = null, className = "" }) {
+    const [whole, wrecked] = PIPS[zone] || PIPS.hull;
+    const cap = Math.max(1, Math.round(max || 1));
+    const n = Math.max(0, Math.min(cap, Math.round(left ?? cap)));
+    return (
+        <span className={`sbt-hits is-${zone}${n <= 0 ? " is-out" : ""}${className ? ` ${className}` : ""}`}
+            style={{ "--per": Math.min(pipRow(zone, cap), cap), ...(style || {}) }}
+            title={label || `${n} of ${cap} left`}>
+            {Array.from({ length: cap }).map((_, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={i < n ? whole : wrecked} alt="" draggable="false"
+                    className={`sbt-pip${i < n ? " is-up" : " is-gone"}`} style={{ "--i": i }} />
+            ))}
+        </span>
+    );
+}
+
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
-function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targets = null,
+function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax = null, sys, caps, targets = null,
                 onPick = null, onUnpick = null, firing = false, hullRef = null, incoming = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
@@ -298,6 +335,31 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                 broadside blind and find out afterwards — she was a dice roll rather than an opponent.
                 Marks are placed on the part with the count of barrels bearing on it, because "three on
                 your canvas" is the decision; which of her guns it is does not matter. */}
+            {/* WHAT EACH PART HAS LEFT, ON THE PART. Outside .sbt-hull on purpose, for the same reason the
+                target markers are: inside it they inherit the swell, and a count you have to read off a
+                thing rocking a degree either way is a count you squint at. */}
+            {hpMax ? (
+                <span className="sbt-parthits" aria-hidden="true">
+                    {(() => {
+                        const hb = zoneBox(key, "hull", { mirror });
+                        if (!hb) return null;
+                        // ONE PLACARD PER SHIP, AT THE WATERLINE. The canvas strip started out floating above
+                        // the mastheads, which is where the part is — and also exactly where the "last
+                        // exchange" recap sits for the whole aim phase, so the thing you were meant to read
+                        // while choosing a target was underneath a panel every single round. Both strips ride
+                        // together under the hull instead: never occluded, unmistakably one ship's condition,
+                        // and still per-part because canvas and oak do not look remotely alike.
+                        return (
+                            <span className="sbt-placard" style={{ left: `${hb.cx}%`, top: `${hb.y + hb.h}%` }}>
+                                {caps?.sails ? (
+                                    <HitStrip zone="sails" left={sys?.sails ?? caps.sails} max={caps.sails} />
+                                ) : null}
+                                <HitStrip zone="hull" left={hp} max={hpMax} />
+                            </span>
+                        );
+                    })()}
+                </span>
+            ) : null}
             {incoming?.length ? (
                 <span className="sbt-incoming" aria-hidden="true">
                     {incoming.map((inc) => {
@@ -344,11 +406,13 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                                         screen — you were aiming at a part with no idea whether one more ball
                                         would take it off her. On a cannon this IS the label: a bar and a
                                         percentage, small enough that six of them read as six. */}
-                                    {/* A METER, NOT A NUMBER. The percentages were noise: the odds already
-                                        live in the read-out with the damage, and health reads faster as a bar
-                                        than as "71%". The only number left is the one you put there — how
-                                        many barrels you have committed to this part. */}
-                                    <span className="sbt-plaque-hp" style={{ "--w": `${t.hpPct}%` }}><i /></span>
+                                    {/* A gun's condition, in the iron holding it to the deck — four plates,
+                                        one a hit. The sails and the hull carry their own strips on the ship
+                                        itself, so a zone marker adds nothing but the count of barrels you
+                                        have committed to it. */}
+                                    {t.kind === "gun" ? (
+                                        <HitStrip zone="guns" left={t.hp} max={t.hpMax} />
+                                    ) : null}
                                     {t.laid ? <b>×{t.laid}</b> : null}
                                 </span>
                                 {/* THE UNDO, ON THE THING YOU AIMED. Tapping the part adds a barrel, so it
@@ -372,8 +436,6 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
 // "has she anything left to shoot off", which is a shape.
 function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
     const pct = clampPct(hp, max);
-    const guns = sys?.guns || [];
-    const gunsUp = guns.filter((h) => h > 0).length;
     // Read off the SAME function the engine rolls against, so the panel cannot promise a dodge the fight does
     // not honour.
     const dodgePct = Math.round(evasionOf(sys?.sails ?? caps?.sails ?? 0) * 100);
@@ -390,29 +452,13 @@ function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
                     <em>{f?.cls || (f?.level != null ? `boat level ${f.level}` : "")}</em>
                 </div>
             </div>
-            {/* THE HULL IS PLANKS. It was a draining bar with "294 / 341" on it — a number nobody can hold in
-                their head, in units that meant nothing next to six sails and four hits a cannon. A hull is
-                counted in hits now and drawn as the thing being hit: a run of timber, one plank a hit. The
-                ones still standing are oak; the ones staved in are the dark hole they left, so you read what
-                you have LEFT and what she has ALREADY TAKEN in the same glance — which a bar never showed. */}
-            <div className="sbt-planks" title={`${Math.max(0, Math.round(hp))} of ${max} planks holding`}>
-                {Array.from({ length: Math.max(1, max) }).map((_, i) => (
-                    <i key={i} className={`sbt-plank${i < Math.max(0, Math.round(hp)) ? " is-up" : " is-gone"}`}
-                        style={{ "--i": i }} />
-                ))}
-                <b className="sbt-plank-count">{Math.max(0, Math.round(hp))}<em>/{max}</em></b>
-            </div>
+            {/* NO CONDITION UP HERE — IT LIVES ON THE SHIP. This card used to carry the whole ship's state a
+                second time: a hull bar reading "294 / 341", six canvas pips and a "2/2" gun count, all of it
+                describing parts that are drawn, in full, twenty pixels below. Two places to look for one
+                fact, and the abstract one on top. What a card is FOR is the things that have no picture — who
+                she is, and the two percentages that quietly decide every exchange. Damage is read off the
+                timber. */}
             <div className="sbt-sys">
-                <span className={`sbt-syschip${(sys?.sails ?? 1) <= 0 ? " is-out" : ""}`} title="Canvas — what keeps her dodging">
-                    <Icon name="GiSailboat" className="sbt-sysicon" />
-                    {Array.from({ length: caps?.sails || 4 }).map((_, i) => (
-                        <i key={i} className={i < (sys?.sails ?? 0) ? "is-up" : ""} />
-                    ))}
-                </span>
-                <span className={`sbt-syschip${gunsUp === 0 ? " is-out" : ""}`} title="Cannons still mounted">
-                    <Icon name="GiCannon" className="sbt-sysicon" />
-                    <em>{gunsUp}/{guns.length || "–"}</em>
-                </span>
                 {/* DODGE — THE REASON TO SHOOT CANVAS. Sails do the least damage in the game by a wide margin,
                     and the payoff for taking them is that this number falls and every shot after it lands more
                     often. That payoff was completely invisible: you spent your worst damage on faith. Now it
@@ -602,7 +648,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                 key: `gun${i}`, kind: "gun", zone: "guns", target: i, dead: hp <= 0,
                 name: `${ZONES.guns.name} ${i + 1}`, icon: ZONES.guns.icon, tint: ZONES.guns.tint, effect: ZONES.guns.effect,
                 x: p.x * 100, y: p.y * 100, box: null,
-                hpPct: clampPct(hp, caps?.gun || 4),
+                hpPct: clampPct(hp, caps?.gun || 4), hp, hpMax: caps?.gun || 4,
                 chance: hitChance(att, ZONES.guns, shot, evasion),
                 dmg: expectedDamage(att, def, ZONES.guns, shot),
             });
@@ -837,8 +883,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
     return (
         <div className="sbt-scene" role="dialog" aria-modal="true">
+            {/* THE SEA IS PAINTED, NOT PLOTTED. This was two CSS gradients with a hairline horizon and
+                repeating-linear-gradient "swell" — flat blue bands that read as a loading screen, and the one
+                surface on screen that is supposed to sell "you are out on the water in the middle of a
+                fight". The game already owned this canvas: the same storm-lit ocean the raid screens use,
+                painted in the house palette, warm break in the cloud over a cold green sea. */}
             <div className="sbt-sky" aria-hidden="true" />
             <div className="sbt-sea" aria-hidden="true" />
+            <div className="sbt-seaveil" aria-hidden="true" />
             <div className="sbt-motes" aria-hidden="true">
                 {MOTES.map((m, i) => <i key={i} style={{ left: `${m.x}%`, animationDelay: `${m.d}s`, animationDuration: `${m.t}s`, "--mz": m.z }} />)}
             </div>
@@ -913,11 +965,13 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         hurt={hitFx?.side === "me"} heavy={Boolean(hitFx?.side === "me" && hitFx.heavy)}
                         low={clampPct(myHp, battle?.myMax) <= 25}
                         sinking={sinkingSide === "me"} hpFrac={(myHp || 0) / Math.max(1, battle?.myMax || 1)}
+                        hp={myHp} hpMax={battle?.myMax}
                         sys={battle?.sys?.me} caps={caps} firing={firingSide === "me"} />
                     <Ship f={foe} side="foe" hullRef={foeHullRef}
                         hurt={hitFx?.side === "foe"} heavy={Boolean(hitFx?.side === "foe" && hitFx.heavy)}
                         low={clampPct(foeHp, battle?.foeMax) <= 25}
                         sinking={sinkingSide === "foe"} hpFrac={(foeHp || 0) / Math.max(1, battle?.foeMax || 1)}
+                        hp={foeHp} hpMax={battle?.foeMax}
                         sys={foeSys} caps={caps} firing={firingSide === "foe"}
                         targets={phase === "aim" && !battle?.over ? markers : null}
                         onPick={pick} onUnpick={unpick} />

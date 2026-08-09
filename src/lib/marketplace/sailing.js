@@ -2012,8 +2012,8 @@ async function saveBattle(buyerId, state, meta) {
 // machine: you can see three barrels bearing on your canvas and choose to press the attack anyway, or spend a
 // round taking those guns off her first.
 //
-// Stored on the battle state as `theirNext`. Nothing else about the state changed, and readBattle only checks
-// `v === 3`, so a fight saved before this simply has no plan and the resolver rolls one the old way.
+// Stored on the battle state as `theirNext`. A fight saved before this simply has no plan and the resolver
+// rolls one the old way.
 function planFoeRound(meState, meProfile, foeProfile2) {
     try {
         const orders = foeAims(meProfile, foeProfile2, meState);
@@ -2026,7 +2026,12 @@ const readBattle = (row) => {
     if (!b) return null;
     const parsed = typeof b === "string" ? (() => { try { return JSON.parse(b); } catch { return null; } })() : b;
     if (!parsed?.state || !parsed?.meta) return null;
-    return parsed.state.v === 3 && parsed.state.me && parsed.state.foe ? parsed : null;
+    // ONLY THE CURRENT SCALE. v3 counted a hull in hundreds of hit points; v4 counts it in planks. A v3 fight
+    // left mid-battle renders as "294 / 341 planks" — 341 plank elements in a row — so it is not upgradable,
+    // it is unreadable, and it must not load. Bumping this without moving the check was the actual bug: the
+    // engine started writing v4 while the reader still demanded v3, which quietly threw away every NEW battle
+    // on the next page load and kept only the stale ones.
+    return parsed.state.v === 4 && parsed.state.me && parsed.state.foe ? parsed : null;
 };
 
 // COMMIT THE VOLLEY — your whole broadside goes at the part you picked, they answer, and the fight waits

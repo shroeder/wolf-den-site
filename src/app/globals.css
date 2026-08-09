@@ -14885,34 +14885,171 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-on { z-index: 14; }
 .sbt-plaque-minus { z-index: 3; }
 
-/* ══ THE HULL, IN PLANKS ════════════════════════════════════════════════════════════════════════════════════
-   The hull was the one part of a ship still measured in hit points — a bar draining past "294 / 341", in units
-   that meant nothing beside six sails and four hits a cannon. It is counted in hits now, and drawn as the
-   thing being hit: a run of timber, one plank per hit.
 
-   Both halves of the story are on screen at once. A plank still standing is lit oak; one staved in is the dark
-   gap it left. A bar only ever showed what remained — this shows what she has ALREADY taken out of you, which
-   is the half that tells you how the fight is going. */
-.sbt-planks { position: relative; display: flex; gap: 2px; align-items: stretch; height: 22px;
-    padding: 3px 4px; border-radius: 8px; background: rgba(0,0,0,0.38);
-    border: 1px solid rgba(255,255,255,0.08); }
-.sbt-plank { flex: 1 1 0; min-width: 3px; border-radius: 2px; transition: background .28s ease, box-shadow .28s ease; }
-/* Oak: still holding. Warm, with a grain highlight down the top edge. */
-.sbt-plank.is-up { background: linear-gradient(180deg, #d9a054, #a5702f 55%, #7d5220);
-    box-shadow: inset 0 1px 0 rgba(255,225,170,0.55); }
-/* Staved in: the hole where a plank used to be. */
-.sbt-plank.is-gone { background: rgba(0,0,0,0.55); box-shadow: inset 0 1px 2px rgba(0,0,0,0.9); }
-/* Her timber reads red the way her hull bar used to, so the two sides stay told apart at a glance. */
-.sbt-panel-foe .sbt-plank.is-up { background: linear-gradient(180deg, #e08a72, #b3543c 55%, #7d3524);
-    box-shadow: inset 0 1px 0 rgba(255,200,180,0.5); }
-/* Down to the last three and the remaining timber pulses — the ship is about to go. */
-.sbt-planks:has(.sbt-plank.is-up:nth-child(-n+3):last-of-type) .sbt-plank.is-up { animation: sbtPlankLow 1.1s ease-in-out infinite; }
-@keyframes sbtPlankLow { 0%, 100% { filter: none; } 50% { filter: brightness(1.45); } }
-.sbt-plank-count { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
-    font-size: 0.72rem; font-weight: 900; color: #fff; letter-spacing: 0.02em;
-    text-shadow: 0 1px 0 rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.85); }
-.sbt-plank-count em { font-style: normal; font-size: 0.82em; opacity: 0.7; }
+/* ══ SHIP BATTLE — A PAINTED SEA, AND HITS COUNTED IN TIMBER ═════════════════════════════════════════════
+   Two things this pass replaces, both of them the same mistake in different clothes: a picture stood in for
+   by a CSS abstraction.
 
-/* The tally sits on one line. `place-items: center` on a grid made the "/14" a second grid item and stacked
-   it under the number, so a hull read as "5" with "/14" hanging beneath it. */
-.sbt-plank-count { display: flex; align-items: baseline; justify-content: center; gap: 2px; white-space: nowrap; }
+   1. THE OCEAN. Two linear-gradients and a repeating-linear-gradient "swell" — flat blue bands. The one
+      surface that has to sell being out on the water mid-fight, and it read as an unfinished loading screen.
+      It is a painting now, built for this frame (horizon high, open sea filling the bottom two thirds,
+      nothing in it with a silhouette because everything with a silhouette here is a thing you can shoot).
+
+   2. THE CONDITION READ-OUTS. A gold pill on the hull, a blue pill on the masts, a draining meter on every
+      cannon, and the whole lot printed a SECOND time up in the name cards as "294 / 341". A bar answers
+      "what fraction"; the question actually in front of the player is "how many more balls does this take",
+      which is a count, and a count wants to be counted in objects. */
+
+/* ── The sea ─────────────────────────────────────────────────────────────────────────────────────────── */
+.sbt-scene { background: #05090f; }
+.sbt-sky { inset: 0; background: url("/images/sailing/battle-bg.webp") center top / cover no-repeat; }
+/* The old hairline horizon and its haze belonged to the gradient; the painting has its own. */
+.sbt-sky::after { content: none; }
+/* .sbt-sea keeps only the swell — a slow vertical drift over the painted water so the surface is never
+   completely still between orders. No colour of its own any more. */
+.sbt-sea { inset: 34% 0 0 0; background: none; box-shadow: none; }
+.sbt-sea::before { content: none; }
+.sbt-sea::after { opacity: 0.14;
+    background: repeating-linear-gradient(180deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 13px); }
+/* THE VEIL. A painting bright enough to be worth looking at is also bright enough to eat white text, so the
+   top and bottom — where the cards and the order panel sit — get pulled down, and the middle third, where
+   the two ships are, is left alone at full strength. */
+.sbt-seaveil { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(4,8,14,0.82) 0%, rgba(4,8,14,0.42) 14%, rgba(4,8,14,0.06) 28%,
+                        transparent 44%, transparent 58%, rgba(3,7,12,0.42) 82%, rgba(3,7,12,0.78) 100%),
+        radial-gradient(120% 70% at 50% 50%, transparent 42%, rgba(3,7,12,0.5) 100%); }
+
+/* ── Hits, as sprites ────────────────────────────────────────────────────────────────────────────────── */
+/* One strip per part, sitting just off the part it belongs to rather than pasted across it — the ship is the
+   art, and a sticker over the middle of it was the reason the old pills looked bolted on. */
+.sbt-parthits { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.sbt-hits { display: grid; grid-template-columns: repeat(var(--per, 6), 1fr); gap: 2px 3px;
+    padding: 3px 4px; border-radius: 8px; width: max-content; max-width: 96%;
+    background: rgba(6,10,16,0.52); border: 1px solid rgba(255,255,255,0.09);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.sbt-parthits .sbt-hits { position: absolute; transform: translate(-50%, -50%); }
+/* Canvas rides above the masts, timber sits under the waterline. Both clear of the painting. */
+.sbt-parthits .sbt-hits.is-above { transform: translate(-50%, -112%); }
+.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, 12%); }
+.sbt-pip { display: block; width: 100%; height: auto; image-rendering: auto;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
+    transition: opacity .3s ease, filter .3s ease, transform .3s ease; }
+/* A pip that has just gone drops and settles, so losing one is an EVENT rather than a redraw. */
+.sbt-pip.is-gone { opacity: 0.72; animation: sbtPipGone .42s ease-out both; }
+@keyframes sbtPipGone {
+    0% { transform: translateY(-3px) scale(1.18) rotate(0deg); opacity: 1; filter: brightness(2.2); }
+    60% { transform: translateY(1px) scale(0.96) rotate(-4deg); }
+    100% { transform: none; opacity: 0.72; filter: none; }
+}
+/* Pip sizes are per-material because the sprites are: a plank is wide, a sail is tall, a plate is square. */
+.sbt-hits.is-hull { --pipw: 15px; }
+.sbt-hits.is-sails { --pipw: 14px; }
+.sbt-hits.is-guns { --pipw: 9px; gap: 1px 2px; padding: 2px 3px; }
+.sbt-hits .sbt-pip { width: var(--pipw); }
+/* Down to the last two boards and the timber that is left glows — the ship is about to go. */
+.sbt-hits.is-hull:has(.sbt-pip.is-up:nth-child(-n+2):last-of-type) .sbt-pip.is-up { animation: sbtPipLow 1.05s ease-in-out infinite; }
+@keyframes sbtPipLow { 0%, 100% { filter: none; } 50% { filter: brightness(1.5) drop-shadow(0 0 4px rgba(255,190,110,0.7)); } }
+/* Nothing left of that part: the frame goes red so a dead system reads without counting. */
+.sbt-hits.is-out { background: rgba(96,18,10,0.5); border-color: rgba(255,120,100,0.34); }
+
+/* The gun markers carry their own strip now, so the plaque is just the strip plus the barrel count. */
+.sbt-plaque-hp { display: none; }
+.sbt-target.is-gun .sbt-plaque-body { gap: 3px; }
+
+/* Phones: the strips are the readable part, so they shrink last and least. */
+@media (max-width: 430px) {
+    .sbt-hits.is-hull { --pipw: 12px; }
+    .sbt-hits.is-sails { --pipw: 11px; }
+    .sbt-hits.is-guns { --pipw: 8px; }
+    .sbt-hits { gap: 1px 2px; padding: 2px 3px; }
+}
+
+/* ── Placement pass on the strips ────────────────────────────────────────────────────────────────────────
+   Three things the first cut got wrong, all of them only visible on a phone with the art actually loaded.
+
+   1. THE PIPS WERE TOO SMALL. At 12px a plank is a brown tick — the whole point of drawing them as objects
+      is that you can see WHAT the object is, and a strip you have to count one at a time is worse than the
+      bar it replaced. Bigger, and fewer per row so the block stays narrow.
+   2. THE HULL STRIP FLOATED IN OPEN WATER. It was anchored to the bottom of the hull ZONE, which includes
+      the sprite's transparent padding, so it sat seventy pixels below the ship. It belongs on the waterline,
+      where planking is.
+   3. THE CHROME SAT ON TOP OF HER RIGGING. Music / Leave / Log were pinned top-RIGHT, which is exactly where
+      the enemy ship and her canvas are. Top-left is the one genuinely empty corner of the scene. */
+.sbt-chrome { justify-content: flex-start; }
+.sbt-chrome .sbt-log { right: auto; left: 8px; }
+
+.sbt-hits.is-hull { --pipw: 17px; --per: 6; }
+.sbt-hits.is-sails { --pipw: 16px; }
+.sbt-hits.is-guns { --pipw: 10px; }
+.sbt-hits { gap: 2px; padding: 3px; border-radius: 9px;
+    background: rgba(6,10,16,0.62); box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
+/* Canvas rides just clear of the mastheads; timber sits ON the waterline rather than under the keel. */
+.sbt-parthits .sbt-hits.is-above { transform: translate(-50%, -104%); }
+.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, -52%); }
+
+@media (max-width: 430px) {
+    .sbt-hits.is-hull { --pipw: 15px; --per: 5; }
+    .sbt-hits.is-sails { --pipw: 14px; }
+    .sbt-hits.is-guns { --pipw: 9px; }
+    .sbt-hits { gap: 2px; padding: 3px; }
+}
+
+/* ── The hull reads as planking, not as a slab ───────────────────────────────────────────────────────────
+   Six per row turned a twenty-plank hull into a four-row block that covered the ship it was describing. Two
+   courses, sized to fit the hull rather than to a fixed pip width, so the strip is always the same shape and
+   always narrower than the boat. And the incoming marks go BACK on top: "2 HULL" — the one thing telling you
+   where her broadside is about to land — was being buried under the timber. */
+.sbt-parthits { z-index: 6; }
+.sbt-incoming { z-index: 11; }
+.sbt-hits.is-hull { --pipw: auto; width: min(58%, 190px); }
+.sbt-hits.is-hull .sbt-pip { width: 100%; }
+.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, -28%); }
+.sbt-hits { background: rgba(6,10,16,0.5); }
+@media (max-width: 430px) {
+    .sbt-hits.is-hull { width: min(62%, 158px); }
+}
+
+/* The canvas chip used to be first in this grid and needed the full row for its six pips; it is gone, so the
+   rule was making DODGE span both columns and leaving armour stranded underneath it. Two equal chips. */
+.sbt-sys > .sbt-syschip:first-child { grid-column: auto; }
+
+/* ── One condition placard per ship ──────────────────────────────────────────────────────────────────────
+   Canvas above timber, both riding at the waterline. See the note in ShipBattleScene: the sails strip used
+   to sit over the mastheads, where the "last exchange" recap lives for the entire aim phase — so the count
+   you were meant to read while picking a target spent every round hidden behind a panel. */
+.sbt-placard { position: absolute; transform: translate(-50%, -18%);
+    display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.sbt-placard .sbt-hits { position: static; transform: none; }
+/* Canvas is at most six sheets, so it sits in one row the width of the timber below it. */
+.sbt-placard .sbt-hits.is-sails { width: min(58%, 190px); }
+.sbt-placard .sbt-hits.is-sails .sbt-pip { width: 100%; }
+@media (max-width: 430px) {
+    .sbt-placard .sbt-hits.is-sails { width: min(62%, 158px); }
+}
+
+/* The placard is absolutely positioned, so it shrink-wraps its content — which made the strips' own
+   percentage widths circular and collapsed every pip back to a speck. The placard owns the width; the strips
+   fill it, and the pips divide it. */
+.sbt-placard { width: min(54vw, 208px); }
+.sbt-placard .sbt-hits { width: 100%; }
+.sbt-placard .sbt-hits .sbt-pip { width: 100%; }
+@media (max-width: 430px) { .sbt-placard { width: min(50vw, 178px); } }
+
+/* Riding UNDER the keel put the lower ship's placard through the floor of the stage and into the order
+   panel. It sits ON the planking instead — over the bottom of the hull, which is both where planking is and
+   the least interesting part of the sprite to cover. Slightly narrower with it, so the ship still reads as
+   the biggest thing on screen. */
+.sbt-placard { width: min(48vw, 182px); transform: translate(-50%, -62%); }
+@media (max-width: 430px) { .sbt-placard { width: min(46vw, 164px); } }
+/* "1 GUN 6" was wrapping onto two lines inside its own pill. */
+.sbt-inc em { white-space: nowrap; }
+
+/* WHERE THE HORIZON LANDS DEPENDS ON THE SHAPE OF THE WINDOW. The painting is cropped so its horizon sits a
+   third of the way down, and on a portrait phone `cover` scales it by height and that holds. On anything
+   wider than the image (desktop, landscape) `cover` scales by WIDTH instead and the extra height spills off
+   the bottom — anchoring at the top pushed the horizon to ~61%, which left both ships sailing through the
+   sky. Pull the crop down so the waterline comes back up to roughly a third. */
+@media (min-aspect-ratio: 9/10) {
+    .sbt-sky { background-position: center 30%; }
+}
