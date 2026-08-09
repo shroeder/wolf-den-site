@@ -218,8 +218,7 @@ function gunWidthPct(ports) {
 //
 // A COUNT AND THE NAME OF THE PART. "4 HULL" needs no legend, survives any size, and the colour does the work
 // the art was failing to do: green while it is whole, amber once it is bitten into, red when it is gone. It is
-// the same shape as the incoming marks that land on your ship, which is the point — one vocabulary for "how
-// much of this part is there", whoever it belongs to.
+// one vocabulary for "how much of this part is there", whoever it belongs to.
 const conditionTone = (left, max) => {
     if (left <= 0) return "is-dead";
     return left >= max ? "is-full" : "is-hurt";
@@ -240,7 +239,7 @@ function PartChip({ zone, left, max, label = null }) {
 
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
 function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax = null, sys, caps, targets = null,
-                onPick = null, onUnpick = null, firing = false, hullRef = null, incoming = null }) {
+                onPick = null, onUnpick = null, firing = false, hullRef = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
     const mirror = Boolean(f?.mirror);
@@ -358,28 +357,6 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                             </span>
                         );
                     })()}
-                </span>
-            ) : null}
-            {incoming?.length ? (
-                <span className="sbt-incoming" aria-hidden="true">
-                    {incoming.map((inc) => {
-                        const spot = inc.zone === "guns" && inc.target != null
-                            ? (f?.ports || [])[inc.target]
-                            : null;
-                        const b = spot ? null : zoneBox(key, inc.zone, { mirror });
-                        const pos = spot
-                            ? { left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }
-                            : b ? { left: `${b.cx}%`, top: `${b.cy}%` } : null;
-                        if (!pos) return null;
-                        return (
-                            <span key={`${inc.zone}-${inc.target ?? "z"}`} className="sbt-inc" style={pos}>
-                                {/* NAME THE PART. Three bare red rings told you she was shooting at something,
-                                    not what — and "two on your canvas" is the whole decision. */}
-                                <b>{inc.n}</b>
-                                <em>{inc.zone === "guns" ? `gun ${(inc.target ?? 0) + 1}` : zoneById(inc.zone).name}</em>
-                            </span>
-                        );
-                    })}
                 </span>
             ) : null}
             {targets ? (
@@ -529,16 +506,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     // WHAT SHE IS ABOUT TO DO. Her orders are rolled when the round opens and sent with the battle, so this
     // is the volley that will actually land — not a prediction. Grouped by part, because "three barrels on
     // your canvas" is the decision; which specific gun is hers is not.
-    const incoming = useMemo(() => {
-        const plan = battle?.theirNext;
-        if (!Array.isArray(plan) || !plan.length) return [];
-        const byZone = new Map();
-        for (const o of plan) {
-            const k = `${o.zone}:${o.target ?? ""}`;
-            byZone.set(k, { zone: o.zone, target: o.target ?? null, n: (byZone.get(k)?.n || 0) + 1 });
-        }
-        return [...byZone.values()];
-    }, [battle?.theirNext]);
+     // HER INTENT IS NO LONGER SHOWN. Her orders are still rolled when the round OPENS rather than when it
+    // resolves — that part matters and stays, because it means the volley you are aiming into is already
+    // decided and cannot be re-rolled against you after you commit. What is gone is DRAWING it on your ship.
+    //
+    // Three or four red marks sat on the parts they were aimed at, and the one on the hull read "2 HULL"
+    // directly above a condition chip reading "7 HULL" — the same words in the same order meaning opposite
+    // things, one a stock and one a threat. It also told you the answer before you had made the decision.
+    // Knowing exactly what she will do every round is not the interesting version of this fight.
 
     // WHAT JUST HAPPENED, held still so you can read it.
     //
@@ -998,7 +973,6 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         </div>
                     ) : null}
                     <Ship f={me} side="me" hullRef={meHullRef}
-                        incoming={phase === "aim" && !battle?.over ? incoming : null}
                         hurt={hitFx?.side === "me"} heavy={Boolean(hitFx?.side === "me" && hitFx.heavy)}
                         low={clampPct(myHp, battle?.myMax) <= 25}
                         sinking={sinkingSide === "me"} hpFrac={(myHp || 0) / Math.max(1, battle?.myMax || 1)}

@@ -14447,27 +14447,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
 @media (max-width: 400px) { .bh-stat-art { width: 26px; height: 26px; } }
 
-/* ══ SHIP BATTLE — WHAT SHE IS ABOUT TO DO ══════════════════════════════════════════════════════════════════
-   Her guns are laid when the round OPENS now, and these are the marks. You used to commit the whole broadside
-   blind and learn what she went for afterwards, which made her a dice roll wearing a captain's hat. Seeing
-   three barrels bearing on your canvas is the decision the fight was missing: press the attack, or spend a
-   round taking those guns off her first.
-
-   Red, pulsing, and on YOUR hull — the one place nothing else is drawn, so it cannot be confused with the
-   targets you are laying on hers. */
-.sbt-incoming { position: absolute; inset: 0; z-index: 7; pointer-events: none; }
-.sbt-inc { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center;
-    width: 30px; height: 30px; }
-.sbt-inc-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px dashed rgba(255,120,110,0.85);
-    box-shadow: 0 0 12px rgba(255,90,80,0.55), inset 0 0 10px rgba(255,90,80,0.35);
-    animation: sbtIncoming 1.5s ease-in-out infinite; }
-.sbt-inc b { position: relative; font-size: 0.76rem; font-weight: 900; color: #fff;
-    text-shadow: 0 1px 0 rgba(0,0,0,0.85), 0 0 8px rgba(255,90,80,0.9); }
-@keyframes sbtIncoming {
-    0%, 100% { transform: scale(1); opacity: 0.85; }
-    50% { transform: scale(1.14); opacity: 1; }
-}
-
 /* ══ SHIP BATTLE — THIRD PASS ON THE COMPOSITION ════════════════════════════════════════════════════════════
    BOTH SHIPS, WHOLE. The last two passes chased depth — yours nearer and dimmer, hers further back and lit —
    and paid for it by hanging your own galleon off the left edge of the screen. A ship you own that is half
@@ -14497,17 +14476,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-gun .sbt-plaque-body { min-width: 30px; }
 .sbt-target.is-gun .sbt-plaque-body b { font-size: 0.62rem; }
 .sbt-target.is-gun .sbt-plaque-hp { height: 4px; }
-
-/* WHICH PART SHE IS SHOOTING AT. The incoming marks were bare red rings — you could see three of them and not
-   tell whether that was your hull or a gun. Labelled, in her colour, so the threat names itself. */
-.sbt-inc { width: auto; height: auto; padding: 3px 8px; border-radius: 999px;
-    background: rgba(28,6,6,0.88); border: 1.5px solid rgba(255,120,110,0.9);
-    box-shadow: 0 0 14px rgba(255,80,70,0.45); display: flex; align-items: center; gap: 5px;
-    animation: sbtIncoming 1.6s ease-in-out infinite; }
-.sbt-inc .sbt-inc-ring { display: none; }
-.sbt-inc b { font-size: 0.74rem; color: #ffd2cc; }
-.sbt-inc em { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
-    text-transform: uppercase; color: #ff9a8e; }
 
 /* ── SIX CANNONS THAT READ AS SIX ────────────────────────────────────────────────────────────────────────
    The markers were 46px circles on a rail whose ports sit about 24px apart, so the gun deck came out as one
@@ -14893,9 +14861,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    rule was making DODGE span both columns and leaving armour stranded underneath it. Two equal chips. */
 .sbt-sys > .sbt-syschip:first-child { grid-column: auto; }
 
-/* "1 GUN 6" was wrapping onto two lines inside its own pill. */
-.sbt-inc em { white-space: nowrap; }
-
 /* WHERE THE HORIZON LANDS DEPENDS ON THE SHAPE OF THE WINDOW. The painting is cropped so its horizon sits a
    third of the way down, and on a portrait phone `cover` scales it by height and that holds. On anything
    wider than the image (desktop, landscape) `cover` scales by WIDTH instead and the extra height spills off
@@ -15076,3 +15041,4 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-gun.is-edge-l .sbt-plaque { transform: translateX(56%); }
 /* And the minus lives clear of the text rather than over it. */
 .sbt-target.is-gun .sbt-plaque-minus { transform: translate(38%, -38%); }
+
