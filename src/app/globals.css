@@ -14506,3 +14506,62 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     0%, 100% { transform: scale(1); opacity: 0.85; }
     50% { transform: scale(1.14); opacity: 1; }
 }
+
+/* ══ SHIP BATTLE — THIRD PASS ON THE COMPOSITION ════════════════════════════════════════════════════════════
+   BOTH SHIPS, WHOLE. The last two passes chased depth — yours nearer and dimmer, hers further back and lit —
+   and paid for it by hanging your own galleon off the left edge of the screen. A ship you own that is half
+   out of frame is not foreground, it is cropped. Both hulls sit fully inside the water now, yours lower and
+   nearer, hers higher and further off, with clear water on the diagonal between them. */
+.sbt-ship-me { width: min(48%, 300px); left: 1.5%; bottom: 9%; z-index: 3;
+    filter: brightness(0.94) saturate(0.97) drop-shadow(0 14px 22px rgba(0,0,0,0.58)); }
+.sbt-ship-foe { width: min(52%, 330px); right: 1.5%; bottom: 30%; z-index: 2;
+    filter: drop-shadow(0 18px 26px rgba(0,0,0,0.55)); }
+@media (max-width: 520px) {
+    .sbt-ship-me { width: min(50%, 250px); left: 1%; bottom: 8%; }
+    .sbt-ship-foe { width: min(54%, 270px); right: 1%; bottom: 31%; }
+}
+
+/* ── MARKERS WITHOUT ICONS ───────────────────────────────────────────────────────────────────────────────
+   The outline already says what the part is; the sprite on top of it was repeating the shape, and six cannon
+   icons along a rail bled into one another until you could not tell which barrel you were aiming at. What is
+   left is the region, a bar for what it has left, and the one number that matters — odds on a zone, health on
+   a cannon. */
+.sbt-plaque { padding: 3px 9px; gap: 0; }
+.sbt-plaque-body { min-width: 40px; }
+.sbt-plaque-body b { font-size: 0.8rem; }
+.sbt-plaque-hp { height: 5px; }
+/* A cannon is small and there are six of them: bar over number, tight, so a rail reads as six separate guns. */
+.sbt-target.is-gun { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+.sbt-target.is-gun .sbt-plaque { padding: 2px 5px; }
+.sbt-target.is-gun .sbt-plaque-body { min-width: 30px; }
+.sbt-target.is-gun .sbt-plaque-body b { font-size: 0.62rem; }
+.sbt-target.is-gun .sbt-plaque-hp { height: 4px; }
+
+/* WHICH PART SHE IS SHOOTING AT. The incoming marks were bare red rings — you could see three of them and not
+   tell whether that was your hull or a gun. Labelled, in her colour, so the threat names itself. */
+.sbt-inc { width: auto; height: auto; padding: 3px 8px; border-radius: 999px;
+    background: rgba(28,6,6,0.88); border: 1.5px solid rgba(255,120,110,0.9);
+    box-shadow: 0 0 14px rgba(255,80,70,0.45); display: flex; align-items: center; gap: 5px;
+    animation: sbtIncoming 1.6s ease-in-out infinite; }
+.sbt-inc .sbt-inc-ring { display: none; }
+.sbt-inc b { font-size: 0.74rem; color: #ffd2cc; }
+.sbt-inc em { font-style: normal; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase; color: #ff9a8e; }
+
+/* ── SIX CANNONS THAT READ AS SIX ────────────────────────────────────────────────────────────────────────
+   The markers were 46px circles on a rail whose ports sit about 24px apart, so the gun deck came out as one
+   overlapping chain of rings you could not pick a barrel out of. Small, square-ish, and no ring: a health bar
+   over the port, which is the thing worth knowing.
+
+   The number is shown when the gun is DAMAGED or when you have laid on it. The earlier rule hid it always,
+   on the reasoning that six cannons "all share one number" — that stopped being true when guns got individual
+   hit points, and a barrel you have already worked on is exactly the one whose health you want to read. Six
+   untouched guns still stay quiet rather than printing 100% six times. */
+.sbt-target.is-gun { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.sbt-target.is-gun .sbt-target-skin { border-radius: 7px; border-width: 1.5px; }
+.sbt-target.is-gun .sbt-plaque { padding: 2px 4px; background: rgba(6,12,20,0.9); }
+.sbt-target.is-gun .sbt-plaque-body { min-width: 22px; }
+.sbt-target.is-gun .sbt-plaque-hp { height: 4px; }
+.sbt-target.is-gun .sbt-plaque-body b { display: none; font-size: 0.56rem; }
+.sbt-target.is-gun.is-hurt .sbt-plaque-body b,
+.sbt-target.is-gun.is-on .sbt-plaque-body b { display: block; }

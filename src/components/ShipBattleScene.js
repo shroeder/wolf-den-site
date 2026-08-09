@@ -311,8 +311,10 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                         if (!pos) return null;
                         return (
                             <span key={`${inc.zone}-${inc.target ?? "z"}`} className="sbt-inc" style={pos}>
-                                <i className="sbt-inc-ring" />
+                                {/* NAME THE PART. Three bare red rings told you she was shooting at something,
+                                    not what — and "two on your canvas" is the whole decision. */}
                                 <b>{inc.n}</b>
+                                <em>{inc.zone === "guns" ? `gun ${(inc.target ?? 0) + 1}` : zoneById(inc.zone).name}</em>
                             </span>
                         );
                     })}
@@ -322,26 +324,27 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                 <span className="sbt-targets">
                     {targets.map((t) => (
                         <button key={t.key} type="button"
-                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}`}
+                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}${t.kind === "gun" && t.hpPct < 100 ? " is-hurt" : ""}`}
                             style={t.box
                                 ? { left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }
                                 : { left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
                             disabled={t.dead}
                             onClick={(e) => { e.stopPropagation(); onPick?.(t); }}
                             title={`${t.name} — ${Math.round(t.chance * 100)}% to hit`}>
-                            {/* THE PART ITSELF, outlined. It is here before you touch anything: you should be
-                                able to see what a ship is made of and what state each piece is in without
-                                having to prod it first. */}
+                            {/* THE AREA IS THE TARGET. The outline was doing the work and the icon on top of it
+                                was just repeating what the shape already said — and six cannon icons in a row
+                                on a gun deck bled into one another until you could not tell which barrel you
+                                were aiming at. What is left is the region, what it has left, and the number
+                                that matters. */}
                             <span className="sbt-target-skin" aria-hidden="true" />
                             <span className="sbt-plaque">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img className="sbt-plaque-art" src={PART_ART[t.zone]} alt="" draggable="false" />
                                 <span className="sbt-plaque-body">
                                     {/* WHAT IT HAS LEFT. Every piece has hit points and none of them were on
                                         screen — you were aiming at a part with no idea whether one more ball
-                                        would take it off her. */}
+                                        would take it off her. On a cannon this IS the label: a bar and a
+                                        percentage, small enough that six of them read as six. */}
                                     <span className="sbt-plaque-hp" style={{ "--w": `${t.hpPct}%` }}><i /></span>
-                                    <b>{t.laid ? `×${t.laid}` : `${Math.round(t.chance * 100)}%`}</b>
+                                    <b>{t.laid ? `×${t.laid}` : t.kind === "gun" ? `${t.hpPct}%` : `${Math.round(t.chance * 100)}%`}</b>
                                 </span>
                             </span>
                         </button>
@@ -654,10 +657,21 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         return { x: box.x + (b.cx / 100) * box.w, y: box.y + (b.cy / 100) * box.h };
     }, [boxes, me, foe]);
 
+    // TAP TO LAY, TAP AGAIN TO TAKE IT BACK. The rail was the only undo, which nobody guessed — the intuition
+    // is that the thing you tapped to aim is the thing you tap to stop aiming. Removes the LAST gun put on
+    // that part, so tapping a stack of three walks it back one barrel at a time rather than clearing the lot.
     const pick = useCallback((t) => {
         if (phase !== "aim" || busy || battle?.over || t.dead) return;
-        if (nextGun == null) return;   // every gun is already laid
-        setAim((list) => [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }]);
+        const same = (a) => a.zone === t.zone && (a.target ?? null) === (t.target ?? null);
+        setAim((list) => {
+            const onIt = list.filter(same);
+            if (onIt.length) {
+                const lastGun = onIt[onIt.length - 1].gun;
+                return list.filter((a) => a.gun !== lastGun);
+            }
+            if (nextGun == null) return list;   // every gun is already laid
+            return [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }];
+        });
         sfxPick();
     }, [phase, busy, battle?.over, nextGun, ammo]);
 
