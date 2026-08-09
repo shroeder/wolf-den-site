@@ -591,6 +591,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const meHullRef = useRef(null);
     const foeHullRef = useRef(null);
     const [boxes, setBoxes] = useState(null);
+    // Pulled out as primitives: the animation effect below keys off these, not off the `battle` object, whose
+    // identity changes on every render of the parent.
+    const battleRound = battle?.round;
+    const battleOver = Boolean(battle?.over);
+    const battleSunk = battle?.sunk || null;
 
     const foeSys = battle?.sys?.foe;
     const caps = battle?.caps;
@@ -690,12 +695,22 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const markers = useMemo(() => targets.map((t) => ({ ...t, laid: gunsAt(t.zone, t.target) })), [targets, gunsAt]);
 
     // Where each hull sits on the stage, in pixels — needed to fly a ball from a muzzle to a cannon.
+    // ALSO KEPT IN A REF. `setBoxes` mints a new object every time it runs, and the volley animation used to
+    // list `boxes` as a dependency — so a re-measure DURING an exchange tore the effect down, cleared its
+    // pending timers and scheduled the whole step again from the top. The shots you had just watched fired a
+    // second time. The remeasure is on a 400ms timer after every round (the boat art loads after first paint)
+    // and on every window resize, which on a phone includes the URL bar sliding away, so this fired
+    // constantly. Reading geometry off a ref keeps it out of the dependency list — and reading it inside each
+    // shot's own timeout means a ball uses the freshest measurement rather than one captured up front.
+    const boxesRef = useRef(null);
     const measure = useCallback(() => {
         const stage = stageRef.current, a = meHullRef.current, b = foeHullRef.current;
         if (!stage || !a || !b) return;
         const s = stage.getBoundingClientRect();
         const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left - s.left, y: r.top - s.top, w: r.width, h: r.height }; };
-        setBoxes({ me: box(a), foe: box(b), w: s.width, h: s.height });
+        const next = { me: box(a), foe: box(b), w: s.width, h: s.height };
+        boxesRef.current = next;
+        setBoxes(next);
     }, []);
     useLayoutEffect(() => {
         measure();
@@ -707,7 +722,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
     // A point on a ship in stage pixels: the middle of a zone, or one particular gun port.
     const pointOn = useCallback((sideKey, zone, target) => {
-        const box = boxes?.[sideKey];
+        const box = (boxesRef.current || boxes)?.[sideKey];
         const f = sideKey === "me" ? me : foe;
         if (!box) return null;
         if (zone === "guns") {
@@ -717,7 +732,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         const b = zoneBox(shipKey(f), zone, { mirror: Boolean(f?.mirror) });
         if (!b) return { x: box.x + box.w / 2, y: box.y + box.h * 0.6 };
         return { x: box.x + (b.cx / 100) * box.w, y: box.y + (b.cy / 100) * box.h };
-    }, [boxes, me, foe]);
+    }, [me, foe]);
 
     // TAP ADDS A BARREL. Concentrating the broadside is the whole point of splitting it — four guns into one
     // hull is a decision, and for a while tapping twice removed the first instead of adding a second, which
@@ -773,7 +788,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     useEffect(() => {
         if (phase !== "play" || step < 0) return undefined;
         if (step >= events.length) {
-            if (battle?.over) { setPhase(battle?.sunk ? "sinking" : "result"); return undefined; }
+            if (battleOver) { setPhase(battleSunk ? "sinking" : "result"); return undefined; }
             const t = setTimeout(() => { setPhase("aim"); setAim([]); setBalls([]); setPops([]); }, 300);
             return () => clearTimeout(t);
         }
@@ -782,7 +797,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         // KEYED, not appended — an effect that runs twice (StrictMode in development, any re-render of the same
         // exchange) was adding the same line a second time under the same key.
         if (line) {
-            const lk = `${battle?.round}-${step}`;
+            const lk = `${battleRound}-${step}`;
             setLog((l) => [...l.slice(-40).filter((x) => x.k !== lk), { ...line, k: lk }]);
         }
         const timers = [];
@@ -790,7 +805,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         if (ev.type === "volley") {
             const shots = ev.shots || [];
             const from = ev.side, to = from === "me" ? "foe" : "me";
-            const fromBox = boxes?.[from];
+            const fromBox = boxesRef.current?.[from];
             setFiringSide(from);
             setPops([]);
             setShout(null);
@@ -801,13 +816,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                     sfxGun(s.ammo);
                     const ports = (from === "me" ? me : foe)?.ports || [];
                     const p = ports[s.gun];
-                    const muzzle = fromBox && p
-                        ? { x: fromBox.x + p.x * fromBox.w, y: fromBox.y + p.y * fromBox.h }
-                        : fromBox ? { x: fromBox.x + fromBox.w / 2, y: fromBox.y + fromBox.h * 0.55 } : null;
+                    const live = boxesRef.current?.[from] || fromBox;
+                    const muzzle = live && p
+                        ? { x: live.x + p.x * live.w, y: live.y + p.y * live.h }
+                        : live ? { x: live.x + live.w / 2, y: live.y + live.h * 0.55 } : null;
                     const land = pointOn(to, s.zone, s.target);
                     if (muzzle && land) {
-                        const end = s.hit ? land : { x: muzzle.x + (land.x - muzzle.x) * 0.72, y: Math.max(land.y, (boxes?.h || 400) * 0.78) };
-                        const key = `${battle?.round}-${step}-${i}`;
+                        const end = s.hit ? land : { x: muzzle.x + (land.x - muzzle.x) * 0.72, y: Math.max(land.y, (boxesRef.current?.h || 400) * 0.78) };
+                        const key = `${battleRound}-${step}-${i}`;
                         setBalls((b) => [...b.slice(-14).filter((x) => x.k !== key), {
                             k: key, from: muzzle, to: end, hit: s.hit, ammo: s.ammo, rake: s.rake,
                         }]);
@@ -817,7 +833,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                     }
                 }, at));
                 timers.push(setTimeout(() => {
-                    const pk = `${battle?.round}-${step}-${i}`;
+                    const pk = `${battleRound}-${step}-${i}`;
                     const at2 = landings.current[pk] || null;
                     if (s.hit) {
                         setHitFx({ side: to, heavy: Boolean(s.rake) });
@@ -852,7 +868,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         if (ev.hp) { setMyHp(ev.hp.me); setFoeHp(ev.hp.foe); }
         timers.push(setTimeout(() => { setShake(null); setStep((v) => v + 1); }, 760));
         return () => timers.forEach(clearTimeout);
-    }, [phase, step, events, battle, me, foe, boxes, pointOn]);
+        // DEPENDENCIES ARE THE STEP, NOT THE SCENE. `battle` and `boxes` are fresh objects on every render and
+        // every remeasure; listing them made this effect re-run — and therefore re-fire — in the middle of an
+        // exchange. Only the things that genuinely identify WHICH step is playing belong here.
+    }, [phase, step, events, battleRound, battleOver, battleSunk, me, foe, pointOn]);
 
     useEffect(() => {
         if (phase !== "sinking") return undefined;
@@ -915,7 +934,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         it is furniture. What it used to be for (warning you the order had flipped) no longer
                         happens. A fight already in progress from before the change keeps its saved order, so
                         that one case still says so. */}
-                    {battle?.gauge === "foe" ? <em>they fire first</em> : null}
+                    {/* Nothing here any more: you fire first in every fight, including one already in
+                        progress, so there is no order left to announce. */}
                 </div>
                 <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps}
                     armor={battle?.stats?.foe?.armor || 0} />

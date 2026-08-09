@@ -498,8 +498,12 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
         for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
     };
 
-    if (st.gauge === "me") { fire("me", mine); fire("foe", theirs); }
-    else { fire("foe", theirs); fire("me", mine); }
+    // YOU FIRE FIRST. FULL STOP. Setting the gauge to "me" at the opening was not enough: a fight already in
+    // progress kept the order it was saved with, so anyone mid-battle when that shipped still watched the
+    // enemy answer their own FIRE button. There is no case left where she goes first, so there is no reason
+    // to branch on a stored field — `gauge` stays on the state only because it is a saved shape.
+    fire("me", mine);
+    fire("foe", theirs);
 
     // IT ENDS WHEN A SHIP GOES DOWN. There used to be a fourteen-round limit and a winner decided on which
     // hull had the greater share of itself left, which is how a fight both captains were still fighting got
