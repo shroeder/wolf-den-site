@@ -14407,3 +14407,44 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    right for a point and catastrophic for an outlined AREA: each region landed half its width up and left of
    the part it described, floating in open sky beside the ship. Guns stay centred on their port by margin. */
 .sbt-target { transform: none; }
+
+/* ══ SHIP BATTLE — LAST EXCHANGE ════════════════════════════════════════════════════════════════════════════
+   The fight resolves in about a second and a half, then asks for your next decision. Every bit of feedback
+   lived inside that second, so looking at the wrong ship meant the exchange was simply gone — and the log
+   that had it was one summarised line behind a button nobody opens mid-fight.
+
+   It sits in the water ABOVE the ships, which was the emptiest third of a phone screen and was doing nothing
+   at all, and only while you are aiming — during the volley it would be reading a result that has not
+   happened yet. */
+.sbt-recap { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 9;
+    width: min(94%, 420px); padding: 8px 10px 9px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(8,16,28,0.90), rgba(6,12,22,0.86));
+    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+    animation: sbtRecapIn .32s ease-out both; pointer-events: none; }
+@keyframes sbtRecapIn { from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+.sbt-recap-head { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
+    color: #8fa4bb; text-align: center; margin-bottom: 6px; }
+.sbt-recap-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sbt-recap-col { display: grid; gap: 2px; align-content: start; padding: 6px 8px; border-radius: 10px;
+    background: rgba(255,255,255,0.04); border-left: 3px solid transparent; }
+/* Yours reads gold, hers reads red — the same two colours the hull bars already use, so the column you are
+   looking at is identified before you read a word of it. */
+.sbt-recap-col.is-mine { border-left-color: #ffd28a; }
+.sbt-recap-col.is-theirs { border-left-color: #ff8f7a; }
+.sbt-recap-col b { font-size: 0.68rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #e9dcb8; }
+.sbt-recap-col.is-theirs b { color: #f0c4bb; }
+.sbt-recap-tally { font-size: 0.78rem; color: #dfe6ee; font-weight: 700; }
+.sbt-recap-tally em { font-style: normal; color: #ff9c5e; font-weight: 800; }
+.sbt-recap-dmg { font-size: 0.95rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
+.sbt-recap-col.is-theirs .sbt-recap-dmg { color: #ff8f7a; }
+.sbt-recap-where { font-size: 0.68rem; color: #9fb0c4; }
+.sbt-recap-miss { font-size: 0.68rem; color: #7f8fa3; }
+.sbt-recap-wreck { font-size: 0.68rem; font-weight: 800; color: #8fe3a1; }
+.sbt-recap-col.is-theirs .sbt-recap-wreck { color: #ffb4a8; }
+
+@media (max-width: 400px) {
+    .sbt-recap { top: 6px; padding: 7px 8px 8px; }
+    .sbt-recap-cols { gap: 7px; }
+    .sbt-recap-col { padding: 5px 6px; }
+}

@@ -396,6 +396,46 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const foe = battle?.foe || {};
     const events = useMemo(() => battle?.events || [], [battle?.events]);
 
+    // WHAT JUST HAPPENED, held still so you can read it.
+    //
+    // The fight resolves in about a second and a half and then asks you to make your next decision. Every
+    // piece of feedback up to now lived inside that second — a number over the hull, a splash, a shout — so
+    // if you blinked, or looked at your own ship while hers was being hit, the exchange was simply gone. The
+    // log had it, as one summarised line, behind a button nobody opens mid-fight.
+    //
+    // This is the same information as a standing scoreboard: what you sent, what landed, what it cost, and
+    // the same for what came back. It sits in the empty water above the ships during the aim phase, which is
+    // exactly when you are deciding and exactly when that water was doing nothing.
+    const exchange = useMemo(() => {
+        if (!events.length) return null;
+        const side = (who) => {
+            const vol = events.filter((e) => e.type === "volley" && e.side === who);
+            if (!vol.length) return null;
+            const shots = vol.flatMap((v) => v.shots || []);
+            if (!shots.length) return null;
+            const hits = shots.filter((sh) => sh.hit);
+            const wrecks = events.filter((e) => e.type === "wreck" && e.victim === (who === "me" ? "foe" : "me"));
+            // What the misses were WORTH taking — the average odds of the shots that did not land. A volley
+            // of 80% shots that all missed is luck; a volley of 30% shots that missed is a lesson.
+            const missed = shots.filter((sh) => !sh.hit && sh.chance != null);
+            const avgMiss = missed.length ? Math.round((missed.reduce((n, sh) => n + sh.chance, 0) / missed.length) * 100) : null;
+            const byZone = {};
+            for (const sh of hits) byZone[sh.zone] = (byZone[sh.zone] || 0) + (sh.dmg || 0);
+            return {
+                guns: shots.length,
+                hits: hits.length,
+                dmg: vol.reduce((n, v) => n + (v.dmg || 0), 0),
+                rakes: hits.filter((sh) => sh.rake).length,
+                avgMiss,
+                byZone,
+                wrecks: wrecks.map((w) => (w.sys === "sails" ? "canvas shredded" : "gun dismounted")),
+            };
+        };
+        const mine = side("me");
+        const theirs = side("foe");
+        return mine || theirs ? { mine, theirs } : null;
+    }, [events]);
+
     const [phase, setPhase] = useState(battle?.round ? "aim" : "intro"); // intro → aim → play → sinking → result
     const [step, setStep] = useState(-1);
     const [myHp, setMyHp] = useState(battle?.myHp ?? battle?.myMax ?? 100);
@@ -750,6 +790,36 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
             <div className={`sbt-shakewrap${shake ? (shake.big ? " is-quake" : " is-shake") : ""}`}>
                 <div className={`sbt-stage${lowAny ? " is-desperate" : ""}`} ref={stageRef}>
+                    {phase === "aim" && exchange ? (
+                        <div className="sbt-recap">
+                            <div className="sbt-recap-head">Last exchange</div>
+                            <div className="sbt-recap-cols">
+                                {[["You fired", exchange.mine, "is-mine"], ["They fired", exchange.theirs, "is-theirs"]].map(([label, x, cls]) => (
+                                    <div key={label} className={`sbt-recap-col ${cls}`}>
+                                        <b>{label}</b>
+                                        {x ? (
+                                            <>
+                                                <span className="sbt-recap-tally">
+                                                    {x.hits}/{x.guns} on target
+                                                    {x.rakes ? <em> · {x.rakes} rake{x.rakes === 1 ? "" : "s"}</em> : null}
+                                                </span>
+                                                <span className="sbt-recap-dmg">{x.dmg} damage</span>
+                                                {Object.keys(x.byZone).length ? (
+                                                    <span className="sbt-recap-where">
+                                                        {Object.entries(x.byZone).map(([z, d]) => `${zoneById(z).name.toLowerCase()} ${d}`).join(" · ")}
+                                                    </span>
+                                                ) : null}
+                                                {x.avgMiss != null ? (
+                                                    <span className="sbt-recap-miss">{x.guns - x.hits} missed · {x.avgMiss}% shots</span>
+                                                ) : null}
+                                                {x.wrecks.map((w, i) => <span key={i} className="sbt-recap-wreck">{w}</span>)}
+                                            </>
+                                        ) : <span className="sbt-recap-tally">held fire</span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
                     <Ship f={me} side="me" hullRef={meHullRef}
                         hurt={hitFx?.side === "me"} heavy={Boolean(hitFx?.side === "me" && hitFx.heavy)}
                         low={clampPct(myHp, battle?.myMax) <= 25}
