@@ -14462,3 +14462,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-syschip.is-dodge em { color: #8fd3ff; }
 .sbt-syschip.is-armor em { color: #cbb79a; }
 .sbt-syschip.is-dodge, .sbt-syschip.is-armor { font-variant-numeric: tabular-nums; }
+
+/* A board row that is also a door — the farm board lists places you can go and look at, so its rows link. */
+.lb-row.is-link { text-decoration: none; color: inherit; cursor: pointer; transition: background .14s ease, transform .14s ease; }
+.lb-row.is-link:hover, .lb-row.is-link:focus-visible { background: rgba(255,215,110,0.12); transform: translateX(2px); outline: none; }
+
+/* Find a farm to visit. Inline above the board rather than behind a lid: the ranked list and the way to reach
+   the farms in it are the same control, and the previous directory was collapsed inside another collapsed
+   block where nobody found it. */
+.farm-findfarm { width: 100%; margin: 8px 0 6px; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05);
+    color: inherit; font: inherit; font-size: 0.9rem; }
+.farm-findfarm::placeholder { color: #9a8f7f; }
+.farm-findfarm:focus { outline: none; border-color: rgba(255,215,110,0.6); background: rgba(255,215,110,0.08); }

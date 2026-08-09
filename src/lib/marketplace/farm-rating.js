@@ -138,6 +138,48 @@ async function farmStandings(ownerId) {
 // THE BOARD ITSELF. "1st of 47 farms" tells you your position and nothing about the race: who is behind you,
 // who you would have to pass, whether the farm in 2nd is one vote away or thirty. Same DENSE_RANK standings,
 // but handed over as rows — the top of the board plus, if you placed below it, your own row to pin underneath.
+// EVERY FARM, SEARCHABLE, so you can go and see one.
+//
+// The board itself has always been here — the ranked list of farms by tier-weighted love — but it was the top
+// ten and nothing else, and the rows went nowhere. Consolidating the farm page kept the visitors strip (who
+// came to see YOU) and quietly took away the only route in the other direction: there was no way to find
+// somebody's farm and go and look at it. `?u=<alias>` still worked; nothing led to it.
+//
+// A place is also not a name. With enough players "top ten" stops being a way to find anyone in particular,
+// so this takes a query and searches the whole board, returning each match with its REAL standing rather than
+// its position in the filtered list.
+export async function searchFarms(viewerId, q = "", limit = 40) {
+    const query = String(q || "").trim().toLowerCase().replace(/^@/, "");
+    if (!query) return [];
+    // LEFT JOIN, not JOIN. Every member has a farm; only some have been RATED. Searching the ratings table
+    // would hide every new or quiet farm — exactly the ones most worth a visit — so this searches MEMBERS and
+    // attaches a standing where one exists. An unranked farm still comes back and still opens.
+    const rows = await db.query(
+        `WITH scored AS (
+             SELECT owner_id, SUM(votes * CASE tier WHEN 3 THEN 3 WHEN 2 THEN 2 ELSE 1 END)::int AS score,
+                    SUM(votes)::int AS votes
+               FROM mkt_farm_rating GROUP BY owner_id
+         ), placed AS (
+             SELECT owner_id, score, votes, DENSE_RANK() OVER (ORDER BY score DESC) AS place FROM scored
+         )
+         SELECT b.id AS owner_id, p.score, p.votes, p.place::int AS place,
+                COALESCE(NULLIF(b.display_name, ''), b.alias) AS who, b.alias,
+                b.avatar_url, b.avatar_config, b.avatar_cosmetics
+           FROM mkt_buyer b LEFT JOIN placed p ON p.owner_id = b.id
+          WHERE b.alias IS NOT NULL
+            AND (LOWER(b.alias) LIKE $1 OR LOWER(COALESCE(b.display_name, '')) LIKE $1)
+          ORDER BY p.place NULLS LAST, COALESCE(b.xp, 0) DESC, who
+          LIMIT $2`,
+        [`%${query.replace(/[%_]/g, "\$&")}%`, Math.max(1, Math.min(60, limit))]
+    ).catch(() => []);
+    return rows.map((r) => ({
+        place: r.place == null ? null : Number(r.place), who: r.who || "Member", alias: r.alias || null,
+        score: Number(r.score) || 0, votes: Number(r.votes) || 0,
+        avatar: avatarImageUrl(r.avatar_config, r.avatar_cosmetics) || r.avatar_url || DEFAULT_AVATAR_URL,
+        you: viewerId ? String(r.owner_id) === String(viewerId) : false,
+    }));
+}
+
 export async function farmLoveBoard(viewerId, limit = 10) {
     const rows = await db.query(
         `WITH scored AS (

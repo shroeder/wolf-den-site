@@ -156,10 +156,21 @@ export async function actOnOccupant(viewerId, kind) {
     return { ok: true, kind, xp, gold, left: Math.max(0, cap - Number(claimed.count)) };
 }
 
-/** Put someone in. Sets the locked badge and grants the Mark so it shows on their card immediately. */
+/** Put someone in. The stockade itself is the punishment — no badge is granted, see below. */
 export async function placeInStockade(buyerId, { reason, byId = null } = {}) {
     if (!buyerId) return { ok: false, error: "no_target" };
+    // WHOEVER WAS ALREADY IN THERE COMES OUT PROPERLY. This marked the old occupant released in the stockade
+    // table and left everything else stamped on them — so a member displaced by the next poll kept the Mark
+    // locked to the front of their showcase indefinitely, with no stockade row to explain it and no way to
+    // take it off. One member was still carrying it that way. Clear the lock with the sentence.
     await db.query(`UPDATE mkt_stockade SET released_at = NOW() WHERE released_at IS NULL AND buyer_id <> $1`, [buyerId]).catch(() => {});
+    await db.query(
+        `UPDATE mkt_buyer
+            SET locked_badge = NULL,
+                showcase_badge_slugs = NULLIF(array_remove(showcase_badge_slugs, $1), '{}')
+          WHERE locked_badge = $1 AND id <> $2`,
+        [MARK_BADGE, buyerId]
+    ).catch(() => {});
     await db
         .query(
             `INSERT INTO mkt_stockade (buyer_id, reason, placed_by)
@@ -169,18 +180,14 @@ export async function placeInStockade(buyerId, { reason, byId = null } = {}) {
             [buyerId, reason || null, byId]
         )
         .catch(() => {});
-    await db.query(
-        `INSERT INTO mkt_user_badge (buyer_id, badge_slug, awarded_by) VALUES ($1, $2, 'system')
-         ON CONFLICT DO NOTHING`, [buyerId, MARK_BADGE]).catch(() => {});
-    // The Mark goes to the FRONT of their showcase so it's the one on their card, and `locked_badge` is what
-    // setShowcaseBadges checks to stop them dropping it again.
-    await db.query(
-        `UPDATE mkt_buyer
-            SET locked_badge = $2,
-                showcase_badge_slugs = ARRAY[$2]::text[] || COALESCE(array_remove(showcase_badge_slugs, $2), '{}')
-          WHERE id = $1`,
-        [buyerId, MARK_BADGE]
-    ).catch(() => {});
+    // THE MARK OF SHAME IS NOT AWARDED HERE ANY MORE. Going in the stockade used to stamp the badge onto the
+    // occupant and LOCK it to the front of their showcase, where they could not take it off. That is a
+    // permanent mark on a profile handed out by a popularity vote, for a joke sentence that lasts a day — and
+    // members were asking how long they were stuck with it, which is the question you get when a gag starts
+    // feeling like a record. The pillory is the punishment and it ends when they are let out.
+    //
+    // The badge still exists and is still ADMIN-ASSIGNABLE (/api/admin/badges/assign) for the case it was
+    // really meant for: somebody who actually cheated. Nothing automatic grants it.
     // Draw them into the boards. Awaited rather than fired off: on Vercel an un-awaited promise dies the moment
     // the handler returns, and this is the one image the whole feature is about.
     const art = await renderOccupantArt(buyerId).catch(() => ({ ok: false }));

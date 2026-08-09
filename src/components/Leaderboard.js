@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 // ── THE DEN'S ONE LEADERBOARD ────────────────────────────────────────────────────────────────────────────────
 // Every board in the game reads the same way: a metal rank chip, the member's face, what they did, and — the
 // part that actually makes a board worth opening — where YOU sit in it and what the gap is.
@@ -21,8 +23,13 @@ function RankChip({ place }) {
 }
 
 export function LeaderboardRow({ r }) {
+    // A ROW CAN BE A DOOR. Some boards are just standings; the farm board is a list of places you can actually
+    // go and look at, and a rank with no way to reach it is a dead end. `href` turns the row into a link
+    // without every other board having to care.
+    const Row = r.href ? Link : "div";
+    const rowProps = r.href ? { href: r.href } : {};
     return (
-        <div className={`lb-row${r.you ? " is-you" : ""}${r.place <= 3 ? " is-podium" : ""}`}>
+        <Row {...rowProps} className={`lb-row${r.you ? " is-you" : ""}${r.place <= 3 ? " is-podium" : ""}${r.href ? " is-link" : ""}`}>
             <RankChip place={r.place} />
             {r.avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -42,7 +49,7 @@ export function LeaderboardRow({ r }) {
                 <b>{r.value}</b>
                 <em>{r.unit}</em>
             </span>
-        </div>
+        </Row>
     );
 }
 

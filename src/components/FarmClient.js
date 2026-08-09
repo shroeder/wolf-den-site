@@ -572,6 +572,28 @@ export default function FarmClient({ initial, viewingAlias }) {
         return r;
     }, [post]);
 
+    // FINDING SOMEBODY'S FARM. The visitors strip shows who came to see YOU; consolidating the page took away
+    // the only route in the other direction, so there was no way to go and look at anyone else's. `?u=<alias>`
+    // still worked — nothing led to it. The board was already here and already ranked; it just needed to be
+    // searchable and its rows needed to go somewhere.
+    const [farmQuery, setFarmQuery] = useState("");
+    const [farmHits, setFarmHits] = useState(null);
+    const [farmSeeking, setFarmSeeking] = useState(false);
+    useEffect(() => {
+        const q = farmQuery.trim();
+        if (q.length < 2) { setFarmHits(null); return undefined; }
+        let dead = false;
+        setFarmSeeking(true);
+        const t = setTimeout(() => {
+            fetch(`/api/marketplace/farm-ratings?q=${encodeURIComponent(q)}`, { cache: "no-store" })
+                .then((r) => r.json())
+                .then((d) => { if (!dead) setFarmHits(Array.isArray(d?.farms) ? d.farms : []); })
+                .catch(() => { if (!dead) setFarmHits([]); })
+                .finally(() => { if (!dead) setFarmSeeking(false); });
+        }, 220);
+        return () => { dead = true; clearTimeout(t); };
+    }, [farmQuery]);
+
     // Rate (like/love/admire) the farm you're visiting. Revising your rating is free; a brand-new rating spends
     // your one daily charge. Patches the summary in place with a juicy burst.
     const [rateBusy, setRateBusy] = useState(false);
@@ -1265,11 +1287,31 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     <b>Most-loved farms</b>
                                     <span>tier-weighted · like 1 · love 2 · admire 3</span>
                                 </div>
+                                {/* Tap any farm to go and see it. With enough players a top ten stops being a
+                                    way to find anyone in particular, so this searches the WHOLE board and each
+                                    result keeps its real standing rather than its position in the results. */}
+                                <input className="farm-findfarm" value={farmQuery} autoComplete="off"
+                                    onChange={(e) => setFarmQuery(e.target.value)}
+                                    placeholder="Find a farm to visit…" aria-label="Search farms" />
+                                {farmHits ? (
+                                    farmHits.length ? (
+                                        <Leaderboard
+                                            rows={farmHits.map((r) => ({
+                                                place: r.place ?? "–", who: r.who, avatar: r.avatar, you: r.you,
+                                                value: r.place == null ? "—" : r.score.toLocaleString(),
+                                                unit: r.place == null ? "not rated yet" : `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
+                                                href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
+                                            }))}
+                                            unitPlural="farms"
+                                        />
+                                    ) : <p className="lb-empty">{farmSeeking ? "Searching…" : "No farm by that name."}</p>
+                                ) : (
                                 <Leaderboard
                                     rows={farm.loveBoard.top.map((r) => ({
                                         place: r.place, who: r.who, avatar: r.avatar, you: r.you,
                                         value: r.score.toLocaleString(),
                                         unit: `love · ${r.votes} vote${r.votes === 1 ? "" : "s"}`,
+                                        href: r.you || !r.alias ? null : `/marketplace/farm?u=${encodeURIComponent(r.alias)}`,
                                     }))}
                                     mine={farm.loveBoard.mine ? {
                                         place: farm.loveBoard.mine.place, who: farm.loveBoard.mine.who,
@@ -1283,12 +1325,15 @@ export default function FarmClient({ initial, viewingAlias }) {
                                     total={farm.rating?.standings?.ranked || null}
                                     unitPlural="farms"
                                 />
+                                )}
                             </div>
                         ) : null}
-                        <details className="farm-status">
-                            <summary>Find a farm by name</summary>
-                            <FarmDirectory current={viewingAlias} />
-                        </details>
+                        {/* The old "Visit a farm" directory lived here, collapsed inside a second collapsed
+                            block and labelled "owner-only" — a label that was not even true, since the list
+                            endpoint has always been open to any signed-in member. Between the two lids and the
+                            wrong label it read as a dev tool, which is why visiting somebody's farm looked like
+                            it had been removed. The board above does the job in the open: ranked, searchable,
+                            and every row opens that farm. */}
                     </>
                 ) : null}
             </div>
@@ -2946,60 +2991,5 @@ function HeroCard({ m, onClick }) {
             </span>
             <span style={{ opacity: 0.45, fontSize: 20, fontWeight: 700 }}>›</span>
         </button>
-    );
-}
-function FarmDirectory({ current }) {
-    const [open, setOpen] = useState(false); // collapsed by default — opens only when the owner wants it
-    const [q, setQ] = useState("");
-    const [members, setMembers] = useState([]);
-    const [loading, setLoading] = useState(false);
-    useEffect(() => {
-        if (!open) return undefined; // don't fetch until the directory is opened
-        let alive = true;
-        const t = setTimeout(() => {
-            if (alive) setLoading(true);
-            fetch(`/api/marketplace/farm?list=1&q=${encodeURIComponent(q.trim())}`, { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { if (alive) { setMembers(d?.members || []); setLoading(false); } })
-                .catch(() => { if (alive) setLoading(false); });
-        }, q.trim() ? 250 : 0);
-        return () => { alive = false; clearTimeout(t); };
-    }, [q, open]);
-    const visit = (alias) => window.location.assign(`/marketplace/farm?u=${encodeURIComponent(alias)}`);
-    return (
-        <section className="card" style={{ padding: open ? undefined : 0 }}>
-            <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-                className={open ? undefined : "farm-visit"}
-                style={open ? { width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "0 0 10px", background: "none", border: "none", color: "inherit", cursor: "pointer", textAlign: "left" } : undefined}
-            >
-                <span style={{ display: "flex", color: "#ffd75e" }}><SearchIcon /></span>
-                <strong style={{ fontSize: 16 }}>Visit a farm</strong>
-                <span className="muted" style={{ fontSize: 11 }}>owner-only</span>
-                <span aria-hidden="true" className="farm-visit-chev" style={{ marginLeft: "auto", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s", color: "#ffd75e", fontSize: 12, lineHeight: 1 }}>▾</span>
-            </button>
-            {open ? (
-                <>
-                    <div style={{ position: "relative", marginBottom: 10 }}>
-                        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.5, display: "flex" }}><SearchIcon /></span>
-                        <input
-                            type="text"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                            placeholder="Search members…"
-                            style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 12, border: "1px solid rgba(128,128,128,0.35)", background: "rgba(255,255,255,0.04)", color: "inherit" }}
-                        />
-                    </div>
-                    <div style={{ maxHeight: 360, overflowY: "auto", display: "grid", gap: 8, paddingRight: 2 }}>
-                        {members.map((m) => <HeroCard key={m.id} m={m} onClick={() => visit(m.alias)} />)}
-                        {loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>Loading farms…</div> : null}
-                        {!loading && !members.length ? <div className="muted" style={{ padding: 12, textAlign: "center" }}>No farms found.</div> : null}
-                    </div>
-                    {current ? <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>Viewing @{current}&apos;s farm.</p> : null}
-                </>
-            ) : null}
-        </section>
     );
 }
