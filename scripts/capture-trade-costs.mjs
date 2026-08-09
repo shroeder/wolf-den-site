@@ -7,8 +7,11 @@
 //
 // Run:  node scripts/capture-trade-costs.mjs [--dry]
 //
-// Only fills GAPS. A cost from Square or from the COGS export is left alone; this is for the singles that
-// nothing else can price. Idempotent.
+// FOR A TRADED SINGLE, THE LEDGER WINS. Not just gap-filling: any cost Square holds for a card we traded for
+// is a derived guess, because Square was never told what we paid. Intake stamped 65% of market onto it while
+// the trade itself was struck at a rate we agreed at the counter and wrote down — 70% on every line here. All
+// 29 overlapping cards were costed too LOW, which overstated profit on every one of them. `manual` and
+// `cogs_export` are still respected: one is a human decision, the other is Square's own FIFO actual.
 import fs from "node:fs";
 import { neon } from "@neondatabase/serverless";
 
@@ -35,19 +38,22 @@ const rows = await sql`
        AND tl.buy_rate_percent IS NOT NULL
      ORDER BY tl.square_variation_id, t.traded_at DESC, tl.id DESC`;
 
-const existing = new Set((await sql`SELECT variation_id FROM wolfden_item_cost`).map((r) => r.variation_id));
+// Sources this script will NOT overturn. Everything else — including a 65%-of-market guess stamped on at
+// intake — is superseded by what the trade actually paid.
+const KEEP = new Set(["manual", "cogs_export"]);
+const existing = new Map((await sql`SELECT variation_id, source FROM wolfden_item_cost`).map((r) => [r.variation_id, r.source]));
 
 const writes = [];
 let skipped = 0;
 for (const r of rows) {
-    if (existing.has(r.variation_id)) { skipped += 1; continue; }
+    if (KEEP.has(existing.get(r.variation_id))) { skipped += 1; continue; }
     const cents = Math.round(Number(r.unit_market) * (Number(r.buy_rate_percent) / 100) * 100);
     if (!(cents > 0)) continue;
     writes.push({ id: r.variation_id, cents, name: r.item_name, market: Number(r.unit_market), rate: Number(r.buy_rate_percent) });
 }
 console.log(`trade lines with a variation + rate: ${rows.length}`);
-console.log(`already costed from a better source, left alone: ${skipped}`);
-console.log(`NEW costs from the trade ledger: ${writes.length}`);
+console.log(`left alone (manual / Square's own FIFO): ${skipped}`);
+console.log(`costs written from the trade ledger: ${writes.length}`);
 writes.slice(0, 10).forEach((w) => console.log(`  ${String(w.name).slice(0, 40).padEnd(40)} $${w.market.toFixed(2)} @ ${w.rate}%  →  $${(w.cents / 100).toFixed(2)}`));
 if (DRY) { console.log("\n--dry: nothing written"); process.exit(0); }
 
@@ -55,7 +61,9 @@ for (const w of writes) {
     await sql`
         INSERT INTO wolfden_item_cost (variation_id, unit_cost_cents, source, item_name)
         VALUES (${w.id}, ${w.cents}, 'trade_ledger', ${w.name})
-        ON CONFLICT (variation_id) DO NOTHING`;
+        ON CONFLICT (variation_id) DO UPDATE
+           SET unit_cost_cents = EXCLUDED.unit_cost_cents, source = 'trade_ledger',
+               item_name = COALESCE(EXCLUDED.item_name, wolfden_item_cost.item_name), updated_at = NOW()`;
 }
 const [tot] = await sql`SELECT COUNT(*) n FROM wolfden_item_cost`;
 console.log(`\nwrote ${writes.length}; table now holds ${tot.n} costs`);
