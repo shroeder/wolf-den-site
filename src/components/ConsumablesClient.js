@@ -102,6 +102,19 @@ export default function ConsumablesClient() {
             </button>
             {!open ? null : (<>
             <p className="muted" style={{ marginTop: 8 }}>One-shot boosts you use yourself. Potions &amp; stones buff the boss fight; scrolls give XP; relics restore charged gear.</p>
+            {/* HOW THEY COMBINE. A member asked whether hoarding these wastes them — she had four damage
+                potions and no way to tell whether a second one doubled her damage again or just overwrote the
+                first. The cards each describe themselves and nothing described the stack, which is the one
+                thing you need to know before spending six of them at once. Damage MULTIPLIES
+                (memberDamageMult reduces by product), strikes ADD (a SUM over the boost rows), and every
+                timer starts the moment you tap Use — so two 12-hour stones are 4x for twelve hours, never 2x
+                for twenty-four. */}
+            <p className="muted" style={{ marginTop: 6, fontSize: "0.82rem" }}>
+                <strong>They stack.</strong> Damage boosts <strong>multiply</strong> each other (a ×2 and a ×3
+                together is ×6), extra strikes <strong>add up</strong>, and each one&rsquo;s timer starts the
+                moment you use it — so two 12-hour boosts give you ×4 for twelve hours, not ×2 for
+                twenty-four. Save them, then use them together right before you swing.
+            </p>
 
             {active.length ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
