@@ -15032,3 +15032,40 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-recap-tally { margin-left: 0; text-align: right; }
 .sbt-recap-where { white-space: nowrap; }
 .sbt-recap { background: rgba(6,10,16,0.9); }
+
+/* ── AN UNAIMED SHIP IS JUST A SHIP ──────────────────────────────────────────────────────────────────────
+   Touch has no hover, so the zone markers were left at 26% opacity to keep the parts findable. What that
+   actually put on screen was two empty rounded outlines sitting on the enemy — one across her rigging, one
+   across her hull — which read as unfilled health bars, not as "tap here". The panel already says "tap a
+   part of her ship", the parts are a ship, and her cannons have worked this way all along: nothing at rest,
+   the lock when you commit. */
+@media (hover: none) {
+    .sbt-target-skin { opacity: 0; }
+    .sbt-target.is-on .sbt-target-skin { opacity: 1; }
+}
+
+/* Three chips now, so they tighten up rather than growing the stack. */
+.sbt-placard { gap: 3px; }
+.sbt-cond.is-guns { padding: 2px 9px 3px; }
+.sbt-cond.is-guns b { font-size: 0.84rem; }
+
+/* Three chips is a taller stack than two, and the near ship rides low — its cannon count was being cut off by
+   the order panel. The stack grows UPWARD from the waterline now instead of downward from it, so it stays on
+   the hull it belongs to whichever half of the stage that hull is in. */
+.sbt-placard { transform: translate(-50%, -92%); }
+
+/* A ROW, NOT A STACK. Three chips stacked is 70px tall, which either falls through the floor of the stage on
+   the near ship or climbs up into the middle of the hull — where her incoming marks land — on both. Along
+   the waterline they are 24px tall, they clear the panel, and they sit under the marks rather than through
+   them. */
+.sbt-placard { flex-direction: row; align-items: center; gap: 4px; transform: translate(-50%, -6%);
+    width: max-content; max-width: 96vw; }
+.sbt-cond { padding: 3px 8px 4px; }
+.sbt-cond b { font-size: 0.86rem; }
+.sbt-cond em { font-size: 0.58rem; letter-spacing: 0.07em; }
+@media (max-width: 430px) {
+    .sbt-placard { gap: 3px; }
+    .sbt-cond { padding: 2px 6px 3px; gap: 3px; }
+    .sbt-cond b { font-size: 0.8rem; }
+    .sbt-cond em { font-size: 0.54rem; }
+}

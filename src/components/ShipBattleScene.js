@@ -225,12 +225,12 @@ const conditionTone = (left, max) => {
     return left >= max ? "is-full" : "is-hurt";
 };
 
-function PartChip({ zone, left, max }) {
+function PartChip({ zone, left, max, label = null }) {
     const cap = Math.max(1, Math.round(max || 1));
     const n = Math.max(0, Math.min(cap, Math.round(left ?? cap)));
     return (
         <span className={`sbt-cond is-${zone} ${conditionTone(n, cap)}`} title={`${n} of ${cap} left`}>
-            <b>{n}</b><em>{zone === "sails" ? "sails" : zone === "guns" ? "gun" : "hull"}</em>
+            <b>{n}</b><em>{label || (zone === "sails" ? "sails" : zone === "guns" ? "gun" : "hull")}</em>
         </span>
     );
 }
@@ -336,11 +336,22 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                         // of the stage for the whole aim phase — anything up there is behind a panel exactly
                         // when you are choosing a target.
                         return (
-                            <span className="sbt-placard" style={{ left: `${hb.cx}%`, top: `${hb.y + hb.h}%` }}>
+                            <span className="sbt-placard"
+                                /* Clamped so a hull whose centre sits near the edge of its own box cannot
+                                   push the row off the side of the stage. */
+                                style={{ left: `${Math.min(76, Math.max(24, hb.cx))}%`, top: `${hb.y + hb.h}%` }}>
                                 {caps?.sails ? (
                                     <PartChip zone="sails" left={sys?.sails ?? caps.sails} max={caps.sails} />
                                 ) : null}
                                 <PartChip zone="hull" left={hp} max={hpMax} />
+                                {/* HOW MANY BARRELS SHE STILL HAS. A dismounted gun is the most consequential
+                                    damage in the fight — it is a shot she never fires again — and it was the
+                                    one part with no number anywhere, readable only by noticing a cannon on
+                                    the deck had gone dark. */}
+                                {gunHp.length ? (
+                                    <PartChip zone="guns" left={gunHp.filter((h) => h > 0).length}
+                                        max={gunHp.length} label="cannon" />
+                                ) : null}
                             </span>
                         );
                     })()}
@@ -386,6 +397,12 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                                 were aiming at. What is left is the region, what it has left, and the number
                                 that matters. */}
                             <span className="sbt-target-skin" aria-hidden="true" />
+                            {/* AN EMPTY PLAQUE IS AN EMPTY BAR. A zone marker's plaque holds one thing — the
+                                count of barrels you have laid on it — so before you lay any it rendered as a
+                                filled rounded pill with nothing inside, parked across her rigging and her
+                                hull. That is what read as two unfilled health bars. It exists when it has
+                                something to say. */}
+                            {t.kind === "gun" || t.laid ? (
                             <span className="sbt-plaque">
                                 <span className="sbt-plaque-body">
                                     {/* WHAT IT HAS LEFT. Every piece has hit points and none of them were on
@@ -408,6 +425,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                                         onClick={(e) => { e.stopPropagation(); onUnpick?.(t); }}>−</button>
                                 ) : null}
                             </span>
+                            ) : null}
                         </div>
                     ))}
                 </span>
