@@ -14304,8 +14304,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     transition: width .35s ease; }
 .sbt-target.is-on .sbt-plaque { background: var(--tint, #ffd28a); border-color: rgba(0,0,0,0.45); }
 .sbt-target.is-on .sbt-plaque b { color: #1b1004; }
-.sbt-target.is-on .sbt-plaque-hp { background: rgba(0,0,0,0.3); }
-.sbt-target.is-on .sbt-plaque-hp i { background: #1b1004; }
+/* A LAID TARGET STILL HAS TO SHOW ITS HEALTH. Selecting a part turned the plaque bright and then drew a
+   near-black fill (#1b1004) on a 30%-black track — two dark values on top of each other, so the bar went
+   invisible at the exact moment you were deciding whether one more ball would finish that piece off. Dark
+   track, near-white fill: the same reading as the unselected state, just inverted for the bright plaque. */
+.sbt-target.is-on .sbt-plaque-hp { background: rgba(0,0,0,0.42); }
+.sbt-target.is-on .sbt-plaque-hp i { background: #fff3d6; }
 
 /* A CANNON is a point on the rail, not a region. */
 /* THE PLAQUES KEEP OFF THE GUN RAIL. Both regions are centred on the hull, and the cannons sit on the deck
