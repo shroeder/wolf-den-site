@@ -1,5 +1,6 @@
 "use client";
 
+import { GiMusicalNotes, GiSpeakerOff } from "react-icons/gi";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 // Procedural ambient MUSIC for the walkable scenes (Town + Tavern). No audio files — a proper little looping
@@ -156,8 +157,11 @@ export default function SceneMusic({ vibe = "town", place = "top-right" }) {
 
     return (
         <button type="button" onClick={toggle} aria-label={muted ? "Play music" : "Mute music"} title={muted ? `Play ${vibe} music` : "Mute music"}
-            style={{ ...(place === "inline" ? { position: "static", flex: "0 0 auto" } : { position: "absolute", ...(PLACE[place] || PLACE["top-right"]) }), zIndex: 9, width: 34, height: 34, borderRadius: 999, border: "1px solid rgba(255,215,110,0.4)", background: "rgba(20,10,4,0.72)", color: "#ffe0b0", fontSize: 15, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
-            {muted ? "🔇" : "🎵"}
+            style={{ ...(place === "inline" ? { position: "static", flex: "0 0 auto" } : { position: "absolute", ...(PLACE[place] || PLACE["top-right"]) }), zIndex: 9, width: 34, height: 34, borderRadius: place === "inline" ? 10 : 999, border: "1px solid rgba(255,215,94,0.28)", background: "rgba(255,255,255,0.05)", color: "#e8dcc6", fontSize: 17, cursor: "pointer", display: "grid", placeItems: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.45)" }}>
+            {/* A GLYPH, NOT AN EMOJI. 🎵 renders in the operating system's own colours — a purple note in a
+                warm gold-and-timber scene, immune to the `color` set right above it — which is precisely the
+                reason this app does not use emoji on its own surfaces. */}
+            {muted ? <GiSpeakerOff aria-hidden="true" /> : <GiMusicalNotes aria-hidden="true" />}
         </button>
     );
 }

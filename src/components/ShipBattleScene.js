@@ -343,8 +343,12 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                                         screen — you were aiming at a part with no idea whether one more ball
                                         would take it off her. On a cannon this IS the label: a bar and a
                                         percentage, small enough that six of them read as six. */}
+                                    {/* A METER, NOT A NUMBER. The percentages were noise: the odds already
+                                        live in the read-out with the damage, and health reads faster as a bar
+                                        than as "71%". The only number left is the one you put there — how
+                                        many barrels you have committed to this part. */}
                                     <span className="sbt-plaque-hp" style={{ "--w": `${t.hpPct}%` }}><i /></span>
-                                    <b>{t.laid ? `×${t.laid}` : t.kind === "gun" ? `${t.hpPct}%` : `${Math.round(t.chance * 100)}%`}</b>
+                                    {t.laid ? <b>×{t.laid}</b> : null}
                                 </span>
                             </span>
                         </button>

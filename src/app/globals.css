@@ -14565,3 +14565,62 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-gun .sbt-plaque-body b { display: none; font-size: 0.56rem; }
 .sbt-target.is-gun.is-hurt .sbt-plaque-body b,
 .sbt-target.is-gun.is-on .sbt-plaque-body b { display: block; }
+
+
+/* ══ SHIP BATTLE — THE CHROME ROW ═══════════════════════════════════════════════════════════════════════════
+   Music / Leave / Log sat flush against the bottom of the stat cards — .sbt-hud ends `12px 10px 0` and
+   .sbt-chrome starts `0 8px 4px`, so there was literally zero space between them — and each of the three was
+   styled from a different vocabulary: a purple-ish circle, a grey micro-pill, and a gold micro-pill, none of
+   which is a button this app uses anywhere else.
+
+   The app's buttons are .btn-gold and .btn-ghost: 10px radius, a warm #e6c76b→#d4af37→#b8912e gradient for
+   the primary, an outlined ghost for the secondary, weight 800, sentence case. This row now speaks that
+   language — one segmented group, one radius, one gold — instead of three strangers in a row. */
+.sbt-hud { padding: 12px 10px 0; }
+.sbt-chrome { padding: 10px 10px 6px; gap: 8px; align-items: center; }
+.sbt-chrome > * { flex: 0 0 auto; }
+
+.sbt-leave, .sbt-logtoggle {
+    pointer-events: auto; cursor: pointer; height: 34px; padding: 0 14px; border-radius: 10px;
+    font-family: var(--font-display); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.01em;
+    text-transform: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+/* Secondary — the app's ghost. Leaving is an exit, not an action. */
+.sbt-leave { color: #e8dcc6; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,94,0.28); }
+.sbt-leave:hover, .sbt-leave:focus-visible { color: #fff; border-color: rgba(255,215,94,0.55);
+    background: rgba(255,215,94,0.10); transform: translateY(-1px); }
+/* Primary — the app's gold, the same gradient every other primary button in the game uses. */
+.sbt-logtoggle { color: #171008; border: 1px solid rgba(255,215,94,0.55);
+    background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
+    box-shadow: 0 4px 14px rgba(212,175,55,0.28); }
+.sbt-logtoggle:hover:not(:disabled), .sbt-logtoggle:focus-visible {
+    transform: translateY(-1px); box-shadow: 0 8px 22px rgba(212,175,55,0.42); filter: brightness(1.06); }
+.sbt-logtoggle.is-idle, .sbt-logtoggle:disabled { opacity: 0.4; cursor: default; box-shadow: none; transform: none; }
+.sbt-logtoggle.is-open { background: rgba(255,255,255,0.05); color: #e8dcc6;
+    border-color: rgba(255,215,94,0.28); box-shadow: none; }
+/* The music toggle is a sibling, not a stray — same height, same radius, same border as the ghost. */
+.sbt-chrome > button[aria-label*="usic"], .sbt-chrome > button[title*="usic"] {
+    width: 34px !important; height: 34px !important; border-radius: 10px !important;
+    border: 1px solid rgba(255,215,94,0.28) !important; background: rgba(255,255,255,0.05) !important;
+}
+
+/* ── A CANNON IS QUIET UNTIL YOU CHOOSE IT ───────────────────────────────────────────────────────────────
+   Six outlined boxes with six health bars along one rail is still six things competing for attention on a
+   ship you are trying to read at a glance. A gun now shows nothing at all until you touch it — the port is
+   the target, the art is already there — and answers with its health when you pick it. */
+.sbt-target.is-gun .sbt-target-skin { opacity: 0; transition: opacity .14s ease; }
+.sbt-target.is-gun .sbt-plaque { opacity: 0; transition: opacity .14s ease; }
+.sbt-target.is-gun:hover .sbt-target-skin,
+.sbt-target.is-gun:focus-visible .sbt-target-skin,
+.sbt-target.is-gun.is-on .sbt-target-skin,
+.sbt-target.is-gun.is-hurt .sbt-target-skin { opacity: 1; }
+.sbt-target.is-gun:hover .sbt-plaque,
+.sbt-target.is-gun:focus-visible .sbt-plaque,
+.sbt-target.is-gun.is-on .sbt-plaque,
+.sbt-target.is-gun.is-hurt .sbt-plaque { opacity: 1; }
+/* A gun you have already damaged stays visible — that is the one whose health you actually want to track. */
+
+/* The zone plaque is now just a meter and, once you commit, a count. Narrower to suit. */
+.sbt-plaque-body { min-width: 34px; }
+.sbt-plaque-body b { font-size: 0.78rem; }
