@@ -15,7 +15,7 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
-         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims } from "@/lib/marketplace/ship-battle.js";
+         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
@@ -2026,12 +2026,12 @@ const readBattle = (row) => {
     if (!b) return null;
     const parsed = typeof b === "string" ? (() => { try { return JSON.parse(b); } catch { return null; } })() : b;
     if (!parsed?.state || !parsed?.meta) return null;
-    // ONLY THE CURRENT SCALE. v3 counted a hull in hundreds of hit points; v4 counts it in planks. A v3 fight
-    // left mid-battle renders as "294 / 341 planks" — 341 plank elements in a row — so it is not upgradable,
-    // it is unreadable, and it must not load. Bumping this without moving the check was the actual bug: the
-    // engine started writing v4 while the reader still demanded v3, which quietly threw away every NEW battle
-    // on the next page load and kept only the stale ones.
-    return parsed.state.v === 4 && parsed.state.me && parsed.state.foe ? parsed : null;
+    // ONLY THE CURRENT SCALE, and read off the SAME constant the engine writes. v3 counted a hull in hundreds
+    // of hit points; v4 counts it in planks, so a v3 fight left mid-battle is not upgradable — it is
+    // unreadable — and must not load. Comparing against a literal here is what made this a live bug twice
+    // over: once when the writer moved to v4 and this still said 3, and again when the resolver turned out to
+    // be stamping its own hardcoded 3 on every write-back.
+    return parsed.state.v === BATTLE_STATE_V && parsed.state.me && parsed.state.foe ? parsed : null;
 };
 
 // COMMIT THE VOLLEY — your whole broadside goes at the part you picked, they answer, and the fight waits

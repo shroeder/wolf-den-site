@@ -210,39 +210,27 @@ function gunWidthPct(ports) {
     return Math.max(6, Math.min(16, gap * 100 * 0.92));
 }
 
-// ── HITS, COUNTED IN THE THING BEING HIT ─────────────────────────────────────────────────────────────────────
-// Every part of a ship was reading as a bar: a gold pill across the hull, a blue pill on the masts, a draining
-// meter on each cannon. A bar answers "what fraction", and the question in front of the player is "how many
-// more balls" — a count, which wants to be counted. So each part shows one sprite per hit: oak planks for the
-// hull, canvas for the sails, iron plate for a gun's mount.
+// ── WHAT EACH PART HAS LEFT ──────────────────────────────────────────────────────────────────────────────────
+// This has now been a bar, then a pill, then a row of sprites, and the sprites were the wrong answer for a
+// reason worth writing down: a sail drawn at fourteen pixels is a cream rectangle. Six cream rectangles in a
+// row is not "four sheets of canvas left", it is a row of blank cards — the sprite carried no meaning at that
+// size, and two courses of little brown boards just rebuilt the bar the sprites were supposed to replace.
 //
-// Both halves are drawn. The spent ones are not hidden or dimmed, they are the WRECKED sprite — splintered
-// timber, canvas in rags — so a strip reads "four boards left, and look what I have already taken off her"
-// in one glance. That second half is the part no bar has ever been able to show.
-const PIPS = {
-    hull: ["/images/sailing/hits/plank.png", "/images/sailing/hits/plank-gone.png"],
-    sails: ["/images/sailing/hits/sail.png", "/images/sailing/hits/sail-gone.png"],
-    guns: ["/images/sailing/hits/iron.png", "/images/sailing/hits/iron-gone.png"],
+// A COUNT AND THE NAME OF THE PART. "4 HULL" needs no legend, survives any size, and the colour does the work
+// the art was failing to do: green while it is whole, amber once it is bitten into, red when it is gone. It is
+// the same shape as the incoming marks that land on your ship, which is the point — one vocabulary for "how
+// much of this part is there", whoever it belongs to.
+const conditionTone = (left, max) => {
+    if (left <= 0) return "is-dead";
+    return left >= max ? "is-full" : "is-hurt";
 };
-// How many pips before the strip wraps. A hull runs from ten planks to twenty-two, so a fixed row length
-// either wraps a small hull pointlessly or stacks a big one into a four-row slab that swamps the ship it is
-// describing. TWO COURSES, always: it holds one shape all fight, it stays narrower than the hull it sits on,
-// and two strakes of planking is what the side of a boat actually looks like.
-const pipRow = (zone, cap) => (zone === "hull" ? Math.ceil(cap / 2) : zone === "guns" ? 4 : 6);
 
-function HitStrip({ zone, left, max, style = null, label = null, className = "" }) {
-    const [whole, wrecked] = PIPS[zone] || PIPS.hull;
+function PartChip({ zone, left, max }) {
     const cap = Math.max(1, Math.round(max || 1));
     const n = Math.max(0, Math.min(cap, Math.round(left ?? cap)));
     return (
-        <span className={`sbt-hits is-${zone}${n <= 0 ? " is-out" : ""}${className ? ` ${className}` : ""}`}
-            style={{ "--per": Math.min(pipRow(zone, cap), cap), ...(style || {}) }}
-            title={label || `${n} of ${cap} left`}>
-            {Array.from({ length: cap }).map((_, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={i < n ? whole : wrecked} alt="" draggable="false"
-                    className={`sbt-pip${i < n ? " is-up" : " is-gone"}`} style={{ "--i": i }} />
-            ))}
+        <span className={`sbt-cond is-${zone} ${conditionTone(n, cap)}`} title={`${n} of ${cap} left`}>
+            <b>{n}</b><em>{zone === "sails" ? "sails" : zone === "guns" ? "gun" : "hull"}</em>
         </span>
     );
 }
@@ -343,18 +331,16 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                     {(() => {
                         const hb = zoneBox(key, "hull", { mirror });
                         if (!hb) return null;
-                        // ONE PLACARD PER SHIP, AT THE WATERLINE. The canvas strip started out floating above
-                        // the mastheads, which is where the part is — and also exactly where the "last
-                        // exchange" recap sits for the whole aim phase, so the thing you were meant to read
-                        // while choosing a target was underneath a panel every single round. Both strips ride
-                        // together under the hull instead: never occluded, unmistakably one ship's condition,
-                        // and still per-part because canvas and oak do not look remotely alike.
+                        // ONE PLACARD PER SHIP, AT THE WATERLINE. Canvas first, then timber. It rides on the
+                        // hull rather than over the mastheads because the "last exchange" recap owns the top
+                        // of the stage for the whole aim phase — anything up there is behind a panel exactly
+                        // when you are choosing a target.
                         return (
                             <span className="sbt-placard" style={{ left: `${hb.cx}%`, top: `${hb.y + hb.h}%` }}>
                                 {caps?.sails ? (
-                                    <HitStrip zone="sails" left={sys?.sails ?? caps.sails} max={caps.sails} />
+                                    <PartChip zone="sails" left={sys?.sails ?? caps.sails} max={caps.sails} />
                                 ) : null}
-                                <HitStrip zone="hull" left={hp} max={hpMax} />
+                                <PartChip zone="hull" left={hp} max={hpMax} />
                             </span>
                         );
                     })()}
@@ -411,7 +397,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                                         itself, so a zone marker adds nothing but the count of barrels you
                                         have committed to it. */}
                                     {t.kind === "gun" ? (
-                                        <HitStrip zone="guns" left={t.hp} max={t.hpMax} />
+                                        <PartChip zone="guns" left={t.hp} max={t.hpMax} />
                                     ) : null}
                                     {t.laid ? <b>×{t.laid}</b> : null}
                                 </span>
@@ -463,9 +449,16 @@ function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
                     and the payoff for taking them is that this number falls and every shot after it lands more
                     often. That payoff was completely invisible: you spent your worst damage on faith. Now it
                     is a number on her card that drops as her canvas goes, which is the argument for aiming
-                    there, made without making it. */}
+                    there, made without making it.
+
+                    DRAWN, AND NAMED. These were two react-icons glyphs and two bare percentages — line art in
+                    a game built entirely out of painted sprites, and nothing anywhere saying which percentage
+                    was which. The sprites come from the badge-power family so they match the rest of the app,
+                    and each carries the one word that says what it is. */}
                 <span className={`sbt-syschip is-dodge${dodgePct <= 5 ? " is-out" : ""}`} title="How often a ball misses her — canvas keeps her dodging">
-                    <Icon name="GiSpeedometer" className="sbt-sysicon" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/bonus/tailwind.png" alt="" className="sbt-sysart" draggable="false" />
+                    <span className="sbt-syslabel">Dodge</span>
                     <em>{dodgePct}%</em>
                 </span>
                 {/* ARMOUR, at last on screen. Up to 28% off every ball that lands, modified by what the shot is
@@ -473,7 +466,9 @@ function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
                     against a stat that did not appear anywhere in the game. */}
                 {armorPct > 0 ? (
                     <span className="sbt-syschip is-armor" title="Plate — takes a bite out of every ball that lands">
-                        <Icon name="GiShield" className="sbt-sysicon" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/bonus/ironclad.png" alt="" className="sbt-sysart" draggable="false" />
+                        <span className="sbt-syslabel">Armour</span>
                         <em>{armorPct}%</em>
                     </span>
                 ) : null}
@@ -570,6 +565,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     const [log, setLog] = useState([]);
     const [ready, setReady] = useState(false);
     const [logOpen, setLogOpen] = useState(false);
+    // THE RECAP SHOWS ITSELF, THEN LEAVES. It was a permanent card taking a third of the stage for the whole
+    // aim phase — sitting over both ships while you were trying to choose a target on one of them. It is the
+    // answer to "what just happened", which is a question you have for about three seconds. It plays, it
+    // goes, and the chrome keeps a Recap button so it is never lost.
+    const [recapOpen, setRecapOpen] = useState(false);
     const [pops, setPops] = useState([]);
     // Where each ball came down, keyed by shot. A ref, not state: it is written while the volley is playing
     // and read 460ms later by the same sequence — putting it in state would re-render the scene mid-flight
@@ -879,6 +879,17 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
+    // A new exchange raises the recap; four and a half seconds later it lowers itself. Keyed on the round so
+    // re-rendering for any other reason cannot restart the timer, and so the Recap button's manual open is
+    // not yanked shut underneath the player.
+    const recapRound = exchange ? battle?.round : null;
+    useEffect(() => {
+        if (recapRound == null || phase !== "aim") return undefined;
+        setRecapOpen(true);
+        const t = setTimeout(() => setRecapOpen(false), 4500);
+        return () => clearTimeout(t);
+    }, [recapRound, phase]);
+
     const lowAny = clampPct(myHp, battle?.myMax) <= 25 || clampPct(foeHp, battle?.foeMax) <= 25;
 
     return (
@@ -915,6 +926,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         {battle?.over ? "Close" : "Leave"}
                     </button>
                 ) : null}
+                {/* THE WAY BACK. The recap dismisses itself, so there has to be one. Only appears once there
+                    is an exchange to show, and only while it is down. */}
+                {exchange && !recapOpen && phase === "aim" && !battle?.over ? (
+                    <button type="button" className="sbt-recall" onClick={() => setRecapOpen(true)}>Recap</button>
+                ) : null}
                 <button type="button" className={`sbt-logtoggle${logOpen ? " is-open" : ""}${log.length ? "" : " is-idle"}`}
                     disabled={!log.length} onClick={() => setLogOpen((o) => !o)}>
                     {logOpen ? "Hide log" : `Log${log.length ? ` · ${log.length}` : ""}`}
@@ -930,34 +946,27 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
             <div className={`sbt-shakewrap${shake ? (shake.big ? " is-quake" : " is-shake") : ""}`}>
                 <div className={`sbt-stage${lowAny ? " is-desperate" : ""}`} ref={stageRef}>
-                    {phase === "aim" && exchange ? (
-                        <div className="sbt-recap">
-                            <div className="sbt-recap-head">Last exchange</div>
-                            <div className="sbt-recap-cols">
-                                {[["You fired", exchange.mine, "is-mine"], ["They fired", exchange.theirs, "is-theirs"]].map(([label, x, cls]) => (
-                                    <div key={label} className={`sbt-recap-col ${cls}`}>
-                                        <b>{label}</b>
-                                        {x ? (
-                                            <>
-                                                <span className="sbt-recap-tally">
-                                                    {x.hits}/{x.guns} on target
-                                                    {x.rakes ? <em> · {x.rakes} rake{x.rakes === 1 ? "" : "s"}</em> : null}
-                                                </span>
-                                                <span className="sbt-recap-dmg">{x.dmg} damage</span>
-                                                {Object.keys(x.byZone).length ? (
-                                                    <span className="sbt-recap-where">
-                                                        {Object.entries(x.byZone).map(([z, d]) => `${zoneById(z).name.toLowerCase()} ${d}`).join(" · ")}
-                                                    </span>
-                                                ) : null}
-                                                {x.avgMiss != null ? (
-                                                    <span className="sbt-recap-miss">{x.guns - x.hits} missed · {x.avgMiss}% shots</span>
-                                                ) : null}
-                                                {x.wrecks.map((w, i) => <span key={i} className="sbt-recap-wreck">{w}</span>)}
-                                            </>
-                                        ) : <span className="sbt-recap-tally">held fire</span>}
-                                    </div>
-                                ))}
-                            </div>
+                    {/* ONE LINE A SIDE. It was two stacked cards of five lines each: a tally, a damage
+                        figure, a per-zone breakdown, a miss count and a wreck notice, times two — a debug
+                        dump with a border, parked over both ships. Everything here is already somewhere
+                        else: the hit odds are on the target, the damage is on the read-out, and the full
+                        blow-by-blow is in the Log. What a recap owes you is the headline. */}
+                    {phase === "aim" && exchange && recapOpen ? (
+                        <div className="sbt-recap" onClick={() => setRecapOpen(false)}>
+                            {[["You", exchange.mine, "is-mine"], ["Them", exchange.theirs, "is-theirs"]].map(([label, x, cls]) => (
+                                <div key={label} className={`sbt-recap-line ${cls}`}>
+                                    <b>{label}</b>
+                                    <span className="sbt-recap-dmg">{x ? x.dmg : "–"}</span>
+                                    <span className="sbt-recap-where">
+                                        {!x ? "held fire"
+                                            : Object.keys(x.byZone).length
+                                                ? Object.entries(x.byZone).map(([z]) => zoneById(z).name.toLowerCase()).join(" · ")
+                                                : "no damage"}
+                                    </span>
+                                    <span className="sbt-recap-tally">{x ? `${x.hits}/${x.guns}` : ""}</span>
+                                    <span className="sbt-recap-wreck">{x?.wrecks?.length ? x.wrecks[0] : ""}</span>
+                                </div>
+                            ))}
                         </div>
                     ) : null}
                     <Ship f={me} side="me" hullRef={meHullRef}

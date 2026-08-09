@@ -12669,7 +12669,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     box-shadow: 0 3px 0 #1c5f88, 0 4px 12px rgba(0,0,0,0.35); }
 .sail-cta-fish:not(:disabled):active { transform: translateY(2px); box-shadow: 0 1px 0 #1c5f88; }
 
-
 /* ── GEAR COMPARISON ──────────────────────────────────────────────────────────────────────────────────────
    Was a bare three-row list with the numbers crammed into one right-aligned string ("14% → 15% +1%"), so
    nothing lined up and the eye had no column to run down. It is a real table now: stat, what you have, what
@@ -14394,46 +14393,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    the part it described, floating in open sky beside the ship. Guns stay centred on their port by margin. */
 .sbt-target { transform: none; }
 
-/* ══ SHIP BATTLE — LAST EXCHANGE ════════════════════════════════════════════════════════════════════════════
-   The fight resolves in about a second and a half, then asks for your next decision. Every bit of feedback
-   lived inside that second, so looking at the wrong ship meant the exchange was simply gone — and the log
-   that had it was one summarised line behind a button nobody opens mid-fight.
-
-   It sits in the water ABOVE the ships, which was the emptiest third of a phone screen and was doing nothing
-   at all, and only while you are aiming — during the volley it would be reading a result that has not
-   happened yet. */
-.sbt-recap { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 9;
-    width: min(94%, 420px); padding: 8px 10px 9px; border-radius: 14px;
-    background: linear-gradient(180deg, rgba(8,16,28,0.90), rgba(6,12,22,0.86));
-    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 22px rgba(0,0,0,0.5);
-    animation: sbtRecapIn .32s ease-out both; pointer-events: none; }
 @keyframes sbtRecapIn { from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
     to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-.sbt-recap-head { font-size: 0.62rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase;
-    color: #8fa4bb; text-align: center; margin-bottom: 6px; }
-.sbt-recap-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sbt-recap-col { display: grid; gap: 2px; align-content: start; padding: 6px 8px; border-radius: 10px;
-    background: rgba(255,255,255,0.04); border-left: 3px solid transparent; }
-/* Yours reads gold, hers reads red — the same two colours the hull bars already use, so the column you are
-   looking at is identified before you read a word of it. */
-.sbt-recap-col.is-mine { border-left-color: #ffd28a; }
-.sbt-recap-col.is-theirs { border-left-color: #ff8f7a; }
-.sbt-recap-col b { font-size: 0.68rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #e9dcb8; }
-.sbt-recap-col.is-theirs b { color: #f0c4bb; }
-.sbt-recap-tally { font-size: 0.78rem; color: #dfe6ee; font-weight: 700; }
-.sbt-recap-tally em { font-style: normal; color: #ff9c5e; font-weight: 800; }
-.sbt-recap-dmg { font-size: 0.95rem; font-weight: 900; color: #ffd75e; font-variant-numeric: tabular-nums; }
-.sbt-recap-col.is-theirs .sbt-recap-dmg { color: #ff8f7a; }
-.sbt-recap-where { font-size: 0.68rem; color: #9fb0c4; }
-.sbt-recap-miss { font-size: 0.68rem; color: #7f8fa3; }
-.sbt-recap-wreck { font-size: 0.68rem; font-weight: 800; color: #8fe3a1; }
-.sbt-recap-col.is-theirs .sbt-recap-wreck { color: #ffb4a8; }
-
-@media (max-width: 400px) {
-    .sbt-recap { top: 6px; padding: 7px 8px 8px; }
-    .sbt-recap-cols { gap: 7px; }
-    .sbt-recap-col { padding: 5px 6px; }
-}
 
 /* Odds and expected damage, together. The percentage always moved with the ammunition; the damage never did,
    so half of every ammunition decision was invisible. Side by side they teach the trade wordlessly — explosive
@@ -14565,7 +14526,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-gun .sbt-plaque-body b { display: none; font-size: 0.56rem; }
 .sbt-target.is-gun.is-hurt .sbt-plaque-body b,
 .sbt-target.is-gun.is-on .sbt-plaque-body b { display: block; }
-
 
 /* ══ SHIP BATTLE — THE CHROME ROW ═══════════════════════════════════════════════════════════════════════════
    Music / Leave / Log sat flush against the bottom of the stat cards — .sbt-hud ends `12px 10px 0` and
@@ -14885,7 +14845,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-target.is-on { z-index: 14; }
 .sbt-plaque-minus { z-index: 3; }
 
-
 /* ══ SHIP BATTLE — A PAINTED SEA, AND HITS COUNTED IN TIMBER ═════════════════════════════════════════════
    Two things this pass replaces, both of them the same mistake in different clothes: a picture stood in for
    by a CSS abstraction.
@@ -14920,128 +14879,20 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
                         transparent 44%, transparent 58%, rgba(3,7,12,0.42) 82%, rgba(3,7,12,0.78) 100%),
         radial-gradient(120% 70% at 50% 50%, transparent 42%, rgba(3,7,12,0.5) 100%); }
 
-/* ── Hits, as sprites ────────────────────────────────────────────────────────────────────────────────── */
-/* One strip per part, sitting just off the part it belongs to rather than pasted across it — the ship is the
-   art, and a sticker over the middle of it was the reason the old pills looked bolted on. */
-.sbt-parthits { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
-.sbt-hits { display: grid; grid-template-columns: repeat(var(--per, 6), 1fr); gap: 2px 3px;
-    padding: 3px 4px; border-radius: 8px; width: max-content; max-width: 96%;
-    background: rgba(6,10,16,0.52); border: 1px solid rgba(255,255,255,0.09);
-    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-.sbt-parthits .sbt-hits { position: absolute; transform: translate(-50%, -50%); }
-/* Canvas rides above the masts, timber sits under the waterline. Both clear of the painting. */
-.sbt-parthits .sbt-hits.is-above { transform: translate(-50%, -112%); }
-.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, 12%); }
-.sbt-pip { display: block; width: 100%; height: auto; image-rendering: auto;
-    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6));
-    transition: opacity .3s ease, filter .3s ease, transform .3s ease; }
-/* A pip that has just gone drops and settles, so losing one is an EVENT rather than a redraw. */
-.sbt-pip.is-gone { opacity: 0.72; animation: sbtPipGone .42s ease-out both; }
-@keyframes sbtPipGone {
-    0% { transform: translateY(-3px) scale(1.18) rotate(0deg); opacity: 1; filter: brightness(2.2); }
-    60% { transform: translateY(1px) scale(0.96) rotate(-4deg); }
-    100% { transform: none; opacity: 0.72; filter: none; }
-}
-/* Pip sizes are per-material because the sprites are: a plank is wide, a sail is tall, a plate is square. */
-.sbt-hits.is-hull { --pipw: 15px; }
-.sbt-hits.is-sails { --pipw: 14px; }
-.sbt-hits.is-guns { --pipw: 9px; gap: 1px 2px; padding: 2px 3px; }
-.sbt-hits .sbt-pip { width: var(--pipw); }
-/* Down to the last two boards and the timber that is left glows — the ship is about to go. */
-.sbt-hits.is-hull:has(.sbt-pip.is-up:nth-child(-n+2):last-of-type) .sbt-pip.is-up { animation: sbtPipLow 1.05s ease-in-out infinite; }
-@keyframes sbtPipLow { 0%, 100% { filter: none; } 50% { filter: brightness(1.5) drop-shadow(0 0 4px rgba(255,190,110,0.7)); } }
-/* Nothing left of that part: the frame goes red so a dead system reads without counting. */
-.sbt-hits.is-out { background: rgba(96,18,10,0.5); border-color: rgba(255,120,100,0.34); }
-
-/* The gun markers carry their own strip now, so the plaque is just the strip plus the barrel count. */
-.sbt-plaque-hp { display: none; }
-.sbt-target.is-gun .sbt-plaque-body { gap: 3px; }
-
-/* Phones: the strips are the readable part, so they shrink last and least. */
-@media (max-width: 430px) {
-    .sbt-hits.is-hull { --pipw: 12px; }
-    .sbt-hits.is-sails { --pipw: 11px; }
-    .sbt-hits.is-guns { --pipw: 8px; }
-    .sbt-hits { gap: 1px 2px; padding: 2px 3px; }
-}
-
-/* ── Placement pass on the strips ────────────────────────────────────────────────────────────────────────
-   Three things the first cut got wrong, all of them only visible on a phone with the art actually loaded.
-
-   1. THE PIPS WERE TOO SMALL. At 12px a plank is a brown tick — the whole point of drawing them as objects
-      is that you can see WHAT the object is, and a strip you have to count one at a time is worse than the
-      bar it replaced. Bigger, and fewer per row so the block stays narrow.
-   2. THE HULL STRIP FLOATED IN OPEN WATER. It was anchored to the bottom of the hull ZONE, which includes
-      the sprite's transparent padding, so it sat seventy pixels below the ship. It belongs on the waterline,
-      where planking is.
-   3. THE CHROME SAT ON TOP OF HER RIGGING. Music / Leave / Log were pinned top-RIGHT, which is exactly where
-      the enemy ship and her canvas are. Top-left is the one genuinely empty corner of the scene. */
+/* ── Chrome, off her rigging ─────────────────────────────────────────────────────────────────────────────
+   Music / Leave / Log were pinned top-RIGHT, which is exactly where the enemy ship and her canvas are.
+   Top-left is the one genuinely empty corner of the scene. */
 .sbt-chrome { justify-content: flex-start; }
 .sbt-chrome .sbt-log { right: auto; left: 8px; }
 
-.sbt-hits.is-hull { --pipw: 17px; --per: 6; }
-.sbt-hits.is-sails { --pipw: 16px; }
-.sbt-hits.is-guns { --pipw: 10px; }
-.sbt-hits { gap: 2px; padding: 3px; border-radius: 9px;
-    background: rgba(6,10,16,0.62); box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
-/* Canvas rides just clear of the mastheads; timber sits ON the waterline rather than under the keel. */
-.sbt-parthits .sbt-hits.is-above { transform: translate(-50%, -104%); }
-.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, -52%); }
-
-@media (max-width: 430px) {
-    .sbt-hits.is-hull { --pipw: 15px; --per: 5; }
-    .sbt-hits.is-sails { --pipw: 14px; }
-    .sbt-hits.is-guns { --pipw: 9px; }
-    .sbt-hits { gap: 2px; padding: 3px; }
-}
-
-/* ── The hull reads as planking, not as a slab ───────────────────────────────────────────────────────────
-   Six per row turned a twenty-plank hull into a four-row block that covered the ship it was describing. Two
-   courses, sized to fit the hull rather than to a fixed pip width, so the strip is always the same shape and
-   always narrower than the boat. And the incoming marks go BACK on top: "2 HULL" — the one thing telling you
-   where her broadside is about to land — was being buried under the timber. */
-.sbt-parthits { z-index: 6; }
-.sbt-incoming { z-index: 11; }
-.sbt-hits.is-hull { --pipw: auto; width: min(58%, 190px); }
-.sbt-hits.is-hull .sbt-pip { width: 100%; }
-.sbt-parthits .sbt-hits.is-below { transform: translate(-50%, -28%); }
-.sbt-hits { background: rgba(6,10,16,0.5); }
-@media (max-width: 430px) {
-    .sbt-hits.is-hull { width: min(62%, 158px); }
-}
+/* The gun markers carry their own count now, so the plaque is the count plus the barrels laid on it. */
+.sbt-plaque-hp { display: none; }
+.sbt-target.is-gun .sbt-plaque-body { gap: 3px; }
 
 /* The canvas chip used to be first in this grid and needed the full row for its six pips; it is gone, so the
    rule was making DODGE span both columns and leaving armour stranded underneath it. Two equal chips. */
 .sbt-sys > .sbt-syschip:first-child { grid-column: auto; }
 
-/* ── One condition placard per ship ──────────────────────────────────────────────────────────────────────
-   Canvas above timber, both riding at the waterline. See the note in ShipBattleScene: the sails strip used
-   to sit over the mastheads, where the "last exchange" recap lives for the entire aim phase — so the count
-   you were meant to read while picking a target spent every round hidden behind a panel. */
-.sbt-placard { position: absolute; transform: translate(-50%, -18%);
-    display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.sbt-placard .sbt-hits { position: static; transform: none; }
-/* Canvas is at most six sheets, so it sits in one row the width of the timber below it. */
-.sbt-placard .sbt-hits.is-sails { width: min(58%, 190px); }
-.sbt-placard .sbt-hits.is-sails .sbt-pip { width: 100%; }
-@media (max-width: 430px) {
-    .sbt-placard .sbt-hits.is-sails { width: min(62%, 158px); }
-}
-
-/* The placard is absolutely positioned, so it shrink-wraps its content — which made the strips' own
-   percentage widths circular and collapsed every pip back to a speck. The placard owns the width; the strips
-   fill it, and the pips divide it. */
-.sbt-placard { width: min(54vw, 208px); }
-.sbt-placard .sbt-hits { width: 100%; }
-.sbt-placard .sbt-hits .sbt-pip { width: 100%; }
-@media (max-width: 430px) { .sbt-placard { width: min(50vw, 178px); } }
-
-/* Riding UNDER the keel put the lower ship's placard through the floor of the stage and into the order
-   panel. It sits ON the planking instead — over the bottom of the hull, which is both where planking is and
-   the least interesting part of the sprite to cover. Slightly narrower with it, so the ship still reads as
-   the biggest thing on screen. */
-.sbt-placard { width: min(48vw, 182px); transform: translate(-50%, -62%); }
-@media (max-width: 430px) { .sbt-placard { width: min(46vw, 164px); } }
 /* "1 GUN 6" was wrapping onto two lines inside its own pill. */
 .sbt-inc em { white-space: nowrap; }
 
@@ -15053,3 +14904,131 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @media (min-aspect-ratio: 9/10) {
     .sbt-sky { background-position: center 30%; }
 }
+
+/* ── CONDITION: A COUNT, THE PART, AND A COLOUR ──────────────────────────────────────────────────────────
+   Third attempt at this and the first one that survives being small. A bar answered the wrong question. The
+   sprites answered the right one but could not be read: a sail drawn at fourteen pixels is a cream rectangle,
+   and six of them in a row is a row of blank cards, while two courses of little brown boards quietly rebuilt
+   the bar they replaced.
+
+   "4 HULL" needs no legend and works at any size, and the colour carries the state the art was failing to:
+   green whole, amber bitten into, red gone. Same shape as the incoming marks that land on your ship — one
+   vocabulary for "how much of this part is there", whoever it belongs to. */
+.sbt-placard { position: absolute; transform: translate(-50%, -40%); z-index: 6;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+.sbt-cond { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap;
+    padding: 3px 10px 4px; border-radius: 999px; border: 1px solid;
+    font-family: var(--font-display); line-height: 1;
+    background: rgba(6,10,16,0.72); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    transition: color .25s ease, border-color .25s ease, background .25s ease; }
+.sbt-cond b { font-size: 0.92rem; font-weight: 900; }
+.sbt-cond em { font-style: normal; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.1em;
+    text-transform: uppercase; opacity: 0.78; }
+
+/* Whole. */
+.sbt-cond.is-full { color: #7fe0a4; border-color: rgba(127,224,164,0.42); }
+/* Bitten into. */
+.sbt-cond.is-hurt { color: #f2c14e; border-color: rgba(242,193,78,0.48); background: rgba(28,18,4,0.72); }
+/* Gone — and it says so, rather than making you notice a zero. */
+.sbt-cond.is-dead { color: #ff8272; border-color: rgba(255,130,114,0.55); background: rgba(58,10,6,0.76); }
+.sbt-cond.is-dead b { text-decoration: line-through; text-decoration-thickness: 2px; }
+
+/* On a gun marker it is one line inside the plaque, so it loses the pill. */
+.sbt-target.is-gun .sbt-cond { padding: 0; border: none; background: none; box-shadow: none; backdrop-filter: none; }
+.sbt-target.is-gun .sbt-cond b { font-size: 0.78rem; }
+.sbt-target.is-gun .sbt-cond em { font-size: 0.54rem; }
+
+@media (max-width: 430px) {
+    .sbt-cond { padding: 3px 8px 4px; gap: 4px; }
+    .sbt-cond b { font-size: 0.86rem; }
+    .sbt-cond em { font-size: 0.58rem; }
+}
+
+/* ── THE RECAP IS A HEADLINE, NOT A REPORT ───────────────────────────────────────────────────────────────
+   It was two stacked cards of five lines each — tally, damage, per-zone breakdown, miss count, wreck notice,
+   twice — parked over both ships for the whole aim phase. A debug dump with a border, sitting on top of the
+   thing you were trying to aim at. Every number in it lives somewhere else already: the odds are on the
+   target, the damage on the read-out, the blow-by-blow in the Log.
+
+   One line a side, it plays for four and a half seconds, then it gets out of the way. Tap it to dismiss it
+   early; the Recap button in the chrome brings it back. */
+.sbt-recap { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 14;
+    width: max-content; max-width: min(94%, 420px); cursor: pointer;
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 7px 10px; border-radius: 12px;
+    background: rgba(6,10,16,0.78); border: 1px solid rgba(255,255,255,0.09);
+    backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+    animation: sbtRecapIn .28s cubic-bezier(.2,.9,.3,1.3) both; }
+@keyframes sbtRecapIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+.sbt-recap-line { display: flex; align-items: baseline; gap: 7px; white-space: nowrap;
+    font-family: var(--font-display); font-size: 0.72rem; line-height: 1.15; }
+.sbt-recap-line > b { min-width: 3.1em; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+    font-size: 0.62rem; opacity: 0.72; }
+.sbt-recap-line.is-mine > b { color: #ffd75e; }
+.sbt-recap-line.is-theirs > b { color: #ff8272; }
+/* The damage is the headline; everything beside it is the footnote that makes it mean something. */
+.sbt-recap-dmg { font-size: 0.98rem; font-weight: 900; }
+.sbt-recap-line.is-mine .sbt-recap-dmg { color: #ffd75e; }
+.sbt-recap-line.is-theirs .sbt-recap-dmg { color: #ff8272; }
+.sbt-recap-where { color: #cfc7b6; opacity: 0.82; overflow: hidden; text-overflow: ellipsis; }
+.sbt-recap-tally { margin-left: auto; color: #8f8875; font-size: 0.66rem; font-weight: 700; }
+.sbt-recap-wreck { font-style: normal; color: #7fe0a4; font-size: 0.62rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.05em; }
+
+.sbt-recall { pointer-events: auto; cursor: pointer; padding: 5px 10px; border-radius: 10px;
+    font-family: var(--font-display); font-size: 0.72rem; font-weight: 800; color: #e8dcc6;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,215,94,0.28); }
+.sbt-recall:hover, .sbt-recall:focus-visible { color: #fff; border-color: rgba(255,215,94,0.55); }
+
+/* ── The stat chips say what they are ────────────────────────────────────────────────────────────────────
+   Two react-icons glyphs and two bare percentages: line art in a game built out of painted sprites, and
+   nothing anywhere saying which number was which. Sprites from the badge-power family, and one word each. */
+.sbt-syschip { gap: 5px; padding: 4px 8px; }
+.sbt-sysart { width: 17px; height: 17px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.55)); }
+.sbt-syschip > i { font-style: normal; font-size: 0.58rem; font-weight: 800; letter-spacing: 0.07em;
+    text-transform: uppercase; color: #9aa2ab; }
+.sbt-syschip > em { margin-left: auto; font-style: normal; font-size: 0.76rem; font-weight: 900; }
+.sbt-syschip.is-dodge > em { color: #63c8ef; }
+.sbt-syschip.is-armor > em { color: #e8dcc6; }
+
+/* The painting is dark now — the old veil was tuned for a bright golden sunset and just made this muddy. */
+.sbt-seaveil { background:
+    linear-gradient(180deg, rgba(4,8,14,0.62) 0%, rgba(4,8,14,0.24) 14%, transparent 30%,
+                    transparent 64%, rgba(3,7,12,0.3) 84%, rgba(3,7,12,0.6) 100%); }
+
+/* A sprite, a word and a number do not fit across half a name card on a 375px phone — "DODGE" and "24%"
+   printed straight over each other. One chip per row: the card grows by a line and every part of it is
+   legible, which is the trade worth making. */
+.sbt-sys { grid-template-columns: 1fr; gap: 4px; }
+.sbt-syschip { justify-content: flex-start; }
+
+/* The label was starting underneath the sprite — an older rule still had the icon slot sized for a react
+   glyph. Give the art its own column and the word room to start. */
+.sbt-syschip { display: grid; grid-template-columns: 17px 1fr auto; align-items: center; gap: 7px; }
+.sbt-syschip > i { justify-self: start; }
+.sbt-syschip > em { justify-self: end; margin-left: 0; }
+
+/* The condition pills sat on the hull, which is also where her incoming marks land — "6 SAILS" spent every
+   round half-hidden behind a "2 HULL". They are two small pills now, not a three-row block of sprites, so
+   they fit under the keel where they started without falling through the floor of the stage. */
+.sbt-placard { transform: translate(-50%, -14%); }
+
+/* `<i>` inside a stat chip used to BE a sail pip, so the old rule painted a small grey block behind the first
+   letter of "Dodge" and "Armour". Its own class, and the columns of the two chips line up with each other. */
+.sbt-syschip > .sbt-syslabel { justify-self: start; font-style: normal; font-size: 0.6rem; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #9aa2ab; background: none; }
+
+/* The recap is a TABLE of two rows, so the columns have to agree: side, damage, where, hits, wreck. With
+   `margin-left:auto` doing the alignment the tally landed against the right edge on one row and mid-sentence
+   on the other, which read as two unrelated lines rather than a comparison. */
+.sbt-recap-line { display: grid; grid-template-columns: 3.2em 1.4em minmax(0, 1fr) 2.4em auto;
+    align-items: baseline; gap: 6px; }
+.sbt-recap-tally { margin-left: 0; text-align: right; }
+.sbt-recap-where { white-space: nowrap; }
+.sbt-recap { background: rgba(6,10,16,0.9); }

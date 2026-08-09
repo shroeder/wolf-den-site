@@ -129,6 +129,20 @@ export const rakeFor = (gunneryLevel = 0) => Math.min(0.35, 0.06 + Math.max(0, g
 // Ten planks to start and one more per level of the Hull track: 10 at the beginning, 18 fully plated. BOAT
 // LEVEL NO LONGER TOUCHES IT — a bigger ship is not a tougher one, it carries more guns. That was the change
 // that made hull the only stat that scaled and quietly turned late fights into slugging matches.
+/**
+ * THE SAVED-BATTLE FORMAT VERSION, in ONE place.
+ *
+ * It was written out in two: the opener said one number and the resolver said another, hardcoded. So long as
+ * both happened to say 3 nothing showed. The moment the hull moved from hit points to planks and the opener
+ * went to 4, a fight opened at v4, loaded, fired one volley — and the resolver stamped the write-back v3, so
+ * the NEXT load was rejected and the FIRE button silently did nothing from round two onward. Two literals for
+ * one fact is the whole bug; there is now one.
+ *
+ * Bump this only when the shape or the UNITS of the state change, and readBattle in sailing.js will drop
+ * anything older rather than render it.
+ */
+export const BATTLE_STATE_V = 4;
+
 export const HULL_BASE_HITS = 10;
 export const hullHitsFor = (hullLevel = 0) => HULL_BASE_HITS + Math.max(0, hullLevel);
 
@@ -226,7 +240,8 @@ export function foeProfile(foe) {
     };
 }
 
-// ── AIMING: THE PART YOU ACTUALLY PLAY ───────────────────────────────────────────────────────────────────────
+
+// ── AIMING: THE PART YOU ACTUALLY PLAY ───────────────────────────────────────────────────────────────────────
 // This started as one order a round — broadside, rake, hole her, board — chosen off four cards under the ships.
 // It worked, and it was still one decision per round no matter what you had bought.
 //
@@ -271,7 +286,7 @@ export function initBattleState(me, foe, { rng = Math.random } = {}) {
     const myOdds = 0.5 + Math.max(-0.18, Math.min(0.18, (foe.guns - me.guns) * 0.02));
     // v4: `hp` counts PLANKS now, not hit points. A v3 state carries 419 in that field and would be read as
     // four hundred planks, so those battles are dropped rather than migrated.
-    return { v: 4, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
+    return { v: BATTLE_STATE_V, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
@@ -370,7 +385,7 @@ export function foeAims(me, foe, st, { rng = Math.random } = {}) {
 // persists whatever comes back — and `rng` is injectable so a fight can be replayed exactly in the lab.
 export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrders = null } = {}) {
     const st = {
-        v: 3, round: state.round, gauge: state.gauge,
+        v: BATTLE_STATE_V, round: state.round, gauge: state.gauge,
         me: { ...state.me, guns: [...state.me.guns] },
         foe: { ...state.foe, guns: [...state.foe.guns] },
     };
