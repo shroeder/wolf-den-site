@@ -2,6 +2,7 @@
 
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
+import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 // Buy store credit (real dollars on your account) with a card, and spend it in-store via a QR staff scan.
 // $1 = 200 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
@@ -164,7 +165,7 @@ export default function StoreCreditClient({
             const res = await fetch("/api/marketplace/credit/claim", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
             const d = await res.json().catch(() => null);
             if (!res.ok || !d?.ok) throw new Error(d?.error === "no_credit" ? "You have no store credit to spend yet." : d?.error || "Couldn't create a code.");
-            const qr = await QRCode.toDataURL(`WDCRD:${d.token}`, { width: 320, margin: 1 }).catch(() => null);
+            const qr = await QRCode.toDataURL(redeemUrl("credit", d.token), { width: 320, margin: 1 }).catch(() => null);
             setClaim({ qr, expiresAt: d.expiresAt });
         } catch (e) {
             setErr(e instanceof Error ? e.message : "Couldn't create a code.");

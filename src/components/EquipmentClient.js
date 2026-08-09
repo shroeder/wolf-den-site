@@ -13,6 +13,7 @@ import useScrollLock from "@/lib/useScrollLock";
 import { trackClient } from "@/lib/marketplace/track-client";
 import { EQUIP_SLOTS, STAT_META, describeStats, describeSea, describeFarm, describeDepth, itemFitsSlot } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
+import { redeemUrl } from "@/lib/marketplace/redeem-link";
 
 // An item's elemental affinity chip(s) — matters against a boss weak to that element (bonus damage). Prefers the
 // effective (reforged) elements passed from the server; falls back to the item's deterministic base element.
@@ -227,15 +228,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     function unequip(slotKey) { setSlot(null); post({ slot: slotKey, itemId: null }); }
 
     // Member taps a READY in-store perk → mint a claim + show its QR. Staff scan it to actually use the
-    // charge (nothing is burned here). The QR encodes an opaque token behind a scheme prefix the admin app
-    // recognizes, so a random camera just sees harmless text.
+    // charge (nothing is burned here). The QR encodes an https link the admin app claims as a verified App
+    // Link, so scanning with any camera opens the app straight on the redeem screen; a phone without the app
+    // just lands on a page telling them to show it to staff.
     async function redeemCharge(item) {
         setBusy(true); setErr("");
         try {
             const r = await fetch("/api/marketplace/item-charge/claim", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: item.id }) });
             const d = await r.json().catch(() => null);
             if (!r.ok || !d?.ok) { setErr(chargeErr(d?.error)); return; }
-            const qr = await QRCode.toDataURL(`WDCHG:${d.token}`, { width: 320, margin: 1 }).catch(() => null);
+            const qr = await QRCode.toDataURL(redeemUrl("charge", d.token), { width: 320, margin: 1 }).catch(() => null);
             setChargeClaim({ token: d.token, qr, rewardLabel: d.rewardLabel || item.charge?.rewardLabel || "Perk", itemName: item.name });
             trackClient("use_charge", { itemId: item.id, name: item.name });
         } finally { setBusy(false); }
