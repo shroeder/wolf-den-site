@@ -43,26 +43,36 @@ export const AMMO = {
     round: {
         id: "round", name: "Round Shot", basic: true, price: 0,
         icon: "GiCannonBall", blurb: "Solid iron, and you never run out.",
-        dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {}, hull: 0,
+        accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {}, hull: 0,
     },
     chain: {
         id: "chain", name: "Chain Shot", basic: false, price: 3,
         icon: "GiChainedHeart", blurb: "Shreds canvas — takes a whole suit of sails at once.",
         // Light against timber: it is rigging shot, and putting it into a hull is a wasted round.
-        dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 }, hull: 0,
+        accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 }, hull: 0,
     },
     grape: {
         id: "grape", name: "Grapeshot", basic: false, price: 3,
         icon: "GiCannonShot", blurb: "Dismounts cannons. Armour stops it dead.",
-        dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 }, hull: 0,   // counts double on a gun deck
+        accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 }, hull: 0,   // counts double on a gun deck
     },
     explosive: {
         id: "explosive", name: "Explosive Shell", basic: false, price: 6,
         icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but it goes through plate.",
         // The only round that staves in TWO planks at once, and the only one that gets through plate.
-        dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {}, hull: 1,
+        //
+        // ITS PRICE WAS -0.14 ACCURACY, WHICH BOUGHT DOUBLE DAMAGE. Simulating the whole fleet ladder four
+        // hundred fights a rung showed the four hardest rungs by a wide margin were exactly the four ships
+        // that load this shell — Bitterhold (7), the Black Tithe (10), Cannonade (13) and the Sovereign (15)
+        // — while rank 14, which loads round shot, was easier than rank 13. Ammunition, not rank, was
+        // deciding the difficulty of a designed ladder. At -0.28 the shell is still the only thing that goes
+        // through plate and still the only thing that takes two planks, but you pay for it.
+        accuracy: -0.28, armorPierce: 0.35, rakeBonus: 0.05, sys: {}, hull: 1,
     },
 };
+// `dmg` used to sit on every entry above. It has meant nothing since a hull stopped being a pool of hit points
+// and became a count of planks: the resolver works in whole planks (1 + ammo.hull + a rake), and nothing has
+// read the field since. Removed rather than left lying there looking like a balance lever.
 export const AMMO_LIST = Object.values(AMMO);
 export const ammoById = (id) => AMMO[String(id || "round")] || AMMO.round;
 
