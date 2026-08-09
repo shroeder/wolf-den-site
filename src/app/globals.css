@@ -14800,3 +14800,87 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-sys > .sbt-syschip:first-child { grid-column: 1 / -1; justify-content: flex-start; }
 .sbt-panel-foe .sbt-sys > .sbt-syschip:first-child { justify-content: flex-end; }
 .sbt-syschip { overflow: visible; white-space: nowrap; }
+
+/* ══ SHIP BATTLE — SECOND ART PASS ══════════════════════════════════════════════════════════════════════════ */
+
+/* The value, not an ellipsis. The chip was told to stop truncating but the <em> INSIDE it still had
+   overflow:hidden + text-overflow, so "24%" went on rendering as "2…". */
+.sbt-syschip em { overflow: visible; text-overflow: clip; }
+
+/* ── BRACKETS EARN THEIR PLACE ───────────────────────────────────────────────────────────────────────────
+   Eight corner marks floating over an untouched ship is clutter — it reads as damage, or as a UI element
+   nobody asked for. They are a LOCK, so they appear when you are locking: faint until you touch the part,
+   full when a gun is on it. An unaimed ship is just a ship. */
+.sbt-target-skin { opacity: 0; }
+.sbt-target:hover .sbt-target-skin, .sbt-target:focus-visible .sbt-target-skin { opacity: 0.9; }
+.sbt-target.is-on .sbt-target-skin { opacity: 1; }
+/* Touch has no hover, so the parts must still be findable — the faintest hint of a corner, enough to say
+   "this is a thing", nothing like the full lock. */
+@media (hover: none) {
+    .sbt-target-skin { opacity: 0.26; }
+    .sbt-target.is-on .sbt-target-skin { opacity: 1; }
+}
+
+/* ── THE FIRE BUTTON ─────────────────────────────────────────────────────────────────────────────────────
+   It was a slab of orange twice the visual weight of anything else, in a colour the app uses nowhere. It is
+   the most important control on the screen and it should look like the game's own primary — the same gold as
+   every other one — with the barrel count as a quiet second line rather than a shouted one. */
+.sbt-fire { min-width: 148px; padding: 14px 20px; border-radius: 14px; border: 1px solid rgba(255,225,140,0.6);
+    background: linear-gradient(180deg, #ffdf85, #e6c76b 46%, #c79a2c);
+    box-shadow: 0 6px 18px rgba(212,175,55,0.35), inset 0 1px 0 rgba(255,255,255,0.5);
+    transition: transform .14s ease, box-shadow .14s ease, filter .14s ease; }
+.sbt-fire b { font-size: 1.16rem; letter-spacing: 0.14em; color: #241703; }
+.sbt-fire em { font-size: 0.68rem; font-weight: 800; color: #6b4f10; letter-spacing: 0.02em; }
+.sbt-fire.is-ready { box-shadow: 0 8px 26px rgba(255,205,80,0.5), inset 0 1px 0 rgba(255,255,255,0.6);
+    animation: sbtFireReady 2.4s ease-in-out infinite; }
+@keyframes sbtFireReady {
+    0%, 100% { box-shadow: 0 8px 26px rgba(255,205,80,0.45), inset 0 1px 0 rgba(255,255,255,0.6); }
+    50% { box-shadow: 0 10px 34px rgba(255,215,110,0.7), inset 0 1px 0 rgba(255,255,255,0.7); }
+}
+.sbt-fire:active { transform: translateY(1px); }
+.sbt-fire:disabled { background: rgba(255,255,255,0.045); border-color: rgba(255,255,255,0.1);
+    box-shadow: none; animation: none; }
+.sbt-fire:disabled b { color: #6d7783; letter-spacing: 0.1em; }
+.sbt-fire:disabled em { color: #5a636e; }
+
+/* The undo, sitting on the count you are undoing. */
+.sbt-plaque-minus { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; padding: 0;
+    border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,16,24,0.95);
+    color: #ffd7c4; font-size: 13px; font-weight: 900; line-height: 1; cursor: pointer; z-index: 2;
+    display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+.sbt-plaque-minus:hover { background: #6b1414; border-color: #ff9a8e; color: #fff; }
+.sbt-plaque { position: relative; }
+
+/* ── THE BOTTOM BAR AS ONE PANEL ─────────────────────────────────────────────────────────────────────────
+   The grid declared "read fire / rack fire" and then the gun rail — which is not in the template — dropped
+   into an implicit row underneath, which is why it kept ending up against the bottom edge of the phone. Four
+   named areas, so every part of the control has a place: what you are aimed at, what it is loaded with, your
+   barrels, and the button. */
+.sbt-aimbar {
+    grid-template-areas: "read fire" "rack fire" "rail rail";
+    gap: 8px 12px; padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(6,14,24,0.72), rgba(4,10,18,0.97));
+    border-top: 1px solid rgba(255,214,140,0.2);
+    box-shadow: 0 -10px 26px rgba(0,0,0,0.45);
+}
+.sbt-gunrail { grid-area: rail; justify-content: flex-start; padding-top: 8px; margin-top: 2px;
+    border-top: 1px solid rgba(255,255,255,0.07); }
+
+/* ── THE SHIPS ARE ON WATER ──────────────────────────────────────────────────────────────────────────────
+   Both hulls bobbed on the same beat with nothing else moving, so the scene read as two sprites pinned to a
+   picture. A slow drift on a different period from the bob — and a different one per ship — is enough for the
+   eye to accept that they are floating rather than placed. */
+@keyframes sbtDriftMe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, -4px); } }
+@keyframes sbtDriftFoe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-7px, 3px); } }
+.sbt-ship-me { animation: sbtDriftMe 13s ease-in-out infinite; }
+.sbt-ship-foe { animation: sbtDriftFoe 17s ease-in-out infinite; }
+/* A sinking ship has its own animation on this element — do not fight it. */
+.sbt-ship.is-sinking { animation-name: sbtSink; }
+.sbt-ship-foe.is-sinking { animation-name: sbtSinkFoe; }
+
+/* A LAID PART COMES TO THE FRONT. Cannon markers sit at z-index 8 so they can be picked out of the hull
+   region behind them — which also put them on top of the hull's own count badge, so the − that takes a
+   barrel back was unclickable: the tap landed on whichever gun happened to be under it. A part you have
+   committed to outranks the parts you have not. */
+.sbt-target.is-on { z-index: 14; }
+.sbt-plaque-minus { z-index: 3; }

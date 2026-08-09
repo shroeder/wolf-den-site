@@ -212,7 +212,7 @@ function gunWidthPct(ports) {
 
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
 function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targets = null,
-                onPick = null, firing = false, hullRef = null, incoming = null }) {
+                onPick = null, onUnpick = null, firing = false, hullRef = null, incoming = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
     const mirror = Boolean(f?.mirror);
@@ -323,13 +323,14 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
             {targets ? (
                 <span className="sbt-targets">
                     {targets.map((t) => (
-                        <button key={t.key} type="button"
+                        <div key={t.key} role="button" tabIndex={t.dead ? -1 : 0}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick?.(t); } }}
                             className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}${t.kind === "gun" && t.hpPct < 100 ? " is-hurt" : ""}`}
                             style={t.box
                                 ? { left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }
                                 : { left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
-                            disabled={t.dead}
-                            onClick={(e) => { e.stopPropagation(); onPick?.(t); }}
+                            aria-disabled={t.dead || undefined}
+                            onClick={(e) => { e.stopPropagation(); if (!t.dead) onPick?.(t); }}
                             title={`${t.name} — ${Math.round(t.chance * 100)}% to hit`}>
                             {/* THE AREA IS THE TARGET. The outline was doing the work and the icon on top of it
                                 was just repeating what the shape already said — and six cannon icons in a row
@@ -350,8 +351,14 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
                                     <span className="sbt-plaque-hp" style={{ "--w": `${t.hpPct}%` }}><i /></span>
                                     {t.laid ? <b>×{t.laid}</b> : null}
                                 </span>
+                                {/* THE UNDO, ON THE THING YOU AIMED. Tapping the part adds a barrel, so it
+                                    cannot also remove one — and the rail alone was never guessed. */}
+                                {t.laid ? (
+                                    <button type="button" className="sbt-plaque-minus" aria-label={`Take a gun off ${t.name}`}
+                                        onClick={(e) => { e.stopPropagation(); onUnpick?.(t); }}>−</button>
+                                ) : null}
                             </span>
-                        </button>
+                        </div>
                     ))}
                 </span>
             ) : null}
@@ -661,23 +668,26 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         return { x: box.x + (b.cx / 100) * box.w, y: box.y + (b.cy / 100) * box.h };
     }, [boxes, me, foe]);
 
-    // TAP TO LAY, TAP AGAIN TO TAKE IT BACK. The rail was the only undo, which nobody guessed — the intuition
-    // is that the thing you tapped to aim is the thing you tap to stop aiming. Removes the LAST gun put on
-    // that part, so tapping a stack of three walks it back one barrel at a time rather than clearing the lot.
+    // TAP ADDS A BARREL. Concentrating the broadside is the whole point of splitting it — four guns into one
+    // hull is a decision, and for a while tapping twice removed the first instead of adding a second, which
+    // made stacking impossible. Tap adds; the small − on the count takes one back.
     const pick = useCallback((t) => {
         if (phase !== "aim" || busy || battle?.over || t.dead) return;
-        const same = (a) => a.zone === t.zone && (a.target ?? null) === (t.target ?? null);
-        setAim((list) => {
-            const onIt = list.filter(same);
-            if (onIt.length) {
-                const lastGun = onIt[onIt.length - 1].gun;
-                return list.filter((a) => a.gun !== lastGun);
-            }
-            if (nextGun == null) return list;   // every gun is already laid
-            return [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }];
-        });
+        if (nextGun == null) return;   // every gun is already laid
+        setAim((list) => [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }]);
         sfxPick();
     }, [phase, busy, battle?.over, nextGun, ammo]);
+
+    /** Take ONE barrel back off a part — the last one laid there, so a stack unwinds a gun at a time. */
+    const unpick = useCallback((t) => {
+        setAim((list) => {
+            const onIt = list.filter((a) => a.zone === t.zone && (a.target ?? null) === (t.target ?? null));
+            if (!onIt.length) return list;
+            const lastGun = onIt[onIt.length - 1].gun;
+            return list.filter((a) => a.gun !== lastGun);
+        });
+        sfxPick();
+    }, []);
 
     /** Take a gun back off its target. The gun rail is the undo. */
     const clearGun = useCallback((gun) => {
@@ -903,7 +913,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         sinking={sinkingSide === "foe"} hpFrac={(foeHp || 0) / Math.max(1, battle?.foeMax || 1)}
                         sys={foeSys} caps={caps} firing={firingSide === "foe"}
                         targets={phase === "aim" && !battle?.over ? markers : null}
-                        onPick={pick} />
+                        onPick={pick} onUnpick={unpick} />
 
                     {balls.map((b) => (
                         <span key={b.k} className={`sbt-ball2 is-${b.ammo}${b.hit ? "" : " is-miss"}${b.rake ? " is-rake" : ""}`}
