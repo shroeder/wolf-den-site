@@ -935,7 +935,12 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                 <div className="sbt-round">
                     {/* The round you are IN, not the one you just fought — `round` counts exchanges resolved. */}
                     <b>Round {(battle?.round || 0) + (phase === "play" ? 0 : 1)}</b>
-                    <em>{battle?.gauge === "me" ? "you fire first" : "they fire first"}</em>
+                    {/* The initiative line is gone. You always fire first now, so it said the same three
+                        words every round of every battle — and a label that never changes is not information,
+                        it is furniture. What it used to be for (warning you the order had flipped) no longer
+                        happens. A fight already in progress from before the change keeps its saved order, so
+                        that one case still says so. */}
+                    {battle?.gauge === "foe" ? <em>they fire first</em> : null}
                 </div>
                 <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps}
                     armor={battle?.stats?.foe?.armor || 0} />

@@ -277,16 +277,24 @@ const gunsReady = (s) => s.guns.reduce((n, hp) => n + (hp > 0 ? 1 : 0), 0);
 const hpPair = (st) => ({ me: st.me.hp, foe: st.foe.hp });
 
 // The opening state of a fight. Kept JSON-safe: it is stored on the sailing row between rounds.
-export function initBattleState(me, foe, { rng = Math.random } = {}) {
+export function initBattleState(me, foe) {
     const fresh = (p) => ({
         hp: p.hp, max: p.hp, sails: SAILS_MAX,
         guns: Array.from({ length: Math.max(1, p.guns) }, () => GUN_HP),
     });
-    // Who fires first, leaning to the lighter, handier ship.
-    const myOdds = 0.5 + Math.max(-0.18, Math.min(0.18, (foe.guns - me.guns) * 0.02));
+    // YOU ALWAYS FIRE FIRST. This used to be a coin weighted by who carried fewer guns, and roughly half of
+    // all battles therefore answered the FIRE button by playing HER broadside — you pressed fire and watched
+    // the enemy shoot. Worse, the recap lists YOU above THEM whatever happened, so those fights showed you an
+    // order that contradicted the one you had just watched, which is exactly what "they shot twice in a row"
+    // looks like from the outside.
+    //
+    // `gauge` is kept on the state rather than deleted: it is a saved shape, the view sends it, and the
+    // resolver still branches on it, so a battle saved before this keeps resolving in the order it started
+    // with instead of being thrown away.
+    //
     // v4: `hp` counts PLANKS now, not hit points. A v3 state carries 419 in that field and would be read as
     // four hundred planks, so those battles are dropped rather than migrated.
-    return { v: BATTLE_STATE_V, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
+    return { v: BATTLE_STATE_V, round: 0, gauge: "me", me: fresh(me), foe: fresh(foe) };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
