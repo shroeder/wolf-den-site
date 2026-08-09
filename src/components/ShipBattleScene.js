@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
 import SceneMusic from "@/components/SceneMusic";
-import { ZONES, ZONE_LIST, zoneById, zoneBox, zoneRects, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
+import { ZONES, zoneById, zoneBox, zoneRects, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { hitChance, evasionOf, ammoById, expectedDamage } from "@/lib/marketplace/ship-battle.js";
 
 // Spoils get their sprite, not a word. `+340 gold` as plain text is a receipt; a coin with a number on it is a
@@ -166,7 +166,6 @@ const MOTES = [
 ];
 const SPRAY = [[-26, -20], [-15, -30], [0, -34], [15, -30], [26, -20], [-20, -8], [20, -8]];
 const SPLINTERS = [-142, -108, -74, -38, -8, 22, 56, 92, 128, 162];
-const TAUGHT_KEY = "wd_ship_targets_seen";
 
 // ── THE SHIP BATTLE ──────────────────────────────────────────────────────────────────────────────────────────
 // You pick a PART of the ship in front of you and your whole broadside goes there. Three targets, marked on her
@@ -333,10 +332,14 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, sys, caps, targe
 // ── THE PANELS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Hull, canvas and guns per ship. The two systems are pips rather than numbers: the question they answer is
 // "has she anything left to shoot off", which is a shape.
-function Bar({ f, hp, max, side, sys, caps }) {
+function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
     const pct = clampPct(hp, max);
     const guns = sys?.guns || [];
     const gunsUp = guns.filter((h) => h > 0).length;
+    // Read off the SAME function the engine rolls against, so the panel cannot promise a dodge the fight does
+    // not honour.
+    const dodgePct = Math.round(evasionOf(sys?.sails ?? caps?.sails ?? 0) * 100);
+    const armorPct = Math.round((armor || 0) * 100);
     return (
         <div className={`sbt-panel sbt-panel-${side}${pct <= 25 ? " is-critical" : ""}`}>
             <div className="sbt-phead">
@@ -365,6 +368,24 @@ function Bar({ f, hp, max, side, sys, caps }) {
                     <Icon name="GiCannon" className="sbt-sysicon" />
                     <em>{gunsUp}/{guns.length || "–"}</em>
                 </span>
+                {/* DODGE — THE REASON TO SHOOT CANVAS. Sails do the least damage in the game by a wide margin,
+                    and the payoff for taking them is that this number falls and every shot after it lands more
+                    often. That payoff was completely invisible: you spent your worst damage on faith. Now it
+                    is a number on her card that drops as her canvas goes, which is the argument for aiming
+                    there, made without making it. */}
+                <span className={`sbt-syschip is-dodge${dodgePct <= 5 ? " is-out" : ""}`} title="How often a ball misses her — canvas keeps her dodging">
+                    <Icon name="GiSpeedometer" className="sbt-sysicon" />
+                    <em>{dodgePct}%</em>
+                </span>
+                {/* ARMOUR, at last on screen. Up to 28% off every ball that lands, modified by what the shot is
+                    made of, and never once shown — so the whole grape-versus-explosive decision was being made
+                    against a stat that did not appear anywhere in the game. */}
+                {armorPct > 0 ? (
+                    <span className="sbt-syschip is-armor" title="Plate — takes a bite out of every ball that lands">
+                        <Icon name="GiShield" className="sbt-sysicon" />
+                        <em>{armorPct}%</em>
+                    </span>
+                ) : null}
             </div>
         </div>
     );
@@ -462,7 +483,6 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     // it is opt-in — one extra tap per gun you want doing something else.
     const [aim, setAim] = useState([]);             // [{ gun, zone, target, ammo }]
     const [ammo, setAmmo] = useState(battle?.loadout || "round");
-    const [taught, setTaught] = useState(true);
 
     const stageRef = useRef(null);
     const meHullRef = useRef(null);
@@ -562,15 +582,6 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         });
     }, [targets]);
 
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        try { setTaught(window.localStorage.getItem(TAUGHT_KEY) === "1"); } catch { setTaught(true); }
-    }, []);
-    const dismissTeach = useCallback(() => {
-        setTaught(true);
-        try { window.localStorage.setItem(TAUGHT_KEY, "1"); } catch { /* private mode */ }
-    }, []);
-
     // Every marker, plus the number of guns that will fire at it — followers included. Computed here rather
     // than in Ship so the ring, the chip and the read-out all agree on one count.
     const markers = useMemo(() => targets.map((t) => ({ ...t, laid: gunsAt(t.zone, t.target) })), [targets, gunsAt]);
@@ -610,8 +621,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         if (nextGun == null) return;   // every gun is already laid
         setAim((list) => [...list, { gun: nextGun, zone: t.zone, target: t.target, ammo }]);
         sfxPick();
-        if (!taught) dismissTeach();
-    }, [phase, busy, battle?.over, nextGun, ammo, taught, dismissTeach]);
+    }, [phase, busy, battle?.over, nextGun, ammo]);
 
     /** Take a gun back off its target. The gun rail is the undo. */
     const clearGun = useCallback((gun) => {
@@ -761,13 +771,15 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
             </div>
 
             <div className="sbt-hud">
-                <Bar f={me} hp={myHp} max={battle?.myMax} side="me" sys={battle?.sys?.me} caps={caps} />
+                <Bar f={me} hp={myHp} max={battle?.myMax} side="me" sys={battle?.sys?.me} caps={caps}
+                    armor={battle?.stats?.me?.armor || 0} />
                 <div className="sbt-round">
                     {/* The round you are IN, not the one you just fought — `round` counts exchanges resolved. */}
                     <b>Round {(battle?.round || 0) + (phase === "play" ? 0 : 1)}</b>
                     <em>{battle?.gauge === "me" ? "you fire first" : "they fire first"}</em>
                 </div>
-                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps} />
+                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps}
+                    armor={battle?.stats?.foe?.armor || 0} />
             </div>
 
             <div className={`sbt-chrome${logOpen ? " is-open" : ""}`}>
@@ -926,6 +938,19 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                                     title={a ? `Gun ${g + 1} — ${at?.name || a.zone}` : `Gun ${g + 1} — not laid yet`}>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src="/images/sailing/deck-cannon.png" alt="" draggable="false" />
+                                    {/* WHERE THIS BARREL IS POINTED. Splitting the broadside is the whole point
+                                        of the feature and the rail was six identical icons — the assignment
+                                        existed, on a `title` tooltip, which is nothing at all on a phone. The
+                                        part's own sprite under each pip means you read your plan off the rail
+                                        instead of remembering what you tapped. */}
+                                    {a ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img className="sbt-gunpip-at" src={PART_ART[a.zone]} alt=""
+                                            style={{ "--tint": at?.tint || "#ffd28a" }} draggable="false" />
+                                    ) : null}
+                                    {a && a.zone === "guns" && a.target != null ? (
+                                        <span className="sbt-gunpip-n">{a.target + 1}</span>
+                                    ) : null}
                                 </button>
                             );
                         })}
@@ -943,23 +968,14 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                 </div>
             ) : null}
 
-            {/* THE ONE-TIME EXPLANATION. Three sentences, once, on the first fight — the markers carry their own
-                odds and the bar names what each does, so this only has to say that the ship IS the control. */}
-            {!taught && phase === "aim" && !battle?.over ? (
-                <div className="sbt-teach" role="note">
-                    <b>Aim your broadside</b>
-                    <p>Tap a part of her ship. Every gun you own fires at it.</p>
-                    <ul>
-                        {ZONE_LIST.map((z) => (
-                            <li key={z.id} style={{ "--tint": z.tint }}>
-                                <Icon name={z.icon} /><b>{z.name}</b><span>{z.effect}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    <button type="button" onClick={dismissTeach}>Got it</button>
-                </div>
-            ) : null}
-
+            {/* THE ONE-TIME EXPLANATION IS GONE. It appeared on the first fight, before the player had any
+                context to attach it to, and never again — so the round they actually wondered what canvas was
+                for was a round it could not help them. It had also gone stale: "Every gun you own fires at it"
+                stopped being true the day the broadside could be split.
+                What replaced it is the screen itself. The read-out names the part and what it does, and now
+                carries the odds AND the damage, both of which move when the ammunition changes. Her card shows
+                the dodge that canvas is protecting and the plate a ball has to get through. The rail shows
+                where every barrel is pointed. Nothing needs to be read once and remembered. */}
             {phase === "intro" ? (
                 <div className="sbt-intro">
                     <div className="sbt-intro-tag">{foe.boss ? "FLAGSHIP" : "SHIP BATTLE"}</div>

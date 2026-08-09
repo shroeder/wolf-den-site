@@ -14069,21 +14069,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Shown on the first fight and never again. The markers carry the odds and the bar names the effect, so this
    only has to say that the ship itself is the control. */
 /* Over the SKY, not over the ships. Anchored to the bottom it sat on top of the hull it was describing. */
-.sbt-teach { position: absolute; left: 50%; transform: translateX(-50%); z-index: 30;
-    top: calc(env(safe-area-inset-top, 0px) + 148px); width: min(92vw, 400px);
-    padding: 12px 14px; border-radius: 14px; background: rgba(8,16,26,0.97);
-    border: 1px solid rgba(255,214,140,0.28); box-shadow: 0 14px 40px rgba(0,0,0,0.6);
-    animation: sbtTeachIn 0.2s ease-out both; }
 @keyframes sbtTeachIn { from { transform: translate(-50%, 12px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-.sbt-teach > b { display: block; color: #ffd75e; font-size: 0.95rem; }
-.sbt-teach > p { margin: 3px 0 8px; font-size: 0.78rem; color: #c3d3e2; }
-.sbt-teach ul { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
-.sbt-teach li { display: grid; grid-template-columns: 20px auto 1fr; align-items: center; gap: 7px;
-    font-size: 0.74rem; color: #b8c8d8; }
-.sbt-teach li svg { color: var(--tint, #ffd28a); font-size: 1.05rem; }
-.sbt-teach li b { color: var(--tint, #ffd28a); }
-.sbt-teach button { width: 100%; padding: 8px; border-radius: 10px; font-weight: 800; font-size: 0.8rem;
-    background: linear-gradient(180deg, #ffb347, #e0761c); color: #2a1400; }
 
 /* Phones: the bar must never eat the stage, so it stays compact and the ships lift clear of it. */
 @media (max-width: 520px) {
@@ -14455,3 +14441,24 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-read-nums { display: grid; justify-items: end; gap: 1px; line-height: 1; }
 .sbt-expect { font-size: 0.82rem; font-weight: 800; color: #ffd28a; font-variant-numeric: tabular-nums; }
 .sbt-expect i { font-style: normal; font-size: 0.62em; letter-spacing: 0.08em; color: #b9a07a; margin-left: 2px; }
+
+/* WHERE EACH BARREL IS POINTED. Splitting the broadside is the point of the feature, and the rail was six
+   identical cannons — the assignment lived on a title tooltip, which is nothing on a phone. Each laid pip now
+   carries the sprite of the part it is trained on, so the plan is read off the rail rather than remembered. */
+.sbt-gunpip { position: relative; overflow: visible; }
+.sbt-gunpip-at { position: absolute; right: -3px; bottom: -3px; width: 15px; height: 15px; object-fit: contain;
+    border-radius: 50%; padding: 1px; background: rgba(6,12,20,0.92);
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tint, #ffd28a) 75%, transparent), 0 2px 5px rgba(0,0,0,0.6); }
+/* Which cannon, when it is trained on one of hers — a battery is six identical targets otherwise. */
+.sbt-gunpip-n { position: absolute; left: -3px; bottom: -3px; min-width: 13px; height: 13px; padding: 0 2px;
+    border-radius: 999px; background: var(--tint, #ffd28a); color: #1b1004;
+    font-size: 9px; font-weight: 900; line-height: 13px; text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.55); }
+
+/* DODGE and ARMOUR on the ship card. Both were real and neither was ever on screen: canvas has always driven
+   how often a ball misses her, and plate has always taken a bite out of every one that lands. Shown as chips
+   beside the sails and guns they belong to, so shredding her canvas visibly drops the dodge — which is the
+   entire argument for spending your worst damage there, made by watching it rather than by being told. */
+.sbt-syschip.is-dodge em { color: #8fd3ff; }
+.sbt-syschip.is-armor em { color: #cbb79a; }
+.sbt-syschip.is-dodge, .sbt-syschip.is-armor { font-variant-numeric: tabular-nums; }
