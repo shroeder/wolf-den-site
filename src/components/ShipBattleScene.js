@@ -390,10 +390,17 @@ function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
                     <em>{f?.cls || (f?.level != null ? `boat level ${f.level}` : "")}</em>
                 </div>
             </div>
-            <div className="sbt-hpbar">
-                <span className="sbt-hpghost" style={{ width: `${pct}%` }} />
-                <span className={`sbt-hpfill is-${side}${pct <= 25 ? " is-low" : ""}`} style={{ width: `${pct}%` }} />
-                <b className="sbt-hpnum">{Math.max(0, Math.round(hp))} / {max}</b>
+            {/* THE HULL IS PLANKS. It was a draining bar with "294 / 341" on it — a number nobody can hold in
+                their head, in units that meant nothing next to six sails and four hits a cannon. A hull is
+                counted in hits now and drawn as the thing being hit: a run of timber, one plank a hit. The
+                ones still standing are oak; the ones staved in are the dark hole they left, so you read what
+                you have LEFT and what she has ALREADY TAKEN in the same glance — which a bar never showed. */}
+            <div className="sbt-planks" title={`${Math.max(0, Math.round(hp))} of ${max} planks holding`}>
+                {Array.from({ length: Math.max(1, max) }).map((_, i) => (
+                    <i key={i} className={`sbt-plank${i < Math.max(0, Math.round(hp)) ? " is-up" : " is-gone"}`}
+                        style={{ "--i": i }} />
+                ))}
+                <b className="sbt-plank-count">{Math.max(0, Math.round(hp))}<em>/{max}</em></b>
             </div>
             <div className="sbt-sys">
                 <span className={`sbt-syschip${(sys?.sails ?? 1) <= 0 ? " is-out" : ""}`} title="Canvas — what keeps her dodging">

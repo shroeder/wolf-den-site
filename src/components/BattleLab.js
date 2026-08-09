@@ -91,7 +91,7 @@ export default function BattleLab() {
     // The yard against fixture state, so the gun deck and the ladder can be looked at without a database.
     const combat = {
         doubloons: 240,
-        ship: { guns: 11, accuracy: 79, hp: 320, armor: 14, boatLevel: 25 },
+        ship: { guns: 11, accuracy: 79, hp: 14, armor: 14, boatLevel: 25 },
         tracks: [
             { key: "guns", name: "Cannons", icon: "GiCannon", desc: "More barrels in the broadside — every gun is another roll to hit.", level: 4, max: 8, maxed: false, cost: 66 },
             { key: "gunnery", name: "Gunnery", icon: "GiTargeting", desc: "A drilled crew lays the guns truer — better accuracy, and more raking hits.", level: 4, max: 8, maxed: false, cost: 66 },

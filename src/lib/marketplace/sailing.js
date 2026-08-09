@@ -14,7 +14,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, rakeFor, hullFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
+         gunsFor, accuracyFor, rakeFor, hullHitsFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -1762,9 +1762,9 @@ function combatView(row, boatLevel, consumableArt = {}) {
         // whose whole job is to let you decide what to buy next.
         ship: {
             guns: gunsFor(gun),
-            hullGrade: hullGrade(hullFor(hull, boatLevel)),
+            hullGrade: hullGrade(hullHitsFor(hull)),
             accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
-            hp: hullFor(hull, boatLevel),
+            hp: hullHitsFor(hull),
             armor: Math.round(armorFor(hull) * 100),
             boatLevel,
         },
@@ -1780,7 +1780,7 @@ function combatView(row, boatLevel, consumableArt = {}) {
                     // find out what a level of Gunnery had bought you was to open a battle and squint at it.
                     effect: t.key === "guns" ? `${gunsFor(level)} guns`
                         : t.key === "gunnery" ? `${Math.round(accuracyFor(level, boatLevel) * 100)}% to hit · ${Math.round(rakeFor(level) * 100)}% rake`
-                        : `${hullFor(level, boatLevel)} hit points · ${Math.round(armorFor(level) * 100)}% armour`,
+                        : `${hullHitsFor(level)} hits to sink · ${Math.round(armorFor(level) * 100)}% armour`,
                 };
             }),
             // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
@@ -2141,7 +2141,7 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myArmour) {
     }));
     for (const r of rivals) {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
-        const guns = gunsFor(r.gun_level || 0), hull = hullFor(r.hull_level || 0, level);
+        const guns = gunsFor(r.gun_level || 0), hull = hullHitsFor(r.hull_level || 0);
         all.push({
             kind: "rival", id: r.id, boost: RIVAL_WEIGHT,
             d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level), armor: armorFor(r.hull_level || 0) })),
@@ -2169,7 +2169,7 @@ export async function doBattle(buyerId) {
     const extras = await equippedRaidExtras(buyerId);
     if (raidsUsedToday(row) >= raidsPerDay(myLevel, extras.bonusRaids)) return { ok: false, error: "no_battles", ...(await getSailingState(buyerId)) };
 
-    const myGuns = gunsFor(row?.gun_level || 0), myHull = hullFor(row?.hull_level || 0, myLevel);
+    const myGuns = gunsFor(row?.gun_level || 0), myHull = hullHitsFor(row?.hull_level || 0);
     const match = await matchOpponent(buyerId, myGuns, myHull,
         accuracyFor(row?.gunnery_level || 0, myLevel), armorFor(row?.hull_level || 0));
     return match.kind === "rival" ? doRaid(buyerId, match.id) : doFleetBattle(buyerId, match.rank);

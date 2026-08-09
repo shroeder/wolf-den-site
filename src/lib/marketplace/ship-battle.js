@@ -43,22 +43,24 @@ export const AMMO = {
     round: {
         id: "round", name: "Round Shot", basic: true, price: 0,
         icon: "GiCannonBall", blurb: "Solid iron, and you never run out.",
-        dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {},
+        dmg: 1, accuracy: 0, armorPierce: 0, rakeBonus: 0, sys: {}, hull: 0,
     },
     chain: {
         id: "chain", name: "Chain Shot", basic: false, price: 3,
         icon: "GiChainedHeart", blurb: "Shreds canvas — takes a whole suit of sails at once.",
-        dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 },
+        // Light against timber: it is rigging shot, and putting it into a hull is a wasted round.
+        dmg: 0.75, accuracy: 0.05, armorPierce: 0, rakeBonus: 0, sys: { sails: 2 }, hull: 0,
     },
     grape: {
         id: "grape", name: "Grapeshot", basic: false, price: 3,
         icon: "GiCannonShot", blurb: "Dismounts cannons. Armour stops it dead.",
-        dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 },   // counts double on a gun deck
+        dmg: 1.15, accuracy: 0.12, armorPierce: -0.5, rakeBonus: 0.08, sys: { guns: 1 }, hull: 0,   // counts double on a gun deck
     },
     explosive: {
         id: "explosive", name: "Explosive Shell", basic: false, price: 6,
         icon: "GiBurningEmbers", blurb: "Wild off the muzzle, but it goes through plate.",
-        dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {},
+        // The only round that staves in TWO planks at once, and the only one that gets through plate.
+        dmg: 1.45, accuracy: -0.14, armorPierce: 0.35, rakeBonus: 0.05, sys: {}, hull: 1,
     },
 };
 export const AMMO_LIST = Object.values(AMMO);
@@ -117,27 +119,36 @@ export const rakeFor = (gunneryLevel = 0) => Math.min(0.35, 0.06 + Math.max(0, g
 // with 264 hit points against a level-1's 120. Boat level is the BASE now (+9 a level) and the Hull track is
 // what you buy on top, which is the shape the two things actually have: the boat is how much ship there is,
 // the track is how well it is armoured.
-export const hullFor = (hullLevel = 0, boatLevel = 1) =>
-    90 + Math.max(1, boatLevel) * 9 + Math.max(0, hullLevel) * 26;
+// A HULL IS COUNTED IN HITS, like her canvas and her guns.
+//
+// It used to be hit points — 90 + 9 a boat level + 26 a hull level, so 419 at level 25 — and the whole fight
+// was one bar draining by numbers nobody could hold in their head. Every other part of a ship was already
+// counted in HITS: six for a suit of sails, four for a cannon. The hull is planks, and planks stave in one at
+// a time, so it is counted the same way.
+//
+// Ten planks to start and one more per level of the Hull track: 10 at the beginning, 18 fully plated. BOAT
+// LEVEL NO LONGER TOUCHES IT — a bigger ship is not a tougher one, it carries more guns. That was the change
+// that made hull the only stat that scaled and quietly turned late fights into slugging matches.
+export const HULL_BASE_HITS = 10;
+export const hullHitsFor = (hullLevel = 0) => HULL_BASE_HITS + Math.max(0, hullLevel);
 
 // ── HOW HEAVY A SHIP IS, AT A GLANCE ─────────────────────────────────────────────────────────────────────────
 // Five grades with their own art, so a ship's hull is something you SEE on the row rather than a number you
 // have to hold two of and compare. Thresholds sit on the fleet's own spine — grade 3 is roughly where the
 // mid-fleet lives, grade 5 is flagship weight.
+// Read off PLANKS now: 10 bare, 18 fully plated, so the bands are two apart rather than a hundred and fifty.
 export const HULL_GRADES = [
-    { grade: 1, name: "Timber", max: 179, blurb: "Bare planking. It floats." },
-    { grade: 2, name: "Reinforced", max: 299, blurb: "Doubled frames and a strake of oak." },
-    { grade: 3, name: "Iron-bound", max: 449, blurb: "Iron banding at the waterline." },
-    { grade: 4, name: "Plated", max: 649, blurb: "Plate over oak. Shot bounces." },
+    { grade: 1, name: "Timber", max: 11, blurb: "Bare planking. It floats." },
+    { grade: 2, name: "Reinforced", max: 13, blurb: "Doubled frames and a strake of oak." },
+    { grade: 3, name: "Iron-bound", max: 15, blurb: "Iron banding at the waterline." },
+    { grade: 4, name: "Plated", max: 17, blurb: "Plate over oak. Shot bounces." },
     { grade: 5, name: "Ironclad", max: Infinity, blurb: "A fortress that happens to float." },
 ];
-export const hullGrade = (hp = 0) => HULL_GRADES.find((g) => hp <= g.max) || HULL_GRADES[HULL_GRADES.length - 1];
+export const hullGrade = (hits = 0) => HULL_GRADES.find((g) => hits <= g.max) || HULL_GRADES[HULL_GRADES.length - 1];
 
 // Armour: a flat fraction off every ball that lands, before ammunition's piercing is applied.
 export const armorFor = (hullLevel = 0) => Math.min(0.4, Math.max(0, hullLevel) * 0.035);
 
-// Damage one ball does before armour. Guns are the count, not the calibre — calibre is the ammunition.
-const SHOT_MIN = 5, SHOT_VAR = 9;
 
 // WHAT THIS SHOT WOULD DO, on average, before the dice.
 //
@@ -145,12 +156,14 @@ const SHOT_MIN = 5, SHOT_VAR = 9;
 // predicts with the engine's formula rather than a second copy that can drift. This exists so the read-out
 // can put a damage number next to the hit chance: change the ammunition and BOTH move, which is how a player
 // discovers that grape is punished by armour and explosive eats through it. Nothing has to say so in words.
-export const AVG_SHOT = SHOT_MIN + SHOT_VAR / 2;
 export function expectedDamage(att, def, zone, ammo) {
     if (!zone || !ammo) return 0;
-    const base = AVG_SHOT * (ammo.dmg || 1) * (att?.dmgMult ?? 1) * (zone.dmg || 1);
-    const armor = Math.max(0, (def?.armor || 0) * (1 - (ammo.armorPierce || 0)));
-    return Math.max(1, Math.round(base * (1 - armor) * (def?.dmgTaken ?? 1)));
+    // Only timber is counted in planks; a shot into canvas or a gun deck is measured by what it WRECKS, which
+    // the marker already shows, so the read-out reports zero hull damage for it rather than a misleading one.
+    if (zone.sys) return 0;
+    const raw = 1 + (ammo.hull || 0) + (att?.rake || 0);              // rake is a chance, so it averages in
+    const glance = Math.max(0, Math.min(0.9, (def?.armor || 0) * (1 - (ammo.armorPierce || 0))));
+    return Math.max(0, Math.round(raw * (1 - glance) * (def?.dmgTaken ?? 1) * 10) / 10);
 }
 
 // ── THE TWO THINGS THAT ARE NOT HIT POINTS ───────────────────────────────────────────────────────────────────
@@ -182,7 +195,7 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
         guns: gunsFor(gunLevel),
         accuracy: accuracyFor(gunneryLevel, boatLevel),
         rake: rakeFor(gunneryLevel),
-        hp: hullFor(hullLevel, boatLevel),
+        hp: hullHitsFor(hullLevel),
         armor: armorFor(hullLevel),
         ammo: ammoById(ammo),
         // Broadside adds damage, Ironclad takes it off what lands. Both are sea affinity, unchanged.
@@ -201,7 +214,11 @@ export function foeProfile(foe) {
         guns: foe?.guns || 4,
         accuracy: Math.min(0.96, (foe?.accuracy ?? 0.6) + 0.1),
         rake: foe?.rake ?? 0.08,
-        hp: foe?.hp || 140,
+        // PLANKS, NOT HIT POINTS. The fleet catalogue still carries designed hp values (78 at rank 1 up past
+        // 600) from when a hull was a bar; a ship is counted in planks now, so the ladder is derived from its
+        // RANK instead — 6 at the bottom, 20 at the top, against a player who runs 10 bare and 18 plated.
+        // A rival captain arrives with `hits` already worked out from their own Hull track.
+        hp: foe?.hits ?? (foe?.rank ? Math.max(5, Math.min(22, 5 + Number(foe.rank))) : 10),
         armor: foe?.armor ?? 0.05,
         ammo: ammoById(foe?.ammo || "round"),
         dmgMult: 1,
@@ -252,7 +269,9 @@ export function initBattleState(me, foe, { rng = Math.random } = {}) {
     });
     // Who fires first, leaning to the lighter, handier ship.
     const myOdds = 0.5 + Math.max(-0.18, Math.min(0.18, (foe.guns - me.guns) * 0.02));
-    return { v: 3, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
+    // v4: `hp` counts PLANKS now, not hit points. A v3 state carries 419 in that field and would be read as
+    // four hundred planks, so those battles are dropped rather than migrated.
+    return { v: 4, round: 0, gauge: rng() < myOdds ? "me" : "foe", me: fresh(me), foe: fresh(foe) };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
@@ -392,13 +411,30 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             const chance = hitChance(att, zone, ammo, evasion);
             if (rng() > chance) { shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false, chance, evasion }); continue; }
             const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
-            let dmg = (SHOT_MIN + rng() * SHOT_VAR) * ammo.dmg * att.dmgMult * zone.dmg;
-            if (rake) dmg *= 1.8;
-            const armor = Math.max(0, def.armor * (1 - ammo.armorPierce));
-            dmg = Math.max(1, Math.round(dmg * (1 - armor) * def.dmgTaken));
+
+            // HOW MANY PLANKS THIS BALL STAVES IN.
+            //
+            // One, because it landed. One more if the round is built for timber (explosive). One more again
+            // for a rake — a ball down the length of her deck instead of into her side, which used to be a
+            // 1.8x on a damage number and is now the extra plank it always meant.
+            //
+            // ARMOUR IS A GLANCE, NOT A FRACTION. You cannot take 14% off a plank. Each hit rolls against her
+            // plate and a shot that loses is turned aside — so armour reads as "some of your shots do not
+            // count", which is what plate does, and the ammunition's pierce moves that roll. A shot always
+            // does at least something if any part of it gets through; a fully-glanced shot does nothing,
+            // which is the risk grape takes against a plated hull.
+            let hits = 1 + (ammo.hull || 0) + (rake ? 1 : 0);
+            const glance = Math.max(0, Math.min(0.9, (def.armor || 0) * (1 - ammo.armorPierce)));
+            let turned = 0;
+            for (let h = 0; h < hits; h += 1) if (rng() < glance) turned += 1;
+            hits = Math.max(0, hits - turned);
+            // Sea affinity's Ironclad used to scale a damage number; here it is one more chance to shrug.
+            if (hits > 0 && def.dmgTaken < 1 && rng() > def.dmgTaken) hits -= 1;
+
+            const dmg = hits;   // the event log and the recap both count in planks now
             total += dmg;
-            theirSide.hp = Math.max(0, theirSide.hp - dmg);
-            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, rake, chance, evasion };
+            theirSide.hp = Math.max(0, theirSide.hp - hits);
+            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits, glanced: turned > 0 && hits === 0, rake, chance, evasion };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
             // is especially good at — which is where chain and grape earn their price. Round shot is never
@@ -460,6 +496,7 @@ export const MAX_ROUNDS = null;
 // which is a thing you can reason about. Equal ships give 0.5, and the number means what it says.
 export function matchupOdds({ myGuns = 4, myHull = 140, myAcc = 0.7, myArmor = 0,
                               guns = 4, hull = 140, acc = 0.7, armor = 0 } = {}) {
+    // Now in planks a round rather than damage a round — same arithmetic, honest units.
     const myDps = Math.max(0.1, myGuns * myAcc * (1 - armor));
     const theirDps = Math.max(0.1, guns * acc * (1 - myArmor));
     const roundsIneed = hull / myDps;
