@@ -14422,8 +14422,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    beside the sails and guns they belong to, so shredding her canvas visibly drops the dodge — which is the
    entire argument for spending your worst damage there, made by watching it rather than by being told. */
 .sbt-syschip.is-dodge em { color: #8fd3ff; }
-.sbt-syschip.is-armor em { color: #cbb79a; }
-.sbt-syschip.is-dodge, .sbt-syschip.is-armor { font-variant-numeric: tabular-nums; }
+.sbt-syschip.is-dodge { font-variant-numeric: tabular-nums; }
 
 /* A board row that is also a door — the farm board lists places you can go and look at, so its rows link. */
 .lb-row.is-link { text-decoration: none; color: inherit; cursor: pointer; transition: background .14s ease, transform .14s ease; }
@@ -14961,7 +14960,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     text-transform: uppercase; color: #9aa2ab; }
 .sbt-syschip > em { margin-left: auto; font-style: normal; font-size: 0.76rem; font-weight: 900; }
 .sbt-syschip.is-dodge > em { color: #63c8ef; }
-.sbt-syschip.is-armor > em { color: #e8dcc6; }
 
 /* The painting is dark now — the old veil was tuned for a bright golden sunset and just made this muddy. */
 .sbt-seaveil { background:

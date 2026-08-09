@@ -420,12 +420,11 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
 // ── THE PANELS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Hull, canvas and guns per ship. The two systems are pips rather than numbers: the question they answer is
 // "has she anything left to shoot off", which is a shape.
-function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
+function Bar({ f, hp, max, side, sys, caps }) {
     const pct = clampPct(hp, max);
     // Read off the SAME function the engine rolls against, so the panel cannot promise a dodge the fight does
     // not honour.
     const dodgePct = Math.round(evasionOf(sys?.sails ?? caps?.sails ?? 0) * 100);
-    const armorPct = Math.round((armor || 0) * 100);
     return (
         <div className={`sbt-panel sbt-panel-${side}${pct <= 25 ? " is-critical" : ""}`}>
             <div className="sbt-phead">
@@ -461,17 +460,9 @@ function Bar({ f, hp, max, side, sys, caps, armor = 0 }) {
                     <span className="sbt-syslabel">Dodge</span>
                     <em>{dodgePct}%</em>
                 </span>
-                {/* ARMOUR, at last on screen. Up to 28% off every ball that lands, modified by what the shot is
-                    made of, and never once shown — so the whole grape-versus-explosive decision was being made
-                    against a stat that did not appear anywhere in the game. */}
-                {armorPct > 0 ? (
-                    <span className="sbt-syschip is-armor" title="Plate — takes a bite out of every ball that lands">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src="/images/bonus/ironclad.png" alt="" className="sbt-sysart" draggable="false" />
-                        <span className="sbt-syslabel">Armour</span>
-                        <em>{armorPct}%</em>
-                    </span>
-                ) : null}
+                {/* ARMOUR IS GONE. It was a percentage on a card that quietly turned aside balls you had
+                    already earned — a hit that did nothing. A ball that lands is a plank now, so there is
+                    nothing here to show. */}
             </div>
         </div>
     );
@@ -613,7 +604,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         const mirror = Boolean(foe?.mirror);
         const evasion = evasionOf(foeSys?.sails ?? caps?.sails ?? 4);
         const att = { accuracy: battle.myAccuracy ?? 0.7, dmgMult: battle.stats?.me?.dmgMult ?? 1 };
-        const def = battle.stats?.foe || { armor: 0, dmgTaken: 1 };
+        const def = battle.stats?.foe || { dmgTaken: 1 };
         const shot = ammoById(ammo);
         const out = [];
         // THE RIGGING IS NOT THE SAILS. zoneBox returns the extent of every lit pixel in the zone, and a topmast
@@ -924,8 +915,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
             </div>
 
             <div className="sbt-hud">
-                <Bar f={me} hp={myHp} max={battle?.myMax} side="me" sys={battle?.sys?.me} caps={caps}
-                    armor={battle?.stats?.me?.armor || 0} />
+                <Bar f={me} hp={myHp} max={battle?.myMax} side="me" sys={battle?.sys?.me} caps={caps} />
                 <div className="sbt-round">
                     {/* The round you are IN, not the one you just fought — `round` counts exchanges resolved. */}
                     <b>Round {(battle?.round || 0) + (phase === "play" ? 0 : 1)}</b>
@@ -937,8 +927,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                     {/* Nothing here any more: you fire first in every fight, including one already in
                         progress, so there is no order left to announce. */}
                 </div>
-                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps}
-                    armor={battle?.stats?.foe?.armor || 0} />
+                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps} />
             </div>
 
             <div className={`sbt-chrome${logOpen ? " is-open" : ""}`}>
@@ -1053,10 +1042,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                                 : "Tap a part of her ship — one gun each tap."}</em>
                         </div>
                         {/* TWO NUMBERS, BOTH LIVE. The odds moved with the ammunition already; the damage
-                            never did, so half of every ammunition decision was invisible. Now switching to
-                            explosive drops the percentage and lifts the damage in the same glance, and grape
-                            into a plated hull visibly loses — which is the armour system explaining itself
-                            without a word about armour. */}
+                            never did, so half of every ammunition decision was invisible. Switching to
+                            explosive drops the percentage and lifts the damage in the same glance, which is
+                            the whole trade, shown rather than described. */}
                         {picked ? (
                             <span className="sbt-read-nums">
                                 <span className="sbt-odds">{Math.round(picked.chance * 100)}%</span>

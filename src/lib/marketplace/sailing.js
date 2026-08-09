@@ -14,7 +14,7 @@ import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
-         gunsFor, accuracyFor, rakeFor, hullHitsFor, armorFor, initBattleState, resolveVolley, sanitizeAims,
+         gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -1765,7 +1765,6 @@ function combatView(row, boatLevel, consumableArt = {}) {
             hullGrade: hullGrade(hullHitsFor(hull)),
             accuracy: Math.round(accuracyFor(gunnery, boatLevel) * 100),
             hp: hullHitsFor(hull),
-            armor: Math.round(armorFor(hull) * 100),
             boatLevel,
         },
         tracks: [
@@ -1780,7 +1779,7 @@ function combatView(row, boatLevel, consumableArt = {}) {
                     // find out what a level of Gunnery had bought you was to open a battle and squint at it.
                     effect: t.key === "guns" ? `${gunsFor(level)} guns`
                         : t.key === "gunnery" ? `${Math.round(accuracyFor(level, boatLevel) * 100)}% to hit · ${Math.round(rakeFor(level) * 100)}% rake`
-                        : `${hullHitsFor(level)} hits to sink · ${Math.round(armorFor(level) * 100)}% armour`,
+                        : `${hullHitsFor(level)} planks to shoot away`,
                 };
             }),
             // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
@@ -1941,16 +1940,14 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     // held on the state, so what you are shown is the order she will actually fire — not a guess, and not a
     // second roll that could disagree with the one that resolves.
     theirNext: Array.isArray(st.theirNext) ? st.theirNext : null,
-    // ARMOUR AND THE DAMAGE MULTIPLIERS, so the aiming screen can predict what a shot would do rather than
-    // only how likely it is to land. Armour existed and was doing real work — up to 28% off every ball from
-    // the Hull track, modified per ammunition by its pierce — and had never once appeared on screen, so the
-    // whole grape-versus-explosive decision was being made against a stat the player could not see.
+    // The damage multipliers, so the aiming screen can predict what a shot would do. Armour used to live here
+    // too and is gone: a ball that lands is a plank, full stop.
     stats: (() => {
         const mine = shipProfile(meta.meProfile || {});
         const theirs = meta.foe || {};
         return {
-            me: { armor: mine.armor || 0, dmgMult: mine.dmgMult ?? 1, dmgTaken: mine.dmgTaken ?? 1 },
-            foe: { armor: theirs.armor ?? 0.05, dmgMult: 1, dmgTaken: 1 },
+            me: { dmgMult: mine.dmgMult ?? 1, dmgTaken: mine.dmgTaken ?? 1 },
+            foe: { dmgMult: 1, dmgTaken: 1 },
         };
     })(),
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
@@ -2113,7 +2110,7 @@ export async function shipBattleVolley(buyerId, aim) {
 //
 // "Your own size" is NOT the rank a ship resembles. That was the first attempt and it was measured wrong:
 // fleetRankForShip matches on raw guns and hull, but a designed pirate of the same size also carries better
-// gunnery and armour, so an "equal" match was one a plain broadside won 2% of the time. The sim said a mid
+// gunnery, so an "equal" match was one a plain broadside won 2% of the time. The sim said a mid
 // build met its fair fight two rungs below its own number, and a fresh boat three.
 //
 // So the match is made on the ODDS instead — matchupOdds, the same read the opponent rows used to print on
@@ -2123,7 +2120,7 @@ const TARGET_ODDS = 0.56;   // a shade in your favour
 const SHORTLIST = 7;        // how many of the closest matches go in the hat
 const RIVAL_WEIGHT = 1.5;   // a real ship is a better story than a designed one, when there is one your size
 
-async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myArmour) {
+async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
     const rivals = await db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
@@ -2138,18 +2135,18 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy, myArmour) {
     // with rank 15 turning up as often as rank 2. Shortlisting the CLOSEST few and drawing from those is
     // fair wherever you stand, because it asks who is nearest rather than who is close.
     const dist = (o) => Math.abs(o - TARGET_ODDS);
-    const mine = { myGuns, myHull, myAcc: myAccuracy, myArmor: myArmour };
+    const mine = { myGuns, myHull, myAcc: myAccuracy };
     const all = FLEET.map((f) => ({
         kind: "fleet", rank: f.rank, boost: 1,
         // +0.1 on their accuracy, the same lift foeProfile gives a designed ship when it actually fights.
-        d: dist(matchupOdds({ ...mine, guns: f.guns, hull: f.hp, acc: Math.min(0.96, f.accuracy + 0.1), armor: f.armor })),
+        d: dist(matchupOdds({ ...mine, guns: f.guns, hull: f.hp, acc: Math.min(0.96, f.accuracy + 0.1) })),
     }));
     for (const r of rivals) {
         const level = boatLevelFromUpgrades(r.speed_level, r.luck_level, r.rarity_level, r.find_level, r.raid_level);
         const guns = gunsFor(r.gun_level || 0), hull = hullHitsFor(r.hull_level || 0);
         all.push({
             kind: "rival", id: r.id, boost: RIVAL_WEIGHT,
-            d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level), armor: armorFor(r.hull_level || 0) })),
+            d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level) })),
         });
     }
     all.sort((a, z) => a.d - z.d);
@@ -2176,7 +2173,7 @@ export async function doBattle(buyerId) {
 
     const myGuns = gunsFor(row?.gun_level || 0), myHull = hullHitsFor(row?.hull_level || 0);
     const match = await matchOpponent(buyerId, myGuns, myHull,
-        accuracyFor(row?.gunnery_level || 0, myLevel), armorFor(row?.hull_level || 0));
+        accuracyFor(row?.gunnery_level || 0, myLevel));
     return match.kind === "rival" ? doRaid(buyerId, match.id) : doFleetBattle(buyerId, match.rank);
 }
 
