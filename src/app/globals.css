@@ -14624,3 +14624,179 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The zone plaque is now just a meter and, once you commit, a count. Narrower to suit. */
 .sbt-plaque-body { min-width: 34px; }
 .sbt-plaque-body b { font-size: 0.78rem; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+   SHIP BATTLE — THE ART PASS
+   The screen had every piece of information it needed and looked like a debugger. Three things were doing
+   most of the damage: the targeting boxes were filled rounded rectangles the size of a mainsail, the sea was
+   a flat vertical gradient with no horizon and no distance, and the panels were laid out by accretion.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. RETICLES, NOT BOXES ──────────────────────────────────────────────────────────────────────────────
+   A big translucent rounded rect over her canvas reads as a selection highlight in an editor. Gunnery reads
+   as CORNER BRACKETS — the shape every game uses for "this is what I am pointed at" — so the part underneath
+   stays visible instead of being tinted over, and the ship keeps being the picture. */
+.sbt-target-skin {
+    --b: 13px;                  /* bracket arm length */
+    --t: 2px;                   /* bracket thickness  */
+    border: 0 !important;
+    background:
+        linear-gradient(var(--tint), var(--tint)) 0 0 / var(--b) var(--t) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 0 0 / var(--t) var(--b) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 100% 0 / var(--b) var(--t) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 100% 0 / var(--t) var(--b) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 0 100% / var(--b) var(--t) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 0 100% / var(--t) var(--b) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 100% 100% / var(--b) var(--t) no-repeat,
+        linear-gradient(var(--tint), var(--tint)) 100% 100% / var(--t) var(--b) no-repeat !important;
+    opacity: 0.55;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.8));
+    transition: opacity .16s ease, transform .16s ease, filter .16s ease;
+}
+.sbt-target:hover .sbt-target-skin, .sbt-target:focus-visible .sbt-target-skin { opacity: 1; transform: scale(1.02); }
+/* Committed: brackets go solid and pull IN a touch, the way a lock-on snaps. */
+.sbt-target.is-on .sbt-target-skin {
+    --b: 17px; --t: 3px;
+    opacity: 1; transform: scale(0.985);
+    filter: drop-shadow(0 0 7px var(--tint)) drop-shadow(0 0 3px rgba(0,0,0,0.9));
+    animation: none;
+}
+.sbt-target.is-dead .sbt-target-skin { opacity: 0.18; filter: none; }
+
+/* The count that rides on a locked part — small, dark, and out of the way of the ship. */
+.sbt-plaque { background: rgba(6,12,20,0.9); border: 1px solid color-mix(in srgb, var(--tint) 55%, transparent);
+    padding: 2px 7px; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.6); }
+.sbt-target.is-on .sbt-plaque { background: rgba(6,12,20,0.94); border-color: var(--tint); }
+.sbt-target.is-on .sbt-plaque b { color: var(--tint); }
+.sbt-plaque-hp { height: 4px; background: rgba(255,255,255,0.14); }
+.sbt-target.is-on .sbt-plaque-hp { background: rgba(0,0,0,0.5); }
+.sbt-target.is-on .sbt-plaque-hp i { background: var(--tint); }
+
+/* ── 2. A SEA WITH A HORIZON ─────────────────────────────────────────────────────────────────────────────
+   It was one vertical gradient, so there was no distance in the picture and the ships floated on a wall.
+   A horizon line, haze above it, and swell bands that widen as they come toward you: the water now recedes,
+   which is most of what makes two boats look like they are on an ocean rather than on a background. */
+.sbt-sky { inset: 0 0 62% 0;
+    background:
+        radial-gradient(90% 120% at 78% 100%, rgba(255,190,120,0.10), transparent 62%),
+        radial-gradient(120% 90% at 70% 6%, rgba(120,180,230,0.20), transparent 60%),
+        linear-gradient(180deg, #0a1826 0%, #12293d 62%, #1b3d56 100%); }
+/* The horizon itself: a bright hairline with haze sitting on it. */
+.sbt-sky::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 44px;
+    background: linear-gradient(180deg, transparent, rgba(150,200,235,0.16) 72%, rgba(190,220,245,0.30));
+    pointer-events: none; }
+.sbt-sea { inset: 38% 0 0 0;
+    background: linear-gradient(180deg, #17475f 0%, #0d3350 22%, #071a2a 78%, #04101b 100%);
+    box-shadow: inset 0 10px 22px -12px rgba(0,0,0,0.75); }
+/* Swell that widens toward the viewer — cheap perspective, and it stops the water reading as a flat panel. */
+.sbt-sea::after { opacity: 0.5;
+    background:
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 7px) 0 0 / 100% 26%,
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 14px) 0 26% / 100% 34%,
+        repeating-linear-gradient(180deg, rgba(255,255,255,0.045) 0 3px, transparent 3px 26px) 0 60% / 100% 40%; }
+/* A pool of moonlight down the middle so the eye has somewhere to sit. */
+.sbt-sea::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(52% 40% at 62% 8%, rgba(160,205,240,0.16), transparent 70%); }
+
+/* ── 3. THE STAT PANELS ──────────────────────────────────────────────────────────────────────────────────
+   `flex-wrap` was doing the layout, so four chips of different widths broke onto two or three ragged lines
+   and the two panels never matched each other — one read sails / guns+dodge / armour, the other something
+   else, changing shape as the fight went on. A fixed 2×2 grid: the panel is the same object all fight, and
+   the two captains are mirror images of one another. */
+.sbt-sys { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
+.sbt-panel-foe .sbt-sys { justify-content: initial; }
+.sbt-syschip { display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 4px 7px; border-radius: 9px; background: rgba(0,0,0,0.34);
+    border: 1px solid rgba(255,255,255,0.07); font-size: 0.68rem; font-weight: 700; }
+/* The canvas chip carries six pips, so it takes the full width rather than being crushed into a half. */
+.sbt-sys > .sbt-syschip:first-child { grid-column: 1 / -1; }
+.sbt-syschip.is-out { color: #ff8f7a; background: rgba(120,20,10,0.35); border-color: rgba(255,120,100,0.3); }
+
+/* The round marker between them was a third card competing with the two it sits between. Quieter: a plain
+   plate, the number as the loud part, the initiative underneath it as the note it is. */
+.sbt-round { align-self: center; text-align: center; padding: 7px 10px; border-radius: 12px;
+    background: rgba(10,18,28,0.7); border: 1px solid rgba(255,215,94,0.22); box-shadow: none; }
+.sbt-round b { font-size: 0.95rem; letter-spacing: 0.02em; text-shadow: 0 0 12px rgba(255,190,60,0.4); }
+.sbt-round em { font-size: 0.58rem; color: #8fa0b2; letter-spacing: 0.02em; }
+
+/* ── 4. THE BOTTOM BAR ───────────────────────────────────────────────────────────────────────────────────
+   The rail and the ammo row were running off the bottom edge of the phone and the FIRE button was a slab of
+   orange twice the weight of anything else on screen. Padded off the edge, and FIRE now uses the same gold
+   as every other primary in the game rather than inventing its own orange. */
+.sbt-aimbar { padding: 12px 12px calc(14px + env(safe-area-inset-bottom, 0px)); gap: 10px;
+    background: linear-gradient(180deg, rgba(8,14,22,0.86), rgba(6,11,18,0.97));
+    border-top: 1px solid rgba(255,215,94,0.16); }
+.sbt-fire { min-width: 132px; padding: 13px 18px; border-radius: 12px;
+    background: linear-gradient(135deg, #e6c76b, #d4af37 52%, #b8912e);
+    border: 1px solid rgba(255,215,94,0.55); color: #171008;
+    box-shadow: 0 4px 14px rgba(212,175,55,0.3); }
+.sbt-fire.is-ready { box-shadow: 0 6px 20px rgba(212,175,55,0.5); }
+.sbt-fire b { font-size: 1.1rem; letter-spacing: 0.09em; color: #171008; }
+.sbt-fire em { color: #4a3608; }
+.sbt-fire:disabled { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12);
+    color: #7d8794; box-shadow: none; }
+.sbt-fire:disabled b, .sbt-fire:disabled em { color: #7d8794; }
+.sbt-gunrail { padding-bottom: 2px; gap: 7px; flex-wrap: wrap; }
+
+/* ── 5. TIGHTENING ───────────────────────────────────────────────────────────────────────────────────────
+   Two rows, not three. Four chips in a 2-up grid left armour orphaned on a line of its own and the panel
+   changed height as guns were shot away. Canvas spans the top, the three single-value chips share the row
+   under it, and the panel is the same size from the first round to the last. */
+.sbt-sys { grid-template-columns: repeat(3, 1fr); }
+.sbt-sys > .sbt-syschip:first-child { grid-column: 1 / -1; }
+.sbt-syschip { padding: 4px 5px; font-size: 0.66rem; }
+
+/* The horizon sat at 38%, which left a third of the screen as empty sky between the buttons and the water.
+   Raised: more ocean, less dead air, and the ships get to sit further up in it. */
+.sbt-sky { inset: 0 0 74% 0; }
+.sbt-sky::after { height: 36px; }
+.sbt-sea { inset: 26% 0 0 0; }
+.sbt-ship-me { bottom: 12%; }
+.sbt-ship-foe { bottom: 38%; }
+@media (max-width: 520px) {
+    .sbt-ship-me { bottom: 11%; }
+    .sbt-ship-foe { bottom: 39%; }
+}
+
+/* ── 6. LET THE PANELS SHRINK ────────────────────────────────────────────────────────────────────────────
+   The three-across chip row made each panel's content wider than the column it lives in, and a grid child
+   defaults to min-width:auto — so instead of compressing, the panels pushed out: her armour chip ran off the
+   right edge and the round marker was overlapped by the card beside it. Letting them shrink is the whole
+   fix; the chips give up padding before the panel gives up its bounds. */
+.sbt-hud > * { min-width: 0; }
+.sbt-syschip { padding: 4px 3px; font-size: 0.63rem; min-width: 0; overflow: hidden; }
+.sbt-syschip em { overflow: hidden; text-overflow: ellipsis; }
+.sbt-sysicon { font-size: 0.78rem; flex: none; }
+.sbt-syschip i { flex: none; }
+/* Six pips at 5px plus gaps is 60px of fixed width in a chip that may only get 90 — shrink the pips too. */
+.sbt-sys > .sbt-syschip:first-child i { width: 4px; }
+/* The round marker is the narrowest thing in the row; stop it being the thing that gets squeezed. */
+.sbt-round { padding: 7px 8px; white-space: nowrap; }
+
+/* ── 7. THE ROUND MARKER COMES OUT OF THE ROW ────────────────────────────────────────────────────────────
+   `1fr auto 1fr` put a third panel between the two that matter, and on a 390px phone that left each captain
+   about 150px — not enough for three values, so they ellipsised to "6…", "2…", "1…". Numbers you cannot read
+   are worse than no numbers.
+
+   The round is not a third combatant. It comes out of the row and sits centred on the seam between the HUD
+   and the water, which is dead space anyway, and the two panels take half the screen each. */
+.sbt-hud { grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 10px 22px; }
+.sbt-round { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); z-index: 4;
+    align-self: auto; padding: 5px 12px; border-radius: 999px;
+    background: rgba(8,14,22,0.92); border: 1px solid rgba(255,215,94,0.3);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: flex; align-items: baseline; gap: 7px; }
+.sbt-round b { display: inline; font-size: 0.82rem; }
+.sbt-round em { display: inline; font-size: 0.6rem; }
+/* With the full half-width back, the chips can breathe and stop truncating. */
+.sbt-syschip { padding: 4px 6px; font-size: 0.67rem; }
+.sbt-sysicon { font-size: 0.82rem; }
+.sbt-sys > .sbt-syschip:first-child i { width: 5px; }
+
+/* ── 8. CHIPS SIZE TO THEIR CONTENT ──────────────────────────────────────────────────────────────────────
+   `repeat(3, 1fr)` forces three equal columns, so every chip got the width of the narrowest and "24%" came
+   out as "24…". They are not a table — they are three different-sized facts. Auto columns, spread across the
+   row: each takes exactly what it needs and nothing truncates. */
+.sbt-sys { grid-template-columns: repeat(3, auto); justify-content: space-between; gap: 4px; }
+.sbt-sys > .sbt-syschip:first-child { grid-column: 1 / -1; justify-content: flex-start; }
+.sbt-panel-foe .sbt-sys > .sbt-syschip:first-child { justify-content: flex-end; }
+.sbt-syschip { overflow: visible; white-space: nowrap; }
