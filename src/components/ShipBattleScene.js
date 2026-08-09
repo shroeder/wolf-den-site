@@ -1088,7 +1088,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                                 })}
                             </div>
                         ) : null}
-                        <button className="sail-cta" disabled={!ready} onClick={onClose}>{ready ? "Back to the helm ⚓" : "…"}</button>
+                        <button className="sail-cta" disabled={!ready} onClick={onClose}>{ready ? "Back to the helm" : "…"}</button>
                     </div>
                 </div>
             ) : null}
