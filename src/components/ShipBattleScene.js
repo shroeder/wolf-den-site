@@ -238,7 +238,7 @@ function PartChip({ zone, left, max, label = null }) {
 }
 
 // ── ONE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────────
-function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax = null, sys, caps, targets = null,
+function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys, caps, targets = null,
                 onPick = null, onUnpick = null, firing = false, hullRef = null }) {
     const ports = f?.ports || [];
     const key = shipKey(f);
@@ -255,7 +255,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
 
     return (
         <div className={`sbt-ship sbt-ship-${side}${hurt ? " is-hurt" : ""}${low ? " is-low" : ""}${sinking ? " is-sinking" : ""}${firing ? " is-firing" : ""}`}
-            style={{ "--deck": `${f?.deck ?? 30}%`, "--settle": `${Math.round((1 - Math.max(0, Math.min(1, hpFrac))) * 26)}px` }}>
+            style={{ "--deck": `${f?.deck ?? 30}%` }}>
             <div className="sbt-hull" ref={hullRef}>
                 {f?.art ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -995,13 +995,13 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                     <Ship f={me} side="me" hullRef={meHullRef}
                         hurt={hitFx?.side === "me"} heavy={Boolean(hitFx?.side === "me" && hitFx.heavy)}
                         low={clampPct(myHp, battle?.myMax) <= 25}
-                        sinking={sinkingSide === "me"} hpFrac={(myHp || 0) / Math.max(1, battle?.myMax || 1)}
+                        sinking={sinkingSide === "me"}
                         hp={myHp} hpMax={battle?.myMax}
                         sys={battle?.sys?.me} caps={caps} firing={firingSide === "me"} />
                     <Ship f={foe} side="foe" hullRef={foeHullRef}
                         hurt={hitFx?.side === "foe"} heavy={Boolean(hitFx?.side === "foe" && hitFx.heavy)}
                         low={clampPct(foeHp, battle?.foeMax) <= 25}
-                        sinking={sinkingSide === "foe"} hpFrac={(foeHp || 0) / Math.max(1, battle?.foeMax || 1)}
+                        sinking={sinkingSide === "foe"}
                         hp={foeHp} hpMax={battle?.foeMax}
                         sys={foeSys} caps={caps} firing={firingSide === "foe"}
                         targets={phase === "aim" && !battle?.over ? markers : null}

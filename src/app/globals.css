@@ -13089,11 +13089,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    other overlap in the middle and the bowsprit ends up inside the enemy's hull. */
 .sbt-ship-me { left: 0; }
 .sbt-ship-foe { right: 0; }
-/* --settle rides on the hull, so a ship low on health sits nearer the waterline. It is a translate rather
-   than a mask because the sea is a flat gradient here — sinking her INTO it would mean clipping the sprite
-   against a horizon that does not exist. Dropping her is the read that works. */
-.sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; transform: translateY(var(--settle, 0px));
-    transition: transform .5s ease; }
+/* THE SAG IS GONE. A hull used to be dropped toward the waterline in proportion to the damage on it, back
+   when damage was hundreds of hit points and the slide was gradual. A hull is a dozen planks now, so a
+   single volley moves it several pixels at once and the ship visibly JUMPS downward the instant a volley
+   resolves — it read as a glitch, not as a ship settling. The condition chips say what shape she is in; the
+   sprite does not need to mime it. */
+.sbt-hull { animation: sbtBob 3.4s ease-in-out infinite; }
 .sbt-ship-foe .sbt-hull { animation-delay: -1.6s; }
 @keyframes sbtBob { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-7px) rotate(1deg); } }
 .sbt-boat { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.55)); }
