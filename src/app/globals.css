@@ -15069,3 +15069,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .sbt-cond b { font-size: 0.8rem; }
     .sbt-cond em { font-size: 0.54rem; }
 }
+
+/* A gun at the very bow or stern hung its plaque off the edge of the stage, so "4 HITS" arrived as "4 HI"
+   with the remove button sitting on top of the last letter. Those guns open their plaque inward instead. */
+.sbt-target.is-gun.is-edge-r .sbt-plaque { transform: translateX(-56%); }
+.sbt-target.is-gun.is-edge-l .sbt-plaque { transform: translateX(56%); }
+/* And the minus lives clear of the text rather than over it. */
+.sbt-target.is-gun .sbt-plaque-minus { transform: translate(38%, -38%); }

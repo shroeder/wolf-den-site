@@ -230,7 +230,10 @@ function PartChip({ zone, left, max, label = null }) {
     const n = Math.max(0, Math.min(cap, Math.round(left ?? cap)));
     return (
         <span className={`sbt-cond is-${zone} ${conditionTone(n, cap)}`} title={`${n} of ${cap} left`}>
-            <b>{n}</b><em>{label || (zone === "sails" ? "sails" : zone === "guns" ? "gun" : "hull")}</em>
+            {/* A GUN MARKER COUNTS HITS, NOT GUNS. Every other chip reads "<how many of this part is left>"
+                — 10 HULL, 6 SAILS, 2 CANNON — so "4 GUN" on a single cannon read as four cannons when it
+                meant this one cannon can take four more balls. The label has to say what is being counted. */}
+            <b>{n}</b><em>{label || (zone === "sails" ? "sails" : zone === "guns" ? (n === 1 ? "hit" : "hits") : "hull")}</em>
         </span>
     );
 }
@@ -384,7 +387,9 @@ function Ship({ f, side, hurt, heavy, low, sinking, hpFrac = 1, hp = null, hpMax
                     {targets.map((t) => (
                         <div key={t.key} role="button" tabIndex={t.dead ? -1 : 0}
                             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick?.(t); } }}
-                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}${t.kind === "gun" && t.hpPct < 100 ? " is-hurt" : ""}`}
+                            /* A gun out at the bow or the stern hangs its plaque off the side of the stage —
+                               "4 HITS" arrived as "4 HI". Guns in the outer fifth open their plaque inward. */
+                            className={`sbt-target is-${t.zone}${t.laid ? " is-on" : ""}${t.kind === "gun" ? " is-gun" : ""}${t.dead ? " is-dead" : ""}${t.kind === "gun" && t.hpPct < 100 ? " is-hurt" : ""}${t.kind === "gun" && t.x >= 78 ? " is-edge-r" : ""}${t.kind === "gun" && t.x <= 22 ? " is-edge-l" : ""}`}
                             style={t.box
                                 ? { left: `${t.box.x}%`, top: `${t.box.y}%`, width: `${t.box.w}%`, height: `${t.box.h}%`, "--tint": t.tint }
                                 : { left: `${t.x}%`, top: `${t.y}%`, "--tint": t.tint }}
