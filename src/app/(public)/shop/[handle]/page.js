@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getInventoryItem } from "@/lib/inventory-feed/feed";
 import { productHandle, variationIdFromHandle } from "@/lib/inventory-feed/product-url";
 import { SITE_URL } from "@/lib/site";
+import ShopProductBuy from "@/components/ShopProductBuy";
 import { computeShopPricingDollars, isSingleName } from "@/lib/single-discount";
 
 // Regenerate each product's static HTML at most every 30 min (inventory reconcile runs ~every 15).
@@ -46,6 +47,9 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function ShopProductPage({ params }) {
+    // Same flag the shop grid reads. This page never checked it, which is the whole bug: it was hard-wired to
+    // the pre-online-store phone CTA regardless of whether the store could take the order.
+    const paymentsEnabled = process.env.NEXT_PUBLIC_PAYMENTS_ENABLED === "true";
     const { handle } = await params;
     const item = await getInventoryItem(variationIdFromHandle(handle));
 
@@ -126,14 +130,11 @@ export default async function ShopProductPage({ params }) {
                                 representative and minor wear consistent with the listed grade may be present.
                             </p>
                         )}
-                        <div className="cta-row">
-                            <a className="button primary" href="tel:+17014090782">
-                                Call: (701) 409-0782
-                            </a>
-                            <Link className="button" href="/shop">
-                                Browse the shop
-                            </Link>
-                        </div>
+                        <ShopProductBuy
+                            catalogObjectId={item.variationId}
+                            inStock={Boolean(item.inStock) && Number(item.quantity || 0) > 0}
+                            paymentsEnabled={paymentsEnabled}
+                        />
                     </div>
                 </div>
             </section>
