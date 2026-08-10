@@ -19,16 +19,15 @@ import {
     pointsSpent, treeAbilities, treeEffects, treeState,
 } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
-import { jewelsEnabled } from "@/lib/marketplace/jeweller.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
 // one rung. Your opponents are real members with their real level, real gear and real hero — but nobody has to
 // be online, because you fight their LOADOUT, not their attention.
 //
-// OWNER-GATED while it's built out. Every read and write goes through ARENA_UNLOCKED — one switch to open it,
-// exactly as the mine and the dungeons did.
-export const ARENA_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
+// THE GATE IS OFF (2026-08-10). `ARENA_UNLOCKED` is DELETED rather than flipped to true — a predicate that
+// always answers yes is a gate you have to keep reading to be sure of, and the next person to see one assumes
+// it still means something. The arena is a public feature; it is gated by having a hero, like everything else.
 
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // Ten, not three. Three was set when the ladder was a bottom-up grind and every fight was progress; on a
@@ -309,7 +308,6 @@ const saveBout = (buyerId, bout) =>
 // What a win at a given rung is worth. Climbing has to pay more than grinding the bottom, or the ladder is
 // decoration on a farming loop.
 export async function getArenaState(buyerId) {
-    if (!ARENA_UNLOCKED(buyerId)) return { unlocked: false };
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
     const used = fightsUsed(row);
@@ -417,10 +415,10 @@ export async function getArenaState(buyerId) {
             id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,
             // Every possible outcome, best first. A crate that will not say what is in it is a slot machine,
             // and this game does not have those.
-            table: rollable(c, { jewels: jewelsEnabled(buyerId) })
+            table: rollable(c)
                 .map((r) => ({ label: r.label, worth: r.worth, w: r.w }))
                 .sort((a, z) => z.worth - a.worth),
-            ev: armouryEv(c, { jewels: jewelsEnabled(buyerId) }),
+            ev: armouryEv(c),
         })),
         progress,
         upgrades: upgradeView(row?.upgrades || {}),
@@ -487,7 +485,6 @@ async function awayReport(buyerId, row) {
 
 /** Mark the away report read, so it is shown once and not on every visit. */
 export async function seenArena(buyerId) {
-    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     await db.query(`UPDATE mkt_arena SET last_seen_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
@@ -553,7 +550,6 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
 }
 
 export async function startBout(buyerId, targetId = null) {
-    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
         return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
@@ -676,7 +672,6 @@ export async function startBout(buyerId, targetId = null) {
  * and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
  */
 export async function fightRound(buyerId, opts = {}) {
-    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
     if (staleBout(b)) {
@@ -1144,7 +1139,6 @@ async function finishBout(buyerId, row, b, won) {
 
 /** Clear a finished bout so the arena screen comes back. */
 export async function clearBout(buyerId) {
-    if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     await saveBout(buyerId, null);
     return { ok: true, ...(await getArenaState(buyerId)) };
 }

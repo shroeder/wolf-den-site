@@ -11,15 +11,13 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 // The bench where a gem meets a piece of gear. Two operations and nothing else: CUT a socket into something
 // (expensive, permanent, one per piece), and SET a gem into a socket you have already cut.
 //
-// UNDER CONSTRUCTION. `jewelsEnabled` is the one predicate the whole feature reads — the bench, the drops, the
-// bag and the stat merge — so opening it is one line rather than a hunt. Both halves are gated deliberately:
-// a member who cannot reach the bench must not be finding jewels either, or the drop is a mystery item with
-// nowhere to go and the first thing anybody does is ask what it is for.
-export const jewelsEnabled = (buyerId) => isOwner(buyerId);
+// THE GATE IS OFF (2026-08-10). `jewelsEnabled` was the one predicate the whole feature read — the bench, the
+// drops, the sockets, the totals — and it is DELETED rather than flipped, for the same reason the arena's was:
+// a gate that always says yes still reads like a gate.
 
 // ── THE BAG ──────────────────────────────────────────────────────────────────────────────────────────────────
 export async function getGems(buyerId) {
-    if (!buyerId || !jewelsEnabled(buyerId)) return [];
+    if (!buyerId) return [];
     const rows = await db.query(
         `SELECT gem_id, count FROM mkt_gem WHERE buyer_id = $1 AND count > 0`, [buyerId]
     ).catch(() => []);
@@ -79,7 +77,7 @@ export async function socketsFor(buyerId, itemIds = null) {
  * forge enhancement are the same kind of number by the time anything fights with them.
  */
 export async function socketBonusFor(buyerId, itemIds) {
-    if (!buyerId || !itemIds?.length || !jewelsEnabled(buyerId)) return {};
+    if (!buyerId || !itemIds?.length) return {};
     const rows = await db.query(
         `SELECT gem_id FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = ANY($2) AND gem_id IS NOT NULL`,
         [buyerId, itemIds]
@@ -121,7 +119,6 @@ export async function reclaimGems(buyerId, itemId, reason = "item_gone") {
 // The kind never changes — only the tier. Turning rubies into emeralds would make the colour meaningless and
 // the whole choice of which stat to chase collapses into "fuse whatever you have most of".
 export async function fuseGems(buyerId, id) {
-    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     const gem = gemById(id);
     if (!gem) return { ok: false, error: "bad_gem" };
     // The ladder stops at Polished — above that a jewel is mined or it is not had. Checked here as well as
@@ -149,7 +146,6 @@ export async function fuseGems(buyerId, id) {
 // Expensive on purpose, and priced by the item's rarity: a socket in a mythic is a commitment, a socket in a
 // common is a cheap lesson in what sockets do.
 export async function cutSocket(buyerId, itemId) {
-    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     const item = itemById(itemId);
     if (!item) return { ok: false, error: "bad_item" };
     // You have to own it. Checked against the same table equip checks use, so a crafted POST cannot socket
@@ -182,7 +178,6 @@ export async function cutSocket(buyerId, itemId) {
 
 // ── SETTING A GEM ────────────────────────────────────────────────────────────────────────────────────────────
 export async function setGem(buyerId, itemId, gemId, idx = 0) {
-    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     const gem = gemById(gemId);
     if (!gem || !itemById(itemId)) return { ok: false, error: "bad_gem" };
 
@@ -222,7 +217,6 @@ export async function setGem(buyerId, itemId, gemId, idx = 0) {
 export const EXTRACT_COST = (tier = 1) => 800 * Math.max(1, Number(tier) || 1);
 
 export async function pullGem(buyerId, itemId, idx = 0, keep = false) {
-    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     // The old value comes from a FROM subquery, not from RETURNING: RETURNING hands back the row as it is
     // AFTER the update, which for this statement is the NULL we just wrote. The join reads the pre-update
     // snapshot, so `was` is the gem that actually broke.
@@ -268,7 +262,6 @@ export async function pullGem(buyerId, itemId, idx = 0, keep = false) {
 // and what is already set.
 export async function getJewellerState(buyerId) {
     if (!buyerId) return { unlocked: false };
-    if (!jewelsEnabled(buyerId)) return { unlocked: false };
 
     const [owned, socketRows, gems, goldRow, equipped, enhRows] = await Promise.all([
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),

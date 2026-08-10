@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import JewellerClient from "@/components/JewellerClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getJewellerState, jewelsEnabled } from "@/lib/marketplace/jeweller.js";
+import { getJewellerState } from "@/lib/marketplace/jeweller.js";
 
 // UNDER CONSTRUCTION — owner only, and a 404 for everyone else rather than a locked door, because a door
 // tells you the feature exists. Jewel DROPS are gated by the same predicate, so nobody outside the allow-list
@@ -12,7 +12,7 @@ export const metadata = { title: "The Jewelcutter | The Wolf Den", robots: { ind
 
 export default async function JewellerPage() {
     const buyer = await getAuthenticatedBuyer().catch(() => null);
-    if (!buyer || !jewelsEnabled(buyer.id)) notFound();
+    if (!buyer) notFound();
     const state = await getJewellerState(buyer.id);
     return <JewellerClient initial={state} />;
 }

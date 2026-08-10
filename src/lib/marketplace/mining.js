@@ -383,8 +383,7 @@ export async function descend(buyerId) {
     // ── A JEWEL IN THE ROCK ── rolled on the way DOWN, independently of the card, so it is the depth you dared
     // that earns it rather than a lucky draw. Gated with the bench: no bench, no jewels.
     try {
-        const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
-        if (jewelsEnabled(buyerId)) {
+        {
             const jewel = rollJewel(depth);
             if (jewel) {
                 // Carried WITH its name and colour. The haul chip falls back to the gold-coin icon for a kind

@@ -137,9 +137,8 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
     // itself counted them, so matchmaking was aiming at a number nobody actually fought with.
     const gemByBuyer = new Map();
     try {
-        const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
         const { sumGemStats } = await import("@/lib/marketplace/gems.js");
-        const eligible = buyerIds.filter((x) => jewelsEnabled(x));
+        const eligible = buyerIds;
         if (eligible.length) {
             const socketRows = await db.query(
                 `SELECT buyer_id, item_id, gem_id FROM mkt_item_socket WHERE buyer_id = ANY($1) AND gem_id IS NOT NULL`,
@@ -322,8 +321,7 @@ export async function getInventory(buyerId) {
     // widely) and empty for anyone the bench is not open to, so a gated feature adds nothing to their bag.
     const socketed = await (async () => {
         try {
-            const { socketsFor, jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
-            if (!jewelsEnabled(buyerId)) return {};
+            const { socketsFor } = await import("@/lib/marketplace/jeweller.js");
             return await socketsFor(buyerId);
         } catch { return {}; }
     })();

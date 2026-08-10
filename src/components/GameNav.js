@@ -377,7 +377,7 @@ export default function GameNav() {
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
-            ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Climb the pack" }] : []),
+            ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },

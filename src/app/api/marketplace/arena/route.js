@@ -10,7 +10,7 @@ import { withRequestLogging } from "@/lib/server-logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// The Arena is OWNER-GATED. The gate lives in arena.js (ARENA_UNLOCKED) rather than here, so every entry point
+// The Arena is PUBLIC as of 2026-08-10. It was owner-gated through its build, behind a single predicate in
 // is covered by one switch instead of each route remembering to check.
 const noStore = (body, init) => NextResponse.json(body, { ...init, headers: { "Cache-Control": "no-store", ...(init?.headers || {}) } });
 

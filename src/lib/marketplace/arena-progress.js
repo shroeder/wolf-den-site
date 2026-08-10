@@ -216,8 +216,6 @@ export async function buyArmoury(buyerId, id) {
     const crate = crateById(String(id || ""));
     if (!buyerId || !crate) return { ok: false, error: "bad_item" };
 
-    const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
-    const jewels = jewelsEnabled(buyerId);
 
     // Spent conditionally inside the UPDATE — neon() has no transactions, so a balance read followed by a
     // spend is two taps both passing a check only one of them can afford.
@@ -227,7 +225,7 @@ export async function buyArmoury(buyerId, id) {
     ).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_laurels", cost: crate.cost };
 
-    const won = rollCrate(crate, { jewels });
+    const won = rollCrate(crate);
 
     // Hand it over. Anything that throws here has already been paid for, so each grant is best-effort and the
     // log below is the record — a member charged and given nothing is the one outcome worth avoiding above all.

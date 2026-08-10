@@ -33,10 +33,11 @@ const CHEST = (tier, worth, label) => ({ kind: "chest", tier, worth, label });
 const PARTS = (tier, n, worth, label) => ({ kind: "parts", tier, n, worth, label });
 const FRAG = (tier, n, worth, label) => ({ kind: "fragment", tier, n, worth, label });
 const CONS = (id, worth, label) => ({ kind: "consumable", consumable: id, n: 1, worth, label });
-// A gated row carries its own STAND-IN. Filtering it out instead would hand a member without the bench a
-// different table at the same price — and because the gem rows sit below their crate's average, removing them
-// silently made the crate BETTER for them. Same slot, same weight, comparable worth, no gems.
-const GEM = (tier, worth, label, alt) => ({ kind: "gem", gemTier: tier, worth, label, gated: "jewels", alt });
+// Gem rows used to carry a STAND-IN for members who could not reach the Jewelcutter while it was gated —
+// filtering them out instead would have handed those members a different table at the same price, and because
+// the gem rows sit below their crate's average, removing them silently made the crate BETTER. The bench opened
+// on 2026-08-10 and everybody can roll a jewel, so the stand-ins and the whole `jewels` parameter are gone.
+const GEM = (tier, worth, label) => ({ kind: "gem", gemTier: tier, worth, label });
 const FIGHTS = (n, worth, label) => ({ kind: "fights", n, worth, label });
 
 export const CRATES = [
@@ -54,7 +55,7 @@ export const CRATES = [
             { w: 10, ...CONS("scroll_wisdom", 260, "Tome of Wisdom") },
             { w: 9, ...PARTS(3, 3, 280, "Tempered Steel ×3") },
             { w: 7, ...CHEST("wooden", 130, "Wooden Chest") },
-            { w: 5, ...GEM(1, 240, "A Chipped Jewel", CONS("scroll_wisdom", 260, "Tome of Wisdom")) },
+            { w: 5, ...GEM(1, 240, "A Chipped Jewel") },
             { w: 2, ...CHEST("gold", 900, "Gold Chest") },
             { w: 1, ...CONS("scroll_ancient", 900, "Ancient Codex") },
         ],
@@ -71,7 +72,7 @@ export const CRATES = [
             { w: 14, ...PARTS(4, 3, 840, "Mythril Dust ×3") },
             { w: 12, ...FRAG("gold", 6, 760, "Gold Fragments ×6") },
             { w: 10, ...CONS("scroll_ancient", 900, "Ancient Codex") },
-            { w: 9, ...GEM(2, 520, "A Flawed Jewel", PARTS(4, 2, 560, "Mythril Dust ×2")) },
+            { w: 9, ...GEM(2, 520, "A Flawed Jewel") },
             { w: 7, ...CONS("forge_enchant_scroll", 1100, "Enchantment Scroll") },
             { w: 6, ...PARTS(5, 1, 980, "Emberheart Shard") },
             { w: 4, ...FIGHTS(2, 420, "Second Wind — two more challenges today") },
@@ -88,12 +89,12 @@ export const CRATES = [
             { w: 22, ...CHEST("mythic", 2400, "Mythic Chest") },
             { w: 17, ...G(9000) },
             { w: 14, ...PARTS(5, 3, 2940, "Emberheart Shard ×3") },
-            { w: 12, ...GEM(3, 1150, "A Polished Jewel", CONS("forge_enchant_scroll", 1100, "Enchantment Scroll")) },
+            { w: 12, ...GEM(3, 1150, "A Polished Jewel") },
             { w: 11, ...FRAG("mythic", 6, 2460, "Mythic Fragments ×6") },
             { w: 9, ...CONS("forge_enchant_scroll", 1100, "Enchantment Scroll") },
             { w: 8, ...CHEST("gold", 1800, "Gold Chest ×2"), n: 2 },
             { w: 5, ...PARTS(5, 5, 4900, "Emberheart Shard ×5") },
-            { w: 2, ...GEM(3, 1150, "A Polished Jewel", PARTS(5, 2, 1960, "Emberheart Shard ×2")) },
+            { w: 2, ...GEM(3, 1150, "A Polished Jewel") },
         ],
     },
 ];
@@ -103,25 +104,21 @@ export const crateById = (id) => CRATES.find((c) => c.id === String(id || "")) |
 /**
  * Expected laurel value of a crate, for the member the roll is FOR.
  *
- * `has` decides whether the gated rows are in the table — a member without the bench cannot roll a jewel, so
- * their crate must not be balanced as though they could. Without this the gating would quietly make the same
- * crate worth 12% less to them, which is the sort of unfairness nobody would ever report because nobody can
- * see it.
  */
-export function armouryEv(crate, { jewels = true } = {}) {
-    const rows = rollable(crate, { jewels });
+export function armouryEv(crate) {
+    const rows = rollable(crate);
     const total = rows.reduce((n, r) => n + r.w, 0);
     return Math.round(rows.reduce((n, r) => n + r.w * r.worth, 0) / (total || 1));
 }
 
-/** The rows a given member can actually roll — gated ones swapped for their stand-in rather than dropped. */
-export function rollable(crate, { jewels = true } = {}) {
-    return (crate?.table || []).map((r) => (r.gated === "jewels" && !jewels ? { ...r.alt, w: r.w } : r));
+/** The rows a crate can roll. Every member sees the same table — there is nothing left to gate. */
+export function rollable(crate) {
+    return crate?.table || [];
 }
 
 /** Draw one, weighted. */
-export function rollCrate(crate, { jewels = true, random = Math.random } = {}) {
-    const rows = rollable(crate, { jewels });
+export function rollCrate(crate, { random = Math.random } = {}) {
+    const rows = rollable(crate);
     const total = rows.reduce((n, r) => n + r.w, 0);
     let roll = random() * total;
     return rows.find((r) => (roll -= r.w) <= 0) || rows[rows.length - 1];
