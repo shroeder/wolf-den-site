@@ -74,7 +74,7 @@ export default function AnnouncementModal() {
                    button sat on top of the launch card's own call to action.
                    100svh, not just inset:0 — on a phone a fixed overlay is laid out against the LARGE viewport,
                    so the bottom of the card ends up underneath the browser's own bars. */
-                .ann-scrim { position: fixed; inset: 0; height: 100svh; z-index: 5100; display: grid; place-items: center;
+                .ann-scrim { position: fixed; inset: 0; height: 100svh; z-index: 10092; display: grid; place-items: center;
                     padding: 16px;
                     background: rgba(6,4,10,0.82); backdrop-filter: blur(4px); animation: annIn .22s ease both; }
                 .ann-scrim.is-closing { animation: annOut .18s ease both; }

@@ -12,6 +12,7 @@ import MiningLaunch from "@/components/MiningLaunch";
 import DungeonLaunch from "@/components/DungeonLaunch";
 import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
+import BadgePop from "@/components/BadgePop";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
@@ -398,6 +399,9 @@ export default function GameNav() {
             {/* Mounted on the NAV, not on a page, so a launch card reaches people wherever they resume — most
                 sessions do not start on the home screen. */}
             {signedIn ? <AnnouncementModal /> : null}
+            {/* A badge is earned while you are busy doing something else, so the card has to find you rather
+                than wait on the badge screen for you to come and count. */}
+            {signedIn ? <BadgePop /> : null}
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
             {signedIn ? <DungeonLaunch /> : null}

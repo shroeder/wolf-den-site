@@ -268,8 +268,11 @@ export async function getMemberMetrics(buyerId) {
 }
 
 // Earning a badge grants a little XP + gold, so every unlock feels rewarding (not just cosmetic).
+// Exported as a pair because the celebration card states them, and a card that says 120 while the ledger
+// hands over 90 is worse than a card that says nothing.
 const BADGE_REWARD_XP = 120;
 const BADGE_REWARD_GOLD = 120;
+export const BADGE_REWARD = { xp: BADGE_REWARD_XP, gold: BADGE_REWARD_GOLD };
 async function rewardBadgeEarned(buyerId, slug) {
     // dedupeKey keys off the slug so re-syncs never double-pay, even though the INSERT is idempotent.
     await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});
@@ -291,7 +294,7 @@ const F = (farm) => ({ farm });
 const G = (forge) => ({ forge });
 const D = (depth) => ({ depth });   // DEPTHS affinity — the mine (see items.js DEPTH_META)
 
-const BADGE_BONUSES = {
+export const BADGE_BONUSES = {
     // ── Staff / identity / prestige (hand-assigned) → modest Might, a nod for the recognition ──
     owner: C(5), site_admin: C(2), secret: C(3), staff: C(2), event_coordinator: C(2), volunteer: C(1),
     judge: C(2), developer: C(2), loyal: C(2), helping_paw: C(2), mvp: C(3), opening_day: C(3), first_week: C(2),
