@@ -293,6 +293,16 @@ export async function getInventory(buyerId) {
         db.query(`SELECT item_id FROM mkt_auction WHERE seller_id = $1 AND status = 'active'`, [buyerId]).catch(() => []),
     ]);
     const elemOver = await getElementOverrides(buyerId).catch(() => ({})); // reforged elemental affinities
+    // Sockets and what is set in them. Lazily imported (jeweller.js is server-only and this module is imported
+    // widely) and empty for anyone the bench is not open to, so a gated feature adds nothing to their bag.
+    const socketed = await (async () => {
+        try {
+            const { socketsFor, jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
+            if (!jewelsEnabled(buyerId)) return {};
+            return await socketsFor(buyerId);
+        } catch { return {}; }
+    })();
+    const { gemById } = await import("@/lib/marketplace/gems.js");
     // Items you have up for auction are "in escrow" — don't show them in the bag (an auto-re-granted level item
     // could otherwise reappear here while it's still listed).
     const listedSet = new Set(listedRows.map((r) => r.item_id));
@@ -315,6 +325,9 @@ export async function getInventory(buyerId) {
                 // stats: without it, weighing a new piece against an enhanced one compared the new item to the
                 // equipped item's UNFORGED self and called a downgrade a sidegrade.
                 forgeBonus: enh?.statBonus && Object.keys(enh.statBonus).length ? enh.statBonus : null,
+                // The socket, and the gem in it — so every grid that draws this item can show it.
+                socket: Boolean((socketed[def.id] || []).length),
+                gem: (() => { const g = (socketed[def.id] || []).find((x) => x.gemId); return g ? gemById(g.gemId) : null; })(),
                 util: describeUtil(enh?.util), elements: describeItemElements(def.id, elemOver[def.id]), charge: chargeState(r, def), signature: signatureFor(def.id), sellValue: sellValueOf(def), setName: set?.name || null, setId: set?.id || null, farmText: def.farm ? describeFarm(def.farm) : null,
                 // Trophies are not items any more, so nothing in this bag can be one and the flag is always
                 // false. Kept on the payload so the client's existing branches stay valid until they are cleaned

@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import * as Gi from "react-icons/gi";
 
 import ItemArt from "@/components/ItemArt";
+// The house synth. It is named for the arena because that is where it was built, but there is nothing
+// arena-shaped in it — one AudioContext, three buses, one mute switch — and a second copy for this bench
+// would be a second context to leak and a second mute nobody can find.
+import { Haptic, Sfx, unlock } from "@/components/arena/arena-audio.js";
 import { MAX_SOCKETS } from "@/lib/marketplace/gems.js";
 
 // ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────────────
@@ -30,6 +35,13 @@ export default function JewellerClient({ initial }) {
     const [picked, setPicked] = useState(null);       // the gem in your hand
     const [msg, setMsg] = useState(null);
     const [confirm, setConfirm] = useState(null);     // { itemId, idx } — pulling one back out
+    // ── THE BENCH RUNS WHILE YOU WORK ────────────────────────────────────────────────────────────────────
+    // `working` drives the wheel: it spins up, throws sparks and settles. `reveal` is what the work produced.
+    const [working, setWorking] = useState(null);     // "cut" | "set"
+    const [reveal, setReveal] = useState(null);       // { piece, gem, before, after }
+    const timers = useRef([]);
+    useEffect(() => () => timers.current.forEach(clearTimeout), []);
+    const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
 
     async function act(body) {
         if (busy) return null;
@@ -58,7 +70,24 @@ export default function JewellerClient({ initial }) {
 
     return (
         <div className="stack jw">
-            <section className="card jw-head">
+            {/* ── THE BENCH ── the Forge has an anvil you hit; this has a wheel that turns. It idles slowly
+                so the room is alive while you are deciding, and spins up with sparks off the stone whenever
+                the bench is actually doing something. */}
+            <section className={`card jw-head${working ? ` is-working is-${working}` : ""}`}>
+                <div className="jw-bench" aria-hidden="true">
+                    <span className="jw-wheel">
+                        <i /><i /><i /><i /><i /><i />
+                    </span>
+                    <span className="jw-anvil" />
+                    {working ? (
+                        <span className="jw-sparks">
+                            {Array.from({ length: 14 }).map((_, i) => (
+                                <b key={i} style={{ "--a": `${-20 - i * 11}deg`, "--d": `${40 + (i % 5) * 26}px`,
+                                    animationDelay: `${(i % 7) * 0.05}s` }} />
+                            ))}
+                        </span>
+                    ) : null}
+                </div>
                 <h1>The Jewelcutter</h1>
                 <p className="muted">
                     A socket is the reason to keep a piece you already like. Cut one — once, permanently, for a
@@ -75,7 +104,8 @@ export default function JewellerClient({ initial }) {
                 {gems.length ? (
                     <div className="jw-gems">
                         {gems.map((g) => (
-                            <button key={g.id} type="button"
+                            <div key={g.id} className="jw-gemwrap">
+                            <button type="button"
                                 className={`jw-gem${picked === g.id ? " is-on" : ""}${g.secret ? " is-secret" : ""}`}
                                 style={{ "--c": g.color }}
                                 onClick={() => setPicked((cur) => (cur === g.id ? null : g.id))}>
@@ -84,6 +114,27 @@ export default function JewellerClient({ initial }) {
                                 <em>{describe(g.stats)}</em>
                                 {g.count > 1 ? <i className="jw-gem-n">×{g.count}</i> : null}
                             </button>
+                            {/* ── FUSING ── three of a kind make one of the tier above, which is what stops the
+                                bottom tiers being litter: a Chipped Ruby is not worth setting into anything by
+                                the time you have real gear, but nine of them are a Polished one. Only offered
+                                when you are actually holding three — a greyed-out button you can never press
+                                is a worse explanation than no button. */}
+                            {g.canFuse ? (
+                                <button type="button" className="jw-fuse" disabled={busy}
+                                    style={{ "--c": g.color }}
+                                    onClick={async () => {
+                                        unlock(); Sfx.cut(); Haptic.tap();
+                                        setWorking("fuse");
+                                        const r = await act({ action: "fuse", gemId: g.id });
+                                        setWorking(null);
+                                        if (r?.ok) { Sfx.gemSet(g.tier + 1); Haptic.gemSet(g.tier + 1); }
+                                    }}>
+                                    Fuse ×{g.fuseCount}<i>→ {g.fuseInto?.name}</i>
+                                </button>
+                            ) : g.fuseInto ? (
+                                <span className="jw-fuse-hint">{g.fuseCount} make a {g.fuseInto.name}</span>
+                            ) : null}
+                            </div>
                         ))}
                     </div>
                 ) : (
@@ -108,7 +159,8 @@ export default function JewellerClient({ initial }) {
                             <div key={p.id} className="jw-piece" style={{ "--rar": RARITY[p.rarity] || "#c9d1d9" }}>
                                 {/* The item's own painted art, through the same component every other gear grid
                                     in the game uses — so a piece looks the same here as it does in your bag. */}
-                                <ItemArt id={p.id} icon={p.icon} className="jw-piece-ico" alt="" />
+                                <ItemArt id={p.id} icon={p.icon} className="jw-piece-ico" alt=""
+                                    gem={gem} socket={Boolean(socket)} />
                                 <div className="jw-piece-body">
                                     <b>{p.name}{p.enhanceLevel ? <i className="jw-enh">+{p.enhanceLevel}</i> : null}</b>
                                     <em>
@@ -124,12 +176,31 @@ export default function JewellerClient({ initial }) {
                                 <div className="jw-piece-go">
                                     {!socket ? (
                                         <button type="button" className="jw-btn" disabled={busy || st.gold < p.cost}
-                                            onClick={() => act({ action: "cut", itemId: p.id })}>
+                                            onClick={() => {
+                                                unlock(); Sfx.cut(); Haptic.cut();
+                                                setWorking("cut");
+                                                later(() => setWorking(null), 900);
+                                                act({ action: "cut", itemId: p.id });
+                                            }}>
                                             Cut a socket<i>{money(p.cost)} gold</i>
                                         </button>
                                     ) : !gem ? (
                                         <button type="button" className="jw-btn is-set" disabled={busy || !picked}
-                                            onClick={() => act({ action: "set", itemId: p.id, gemId: picked, idx: socket.idx })}>
+                                            onClick={async () => {
+                                                const chosen = gems.find((g) => g.id === picked) || null;
+                                                const before = p.stats || {};
+                                                unlock(); Sfx.cut(); Haptic.tap();
+                                                setWorking("set");
+                                                const r = await act({ action: "set", itemId: p.id, gemId: picked, idx: socket.idx });
+                                                setWorking(null);
+                                                if (r?.ok && chosen) {
+                                                    // The sound lands with the CARD, not with the tap — the tap is
+                                                    // the wheel, this is the stone going home.
+                                                    Sfx.gemSet(chosen.tier); Haptic.gemSet(chosen.tier);
+                                                    setPicked(null);
+                                                    setReveal({ piece: p, gem: chosen, before });
+                                                }
+                                            }}>
                                             {picked ? "Set the jewel" : "Empty socket"}
                                             {picked ? null : <i>pick a jewel above</i>}
                                         </button>
@@ -139,7 +210,11 @@ export default function JewellerClient({ initial }) {
                                                 the whole reason setting one is a decision. */}
                                             <p>Prise it out? The <b>{gem.name}</b> shatters — you do not get it back.</p>
                                             <button type="button" className="jw-btn is-bad" disabled={busy}
-                                                onClick={() => { setConfirm(null); act({ action: "pull", itemId: p.id, idx: socket.idx }); }}>
+                                                onClick={() => {
+                                                    unlock(); Sfx.gemBreak(); Haptic.gemBreak();
+                                                    setConfirm(null);
+                                                    act({ action: "pull", itemId: p.id, idx: socket.idx });
+                                                }}>
                                                 Break it out
                                             </button>
                                             <button type="button" className="jw-btn is-quiet" onClick={() => setConfirm(null)}>Leave it</button>
@@ -158,63 +233,51 @@ export default function JewellerClient({ initial }) {
                 </div>
             </section>
 
-            <style>{`
-                .jw-head { position: relative; }
-                .jw-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
-                .jw-gold { position: absolute; top: 14px; right: 14px; font-family: var(--font-display);
-                    font-weight: 900; color: #ffd75e; font-size: 0.9rem; }
-                .jw-msg { margin: 0; padding: 9px 12px; border-radius: 11px; font-size: 0.84rem; color: #ffd0a8;
-                    background: rgba(255,150,60,0.12); border: 1px solid rgba(255,150,60,0.35); }
-                .jw-sec-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
-                .jw-sec-head b { font-family: var(--font-display); font-size: 1rem; color: #e8dcc6; }
-                .jw-sec-head em { font-style: normal; font-size: 0.74rem; color: #8f98a3; margin-left: auto; }
-
-                .jw-gems { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-                .jw-gem { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-                    padding: 10px; border-radius: 13px; cursor: pointer; text-align: left;
-                    background: color-mix(in srgb, var(--c) 10%, rgba(255,255,255,0.03));
-                    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
-                .jw-gem.is-on { box-shadow: 0 0 0 2px var(--c), 0 6px 20px color-mix(in srgb, var(--c) 40%, transparent); }
-                .jw-gem-face svg { width: 26px; height: 26px; color: var(--c); }
-                .jw-gem b { font-family: var(--font-display); font-size: 0.84rem; color: var(--c); }
-                .jw-gem em { font-style: normal; font-size: 0.72rem; color: #cbd2da; }
-                .jw-gem-n { position: absolute; top: 8px; right: 10px; font-style: normal; font-weight: 900;
-                    font-size: 0.78rem; color: #e8dcc6; }
-                /* The sixth one gets to look like it knows something. */
-                .jw-gem.is-secret { background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(180,140,255,0.12)); }
-
-                .jw-pieces { display: grid; gap: 8px; }
-                .jw-piece { display: flex; align-items: center; gap: 11px; padding: 11px; border-radius: 13px;
-                    background: rgba(255,255,255,0.03);
-                    border: 1px solid color-mix(in srgb, var(--rar) 34%, transparent); }
-                .jw-piece-ico { flex: none; display: grid; place-items: center; width: 42px; height: 42px;
-                    border-radius: 10px; color: var(--rar);
-                    background: color-mix(in srgb, var(--rar) 12%, rgba(0,0,0,0.25));
-                    border: 1px solid color-mix(in srgb, var(--rar) 32%, transparent); }
-                .jw-piece-ico :global(svg) { width: 26px; height: 26px; }
-                .jw-piece-ico :global(.item-art-img) { width: 36px; height: 36px; object-fit: contain; }
-                .jw-enh { font-style: normal; margin-left: 5px; font-size: 0.76rem; color: #7fe0a4; }
-                .jw-worn { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
-                    font-size: 0.62rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
-                    color: #1a1206; background: linear-gradient(180deg,#ffdf85,#d4af37); }
-                .jw-stats { display: block; margin-top: 2px; font-size: 0.74rem; color: #cbd2da; }
-                .jw-piece-body { min-width: 0; flex: 1; }
-                .jw-piece-body b { display: block; font-family: var(--font-display); font-size: 0.88rem; color: var(--rar); }
-                .jw-piece-body em { display: block; font-style: normal; font-size: 0.72rem; text-transform: capitalize; color: #8f98a3; }
-                .jw-set { display: block; margin-top: 3px; font-size: 0.76rem; font-weight: 700; color: var(--c); }
-                .jw-piece-go { flex: none; }
-                .jw-btn { display: block; padding: 9px 12px; border-radius: 11px; cursor: pointer;
-                    font-family: var(--font-display); font-weight: 800; font-size: 0.8rem; color: #1a1206;
-                    border: 1px solid rgba(255,225,140,0.6);
-                    background: linear-gradient(180deg, #ffdf85, #e6c76b 46%, #c79a2c); }
-                .jw-btn i { display: block; font-style: normal; font-size: 0.68rem; font-weight: 700; opacity: .75; }
-                .jw-btn:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); }
-                .jw-btn.is-quiet { color: #b9a892; background: none; border-color: rgba(255,255,255,0.16); }
-                .jw-btn.is-bad { color: #2a0d10; border-color: rgba(255,160,170,0.7);
-                    background: linear-gradient(180deg, #ff9aa6, #e0616f); }
-                .jw-confirm { max-width: 210px; text-align: right; display: grid; gap: 6px; justify-items: end; }
-                .jw-confirm p { margin: 0; font-size: 0.74rem; line-height: 1.4; color: #cbd2da; }
-            `}</style>
+            {/* ── WHAT YOU JUST MADE ── the moment the stone goes home. The item is drawn at size with the
+                jewel dropping into it, the room floods with the gem's own colour, and then the numbers arrive
+                one line at a time: what the piece was, what the jewel gave it, what it is now. */}
+            {reveal ? createPortal((
+                <div className="jwr-scrim" role="dialog" aria-modal="true"
+                    aria-label={`${reveal.gem.name} set into ${reveal.piece.name}`}
+                    style={{ "--c": reveal.gem.color }}
+                    onClick={() => setReveal(null)}>
+                    <span className="jwr-rays" aria-hidden="true" />
+                    <span className="jwr-flash" aria-hidden="true" />
+                    <div className="jwr-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="jwr-kicker">Set</div>
+                        <div className="jwr-stage" aria-hidden="true">
+                            <ItemArt id={reveal.piece.id} icon={reveal.piece.icon} className="jwr-item" alt="" />
+                            {/* The stone falls into the piece and seats with a ring. */}
+                            <span className="jwr-gem"><Icon name="GiCutDiamond" /></span>
+                            <span className="jwr-ring" />
+                            <span className="jwr-ring is-two" />
+                            <span className="jwr-shards">
+                                {Array.from({ length: 12 }).map((_, i) => (
+                                    <b key={i} style={{ "--a": `${i * 30}deg`, "--d": `${58 + (i % 4) * 22}px`,
+                                        animationDelay: `${0.42 + (i % 5) * 0.03}s` }} />
+                                ))}
+                            </span>
+                        </div>
+                        <h2 className="jwr-name">{reveal.piece.name}</h2>
+                        <p className="jwr-gemname">{reveal.gem.name}</p>
+                        <div className="jwr-rows">
+                            {Object.entries(reveal.gem.stats).map(([k, v], i) => {
+                                const was = Number(reveal.before?.[k] || 0);
+                                return (
+                                    <p key={k} className="jwr-row" style={{ animationDelay: `${0.55 + i * 0.11}s` }}>
+                                        <i>{STAT[k] || k}</i>
+                                        <s>{was}</s>
+                                        <em>→</em>
+                                        <b>{was + v}</b>
+                                        <u>+{v}</u>
+                                    </p>
+                                );
+                            })}
+                        </div>
+                        <button type="button" className="jw-btn jwr-go" onClick={() => setReveal(null)}>Back to the bench</button>
+                    </div>
+                </div>
+            ), document.body) : null}
         </div>
     );
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { cutSocket, getJewellerState, pullGem, setGem } from "@/lib/marketplace/jeweller.js";
+import { cutSocket, fuseGems, getJewellerState, pullGem, setGem } from "@/lib/marketplace/jeweller.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -37,6 +37,7 @@ export async function POST(request) {
             if (action === "cut") res = await cutSocket(buyer.id, itemId);
             else if (action === "set") res = await setGem(buyer.id, itemId, String(b?.gemId || ""), idx);
             else if (action === "pull") res = await pullGem(buyer.id, itemId, idx);
+            else if (action === "fuse") res = await fuseGems(buyer.id, String(b?.gemId || ""));
             else return noStore({ error: "bad_action" }, { status: 400 });
             return noStore({ ...res, ...(await getJewellerState(buyer.id)) });
         } catch (error) {

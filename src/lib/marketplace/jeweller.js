@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { GEMS, GEM_TIERS, MAX_SOCKETS, gemById, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { FUSE_COUNT, GEMS, GEM_TIERS, MAX_SOCKETS, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -26,7 +26,17 @@ export async function getGems(buyerId) {
     const held = new Map(rows.map((r) => [r.gem_id, Number(r.count) || 0]));
     // Everything you hold, in catalog order, so the bag reads as a set you are filling rather than a list of
     // whatever happened to drop.
-    return GEMS.filter((g) => held.get(g.id) > 0).map((g) => ({ ...g, count: held.get(g.id) }));
+    return GEMS.filter((g) => held.get(g.id) > 0).map((g) => {
+        const next = GEMS.find((x) => x.kind === g.kind && x.tier === g.tier + 1) || null;
+        return {
+            ...g,
+            count: held.get(g.id),
+            // What three of them would make, and whether you are holding three.
+            fuseInto: next ? { id: next.id, name: next.name, stats: next.stats } : null,
+            canFuse: Boolean(next) && held.get(g.id) >= FUSE_COUNT,
+            fuseCount: FUSE_COUNT,
+        };
+    });
 }
 
 /** Put a gem in the bag. The one way in — drops, purchases and admin grants all land here. */
@@ -73,6 +83,36 @@ export async function socketBonusFor(buyerId, itemIds) {
         [buyerId, itemIds]
     ).catch(() => []);
     return sumGemStats(rows.map((r) => r.gem_id));
+}
+
+// ── FUSING ──────────────────────────────────────────────────────────────────────────────────────────────────
+// Three of a kind become one of the tier above. This is what stops the bottom tiers being litter: a Chipped
+// Ruby is not worth setting into anything by the time you have real gear, but nine of them are a Polished one,
+// and the mine hands out chips by the fistful. It also gives the shallow end of the mine a purpose after you
+// have outgrown what it drops.
+//
+// The kind never changes — only the tier. Turning rubies into emeralds would make the colour meaningless and
+// the whole choice of which stat to chase collapses into "fuse whatever you have most of".
+export async function fuseGems(buyerId, id) {
+    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
+    const gem = gemById(id);
+    if (!gem) return { ok: false, error: "bad_gem" };
+    const next = gemById(gemId(gem.kind, gem.tier + 1));
+    if (!next) return { ok: false, error: "max_tier" };
+
+    // Spend conditionally — three at once, in one statement, so two taps cannot both pass a count check that
+    // only one of them can afford.
+    const spent = await db.queryOne(
+        `UPDATE mkt_gem SET count = count - $3 WHERE buyer_id = $1 AND gem_id = $2 AND count >= $3 RETURNING count`,
+        [buyerId, gem.id, FUSE_COUNT]
+    ).catch(() => null);
+    if (!spent) return { ok: false, error: "not_enough" };
+
+    await grantGem(buyerId, next.id, 1, "fuse");
+    await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, meta) VALUES ($1, 'fused', $2, $3::jsonb)`,
+        [buyerId, next.id, JSON.stringify({ from: gem.id, spent: FUSE_COUNT })]).catch(() => {});
+    await trackActivity(buyerId, "gem_fuse", { from: gem.id, to: next.id }).catch(() => {});
+    return { ok: true, from: gem, to: next };
 }
 
 // ── CUTTING A SOCKET ─────────────────────────────────────────────────────────────────────────────────────────

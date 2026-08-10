@@ -9955,7 +9955,17 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    the art sits in — so on the paper doll, where the glyph box is a good deal smaller than the bordered slot,
    the marker landed on top of the gear instead of on the slot's corner. The marker belongs on the border, the
    way the forge-rank stars already sit on the opposite one. Its offset parent is now the tile. */
-.item-art { display: grid; place-items: center; }
+.item-art { display: grid; place-items: center; position: relative; }
+/* ── A SOCKET ON A GEAR ICON ──────────────────────────────────────────────────────────────────────────────
+   Top-left, because the element marker already owns the bottom-left and the forge rank badge the top-right,
+   and three badges fighting over two corners is how you get a ruby that reads as a fire pip. Sized off the
+   tile so it stays proportional from a 28px row to a 96px paper-doll slot. */
+.item-gem { position: absolute; top: 4%; left: 4%; width: 26%; height: 26%; min-width: 7px; min-height: 7px;
+    border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 34% 30%, #fff, var(--g) 62%, color-mix(in srgb, var(--g) 60%, #000));
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 7px color-mix(in srgb, var(--g) 70%, transparent); }
+.item-gem.is-empty { background: radial-gradient(circle at 34% 30%, rgba(255,255,255,0.16), rgba(0,0,0,0.6));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), 0 0 0 1px rgba(0,0,0,0.5); }
 .item-art-img { width: 1.55em; height: 1.55em; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)); }
 /* ── ELEMENT MARKERS ON A GEAR ICON ───────────────────────────────────────────────────────────────────────
    Sits in the BOTTOM-LEFT because the forge rank badge already owns the top-right of these same tiles, and
@@ -15480,3 +15490,185 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     margin-left: auto; font-style: normal; font-size: 0.74rem; font-weight: 800;
     letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.62);
 }
+
+/* ══ THE JEWELCUTTER ═════════════════════════════════════════════════════════════════════════════════════
+   Lives here rather than in a runtime <style> tag inside the component. It started life in one, and that is
+   a hydration mismatch waiting to happen — React 19 hoists and dedupes style tags, so the server's markup and
+   the client's first render disagree about where the tag is. It also made every rule that needed to reach
+   inside <ItemArt> read like a styled-jsx problem when the file was not using styled-jsx at all. */
+.jw-head { position: relative; }
+.jw-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+.jw-gold { position: absolute; top: 14px; right: 14px; font-family: var(--font-display);
+    font-weight: 900; color: #ffd75e; font-size: 0.9rem; }
+/* ── THE WHEEL ── it turns slowly all the time, because a workshop with nothing moving in it
+   is a diagram. When the bench is working it spins up and throws grit off the stone. */
+.jw-bench { position: relative; height: 76px; margin: 2px 0 10px; }
+.jw-wheel { position: absolute; left: 50%; top: 8px; width: 58px; height: 58px; margin-left: -29px;
+    border-radius: 50%; border: 3px solid #6a5c46;
+    background: radial-gradient(circle at 38% 34%, #4b4234, #2a241c 70%);
+    animation: jwSpin 5.5s linear infinite; }
+.jw-wheel i { position: absolute; left: 50%; top: 50%; width: 2px; height: 22px; margin: -11px 0 0 -1px;
+    background: rgba(255,255,255,0.09); transform-origin: 50% 50%; }
+.jw-wheel i:nth-child(1) { transform: rotate(0deg) }
+.jw-wheel i:nth-child(2) { transform: rotate(30deg) }
+.jw-wheel i:nth-child(3) { transform: rotate(60deg) }
+.jw-wheel i:nth-child(4) { transform: rotate(90deg) }
+.jw-wheel i:nth-child(5) { transform: rotate(120deg) }
+.jw-wheel i:nth-child(6) { transform: rotate(150deg) }
+.jw-head.is-working .jw-wheel { animation-duration: .32s; border-color: #b79a5e;
+    box-shadow: 0 0 22px rgba(255,200,90,0.35); }
+.jw-anvil { position: absolute; left: 50%; top: 58px; width: 96px; height: 12px; margin-left: -48px;
+    border-radius: 4px 4px 8px 8px; background: linear-gradient(180deg, #55493a, #2c251d); }
+.jw-sparks { position: absolute; left: 50%; top: 56px; }
+.jw-sparks b { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #ffd88a;
+    box-shadow: 0 0 6px #ffb648;
+    animation: jwSpark .5s ease-out forwards; }
+@keyframes jwSpin { to { transform: rotate(360deg) } }
+@keyframes jwSpark {
+    from { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(1) }
+    to { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(.3) } }
+
+.jw-msg { margin: 0; padding: 9px 12px; border-radius: 11px; font-size: 0.84rem; color: #ffd0a8;
+    background: rgba(255,150,60,0.12); border: 1px solid rgba(255,150,60,0.35); }
+.jw-sec-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+.jw-sec-head b { font-family: var(--font-display); font-size: 1rem; color: #e8dcc6; }
+.jw-sec-head em { font-style: normal; font-size: 0.74rem; color: #8f98a3; margin-left: auto; }
+
+.jw-gems { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.jw-gemwrap { display: flex; flex-direction: column; gap: 5px; }
+.jw-gemwrap .jw-gem { flex: 1; }
+/* Fusing sits under its own stack, in the gem's colour, and only appears when you are holding three. */
+.jw-fuse { padding: 7px 9px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 0.74rem;
+    color: color-mix(in srgb, var(--c) 80%, white);
+    background: color-mix(in srgb, var(--c) 14%, rgba(0,0,0,0.3));
+    border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); }
+.jw-fuse i { display: block; font-style: normal; font-size: 0.68rem; opacity: .8; }
+.jw-fuse:disabled { cursor: default; filter: grayscale(.6) brightness(.7); }
+.jw-fuse-hint { padding: 0 2px; font-size: 0.66rem; line-height: 1.35; color: #7f8790; }
+.jw-gem { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 10px; border-radius: 13px; cursor: pointer; text-align: left;
+    background: color-mix(in srgb, var(--c) 10%, rgba(255,255,255,0.03));
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
+.jw-gem.is-on { box-shadow: 0 0 0 2px var(--c), 0 6px 20px color-mix(in srgb, var(--c) 40%, transparent); }
+.jw-gem-face svg { width: 26px; height: 26px; color: var(--c); }
+.jwr-stage { position: relative; }
+.jw-gem b { font-family: var(--font-display); font-size: 0.84rem; color: var(--c); }
+.jw-gem em { font-style: normal; font-size: 0.72rem; color: #cbd2da; }
+.jw-gem-n { position: absolute; top: 8px; right: 10px; font-style: normal; font-weight: 900;
+    font-size: 0.78rem; color: #e8dcc6; }
+/* The sixth one gets to look like it knows something. */
+.jw-gem.is-secret { background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(180,140,255,0.12)); }
+
+.jw-pieces { display: grid; gap: 8px; }
+.jw-piece { display: flex; align-items: center; gap: 11px; padding: 11px; border-radius: 13px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid color-mix(in srgb, var(--rar) 34%, transparent); }
+/* ⚠️ NO  ANYWHERE IN HERE. This component renders a PLAIN <style> tag, not styled-jsx,
+   so the CSS is literal and ... is not a selector a browser understands — every rule
+   written that way was silently dropped, which is how a 104px cape kept rendering at 1.55em of
+   an inherited font size. The global item art is sized in EM, so anything that wants it bigger
+   has to say so in px and mean it. */
+.jw-piece-ico { flex: none; display: grid; place-items: center; width: 42px; height: 42px;
+    border-radius: 10px; color: var(--rar);
+    background: color-mix(in srgb, var(--rar) 12%, rgba(0,0,0,0.25));
+    border: 1px solid color-mix(in srgb, var(--rar) 32%, transparent); }
+.jw-piece-ico svg { width: 26px; height: 26px; }
+.jw-piece-ico .item-art-img { width: 36px !important; height: 36px !important; }
+.jw-enh { font-style: normal; margin-left: 5px; font-size: 0.76rem; color: #7fe0a4; }
+/* Specificity, not preference: `.jw-piece-body b` sets display:block for the item name, and it
+   outranks a bare .jw-worn — so the tag stretched into a full-width gold bar with the word lost inside it. */
+.jw-piece-body .jw-worn { display: inline-block; vertical-align: middle; line-height: 1.5; font-style: normal;
+    margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+    font-size: 0.62rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+    color: #1a1206; background: linear-gradient(180deg,#ffdf85,#d4af37); }
+.jw-stats { display: block; margin-top: 2px; font-size: 0.74rem; color: #cbd2da; }
+.jw-piece-body { min-width: 0; flex: 1; }
+.jw-piece-body b { display: block; font-family: var(--font-display); font-size: 0.88rem; color: var(--rar); }
+.jw-piece-body em { display: block; font-style: normal; font-size: 0.72rem; text-transform: capitalize; color: #8f98a3; }
+.jw-set { display: block; margin-top: 3px; font-size: 0.76rem; font-weight: 700; color: var(--c); }
+.jw-piece-go { flex: none; }
+.jw-btn { display: block; padding: 9px 12px; border-radius: 11px; cursor: pointer;
+    font-family: var(--font-display); font-weight: 800; font-size: 0.8rem; color: #1a1206;
+    border: 1px solid rgba(255,225,140,0.6);
+    background: linear-gradient(180deg, #ffdf85, #e6c76b 46%, #c79a2c); }
+.jw-btn i { display: block; font-style: normal; font-size: 0.68rem; font-weight: 700; opacity: .75; }
+.jw-btn:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); }
+.jw-btn.is-quiet { color: #b9a892; background: none; border-color: rgba(255,255,255,0.16); }
+.jw-btn.is-bad { color: #2a0d10; border-color: rgba(255,160,170,0.7);
+    background: linear-gradient(180deg, #ff9aa6, #e0616f); }
+.jw-confirm { max-width: 210px; text-align: right; display: grid; gap: 6px; justify-items: end; }
+.jw-confirm p { margin: 0; font-size: 0.74rem; line-height: 1.4; color: #cbd2da; }
+
+/* ── THE REVEAL ── everything here is in the GEM'S colour, so a ruby and an emerald do not land
+   identically. Above every other overlay: it is the payoff of the screen. */
+.jwr-scrim { position: fixed; inset: 0; height: 100svh; z-index: 10096; display: grid;
+    place-items: center; padding: 16px; background: rgba(4,3,8,0.86);
+    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+    animation: jwrIn .2s ease both; }
+@keyframes jwrIn { from { opacity: 0 } to { opacity: 1 } }
+.jwr-rays { position: absolute; inset: -25%; pointer-events: none;
+    background: conic-gradient(from 0deg, transparent 0 11deg,
+        color-mix(in srgb, var(--c) 26%, transparent) 11deg 16deg, transparent 16deg 28deg);
+    animation: jwrSpin 22s linear infinite; }
+@keyframes jwrSpin { to { transform: rotate(360deg) } }
+/* The flash of the stone seating — two frames, then gone. */
+.jwr-flash { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(60% 40% at 50% 44%, color-mix(in srgb, var(--c) 75%, white), transparent 70%);
+    animation: jwrFlash .5s ease-out .38s both; }
+@keyframes jwrFlash { 0% { opacity: 0 } 12% { opacity: .9 } 100% { opacity: 0 } }
+.jwr-card { position: relative; width: min(340px, 100%); max-height: 100%; overflow-y: auto;
+    text-align: center; padding: 18px; border-radius: 20px;
+    border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
+    background: linear-gradient(180deg, #1c1726, #110e18);
+    box-shadow: 0 0 60px color-mix(in srgb, var(--c) 34%, transparent), 0 22px 60px rgba(0,0,0,0.7);
+    animation: jwrPop .42s cubic-bezier(.2,1.25,.35,1) both; }
+@keyframes jwrPop { from { opacity: 0; transform: scale(.88) translateY(12px) } to { opacity: 1; transform: none } }
+.jwr-kicker { font-size: 0.62rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--c); }
+.jwr-stage { position: relative; height: 150px; display: grid; place-items: center; margin: 6px 0 2px; }
+/* Same trap, same fix — and the width is stated rather than inherited, because the global rule
+   sizes this art in EM and a card that never sets a font-size gets 24px of legendary cape. */
+.jwr-item { display: grid; place-items: center; }
+.jwr-item .item-art-img { width: 104px !important; height: 104px !important;
+    object-fit: contain; filter: drop-shadow(0 8px 18px rgba(0,0,0,0.65)); }
+.jwr-item svg { width: 96px; height: 96px; color: #e8dcc6;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,0.6)); }
+/* The stone falls in from above and seats. */
+.jwr-gem { position: absolute; left: 58%; top: 56%; display: grid; place-items: center;
+    animation: jwrDrop .46s cubic-bezier(.4,0,.7,1) both; }
+.jwr-gem svg { width: 52px; height: 52px; color: var(--c);
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 85%, transparent)); }
+@keyframes jwrDrop {
+    0% { opacity: 0; transform: translateY(-130px) scale(1.9) rotate(-25deg) }
+    70% { opacity: 1 }
+    100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg) } }
+/* Two rings going out from the seat.*/
+.jwr-ring { position: absolute; left: 58%; top: 56%; width: 60px; height: 60px; margin: -30px 0 0 -30px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--c) 80%, transparent);
+    animation: jwrRing .8s ease-out .42s both; }
+.jwr-ring.is-two { animation-delay: .56s; }
+@keyframes jwrRing { from { opacity: .9; transform: scale(.3) } to { opacity: 0; transform: scale(2.6) } }
+.jwr-shards { position: absolute; left: 58%; top: 56%; }
+.jwr-shards b { position: absolute; width: 4px; height: 4px; border-radius: 50%;
+    background: color-mix(in srgb, var(--c) 90%, white);
+    box-shadow: 0 0 8px var(--c);
+    animation: jwrShard .6s ease-out both; }
+@keyframes jwrShard {
+    from { opacity: 1; transform: rotate(var(--a)) translateX(0) scale(1) }
+    to { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(.2) } }
+.jwr-name { margin: 2px 0 0; font-size: 1.16rem; color: #f7efe0; }
+.jwr-gemname { margin: 2px 0 12px; font-size: 0.84rem; font-weight: 800; color: var(--c); }
+/* The numbers arrive one line at a time — a stat block that appears all at once is a receipt. */
+.jwr-rows { display: grid; gap: 5px; margin-bottom: 14px; }
+.jwr-row { display: flex; align-items: baseline; gap: 7px; margin: 0; padding: 7px 10px;
+    border-radius: 10px; background: rgba(255,255,255,0.04);
+    animation: jwrRow .34s ease-out both; }
+@keyframes jwrRow { from { opacity: 0; transform: translateX(-10px) } to { opacity: 1; transform: none } }
+.jwr-row i { font-style: normal; font-size: 0.76rem; color: #9aa2ab; flex: 1; text-align: left; }
+.jwr-row s { font-size: 0.78rem; color: #7f8790; }
+.jwr-row em { font-style: normal; font-size: 0.72rem; color: #7f8790; }
+.jwr-row b { font-family: var(--font-display); font-size: 0.98rem; color: #f7efe0; }
+.jwr-row u { text-decoration: none; font-size: 0.72rem; font-weight: 900; color: var(--c); }
+.jwr-go { width: 100%; text-align: center; }
+            

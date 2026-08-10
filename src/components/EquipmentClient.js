@@ -45,8 +45,8 @@ const SHOP_SLOT_CATS = [
     { slot: "ring", label: "Rings", icon: "💍" },
 ];
 
-function ItemGlyph({ id, className = "", elements = null }) {
-    return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} elements={elements} />;
+function ItemGlyph({ id, className = "", elements = null, gem = null, socket = false }) {
+    return <ItemArt id={id} icon={itemDef(id)?.icon} className={className} elements={elements} gem={gem} socket={socket} />;
 }
 
 // Render a slot's glyph. The helmet slot uses the approved Warplate Helm die-cut sprite (never the 🪖
@@ -402,7 +402,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     const def = id ? itemDef(id) : null;
                     return (
                         <button type="button" key={s.slot} className={`equip-slot slot-${s.slot}${def ? ` filled rar-${def.rarity}` : ""}`} onClick={() => setSlot(s.slot)} title={def ? `${def.name}${def.enhanceLevel > 0 ? ` +${def.enhanceLevel}` : ""}` : s.label} style={{ position: "relative" }}>
-                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" elements={def.elements} /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
+                            {def ? <ItemGlyph id={id} className="equip-slot-glyph" elements={def.elements} gem={def.gem} socket={def.socket} /> : <span className="equip-slot-empty"><SlotIcon slot={s.slot} size={20} /></span>}
                             {def && def.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -5, right: -5, zIndex: 3 }}><ForgeRank level={def.enhanceLevel} size={20} /></span> : null}
                         </button>
                     );
@@ -472,7 +472,7 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                             one here is offering to waste a slot. See isCollectionItem in items.js. */}
                         {(data.items || []).filter((i) => itemFitsSlot(i, slot) && !i.collectionPiece).map((i) => (
                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => equip(slot, i.id)} disabled={busy}>
-                                <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} />
+                                <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
                                 <span className="equip-card-name">{i.name}</span>
                                 <span className="equip-card-stats">{describeStats(i.stats)}</span>
                                 {i.sea ? <span className="equip-card-sea">{describeSea(i.sea)}</span> : null}
@@ -583,7 +583,8 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                     <div className="equip-bag-grid">
                                         {cat.items.map((i) => (
                                             <button type="button" key={i.id} className={`equip-card rar-${i.rarity}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : (i.setName || "collection")} · ${i.statsText}`}>
-                                                <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements} />
+                                                <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements}
+                                                    gem={i.gem} socket={i.socket} />
                                                 <span className="equip-card-name">{i.name}</span>
                                                 <span className="equip-card-stats">{i.statsText}</span>
                                                 <ElBadge id={i.id} elements={i.elements} />

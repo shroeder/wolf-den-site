@@ -185,6 +185,50 @@ export const Sfx = {
         noise({ at: at + 0.01, dur: 0.3, gain: 0.1, type: "highpass", freq: 4200 });
     },
 
+    // ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────
+    // This module is the house synth now, not only the arena's: the bench needs three sounds and none of them
+    // is worth a second AudioContext, a second mute switch or a second set of buses. Kept here, named for what
+    // they are, so the next feature that needs a noise reaches for this file rather than writing its own.
+
+    /** The wheel on the stone: a rising whirr with grit in it, and the bite at the end. */
+    cut(at = 0) {
+        noise({ at, dur: 0.52, gain: 0.1, type: "bandpass", freq: 900, sweepTo: 2600, q: 3.2 });
+        tone({ at, freq: 220, to: 460, type: "sawtooth", dur: 0.5, gain: 0.05 });
+        // The moment it breaks through.
+        noise({ at: at + 0.5, dur: 0.09, gain: 0.16, type: "highpass", freq: 3800 });
+        tone({ at: at + 0.5, freq: 180, to: 60, type: "sine", dur: 0.2, gain: 0.22 });
+    },
+
+    /**
+     * A jewel going home. Scaled by TIER, because a Chipped Ruby and a Flawless one should not sound alike:
+     * the chime climbs the harmonic series as the tier does, and only the good ones get the long shimmering
+     * tail. The thunk underneath is the same every time — that is the setting, not the stone.
+     */
+    gemSet(tier = 1, at = 0) {
+        const t = Math.max(1, Math.min(5, Number(tier) || 1));
+        const base = 660 * Math.pow(1.12, t - 1);
+        // Three partials, struck a hair apart, which is what makes a chime read as glass rather than a beep.
+        [1, 1.5, 2.02].forEach((mult, i) => {
+            tone({ at: at + i * 0.014, freq: base * mult, type: "triangle", dur: 0.5 + t * 0.12,
+                gain: 0.1 / (i + 1) });
+        });
+        // Seated: low, short, felt.
+        tone({ at: at + 0.05, freq: 150, to: 52, type: "sine", dur: 0.22, gain: 0.26 });
+        noise({ at: at + 0.05, dur: 0.08, gain: 0.1, type: "lowpass", freq: 1400 });
+        // The tail only the top tiers earn.
+        if (t >= 3) {
+            tone({ at: at + 0.12, freq: base * 3, type: "sine", dur: 0.9 + t * 0.1, gain: 0.05 });
+            noise({ at: at + 0.12, dur: 0.7, gain: 0.04, type: "highpass", freq: 5200 });
+        }
+    },
+
+    /** A stone breaking out of its setting. Deliberately ugly — it is a thing you destroyed. */
+    gemBreak(at = 0) {
+        noise({ at, dur: 0.26, gain: 0.2, type: "bandpass", freq: 2200, q: 1.2, sweepTo: 700 });
+        tone({ at, freq: 420, to: 90, type: "square", dur: 0.2, gain: 0.1 });
+        tone({ at: at + 0.04, freq: 130, to: 48, type: "sine", dur: 0.28, gain: 0.2 });
+    },
+
     /** Turning a blow aside — metal, short and hard. */
     block(strength = 0.5, at = 0) {
         const s = Math.max(0, Math.min(1, strength));
@@ -603,6 +647,15 @@ export const Haptic = {
     ko() { Haptic.fire([0, 60, 50, 90]); },
     win() { Haptic.fire([0, 40, 60, 40, 60, 90]); },
     lose() { Haptic.fire([0, 90, 80, 40]); },
+    /** The wheel biting, then breaking through. */
+    cut() { Haptic.fire([0, 12, 60, 12, 60, 12, 60, 40]); },
+    /** A jewel seating. The better the stone, the longer the game holds onto your hand. */
+    gemSet(tier = 1) {
+        const t = Math.max(1, Math.min(5, Number(tier) || 1));
+        Haptic.fire([0, 18, 40, 30 + t * 12]);
+    },
+    /** Something you broke on purpose. */
+    gemBreak() { Haptic.fire([0, 50, 30, 20, 25, 12]); },
     /** The box straining — a stutter that tightens, matched to chestRattle's knocks. */
     chestShake() { Haptic.fire([0, 18, 170, 22, 150, 26, 130, 34, 110, 44]); },
     /** The lid going, scaled by what came out: a common is a thump, an eternal is a fanfare you can feel. */

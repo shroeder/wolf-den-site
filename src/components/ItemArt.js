@@ -46,7 +46,7 @@ export function useItemSprite(id) {
 // bottom-left corner of the art. It lives HERE rather than at each call site because every gear icon in the
 // app — bag, slot picker, gold shop, Forge, auction, trade, public profile — already funnels through this one
 // component, so a marker added here is a marker on every grid at once and can never drift between them.
-export default function ItemArt({ id, icon, className = "", alt = "", elements = null }) {
+export default function ItemArt({ id, icon, className = "", alt = "", elements = null, gem = null, socket = false }) {
     const sprite = useItemSprite(id);
     // Always render the SAME styled box the glyph used (rarity backplate, border, sizing) — just swap the
     // svg glyph for the die-cut <img> so layout is identical whether or not a sprite exists yet.
@@ -54,6 +54,15 @@ export default function ItemArt({ id, icon, className = "", alt = "", elements =
         <span className={`${className} item-art${sprite ? " has-sprite" : ""}`}>
             {sprite ? <img src={sprite} alt={alt} className="item-art-img" loading="lazy" /> : (() => { const Icon = itemIcon(icon); return <Icon aria-hidden="true" />; })()}
             <ElementPip elements={elements} />
+            {/* ── THE SOCKET ── same argument as the element pip: a gem you can only see on the Jewelcutter is
+                a gem you forget you set. A filled socket rides in the TOP-LEFT (the element marker owns the
+                bottom-left and the forge rank badge the top-right), drawn in the gem's own colour so a ruby
+                and an emerald are told apart at 28px without reading anything. An empty socket is a hole. */}
+            {gem ? (
+                <i className="item-gem" style={{ "--g": gem.color }} title={gem.name} aria-hidden="true" />
+            ) : socket ? (
+                <i className="item-gem is-empty" title="Empty socket" aria-hidden="true" />
+            ) : null}
         </span>
     );
 }

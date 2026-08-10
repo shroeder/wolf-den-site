@@ -2,6 +2,7 @@
 
 import CollectionPanel from "@/components/CollectionPanel";
 import Leaderboard from "@/components/Leaderboard";
+import JewellerClient from "@/components/JewellerClient";
 import Quartermaster from "@/components/Quartermaster";
 import SailingBoards from "@/components/SailingBoards";
 
@@ -132,6 +133,33 @@ const QM_SHOP = {
     ],
 };
 
+// ── THE JEWELCUTTER ── owner-gated and database-backed, so the only way to judge the bench animation and the
+// socket reveal is against a fixture. Deliberately awkward again: a worn +6 legendary that already has an empty
+// socket waiting, an un-socketed epic, and one of the secret jewels.
+const JW = {
+    unlocked: true, gold: 48000, maxSockets: 1,
+    gems: [
+        { id: "ruby_t4", kind: "ruby", tier: 4, name: "Brilliant Ruby", color: "#ff5a6a", stats: { might: 11 }, count: 2,
+            canFuse: false, fuseCount: 3, fuseInto: { id: "ruby_t5", name: "Flawless Ruby", stats: { might: 16 } } },
+        { id: "emerald_t2", kind: "emerald", tier: 2, name: "Flawed Emerald", color: "#4fd18b", stats: { fortune: 4 },
+            count: 4, canFuse: true, fuseCount: 3, fuseInto: { id: "emerald_t3", name: "Polished Emerald", stats: { fortune: 7 } } },
+        { id: "wolfeye_t5", kind: "wolfeye", tier: 5, name: "Flawless Wolf's Eye", color: "#e8dcc6", secret: true,
+            stats: { might: 4, ferocity: 4, fortune: 4, crit_chance: 4, crit_power: 4 }, count: 1 },
+    ],
+    pieces: [
+        { id: "dragoncape", name: "Dragoncape", slot: "chest", rarity: "legendary", icon: "GiCape", cost: 12000,
+            equipped: true, enhanceLevel: 6, stats: { might: 18, crit_power: 9 },
+            statLine: "+18% Might · +9% Crit Power", sockets: [{ idx: 0, gem: null }], canCut: false },
+        { id: "dragon_shield", name: "Dragon Shield", slot: "off_hand", rarity: "epic", icon: "GiEyeShield",
+            cost: 6000, equipped: false, enhanceLevel: 0, stats: { ferocity: 12 }, statLine: "+12% Ferocity",
+            sockets: [], canCut: true },
+        { id: "warlord_plate", name: "Warlord Plate", slot: "chest", rarity: "epic", icon: "GiChestArmor",
+            cost: 6000, equipped: false, enhanceLevel: 2, stats: { might: 14 }, statLine: "+14% Might",
+            sockets: [{ idx: 0, gem: { id: "emerald_t3", name: "Polished Emerald", color: "#4fd18b", tier: 3,
+                stats: { fortune: 7 } } }], canCut: false },
+    ],
+};
+
 export default function BoardsLab() {
     return (
         <div className="stack">
@@ -173,6 +201,8 @@ export default function BoardsLab() {
                     onGamble={async () => ({ won: { tier: "gold", label: "Gold chest", color: "#ffb648", image: null } })}
                 />
             </section>
+
+            <JewellerClient initial={JW} />
 
             <CollectionPanel sets={SETS} feature="wheel" title="Wheel collection"
                 blurb="Won only from this wheel — the bonus is permanent and you never have to wear them." />

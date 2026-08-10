@@ -81,6 +81,10 @@ export const SOCKET_COST = {
 };
 export const socketCost = (rarity) => SOCKET_COST[rarity] || SOCKET_COST.common;
 
+// Three of a kind make one of the tier above. Three rather than two because two is an upgrade path so cheap
+// that the lower tiers stop being drops and start being currency; three keeps a Flawless rare.
+export const FUSE_COUNT = 3;
+
 // ONE socket per piece for now. Written as a number rather than a boolean because the bench is the only thing
 // that would have to change to allow two, and every read below already counts rather than tests.
 export const MAX_SOCKETS = 1;
