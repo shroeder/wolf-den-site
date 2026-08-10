@@ -505,6 +505,40 @@ function publicBout(b) {
     };
 }
 
+// ── FINDING A FIGHT ──────────────────────────────────────────────────────────────────────────────────────────
+// One button, the way the sea does it. The list was two stacked lists of eighty rows asking you to compare
+// strangers before you had fought once — and the comparison is not a decision anybody has the information to
+// make, because a name and a vigour number do not tell you whether you can take them.
+//
+// "Someone your own size" is a POWER ratio, aimed a shade in your favour: this is a fight against the Den, not
+// a ladder rung you have to earn. Members and Gauntlet tiers go in the same hat; a real member is weighted up,
+// because beating a person is a better story than beating a dummy — but only when one of them is your size.
+const TARGET_RATIO = 0.95;   // their power against yours: a shade in your favour
+const SHORTLIST = 7;         // how many of the closest go in the hat
+const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your size
+
+function matchArenaOpponent(buyerId, myPower, board, bestTier) {
+    const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
+    const all = [];
+    for (const o of board) {
+        if (String(o.id) === String(buyerId)) continue;
+        all.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
+    }
+    // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can
+    // never hand you a tier a crafted POST would have been refused.
+    const maxTier = Math.max(1, (Number(bestTier) || 0) + NPC_REACH);
+    for (let t = 1; t <= maxTier; t += 1) {
+        const n = npcFor(t);
+        if (!n) break;
+        all.push({ kind: "npc", tier: t, boost: 1, d: dist((n.vigour || 0) + (n.might || 0) * 4) });
+    }
+    if (!all.length) return null;
+    all.sort((a, z) => a.d - z.d);
+    const shortlist = all.slice(0, SHORTLIST).map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
+    let roll = Math.random() * shortlist.reduce((sum, c) => sum + c.w, 0);
+    return shortlist.find((c) => (roll -= c.w) <= 0) || shortlist[0];
+}
+
 export async function startBout(buyerId, targetId = null) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
@@ -519,7 +553,14 @@ export async function startBout(buyerId, targetId = null) {
     // A member, or a tier out of the Gauntlet. Both resolve to the same shape so the engine below needs no
     // idea which it is. There is no reach check any more: points are accrued, not swapped, so no opponent is
     // off limits and the target list is a convenience rather than the only thing holding the rules up.
-    const npcTier = typeof targetId === "string" && targetId.startsWith("npc:") ? Number(targetId.slice(4)) : 0;
+    // No target (or an explicit "auto") means: find me one.
+    let target = targetId;
+    if (!target || target === "auto") {
+        const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0);
+        if (!m) return { ok: false, error: "no_target", ...(await getArenaState(buyerId)) };
+        target = m.kind === "npc" ? `npc:${m.tier}` : m.id;
+    }
+    const npcTier = typeof target === "string" && target.startsWith("npc:") ? Number(target.slice(4)) : 0;
     let foe = null;
     let foeKit = null;
     if (npcTier > 0) {
@@ -536,7 +577,7 @@ export async function startBout(buyerId, targetId = null) {
         // brings the same two moves and can be planned against.
         foeKit = { ...n, abilities: npcAbilities(npcTier), vigour: n.vigour };
     } else {
-        foe = board.find((o) => o.id === targetId);
+        foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
         foeKit = await kitFor(foe.id);
     }

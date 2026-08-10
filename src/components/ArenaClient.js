@@ -370,7 +370,6 @@ export default function ArenaClient({ initial }) {
     // The ladder screen carries three jobs now — who to fight, how you fight, and what you have trained. One
     // scroll for all three was already long before the tree existed.
     const [tab, setTab] = useState("fight");
-    const [who, setWho] = useState("npc");        // which opponent list — the Gauntlet or the member ladder
     const [boardAll, setBoardAll] = useState(false);
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
@@ -1160,79 +1159,25 @@ export default function ArenaClient({ initial }) {
                 </p>
             ) : null}
 
-            {/* ── ONE OPPONENT LIST ── the Gauntlet and the member ladder were two stacked lists of the same
-                row, one after the other, and you had to scroll past all of one to reach the other. They are
-                the same question — who am I fighting — so they are one list with a switch. */}
-            <div className="ar-who">
-                <button type="button" className={`ar-who-btn${who === "npc" ? " is-on" : ""}`}
-                    onClick={() => { Sfx.ui(); setWho("npc"); }}>
-                    The Gauntlet<em>best tier {st.stats?.npcBest || 0}</em>
-                </button>
-                <button type="button" className={`ar-who-btn${who === "member" ? " is-on" : ""}`}
-                    onClick={() => { Sfx.ui(); setWho("member"); }}>
-                    Members<em>{st.targets?.length || 0} in the Den</em>
-                </button>
-            </div>
+            {/* ── ONE BUTTON ── it was two stacked lists of eighty rows behind a switch, and picking off them
+                is not a decision anybody has the information to make: a name, a level and a vigour number do
+                not tell you whether you can take somebody. The sea answers this with one button and so does
+                this now — the server matches you against someone your own size, member or Gauntlet, aimed a
+                shade in your favour. The Gauntlet's tiers are still there to be climbed; you just meet them
+                when you are the right size for them.
 
-            {who === "npc" ? (
-                <div className="ar-targets ar-gaunt">
-                    {st.gauntlet?.length ? st.gauntlet.map((n) => (
-                        <div key={n.id} className={`ar-target is-npc${n.beaten ? " is-beaten" : ""}`}
-                            style={{ "--el": n.color }}>
-                            <span className="ar-target-pos">T{n.tier}</span>
-                            <div className="ar-portrait is-npc">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={n.sprite} alt="" draggable="false" />
-                            </div>
-                            <div className="ar-target-body">
-                                <b>{n.name}{n.beaten ? <i className="ar-beat-tick"> ✓</i> : null}</b>
-                                <em>{n.blurb} · {n.vigour} vigour</em>
-                            </div>
-                            <div className="ar-target-go">
-                                <span className="ar-prize">+{money(n.reward.vp)} VP</span>
-                                <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
-                                    onClick={() => { unlock(); Sfx.ui(); act("start", { target: n.id }); }}>
-                                    {st.fightsLeft <= 0 ? "Spent" : n.beaten ? "Again" : "Fight"}
-                                </button>
-                            </div>
-                        </div>
-                    )) : <p className="ar-none">The Gauntlet is being set up.</p>}
-                </div>
-            ) : (
-                /* No reach window: points are accrued, so a fight can never cost you rank and there is no
-                   such thing as an opponent who is off limits. */
-                <div className="ar-targets">
-                    {st.targets?.length ? st.targets.map((o) => (
-                        <div key={o.id} className="ar-target">
-                            <span className="ar-target-pos">#{o.rank}</span>
-                            <div className="ar-portrait is-tiny">
-                                {o.sprite ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={o.sprite} alt="" draggable="false" style={{ transform: "scaleX(-1)" }} />
-                                ) : <span className="ar-noface" aria-hidden="true" />}
-                            </div>
-                            <div className="ar-target-body">
-                                <b>{o.name}</b>
-                                {/* This said "Lv 34 · 241 vigour · {o.tell}" — and `tell` is never set by the
-                                    server, on this row or anywhere else, so every opponent on the ladder
-                                    rendered with a trailing separator and nothing after it. Their record is
-                                    real, free (standings already selects it) and the thing you actually want
-                                    to know before spending one of ten daily challenges on them. */}
-                                <em>Lv {o.level} · {o.vigour} vigour · {o.wins ?? 0}W&ndash;{o.losses ?? 0}L · {money(o.vp)} VP</em>
-                            </div>
-                            <div className="ar-target-go">
-                                <span className="ar-prize">+{money(o.reward.vp)} VP</span>
-                                <button type="button" className="ar-btn is-sm" disabled={busy || st.fightsLeft <= 0}
-                                    onClick={() => act("start", { target: o.id })}>
-                                    {st.fightsLeft <= 0 ? "Spent" : "Challenge"}
-                                </button>
-                            </div>
-                        </div>
-                    )) : (
-                        <p className="ar-none">Nobody else has entered the arena yet — try the Gauntlet.</p>
-                    )}
-                </div>
-            )}
+                The lists themselves are not missed: the standings below are who is who, and the recap after a
+                bout is where an opponent actually becomes a name you remember. */}
+            <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0}
+                onClick={() => { unlock(); Sfx.ui(); act("start", { target: "auto" }); }}>
+                <GiCrossedSwords aria-hidden="true" />
+                <span>
+                    <b>{st.fightsLeft > 0 ? "Find a fight" : "No fights left today"}</b>
+                    <em>{st.fightsLeft > 0
+                        ? "Someone your own size — a member of the Den, or the Gauntlet"
+                        : "They come back at midnight"}</em>
+                </span>
+            </button>
 
             {/* The standings are context, not the job. Three rows, and the rest on request. */}
             {st.board?.length ? (
@@ -2264,6 +2209,17 @@ function Styles() {
 
             .ar-ability.is-static { cursor: default; }
 
+            /* ── FIND A FIGHT ── the one button that replaced two lists. Sized like the thing it is: the
+               reason you opened the screen. */
+            .ar-find { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0 4px;
+                padding: 15px 17px; border-radius: 15px; cursor: pointer; text-align: left;
+                color: #22180a; border: 1px solid rgba(255,236,170,0.85);
+                background: linear-gradient(180deg, #f6c34a, #d99a1e 52%, #a86f10);
+                box-shadow: 0 6px 20px rgba(180,120,20,0.38); }
+            .ar-find:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); box-shadow: none; }
+            .ar-find svg { width: 30px; height: 30px; flex: none; }
+            .ar-find b { display: block; font-family: var(--font-display); font-weight: 900; font-size: 1.06rem; }
+            .ar-find em { display: block; font-style: normal; font-size: 0.78rem; opacity: .82; margin-top: 2px; }
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
             /* The drawer: it takes its space from the ring rather than from the page, and never more than a
