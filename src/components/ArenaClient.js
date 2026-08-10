@@ -1183,14 +1183,17 @@ export default function ArenaClient({ initial }) {
                     <div className="ar-arm-grid">
                         {(st.armoury || []).map((a) => {
                             const poor = (st.laurels || 0) < a.cost;
+                            // Second Wind hands back challenges you have SPENT, so with a full allowance it
+                            // would take laurels and give you nothing. Off until it is worth something.
+                            const useless = a.kind === "fights" && st.fightsLeft >= st.fightsPerDay;
                             return (
-                                <div key={a.id} className={`ar-arm${poor ? " is-poor" : ""}`}>
+                                <div key={a.id} className={`ar-arm${poor || useless ? " is-poor" : ""}`}>
                                     <b>{a.name}</b>
                                     <p>{a.blurb}</p>
                                     {a.note ? <em>{a.note}</em> : null}
-                                    <button type="button" className="ar-btn is-sm" disabled={busy || poor}
+                                    <button type="button" className="ar-btn is-sm" disabled={busy || poor || useless}
                                         onClick={() => { Sfx.ui(); act("buy_armoury", { id: a.id }); }}>
-                                        {money(a.cost)} laurels
+                                        {useless ? "Nothing to restore" : `${money(a.cost)} laurels`}
                                     </button>
                                 </div>
                             );

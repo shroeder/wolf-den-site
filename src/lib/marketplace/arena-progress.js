@@ -220,6 +220,19 @@ export async function buyArmoury(buyerId, id) {
         if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     }
 
+    // ── DO NOT SELL SOMEBODY NOTHING ─────────────────────────────────────────────────────────────────────
+    // Second Wind is spent as a REDUCTION of today's used count, so buying it before you have used any
+    // challenges would take 420 laurels and hand back fights you already had. Refused rather than silently
+    // wasted: a shop that takes your money for a no-op is worse than one that says no.
+    if (item.kind === "fights") {
+        const used = await db.queryOne(
+            `SELECT CASE WHEN fights_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                         THEN COALESCE(fights_today, 0) ELSE 0 END AS n
+               FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
+        ).catch(() => null);
+        if ((Number(used?.n) || 0) <= 0) return { ok: false, error: "nothing_to_restore" };
+    }
+
     const paid = await db.queryOne(
         `UPDATE mkt_arena SET laurels = laurels - $2 WHERE buyer_id = $1 AND laurels >= $2 RETURNING laurels`,
         [buyerId, item.cost]

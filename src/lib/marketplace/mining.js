@@ -386,7 +386,15 @@ export async function descend(buyerId) {
         const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
         if (jewelsEnabled(buyerId)) {
             const jewel = rollJewel(depth);
-            if (jewel) haul.push({ kind: "gem", gemId: jewel });
+            if (jewel) {
+                // Carried WITH its name and colour. The haul chip falls back to the gold-coin icon for a kind
+                // it does not recognise, so a bare { kind: "gem" } would have shown the rarest drop in the
+                // mine as a handful of change.
+                const { gemById } = await import("@/lib/marketplace/gems.js");
+                const g = gemById(jewel);
+                haul.push({ kind: "gem", gemId: jewel, name: g?.name || "A jewel", color: g?.color || "#8fd0ff",
+                    art: "/images/bonus/trove.png" });
+            }
         }
     } catch { /* the bench is not open */ }
 
