@@ -246,6 +246,12 @@ async function kitFor(buyerId) {
         // Fortune already means "luck" everywhere else in the Den; in here it is what moves your crit chance,
         // so the dial sits on the gear you built rather than on anything you do in the moment.
         fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
+        // CRIT OFF THE GEAR. The ring read Fortune and nothing else, so the two stats that exist specifically
+        // to make you crit — the ones the boss fight has always used — did nothing here. A kit built to crit
+        // critted at the floor. Named critStat/critPower rather than crit/critMult because the skill tree
+        // already owns those two words on the perks map, and the collision would be silent.
+        critStat: Number(stats.crit_chance) || 0,
+        critPower: Number(stats.crit_power) || 0,
         // The tree and the upgrade tracks both land here, so the engine reads one set of numbers and does not
         // care which system paid for them.
         vigour: arenaVigour(level, gearPower) + Math.round(perks.vigour || 0),
@@ -616,7 +622,7 @@ export async function startBout(buyerId, targetId = null) {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
             npc: Boolean(npcTier), tier: npcTier || null,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            speed: foeKit.speed, fortune: foeKit.fortune,
+            speed: foeKit.speed, fortune: foeKit.fortune, critStat: foeKit.critStat, critPower: foeKit.critPower,
         },
         // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
         // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
@@ -627,7 +633,8 @@ export async function startBout(buyerId, targetId = null) {
         // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
         // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
-            fortune: me.fortune, gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
+            fortune: me.fortune, critStat: me.critStat, critPower: me.critPower,
+            gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
         hp: me.vigour, maxHp: me.vigour,
@@ -723,15 +730,25 @@ export async function fightRound(buyerId, opts = {}) {
     // off their own gear's Fortune exactly as yours does.
     const CRIT_BASE = 0.12;
     const CRIT_PER_FORTUNE = 0.0035;
+    // Crit chance is the scarcer stat — it tops out at 20 on a single piece where Fortune reaches 40 — so a
+    // point of it is worth more than a point of Fortune. Half the rate the boss fight gives it, because the
+    // arena's cap is 38% rather than 90% and a boss-crit kit would otherwise sit on the cap on its own.
+    const CRIT_PER_CHANCE = 0.005;
     const CRIT_CAP = 0.38;
     const CRIT_MULT = 1.8;
     // Everything the skill tree bought you that is not already baked into a stat. `|| {}` because a bout that
     // was already open when this shipped has no perks on it.
     const P = b.me?.perks || {};
-    const critFor = (fortune) => Math.min(CRIT_CAP, CRIT_BASE + (Number(fortune) || 0) * CRIT_PER_FORTUNE);
-    const critChance = Math.min(CRIT_CAP + (P.crit || 0), critFor(b.me?.fortune) + (P.crit || 0));
-    const myCritMult = CRIT_MULT + (P.critMult || 0);
-    const foeCritChance = critFor(b.foe?.fortune);
+    const critFor = (side) => Math.min(CRIT_CAP, CRIT_BASE
+        + (Number(side?.fortune) || 0) * CRIT_PER_FORTUNE
+        + (Number(side?.critStat) || 0) * CRIT_PER_CHANCE);
+    // Crit power raises the multiplier off the same denominator the boss uses. It sits on a 1.8 base rather
+    // than a 2.5 one, so it is worth proportionally MORE in here — which is the point: it was worth nothing.
+    const critPowerOf = (side) => (Number(side?.critPower) || 0) / 100;
+    const critChance = Math.min(CRIT_CAP + (P.crit || 0), critFor(b.me) + (P.crit || 0));
+    const myCritMult = CRIT_MULT + (P.critMult || 0) + critPowerOf(b.me);
+    const foeCritChance = critFor(b.foe);
+    const foeCritMult = CRIT_MULT + critPowerOf(b.foe);
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
     const cool = (n) => { for (const k of Object.keys(b.cd)) b.cd[k] = Math.max(0, (b.cd[k] || 0) - n); };
@@ -949,7 +966,7 @@ export async function fightRound(buyerId, opts = {}) {
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const foeCrit = Math.random() < foeCritChance;
-        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back * (foeCrit ? CRIT_MULT : 1)));
+        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back * (foeCrit ? foeCritMult : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
         // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
         const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)));
