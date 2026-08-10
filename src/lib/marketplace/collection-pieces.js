@@ -60,6 +60,16 @@ export const COLLECTION_PIECES = [
     { id: "fd_tongs", set: "founder", name: "Long Crucible Tongs", rarity: "epic", icon: "GiTongs", flavor: "Long enough to keep your eyebrows.", depth: { crucible: 5 }, source: "mining", sort: 989 },
     { id: "fd_bellows_charm", set: "founder", name: "Bellows Charm", rarity: "rare", icon: "GiWindHole", flavor: "A scrap of the old forge's leather, kept for luck.", depth: { bellows: 4 }, source: "mining", sort: 990 },
     { id: "fd_slagsifter", set: "founder", name: "Slagsifter's Ring", rarity: "rare", icon: "GiRing", flavor: "Everyone else throws the clinker out.", depth: { crucible: 4 }, source: "mining", sort: 991 },
+    // ── THE GUNNER'S COMMISSION ── the first collection you earn by FIGHTING. Every other set here comes out
+    // of a chest, a shop, the wheel or the mine; this one is bought with doubloons, and doubloons only come
+    // off a won fight at sea. `art` is a plain noun for the sprite generator (see scripts/gen-piece-sprites),
+    // because a piece has no slot to infer one from and these six are drawn rather than glyphed.
+    { id: "gc_quadrant", set: "commission", name: "Brass Quadrant", rarity: "epic", icon: "GiSextant", art: "brass navigational quadrant instrument", flavor: "Lays a gun by the angle of the deck, not the eye of the gunner.", sea: { broadside: 5 }, source: "sea_fight", sort: 992 },
+    { id: "gc_rammer", set: "commission", name: "Worn Rammer", rarity: "rare", icon: "GiSpearHook", art: "long wooden cannon rammer with a sheepskin-wrapped head", flavor: "The sheepskin has been replaced nine times. The staff never has.", sea: { broadside: 4 }, source: "sea_fight", sort: 993 },
+    { id: "gc_bell", set: "commission", name: "Ship's Bell", rarity: "epic", icon: "GiRingingBell", art: "tarnished bronze ship's bell with a rope lanyard", flavor: "Rung for the watch, for the dead, and for beating to quarters.", sea: { ironclad: 5, bounty: 3 }, source: "sea_fight", sort: 994 },
+    { id: "gc_marque", set: "commission", name: "Letter of Marque", rarity: "epic", icon: "GiScrollUnfurled", art: "sealed parchment letter of marque with a red wax seal and ribbon", flavor: "It makes the same act legal. Nothing else about it changes.", sea: { plunder: 6 }, source: "sea_fight", sort: 995 },
+    { id: "gc_horn", set: "commission", name: "Powder Horn", rarity: "rare", icon: "GiPowderBag", art: "scrimshawed powder horn on a leather strap", flavor: "Scratched with the names of eleven ships and one date.", sea: { ironclad: 4 }, source: "sea_fight", sort: 996 },
+    { id: "gc_colours", set: "commission", name: "The Black Colours", rarity: "mythic", icon: "GiPirateFlag", art: "tattered JET-BLACK pirate flag with a white skull-and-crossbones, flying from a short staff", flavor: "Run these up and the negotiating is finished.", sea: { broadside: 6, plunder: 4 }, source: "sea_fight", sort: 997 },
 ];
 
 export const PIECE_IDS = COLLECTION_PIECES.map((p) => p.id);

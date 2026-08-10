@@ -8,7 +8,8 @@ import {
     GiGriffinSymbol, GiUnicorn, GiSpikedDragonHead, GiPegasus, GiDinosaurRex, GiWhaleTail, GiChameleonGlyph,
     GiDragonHead, GiDragonSpiral, GiSpectre,
     // Expanded roster
-    GiPenguin, GiHedgehog, GiTurtle, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
+    GiPenguin, GiHedgehog, GiTurtle, GiTurtleShell, GiParrotHead, GiMonkey, GiPanda, GiDolphin, GiCrab, GiSheep, GiKangaroo,
+    GiFalconMoon,
     GiFlamingo, GiBee, GiSloth, GiRaccoonHead, GiBeaver, GiToucan, GiLadybug, GiButterfly, GiJellyfish,
     GiOctopus, GiSquid, GiAxolotl, GiTropicalFish, GiSeaSerpent, GiKrakenTentacle, GiWyvern, GiMinotaur,
     GiCentaur, GiMammoth, GiPolarBear, GiVulture, GiFairy, GiImp, GiElephant,
@@ -208,6 +209,20 @@ export const COLLECTIBLES = [
     { id: "cinder_scarab", name: "Cinder Scarab", Icon: GiScarabBeetle, color: "#ff9f1c", rarity: "epic", source: "chest", chestTier: "gold", activeStat: "crit_power", depth: { bellows: 5, crucible: 2 }, hint: "It nests in the furnace and fans the coals", spritePrompt: "a glowing ember-orange scarab beetle with cracks of molten light between its wing cases, trailing sparks" },
     { id: "geode_sprite", name: "Geode Sprite", Icon: GiCrystalGrowth, color: "#b98cff", rarity: "epic", source: "chest", chestTier: "mythic", activeStat: "fortune", depth: { prospect: 5, hew: 2 }, hint: "Chimes when there is something worth digging for", spritePrompt: "a tiny cheerful crystal elemental sprite made of glowing violet geode shards, floating with a soft inner light" },
     { id: "deep_golem", name: "Deep Golem", Icon: GiGolemHead, color: "#ffd75e", rarity: "ascendant", source: "chest", chestTier: "ascendant", activeStat: "might", depth: { hew: 5, nerve: 4, lodesense: 3 }, hint: "The mountain, walking — master of the deep", spritePrompt: "a majestic hulking golem of dark stone veined with glowing golden ore, awe-inspiring, standing tall" },
+
+    // ── SEA-FIGHT PETS ── the only way to get one is to WIN a fight at sea (an encounter today; fleet and
+    // raid battles too once those launch). Every other sailing pet falls out of a chest, which means the whole
+    // pet side of sailing rewards digging rather than fighting — you could own the Sea Wyrm without ever
+    // having run a gun out.
+    //
+    // Each carries SEA affinity only, so they make you better at the thing that dropped them and nothing else.
+    // Chances are absolute per win and tier-scaled at the drop site (see maybeGrantSeaFightPet): the Powder
+    // Monkey turns up in a season of skirmishing, the Bosun is a story.
+    { id: "powder_monkey", name: "Powder Monkey", Icon: GiMonkey, color: "#d9a05b", rarity: "rare", source: "encounter", seaFightChance: 0.030, activeStat: "crit_chance", sea: { broadside: 4 }, hint: "Runs cartridges up from the magazine faster than anyone should", spritePrompt: "a small nimble ship's monkey in a scruffy red waistcoat, clutching a paper powder cartridge, soot on its face" },
+    { id: "ironback", name: "Ironback", Icon: GiTurtleShell, color: "#7f9bab", rarity: "epic", source: "encounter", seaFightChance: 0.014, activeStat: "might", sea: { ironclad: 6 }, hint: "Rides the waterline and takes the ball meant for your planks", spritePrompt: "a stout sea turtle with a barnacled shell plated in riveted iron scutes, weathered and unbothered" },
+    { id: "stormcrow", name: "Stormcrow", Icon: GiRaven, color: "#8c7ad6", rarity: "epic", source: "encounter", seaFightChance: 0.011, activeStat: "gold_find", sea: { plunder: 5, bounty: 3 }, hint: "Follows gunfire, and knows which wreck is worth the trip", spritePrompt: "a glossy black storm crow with a silver coin held in its beak, wind-ruffled feathers, storm light on its wings" },
+    { id: "chain_shrike", name: "Chainshot Shrike", Icon: GiFalconMoon, color: "#5ad0e6", rarity: "legendary", source: "encounter", seaFightChance: 0.0035, activeStat: "crit_power", sea: { broadside: 6, ironclad: 3 }, hint: "Takes the rigging off a ship the way its cousins take a hedgerow", spritePrompt: "a fierce grey-and-white shrike with a hooked beak, a short length of iron chain gripped in its talons, wings swept back mid-dive" },
+    { id: "bosun_shade", name: "The Bosun", Icon: GiSpectre, color: "#ffd75e", rarity: "ascendant", source: "encounter", seaFightChance: 0.0006, activeStat: "ferocity", sea: { broadside: 5, ironclad: 5, plunder: 4 }, hint: "Still keeping a deck he has not stood on in ninety years — master of the sea fight", spritePrompt: "a majestic translucent golden ghost of an old bosun in a tattered coat and tricorn, a spectral silver call-whistle at his chest, awe-inspiring" },
 
     // ── Boss-battle-only drops ─────────────────────────────────────────────────────────────────────
     { id: "vulture", name: "Vulture", Icon: GiVulture, color: "#8794a3", rarity: "rare", source: "boss", activeStat: "crit_chance", hint: "Circles the fallen", spritePrompt: "a circling bald vulture" },

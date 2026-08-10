@@ -128,3 +128,29 @@ export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false 
     }
     return null;
 }
+
+// ── PETS THAT COME OFF A FIGHT AT SEA ────────────────────────────────────────────────────────────────────────
+// Every other sailing pet falls out of a chest, which means the whole pet side of sailing rewarded DIGGING —
+// you could own the Sea Wyrm without ever having run a gun out. These five are the other half: the only way to
+// get one is to win, and the harder the thing you beat, the better your odds.
+//
+// The multiplier is the tier of what you sank, not your own level. Beating a fishing skiff for the hundredth
+// time is not how you find the Bosun; it is 0.4x on a tier-1 and 2.4x on a tier-5, so the chase points at the
+// fights people actually avoid.
+const SEA_FIGHT_TIER_MULT = [0, 0.4, 0.8, 1.3, 1.8, 2.4];
+
+export async function maybeGrantSeaFightPet(buyerId, { tier = 1 } = {}) {
+    if (!buyerId) return null;
+    const mult = SEA_FIGHT_TIER_MULT[Math.max(0, Math.min(5, Math.round(tier)))] ?? 1;
+    if (mult <= 0) return null;
+    const owned = await ownedPetSet(buyerId);
+    const eligible = COLLECTIBLES
+        .filter(unlocked(buyerId))
+        .filter((p) => p.seaFightChance > 0 && !owned.has(p.id))
+        // Rarest first, so a lucky roll that clears two thresholds pays the scarcer pet.
+        .sort((a, b) => a.seaFightChance - b.seaFightChance);
+    for (const p of eligible) {
+        if (Math.random() < p.seaFightChance * mult) return grantDrop(buyerId, p, "sea_fight", { tier });
+    }
+    return null;
+}

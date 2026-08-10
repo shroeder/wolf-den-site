@@ -15404,3 +15404,23 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @keyframes qmFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
 .qm-reveal-card b { display: block; font-family: var(--font-display); font-size: 1.3rem; color: var(--c); }
 .qm-reveal-card em { display: block; font-style: normal; font-size: 0.76rem; color: #9aa2ab; margin: 4px 0 14px; }
+
+/* THE QUARTERMASTER DOOR on the Guns station. Struck-metal plaque rather than a button-shaped button: the
+   purse IS the affordance, so the number reads first and the word second. Matches .sby-purse in the yard
+   header — it is the same object, on the other side of the door. */
+.sby-purse-cta {
+    display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 12px;
+    padding: 10px 14px; border-radius: 12px; cursor: pointer;
+    border: 1px solid rgba(255,215,94,0.34);
+    background: linear-gradient(180deg, rgba(255,215,94,0.14), rgba(255,215,94,0.05));
+    color: inherit; text-align: left; transition: border-color 140ms, background 140ms, transform 90ms;
+}
+.sby-purse-cta:hover:not(:disabled) { border-color: rgba(255,215,94,0.6); background: linear-gradient(180deg, rgba(255,215,94,0.2), rgba(255,215,94,0.08)); }
+.sby-purse-cta:active:not(:disabled) { transform: translateY(1px); }
+.sby-purse-cta:disabled { opacity: 0.55; cursor: default; }
+.sby-purse-cta-coin { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.sby-purse-cta b { font-size: 1.06rem; font-weight: 900; color: #ffd75e; }
+.sby-purse-cta em {
+    margin-left: auto; font-style: normal; font-size: 0.74rem; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.62);
+}

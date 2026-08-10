@@ -4,6 +4,9 @@
 const SRC = new URL("../../src/", import.meta.url).href;
 
 export function resolve(specifier, context, next) {
+    // `server-only` is a Next build-time marker with no runtime behaviour — outside Next it is just a package
+    // that is not installed. Stubbed so the pure catalog modules (sets, collectibles) can be exercised here.
+    if (specifier === "server-only") return { url: "data:text/javascript,", shortCircuit: true };
     if (specifier.startsWith("@/")) return next(SRC + specifier.slice(2), context);
     return next(specifier, context);
 }

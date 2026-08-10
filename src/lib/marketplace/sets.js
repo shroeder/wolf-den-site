@@ -150,6 +150,21 @@ export const ITEM_SETS = [
             desc: "The Dread Pirate: +1 raid every day, raid wins pay DOUBLE gold, and a surge of Plunder & Bounty." },
         weakness: null,
     },
+    {
+        // ── THE GUNNER'S COMMISSION ── the first collection you earn by FIGHTING. Corsair is the *sailing* set
+        // and its pieces come out of chests and the XP shop; this one is bought with doubloons, and doubloons
+        // only come off a won fight at sea. Same currency the set makes you better at earning.
+        //
+        // The capstone is deliberately not another percentage. It hands you a Reckoning at the opening bell —
+        // one free unanswered broadside, before she has fired a shot — because that is a thing you can SEE
+        // happen, and because it rewards picking the fight you were going to avoid.
+        id: "commission", collection: true, feature: "sea", name: "The Gunner's Commission",
+        items: ["gc_quadrant", "gc_rammer", "gc_bell", "gc_marque", "gc_horn", "gc_colours"],
+        bonuses: [{ need: 2, sea: { broadside: 4 } }, { need: 4, sea: { broadside: 5, ironclad: 5 } }],
+        capstone: { openingReckoning: true, sea: { broadside: 5, plunder: 5 },
+            desc: "Beat to Quarters: every fight at sea opens with a Reckoning already charged — one free broadside before she answers." },
+        weakness: null,
+    },
     // ── FARM SETS ── bonuses are FARM affinity (seedLuck/growSpeed/harvestLuck/goldHarvest), NOT boss power, and
     // capstones are farm powers read+applied in farm-crops.js (setFarmGrowBonus / setFarmDoubleHarvest). Pieces
     // are utility-slot gear (helmet/belt/back/amulet/off_hand/ring) with FARM affixes — see items.js.
@@ -338,6 +353,12 @@ export function setRaidBonus(ownedIds) {
 export function setDoublesRaidGold(ownedIds) {
     const counts = collectedCounts(ownedIds);
     for (const set of ITEM_SETS) if (set.capstone?.doubleRaidGold && (counts.get(set.id) || 0) >= set.items.length) return true;
+    return false;
+}
+// Does a full-set capstone open every sea fight with the Reckoning already charged? (Gunner's Commission.)
+export function setOpeningReckoning(ownedIds) {
+    const counts = collectedCounts(ownedIds);
+    for (const set of ITEM_SETS) if (set.capstone?.openingReckoning && (counts.get(set.id) || 0) >= set.items.length) return true;
     return false;
 }
 

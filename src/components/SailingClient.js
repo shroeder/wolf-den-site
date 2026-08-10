@@ -8,7 +8,7 @@ import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
 import ShipBattleScene from "@/components/ShipBattleScene";
-import ShipYard, { Track as ShipTrack } from "@/components/ShipYard";
+import ShipYard, { Track as ShipTrack, Dbl } from "@/components/ShipYard";
 import GunDeck from "@/components/GunDeck";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
@@ -942,15 +942,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                             ))}
                         </div>
-                        {/* SHIP BATTLES ARE UNDER CONSTRUCTION — the whole surface is hidden unless the server
-                            says this account is on the dev allow-list (see raidsEnabled in sailing.js). */}
-                        {state.combat ? (
+                        {/* THE FLEET LADDER is under construction — hidden unless the server says this account
+                            is on the dev allow-list (see raidsEnabled). `combat` itself is public now: everyone
+                            fights encounters, so everyone gets a gun deck and a Quartermaster. */}
+                        {state.combat?.fleet ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy}
                                 onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
                                 ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
                         ) : null}
-                        {state.combat ? <p className="sail-raid-wip">🚧 Ship battles are under construction — dev only.</p> : null}
+                        {state.combat?.fleet ? <p className="sail-raid-wip">🚧 Ship battles are under construction — dev only.</p> : null}
                     </div>
                 )}
 
@@ -991,7 +992,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <b>Digging</b><em>{dig?.stamina} digs left</em>
                             </button>
                         )}
-                        {liveStatus === "sailing" && state.combat ? (
+                        {liveStatus === "sailing" && state.combat?.fleet ? (
                             <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
                                 <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
                                 <b>Raid</b><em>{Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left</em>
@@ -1180,6 +1181,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 onBuy={(track) => act(track.action || "upgrade_combat", track.action ? {} : { track: track.key })} />
                         ))}
                     </div>
+                    {/* THE DOOR TO THE QUARTERMASTER. It used to be reachable only through the raid picker,
+                        which is hidden while the fleet ladder is under construction — so every member earning
+                        doubloons off encounters had a purse and nowhere to spend it. The purse IS the button:
+                        the number you are looking at is the reason to press it, and nothing else needs saying. */}
+                    <button type="button" className="sby-purse-cta" disabled={busy}
+                        onClick={() => { setBattleTab("shop"); setYardOpen(true); }}>
+                        <Dbl className="sby-purse-cta-coin" />
+                        <b>{(state.combat.doubloons || 0).toLocaleString()}</b>
+                        <em>Quartermaster</em>
+                    </button>
                 </section>
             </> : null}
 

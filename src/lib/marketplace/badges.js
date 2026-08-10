@@ -343,6 +343,12 @@ const BADGE_BONUSES = {
     merchant_met: S({ bounty: 2 }), merchant_perfect: S({ bounty: 3 }),
     wave_friendly: S({ tailwind: 1 }), wave_ambassador: S({ tailwind: 2, bounty: 1 }), wave_beloved: S({ tailwind: 3, bounty: 2 }),
     sea_tested: S({ ironclad: 2 }), sea_veteran: S({ ironclad: 3 }),
+    // ── SEA FIGHTS ── the chase badges pay in the affinity of the thing they ask for: you get better at
+    // fighting by fighting, and the two hardest ones pay across the board.
+    first_blood_sea: S({ broadside: 1 }), monster_hunter: S({ broadside: 3, ironclad: 2 }),
+    leviathan_slayer: S({ broadside: 4, plunder: 3 }), sea_unscathed: S({ ironclad: 4 }),
+    reckoning_kill: S({ broadside: 3 }),
+    full_bestiary: S({ broadside: 5, ironclad: 5, plunder: 5, bounty: 4 }),
     // ── RAIDING → broadside / ironclad / plunder ──
     raid_marauder: S({ broadside: 3 }), raid_scourge: S({ broadside: 5, plunder: 3 }), raid_untouchable: S({ ironclad: 4 }),
     raid_plunderer: S({ plunder: 5 }), raid_defender: S({ ironclad: 3 }), raid_bastion: S({ ironclad: 5 }),

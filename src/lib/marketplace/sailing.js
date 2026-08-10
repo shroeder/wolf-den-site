@@ -26,7 +26,7 @@ import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fle
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { getSavedPorts, portsWithSaved } from "@/lib/marketplace/gun-ports-store.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
-import { setSeaBonus, setRaidBonus, setDoublesRaidGold } from "@/lib/marketplace/sets.js";
+import { setSeaBonus, setRaidBonus, setDoublesRaidGold, setOpeningReckoning } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge, getBadgeSea } from "@/lib/marketplace/badges.js";
@@ -36,6 +36,7 @@ import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { maybeGrantSeaFightPet } from "@/lib/marketplace/pet-drops.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
 import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
@@ -1037,7 +1038,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         })(),
         // SHIP BATTLES — the gun deck, the racks, the fleet ladder and the purse. Gated with raiding while the
         // rework is under construction; a member outside the allow-list gets null and renders nothing.
-        combat: raidsEnabled(buyerId) ? combatView(row, level, consumableArt, gunDeck) : null,
+        combat: combatView(row, level, consumableArt, gunDeck, pieces, raidsEnabled(buyerId)),
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1225,12 +1226,16 @@ async function openEncounterBattle(buyerId, enc, row) {
     };
     // `sys: false` is what turns the foe from a ship into an animal — see initBattleState.
     const state = initBattleState(mine, { ...foe, sys: enc.kind !== "monster" });
+    // BEAT TO QUARTERS. The Gunner's Commission capstone hands you a charged Reckoning at the opening bell —
+    // one free unanswered broadside before she has fired a shot. Applied here rather than in the engine so a
+    // fleet ladder fight is unaffected: the set is bought with doubloons, which only encounters pay.
+    if (setOpeningReckoning(await getOwnedPieceIds(buyerId).catch(() => []))) state.me.reck = RECKONING_AT;
     state.theirNext = planFoeRound(state, mine, foe);
     await saveBattle(buyerId, state, meta);
 }
 
-/** Pay out an encounter and let the voyage go again. */
-async function finishEncounterBattle(buyerId, meta, res) {
+/** Pay out an encounter and let the voyage go again. `reckoning` is true if the last shot was the free volley. */
+async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } = {}) {
     const enc = encounterById(meta.encId);
     const spoils = [];
     if (enc && res.win) {
@@ -1259,6 +1264,10 @@ async function finishEncounterBattle(buyerId, meta, res) {
         const xp = 30 + (enc.tier * 34);
         await awardXp(buyerId, "sail_encounter", { points: xp, gold: 12 + enc.tier * 9 }).catch(() => {});
         spoils.push({ kind: "xp", n: xp });
+
+        // The chase. Five pets exist only behind a win at sea, and the odds ride on the tier of what you sank.
+        const pet = await maybeGrantSeaFightPet(buyerId, { tier: enc.tier }).catch(() => null);
+        if (pet) spoils.push({ kind: "pet", id: pet.id, name: pet.name, rarity: pet.rarity, color: pet.color });
     }
 
     // THE CLOCK STARTS AGAIN. `returns_at` moves forward by exactly how long the boat sat still, so being
@@ -1277,14 +1286,33 @@ async function finishEncounterBattle(buyerId, meta, res) {
         [buyerId, JSON.stringify(done), res.win ? 1 : 0]
     ).catch(() => {});
 
+    // THE BESTIARY. A count cannot answer "have you beaten all twenty", so the ids are kept — which is also
+    // what makes the last badge a chase rather than a wait: it asks you to go and find the four you have been
+    // sailing past, not to grind the one you are comfortable with.
+    if (res.win) {
+        await db.query(
+            `UPDATE mkt_sailing
+                SET encounters_beaten = CASE WHEN encounters_beaten @> $2::jsonb THEN encounters_beaten
+                                             ELSE encounters_beaten || $2::jsonb END
+              WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify([meta.encId])]
+        ).catch(() => {});
+    }
+
     const tally = await readRow(buyerId);
     const won = tally?.encounters_won || 0;
     const fought = tally?.encounters_fought || 0;
+    const beaten = Array.isArray(tally?.encounters_beaten) ? tally.encounters_beaten : [];
     if (fought >= BADGE_ENC_TESTED) await grantEventBadge(buyerId, "sea_tested").catch(() => {});
     if (fought >= BADGE_ENC_VETERAN) await grantEventBadge(buyerId, "sea_veteran").catch(() => {});
     if (won >= 1) await grantEventBadge(buyerId, "first_blood_sea").catch(() => {});
     if (won >= 25) await grantEventBadge(buyerId, "monster_hunter").catch(() => {});
     if (res.win && enc?.tier >= 5) await grantEventBadge(buyerId, "leviathan_slayer").catch(() => {});
+    // Not a scratch: your timber is untouched. Planks, specifically — canvas and a dismounted gun do not
+    // count, or a monster fight (which can only ever hit your hull) would be the only place to earn it.
+    if (res.win && res.state?.me?.hp >= res.state?.me?.max) await grantEventBadge(buyerId, "sea_unscathed").catch(() => {});
+    if (res.win && reckoning) await grantEventBadge(buyerId, "reckoning_kill").catch(() => {});
+    if (ENCOUNTERS.every((e) => beaten.includes(e.id))) await grantEventBadge(buyerId, "full_bestiary").catch(() => {});
 
     await trackActivity(buyerId, "sail_encounter", { type: meta.encId, outcome: res.win ? "win" : "lose", tier: enc?.tier || 0 }).catch(() => {});
     return spoils;
@@ -1355,8 +1383,8 @@ export async function getSailingState(buyerId, skyKey = null) {
     })().catch(() => []);
     // The gun deck is a query, and decorate() is synchronous on purpose — fetched here and handed in, the
     // same way chest art and collections are.
-    const gunDeck = raidsEnabled(buyerId) ? await gunDeckView(buyerId, row).catch(() => null) : null;
-    const pieces = raidsEnabled(buyerId) ? await pieceShop(buyerId).catch(() => []) : [];
+    const gunDeck = await gunDeckView(buyerId, row).catch(() => null);   // your guns are how you fight an encounter
+    const pieces = await pieceShop(buyerId).catch(() => []);   // the Quartermaster is public — see combatView
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
@@ -1910,7 +1938,10 @@ const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || 
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
 
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
-function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = []) {
+// `ladder` is the FLEET only. It used to gate this whole view, which was right when the only way to fire a
+// gun was a fleet battle — but encounters are public now and they pay doubloons, so gating the yard would mint
+// a currency with nowhere to spend it and leave members fighting with guns they cannot upgrade.
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = [], ladder = false) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -1948,8 +1979,9 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
             }),
             // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
             // belongs with the guns rather than three cards away in the BOAT upgrade list, where it sat purely
-            // because it happens to be an older track bought with gold.
-            (() => {
+            // because it happens to be an older track bought with gold. It buys nothing at all without the
+            // ladder, though, so while that is under construction it is not shown.
+            ...(!ladder ? [] : [(() => {
                 const level = row?.raid_level || 0;
                 return {
                     key: "cunning", name: "Cunning", icon: "GiSpyglass", action: "upgrade_raid", currency: "gold",
@@ -1958,7 +1990,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                     cost: level >= MAX_RAID_LEVEL ? null : upgradeCost(level),
                     effect: `${raidDodgePct(level)}% free`,
                 };
-            })(),
+            })()]),
         ],
         ammo: AMMO_LIST.map((a) => ({
             id: a.id, name: a.name, icon: a.icon, blurb: a.blurb, basic: a.basic, price: a.price,
@@ -1977,12 +2009,13 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
             // counter showed the same bottle of mystery liquid five times, priced from 75 to 12,000.
             art: (l.consumable && consumableArt[l.consumable]) || null,
         })),
-        fleet: {
+        // The one part still under construction. Null hides the ladder entirely client-side.
+        fleet: ladder ? {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
             wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
             cleared: depth >= MAX_FLEET_RANK,
             ships: fleetView(depth),
-        },
+        } : null,
         // A battle you walked away from — closed the tab, locked the phone, reloaded. The sortie is already
         // spent, so this fight is the only one you have; handing it back on every state read is what lets the
         // screen put you straight back on deck instead of leaving a saved fight nobody can reach.
@@ -2320,7 +2353,7 @@ export async function shipBattleReckoning(buyerId) {
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
     const reward = meta.kind === "encounter"
-        ? await finishEncounterBattle(buyerId, meta, res)
+        ? await finishEncounterBattle(buyerId, meta, res, { reckoning: true })
         : meta.kind === "fleet"
             ? await finishFleetBattle(buyerId, meta, res)
             : await finishRaidBattle(buyerId, meta, res);
@@ -2612,7 +2645,9 @@ export async function pieceShop(buyerId) {
 }
 
 export async function buyPiece(buyerId, pieceId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    // NOT GATED. The under-construction gate covers the FLEET LADDER — the thing still being built. This is
+    // the doubloon economy, and doubloons come off encounters, which every member fights. Gating it would mint
+    // a currency with nowhere to spend it.
     const def = COLLECTION_PIECES.find((p) => p.id === String(pieceId));
     if (!def) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
     const owned = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
@@ -2643,7 +2678,6 @@ export const GAMBLE_TABLE = [
 ];
 
 export async function gambleChest(buyerId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const paid = await db.queryOne(
         `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
           WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
@@ -2669,7 +2703,6 @@ export async function gambleChest(buyerId) {
 
 /** Buy one thing out of the prize locker with doubloons. */
 export async function buyLocker(buyerId, id) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = LOCKER[String(id)];
     if (!def) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
     // Charge FIRST and conditionally, so two taps on a slow connection cannot buy two chests for one purse.
@@ -2693,7 +2726,6 @@ export async function buyLocker(buyerId, id) {
 // What is in the racks for the next battle. Loading a type you have none of is refused here rather than
 // silently swapped at fire time, so the loadout screen never lies about what you are about to shoot.
 export async function setLoadout(buyerId, ammoId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = AMMO[String(ammoId)];
     if (!def) return { ok: false, error: "bad_ammo", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
@@ -2760,7 +2792,6 @@ export async function gunDeckView(buyerId, row) {
 
 // Buy one level of one track on ONE gun.
 export async function upgradeGun(buyerId, gunIndex, track) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = GUN_TRACKS[String(track)];
     const idx = Math.floor(Number(gunIndex));
     if (!def || !Number.isFinite(idx) || idx < 0) return { ok: false, error: "bad_upgrade", ...(await getSailingState(buyerId)) };
@@ -2791,7 +2822,6 @@ export async function upgradeGun(buyerId, gunIndex, track) {
 }
 
 export async function upgradeCombat(buyerId, track) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = COMBAT_TRACKS[String(track)];
     if (!def) return { ok: false, error: "bad_upgrade", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);

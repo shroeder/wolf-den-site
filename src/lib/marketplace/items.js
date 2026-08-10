@@ -9,6 +9,7 @@ import {
     GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
     // Farm gear-set pieces
     GiFarmer, GiRolledCloth, GiAmberMosquito, GiBasket, GiClover, GiSwapBag, GiThreeLeaves,
+    GiSextant, GiSpearHook, GiRingingBell, GiScrollUnfurled, GiPowderBag, GiPirateFlag,
 } from "react-icons/gi";
 import { DECO_STATS } from "@/lib/marketplace/decorations.js";
 
@@ -142,6 +143,8 @@ const ICONS = {
     GiBoneMace, GiRelicBlade, GiIceBolt, GiWingedScepter, GiFireSilhouette, GiMeteorImpact, GiFireShield, GiIceGolem, GiFloatingCrystal, GiWorld, GiHood, GiHelmetHeadShot, GiHeavyHelm, GiCultist, GiDeadEye, GiPirateCoat, GiRaggedWound, GiHeartInside, GiSpring, GiSnowflake2, GiCometSpark, GiOwl, GiFox, GiTigerHead, GiLotus, GiElephant, GiSpectre, GiOakLeaf, GiWaterDrop, GiFangedSkull, GiDropletSplash,
     GiAngelWings, GiBatwingEmblem, GiCurlyWing, GiFeatheredWing, GiCondorEmblem, GiFalconMoon, GiFeather, GiWingCloak, GiFluffyWing, GiShoulderArmor,
     GiFarmer, GiRolledCloth, GiAmberMosquito, GiBasket, GiClover, GiSwapBag, GiThreeLeaves,
+    // The Gunner's Commission — glyph fallbacks only; these six are drawn (see scripts/gen-piece-sprites.mjs).
+    GiSextant, GiSpearHook, GiRingingBell, GiScrollUnfurled, GiPowderBag, GiPirateFlag,
 };
 export const itemIcon = (name) => ICONS[name] || GiRing;
 

@@ -38,7 +38,9 @@ const FOUNDER = {
 // system, and rendered as a flat dark disc that read as a missing glyph. It is the only currency ship battles
 // mint and the only thing the Quartermaster takes, so it gets art.
 // eslint-disable-next-line @next/next/no-img-element
-const Dbl = ({ className = "sby-dbl" }) => <img className={className} src="/images/sailing/doubloon.png" alt="doubloons" draggable="false" />;
+// Exported: the Guns station draws the same coin on its Quartermaster door, and two copies of a hard-coded
+// asset path is exactly how one of them ends up stale.
+export const Dbl = ({ className = "sby-dbl" }) => <img className={className} src="/images/sailing/doubloon.png" alt="doubloons" draggable="false" />;
 
 const Icon = ({ name, className }) => {
     const C = Gi[name] || Gi.GiCannon;
@@ -94,9 +96,13 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
-    const active = tab || ownTab;
+    const active = ladder ? (tab || ownTab) : "shop";
     const setTab = onTab || setOwnTab;
     const purse = combat?.doubloons || 0;
+    // THE LADDER IS THE PART UNDER CONSTRUCTION, not the yard. `fleet` is null for anyone off the dev
+    // allow-list — but their doubloons are real (encounters pay them), so the Quartermaster stays open and
+    // the Battles tab simply is not there. A panel with one tab does not need a tab strip either.
+    const ladder = Boolean(combat?.fleet);
     const fleet = combat?.fleet || {};
     // ONE allowance, whoever you are matched against.
     const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
@@ -108,7 +114,7 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
     return (
         <section className="card sby">
             <div className="sby-head">
-                <h3>Ship battles</h3>
+                <h3>{ladder ? "Ship battles" : "Quartermaster"}</h3>
                 {/* The purse. A flat outlined pill for the feature's whole economy read as a form field; it is
                     a struck-metal plaque now, with the coin itself doing the labelling. */}
                 <span className="sby-purse" title={`${purse.toLocaleString()} doubloons`}>
@@ -127,14 +133,18 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                 separate "raid" count in a call-to-action three screens up. */}
             {/* The credit used to be a dotted-underline link parked on the end of this line. It is a medallion
                 in the header now — see FOUNDER — the way the Forge enshrines Alstier1. */}
-            <p className="sby-allowance">
-                <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
-            </p>
+            {ladder ? (
+                <p className="sby-allowance">
+                    <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
+                </p>
+            ) : null}
 
-            <div className="sbd-tabs" role="tablist">
-                <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
-                <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
-            </div>
+            {ladder ? (
+                <div className="sbd-tabs" role="tablist">
+                    <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
+                    <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
+                </div>
+            ) : null}
 
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
                 The page already has a structure for upgrades — one station per thing you improve — and raiding
