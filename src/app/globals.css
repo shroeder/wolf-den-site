@@ -15049,7 +15049,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
    While it fills it is deliberately quiet: a dark trough with a slow amber tide in it, no bigger than the
    rack pills beside it. Full, it goes gold, lifts, and will not stop moving until you spend it. */
-.sbt-aimbar { grid-template-areas: "read fire" "rack fire" "reck fire"; }
+/* FOUR ROWS, NOT THREE. Adding `reck` here without carrying `rail` through dropped the gun rail out of the
+   template entirely — an item with `grid-area: rail` and no such area gets auto-placed into an implicit
+   track, which collapsed the read-out into a three-word column, pushed the rail to the bottom corner and
+   left the Reckoning bar hanging off the left edge of the screen. Every area the bar owns has to be listed
+   in every template that redefines it. */
+.sbt-aimbar { grid-template-areas: "read fire" "rack fire" "reck fire" "rail rail"; }
 .sbt-reck { grid-area: reck; position: relative; overflow: hidden; width: 100%;
     display: block; padding: 0; height: 34px; border-radius: 10px; cursor: default;
     border: 1px solid rgba(255,215,94,0.22); background: rgba(6,10,16,0.72);
@@ -15188,3 +15193,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The sheet is portalled to <body>, so it needs its own stacking context above everything. */
 .gdk-sheet { z-index: 5000; align-items: start; padding: max(16px, 4svh) 16px; overflow-y: auto; }
 .gdk-card { max-height: none; margin: auto 0; }
+
+/* The station kicker pill. Same painted sprite as the tab it sits under — an emoji directly beneath a painted
+   tab was the last thing breaking the run. */
+.sail-kicker { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 5px;
+    border-radius: 999px; border: 1px solid; font-size: 0.68rem; font-weight: 800;
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+.sail-kicker img { width: 20px; height: 20px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+.sail-title-art { width: 34px; height: 34px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+
+/* `1fr` is `minmax(auto, 1fr)`, so the read-out column refuses to shrink below its own content and pushes
+   FIRE past the right edge — 373px of demand in a 351px content box. `minmax(0, 1fr)` lets it give. */
+.sbt-aimbar { grid-template-columns: minmax(0, 1fr) auto; }

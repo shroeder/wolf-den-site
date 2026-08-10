@@ -622,6 +622,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // The boat's current form name = the highest unlocked milestone, else the base Wood Boat.
     const curForm = (state.forms || []).filter((f) => f.unlocked).slice(-1)[0];
     const boatName = curForm ? curForm.name : "Wood Boat";
+    // The little pill at the top of each station's card. It carried the last four emoji on the screen — the
+    // tabs above it are painted now, so an emoji directly beneath one was the only thing left breaking the
+    // run. Same sprite as the tab it belongs to, so the pill and the tab are visibly the same station.
+    const Kicker = ({ art, label, tint, bg }) => (
+        <div className="sail-kicker" style={{ background: bg, borderColor: tint, color: tint }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
+            {label}
+        </div>
+    );
+
     // PAINTED, NOT EMOJI. Every one of these cards carried an OS emoji — a puff of wind, a shamrock, a
     // bucket — which is somebody else's art, rendered differently on every device, in the middle of a screen
     // made entirely of ours. One sprite per track (scripts/gen-track-sprites.mjs); anything without one
@@ -663,7 +674,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         <div className="stack reveal sailing">
             <section className="card" style={{ overflow: "hidden" }}>
                 <div className="sail-head">
-                    <h1 style={{ margin: 0 }}>⛵ Sailing</h1>
+                    <h1 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sail-title-art" src="/images/sailing/tracks/st_helm.png" alt="" draggable="false" />
+                        Sailing
+                    </h1>
                 </div>
 
                 <HowToPlay
@@ -1098,7 +1113,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {/* Boat upgrades — SEA-themed (blue) so it's visually distinct from the earthy digging section below. */}
             <section className="card" style={{ borderColor: "rgba(96,170,255,0.45)", background: "linear-gradient(180deg, rgba(70,130,220,0.08), transparent 40%)" }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(96,170,255,0.16)", border: "1px solid rgba(96,170,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛵ Sailing</div>
+                <Kicker art="st_helm" label="Sailing" tint="rgba(96,170,255,0.5)" bg="rgba(96,170,255,0.16)" />
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>Upgrade your boat</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Each upgrade levels your boat ⭐ — every 10 levels it takes a new form and unlocks a perk. (Digging doesn&apos;t level the boat.)</p>
                 <div className="sail-upgrades is-boat">
@@ -1126,7 +1141,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
             {station === "guns" && state.combat ? <>
                 <section className="card">
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(255,150,60,0.16)", border: "1px solid rgba(255,150,60,0.5)", color: "#ffbe7a", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>💣 Raiding</div>
+                    <Kicker art="st_guns" label="Raiding" tint="rgba(255,150,60,0.5)" bg="rgba(255,150,60,0.16)" />
                     <h2 style={{ margin: "0 0 2px" }}>Gun deck</h2>
                     <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem", lineHeight: 1.5 }}>
                         Your ship as it actually fights. Boat level {state.combat.ship.boatLevel} lifts all four —
@@ -1180,7 +1195,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {station === "dig" ? <>
             {/* Excavation — EARTH-themed (amber) so the digging system reads as clearly separate from sailing. */}
             <section className="card" style={{ borderColor: "rgba(214,158,80,0.5)", background: "linear-gradient(180deg, rgba(180,120,50,0.1), transparent 40%)" }}>
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(214,158,80,0.16)", border: "1px solid rgba(214,158,80,0.5)", color: "#e6b878", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>⛏️ Digging</div>
+                <Kicker art="st_dig" label="Digging" tint="rgba(214,158,80,0.5)" bg="rgba(214,158,80,0.16)" />
                 <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>⛏️ Excavation</h2>
                 <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Level these with gold — and every level also counts toward unlocking the tools above. You've invested <b>{state.digTools?.points ?? 0}</b> of {state.digTools?.pointsTotal ?? 30}{state.digTools?.nextUnlock ? <> · <b>{state.digTools.nextUnlock.toUnlock}</b> more unlocks <b>{state.digTools.nextUnlock.name}</b></> : <> · every tool unlocked</>}.</p>
 {/* TOOLS FIRST. They were the last thing on the longest section of a long scroll, which is why they read
@@ -1262,7 +1277,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 mid-voyage, and there was nowhere to put fishing progression at all. */}
             {station === "rail" && state.fishing ? (
                 <section className="card" style={{ borderColor: "rgba(126,200,255,0.45)", background: "linear-gradient(180deg, rgba(70,170,220,0.08), transparent 40%)" }}>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999, background: "rgba(126,200,255,0.16)", border: "1px solid rgba(126,200,255,0.5)", color: "#9fd0ff", fontSize: "0.68rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>🎣 Fishing</div>
+                    <Kicker art="st_rail" label="Fishing" tint="rgba(126,200,255,0.5)" bg="rgba(126,200,255,0.16)" />
                     <h2 className="sail-upg-h" style={{ margin: "0 0 2px" }}>The Rail</h2>
                     <p className="muted" style={{ margin: "0 0 12px", fontSize: "0.8rem" }}>Drop a line over the side while you sail. Angling comes from gear and badges — it buys extra casts and tilts what bites.</p>
                     <div className="sail-railstats">
