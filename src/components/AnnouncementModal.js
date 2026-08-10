@@ -70,12 +70,22 @@ export default function AnnouncementModal() {
             </div>
 
             <style>{`
-                .ann-scrim { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px;
+                /* ABOVE THE CHAT BUBBLE. z-index was 400 against the social FAB's 900, so the floating chat
+                   button sat on top of the launch card's own call to action.
+                   100svh, not just inset:0 — on a phone a fixed overlay is laid out against the LARGE viewport,
+                   so the bottom of the card ends up underneath the browser's own bars. */
+                .ann-scrim { position: fixed; inset: 0; height: 100svh; z-index: 5100; display: grid; place-items: center;
+                    padding: 16px;
                     background: rgba(6,4,10,0.82); backdrop-filter: blur(4px); animation: annIn .22s ease both; }
                 .ann-scrim.is-closing { animation: annOut .18s ease both; }
                 @keyframes annIn { from { opacity: 0; } to { opacity: 1; } }
                 @keyframes annOut { from { opacity: 1; } to { opacity: 0; } }
+                /* THE CARD NEVER OUTGROWS THE SCREEN. It was free to be as tall as its copy, and a long
+                   announcement with art pushed "Maybe later" clean off the bottom of a phone with no way to
+                   scroll to it — the one control that dismisses the thing. The BODY scrolls now; the title,
+                   the art and the buttons are always on screen. */
                 .ann-card { position: relative; overflow: hidden; width: min(430px, 100%); padding: 26px 22px 20px;
+                    max-height: 100%; display: flex; flex-direction: column;
                     text-align: center; border-radius: 20px; border: 2px solid rgba(255,215,110,0.5);
                     background: linear-gradient(180deg, #2a2033, #17121f);
                     box-shadow: 0 22px 60px rgba(0,0,0,0.65); animation: annPop .34s cubic-bezier(.2,1.25,.35,1) both; }
@@ -84,12 +94,17 @@ export default function AnnouncementModal() {
                     background: conic-gradient(from 0deg, transparent 0 12deg, rgba(255,215,110,0.10) 12deg 18deg, transparent 18deg 30deg);
                     animation: annSpin 22s linear infinite; }
                 @keyframes annSpin { to { transform: rotate(360deg); } }
-                .ann-emoji { position: relative; font-size: 54px; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
-                .ann-kicker { position: relative; margin-top: 8px; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.16em; color: #ffd75e; }
-                .ann-title { position: relative; margin: 5px 0 0; font-size: 1.42rem; color: #f7efe0; }
-                .ann-art { position: relative; display: block; width: 100%; max-height: 190px; object-fit: contain; margin: 12px 0 0; }
-                .ann-body { position: relative; margin: 10px 2px 0; font-size: 0.9rem; line-height: 1.5; color: #cfc6b6; }
-                .ann-actions { position: relative; display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+                .ann-emoji { position: relative; flex: none; font-size: 54px; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5)); }
+                .ann-kicker { position: relative; flex: none; margin-top: 8px; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.16em; color: #ffd75e; }
+                .ann-title { position: relative; flex: none; margin: 5px 0 0; font-size: 1.42rem; color: #f7efe0; }
+                /* The art gives way before the words do — on a short screen it takes a fifth of the height
+                   rather than a fixed 190px it cannot afford. */
+                .ann-art { position: relative; flex: none; display: block; width: 100%; max-height: min(190px, 21svh);
+                    object-fit: contain; margin: 12px 0 0; }
+                .ann-body { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+                    margin: 10px 2px 0; font-size: 0.9rem; line-height: 1.5; color: #cfc6b6; }
+                .ann-actions { position: relative; flex: none; display: flex; flex-direction: column; gap: 8px;
+                    padding-top: 14px; margin-top: 4px; }
                 .ann-cta { display: block; padding: 14px; border-radius: 13px; font-weight: 900; font-size: 1rem; text-decoration: none;
                     color: #3a2c08; background: linear-gradient(180deg,#ffe488,#f3b23a); box-shadow: 0 4px 0 #b57f22; }
                 .ann-cta:active { transform: translateY(3px); box-shadow: 0 1px 0 #b57f22; }
