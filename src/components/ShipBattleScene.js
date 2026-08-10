@@ -607,7 +607,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
     // (the server does the same), so pointing the whole broadside somewhere is still a single tap and splitting
     // it is opt-in — one extra tap per gun you want doing something else.
     const [aim, setAim] = useState([]);             // [{ gun, zone, target, ammo }]
-    const [ammo, setAmmo] = useState(battle?.loadout || "round");
+    // The round the CURRENTLY PICKED target would draw from a bare barrel. Only used to preview odds and
+    // damage before you lay a gun; the server decides per barrel when the volley resolves.
+    const ammo = "round";
 
     const stageRef = useRef(null);
     const meHullRef = useRef(null);
@@ -621,10 +623,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
 
     const foeSys = battle?.sys?.foe;
     const caps = battle?.caps;
-    const rack = battle?.rack || [];
     // The picker only exists if there is something to pick. A row of four rounds where three say "0" is a shop
     // window in the middle of a fight.
-    const haveExotics = rack.some((a) => !a.basic && (a.count || 0) > 0);
 
     // ── WHAT YOU CAN SHOOT AT ────────────────────────────────────────────────────────────────────────────────
     // Sails, hull, and one marker per cannon still mounted, each with the REAL chance of hitting it — computed
@@ -695,12 +695,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
         aim.filter((a) => a.zone === zone && (a.target ?? null) === (target ?? null)).length
     ), [aim]);
     const allLaid = liveGuns.length > 0 && aim.length >= liveGuns.length;
-    // WHAT THIS VOLLEY COSTS, before you fire it. Every gun carries its own round, so tapping four times with
-    // grape selected buys four grape — visible in the rail as colour, but the bill should be a number.
-    const volleyCost = useMemo(() => aim.reduce((sum, a) => {
-        const r = rack.find((x) => x.id === a.ammo);
-        return sum + (r && !r.basic ? (r.price || 0) : 0);
-    }, 0), [aim, rack]);
+    // A VOLLEY COSTS NOTHING NOW. It used to bill you per exotic round; ammunition is unlocked on the barrel
+    // rather than bought by the shot, so there is no bill to show.
     const leftToLay = Math.max(0, liveGuns.length - aim.length);
 
     // Keep the orders honest when the board changes under them — a cannon you laid a gun on can be wreckage by
@@ -870,6 +866,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                         setShake({ k: `${step}-${i}`, big: Boolean(s.rake) });
                         setPops((list) => [...list.slice(-11).filter((x) => x.k !== pk), {
                             k: pk, side: ev.side, dmg: s.dmg, rake: s.rake, lane: (i % 4) - 1.5, at: at2, zone: s.zone,
+                            // What the ball actually DID, for a shot that does no hull damage by design.
+                            wrecked: s.wrecked || null,
                         }]);
                     } else {
                         sfxSplash();
@@ -1074,9 +1072,16 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                             style={pp.at
                                 ? { left: pp.at.x, top: pp.at.y, "--lane": `${pp.lane * 22}px` }
                                 : { "--lane": `${pp.lane * 26}px` }}>
+                            {/* A SHOT INTO CANVAS OR A GUN DECK TAKES NO PLANKS — that is the whole point of
+                                aiming there — so it used to pop "−0", which reads as a shot that did
+                                nothing. It says what it cut instead. */}
                             {pp.miss
                                 ? <>MISS{pp.chance != null ? <b>{Math.round(pp.chance * 100)}% shot</b> : null}</>
-                                : <>−{pp.dmg}{pp.rake ? <b>RAKE ×1.8</b> : null}</>}
+                                : pp.dmg > 0
+                                    ? <>−{pp.dmg}{pp.rake ? <b>RAKE</b> : null}</>
+                                    : pp.wrecked === "sails" ? <>CANVAS<b>cut</b></>
+                                    : pp.wrecked === "guns" ? <>GUN<b>hit</b></>
+                                    : <>GLANCE</>}
                         </span>
                     )) : null}
                 </div>
@@ -1109,24 +1114,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                         ) : null}
                     </div>
 
-                    {/* THE RACK. Only if you actually have something other than solid shot — otherwise it is a
-                        row of empty boxes in the middle of a fight. */}
-                    {haveExotics ? (
-                        <div className="sbt-rack-row">
-                            {rack.map((a) => {
-                                const out = !a.basic && (a.count || 0) <= 0;
-                                return (
-                                    <button key={a.id} type="button"
-                                        className={`sbt-shotpick is-${a.id}${ammo === a.id ? " is-on" : ""}${out ? " is-out" : ""}`}
-                                        disabled={out || phase !== "aim"} onClick={() => { setAmmo(a.id); sfxPick(); }}
-                                        title={a.name}>
-                                        <Icon name={a.icon} />
-                                        <em>{a.basic ? "∞" : a.count}</em>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ) : null}
+                    {/* NO RACK. Ammunition is not a purchase or a quantity any more: a barrel's MARK decides
+                        what it can load and the part you aim at decides which of those it loads, so the rack
+                        of counts and the picker beside it were a control for a decision nobody was making.
+                        What each gun will fire shows on the read-out and on its pip. */}
 
                     {/* THE GUN RAIL. One pip per barrel, in the colour of the round it carries, so a split
                         broadside is visible before it goes off — and tapping a pip takes that gun back. */}
@@ -1205,7 +1196,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                         disabled={!allLaid || busy || phase !== "aim"} onClick={fire}>
                         <b>{allLaid ? "FIRE" : `${aim.length}/${liveGuns.length}`}</b>
                         <em>{allLaid
-                            ? `${liveGuns.length} gun${liveGuns.length === 1 ? "" : "s"}${volleyCost ? ` · ${volleyCost}` : ""}`
+                            ? `${liveGuns.length} gun${liveGuns.length === 1 ? "" : "s"}`
                             : `lay ${leftToLay} more`}</em>
                     </button>
                 </div>

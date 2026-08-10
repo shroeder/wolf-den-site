@@ -121,6 +121,19 @@ export default function GunDeck({ deck, purse, busy, onBuy }) {
                             );
                         })}
 
+                        {/* WHAT THIS BARREL LOADS. Ammunition is not bought or picked any more — the mark
+                            decides what the gun can carry and the target decides which of those it uses, so
+                            this is where a player finds out that four more levels is a new kind of shot. */}
+                        <div className="gdk-ammo">
+                            <b>Loads</b>
+                            <span>
+                                {(gun.ammo || []).map((a) => <i key={a.id} title={a.blurb}>{a.name}</i>)}
+                            </span>
+                            {gun.nextAmmo ? (
+                                <em>{gun.nextAmmo.inLevels} more level{gun.nextAmmo.inLevels === 1 ? "" : "s"} unlocks {gun.nextAmmo.name}</em>
+                            ) : <em>Every round in the game</em>}
+                        </div>
+
                         <div className="gdk-purse">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/sailing/doubloon.png" alt="" draggable="false" />

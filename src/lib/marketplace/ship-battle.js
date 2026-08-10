@@ -279,6 +279,42 @@ export const gunStage = (lv) => {
 };
 export const gunArt = (lv) => `/images/sailing/gun/cannon-${gunStage(lv)}.png`;
 
+// ── WHAT A GUN IS LOADED WITH ────────────────────────────────────────────────────────────────────────────────
+// Ammunition used to be a SHOP and a QUANTITY: you bought chain with doubloons, it sat in a rack as a count,
+// you picked it per gun, and firing spent it. Three problems with that. It put a purchase in the middle of a
+// fight; it made the interesting rounds something you hoard rather than use; and it meant the rack, the
+// counts, the picker and the spending logic all existed to deliver one decision the target had already made
+// for you — nobody puts chain into a hull or explosive into canvas.
+//
+// A gun's MARK decides what it can load, and the part you aim at decides which of those it loads. Every four
+// levels you pour into a barrel unlocks the next round, so the gun deck is the ammunition economy:
+//
+//   mark 1  round shot only
+//   mark 2  + chain     — so aiming a mark-2 gun at her canvas loads chain, automatically
+//   mark 3  + grape     — aimed at a gun deck
+//   mark 4  + explosive — aimed at timber
+//
+// Round shot is never gone: it is what every barrel falls back to, and what a mark-1 gun fires at everything.
+export const GUN_MARK_AMMO = [null, "chain", "grape", "explosive"];   // index = mark - 1
+
+/** Every round this barrel can load, best first. Mark 1 is round shot and nothing else. */
+export function gunAmmoUnlocked(lv) {
+    const mark = gunStage(lv);
+    const out = ["round"];
+    for (let m = 2; m <= mark; m += 1) out.push(GUN_MARK_AMMO[m - 1]);
+    return out;
+}
+
+/**
+ * The round this barrel loads for this target. Canvas wants chain, a gun deck wants grape, timber wants
+ * explosive — and if the gun is not good enough to carry it, round shot, which is never wrong.
+ */
+export function ammoForShot(lv, zone) {
+    const have = gunAmmoUnlocked(lv);
+    const want = zone === "sails" ? "chain" : zone === "guns" ? "grape" : "explosive";
+    return have.includes(want) ? want : "round";
+}
+
 // Build the combat profile a ship brings to a battle. `sea` is the sailing affinity block (broadside/ironclad).
 // AMMUNITION IS NO LONGER PART OF THE PROFILE. It used to be baked in here — one type for the whole battle, its
 // accuracy folded into the ship's — because a broadside was one undifferentiated event. Every gun is laid
@@ -463,7 +499,7 @@ export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
 // field — a zone this hull does not have, a cannon that is already wreckage, ammunition that is not in the
 // racks. None of that is a rejection, it is a correction: a fight that refuses to resolve because one field was
 // stale is a worse outcome than a volley that went somewhere ordinary.
-function oneAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}) {
+function oneAim(st, who, raw, { zonesAllowed = null, gunStats = null, fixedAmmo = null } = {}) {
     const them = who === "me" ? st.foe : st.me;
     let zone = String(raw?.zone || "hull");
     if (!["sails", "hull", "guns"].includes(zone)) zone = "hull";
@@ -476,8 +512,13 @@ function oneAim(st, who, raw, { zonesAllowed = null, ammoAvailable = null } = {}
         if (!up.length) zone = "hull";
         else target = up.includes(Number(raw?.target)) ? Number(raw.target) : up[0];
     }
-    let ammo = String(raw?.ammo || "round");
-    if (ammoAvailable && !ammoAvailable(ammo)) ammo = "round";
+    // THE CLIENT NO LONGER CHOOSES. The round is a function of which barrel is firing and what it is pointed
+    // at, so it is decided here — there is nothing for a client to send, and nothing to spend.
+    //
+    // `fixedAmmo` is for the FLEET. A catalogue ship carries one designed round (Bitterhold fires shells,
+    // the Cormorant loads grape) and that is part of both its character and the difficulty curve the ladder
+    // was measured against — it does not have a gun deck to unlock rounds from.
+    const ammo = fixedAmmo || ammoForShot(gunStat(gunStats, Number(raw?.gun)), zone);
     return { zone, target, ammo };
 }
 
@@ -561,13 +602,13 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
     const events = [];
     st.round += 1;
 
-    const mine = sanitizeAims(st, "me", aims);
+    const mine = sanitizeAims(st, "me", aims, { gunStats: me?.gunStats });
     // HER ORDERS MAY ALREADY BE WRITTEN. She now lays her guns when the round OPENS rather than when it
     // resolves, so the player can see what she is training on before committing their own broadside — that is
     // the whole decision the fight was missing. Rolling here is the fallback for a battle saved before this
     // existed, and for any caller that does not plan ahead; the arithmetic is identical either way.
     const theirs = Array.isArray(foeOrders) && foeOrders.length
-        ? sanitizeAims(st, "foe", foeOrders)
+        ? sanitizeAims(st, "foe", foeOrders, { gunStats: foe?.gunStats, fixedAmmo: foe?.gunStats ? null : (foe?.ammo?.id || "round") })
         : foeAims(me, foe, st, { rng });
 
     const fire = (who, orders) => {
@@ -655,6 +696,10 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             shots.push(shot);
         }
 
+        // A SHIP WITH NO GUNS DOES NOT FIRE. An empty order list still pushed a volley event, and the scene
+        // dutifully played one: muzzle flashes and smoke down a deck of dismounted cannon, from a ship whose
+        // card reads 0 CANNON. Nothing happened, so nothing should be shown to happen.
+        if (!shots.length) return;
         events.push({
             type: "volley", side: who, shots, dmg: total, guns: orders.length, hp: hpPair(st),
         });

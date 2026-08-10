@@ -15237,7 +15237,36 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
         "read fire"
-        "rack fire"
         "reck fire"
         "rail rail";
 }
+
+/* ── A DEAD GUN IS NOT A TARGET ──────────────────────────────────────────────────────────────────────────
+   Dismounted cannons keep their marker so you can see what you have already taken off her — but the marker
+   was still drawing its plaque, so two wrecked guns near her bow overlapped into an unreadable smear of
+   struck-through "0 HITS". Wreckage is a state, not a control: no plaque, no reticle, just the crossed-out
+   port underneath. */
+.sbt-target.is-dead { pointer-events: none; }
+.sbt-target.is-dead .sbt-plaque { display: none; }
+.sbt-target.is-dead .sbt-target-skin { opacity: 0.14; }
+
+/* ── FIRE READS AS A BUTTON ──────────────────────────────────────────────────────────────────────────────
+   Near-black on mid-amber measured about 4:1, and the gun count under it was brown-on-orange and worse. The
+   plate is deeper and the type is lighter, so the word carries at arm's length on a phone in daylight. */
+.sbt-fire.is-ready {
+    background: linear-gradient(180deg, #f6c34a, #d99a1e 52%, #a86f10);
+    border-color: rgba(255,236,170,0.85);
+    box-shadow: 0 6px 18px rgba(180,120,20,0.45), inset 0 1px 0 rgba(255,255,255,0.55); }
+.sbt-fire.is-ready b { color: #1c1103; text-shadow: 0 1px 0 rgba(255,240,190,0.5); }
+.sbt-fire.is-ready em { color: #3a2408; font-weight: 800; opacity: 1; }
+.sbt-fire:disabled b, .sbt-fire:disabled em { color: #cbbfa6; text-shadow: none; }
+
+/* What a barrel can load, on the barrel — the gun deck IS the ammunition economy now. */
+.gdk-ammo { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.07); }
+.gdk-ammo > b { display: block; font-family: var(--font-display); font-size: 0.62rem; font-weight: 800;
+    letter-spacing: 0.1em; text-transform: uppercase; color: #8f8875; margin-bottom: 5px; }
+.gdk-ammo > span { display: flex; flex-wrap: wrap; gap: 5px; }
+.gdk-ammo i { font-style: normal; font-size: 0.72rem; font-weight: 700; color: #e8dcc6;
+    padding: 3px 9px; border-radius: 999px;
+    background: rgba(255,215,94,0.1); border: 1px solid rgba(255,215,94,0.28); }
+.gdk-ammo > em { display: block; margin-top: 7px; font-style: normal; font-size: 0.7rem; color: #7fe0a4; }

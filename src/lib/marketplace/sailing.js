@@ -17,6 +17,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V,
          GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage,
+         gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
          RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -2079,26 +2080,13 @@ export async function shipBattleVolley(buyerId, aim) {
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
     const { me, foe } = profilesFrom(open.meta);
 
-    // ONE ROUND OF AMMUNITION PER GUN, spent here rather than when the battle opened — you choose what each
-    // gun carries when you lay it, so this is the only place that knows. The stock is walked down shot by shot
-    // and anything the racks cannot cover quietly becomes round shot: you are never unable to fire.
-    const stock = { ...ammoStock(row) };
-    let spent = false;
+    // NOTHING IS SPENT AND NOTHING IS CHOSEN. The round each barrel loads follows from its MARK and the part
+    // you aimed it at (see ammoForShot) — so there is no stock to walk down, no purchase to make mid-fight
+    // and no picker to get wrong. What used to be a rack of counts is now the gun deck.
     const laid = sanitizeAims(open.state, "me", aim, {
         zonesAllowed: zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)),
-        ammoAvailable: (id) => {
-            const def = ammoById(id);
-            if (def.basic) return true;
-            if ((Number(stock[id]) || 0) <= 0) return false;
-            stock[id] = (Number(stock[id]) || 0) - 1;
-            spent = true;
-            return true;
-        },
+        gunStats: me.gunStats,
     });
-    if (spent) {
-        await db.query(`UPDATE mkt_sailing SET ammo = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
-            [buyerId, JSON.stringify(stock)]).catch(() => {});
-    }
 
     const res = resolveVolley(me, foe, open.state, laid, { foeOrders: open.state.theirNext });
 
@@ -2491,6 +2479,21 @@ export async function gunDeckView(buyerId, row) {
                 art: gunArt(lv),
                 stage: gunStage(lv),
                 spent: (lv.hp || 0) + (lv.dmg || 0) + (lv.acc || 0),
+                // AMMUNITION IS THE GUN DECK NOW. A barrel's mark decides what it can load; the part you aim
+                // at decides which of those it loads. Four more levels is a new round, which is the reason to
+                // pour them into ONE gun rather than spread them.
+                ammo: gunAmmoUnlocked(lv).map((id) => {
+                    const a = ammoById(id);
+                    return { id, name: a.name, icon: a.icon, blurb: a.blurb };
+                }),
+                nextAmmo: (() => {
+                    const st = gunStage(lv);
+                    if (st >= GUN_ART_STAGES) return null;
+                    const id = GUN_MARK_AMMO[st];
+                    const a = id ? ammoById(id) : null;
+                    const spent = (lv.hp || 0) + (lv.dmg || 0) + (lv.acc || 0);
+                    return a ? { id, name: a.name, blurb: a.blurb, inLevels: (st * 4) - spent } : null;
+                })(),
                 tracks: Object.values(GUN_TRACKS).map((t) => {
                     const level = lv[t.key] || 0;
                     return {
