@@ -12,6 +12,15 @@
 
 export const CHANGELOG = [
     {
+        key: "ship-battles",
+        date: "2026-08-09",
+        tag: "new",
+        title: "Ship battles",
+        blurb: "Your boat has guns now. Find a fight and you're matched against someone your own size — a pirate off the fleet or another captain from the Den — and the two ships trade broadsides until one of them goes down. Tap the part of her you want hit: shred the sails, hole the hull, or knock a cannon out before it can answer. Cannons, Gunnery and Hull are yours to upgrade, and a won fight is the only thing in the game that pays doubloons — which is the only thing the Quartermaster takes. Five battles a day, and losing costs the battle and nothing else.",
+        href: "/marketplace/sailing",
+        askedBy: ["teegs"],
+    },
+    {
         key: "arena",
         date: "2026-08-04",
         tag: "new",

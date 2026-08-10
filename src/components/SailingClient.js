@@ -512,7 +512,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     : d.error === "no_battles" || d.error === "no_raid" ? "No battles left today — they come back at midnight."
                     : d.error === "no_target" ? "Nobody worth taking on out there right now."
                     : d.error === "locked" ? "Sink the ship ahead of it first."
-                    : d.error === "under_construction" ? "Ship battles are under construction."
                     : d.error ? "That fight couldn't start — try again."
                     : null);
             }
@@ -942,16 +941,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 </button>
                             ))}
                         </div>
-                        {/* THE FLEET LADDER is under construction — hidden unless the server says this account
-                            is on the dev allow-list (see raidsEnabled). `combat` itself is public now: everyone
-                            fights encounters, so everyone gets a gun deck and a Quartermaster. */}
+                        {/* SHIP BATTLES, public since 2026-08-09. Still keyed off `combat.fleet` rather than a
+                            bare truthy check: a state that came back without it (an error shape, a stale cache)
+                            should not draw a button that opens an empty yard. */}
                         {state.combat?.fleet ? (
                             <button className="sail-cta sail-cta-raid" disabled={busy}
                                 onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
                                 ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
                             </button>
                         ) : null}
-                        {state.combat?.fleet ? <p className="sail-raid-wip">🚧 Ship battles are under construction — dev only.</p> : null}
                     </div>
                 )}
 
@@ -1182,9 +1180,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         ))}
                     </div>
                     {/* THE DOOR TO THE QUARTERMASTER. It used to be reachable only through the raid picker,
-                        which is hidden while the fleet ladder is under construction — so every member earning
-                        doubloons off encounters had a purse and nowhere to spend it. The purse IS the button:
-                        the number you are looking at is the reason to press it, and nothing else needs saying. */}
+                        which was hidden through the ship-battle rebuild — so every member earning doubloons off
+                        encounters had a purse and nowhere to spend it. The purse IS the button: the number you
+                        are looking at is the reason to press it, and nothing else needs saying. */}
                     <button type="button" className="sby-purse-cta" disabled={busy}
                         onClick={() => { setBattleTab("shop"); setYardOpen(true); }}>
                         <Dbl className="sby-purse-cta-coin" />
@@ -1628,6 +1626,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
                         <ShipYard
                             combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
+                            owner={state.owner === true}
                             tab={battleTab}
                             onTab={setBattleTab}
                             onAct={({ action, ...extra }) => act(action, extra)} />

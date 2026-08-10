@@ -93,31 +93,24 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 // (matchOpponent in sailing.js), so there is nothing to compare and nothing to pick: this tab is one button
 // and your record.
 
-export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }) {
+export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, owner = false }) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
-    // THE LADDER IS THE PART UNDER CONSTRUCTION, not the yard. `fleet` is null for anyone off the dev
-    // allow-list — but their doubloons are real (encounters pay them), so the Quartermaster stays open and
-    // the Battles tab simply is not there. A panel with one tab does not need a tab strip either.
-    //
-    // Declared BEFORE `active`, which reads it. It was below, and a `const` read above its own declaration is
-    // a TDZ throw at runtime — the build compiles it happily and the whole panel dies the moment it renders.
-    const ladder = Boolean(combat?.fleet);
-    const active = ladder ? (tab || ownTab) : "shop";
+    const active = tab || ownTab;
     const setTab = onTab || setOwnTab;
     const purse = combat?.doubloons || 0;
     const fleet = combat?.fleet || {};
     // ONE allowance, whoever you are matched against.
     const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
 
-    // AFTER the hooks, never before: `combat` is null for anyone off the dev allow-list while ship battles are
-    // under construction, and returning early above useMemo changes the hook order between renders.
+    // AFTER the hooks, never before: `combat` is null on an error shape or a state that came back empty, and
+    // returning early above useMemo changes the hook order between renders.
     if (!combat) return null;
 
     return (
         <section className="card sby">
             <div className="sby-head">
-                <h3>{ladder ? "Ship battles" : "Quartermaster"}</h3>
+                <h3>Ship battles</h3>
                 {/* The purse. A flat outlined pill for the feature's whole economy read as a form field; it is
                     a struck-metal plaque now, with the coin itself doing the labelling. */}
                 <span className="sby-purse" title={`${purse.toLocaleString()} doubloons`}>
@@ -136,18 +129,14 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                 separate "raid" count in a call-to-action three screens up. */}
             {/* The credit used to be a dotted-underline link parked on the end of this line. It is a medallion
                 in the header now — see FOUNDER — the way the Forge enshrines Alstier1. */}
-            {ladder ? (
-                <p className="sby-allowance">
-                    <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
-                </p>
-            ) : null}
+            <p className="sby-allowance">
+                <b>{battlesLeft}</b> battle{battlesLeft === 1 ? "" : "s"} left today
+            </p>
 
-            {ladder ? (
-                <div className="sbd-tabs" role="tablist">
-                    <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
-                    <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
-                </div>
-            ) : null}
+            <div className="sbd-tabs" role="tablist">
+                <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
+                <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
+            </div>
 
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
                 The page already has a structure for upgrades — one station per thing you improve — and raiding
@@ -228,9 +217,10 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         occasional heavyweight to keep it honest. Losing costs the battle and nothing else.
                     </p>
 
-                    {/* The gun placement tool. Owner-only and useful, but it is a WORKSHOP door — it belongs at
-                        the bottom of the screen, under the thing you actually came here to press, not in a
-                        dashed banner above it. */}
+                    {/* The gun placement tool. A WORKSHOP door, so it belongs at the bottom of the screen under
+                        the thing you actually came here to press — and only for the owner, since the route
+                        404s for everyone else and a door that never opens is worse than no door. */}
+                    {owner ? (
                     <a href="/marketplace/sailing/gun-lab" className="sby-gunlab">
                         {/* The Cannons track sprite, reused — it is literally a stack of cannons and this is
                             where you go to place them. Nothing to draw. */}
@@ -242,6 +232,7 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                         </span>
                         <i aria-hidden="true">→</i>
                     </a>
+                    ) : null}
                 </>
             ) : null}
 

@@ -12088,10 +12088,6 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* Target picker */
 .sail-raid-pick { max-width: 460px; width: 100%; }
 .sail-raid-hint { font-size: 0.78rem; margin: 2px 0 8px; }
-/* Dev-only banner under the raid CTA while raiding is being rebuilt as ship battles. Nobody outside the
-   allow-list ever renders this — the whole surface is absent for them. */
-.sail-raid-wip { margin: 7px 0 0; padding: 6px 10px; border-radius: 10px; font-size: 0.72rem; line-height: 1.35;
-    color: #ffd08a; background: rgba(255,170,60,0.12); border: 1px dashed rgba(255,170,60,0.5); }
 /* THE DOOR to the ship yard, and the SHEET the yard itself lives in. The yard was a tall four-tab card sitting
    inline in the page, which meant the only thing its two entry points could do was scroll to it — so tapping
    Raid read as "the page moved", not "something opened". */

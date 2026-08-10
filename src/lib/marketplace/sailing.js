@@ -85,16 +85,11 @@ const BOAT_TIERS = 11;
 // items) is gone — a raid pays out of the FLEET table now, matched to the rank the rival's ship resembles.
 // One reward design, so there is one thing to balance rather than two pulling against each other.
 // ── RAIDING IS UNDER CONSTRUCTION ────────────────────────────────────────────────────────────────────────────
-// Raids are being rebuilt as SHIP battles — cannons, hull, ammunition, a raiding currency and a board — and the
-// old player-vs-player version is live while that happens. Rather than rip it out (and lose the working sim,
-// the scene and the daily economy in the meantime), the whole surface is gated to the dev allow-list: the
-// owner can still raid, to build and test against real data, and nobody else sees the feature at all.
+// SHIP BATTLES ARE PUBLIC (2026-08-09). Raiding was rebuilt from captain-vs-captain into ship-vs-ship, and the
+// whole surface spent that rebuild behind `raidsEnabled` (= the dev allow-list) — the CTA, the target list, the
+// buy-another-raid, the Cunning track, the incoming-raid reports and the quest/daily tasks. The gate and every
+// one of its doors are gone; what is left is the feature.
 //
-// EVERY door has to be locked, not just the button: the CTA, the target list, the buy-another-raid, the
-// upgrade track, the incoming-raid reports and the quest/daily tasks that would otherwise ask a member to do
-// something they cannot reach. `raidsEnabled` is the one predicate they all read.
-export const raidsEnabled = (buyerId) => isOwner(buyerId);
-
 const RAID_DODGE_BASE = 0.005, RAID_DODGE_PER = 0.0025; // 0.5% + 0.25%/level to NOT use up the daily raid
 const raidDodgeChance = (lvl = 0) => RAID_DODGE_BASE + Math.max(0, lvl) * RAID_DODGE_PER;
 const raidDodgePct = (lvl = 0) => Math.round(raidDodgeChance(lvl) * 1000) / 10; // one-decimal % for the card
@@ -1022,12 +1017,12 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         raid: (() => {
             const cap = raidsPerDay(level, raidSetBonus);
             const used = raidsUsedToday(row);
-            const enabled = raidsEnabled(buyerId);
             return {
-                // `enabled` false hides the entire raid surface client-side; `available` is kept false too so
-                // any older client that only checks that one still cannot open the picker.
-                enabled, underConstruction: !enabled,
-                usedToday: used >= cap, available: enabled && used < cap, used, cap,
+                // Both flags are constants now that ship battles are public. They are still sent because a
+                // client cached from before the launch reads them, and one that never sees `enabled: true`
+                // would keep the whole surface hidden until it reloaded.
+                enabled: true, underConstruction: false,
+                usedToday: used >= cap, available: used < cap, used, cap,
                 dodgePct: raidDodgePct(raidLevel),
                 canStun: boatPerks(level).raidStun,
                 // Raids pay out of the fleet table now — the client reads the reward off the target row
@@ -1036,9 +1031,8 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
                 reset: { cost: raidResetCost(row?.raid_reset_is_today ? (row?.raid_resets || 0) : 0), free: !RAID_RESET_PAID },
             };
         })(),
-        // SHIP BATTLES — the gun deck, the racks, the fleet ladder and the purse. Gated with raiding while the
-        // rework is under construction; a member outside the allow-list gets null and renders nothing.
-        combat: combatView(row, level, consumableArt, gunDeck, pieces, raidsEnabled(buyerId)),
+        // SHIP BATTLES — the gun deck, the racks, the fleet and the purse.
+        combat: combatView(row, level, consumableArt, gunDeck, pieces),
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1054,9 +1048,9 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             left: Math.max(0, wavesPerDay(luckLevel) + bonusWaves - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
             xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000,
         },
-        // SOMETHING IS ALONGSIDE. Deliberately NOT gated with `combat`: the fleet ladder is still under
-        // construction and hidden from everyone outside the allow-list, but any voyage can be interrupted by
-        // an encounter, so this surface has to stand on its own or the boat would be stuck with no way to fight.
+        // SOMETHING IS ALONGSIDE. Its own surface rather than part of `combat`: any voyage can be interrupted
+        // by an encounter, and the boat has to be able to answer whatever else is or isn't on the screen. It
+        // stood alone through the whole ship-battle rebuild for exactly that reason.
         encounter: (() => {
             if (!row?.encounter_active) return null;
             const enc = encounterById(row.encounter_active);
@@ -1387,7 +1381,10 @@ export async function getSailingState(buyerId, skyKey = null) {
     // same way chest art and collections are.
     const gunDeck = await gunDeckView(buyerId, row).catch(() => null);   // your guns are how you fight an encounter
     const pieces = await pieceShop(buyerId).catch(() => []);   // the Quartermaster is public — see combatView
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea };
+    // `owner` carries exactly ONE thing now that ship battles are public: whether to draw the gun-placement
+    // workshop door in the yard. That route is owner-only and 404s for everybody else, so a link every member
+    // can see is a dead end with a nice icon on it.
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea, owner: isOwner(buyerId) };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1720,7 +1717,6 @@ async function raidTargetById(buyerId, targetId) {
 // copy one random item of theirs; they keep it). Lose → 10–100 gold, and the defender takes a cut for repelling
 // you. The raid-dodge track (raid_level) gives a small chance the daily raid isn't consumed.
 export async function doRaid(buyerId, targetId = null) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     // Same as the fleet: an open fight resumes rather than silently refusing. See doFleetBattle.
     const openNow = readBattle(row);
@@ -1867,11 +1863,6 @@ async function finishRaidBattle(buyerId, meta, res) {
 // by attacker, with their hero card, how many times you beat them, gold earned, and any gear you took. Reading
 // it marks the entries seen so it only pops once.
 export async function getUnseenRaidDefenses(buyerId) {
-    // While raiding is under construction only the dev can raid — but their targets are ordinary members, and
-    // a "you were raided!" report is the feature announcing itself to someone who cannot see it. Nobody loses
-    // anything by being raided (the terms are win-only for the raider), so withholding the report costs them
-    // nothing and keeps the rebuild invisible.
-    if (!raidsEnabled(buyerId)) return [];
     if (!buyerId) return { defenses: [], totalGold: 0, totalDoubloons: 0, totalWins: 0 };
     const rows = await db
         .query(
@@ -1939,11 +1930,10 @@ export const combatUpgradeCost = (level = 0) => Math.round(COMBAT_COST_BASE * Ma
 const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || {};
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
 
-// Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
-// `ladder` is the FLEET only. It used to gate this whole view, which was right when the only way to fire a
-// gun was a fleet battle — but encounters are public now and they pay doubloons, so gating the yard would mint
-// a currency with nowhere to spend it and leave members fighting with guns they cannot upgrade.
-function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = [], ladder = false) {
+// Everything the ship-battle screens read: the gun deck, what is in the racks, the fleet and the purse. The
+// `ladder` flag that used to gate the fleet and the Cunning track went with the launch gate — a member sees
+// all of it now.
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = []) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -1979,11 +1969,10 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                         : `${hullHitsFor(level)} planks to shoot away`,
                 };
             }),
-            // Cunning is a combat lever too — it decides whether a raid costs you your daily raid — so it
+            // Cunning is a combat lever too — it decides whether a battle costs you your daily sortie — so it
             // belongs with the guns rather than three cards away in the BOAT upgrade list, where it sat purely
-            // because it happens to be an older track bought with gold. It buys nothing at all without the
-            // ladder, though, so while that is under construction it is not shown.
-            ...(!ladder ? [] : [(() => {
+            // because it happens to be an older track bought with gold.
+            (() => {
                 const level = row?.raid_level || 0;
                 return {
                     key: "cunning", name: "Cunning", icon: "GiSpyglass", action: "upgrade_raid", currency: "gold",
@@ -1992,7 +1981,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
                     cost: level >= MAX_RAID_LEVEL ? null : upgradeCost(level),
                     effect: `${raidDodgePct(level)}% free`,
                 };
-            })()]),
+            })(),
         ],
         ammo: AMMO_LIST.map((a) => ({
             id: a.id, name: a.name, icon: a.icon, blurb: a.blurb, basic: a.basic, price: a.price,
@@ -2012,13 +2001,12 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
             // counter showed the same bottle of mystery liquid five times, priced from 75 to 12,000.
             art: (l.consumable && consumableArt[l.consumable]) || null,
         })),
-        // The one part still under construction. Null hides the ladder entirely client-side.
-        fleet: ladder ? {
+        fleet: {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
             wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
             cleared: depth >= MAX_FLEET_RANK,
             ships: fleetView(depth),
-        } : null,
+        },
         // A battle you walked away from — closed the tab, locked the phone, reloaded. The sortie is already
         // spent, so this fight is the only one you have; handing it back on every state read is what lets the
         // screen put you straight back on deck instead of leaving a saved fight nobody can reach.
@@ -2273,12 +2261,6 @@ export async function shipBattleVolley(buyerId, aim) {
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
-    // The under-construction gate is about the FLEET LADDER, which is hidden while it is being built — it is
-    // NOT about being allowed to fire a gun. An encounter can interrupt anyone's voyage, so refusing their
-    // volley here would leave the boat stopped forever with no way to answer.
-    if (open.meta?.kind !== "encounter" && !raidsEnabled(buyerId)) {
-        return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
-    }
     const { me, foe } = profilesFrom(open.meta);
 
     // NOTHING IS SPENT AND NOTHING IS CHOSEN. The round each barrel loads follows from its MARK and the part
@@ -2333,9 +2315,6 @@ export async function shipBattleReckoning(buyerId) {
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
-    if (open.meta?.kind !== "encounter" && !raidsEnabled(buyerId)) {
-        return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
-    }
     const { me, foe } = profilesFrom(open.meta);
 
     const res = resolveReckoning(me, foe, open.state);
@@ -2428,7 +2407,6 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
 /** THE ONE WAY INTO A FIGHT. Matches you, then opens the battle — the two paths underneath (a designed fleet
  *  ship, another member's ship) are unchanged, because the fight itself never cared which it was. */
 export async function doBattle(buyerId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     // An unfinished fight owns this button — the sortie is already spent on it, so hand it straight back.
     const openNow = readBattle(row);
@@ -2451,7 +2429,6 @@ export async function doBattle(buyerId) {
 // Fight the next rank down the ladder, or re-fight one already sunk for a reduced purse. Win and the ladder
 // advances; lose and you have spent a sortie and nothing else — the fleet never takes a rung back.
 export async function doFleetBattle(buyerId, rank = null) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     // ONE FIGHT AT A TIME — but a battle already open is not a reason to do NOTHING. Walking away from a fight
     // (closing the tab, a reload) left a saved battle that no screen reopened, so every later tap on Battle
@@ -2557,7 +2534,6 @@ async function finishFleetBattle(buyerId, meta, res) {
 
 // ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────
 export async function buyAmmo(buyerId, ammoId, qty = 10) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const def = AMMO[String(ammoId)];
     if (!def || def.basic) return { ok: false, error: "bad_ammo", ...(await getSailingState(buyerId)) };
     const n = Math.max(1, Math.min(200, Number(qty) || 10));
@@ -2908,7 +2884,6 @@ export async function upgradeCombat(buyerId, track) {
 }
 
 export async function resetRaid(buyerId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const { bonusRaids } = await equippedRaidExtras(buyerId);
@@ -3464,11 +3439,8 @@ export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");
 export const upgradeRarity = (buyerId) => buyUpgrade(buyerId, "rarity");
 export const upgradeLuck = (buyerId) => buyUpgrade(buyerId, "luck"); // the "Luck" (waves) lever
-// The "Raiding" (raid-dodge) lever — gated with the rest of raiding, so nobody buys levels in a track whose
-// only effect is on a feature they cannot open.
-export const upgradeRaid = (buyerId) => (raidsEnabled(buyerId)
-    ? buyUpgrade(buyerId, "raid")
-    : Promise.resolve({ ok: false, error: "under_construction" }));
+// The "Raiding" (raid-dodge) lever.
+export const upgradeRaid = (buyerId) => buyUpgrade(buyerId, "raid");
 export const upgradeDig = (buyerId, track) => buyUpgrade(buyerId, `dig_${track}`); // digging tracks
 // Rail tracks — gated like the rest of fishing, so nobody can buy into an unreleased feature.
 export const upgradeFishing = (buyerId, track) => (fishingUnlocked(buyerId)
