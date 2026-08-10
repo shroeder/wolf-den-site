@@ -23,7 +23,7 @@ export const FEATURE_DAILIES = {
     // gains the XP, their farm gains the vote). Neither pays more PER ACTION — those awards were trimmed once
     // already for being 5.5% of all XP in the game — the pull is the bounty on top.
     farm: [
-        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold", ownerOnly: true },
+        { key: "farm_harvest3", label: "Harvest 3 crops", metric: "harvest_crop", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
         { key: "farm_plant2", label: "Plant 2 seeds", metric: "plant_seed", need: 2, reward: { gold: 90 }, rewardLabel: "+90 gold" },
         { key: "farm_pet2", label: "Pet 2 companions", metric: "pet_animal", need: 2, reward: { gold: 120 }, rewardLabel: "+120 gold" },
         // The chest moves to the visiting bounty rather than being minted twice: a full farm day still pays
@@ -38,15 +38,12 @@ export const FEATURE_DAILIES = {
         { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
         { key: "sail_fleet1", label: "Fight the fleet", metric: "ship_battle", need: 1, reward: { gold: 160 }, rewardLabel: "+160 gold" },
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
-        // the one task you can finish without waiting on a four-hour timer. (Was ownerOnly while fishing was
-        // unreleased; the `ownerOnly` filter below is kept for the next feature that needs it.)
-        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold", ownerOnly: true },
+        // the one task you can finish without waiting on a four-hour timer.
+        { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
     ],
-    // The Kitchen — ownerOnly again while the recipe economy is settled. One task for volume, one for the PREP
-    // chain (the part people skip), and one for skill rather than repetition.
     // The Kitchen's three. Deliberately one of each SHAPE so a day in the kitchen isn't three of the same
     // action: cook a few dishes (volume), prep ingredients (the chain that feeds them), and land a clean run
-    // (skill at the timing bar). ownerOnly came off cook_clean1 when the Kitchen went public.
+    // (skill at the timing bar).
     cooking: [
         { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
         { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
