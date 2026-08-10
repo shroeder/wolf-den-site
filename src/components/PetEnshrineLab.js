@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import PetEnshrine from "@/components/PetEnshrine";
+import PetEnshrineReveal from "@/components/PetEnshrineReveal";
 
 // ── THE ENSHRINE LAB ─────────────────────────────────────────────────────────────────────────────────────────
 // Dev only. Mounts the REAL panel against fixture state, so every branch it has can be looked at without
@@ -31,6 +32,9 @@ const CASES = [
 export default function PetEnshrineLab() {
     const [which, setWhich] = useState("both");
     const [log, setLog] = useState([]);
+    // The reveal is a four-beat animation, so the lab can PAUSE it on a beat — a screenshot of beat 3 is
+    // otherwise a 420ms window you have to catch by luck.
+    const [reveal, setReveal] = useState(null);
     const c = CASES.find((x) => x.key === which) || CASES[0];
 
     return (
@@ -53,10 +57,27 @@ export default function PetEnshrineLab() {
                     stones={c.stones}
                     prices={{ doubloons: 900, laurels: 6000 }}
                     enshrined={c.enshrined}
-                    onEnshrine={(stone) => setLog((l) => [...l, `POST enshrine { petId: "${PET.id}", stone: "${stone}" }`])}
+                    onEnshrine={(stone) => {
+                        setLog((l) => [...l, `POST enshrine { petId: "${PET.id}", stone: "${stone}" }`]);
+                        setReveal(stone);
+                    }}
                 />
                 {c.level < 6 ? <p className="pelab-note">Nothing renders below level 6 — correct.</p> : null}
             </div>
+
+            <div className="pelab-tabs">
+                <button type="button" className="pelab-tab" onClick={() => setReveal("light")}>▶ Play reveal · light</button>
+                <button type="button" className="pelab-tab" onClick={() => setReveal("dark")}>▶ Play reveal · dark</button>
+            </div>
+
+            <PetEnshrineReveal
+                open={Boolean(reveal)}
+                pet={PET}
+                stone={reveal || "light"}
+                before={{ url: "/images/lab/wolf_pup-lv5.png", flip: false }}
+                after={SPRITES[reveal || "light"]}
+                onClose={() => setReveal(null)}
+            />
 
             {log.length ? (
                 <pre className="pelab-log">{log.join("\n")}</pre>

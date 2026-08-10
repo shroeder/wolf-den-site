@@ -73,13 +73,27 @@ const FORMS = {
             + "its head. It stands taller and calmer — serene, holy and unmistakably sanctified.",
     },
     dark: {
+        // ── REWRITTEN AFTER THE FIRST 19 ─────────────────────────────────────────────────────────────────
+        // The contact sheet was damning: the light forms were unmistakably a bat, a bear, a frog, an owl, a
+        // scorpion — and the DARK forms had all collapsed into the same black blob with purple cracks and a
+        // cloud of smoke. Two words did it. "Darkened to deep obsidian" removed every colour that told the
+        // species apart, and "ragged wisps of black smoke peel off its outline" ate the outline itself. That
+        // is the exact failure this whole level was meant to fix, arrived at from the other direction.
+        //
+        // So now: the creature keeps ITS OWN COLOURS, only deepened and desaturated; the smoke is a few thin
+        // curls that must not touch the body; and the prompt says outright that a stranger has to be able to
+        // name the animal. Menace comes from the eyes, the violet cracks and the extremities — not from
+        // painting the whole thing black.
         label: "Darkstone",
-        line: "ENSHRINED IN SHADOW. Its coat/scales/feathers have darkened to deep obsidian and bruised "
-            + "violet. Its natural markings have become CRACKS OF VIOLET VOID LIGHT running through its body, "
-            + "as though something burns inside it. Its eyes are solid violet with no pupil. Where it has "
-            + "horns, claws, fangs or a mane, those have grown longer, sharper and blacker, edged in violet. "
-            + "Ragged wisps of black smoke peel off its outline. It is crouched lower and more predatory — "
-            + "menacing, hungry and unmistakably corrupted.",
+        line: "ENSHRINED IN SHADOW. Keep the creature's OWN colours and markings clearly visible — deepen and "
+            + "desaturate them rather than blacking them out, so the species is instantly recognisable. Its "
+            + "natural markings now carry CRACKS OF GLOWING VIOLET LIGHT running along them, as though "
+            + "something burns under the skin. Its eyes glow solid violet. Where it has horns, claws, fangs "
+            + "or a mane, those have grown longer and sharper, tipped in violet. Add only a FEW THIN CURLS of "
+            + "dark smoke near its feet — they must NOT cover, blur or touch the body, and the full outline of "
+            + "the animal must stay crisp and unbroken against the transparent background. Its posture is "
+            + "lower and more predatory. CRITICAL: a stranger must be able to name the species at a glance; "
+            + "if the animal has become an unreadable dark mass, that is wrong.",
     },
 };
 

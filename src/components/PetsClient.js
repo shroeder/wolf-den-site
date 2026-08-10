@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
 import PetEnshrine from "@/components/PetEnshrine";
+import PetEnshrineReveal from "@/components/PetEnshrineReveal";
 import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
@@ -112,6 +113,7 @@ export default function PetsClient() {
     const [state, setState] = useState(null);
     const [filter, setFilter] = useState("");
     const [busy, setBusy] = useState(null);
+    const [reveal, setReveal] = useState(null);
     const [err, setErr] = useState(null);
     const [justEquipped, setJustEquipped] = useState(null);
     // Pet level-up / evolution celebration is handled site-wide by <PetLevelUp> (mounted in the layout), so it
@@ -268,6 +270,8 @@ export default function PetsClient() {
         const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
         return (
             <div className="petx-page">
+                <PetEnshrineReveal open={Boolean(reveal)} pet={reveal?.pet} stone={reveal?.stone}
+                    before={reveal?.before} after={reveal?.after} onClose={() => setReveal(null)} />
                 <button type="button" className="petx-crumb" onClick={closeDetail}>← All pets</button>
                 {note ? <p style={{ color: "#7ad07a", textAlign: "center", margin: 0, fontWeight: 700 }}>{note}</p> : null}
                 <div className={`petx-detail-card rarity-${p.rarity}`}>
@@ -317,7 +321,14 @@ export default function PetsClient() {
                             prices={state?.ascension?.prices}
                             enshrined={(state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null}
                             busy={busy === p.id}
-                            onEnshrine={(stone) => action(p.id, "enshrine", { stone })}
+                            onEnshrine={async (stone) => {
+                                // The reveal is armed BEFORE the reload, with the sprites captured as they
+                                // are right now — `load()` replaces state and the "before" form would be gone.
+                                const was = state?.petSprites?.[p.id]?.[lvl.level] || null;
+                                const will = state?.petSprites?.[p.id]?.[stone] || null;
+                                const ok = await action(p.id, "enshrine", { stone });
+                                if (ok) setReveal({ pet: p, stone, before: was, after: will });
+                            }}
                         />
                     ) : null}
 

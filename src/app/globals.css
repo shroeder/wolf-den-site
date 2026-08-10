@@ -15748,3 +15748,51 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
                 .pelab-log { margin-top: 12px; padding: 10px; border-radius: 10px; font-size: .7rem;
                     background: rgba(0,0,0,.5); color: #8bf0b4; white-space: pre-wrap; }
             
+
+/* ── THE ENSHRINING, AS A MOMENT ───────────────────────────────────────────────────────────────────────────
+   Four beats. Classes penr-b1..b4 drive the whole thing so the JS only has to say WHICH beat it is on. */
+.penr { position: fixed; inset: 0; z-index: 10120; display: grid; place-items: center; gap: 0;
+    grid-template-rows: 1fr auto; padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
+    background: rgba(6,4,10,0.94); backdrop-filter: blur(3px); animation: penrIn .3s ease both; }
+@keyframes penrIn { from { opacity: 0; } to { opacity: 1; } }
+.penr-rays { position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--stone) 60%, transparent) 0%, transparent 62%); }
+.penr-b3 .penr-rays { animation: penrFlash .42s ease-out both; }
+.penr-b4 .penr-rays { opacity: .28; }
+@keyframes penrFlash { 0% { opacity: 0; } 22% { opacity: 1; } 100% { opacity: .28; } }
+
+.penr-stage { position: relative; width: min(78vw, 300px); aspect-ratio: 1; display: grid; place-items: center; }
+.penr-form { position: absolute; inset: 0; display: grid; place-items: center; }
+.penr-form img, .penr-form svg { width: 100%; height: 100%; object-fit: contain; }
+.penr-new { opacity: 0; transform: scale(.86); }
+.penr-b1 .penr-old, .penr-b2 .penr-old { opacity: 1; }
+/* The old form goes to a pure silhouette of the stone's colour before it is replaced — the same trick the
+   evolution reveal uses, and the reason the change reads as a transformation rather than an image swap. */
+.penr-b2 .penr-old { filter: brightness(0) drop-shadow(0 0 22px var(--stone)); animation: penrShiver .7s ease-in-out; }
+.penr-b3 .penr-old, .penr-b4 .penr-old { opacity: 0; }
+.penr-b3 .penr-new, .penr-b4 .penr-new { opacity: 1; transform: scale(1); transition: opacity .34s ease, transform .5s cubic-bezier(.2,1.4,.4,1); }
+@keyframes penrShiver { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 45% { transform: translateX(5px); } 70% { transform: translateX(-3px); } }
+
+/* The stone falls in and is spent. It exists only for beat 2 — this is the moment the thing you found is gone. */
+.penr-stone { position: absolute; width: 34%; opacity: 0; pointer-events: none; }
+.penr-b2 .penr-stone { animation: penrDrop .7s cubic-bezier(.5,0,.75,0) both; }
+@keyframes penrDrop { 0% { opacity: 0; transform: translateY(-140px) scale(1.5) rotate(-18deg); }
+    30% { opacity: 1; } 88% { opacity: 1; transform: translateY(0) scale(.9) rotate(4deg); }
+    100% { opacity: 0; transform: translateY(6px) scale(.5) rotate(8deg); } }
+
+.penr-shards { position: absolute; inset: 0; pointer-events: none; }
+.penr-shards i { position: absolute; left: 50%; top: 50%; width: 5px; height: 14px; border-radius: 2px;
+    background: var(--stone); opacity: 0; transform-origin: 50% 50%; }
+.penr-b3 .penr-shards i { animation: penrShard .62s ease-out both; animation-delay: calc(var(--i) * 8ms);
+    transform: rotate(calc(var(--i) * 36deg)); }
+@keyframes penrShard { 0% { opacity: 1; translate: 0 0; scale: 1; }
+    100% { opacity: 0; translate: 0 -150px; scale: .3; } }
+
+.penr-words { text-align: center; max-width: 420px; opacity: 0; }
+.penr-b4 .penr-words { animation: penrWords .45s ease both; }
+@keyframes penrWords { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.penr-kick { display: block; font-size: .64rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; color: var(--stone); }
+.penr-name { display: block; font-size: 1.35rem; color: #fff; margin: 4px 0 6px; text-shadow: 0 0 18px color-mix(in srgb, var(--stone) 50%, transparent); }
+.penr-line { margin: 0 0 14px; font-size: .85rem; line-height: 1.5; color: rgba(255,255,255,.8); }
+.penr-go { padding: 11px 26px; border-radius: 11px; font-weight: 900; font-size: .88rem; cursor: pointer;
+    color: #120c1c; background: var(--stone); border: none; }
