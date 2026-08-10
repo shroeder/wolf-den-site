@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiCrossedSwords, GiKnapsack, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiCrossedSwords, GiExitDoor, GiKnapsack, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -379,6 +379,9 @@ export default function ArenaClient({ initial }) {
     const ringRef = useRef(null);
     // The blow-by-blow, off by default — see the drawer note down in the render.
     const [logOpen, setLogOpen] = useState(false);
+    // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
+    // walking away touches it, which is the whole reason this can exist at all.
+    const [stepped, setStepped] = useState(false);
     // The spell layer, driven imperatively. React state is the wrong tool for "play this burst now" — by the
     // time a re-render lands, the moment has gone.
     const fxRef = useRef(null);
@@ -663,7 +666,7 @@ export default function ArenaClient({ initial }) {
     // inside the panel: both fighters, both vigour bars, cooldowns, the last beat and the deck itself. It used to
     // be a picture on top with the controls stacked underneath it like a form, which is why it read as a page
     // rather than a fight.
-    if (bout) {
+    if (bout && !stepped) {
         const yourTurn = !bout.over && bout.turn === "you";
         // A CRIT takes the whole pane for a moment. This used to test for grade "flawless"/"perfect" — timing
         // grades that stopped existing when the ring was removed — so the screen flash, the oversized number
@@ -717,6 +720,11 @@ export default function ArenaClient({ initial }) {
                     {/* Everything that used to sit in paragraphs under the panel, now a strip across the top. */}
                     <div className="ar-hud">
                         <span className="ar-round">Round {bout.beat}</span>
+                        {/* ── THE TOOLS ── mute, leave and the log. A ROW, because .ar-mute is absolutely
+                            positioned at the top-right corner: a second and third button using that class
+                            landed on the exact same 34px square as the first, and only the last one drawn
+                            could be tapped. Caught by a click that Playwright reported as intercepted. */}
+                        <div className="ar-tools">
                         {/* A fight with music needs a way to turn the music off, on the fight screen, without
                             hunting for it. The choice is remembered across bouts. */}
                         <button type="button" className={`ar-mute${muteOn ? " is-off" : ""}`}
@@ -725,12 +733,20 @@ export default function ArenaClient({ initial }) {
                             onClick={() => { const n = !muteOn; setMuteOn(n); setMuted(n); if (!n) { unlock(); Sfx.ui(); } }}>
                             {muteOn ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
                         </button>
+                        {/* ── LEAVE ── the bout is a row in the database, not a thing held open by this screen,
+                            so stepping out of it costs nothing at all: no forfeit, no round conceded, the
+                            opponent is not waiting. Same deal a ship battle already offers. */}
+                        <button type="button" className="ar-mute ar-leave" aria-label="Step out of the fight"
+                            onClick={() => { Sfx.ui(); setStepped(true); }}>
+                            <GiExitDoor aria-hidden="true" />
+                        </button>
                         <button type="button" className={`ar-mute ar-logbtn${logOpen ? "" : " is-off"}`}
                             aria-label={logOpen ? "Hide the blow-by-blow" : "Show the blow-by-blow"}
                             aria-pressed={logOpen}
                             onClick={() => setLogOpen((v) => !v)}>
                             <GiScrollUnfurled aria-hidden="true" />
                         </button>
+                        </div>
                         {bout.clash?.note ? (
                             <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
                                 onClick={() => setWheel((w) => !w)}>
@@ -1159,6 +1175,19 @@ export default function ArenaClient({ initial }) {
                 </p>
             ) : null}
 
+            {/* A fight you stepped out of is still standing, and it owns your next tap: you cannot start
+                another while one is open, so the way back in has to be the loudest thing on the screen. */}
+            {bout && !bout.over ? (
+                <button type="button" className="ar-find is-resume" disabled={busy}
+                    onClick={() => { unlock(); Sfx.ui(); setStepped(false); }}>
+                    <GiCrossedSwords aria-hidden="true" />
+                    <span>
+                        <b>Back to the fight</b>
+                        <em>{bout.foe?.name || "Your opponent"} is still standing — round {bout.beat}</em>
+                    </span>
+                </button>
+            ) : null}
+
             {/* ── ONE BUTTON ── it was two stacked lists of eighty rows behind a switch, and picking off them
                 is not a decision anybody has the information to make: a name, a level and a vigour number do
                 not tell you whether you can take somebody. The sea answers this with one button and so does
@@ -1169,7 +1198,7 @@ export default function ArenaClient({ initial }) {
                 The lists themselves are not missed: the standings below are who is who, and the recap after a
                 bout is where an opponent actually becomes a name you remember. */}
             <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0}
-                onClick={() => { unlock(); Sfx.ui(); act("start", { target: "auto" }); }}>
+                onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
                 <GiCrossedSwords aria-hidden="true" />
                 <span>
                     <b>{st.fightsLeft > 0 ? "Find a fight" : "No fights left today"}</b>
@@ -2137,7 +2166,9 @@ function Styles() {
             /* ── TOUCH TARGETS ── measured at 28x28, well under the 44px every mobile guideline asks for.
                The box stays small so it does not shout on a crowded HUD; the HIT AREA is grown past it with a
                transparent ::after, which is the standard way to have both. */
-            .ar-mute { position: absolute; top: 7px; right: 8px; z-index: 26; width: 34px; height: 34px;
+            .ar-tools { position: absolute; top: 7px; right: 8px; z-index: 26; display: flex; gap: 6px;
+                pointer-events: auto; }
+            .ar-mute { position: relative; width: 34px; height: 34px;
                 padding: 0; appearance: none; -webkit-appearance: none; border-radius: 9px; cursor: pointer;
                 display: grid; place-items: center; pointer-events: auto;
                 color: #ffe0b0; background: rgba(8,6,10,0.62); border: 1px solid rgba(255,255,255,0.18); }
@@ -2217,6 +2248,13 @@ function Styles() {
                 background: linear-gradient(180deg, #f6c34a, #d99a1e 52%, #a86f10);
                 box-shadow: 0 6px 20px rgba(180,120,20,0.38); }
             .ar-find:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); box-shadow: none; }
+            /* The way back into a fight you stepped out of — cooler than "find a fight" so the two never read
+               as the same button, and it sits above it. */
+            .ar-find.is-resume { color: #f4ecff;
+                border-color: rgba(185,140,255,0.8);
+                background: linear-gradient(180deg, #6b4bb8, #4a3080 55%, #33215c);
+                box-shadow: 0 6px 20px rgba(120,70,220,0.34); }
+            .ar-leave svg { width: 15px; height: 15px; }
             .ar-find svg { width: 30px; height: 30px; flex: none; }
             .ar-find b { display: block; font-family: var(--font-display); font-weight: 900; font-size: 1.06rem; }
             .ar-find em { display: block; font-style: normal; font-size: 0.78rem; opacity: .82; margin-top: 2px; }
@@ -2249,7 +2287,8 @@ function Styles() {
                 .ar-round { display: none; }
                 .ar-hud .ar-tag { font-size: 8.5px; min-height: 20px; padding: 3px 7px; }
                 .ar-hud .ar-tag.is-under { display: none; }
-                .ar-mute { top: 3px; right: 4px; width: 26px; height: 26px; }
+                .ar-tools { top: 3px; right: 4px; gap: 4px; }
+                .ar-mute { width: 26px; height: 26px; }
                 .ar-bars { padding: 1px 8px 0; gap: 6px; }
                 .ar-fname { font-size: 10px; }
                 .ar-hp { height: 8px; margin: 2px 0 1px; }
