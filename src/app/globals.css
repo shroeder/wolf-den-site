@@ -12856,6 +12856,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .farm-neigh { min-width: 0; padding: 12px 13px 13px;
     border: 1px solid rgba(255,193,110,0.34);
     background: linear-gradient(150deg, rgba(255,193,110,0.11), rgba(143,227,154,0.05) 62%, rgba(255,255,255,0.02)); }
+/* ── VISIT ANYONE ── the search that used to live inside the collapsed rating summary, where nobody found it.
+   It sits with the faces because this is the card about going somewhere. */
+.farm-find { display: flex; align-items: center; gap: 8px; margin: 9px 0 2px; padding: 8px 11px;
+    border-radius: 11px; color: #8f98a3;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.farm-find input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: #e8dcc6;
+    font-size: 0.86rem; }
+.farm-find input::placeholder { color: #7f8790; }
 .farm-neigh-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .farm-neigh-head strong { font-size: 1rem; }
 /* What is still on the table today, as the loudest thing in the header. */

@@ -2869,6 +2869,26 @@ const SearchIcon = () => (
 // on — un-rated farms first, with a tick on the ones already done. The whole point is that it answers "who
 // haven't I visited yet" without a search box, a tap, or knowing anyone's @name.
 function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
+    // ── AND ANYONE ELSE ── the eight faces answer "who owes me a visit", which is the right question most
+    // days and the wrong one the day you want to go and look at a particular person's farm. There WAS a way:
+    // a search box, inside the collapsed rating summary, under the standings. Nobody found it. It is here now,
+    // beside the faces, because this is the card that is about going somewhere.
+    const [q, setQ] = useState("");
+    const [hits, setHits] = useState(null);
+    const [seeking, setSeeking] = useState(false);
+    useEffect(() => {
+        const term = q.trim();
+        if (term.length < 2) { setHits(null); setSeeking(false); return undefined; }
+        setSeeking(true);
+        // Debounced: a farm directory is not worth a request per keystroke.
+        const t = setTimeout(() => {
+            fetch(`/api/marketplace/farm?list=1&q=${encodeURIComponent(term)}`, { cache: "no-store" })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => { setHits(Array.isArray(d?.members) ? d.members.slice(0, 12) : []); setSeeking(false); })
+                .catch(() => { setHits([]); setSeeking(false); });
+        }, 260);
+        return () => clearTimeout(t);
+    }, [q]);
     if (!neighbours?.length) return null;
     const togo = neighbours.filter((n) => !n.ratedToday);
     const spent = ratesLeft <= 0 && petsLeft <= 0;
@@ -2897,6 +2917,35 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                         ? <><b style={{ color: "#ffd75e" }}>{owed.length === 1 ? `${owed[0].name} came by` : `${owed.length} of these came by`}</b> in the last few days — pay it back.</>
                         : "Their pets gain the XP and their farm gains the vote — and both pay you back."}
             </p>
+            {/* Any member, by name or @handle — not only the ones the strip picked for you. */}
+            <label className="farm-find">
+                <SearchIcon />
+                <input type="search" value={q} onChange={(e) => setQ(e.target.value)}
+                    placeholder="Visit anyone — search a name or @handle" aria-label="Find a farm to visit" />
+            </label>
+            {hits ? (
+                hits.length ? (
+                    <div className="farm-neigh-row">
+                        {hits.map((m) => {
+                            const face = m.spriteUrl || m.avatarUrl;
+                            return (
+                                <a key={m.id} className="farm-neigh-chip"
+                                    href={`/marketplace/farm?u=${encodeURIComponent(m.alias)}`}
+                                    title={`Visit ${m.name}'s farm`}>
+                                    <span className="farm-neigh-face">
+                                        {face ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={face} alt="" style={{ transform: m.spriteFlip ? "scaleX(-1)" : "none" }} />
+                                        ) : <span aria-hidden="true">🐾</span>}
+                                    </span>
+                                    <b>{m.name}</b>
+                                    <em>{m.decoCount ? `${m.decoCount} placed` : "@" + m.alias}</em>
+                                </a>
+                            );
+                        })}
+                    </div>
+                ) : <p className="farm-neigh-sub">{seeking ? "Looking…" : "Nobody by that name."}</p>
+            ) : (
             <div className="farm-neigh-row">
                 {neighbours.map((n) => {
                     const avatar = n.spriteUrl || n.avatarUrl;
@@ -2921,6 +2970,7 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                     );
                 })}
             </div>
+            )}
         </section>
     );
 }

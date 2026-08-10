@@ -152,7 +152,8 @@ export default function BoardsLab() {
                     <span>tier-weighted · like 1 · love 2 · admire 3</span>
                 </div>
                 <Leaderboard
-                    rows={LOVE.map((r) => ({ ...r, value: r.score.toLocaleString(), unit: `love · ${r.votes} votes` }))}
+                    rows={LOVE.map((r, i) => ({ ...r, value: r.score.toLocaleString(), unit: `love · ${r.votes} votes`,
+                        href: r.you ? null : `/marketplace/farm?u=member${i}` }))}
                     total={47} unitPlural="farms"
                 />
             </section>
