@@ -8,8 +8,8 @@ import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
-import { sumPieceSea } from "@/lib/marketplace/collection-pieces.js";
-import { getOwnedPieceIds, getOwnedSetIds } from "@/lib/marketplace/collection-owned.js";
+import { sumPieceSea, COLLECTION_PIECES } from "@/lib/marketplace/collection-pieces.js";
+import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -971,7 +971,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = []) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1236,7 +1236,8 @@ export async function getSailingState(buyerId, skyKey = null) {
     // The gun deck is a query, and decorate() is synchronous on purpose — fetched here and handed in, the
     // same way chest art and collections are.
     const gunDeck = raidsEnabled(buyerId) ? await gunDeckView(buyerId, row).catch(() => null) : null;
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck), gold: goldRow?.gold || 0, fleet, sky, sea };
+    const pieces = raidsEnabled(buyerId) ? await pieceShop(buyerId).catch(() => []) : [];
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1673,7 +1674,19 @@ async function finishRaidBattle(buyerId, meta, res) {
     } else if (meta.targetId) {
         // The defender is told they drove somebody off, and it counts toward their badges — but there is no
         // purse attached, because the raider no longer loses one.
-        await db.query(`INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, gear_item_id) VALUES ($1, $2, 0, NULL)`, [meta.targetId, buyerId]).catch(() => {});
+        // DEFENDING PAYS. It banked `gold: 0` — the row existed only to tell the defender it happened — so the
+        // one thing in ship battles you do not choose to do was the one thing that paid nothing. Doubloons
+        // rather than coin, because they are the only currency the gun deck takes, and this is the only way
+        // to earn them without spending a daily raid of your own.
+        await db.query(
+            `INSERT INTO mkt_raid_defense (defender_id, attacker_id, gold, doubloons, gear_item_id) VALUES ($1, $2, 0, $3, NULL)`,
+            [meta.targetId, buyerId, DEFENCE_DOUBLOONS]
+        ).catch(() => {});
+        await db.query(
+            `INSERT INTO mkt_sailing (buyer_id, doubloons) VALUES ($1, $2)
+             ON CONFLICT (buyer_id) DO UPDATE SET doubloons = COALESCE(mkt_sailing.doubloons,0) + $2, updated_at = NOW()`,
+            [meta.targetId, DEFENCE_DOUBLOONS]
+        ).catch(() => {});
         const defRow = await db.queryOne(
             `INSERT INTO mkt_sailing (buyer_id, raids_defended) VALUES ($1, 1)
              ON CONFLICT (buyer_id) DO UPDATE SET raids_defended = COALESCE(mkt_sailing.raids_defended, 0) + 1 RETURNING raids_defended`,
@@ -1697,17 +1710,18 @@ export async function getUnseenRaidDefenses(buyerId) {
     // anything by being raided (the terms are win-only for the raider), so withholding the report costs them
     // nothing and keeps the rebuild invisible.
     if (!raidsEnabled(buyerId)) return [];
-    if (!buyerId) return { defenses: [], totalGold: 0, totalWins: 0 };
+    if (!buyerId) return { defenses: [], totalGold: 0, totalDoubloons: 0, totalWins: 0 };
     const rows = await db
         .query(
             `SELECT attacker_id, COUNT(*)::int AS n, COALESCE(SUM(gold), 0)::int AS gold,
+                    COALESCE(SUM(doubloons), 0)::int AS doubloons,
                     array_remove(array_agg(gear_item_id), NULL) AS gears
                FROM mkt_raid_defense WHERE defender_id = $1 AND seen_at IS NULL
-              GROUP BY attacker_id ORDER BY n DESC, gold DESC`,
+              GROUP BY attacker_id ORDER BY n DESC, doubloons DESC`,
             [buyerId]
         )
         .catch(() => []);
-    if (!rows.length) return { defenses: [], totalGold: 0, totalWins: 0 };
+    if (!rows.length) return { defenses: [], totalGold: 0, totalDoubloons: 0, totalWins: 0 };
     const ids = rows.map((r) => r.attacker_id);
     const buyers = await db.query(`SELECT id, display_name, alias, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip, equipped_border, featured_collectible FROM mkt_buyer WHERE id = ANY($1)`, [ids]).catch(() => []);
     const byId = new Map((buyers || []).map((b) => [b.id, b]));
@@ -1729,11 +1743,17 @@ export async function getUnseenRaidDefenses(buyerId) {
             },
             count: r.n,
             gold: r.gold,
+            doubloons: r.doubloons,
             gear,
         };
     });
     await db.query(`UPDATE mkt_raid_defense SET seen_at = NOW() WHERE defender_id = $1 AND seen_at IS NULL`, [buyerId]).catch(() => {});
-    return { defenses, totalGold: rows.reduce((s, r) => s + r.gold, 0), totalWins: rows.reduce((s, r) => s + r.n, 0) };
+    return {
+        defenses,
+        totalGold: rows.reduce((s, r) => s + r.gold, 0),
+        totalDoubloons: rows.reduce((s, r) => s + r.doubloons, 0),
+        totalWins: rows.reduce((s, r) => s + r.n, 0),
+    };
 }
 
 // Buy back your daily raid after it's spent. Cost DOUBLES with each reset that day (free while testing). Clears
@@ -1758,7 +1778,7 @@ const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || 
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
 
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
-function combatView(row, boatLevel, consumableArt = {}, gunDeck = null) {
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = []) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -1776,6 +1796,9 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null) {
         },
         // Every barrel you own, priced — the yard draws these ON the ship.
         gunDeck,
+        // THE QUARTERMASTER. Moved off the ammunition tab, which no longer exists — ammunition is unlocked on
+        // the gun deck now, so the shop that used to live beside it needed a home of its own.
+        shop: { pieces: pieceShop_, gamble: { price: GAMBLE_PRICE, table: GAMBLE_TABLE }, piecePrice: PIECE_PRICE },
         tracks: [
             ...Object.values(COMBAT_TRACKS).map((t) => {
                 const level = row?.[t.col] || 0;
@@ -2417,6 +2440,83 @@ export const LOCKER = {
         blurb: "Use an in-store perk again today instead of waiting out its cooldown. Real merchandise." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
+
+// What repelling one raid is worth. Deliberately modest: it is income you did not spend a raid to earn, and
+// the cheapest gun-deck level costs 18.
+export const DEFENCE_DOUBLOONS = 12;
+
+// -- COLLECTION PIECES, FOR DOUBLOONS -------------------------------------------------------------------------
+// The non-combat sets pay for being OWNED, and most of their pieces only come out of chests — so a set you are
+// two pieces short of is a set you can only wait for. A flat price and a list of what you are missing turns
+// that into something you can go and do. Priced high on purpose: 1,000 doubloons is many sinkings, so it is
+// what you save for rather than how you fill a set.
+export const PIECE_PRICE = 1000;
+
+/** Every collection piece you do NOT own, priced. */
+export async function pieceShop(buyerId) {
+    const owned = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    return COLLECTION_PIECES
+        .filter((p) => !owned.has(p.id))
+        .map((p) => ({ id: p.id, name: p.name, set: p.set, rarity: p.rarity, icon: p.icon,
+                       flavor: p.flavor || null, price: PIECE_PRICE }))
+        .sort((a, b) => a.set.localeCompare(b.set) || a.name.localeCompare(b.name));
+}
+
+export async function buyPiece(buyerId, pieceId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = COLLECTION_PIECES.find((p) => p.id === String(pieceId));
+    if (!def) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
+    const owned = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    if (owned.has(def.id)) return { ok: false, error: "already_owned", ...(await getSailingState(buyerId)) };
+    // Charge first and conditionally — neon() has no transactions, so the guard lives inside the UPDATE.
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, PIECE_PRICE]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    await grantPiece(buyerId, def.id, "doubloon_shop").catch(() => {});
+    await trackActivity(buyerId, "buy_piece", { id: def.id, cost: PIECE_PRICE, currency: "doubloons" }).catch(() => {});
+    return { ok: true, bought: { id: def.id, name: def.name, rarity: def.rarity, icon: def.icon },
+             ...(await getSailingState(buyerId)) };
+}
+
+// -- THE GAMBLE -------------------------------------------------------------------------------------------
+// A cheap roll on a chest, weighted hard to the bottom. The point is not the expected value, it is finding out
+// what you got — which is why the client makes an occasion of the reveal. Four tiers only: everything above
+// mythic belongs to bosses and the Forge, and a 250-doubloon lever must never be the best road to it.
+export const GAMBLE_PRICE = 250;
+export const GAMBLE_TABLE = [
+    { tier: "wooden", w: 56 },
+    { tier: "iron", w: 27 },
+    { tier: "gold", w: 13 },
+    { tier: "mythic", w: 4 },
+];
+
+export async function gambleChest(buyerId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, GAMBLE_PRICE]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+    const pick = pickWeighted(GAMBLE_TABLE);
+    await addChests(buyerId, { [pick.tier]: 1 }, { source: "doubloon_gamble" }).catch(() => {});
+    await trackActivity(buyerId, "gamble_chest", { tier: pick.tier, cost: GAMBLE_PRICE }).catch(() => {});
+    const art = await getChestArt().catch(() => ({}));
+    return {
+        ok: true,
+        // Everything the reveal needs in one payload, so the modal never goes back for the picture.
+        won: {
+            tier: pick.tier,
+            label: CHEST_TIERS[pick.tier]?.label || pick.tier,
+            color: CHEST_TIERS[pick.tier]?.color || "#ffd75e",
+            image: art[pick.tier] || null,
+        },
+        ...(await getSailingState(buyerId)),
+    };
+}
 
 /** Buy one thing out of the prize locker with doubloons. */
 export async function buyLocker(buyerId, id) {

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import * as Gi from "react-icons/gi";
 
+import Quartermaster from "@/components/Quartermaster";
+
 // ── Permanent credit: ship battles were Teegs's idea — that they should be immersive and ship-centric, fought
 // as a SHIP rather than as a stat block, which is the whole reason the feature is shaped the way it is. Her
 // actual AI hero sprite is enshrined on the panel as a medallion; tapping it tells the story. Hard-coded to her
@@ -84,55 +86,6 @@ export function Track({ t, purse, gold, busy, onBuy }) {
     );
 }
 
-function Round({ a, purse, busy, onLoad, onBuy }) {
-    const out = !a.basic && (a.count || 0) <= 0;
-    return (
-        // The round carries its own COLOUR as well as its own sprite — the four rows were four identical dark
-        // rectangles, so the one thing that distinguishes them (which round it is) was doing no work at all.
-        <div className={`sby-round is-${a.id}${a.loaded ? " is-loaded" : ""}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="sby-round-ico" src={`/images/sailing/ammo/${a.id}.png`} alt="" draggable="false" />
-            <div className="sby-round-body">
-                <b>{a.name}</b>
-                <em>{a.blurb}</em>
-            </div>
-            <div className="sby-round-acts">
-                <span className={`sby-count${out ? " is-out" : ""}`}>
-                    {a.basic ? "unlimited" : `${a.count} in the racks`}
-                </span>
-                {a.loaded ? (
-                    <span className="sby-count">loaded</span>
-                ) : (
-                    <button type="button" className="sby-mini is-load" disabled={busy || out} onClick={() => onLoad(a.id)}>Load</button>
-                )}
-                {a.basic ? null : (
-                    <>
-                        {/* BUY ONE. The smallest purchase on the counter was a pack of five, which at 40-70
-                            doubloons is several battles' pay — so a captain with a starting purse could not buy
-                            any ammunition at all, and the button just sat there greyed out. A round is spent
-                            per volley now, so a single one is a real thing to own. */}
-                        <div className="sby-buyrow">
-                            <button type="button" className="sby-mini" disabled={busy || purse < a.price}
-                                onClick={() => onBuy(a.id, 1)} title={`One round for ${a.price} doubloons`}>
-                                1 · {a.price}<Dbl />
-                            </button>
-                            <button type="button" className="sby-mini" disabled={busy || purse < a.price * 5}
-                                onClick={() => onBuy(a.id, 5)} title={`5 rounds for ${a.price * 5} doubloons`}>
-                                5 · {a.price * 5}<Dbl />
-                            </button>
-                        </div>
-                        {/* And SAY why, when neither is affordable. A dimmed button with no reason is the
-                            question this answered when it was asked out loud. */}
-                        {purse < a.price ? (
-                            <span className="sby-short">{a.price - purse} more needed</span>
-                        ) : null}
-                    </>
-                )}
-            </div>
-        </div>
-    );
-}
-
 // The opponent LIST that used to live here — one row per fleet rung and per passing member, each with a
 // portrait and an odds pill — is gone, and so is the ladder it implied. The server matches you now
 // (matchOpponent in sailing.js), so there is nothing to compare and nothing to pick: this tab is one button
@@ -147,7 +100,6 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
     const fleet = combat?.fleet || {};
     // ONE allowance, whoever you are matched against.
     const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
-
 
     // AFTER the hooks, never before: `combat` is null for anyone off the dev allow-list while ship battles are
     // under construction, and returning early above useMemo changes the hook order between renders.
@@ -181,7 +133,7 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
 
             <div className="sbd-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={active === "battles"} className={active === "battles" ? "is-on" : ""} onClick={() => setTab("battles")}>Battles</button>
-                <button type="button" role="tab" aria-selected={active === "ammo"} className={active === "ammo" ? "is-on" : ""} onClick={() => setTab("ammo")}>Ammunition</button>
+                <button type="button" role="tab" aria-selected={active === "shop"} className={active === "shop" ? "is-on" : ""} onClick={() => setTab("shop")}>Quartermaster</button>
             </div>
 
             {/* "Your ship" used to live here, which put the UPGRADE list inside the place you go to FIGHT.
@@ -189,56 +141,20 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }
                 simply had no seat at it. The tracks moved to the Gun Deck station; this modal is for choosing
                 an opponent and loading the racks, both of which you do right now. */}
 
-            {active === "ammo" ? (
-                <>
-                    <p className="sby-sub">
-                        One round per volley, picked when you pick your target — this is just the default.
-                        An empty rack falls back to round shot, which never runs out.
-                    </p>
-                    <div className="sby-ammo">
-                        {(combat.ammo || []).map((a) => (
-                            <Round key={a.id} a={a} purse={purse} busy={busy}
-                                onLoad={(ammo) => onAct({ action: "set_loadout", ammo })}
-                                onBuy={(ammo, qty) => onAct({ action: "buy_ammo", ammo, qty })} />
-                        ))}
-                    </div>
-
-                    {/* THE PRIZE LOCKER — the first thing doubloons buy that is not the ship itself. Sits under
-                        the racks rather than in its own tab because it is the same act: spending plunder, on the
-                        one screen where you already have the purse open. */}
-                    {(combat.locker || []).length ? (
-                        <>
-                            <h3 className="sby-lockerhead">The Doubloon Shop</h3>
-                            <p className="sby-sub">
-                                Everything on this counter is chest-only everywhere else in the game — a random roll
-                                inside a random drop. Here you can decide to have one.
-                            </p>
-                            <div className="sby-locker">
-                                {combat.locker.map((l) => (
-                                    <button key={l.id} type="button" className={`sby-lockeritem${l.canAfford ? "" : " is-poor"}`}
-                                        disabled={busy || !l.canAfford}
-                                        onClick={() => onAct({ action: "buy_locker", id: l.id })}>
-                                        {/* The shared reward-kind sprites, which exist on disk. Per-tier chest art
-                                            is served dynamically to the chest opener and has no static path to
-                                            point at from here. */}
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img className="sby-lockerart" alt="" draggable="false"
-                                            src={l.art || "/images/ui/potion.png"} />
-                                        <span className="sby-lockerbody">
-                                            <b>{l.name}</b>
-                                            <em>{l.blurb}</em>
-                                        </span>
-                                        <span className="sby-lockerprice">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src="/images/sailing/doubloon.png" alt="" draggable="false" />
-                                            {l.price}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    ) : null}
-                </>
+            {/* THE QUARTERMASTER. This tab was "Ammunition": rounds you bought by the ten, with the doubloon
+                shop bolted underneath because that was where the purse already was. Ammunition is unlocked on
+                the gun deck now, so the racks are gone and what is left is a shop — which turns out to deserve
+                the room. Three shelves: the locker, the collection manifest, and a gamble. */}
+            {active === "shop" ? (
+                <Quartermaster
+                    shop={combat.shop}
+                    locker={combat.locker}
+                    purse={purse}
+                    busy={busy}
+                    onBuyLocker={(id) => onAct({ action: "buy_locker", id })}
+                    onBuyPiece={(piece) => onAct({ action: "buy_piece", piece })}
+                    onGamble={() => onAct({ action: "gamble_chest" })}
+                />
             ) : null}
 
             {founderOpen ? (
