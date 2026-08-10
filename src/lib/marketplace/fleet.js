@@ -118,17 +118,20 @@ export function fleetReward(rank, { first = false } = {}) {
     const round = (n) => Math.max(1, Math.round(n * mult));
     return {
         doubloons: round(6 + r * 2 + (boss ? 18 : 0)),
-        gold: round(40 + r * 26 + (boss ? 260 : 0)),
+        // GOLD CAME DOWN HARD. It was 40 + 26/rank + 260 on a boss, so the flagship paid 690 a sinking on top
+        // of everything else in this table — the fight was worth more than what it was for.
+        gold: round(25 + r * 11 + (boss ? 110 : 0)),
         xp: round(18 + r * 7 + (boss ? 80 : 0)),
-        // Sailing's own chest currency — a battle now feeds the dig economy it sits next to. The TIER climbs
-        // with the fleet: every rank used to hand out wooden fragments, so sinking Admiral Vane and sinking a
-        // fishing boat filled the same jar and the recap could only ever say "+1 fragments".
-        fragments: round(1 + Math.floor(r / 3) + (boss ? 3 : 0)),
+        // Sailing's own chest currency, and the TIER is what scales — not the pile. It used to climb to nine
+        // mythic fragments a sinking, which is a chest and a half from one fight. Three at the top, and the
+        // rung decides what KIND of jar it fills rather than how fast.
+        fragments: round(r >= 9 ? 3 : r >= 5 ? 2 : 1),
         fragTier: r >= 13 ? "mythic" : r >= 9 ? "gold" : r >= 5 ? "iron" : "wooden",
         // Forge parts, tiered by how far down the fleet you are. The Forge is where people want for materials.
         parts: r >= 3 ? { tier: Math.min(5, 1 + Math.floor(r / 4)), n: round(1 + Math.floor(r / 5) + (boss ? 2 : 0)) } : null,
-        // Bosses drop a chest, and the last two drop a good one. This is the fleet's tie into gear.
-        chest: boss ? (r >= 15 ? "mythic" : r >= 10 ? "gold" : "iron") : null,
+        // NO CHEST. Bosses used to drop one outright, which is the same reward twice: fragments ARE the chest
+        // currency, so a boss paid you a chest and most of the makings of a second one. Forge it yourself.
+        chest: null,
         // A seed for the farm from the mid fleet on — small, but it lands somewhere else in the game.
         seed: r >= 6 && first ? true : false,
         // PLUNDER OFF THEIR DECK. A beaten crew should occasionally leave something behind, and it is the one

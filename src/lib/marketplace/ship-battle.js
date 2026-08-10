@@ -616,11 +616,20 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             const turned = 0;
             // Sea affinity's Ironclad is left alone: it is a gear effect you go and earn, not a stat every
             // hull carries for free, and it is the one thing still able to shrug a ball.
-            const landed = (def.dmgTaken < 1 && rng() > def.dmgTaken) ? Math.max(0, hits - 1) : hits;
+            const shrugged = def.dmgTaken < 1 && rng() > def.dmgTaken;
+            const rolled = shrugged ? Math.max(0, hits - 1) : hits;
+
+            // TIMBER ONLY. This used to run for EVERY zone: a ball aimed at a cannon dismounted the cannon AND
+            // staved in planks, and a ball into her canvas did the same. So the two "system" shots were doing
+            // their own job plus the hull's, which made aiming at a gun strictly better than aiming at the
+            // hull — while the read-out beside the marker said "~0 dmg", because expectedDamage has always
+            // (correctly) reported zero for a system zone. The engine and the number on screen disagreed, and
+            // the engine was the wrong one.
+            const landed = zone.sys ? 0 : rolled;
 
             const dmg = landed;   // the event log and the recap both count in planks now
             total += dmg;
-            theirSide.hp = Math.max(0, theirSide.hp - landed);
+            if (landed) theirSide.hp = Math.max(0, theirSide.hp - landed);
             const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits: landed, glanced: false, rake, bore, chance, evasion };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
