@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
+import PetEnshrine from "@/components/PetEnshrine";
 import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
 
@@ -289,7 +290,7 @@ export default function PetsClient() {
                                 tallest, most repetitive block on the page. */}
                             <div className="petx-tiers-cap">{statText(passive)} by level</div>
                             <div className="petx-tiers">
-                                {[1, 2, 3, 4, 5].map((n) => (
+                                {[1, 2, 3, 4, 5, 6].map((n) => (
                                     <div key={n} className={`petx-tier${n === lvl.level ? " is-current" : ""}${n < lvl.level ? " is-done" : ""}${n > lvl.level ? " is-locked" : ""}`}>
                                         <span className="petx-tier-stars">{n}★</span>
                                         <span className="petx-tier-val">+{Math.round(lvl.base * petPassiveLevelMult(n))}</span>
@@ -302,6 +303,22 @@ export default function PetsClient() {
                                     : "Equip this pet to level it up (12% of your XP + a trickle over time)."}
                             </div>
                         </div>
+                    ) : null}
+
+                    {/* ── LEVEL SIX ── the panel only exists once the climb is done, and it draws BOTH forms
+                        before you choose, because the choice is permanent and two lines of text is not enough
+                        to make one on. */}
+                    {lvl ? (
+                        <PetEnshrine
+                            pet={p}
+                            level={lvl.level}
+                            sprites={state?.petSprites?.[p.id] || null}
+                            stones={state?.ascension?.stones}
+                            prices={state?.ascension?.prices}
+                            enshrined={(state?.ascension?.enshrined || []).find((e) => e.petId === p.id)?.stone || null}
+                            busy={busy === p.id}
+                            onEnshrine={(stone) => action(p.id, "enshrine", { stone })}
+                        />
                     ) : null}
 
                     <div className="petx-abilities">

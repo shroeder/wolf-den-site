@@ -15685,3 +15685,66 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .jwr-row u { text-decoration: none; font-size: 0.72rem; font-weight: 900; color: var(--c); }
 .jwr-go { width: 100%; text-align: center; }
             
+
+/* ── ENSHRINING A LEVEL-SIX PET ────────────────────────────────────────────────────────────────────────────
+   The panel's job is to make an IRREVERSIBLE choice legible before it is made, so the two forms are drawn at
+   size rather than described — the sprites are the argument, and they cost nothing to show. */
+.pens { margin: 14px 0 4px; padding: 12px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,224,138,0.07), rgba(176,97,255,0.07)); border: 1px solid rgba(255,255,255,0.14); }
+.pens-kick { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; color: #cfc3ff; }
+.pens-h { display: block; font-size: 1.05rem; color: #fff; margin: 2px 0 4px; }
+.pens-p { margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: rgba(255,255,255,0.78); }
+.pens-p b { color: #ffe08a; }
+.pens-stones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pens-stone { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+    padding: 10px 8px; border-radius: 12px; cursor: pointer; appearance: none;
+    background: rgba(10,8,14,0.5); border: 1.5px solid rgba(255,255,255,0.14); color: inherit; }
+.pens-stone.is-on { border-color: var(--stone); box-shadow: 0 0 0 1px var(--stone), 0 8px 24px -12px var(--stone); }
+.pens-stone.is-empty { opacity: 0.72; }
+/* The form is the pitch. 96px is the smallest size at which the two are unmistakable side by side on a phone.
+   THE HALO IS LOAD-BEARING, not decoration: the Darkstone form is obsidian and violet on a near-black card and
+   without something behind it, the single most persuasive thing on the panel reads as a smudge. Tinted by the
+   stone so it also does the job of saying which is which before you have read a word. */
+.pens-form { display: block; width: 96px; height: 96px; margin-bottom: 2px; position: relative; border-radius: 50%;
+    background: radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--stone) 52%, transparent) 0%,
+        color-mix(in srgb, var(--stone) 20%, transparent) 44%, transparent 70%); }
+/* The Darkstone form is obsidian on a near-black card, so a violet halo alone is not enough contrast — it
+   needs something PALE behind it to be a silhouette at all. Sits under the tint, not instead of it. */
+.pens-stone[style*="b061ff"] .pens-form { box-shadow: inset 0 0 34px 10px rgba(200,190,255,0.16); }
+.pens-form img, .pens-form svg { width: 100%; height: 100%; object-fit: contain; }
+.pens-stone-kick { font-size: 0.58rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
+.pens-stone-name { font-size: 0.9rem; color: #fff; }
+.pens-stone-line { font-size: 0.7rem; line-height: 1.35; color: rgba(255,255,255,0.72); }
+.pens-stone-best { font-size: 0.66rem; font-style: normal; color: rgba(255,255,255,0.5); }
+.pens-stone-have { margin-top: 2px; font-size: 0.66rem; font-weight: 800; color: var(--stone); }
+.pens-stone-have.is-none { color: rgba(255,255,255,0.38); }
+.pens-go { margin-top: 10px; }
+.pens-go-row { display: flex; gap: 8px; }
+.pens-do { flex: 1; padding: 11px 14px; border-radius: 11px; font-weight: 900; font-size: 0.86rem; cursor: pointer;
+    color: #120c1c; background: var(--stone); border: none; }
+.pens-do:disabled { opacity: 0.6; cursor: default; }
+.pens-back { padding: 11px 14px; border-radius: 11px; font-weight: 800; font-size: 0.82rem; cursor: pointer;
+    color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); }
+.pens-warn { margin: 0 0 8px; font-size: 0.78rem; line-height: 1.4; color: #ffd0d0; }
+.pens-none { margin: 10px 0 0; font-size: 0.74rem; line-height: 1.45; color: rgba(255,255,255,0.6); }
+/* Already done: the pet wears its stone and the ability is simply on. */
+.pens-done { display: flex; gap: 12px; align-items: center; border-color: var(--stone); }
+.pens-done-art { flex: 0 0 auto; width: 84px; height: 84px; }
+.pens-done-art img, .pens-done-art svg { width: 100%; height: 100%; object-fit: contain; }
+.pens-done-h { display: block; font-size: 0.95rem; color: #fff; margin: 2px 0 3px; }
+.pens-done-p { margin: 0; font-size: 0.78rem; line-height: 1.4; color: rgba(255,255,255,0.72); }
+@media (max-width: 380px) { .pens-form { width: 78px; height: 78px; } }
+
+/* ── ENSHRINE LAB (dev only) ── */
+
+                .pelab { max-width: 520px; margin: 0 auto; padding: 16px; color: #eee; font-family: system-ui, sans-serif; }
+                .pelab-h { font-size: 1rem; letter-spacing: .1em; text-transform: uppercase; color: #cfc3ff; margin: 0 0 10px; }
+                .pelab-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+                .pelab-tab { padding: 6px 10px; border-radius: 8px; font-size: .72rem; font-weight: 800; cursor: pointer;
+                    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16); color: #ddd; }
+                .pelab-tab.is-on { background: #cfc3ff; color: #16101f; border-color: #cfc3ff; }
+                .pelab-stage { background: rgba(8,6,12,.5); border-radius: 14px; padding: 4px 10px 10px; }
+                .pelab-note { font-size: .74rem; color: #8bf0b4; text-align: center; padding: 18px 0; }
+                .pelab-log { margin-top: 12px; padding: 10px; border-radius: 10px; font-size: .7rem;
+                    background: rgba(0,0,0,.5); color: #8bf0b4; white-space: pre-wrap; }
+            
