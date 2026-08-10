@@ -1,6 +1,7 @@
 import nextVitals from "eslint-config-next/core-web-vitals";
 
 import { GLOBALS } from "./eslint.config.mjs";
+import noTdz from "./eslint-local/no-tdz.mjs";
 
 // ── THE FAST GATE ────────────────────────────────────────────────────────────────────────────────────────────
 // `npm run lint` also reports ~100 pre-existing react-hooks findings, so its exit code stopped meaning anything
@@ -24,6 +25,7 @@ export default [
     ...silenced,
     {
         languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: GLOBALS },
+        plugins: { local: { rules: { "no-tdz": noTdz } } },
         linterOptions: { reportUnusedDisableDirectives: false },
         rules: {
             "no-undef": "error",
@@ -32,6 +34,15 @@ export default [
             // (the page is force-dynamic, so it is never prerendered) and no-undef has nothing to say about it.
             // It is the same class of defect: correct-looking code that only fails when it runs.
             "react-hooks/rules-of-hooks": "error",
+            // Added after `const active = ladder ? …` was written two lines ABOVE `const ladder`, which throws
+            // the moment the component renders — and which `next build` compiles without a word, because it is
+            // perfectly valid syntax. Same class again: correct-looking code that only fails when it runs, and
+            // the crash names a MINIFIED variable, so the report tells you nothing about where to look.
+            //
+            // Not eslint's own `no-use-before-define`: that reports 85 findings here and 84 are safe (a
+            // function mentioning a const declared below it does not run until the module is evaluated). This
+            // one flags only a read with NO function boundary deferring it — the reads that always throw.
+            "local/no-tdz": "error",
         },
     },
     {

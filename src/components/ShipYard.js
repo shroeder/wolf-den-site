@@ -96,13 +96,16 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct }) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
-    const active = ladder ? (tab || ownTab) : "shop";
-    const setTab = onTab || setOwnTab;
-    const purse = combat?.doubloons || 0;
     // THE LADDER IS THE PART UNDER CONSTRUCTION, not the yard. `fleet` is null for anyone off the dev
     // allow-list — but their doubloons are real (encounters pay them), so the Quartermaster stays open and
     // the Battles tab simply is not there. A panel with one tab does not need a tab strip either.
+    //
+    // Declared BEFORE `active`, which reads it. It was below, and a `const` read above its own declaration is
+    // a TDZ throw at runtime — the build compiles it happily and the whole panel dies the moment it renders.
     const ladder = Boolean(combat?.fleet);
+    const active = ladder ? (tab || ownTab) : "shop";
+    const setTab = onTab || setOwnTab;
+    const purse = combat?.doubloons || 0;
     const fleet = combat?.fleet || {};
     // ONE allowance, whoever you are matched against.
     const battlesLeft = Math.max(0, (raid?.cap || 0) - (raid?.used || 0));
