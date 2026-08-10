@@ -159,14 +159,19 @@ export const ENCOUNTER_MARKS = [
 const FRAG_ART = (t) => `/images/sailing/fragment-${t}.png`;
 const TITLE = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function lootPreview(loot = [], chestArt = {}) {
+export function lootPreview(loot = [], chestArt = {}, consumables = {}) {
     return loot.map((l) => {
         if (l.kind === "doubloons") return { kind: "doubloons", n: l.n, name: "Doubloons", art: "/images/sailing/doubloon.png" };
         if (l.kind === "fragment") return { kind: "fragment", n: l.n, name: `${TITLE(l.tier)} fragment`, art: FRAG_ART(l.tier) };
         // Chest sprites are generated blobs, not files on disk — the caller already holds the map.
         if (l.kind === "chest") return { kind: "chest", n: 1, tier: l.tier, name: `${TITLE(l.tier)} chest`, art: chestArt[l.tier] || null };
         if (l.kind === "parts") { const p = partForTier(l.tier); return { kind: "parts", n: l.n, name: p?.name || `Tier ${l.tier}`, art: p?.sprite || null, color: p?.color }; }
-        if (l.kind === "consumable") return { kind: "consumable", n: 1, id: l.id, name: null, art: null };  // named + drawn client-side from CONSUMABLES
+        // A consumable that resolved to nothing used to fall through to the chest-icon fallback, so a Pet
+        // Treat was advertised as a wooden chest. Both its name and its sprite come from the caller's maps.
+        if (l.kind === "consumable") {
+            const c = consumables[l.id] || {};
+            return { kind: "consumable", n: 1, id: l.id, name: c.name || null, art: c.art || null, emoji: c.emoji || null };
+        }
         return { kind: l.kind, n: l.n || 1, name: null, art: null };
     });
 }

@@ -1064,7 +1064,9 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             if (!enc || !b) return null;
             return {
                 id: enc.id, name: enc.name, cls: enc.cls, kind: enc.kind, tier: enc.tier, blurb: enc.blurb,
-                art: encounterArt(enc.id), loot: lootPreview(enc.loot, chestArt),
+                art: encounterArt(enc.id),
+                loot: lootPreview(enc.loot, chestArt, Object.fromEntries(Object.entries(CONSUMABLES).map(
+                    ([id, c]) => [id, { name: c.name, emoji: c.emoji, art: consumableArt[id] || null }]))),
                 battle: { ...battleView(b.state, b.meta, { row }), events: [], over: false },
             };
         })(),

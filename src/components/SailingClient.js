@@ -1543,10 +1543,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         <div className="sail-hail-loot">
                             {(state.encounter.loot || []).map((l, i) => (
                                 <span key={i} className="sail-hail-drop" style={l.color ? { borderColor: l.color } : undefined}>
+                                    {/* Art, then the item's own emoji, then — only for an actual chest — the
+                                        chest icon. It used to fall straight through to ChestIcon, which drew a
+                                        wooden chest for a Pet Treat. */}
                                     {l.art
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        ? <img src={l.art} alt="" />
-                                        : <ChestIcon tier={l.tier || "wooden"} size={22} />}
+                                        ? <img src={l.art} alt={l.name || ""} title={l.name || undefined} />
+                                        : l.emoji ? <span className="sail-hail-emoji" title={l.name || undefined}>{l.emoji}</span>
+                                        : l.kind === "chest" ? <ChestIcon tier={l.tier || "wooden"} size={22} />
+                                        : <span className="sail-hail-emoji">🎁</span>}
                                     <b>{l.n > 1 ? `×${l.n}` : ""}</b>
                                 </span>
                             ))}
