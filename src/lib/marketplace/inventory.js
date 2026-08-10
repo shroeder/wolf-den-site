@@ -446,6 +446,8 @@ export async function sellItem(buyerId, itemId) {
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.
     await db.query(`DELETE FROM mkt_user_equipment WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => {});
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
+    // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
+    try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(buyerId, itemId, "sold"); } catch { /* no bench, no gems */ }
     if (!del) return { ok: false, error: "not_owned" };
     await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});
     // The item is gone — void any pending trades that were counting on it (refunds their escrow).

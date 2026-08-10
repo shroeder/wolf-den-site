@@ -275,6 +275,8 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
     if (!paid) return { ok: false, error: "insufficient_gold" };
     // Remove the item from inventory (guarded so a race can't double-list) and create the listing.
     const removed = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING id`, [buyerId, itemId]).catch(() => null);
+    // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
+    try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(buyerId, itemId, "listed"); } catch { /* no bench, no gems */ }
     if (!removed) { // lost the race — refund the fee
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, fee]).catch(() => {});
         return { ok: false, error: "not_owned" };

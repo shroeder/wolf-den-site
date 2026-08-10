@@ -23,7 +23,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
             className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""} is-clickable`}
             onClick={() => setDetail(i)}
         >
-            <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements} />
+            <ItemArt id={i.id} icon={i.icon} className="equip-card-glyph" elements={i.elements} gem={i.gem} socket={i.socket} />
             <span className="equip-card-name">{i.name}</span>
         </button>
     );
@@ -47,7 +47,7 @@ export default function InspectableGear({ equipped = [], inventory = [], canTrad
                 <div className="equip-sheet-overlay" onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, zIndex: 1200, display: "flex", alignItems: "flex-end", justifyContent: "center", background: "rgba(0,0,0,0.72)", padding: "0 0 env(safe-area-inset-bottom)" }}>
                     <div className={`card equip-sheet rar-${detail.rarity}`} onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, margin: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}>
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                            <ItemArt id={detail.id} icon={detail.icon} className="equip-card-glyph" />
+                            <ItemArt id={detail.id} icon={detail.icon} className="equip-card-glyph" gem={detail.gem} socket={detail.socket} />
                             <div style={{ minWidth: 0, flex: 1 }}>
                                 <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>{detail.name}</div>
                                 <div className="muted" style={{ fontSize: "0.8rem", textTransform: "capitalize" }}>{detail.rarity}{detail.slot ? ` · ${detail.slot.replace("_", " ")}` : ""}{detail.equipped ? " · Equipped ✓" : ""}</div>

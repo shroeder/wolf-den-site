@@ -257,6 +257,8 @@ export async function salvageItem(buyerId, itemId) {
     // would quietly delete that bonus, and nobody makes that trade knowingly.
     const del = await db.queryOne(`DELETE FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2 RETURNING item_id`, [buyerId, itemId]).catch(() => null);
     if (!del) return { ok: false, error: "not_owned" };
+    // The jewel is yours, not the item's — it comes back to the bag rather than leaving with the piece.
+    try { const { reclaimGems } = await import("@/lib/marketplace/jeweller.js"); await reclaimGems(buyerId, itemId, "salvage"); } catch { /* no bench, no gems */ }
     // Mark it SOLD (same as selling) so an auto-granted LEVEL item is never re-granted — otherwise you could
     // salvage it, have syncLevelItems hand it back on the next gear load, and salvage it again for infinite parts.
     await db.query(`INSERT INTO mkt_sold_item (buyer_id, item_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [buyerId, itemId]).catch(() => {});

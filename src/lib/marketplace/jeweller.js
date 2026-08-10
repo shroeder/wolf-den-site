@@ -85,6 +85,31 @@ export async function socketBonusFor(buyerId, itemIds) {
     return sumGemStats(rows.map((r) => r.gem_id));
 }
 
+// ── WHEN THE ITEM LEAVES YOUR HANDS ──────────────────────────────────────────────────────────────────────────
+// Salvaging, selling, auctioning or trading a socketed piece used to take the jewel with it: the item row was
+// deleted and the socket row was left orphaned, so a Flawless Ruby somebody spent a week of mining on simply
+// stopped existing, silently, with no line anywhere saying where it went.
+//
+// The gem comes HOME instead. Not destroyed, not sold with the piece — back in the bag, because you paid for
+// the socket and you found the stone, and neither of those was part of the trade. Called from every disposal
+// path; safe to call on an item with no socket, which is what makes it safe to bolt onto all of them.
+export async function reclaimGems(buyerId, itemId, reason = "item_gone") {
+    if (!buyerId || !itemId) return [];
+    const rows = await db.query(
+        `DELETE FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = $2 RETURNING gem_id`,
+        [buyerId, itemId]
+    ).catch(() => []);
+    const back = [];
+    for (const r of rows) {
+        if (!r.gem_id) continue;
+        await grantGem(buyerId, r.gem_id, 1, "reclaimed");
+        await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id, meta) VALUES ($1,'reclaimed',$2,$3,$4::jsonb)`,
+            [buyerId, r.gem_id, itemId, JSON.stringify({ reason })]).catch(() => {});
+        back.push(gemById(r.gem_id));
+    }
+    return back.filter(Boolean);
+}
+
 // ── FUSING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // Three of a kind become one of the tier above. This is what stops the bottom tiers being litter: a Chipped
 // Ruby is not worth setting into anything by the time you have real gear, but nine of them are a Polished one,
@@ -201,6 +226,29 @@ export async function pullGem(buyerId, itemId, idx = 0) {
         [buyerId, itemId, idx]
     ).catch(() => null);
     if (!socket) return { ok: false, error: "empty" };
+    const gem = gemById(socket.was);
+
+    // PAID: cut it out intact. Charged conditionally like every other spend; if the charge fails the gem is
+    // handed back anyway rather than being destroyed for a payment that never happened.
+    if (keep && gem) {
+        const cost = EXTRACT_COST(gem.tier);
+        const paid = await db.queryOne(
+            `UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`,
+            [buyerId, cost]
+        ).catch(() => null);
+        if (!paid) {
+            // Put it back where it was — refusing AFTER emptying the socket would be the worst of both.
+            await db.query(`UPDATE mkt_item_socket SET gem_id = $3, set_at = NOW() WHERE buyer_id = $1 AND item_id = $2 AND idx = $4`,
+                [buyerId, itemId, gem.id, idx]).catch(() => {});
+            return { ok: false, error: "not_enough_gold", cost };
+        }
+        await logCoin(buyerId, -cost, "gem_extract", { balanceAfter: paid.gold, meta: { itemId, gemId: gem.id } }).catch(() => {});
+        await grantGem(buyerId, gem.id, 1, "extracted");
+        await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id, meta) VALUES ($1,'gem_extracted',$2,$3,$4::jsonb)`,
+            [buyerId, gem.id, itemId, JSON.stringify({ cost })]).catch(() => {});
+        return { ok: true, kept: gem, cost };
+    }
+
     await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id) VALUES ($1, 'gem_pulled', $2, $3)`,
         [buyerId, socket.was || null, itemId]).catch(() => {});
     return { ok: true, destroyed: socket.was || null };
@@ -248,7 +296,10 @@ export async function getJewellerState(buyerId) {
                 enhanceLevel: e?.level || 0,
                 stats: total,
                 statLine: describeStats(total),
-                sockets: sockets.map((s) => ({ idx: s.idx, gem: s.gemId ? gemById(s.gemId) : null })),
+                sockets: sockets.map((s) => {
+                    const g = s.gemId ? gemById(s.gemId) : null;
+                    return { idx: s.idx, gem: g, extractCost: g ? EXTRACT_COST(g.tier) : null };
+                }),
                 canCut: sockets.length < MAX_SOCKETS,
             };
         })

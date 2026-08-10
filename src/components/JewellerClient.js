@@ -215,23 +215,33 @@ export default function JewellerClient({ initial }) {
                                         </button>
                                     ) : confirm?.itemId === p.id ? (
                                         <div className="jw-confirm">
-                                            {/* Said BEFORE the press, not after: pulling one out breaks it, and that is
-                                                the whole reason setting one is a decision. */}
-                                            <p>Prise it out? The <b>{gem.name}</b> shatters — you do not get it back.</p>
+                                            {/* TWO WAYS OUT, and the difference is the decision. Both said before
+                                                the press: pay and the jeweller cuts it free intact, or break it
+                                                and it is gone. Setting a jewel has to cost something or a socket
+                                                is a slot you shuffle per opponent. */}
+                                            <p>Take the <b>{gem.name}</b> out?</p>
+                                            <button type="button" className="jw-btn" disabled={busy || st.gold < (socket.extractCost || 0)}
+                                                onClick={() => {
+                                                    unlock(); Sfx.cut(); Haptic.cut();
+                                                    setConfirm(null);
+                                                    act({ action: "pull", itemId: p.id, idx: socket.idx, keep: true });
+                                                }}>
+                                                Cut it free<i>{money(socket.extractCost)} gold · you keep it</i>
+                                            </button>
                                             <button type="button" className="jw-btn is-bad" disabled={busy}
                                                 onClick={() => {
                                                     unlock(); Sfx.gemBreak(); Haptic.gemBreak();
                                                     setConfirm(null);
                                                     act({ action: "pull", itemId: p.id, idx: socket.idx });
                                                 }}>
-                                                Break it out
+                                                Break it out<i>free · it shatters</i>
                                             </button>
                                             <button type="button" className="jw-btn is-quiet" onClick={() => setConfirm(null)}>Leave it</button>
                                         </div>
                                     ) : (
                                         <button type="button" className="jw-btn is-quiet" disabled={busy}
                                             onClick={() => setConfirm({ itemId: p.id, idx: socket.idx })}>
-                                            Prise it out
+                                            Take it out
                                         </button>
                                     )}
                                 </div>
