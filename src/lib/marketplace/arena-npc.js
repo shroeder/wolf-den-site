@@ -45,18 +45,71 @@ export const bandForTier = (tier) => {
 // grows far slower than 8.5% a tier. 4.5% keeps every tier meaningfully harder than the last while leaving
 // the ladder climbable as you gear up — and it is still unbounded, so "super super hard" still arrives, just
 // somewhere you can actually reach.
-const BASE_POWER = 82;
-const GROWTH = 1.045;
+// These ARE the stat budget now, not an abstract "power": npcPower(t) is how many points of Might, Crit
+// Chance, Crit Power and Ferocity a tier gets to spend, in the same units a member's gear is measured in
+// (best-in-slot across nine slots totals 644). Set by scripts/check-arena.mjs against four real loadouts.
+const BASE_POWER = 34;
+const GROWTH = 1.07;
 
 export function npcPower(tier) {
     return Math.round(BASE_POWER * Math.pow(GROWTH, Math.max(1, tier) - 1));
 }
 
 // The stat split mirrors what a member brings, so the same engine can fight either without special cases.
+// ── A GAUNTLET FIGHTER IS A LOADOUT ──────────────────────────────────────────────────────────────────────────
+// They used to carry bespoke `health`/`damage`/`armour` figures on a curve of their own, which meant the ring
+// had two kinds of fighter in it and only one of them could be reasoned about from the stat screen. They carry
+// THE SAME FOUR STATS A PLAYER'S GEAR CARRIES now — Might, Crit Chance, Crit Power, Ferocity — and the engine
+// runs them through the identical ringStats() a member goes through. A Warlord is not a special case; it is a
+// kit, and you can read it the way you read your own.
+//
+// ── AND THEY ARE NOT ALL THE SAME SHAPE ──────────────────────────────────────────────────────────────────────
+// With the hidden mitigation roll gone, "harder" cannot mean "secretly luckier" any more, and it should not
+// just mean "every number bigger" either — that is a wall you either out-gear or you do not, and no fight in
+// the middle of it teaches you anything. So a tier spends its BUDGET differently depending on its archetype,
+// and the archetypes cycle, so tier N and tier N+1 want different answers out of you:
+//
+//   BRUTE      pours it into Might. Races you. Kill it or be killed inside ten rounds.
+//   WALL       pours it into Ferocity and armour. Nothing you do lands for much; bring Sunder or Pierce.
+//   DUELIST    pours it into crit. Swingy — it can take a third of you in one beat or whiff for three.
+//   BERSERKER  everything into offence, almost nothing into staying alive. A glass cannon: guard the opening
+//              and it falls over, trade blindly and it wins.
+//   BALANCED   no lever. Whoever built better wins, which is the honest baseline the others deviate from.
+//
+// The archetype is PRINTED ON THE CARD with its stats, because a shape you cannot see before you commit is
+// just another hidden roll wearing a different hat.
+export const ARCHETYPES = [
+    // The spread between the highest and lowest FEROCITY weight is what decides how long a fight is, and the
+    // first cut of these ran 0.08 to 0.62 — an eight-to-one health gap, so a Berserker died in two rounds and
+    // a Wall took twenty. Compressed to 0.22-0.60. Each archetype still plainly IS itself; none of them is a
+    // different game.
+    { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
+      w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, armour: 0.10 },
+    { key: "brute", name: "Brute", tell: "Hits like a falling wall. End it early.",
+      w: { might: 0.44, crit_chance: 0.08, crit_power: 0.12, ferocity: 0.36 }, armour: 0.10 },
+    { key: "wall", name: "Wall", tell: "Soaks everything. Strip its guard or you are here all day.",
+      w: { might: 0.20, crit_chance: 0.10, crit_power: 0.10, ferocity: 0.60 }, armour: 0.26 },
+    { key: "duelist", name: "Duelist", tell: "Fishing for criticals. It only needs to land one.",
+      w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, armour: 0.12 },
+    { key: "berserker", name: "Berserker", tell: "All edge, no armour. Survive the opening and it folds.",
+      w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, armour: 0.06 },
+];
+// The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
+// harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
+// it deviates from.
+export const archetypeForTier = (t) => {
+    const n = Math.max(1, Math.round(t));
+    return n <= 3 ? ARCHETYPES[0] : ARCHETYPES[n % ARCHETYPES.length];
+};
+
+// The budget a tier gets to spend across the four stats. Kept as npcPower so the existing tier curve, the
+// matchmaker and every saved `npc_best` still mean what they meant.
 export function npcFor(tier) {
     const t = Math.max(1, Math.round(tier));
     const band = bandForTier(t);
     const power = npcPower(t);
+    const arch = archetypeForTier(t);
+    const budget = power;
     // Within a band, later tiers are the "II / III / IV" of it — a Veteran IV is plainly a harder Veteran.
     const idx = t - band.from + 1;
     const numeral = ["", " II", " III", " IV", " V", " VI", " VII", " VIII", " IX", " X"][Math.min(9, idx - 1)] || ` ${idx}`;
@@ -69,20 +122,17 @@ export function npcFor(tier) {
         blurb: band.blurb,
         color: band.color,
         sprite: `/images/arena/npc/${band.key}.webp`,
-        // ── FOUR PRINTED NUMBERS ──────────────────────────────────────────────────────────────────────
-        // A tier is harder because these are BIGGER, and all four are on the card you are looking at before
-        // you press challenge. It used to be harder partly because of a hidden per-blow roll that gave the
-        // absent side 12%, 32% or 55% damage reduction; that is gone, and the mitigation it was doing is a
-        // stated armour figure instead.
-        //
-        // Health climbs slowly and armour climbs slower still (capped at 45%, so no tier is ever a wall you
-        // cannot dent) — the ladder's teeth are mostly in DAMAGE, because a fight you lose should feel like
-        // you were out-hit rather than like you were hitting a rock.
-        health: Math.round(power * 2),
-        damage: Math.round((8 + power * 0.07) * 10) / 10,
-        armour: Math.min(0.45, Math.round((0.05 + t * 0.007) * 100) / 100),
-        critChance: Math.min(0.5, Math.round((0.15 + t * 0.004) * 100) / 100),
-        critMult: 2,
+        archetype: arch.key,
+        archetypeName: arch.name,
+        tell: arch.tell,
+        // ── THE STAT LINE ── the same four a player wears, so ringStats() needs no idea which it is holding.
+        might: Math.round(budget * arch.w.might),
+        crit_chance: Math.round(budget * arch.w.crit_chance),
+        crit_power: Math.round(budget * arch.w.crit_power),
+        ferocity: Math.round(budget * arch.w.ferocity),
+        // Armour is the one thing a member does not carry: it is what an absent opponent has instead of the
+        // guard a present one chooses to play. A stated number, never a roll.
+        armour: arch.armour,
         gearPower: power,
         // Element cycles so consecutive tiers are not all answerable with one affinity — the wheel stays a
         // reason to re-attune rather than something you solve once.
@@ -114,8 +164,16 @@ export function npcAbilities(tier) {
     const n = npcFor(t);
     // How deep into the kit this tier may reach. A Straw Dummy gets the first move; an Ascendant gets any.
     const depth = Math.min(NPC_KIT.length, 1 + Math.floor(t / 9));
-    const pick = (offset) => NPC_KIT[(t * 3 + offset) % depth];
-    const chosen = depth === 1 ? [NPC_KIT[0]] : [pick(0), pick(1)].filter((v, i, a) => a.indexOf(v) === i);
+    // THE MOVES MATCH THE BUILD. A wall that opened with Finisher was a mixed message; now the archetype you
+    // can read on the card is the archetype that swings at you, so recognising one is worth something.
+    const BY_ARCH = {
+        balanced: ["strike", "spell"], brute: ["strike", "sunder"], wall: ["drain", "rend"],
+        duelist: ["flurry", "spell"], berserker: ["flurry", "execute"],
+    };
+    const want = BY_ARCH[archetypeForTier(t).key] || BY_ARCH.balanced;
+    const allowed = NPC_KIT.slice(0, depth);
+    const chosen = want.map((k) => allowed.find((x) => x.kind === k)).filter(Boolean);
+    if (!chosen.length) chosen.push(NPC_KIT[0]);
     // Tier scales what the moves are worth, gently — the big lever is already their damage and health.
     const scale = 1 + Math.min(0.6, t * 0.006);
     return chosen.map((k, i) => ({

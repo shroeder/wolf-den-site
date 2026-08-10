@@ -311,7 +311,7 @@ function Recap({ bout, busy, onClose }) {
                 <div className="ar-vp">
                     <span className="ar-vp-num">+{money(shown)}</span>
                     <span className="ar-vp-lab">Victory Points</span>
-                    {r?.rankTo ? <em className="ar-vp-rank">now #{r.rankTo} of {r.size}</em> : null}
+
                 </div>
 
                 {r?.npcUnlocked ? (
@@ -448,7 +448,7 @@ export default function ArenaClient({ initial }) {
             }
             // The rank-up used to be its own overlay on a timer, stacked behind the result card. It lives
             // INSIDE the recap now — one modal, not two in sequence — so all that is left is the sting.
-            if (r?.finished?.rankUp) setTimeout(() => Sfx.rankUp(), 1500);
+            /* The rank-up fanfare went with the rungs — there is no rung to climb. */
         } finally { setBusy(false); }
     }, [busy]);
 
@@ -1146,17 +1146,18 @@ export default function ArenaClient({ initial }) {
                 <AwayReport rows={st.away} onClose={() => act("seen")} />
             ) : null}
 
-            <div className="ar-badge" style={{ "--rank": st.band?.color || "#9aa0a6" }}>
-                {st.band?.icon ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="ar-insignia" src={st.band.icon} alt="" draggable="false" />
-                ) : null}
+            {/* ── YOUR CARD ── this used to be a rung ("Cub · #41 of 84") and a named band, both of them
+                proxies for "how strong am I" from back when strength was a derived number you could not see.
+                It is the four real stats now: the same four the fight multiplies, the same four printed on
+                whoever you are about to fight. Comparing two cards IS the ladder. */}
+            <div className="ar-badge" style={{ "--rank": "#ffd75e" }}>
                 <div className="ar-badge-body">
                     <span className="ar-badge-kick">The Arena</span>
-                    <b className="ar-rankname">{st.band?.name}</b>
-                    {/* VP used to be here AND in the chip below it — the same number twice, two lines apart. */}
-                    <span className="ar-standing">
-                        <b>#{st.rank}</b> of {st.size}
+                    <b className="ar-rankname">Your card</b>
+                    <span className="ar-mycard">
+                        <i><b>{Math.round(st.me?.damage || 0)}</b> damage</i>
+                        <i><b>{Math.round((st.me?.critChance || 0) * 100)}%</b> crit &times;{(st.me?.critMult || 2.5).toFixed(1)}</i>
+                        <i><b>{Math.round(st.me?.health || 0)}</b> health</i>
                     </span>
                     <span className="ar-tonext-label">
                         {st.fightsLeft} of {st.fightsPerDay} challenges left today
@@ -1351,11 +1352,12 @@ export default function ArenaClient({ initial }) {
             {/* The standings are context, not the job. Three rows, and the rest on request. */}
             {st.board?.length ? (
                 <div className="ar-board">
-                    <span className="ar-up-head">The top of the Den</span>
+                    <span className="ar-up-head">Who else fights</span>
                     {(boardAll ? st.board : st.board.slice(0, 3)).map((r) => (
-                        <div key={r.rank} className={`ar-up-row${r.you ? " is-you" : ""}`}>
-                            <span className="ar-up-rung">#{r.rank}</span>
+                        <div key={r.id} className={`ar-up-row${r.you ? " is-you" : ""}`}>
+                            {/* No rung. What a member brings is their card, the same as everybody else's. */}
                             <span className="ar-up-name">{r.name}{r.you ? " · you" : ""}</span>
+                            <span className="ar-up-card">{Math.round(r.damage || 0)} dmg · {Math.round(r.health || 0)} hp</span>
                             <span className="ar-up-lvl">{money(r.vp)} VP</span>
                         </div>
                     ))}
@@ -1485,6 +1487,11 @@ function Styles() {
             .ar-rankup-name { display: block; margin: 2px 0 6px; font-size: 2rem; font-weight: 900; line-height: 1.05;
                 color: color-mix(in srgb, var(--rank) 74%, white); text-shadow: 0 0 34px color-mix(in srgb, var(--rank) 60%, transparent); }
             .ar-rankup-from { margin: 0 0 16px; font-size: 12.5px; color: #a99fc4; }
+            .ar-mycard { display: flex; gap: 10px; flex-wrap: wrap; margin: 3px 0 1px; font-size: 10px;
+                font-weight: 800; color: rgba(255,224,176,.78); }
+            .ar-mycard i { font-style: normal; white-space: nowrap; }
+            .ar-mycard b { color: #ffe9c2; font-weight: 900; font-size: 12px; }
+            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.6); white-space: nowrap; }
             .ar-stats { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0 14px; font-size: 11.5px; color: #8a939d; }
             .ar-stats b { color: #ffd75e; font-variant-numeric: tabular-nums; }
 
@@ -1805,6 +1812,11 @@ function Styles() {
             /* A heal flashes the bar so it reads as health coming back rather than a number being different. */
             .ar-bar.is-healing .ar-hp > i { animation: arHealFlash .6s ease-out; }
             @keyframes arHealFlash { 0% { filter: brightness(2.4) saturate(.4) } 100% { filter: none } }
+            .ar-mycard { display: flex; gap: 10px; flex-wrap: wrap; margin: 3px 0 1px; font-size: 10px;
+                font-weight: 800; color: rgba(255,224,176,.78); }
+            .ar-mycard i { font-style: normal; white-space: nowrap; }
+            .ar-mycard b { color: #ffe9c2; font-weight: 900; font-size: 12px; }
+            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.6); white-space: nowrap; }
             .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
                 font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
             .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
@@ -2534,7 +2546,12 @@ function Styles() {
                 .ar-bars { padding: 1px 8px 0; gap: 6px; }
                 .ar-fname { font-size: 10px; }
                 .ar-hp { height: 8px; margin: 2px 0 1px; }
-                .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
+                .ar-mycard { display: flex; gap: 10px; flex-wrap: wrap; margin: 3px 0 1px; font-size: 10px;
+                font-weight: 800; color: rgba(255,224,176,.78); }
+            .ar-mycard i { font-style: normal; white-space: nowrap; }
+            .ar-mycard b { color: #ffe9c2; font-weight: 900; font-size: 12px; }
+            .ar-up-card { font-size: 9.5px; font-weight: 800; color: rgba(255,224,176,.6); white-space: nowrap; }
+            .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
                 font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
             .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
             .ar-stats i { font-style: normal; white-space: nowrap; }

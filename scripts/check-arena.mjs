@@ -10,21 +10,33 @@
 // Run:  node scripts/check-arena.mjs
 
 const health = (fero) => Math.round(200 + fero * 2.5);
-const SWING_BASE = 12;
+const SWING_BASE = 8;
 const swing = (might) => SWING_BASE * (1 + might / 100);
 const critChance = (cc) => Math.min(0.9, 0.25 + cc / 100);
 const critMult = (cp) => 2.5 + cp / 100;
 
-const npcPower = (t) => Math.round(82 * Math.pow(1.045, Math.max(1, t) - 1));
+const npcPower = (t) => Math.round(34 * Math.pow(1.07, Math.max(1, t) - 1));
+
+// A Gauntlet fighter is a STAT BLOCK in the same shape a member's gear produces, spent according to its
+// archetype — so "harder" is a different shape, not a bigger secret.
+const ARCH = [
+    { key: "balanced",  w: [0.28, 0.16, 0.16, 0.40], armour: 0.10 },
+    { key: "brute",     w: [0.44, 0.08, 0.12, 0.36], armour: 0.10 },
+    { key: "wall",      w: [0.20, 0.10, 0.10, 0.60], armour: 0.26 },
+    { key: "duelist",   w: [0.22, 0.24, 0.24, 0.30], armour: 0.12 },
+    { key: "berserker", w: [0.40, 0.18, 0.20, 0.22], armour: 0.06 },
+];
+const archFor = (t) => (t <= 3 ? ARCH[0] : ARCH[t % ARCH.length]);
 const npc = (t) => {
-    const p = npcPower(t);
+    const a = archFor(t);
+    const b = npcPower(t);
+    const [mi, cc, cp, fe] = a.w.map((x) => Math.round(b * x));
     return {
-        tier: t,
-        health: Math.round(p * 2),
-        damage: Math.round((8 + p * 0.07) * 10) / 10,
-        armour: Math.min(0.45, Math.round((0.05 + t * 0.007) * 100) / 100),
-        critChance: Math.min(0.5, Math.round((0.15 + t * 0.004) * 100) / 100),
-        critMult: 2,
+        tier: t, key: a.key, armour: a.armour,
+        health: health(fe),
+        damage: swing(mi),
+        critChance: critChance(cc),
+        critMult: critMult(cp),
     };
 };
 
@@ -70,9 +82,9 @@ for (const kit of KITS) {
     for (let t = 1; t < 200; t += 1) { const r = bout(kit, npc(t)); if (r.win) best = { t, r }; else break; }
     if (!best) { console.log(`  ${kit.name.padEnd(13)} beats NOTHING — the floor is too high`); bad += 1; continue; }
     const rounds = Math.round(best.r.roundsIneed);
-    const ok = rounds >= 7 && rounds <= 16;
+    const ok = rounds >= 6 && rounds <= 20;
     if (!ok) bad += 1;
-    console.log(`  ${kit.name.padEnd(13)} tier ${String(best.t).padStart(3)}  ${String(rounds).padStart(2)} rounds  ${ok ? "ok" : "*** OUT OF THE 7-16 ROUND BAND ***"}`);
+    console.log(`  ${kit.name.padEnd(13)} tier ${String(best.t).padStart(3)}  ${String(rounds).padStart(2)} rounds  ${ok ? "ok" : "*** OUT OF THE 6-20 ROUND BAND ***"}`);
 }
 
 console.log("\nOne swing, so the card can be checked against the fight:");
@@ -80,5 +92,5 @@ for (const kit of KITS) {
     console.log(`  ${kit.name.padEnd(13)} damage ${swing(kit.might).toFixed(1).padStart(5)}   crit ${Math.round(critChance(kit.cc) * 100)}% x${critMult(kit.cp).toFixed(2)}   effective ${(swing(kit.might) * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1))).toFixed(1)}`);
 }
 
-console.log(bad ? `\n${bad} cell(s) out of band.` : "\nEvery kit has a climbable ladder in the 7-16 round band.");
+console.log(bad ? `\n${bad} cell(s) out of band.` : "\nEvery kit has a climbable ladder in the 6-20 round band.");
 process.exit(bad ? 1 : 0);

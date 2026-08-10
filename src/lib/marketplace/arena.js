@@ -47,9 +47,9 @@ export const FIGHTS_PER_DAY = 10;
 export const arenaHealth = (ferocity = 0) => healthFrom(ferocity);
 
 /**
- * A member's ring card, straight off their real equipped stats. ONE function, so the ladder, the target list,
- * the matchmaker and the fight itself can never disagree about what a loadout is worth — they each used to
- * recompute it from `gearPower` at four separate call sites.
+ * A fighter's ring card, straight off the four stats they carry. ONE function for BOTH kinds of fighter: a
+ * Gauntlet opponent is a stat block in exactly the shape a member's gear produces, so nothing downstream has
+ * to know whether it is holding a person or a Warlord.
  */
 export function ringStats(stats = {}) {
     return {
@@ -57,7 +57,9 @@ export function ringStats(stats = {}) {
         damage: swingFrom(Number(stats.might) || 0),
         critChance: critChanceFrom(Number(stats.crit_chance) || 0),
         critMult: critMultFrom(Number(stats.crit_power) || 0),
-        armour: 0,
+        // A member carries no armour — theirs is the guard they choose to play. An absent fighter carries a
+        // stated one instead, which is what they have in place of a decision.
+        armour: Math.min(0.6, Number(stats.armour) || 0),
         might: Number(stats.might) || 0,
     };
 }
@@ -69,39 +71,13 @@ export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, armour
     return Math.round(perSwing * (health / Math.max(0.1, 1 - armour)) / 10);
 }
 
-// ── RANKS ────────────────────────────────────────────────────────────────────────────────────────────────────
-// A rung number is a fact; a RANK is something you tell people. "I'm 34 of 83" says nothing at a glance, and
-// climbing from 33 to 34 feels like nothing at all — so the ladder is cut into seven named bands, and crossing
-// one is an event the game stops to celebrate.
-//
-// The thresholds are FRACTIONS of the ladder, not fixed rungs. The pack grows every week; a rank that means
-// "top fifth of the Den" keeps meaning that, where "rung 60" would quietly get easier every time somebody joins.
-export const RANKS = [
-    { key: "stray", name: "Stray", at: 0.00, color: "#9aa0a6" },
-    { key: "cub", name: "Cub", at: 0.12, color: "#7ed57e" },
-    { key: "runner", name: "Runner", at: 0.28, color: "#6fd0ff" },
-    { key: "hunter", name: "Hunter", at: 0.45, color: "#b98cff" },
-    { key: "fang", name: "Fang", at: 0.62, color: "#ff9f1c" },
-    { key: "warleader", name: "Warleader", at: 0.80, color: "#ff6f7d" },
-    { key: "alpha", name: "Alpha", at: 0.95, color: "#ffd75e" },
-];
-export function rankFor(rung, size) {
-    const frac = size > 0 ? rung / size : 0;
-    let i = 0;
-    for (let k = 0; k < RANKS.length; k += 1) if (frac >= RANKS[k].at) i = k;
-    const next = RANKS[i + 1] || null;
-    const floor = Math.ceil(RANKS[i].at * size);
-    const ceil = next ? Math.ceil(next.at * size) : size;
-    return {
-        ...RANKS[i], index: i,
-        icon: `/images/arena/rank-${RANKS[i].key}.webp`,
-        next: next ? { ...next, icon: `/images/arena/rank-${next.key}.webp`, atRung: ceil } : null,
-        // How far through this band you are, so the badge can carry a bar rather than just a word.
-        into: Math.max(0, rung - floor), span: Math.max(1, ceil - floor),
-        // Standing, stated the way a person would say it.
-        beat: rung, of: size,
-    };
-}
+// THE RUNG LADDER IS GONE. There used to be a `position` column, seven named bands (Stray, Cub ... Alpha) cut
+// at fractions of the roster, and a rank-up celebration on top. All of it was a PROXY for "how strong is this
+// person", invented back when a fighter's strength was a derived number nobody could see. Every fighter now
+// carries real, printed stats — a member's off their gear, a Gauntlet tier's off its archetype — so the proxy
+// has nothing left to stand for: you read the card. What survives is VP, a lifetime score that is earned and
+// never spent, and is never a position.
+
 
 // ── HOW A BOUT WORKS ─────────────────────────────────────────────────────────────────────────────────────────
 // Rock-paper-scissors is gone. It told you what the opponent would do, which made every round arithmetic, and
@@ -289,22 +265,6 @@ async function arenaRow(buyerId) {
         `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text,
                 a.free_respec_day::text AS free_respec_day_text, b.gold AS gold_now
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
-    // ── SEEDING ──────────────────────────────────────────────────────────────────────────────────────────
-    // You join the ladder WHERE YOUR POWER PUTS YOU, not at the bottom. Entering at the bottom is what made
-    // the first three fights of a geared member a waste of a day: eighty opponents who cannot beat them,
-    // three at a time. Everybody at or below the slot shuffles down one to make room.
-    if (row && row.position == null) {
-        const me = await arenaPower(buyerId);
-        const ladder = await ladderFor(buyerId);
-        const stronger = ladder.filter((o) => o.power > arenaRating(me)).length;
-        const slot = stronger + 1;
-        await db.query(`UPDATE mkt_arena SET position = position + 1 WHERE position >= $1`, [slot]).catch(() => {});
-        await db.query(`UPDATE mkt_arena SET position = $2, best_position = $2 WHERE buyer_id = $1`, [buyerId, slot]).catch(() => {});
-        row = await db.queryOne(
-            `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text,
-                a.free_respec_day::text AS free_respec_day_text, b.gold AS gold_now
-               FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
-    }
     return row;
 }
 
@@ -316,7 +276,7 @@ async function arenaRow(buyerId) {
 // whole unique-index parking-space dance that swapping needed.
 async function standings() {
     const rows = await db.query(
-        `SELECT a.buyer_id, a.vp, a.position, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
+        `SELECT a.buyer_id, a.vp, a.wins, a.losses, a.best_streak, COALESCE(b.xp,0) AS xp,
                 b.alias, b.display_name, b.avatar_sprite_url
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
           WHERE COALESCE(b.xp,0) > 0
@@ -330,7 +290,6 @@ async function standings() {
         const gearPower = Object.values(stats.get(r.buyer_id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
         return {
             id: r.buyer_id,
-            rank: i + 1,                       // derived from the ordering, not stored
             vp: Number(r.vp) || 0,
             name: r.display_name || r.alias || "A member",
             sprite: r.avatar_sprite_url || null,
@@ -356,7 +315,6 @@ export async function getArenaState(buyerId) {
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
-    const pos = Number(row?.position) || board.length;
     const bout = staleBout(row?.bout_json) ? null : (row?.bout_json || null);
 
     // ── HEAL A STALE BOUT ON READ ────────────────────────────────────────────────────────────────────────
@@ -409,7 +367,6 @@ export async function getArenaState(buyerId) {
         reward: { vp: vpPreview(myPower, n.gearPower), laurels: boutLaurels({ won: true, myPower, theirPower: n.gearPower }) },
     }));
 
-    const myRank = (board.findIndex((o) => o.id === buyerId) + 1) || board.length;
     const myVp = Number(row?.vp) || 0;
 
     // ── PROGRESSION ── arena XP, the level it buys, the class, and the state of every node. treeState is the
@@ -442,10 +399,9 @@ export async function getArenaState(buyerId) {
     };
     return {
         unlocked: true,
-        me: { ...me, name: "You", rank: myRank, vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
-        rank: myRank, size: board.length,
+        me: { ...me, name: "You", vp: myVp, power: myPower, element: kit.element, abilities: kit.abilities },
+        size: board.length,
         vp: myVp, laurels: Number(row?.laurels) || 0,
-        band: rankFor(Math.max(0, board.length - myRank), board.length),
         fightsLeft: Math.max(0, dailyFights - used), fightsPerDay: dailyFights,
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
@@ -470,7 +426,12 @@ export async function getArenaState(buyerId) {
         upgrades: upgradeView(row?.upgrades || {}),
         gold: Number(row?.gold_now) || 0,
         // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
-        board: board.slice(0, 10).map((o) => ({ rank: o.rank, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
+        // No rung goes out with a member any more. What they bring is their CARD — the same two numbers you
+        // read off a Gauntlet tier — plus the VP they have earned, which is a score and not a position.
+        board: board.slice(0, 10).map((o) => ({
+            id: o.id, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level,
+            damage: o.damage, health: o.health, you: o.id === buyerId,
+        })),
         bout: bout ? publicBout(bout) : null,
         away: await awayReport(buyerId, row),
     };
@@ -551,7 +512,7 @@ function publicBout(b) {
         incoming: b.incoming || null,
         // `tell` was published here and read on the ladder row, but nothing has ever assigned it — a leftover
         // of the rock-paper-scissors build, where the opponent's next stance was printed for you to counter.
-        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won), rankUp: b.rankUp || null,
+        log: b.log || [], over: Boolean(b.over), won: Boolean(b.won),
         recap: b.recap || null,
         reward: b.reward || null,
     };
@@ -632,7 +593,7 @@ export async function startBout(buyerId, targetId = null) {
         // An NPC's kit is drawn from the same archetype catalog members use, so it fights with real named
         // moves rather than a bare swing — scaled by tier, and seeded off the tier so a given tier always
         // brings the same two moves and can be planned against.
-        foeKit = { ...n, abilities: npcAbilities(npcTier) };
+        foeKit = { ...n, ...ringStats(n), abilities: npcAbilities(npcTier) };
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
@@ -1146,28 +1107,19 @@ async function finishBout(buyerId, row, b, won) {
         console.error("arena.finish.persist_failed", buyerId, e?.message || e);
     });
 
-    // Where that leaves you on the board. Read BACK rather than assumed — the recap is the only thing telling
-    // somebody what changed, so it has to report what actually happened.
-    const after = await db.queryOne(
-        `SELECT (SELECT COUNT(*) + 1 FROM mkt_arena x JOIN mkt_buyer xb ON xb.id = x.buyer_id
-                  WHERE COALESCE(xb.xp,0) > 0 AND x.vp > a.vp) AS rank,
-                (SELECT COUNT(*) FROM mkt_arena y JOIN mkt_buyer yb ON yb.id = y.buyer_id WHERE COALESCE(yb.xp,0) > 0) AS size,
-                a.vp
-           FROM mkt_arena a WHERE a.buyer_id = $1`, [buyerId]
-    ).catch(() => null);
-    const size = Number(after?.size) || b.size || 0;
-    const rankTo = Number(after?.rank) || 0;
+    // Your VP after the fight, read BACK rather than assumed — the recap is the only thing telling somebody
+    // what changed, so it has to report what actually happened. The two counting sub-selects that went with
+    // it worked out your RUNG, which no longer exists.
+    const after = await db.queryOne(`SELECT vp FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
 
     b.recap = {
         won, foe: b.foe, reward, feats,
         vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
-        rankTo, size,
         npcTier: npcTier || null,
         npcUnlocked: won && npcTier > 0 && npcTier > (Number(row?.npc_best) || 0),
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
         rounds: b.beat || (b.log || []).length,
     };
-    b.rankUp = null;
 
     // Recorded from BOTH sides. A defender was asleep; this is the only way they ever find out. An NPC has no
     // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
@@ -1188,40 +1140,7 @@ async function finishBout(buyerId, row, b, won) {
     return { ok: true, finished: { won, reward, feats }, ...state, bout: publicBout(b) };
 }
 
-// ── SEEDING THE LADDER ───────────────────────────────────────────────────────────────────────────────────────
-// Rebuild every position from power, using the SAME calculation the game fights with. This exists because the
-// first seed was done by a throwaway script that re-implemented gearPower from the items catalog and quietly
-// left out forge enhancements — 198 stat points across 19 members, which put 10 of 84 people in the wrong
-// order. Anything that needs to know how strong somebody is has to ask the same function the arena asks.
-//
-// Run it at launch, and any time the ladder needs flattening back to merit.
-export async function seedArenaLadder() {
-    const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
-    const members = await db.query(`SELECT id, alias, COALESCE(xp,0) AS xp FROM mkt_buyer WHERE COALESCE(xp,0) > 0`).catch(() => []);
-    if (!members.length) return { ok: false, error: "no_members" };
-    const stats = await getEquippedStatsForMembers(members.map((m) => m.id)).catch(() => new Map());
-    const ranked = members
-        .map((m) => {
-            const level = levelForXp(Number(m.xp) || 0).level;
-            const gearPower = Object.values(stats.get(m.id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
-            return { id: m.id, alias: m.alias, power: arenaRating(ringStats(stats.get(m.id) || {})) };
-        })
-        .sort((a, b) => b.power - a.power || String(a.alias).localeCompare(String(b.alias)));
-
-    // Park everyone negative first: position carries a unique index, so reassigning in place collides mid-flight.
-    await db.query(`UPDATE mkt_arena SET position = -position WHERE position > 0`).catch(() => {});
-    for (let i = 0; i < ranked.length; i += 1) {
-        await db.query(
-            `INSERT INTO mkt_arena (buyer_id, position, best_position) VALUES ($1, $2, $2)
-             ON CONFLICT (buyer_id) DO UPDATE SET position = $2, best_position = $2`,
-            [ranked[i].id, i + 1]
-        ).catch(() => {});
-    }
-    await db.query(`UPDATE mkt_arena SET position = NULL WHERE position < 0`).catch(() => {});
-    return { ok: true, seeded: ranked.length, top: ranked.slice(0, 5).map((r) => r.alias) };
-}
-
-/** Clear a finished bout so the ladder comes back. */
+/** Clear a finished bout so the arena screen comes back. */
 export async function clearBout(buyerId) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     await saveBout(buyerId, null);

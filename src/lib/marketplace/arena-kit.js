@@ -356,7 +356,7 @@ export const healthFrom = (ferocity = 0) => Math.round(HEALTH_BASE + (Number(fer
 
 // One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
 // to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.
-export const SWING_BASE = 12;
+export const SWING_BASE = 8;
 
 // The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
 // trap on its own — a Fortune kit critted constantly in here and never against the boss.
