@@ -313,7 +313,13 @@ async function grantPrize(buyerId, prize, opts = {}) {
     // 800-XP wedge paid 936 and a 2,000 paid 2,288 while the card still read the wedge. Same rule the XP scrolls
     // got on 2026-08-08 and for the same reason: a fixed prize is not effort, and a spin can be bought with
     // gold, so multiplying it is the same gold→XP arbitrage through a different door.
-    if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount, flat: true }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
+    //
+    // gold: 0 — AND IT WAS PAYING BOTH. awardXp mints gold 1:1 with points unless a caller says otherwise, so
+    // an "XP" wedge quietly handed over the same number in gold as well: the 2,000 XP prize was 2,000 XP AND
+    // 2,000 gold, landing in the ledger as `xp_accrual` where nobody would think to look for wheel prizes.
+    // This wheel already HAS gold wedges — that is what they are for — so the XP wedge paying gold made the
+    // two prize types the same prize, and made the XP one strictly better. It pays XP. That is the wedge.
+    if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount, gold: 0, flat: true }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
     if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "fragment") {
         // Name the TIER on the result card (and use that tier's shard art) — "dig fragments" alone left people

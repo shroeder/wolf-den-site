@@ -51,13 +51,18 @@ export const delveMight = (level = 1, gearPower = 0) => Math.round(9 + level * 0
 // reason. Walking into the Spire un-upgraded in poor gear is meant to be hopeless; that is what the other
 // three dungeons and the provisions shop are for.
 // ── xpPer CUT 35% (2026-08-09), goldPer UNTOUCHED ────────────────────────────────────────────────────────────
-// Within a fortnight of opening, delving was the biggest HONEST source of XP in the game — 216 XP a run at 30+
-// runs a day and climbing, ~9% of every point the pack earned, second only to a scroll exploit that has since
-// been closed. What makes it the runaway is that nothing gates it: no daily allowance, no cooldown, no torch to
-// burn. You can run the Hollow back to back until you get bored.
+// Within a fortnight of opening, delving was the biggest HONEST source of XP in the game: ~9% of every point
+// the pack earned, second only to a scroll exploit that has since been closed. At 216 XP a run it paid more per
+// action than anything else repeatable — a boss strike was 39, a harvest 6, a salvage 10.
+//
+// ⚠️ AN EARLIER VERSION OF THIS NOTE CLAIMED NOTHING GATED IT. That was wrong, and the correction matters more
+// than the number: `startDelve` refuses with `already_today` when runs_json already holds today for that
+// dungeon (delves.js), so it is ONE RUN PER DUNGEON PER DAY — four a day, and the ~30 runs a day showing up in
+// the ledger were seven or eight members each taking their four, not anybody grinding. The cut stands on the
+// per-action figure alone; it was never true that the loop was uncapped.
 //
 // The XP is what got cut, not the gold — the purse is the dungeon's whole draw and delve gold is a modest 7.5%
-// of minting. Levels are the thing a repeatable loop shouldn't be able to print.
+// of minting.
 export const DUNGEONS = [
     {
         id: "hollow", name: "The Hollow Warren", minLevel: 10, tint: "#8fd08a",
