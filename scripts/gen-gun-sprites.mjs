@@ -39,6 +39,10 @@ const SPRITES = {
     // than as art. Nothing underneath it — see the same note on `gunnery` in gen-track-sprites.mjs.
     lay: P("A brass GUNNER'S QUOIN — a wedge-shaped elevation block of oiled oak bound in brass — with a small brass sighting notch on its top face, catching a bright glint. Polished brass and warm oak ONLY. NOTHING behind or underneath it: no panel, no plate, no board, no slab, no rectangle, no card, no flat shape of any kind."),
 
+    // ── THE RECKONING. Its meter was an empty rounded rectangle with grey text in it, which at zero fill
+    // reads as a broken input rather than a thing you are charging. It needs an object.
+    reckoning: P("A small iron-bound POWDER KEG with a short fuse burning at the top, throwing bright orange sparks. Dark oiled oak staves, heavy iron hoops, a hot orange flame and flying embers."),
+
     // ── The gun, at four stages.
     "cannon-1": P(`A plain, well-used ${CANNON}. Dark cast iron barrel, plain oak carriage, iron-rimmed wheels, no ornament at all — a working gun.`),
     // Redrawn: the first came back with a thick white sticker rim traced around the whole silhouette.

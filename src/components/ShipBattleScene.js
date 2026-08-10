@@ -1170,18 +1170,32 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                     {reck ? (
                         <button type="button"
                             className={`sbt-reck${reckReady ? " is-ready" : ""}`}
-                            style={{ "--fill": `${Math.round((reckN / reckAt) * 100)}%` }}
                             disabled={!reckReady || busy || phase !== "aim"}
                             onClick={reckFire}
                             title={reckReady
                                 ? `${reck.name} — one free volley, every ball lands, targets chosen at random`
-                                : `${reckAt - reckN} more misses`}>
-                            <i className="sbt-reck-fill" aria-hidden="true" />
+                                : `${reckAt - reckN} more ${reckAt - reckN === 1 ? "miss" : "misses"}`}>
                             <i className="sbt-reck-shine" aria-hidden="true" />
-                            <span className="sbt-reck-label">
-                                <b>{reckReady ? reck.name.toUpperCase() : reck.name}</b>
-                                <em>{reckReady ? "unleash" : `${reckN}/${reckAt}`}</em>
-                            </span>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="sbt-reck-art" src="/images/sailing/gun/reckoning.png" alt="" draggable="false" />
+                            <b className="sbt-reck-name">{reck.name}</b>
+                            {/* CHARGES, NOT A BAR. Empty, a bar is an empty rounded rectangle with grey text
+                                floating in it — it read as a broken input rather than something filling up.
+                                Four notches say how many misses it takes before you have looked at it once,
+                                and each one lights the moment a ball goes wide. */}
+                            {/* THE CHARGES ARE THE COUNT, so there is no number beside them — art, name,
+                                notches and a tally all in one 191px column overflowed it and clipped the
+                                last charge off the edge. Full, the notches have nothing left to say and are
+                                replaced by the thing to do. */}
+                            {reckReady ? (
+                                <em className="sbt-reck-cta">Unleash</em>
+                            ) : (
+                                <span className="sbt-reck-pips" aria-hidden="true">
+                                    {Array.from({ length: reckAt }).map((_, i) => (
+                                        <i key={i} className={i < reckN ? "is-lit" : ""} style={{ "--i": i }} />
+                                    ))}
+                                </span>
+                            )}
                         </button>
                     ) : null}
 

@@ -15043,52 +15043,57 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 
 /* ══ THE RECKONING ═══════════════════════════════════════════════════════════════════════════════════════
-   Every ball of yours that goes wide is counted here, and at full it stops being a meter and becomes the
-   button. The bar IS the button on purpose — there is nothing to learn about where the skill lives, and the
-   thing you have been watching fill is the thing you press.
+   A tally of every ball of yours that has gone wide. Full, it stops being a meter and becomes the button.
 
-   While it fills it is deliberately quiet: a dark trough with a slow amber tide in it, no bigger than the
-   rack pills beside it. Full, it goes gold, lifts, and will not stop moving until you spend it. */
-/* FOUR ROWS, NOT THREE. Adding `reck` here without carrying `rail` through dropped the gun rail out of the
-   template entirely — an item with `grid-area: rail` and no such area gets auto-placed into an implicit
-   track, which collapsed the read-out into a three-word column, pushed the rail to the bottom corner and
-   left the Reckoning bar hanging off the left edge of the screen. Every area the bar owns has to be listed
-   in every template that redefines it. */
-.sbt-aimbar { grid-template-areas: "read fire" "rack fire" "reck fire" "rail rail"; }
-.sbt-reck { grid-area: reck; position: relative; overflow: hidden; width: 100%;
-    display: block; padding: 0; height: 34px; border-radius: 10px; cursor: default;
-    border: 1px solid rgba(255,215,94,0.22); background: rgba(6,10,16,0.72);
-    transition: border-color .3s ease, box-shadow .3s ease, transform .18s ease; }
-/* The tide. Width is the tally, so a miss is visible the instant it happens. */
-.sbt-reck-fill { position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); pointer-events: none;
-    background: linear-gradient(90deg, rgba(140,60,20,0.55), rgba(214,120,32,0.7));
-    transition: width .45s cubic-bezier(.2,.9,.3,1.2); }
+   IT WAS A BAR AND THE BAR WAS THE PROBLEM. At zero fill a bar is an empty rounded rectangle with small grey
+   text floating in the middle of it — indistinguishable from a disabled text input, and the ugliest object on
+   a screen made of painted ships. It is a keg with a lit fuse and four charges now: something with a shape of
+   its own before anything has filled it, and a notch that lights the instant a ball goes wide. */
+.sbt-reck { grid-area: reck; position: relative; overflow: hidden; width: 100%; cursor: default;
+    display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 6px; height: 40px;
+    border-radius: 12px; border: 1px solid rgba(255,215,94,0.2);
+    background: linear-gradient(180deg, rgba(26,20,12,0.9), rgba(12,10,8,0.92));
+    transition: border-color .3s ease, box-shadow .3s ease, transform .16s ease; }
+.sbt-reck-art { width: 26px; height: 26px; object-fit: contain; flex: none;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.6)) saturate(0.75) brightness(0.8);
+    transition: filter .3s ease, transform .3s ease; }
+.sbt-reck-name { font-family: var(--font-display); font-size: 0.68rem; font-weight: 900;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #9a8f78; transition: color .3s ease; }
+
+/* The charges. Four notches, each one a miss. */
+.sbt-reck-pips { display: flex; gap: 4px; margin-left: auto; }
+.sbt-reck-pips i { width: 14px; height: 9px; border-radius: 2px; transform: skewX(-14deg);
+    background: rgba(255,255,255,0.07); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+    transition: background .3s ease, box-shadow .3s ease; }
+.sbt-reck-pips i.is-lit { background: linear-gradient(180deg, #ffd07a, #e07a1c);
+    box-shadow: 0 0 8px rgba(255,150,40,0.65), inset 0 1px 0 rgba(255,255,255,0.45);
+    animation: sbtReckLight .45s cubic-bezier(.2,.9,.3,1.4) both; }
+@keyframes sbtReckLight {
+    0% { transform: skewX(-14deg) scaleY(0.3); filter: brightness(2.4); }
+    100% { transform: skewX(-14deg) scaleY(1); filter: none; }
+}
+.sbt-reck-cta { font-style: normal; font-size: 0.64rem; font-weight: 800; color: #8f8875;
+    min-width: 2.4em; text-align: right; transition: color .3s ease; }
 .sbt-reck-shine { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
-.sbt-reck-label { position: relative; display: flex; align-items: baseline; justify-content: center; gap: 7px;
-    height: 100%; font-family: var(--font-display); }
-.sbt-reck-label b { font-size: 0.74rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
-    color: #c8bda6; transition: color .3s ease, text-shadow .3s ease; }
-.sbt-reck-label em { font-style: normal; font-size: 0.62rem; font-weight: 800; color: #8f8875; }
 
-/* FULL. Gold, alive, and it does not stop until it is spent. */
+/* FULL. The fuse catches, the whole thing goes gold, and it does not stop until it is spent. */
 .sbt-reck.is-ready { cursor: pointer; border-color: rgba(255,225,140,0.9);
-    box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 22px rgba(255,180,60,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
+    background: linear-gradient(180deg, #ffdf85, #e6a93c 55%, #c9821f);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 22px rgba(255,180,60,0.5), inset 0 1px 0 rgba(255,255,255,0.4);
     animation: sbtReckPulse 1.5s ease-in-out infinite; }
-.sbt-reck.is-ready .sbt-reck-fill {
-    background: linear-gradient(90deg, #b8730f, #ffdf85 45%, #ffb43c 70%, #ffdf85);
-    background-size: 220% 100%; animation: sbtReckTide 2.2s linear infinite; }
-.sbt-reck.is-ready .sbt-reck-label b { color: #1a1206; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
-.sbt-reck.is-ready .sbt-reck-label em { color: rgba(26,18,6,0.72); }
-/* A bar of light that sweeps the button, so "ready" reads even out of the corner of your eye. */
+.sbt-reck.is-ready .sbt-reck-art { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); transform: scale(1.12); }
+.sbt-reck.is-ready .sbt-reck-name { color: #1a1206; }
+.sbt-reck.is-ready .sbt-reck-cta { color: #2a1c06; font-weight: 900; }
+.sbt-reck.is-ready .sbt-reck-pips i { background: linear-gradient(180deg, #fff6dd, #ffcc70);
+    box-shadow: 0 0 10px rgba(255,240,200,0.9), inset 0 1px 0 rgba(255,255,255,0.7); }
 .sbt-reck.is-ready .sbt-reck-shine { opacity: 1;
-    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.6) 50%, transparent 60%);
     background-size: 250% 100%; animation: sbtReckSweep 2.4s ease-in-out infinite; }
 .sbt-reck.is-ready:active { transform: scale(0.97); }
 @keyframes sbtReckPulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 18px rgba(255,180,60,0.35), inset 0 1px 0 rgba(255,255,255,0.25); }
-    50% { box-shadow: 0 0 0 1px rgba(255,235,170,0.6), 0 0 30px rgba(255,190,80,0.7), inset 0 1px 0 rgba(255,255,255,0.35); }
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 18px rgba(255,180,60,0.4), inset 0 1px 0 rgba(255,255,255,0.4); }
+    50% { box-shadow: 0 0 0 1px rgba(255,235,170,0.6), 0 0 32px rgba(255,190,80,0.75), inset 0 1px 0 rgba(255,255,255,0.5); }
 }
-@keyframes sbtReckTide { from { background-position: 0% 0; } to { background-position: 220% 0; } }
 @keyframes sbtReckSweep { 0% { background-position: 130% 0; } 60%, 100% { background-position: -60% 0; } }
 
 /* ── SPENDING IT ─────────────────────────────────────────────────────────────────────────────────────────
@@ -15207,3 +15212,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* `1fr` is `minmax(auto, 1fr)`, so the read-out column refuses to shrink below its own content and pushes
    FIRE past the right edge — 373px of demand in a 351px content box. `minmax(0, 1fr)` lets it give. */
 .sbt-aimbar { grid-template-columns: minmax(0, 1fr) auto; }
+
+/* Everything in this button has to fit a 191px column on a 375px phone: art, name and four charges. The name
+   loses a little tracking and the charges a little width, and the tally is gone — the charges are the tally. */
+.sbt-reck-name { font-size: 0.62rem; letter-spacing: 0.08em; }
+.sbt-reck-pips { margin-left: auto; gap: 3px; }
+.sbt-reck-pips i { width: 12px; height: 10px; }
+.sbt-reck-cta { margin-left: auto; min-width: 0; font-size: 0.7rem; font-weight: 900;
+    letter-spacing: 0.1em; text-transform: uppercase; }
+/* 168px of content in a 165px button — three over, which clips the last charge. */
+.sbt-reck-pips i { width: 11px; }
+.sbt-reck { padding-right: 8px; }
