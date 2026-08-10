@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiCrossedSwords, GiKnapsack, GiReturnArrow, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiCrossedSwords, GiKnapsack, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -378,7 +378,8 @@ export default function ArenaClient({ initial }) {
     const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
     const ringRef = useRef(null);
-    const [ringH, setRingH] = useState(null);
+    // The blow-by-blow, off by default — see the drawer note down in the render.
+    const [logOpen, setLogOpen] = useState(false);
     // The spell layer, driven imperatively. React state is the wrong tool for "play this burst now" — by the
     // time a re-render lands, the moment has gone.
     const fxRef = useRef(null);
@@ -426,6 +427,8 @@ export default function ArenaClient({ initial }) {
     }, [busy]);
 
     const bout = st?.bout || null;
+    // Nothing underneath a full-screen fight should move when you swipe.
+    useScrollLock(Boolean(bout));
 
     // ── FIT THE FIGHT ON THE PHONE ───────────────────────────────────────────────────────────────────────
     // The ring was sized `min(74vh, 640px)`, which is a fraction of the WHOLE viewport — and this page puts
@@ -436,53 +439,16 @@ export default function ArenaClient({ initial }) {
     //
     // So it is measured rather than assumed: scroll the ring up to where it will actually sit, then size it to
     // whatever is left below that. Re-run on resize and orientation change, because both move the answer.
-    useEffect(() => {
-        if (!bout) { setRingH(null); return undefined; }
-        let raf = 0;
-        // The site's nav is STICKY, so scrolling the ring to y=0 parks its first row underneath it — which
-        // clipped "Round 4" and the affinity banner clean off the top. Measure whatever is pinned up there
-        // rather than hard-coding a number, because the banner above the nav comes and goes.
-        const stickyBottom = () => {
-            let worst = 0;
-            for (const el of document.body.querySelectorAll("header, nav, [class*='sticky'], [class*='Sticky']")) {
-                const pos = getComputedStyle(el).position;
-                if (pos !== "fixed" && pos !== "sticky") continue;
-                const r = el.getBoundingClientRect();
-                if (r.top <= 4 && r.height > 0 && r.bottom > worst) worst = r.bottom;
-            }
-            return worst;
-        };
-        const fit = () => {
-            const el = ringRef.current;
-            if (!el) return;
-            const top = el.getBoundingClientRect().top;
-            // 10px of breathing room so the deck is never flush against the bottom edge (or a home indicator).
-            const avail = window.innerHeight - Math.max(top, 0) - 10;
-            // Cap at the desktop size, floor low enough that a LANDSCAPE phone still fits — a 340px minimum
-            // was a guess, and on 844x390 with a 132px sticky nav there are only 248px to be had, so the
-            // "minimum" was itself pushing the deck off the bottom by 81px.
-            setRingH(Math.round(Math.max(240, Math.min(640, avail))));
-        };
-        // Put the fight on screen first, THEN measure — otherwise we size against wherever the page happened
-        // to be scrolled and get a different (wrong) answer every time.
-        const place = () => {
-            const el = ringRef.current;
-            if (!el) return;
-            const pad = stickyBottom();
-            const y = window.scrollY + el.getBoundingClientRect().top - pad - 6;
-            window.scrollTo({ top: Math.max(0, y), behavior: "auto" });
-        };
-        place();
-        raf = requestAnimationFrame(() => requestAnimationFrame(() => { place(); fit(); }));
-        const onResize = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fit); };
-        window.addEventListener("resize", onResize);
-        window.addEventListener("orientationchange", onResize);
-        return () => {
-            cancelAnimationFrame(raf);
-            window.removeEventListener("resize", onResize);
-            window.removeEventListener("orientationchange", onResize);
-        };
-    }, [Boolean(bout)]);
+// ── THE FIGHT IS A SCENE, NOT A PANEL ────────────────────────────────────────────────────────────────────
+    // There used to be forty lines here that measured the sticky nav, scrolled the ring under it and sized the
+    // ring to whatever was left. It fit exactly once — the instant the bout opened. A phone browser then moves
+    // the goalposts constantly: the address bar collapses on the first swipe, the visual viewport changes with
+    // no resize event, and any scroll at all slides the HP bars off the top while the height stays put. You
+    // ended up with the bars OR the command deck, never both, and scrolled between them all fight.
+    //
+    // A fight is fixed to the viewport now, the way a ship battle is: nothing to scroll, nothing to measure,
+    // and the sprites simply get the space that is left after the bars and the deck have taken theirs.
+
 
     // ── THE MUSIC ── it runs for exactly as long as a bout does, and its INTENSITY is your vigour. Losing is
     // audible before it is legible: the hats come in, then the tremolo strings, while you are still reading
@@ -722,9 +688,8 @@ export default function ArenaClient({ initial }) {
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
         const wards = abilities.filter((a) => a.defensive);
         return (
-            <section className="card ar">
+            <section className="card ar ar-fight">
                 <div ref={ringRef}
-                    style={ringH ? { height: `${ringH}px`, minHeight: 0 } : undefined}
                     className={`ar-ring${shake ? ` is-shake-${shake}` : ""}${bigHit ? (critTheirs ? " is-crit is-crit-theirs" : " is-crit") : ""}`
                     + `${stop ? " is-stop" : ""}`
                     + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
@@ -760,6 +725,12 @@ export default function ArenaClient({ initial }) {
                             aria-pressed={muteOn}
                             onClick={() => { const n = !muteOn; setMuteOn(n); setMuted(n); if (!n) { unlock(); Sfx.ui(); } }}>
                             {muteOn ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
+                        </button>
+                        <button type="button" className={`ar-mute ar-logbtn${logOpen ? "" : " is-off"}`}
+                            aria-label={logOpen ? "Hide the blow-by-blow" : "Show the blow-by-blow"}
+                            aria-pressed={logOpen}
+                            onClick={() => setLogOpen((v) => !v)}>
+                            <GiScrollUnfurled aria-hidden="true" />
                         </button>
                         {bout.clash?.note ? (
                             <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
@@ -1083,7 +1054,10 @@ export default function ArenaClient({ initial }) {
                 {bout.over ? <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} /> : null}
 
                 {err ? <p className="ar-err">{err}</p> : null}
-                {bout.log?.length ? (
+                {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px
+                    of the reason you had to scroll. The beat you just played is already printed on the field
+                    (.ar-beat); the history is for when you want it. */}
+                {logOpen && bout.log?.length ? (
                     <div className="ar-log">
                         {bout.log.slice(-8).map((l, i) => (
                             <div key={i} className="ar-line"><b>{l.beat}</b> {l.text}</div>
@@ -1432,11 +1406,25 @@ function Styles() {
             /* The gradient is a FALLBACK, not decoration: until the background image lands the stage is
                otherwise pure black, which is what the first frames of every filmed bout looked like. A warm
                dark floor means a slow load degrades to "dim arena" rather than "broken". */
+            /* ── THE FIGHT OWNS THE SCREEN ── fixed to the viewport, like a ship battle. It used to be a card
+               in the page whose height was measured once, which meant one swipe (or a phone browser hiding its
+               own address bar) slid the HP bars off the top while the command deck stayed pinned to the
+               bottom — the bars or the buttons, never both, for the whole fight.
+               100svh is the SMALL viewport: the one that is still there when the browser chrome comes back. */
+            .ar.ar-fight { position: fixed; inset: 0; height: 100svh; z-index: 4000;
+                margin: 0; padding: 0; border: 0; border-radius: 0; max-width: none;
+                display: flex; flex-direction: column; overflow: hidden;
+                background: #0b0910; }
             .ar-ring { position: relative; border-radius: 16px; overflow: hidden;
                 height: min(74vh, 640px); min-height: 420px;
                 display: flex; flex-direction: column;
                 background: linear-gradient(180deg, #150f0c 0%, #1e1410 52%, #33210f 100%);
                 border: 1px solid rgba(255,190,110,0.3); }
+            /* Inside the scene the ring takes whatever the bars and the deck have not: the sprites are
+               object-fit:contain, so they simply draw smaller on a short screen instead of pushing anything
+               off it. min-height:0 is what lets a flex child actually shrink. */
+            .ar-fight .ar-ring { flex: 1 1 auto; height: auto; min-height: 0;
+                border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
             /* Shake is one decaying impulse per hit from the canvas engine, scaled by damage — a graze and a
                fight-ender no longer shake identically. .ar-quake is the node whose transform it writes. */
             .ar-quake { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
@@ -1564,6 +1552,11 @@ function Styles() {
             .ar-ring.is-on-them .ar-floor { transform: scale(1.18) translateX(-9%); }
             .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(44% 38% at 24% 58%, transparent, rgba(6,4,10,0.88)); }
             .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(44% 38% at 76% 58%, transparent, rgba(6,4,10,0.88)); }
+            /* In the full-screen scene the ring is portrait, so a spotlight measured as a percentage of it
+               collapsed to a small disc with a black field around it. Sized off the WIDTH and aimed at the
+               floor, where the fighters actually stand. */
+            .ar-fight .ar-ring.is-on-you .ar-ring-scrim { background: radial-gradient(78% 30% at 26% 76%, transparent, rgba(6,4,10,0.86)); }
+            .ar-fight .ar-ring.is-on-them .ar-ring-scrim { background: radial-gradient(78% 30% at 74% 76%, transparent, rgba(6,4,10,0.86)); }
             .ar-ring.is-on-you .ar-fighter.is-foe { opacity: .28; filter: saturate(.35); }
             .ar-ring.is-on-them .ar-fighter:not(.is-foe) { opacity: .28; filter: saturate(.35); }
             /* The one casting stands up out of the frame a little. */
@@ -2273,6 +2266,17 @@ function Styles() {
 
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;
                 padding: 9px 11px; border-radius: 11px; background: rgba(0,0,0,0.28); }
+            /* The drawer: it takes its space from the ring rather than from the page, and never more than a
+               third of the screen. */
+            .ar-fight .ar-log { flex: none; margin: 0; max-height: 30svh; border-radius: 0;
+                background: rgba(0,0,0,0.55); }
+            /* TWO FIGHTERS ON A PHONE CAN ONLY BE SO WIDE, and a contained sprite is only ever as tall as it
+               is wide — so a taller ring does not make them bigger, it just opens a hole above their heads.
+               Cap the floor and push it DOWN: the fighters sit near the deck where the action is, and the
+               space that is left lands above them, which is exactly where the incoming-move banner, the
+               damage numbers and the spell layer all draw anyway. */
+            .ar-fight .ar-floor { flex: 0 1 auto; height: min(100%, 34svh); margin-top: auto; }
+            .ar-logbtn svg { width: 15px; height: 15px; }
             .ar-line { font-size: 11.5px; line-height: 1.45; color: #9aa2ab; }
             .ar-line b { color: #6f6486; margin-right: 5px; }
             /* ── LANDSCAPE PHONE ── LAST IN THE FILE ON PURPOSE. A media query adds no specificity, so
