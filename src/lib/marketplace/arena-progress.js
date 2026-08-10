@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import {
-    arenaLevelFor, classById, nodeById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
+    arenaLevelFor, classById, FREE_REFUNDS_PER_DAY, nodeById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     TIER_GATE, treeFor,
 } from "@/lib/marketplace/arena-classes.js";
 import { ARENA_UPGRADES, upgradeCost } from "@/lib/marketplace/arena-upgrades.js";
@@ -14,11 +14,18 @@ import { ARENA_UPGRADES, upgradeCost } from "@/lib/marketplace/arena-upgrades.js
 // renders from, and only then writes. Nothing trusts a number that arrived from a client: a skill point is
 // worth gold, and a tree that can be posted into is a tree that will be.
 
+// `free_used` is computed in SQL against the STORE-LOCAL day, so a count stamped yesterday reads as zero
+// without anything having to reset it at midnight — the same trick the daily raid counter uses.
 const row = (buyerId) =>
     db.queryOne(
-        `SELECT arena_xp, arena_class, skill_tree, upgrades, respecs, class_respecs
+        `SELECT arena_xp, arena_class, skill_tree, upgrades, respecs, class_respecs,
+                CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                     THEN COALESCE(free_respecs, 0) ELSE 0 END AS free_used
            FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
     ).catch(() => null);
+
+/** How many free point-refunds are left today. */
+export const freeRefundsLeft = (r) => Math.max(0, FREE_REFUNDS_PER_DAY - (Number(r?.free_used) || 0));
 
 const gold = (buyerId) =>
     db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).then((r) => Number(r?.gold) || 0).catch(() => 0);
@@ -91,9 +98,31 @@ export async function refundNode(buyerId, nodeId) {
     const taken = { ...(r.skill_tree || {}) };
     if (!(Number(taken[nodeId]) > 0)) return { ok: false, error: "not_taken" };
 
-    const cost = RESPEC_ONE(pointsSpent(taken));
-    const paid = await spendGold(buyerId, cost, "arena_respec_one", { nodeId });
-    if (!paid.ok) return { ...paid, cost };
+    // THE FIRST THREE OF THE DAY ARE FREE. Charged only once the allowance is gone, and the counter moves in
+    // the same statement that spends it — two taps at once must not both read "one left".
+    const free = freeRefundsLeft(r) > 0;
+    const cost = free ? 0 : RESPEC_ONE(pointsSpent(taken));
+    if (free) {
+        const took = await db.queryOne(
+            `UPDATE mkt_arena
+                SET free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date,
+                    free_respecs = CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                                        THEN COALESCE(free_respecs, 0) + 1 ELSE 1 END
+              WHERE buyer_id = $1
+                AND CASE WHEN free_respec_day = (NOW() AT TIME ZONE 'America/Chicago')::date
+                         THEN COALESCE(free_respecs, 0) ELSE 0 END < $2
+              RETURNING free_respecs`,
+            [buyerId, FREE_REFUNDS_PER_DAY]
+        ).catch(() => null);
+        // Lost the race for the last free one — fall through and charge for it rather than refusing.
+        if (!took) {
+            const paidNow = await spendGold(buyerId, RESPEC_ONE(pointsSpent(taken)), "arena_respec_one", { nodeId });
+            if (!paidNow.ok) return { ...paidNow, cost: RESPEC_ONE(pointsSpent(taken)) };
+        }
+    } else {
+        const paid = await spendGold(buyerId, cost, "arena_respec_one", { nodeId });
+        if (!paid.ok) return { ...paid, cost };
+    }
 
     taken[nodeId] = Number(taken[nodeId]) - 1;
     if (taken[nodeId] <= 0) delete taken[nodeId];
@@ -101,7 +130,7 @@ export async function refundNode(buyerId, nodeId) {
 
     await db.query(`UPDATE mkt_arena SET skill_tree = $2::jsonb, respecs = respecs + 1 WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(cleaned)]).catch(() => {});
-    return { ok: true, cost, orphaned: pointsSpent(taken) - pointsSpent(cleaned) };
+    return { ok: true, cost, free, orphaned: pointsSpent(taken) - pointsSpent(cleaned) };
 }
 
 /** Drop anything whose tier gate is no longer met, repeatedly, until the allocation is self-consistent. */

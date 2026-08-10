@@ -14,7 +14,7 @@ import {
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { ARMOURY, boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import {
-    arenaLevelFor, arenaXpFor, CLASSES, classById, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
+    arenaLevelFor, arenaXpFor, CLASSES, classById, FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState,
 } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -99,7 +99,11 @@ export function rankFor(rung, size) {
 //
 // COOLDOWNS are the constraint. A skill fires, then sits out a few of your turns — so a kit is a rotation
 // rather than a single best move you spam, and no run of bad timing can lock you out of your own gear.
-const AI_ABILITY_CHANCE = 0.45;      // how often the defender's kit answers with an ability rather than a swing
+// How often the defender's kit answers with an ability rather than a plain swing. 0.45 meant the opponent
+// spent most of the fight doing the most boring thing available to them — their signature moves are the only
+// thing that makes one loadout feel different from another, and you saw them less than half the time. At 0.75
+// a kit reads as a kit, and the telegraph line ("Emberbrand — incoming") is the interesting half of defending.
+const AI_ABILITY_CHANCE = 0.75;
 
 // Defending felt like taking a second swing of your own: same ring, same tap, no idea what was coming. The
 // cause was structural — the opponent's move was rolled at the moment the beat RESOLVED, so there was nothing
@@ -253,7 +257,8 @@ function mergeAdd(a = {}, b = {}) {
 async function arenaRow(buyerId) {
     await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     let row = await db.queryOne(
-        `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text, b.gold AS gold_now
+        `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text,
+                a.free_respec_day::text AS free_respec_day_text, b.gold AS gold_now
            FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
     // ── SEEDING ──────────────────────────────────────────────────────────────────────────────────────────
     // You join the ladder WHERE YOUR POWER PUTS YOU, not at the bottom. Entering at the bottom is what made
@@ -267,7 +272,8 @@ async function arenaRow(buyerId) {
         await db.query(`UPDATE mkt_arena SET position = position + 1 WHERE position >= $1`, [slot]).catch(() => {});
         await db.query(`UPDATE mkt_arena SET position = $2, best_position = $2 WHERE buyer_id = $1`, [buyerId, slot]).catch(() => {});
         row = await db.queryOne(
-            `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text, b.gold AS gold_now
+            `SELECT a.*, ${DAY}::text AS today, a.fights_day::text AS fights_day_text,
+                a.free_respec_day::text AS free_respec_day_text, b.gold AS gold_now
                FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id WHERE a.buyer_id = $1`, [buyerId]).catch(() => null);
     }
     return row;
@@ -395,6 +401,11 @@ export async function getArenaState(buyerId) {
             one: RESPEC_ONE(spentPts),
             tree: RESPEC_TREE(spentPts),
             klass: RESPEC_CLASS(spentPts),
+            // Three point-refunds a day cost nothing. Compared as TEXT against the store-local day the same
+            // query computed — building a JS Date from a Postgres DATE reads today as yesterday on a UTC box.
+            free: Math.max(0, FREE_REFUNDS_PER_DAY
+                - (row?.free_respec_day_text === row?.today ? (Number(row?.free_respecs) || 0) : 0)),
+            freePerDay: FREE_REFUNDS_PER_DAY,
         },
     };
     return {
@@ -543,8 +554,13 @@ export async function startBout(buyerId, targetId = null) {
         // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
         // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
         // "anything >= 0" and it fired on EVERY win — including beating a Straw Dummy.
+        // `perks` RIDES ALONG NOW, and that is the whole fix for a shield build that did nothing. The tree's
+        // stat nodes were merged into vigour/might/speed/fortune at kit time and then thrown away, so the
+        // fifteen that are not one of those four — thorns, regen, block, guardSoak, riposteShare, lastStand,
+        // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
+        // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
-            fortune: me.fortune, gearPower: me.gearPower, level: me.level },
+            fortune: me.fortune, gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
         hp: me.vigour, maxHp: me.vigour,
@@ -642,8 +658,12 @@ export async function fightRound(buyerId, opts = {}) {
     const CRIT_PER_FORTUNE = 0.0035;
     const CRIT_CAP = 0.38;
     const CRIT_MULT = 1.8;
+    // Everything the skill tree bought you that is not already baked into a stat. `|| {}` because a bout that
+    // was already open when this shipped has no perks on it.
+    const P = b.me?.perks || {};
     const critFor = (fortune) => Math.min(CRIT_CAP, CRIT_BASE + (Number(fortune) || 0) * CRIT_PER_FORTUNE);
-    const critChance = critFor(b.me?.fortune);
+    const critChance = Math.min(CRIT_CAP + (P.crit || 0), critFor(b.me?.fortune) + (P.crit || 0));
+    const myCritMult = CRIT_MULT + (P.critMult || 0);
     const foeCritChance = critFor(b.foe?.fortune);
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
@@ -668,7 +688,9 @@ export async function fightRound(buyerId, opts = {}) {
             await saveBout(buyerId, b);
             return { ok: true, ...(await getArenaState(buyerId)) };
         }
-        const soak = Math.min(Math.round(b.maxHp * WARD_SOAK), Math.max(0, Math.round(b.maxHp * SHIELD_CAP) - b.shield));
+        // Deep Guard makes a ward soak more; Unyielding raises the ceiling it can stack to.
+        const soak = Math.min(Math.round(b.maxHp * (WARD_SOAK + (P.wardSoak || 0))),
+            Math.max(0, Math.round(b.maxHp * (SHIELD_CAP + (P.shieldCap || 0))) - b.shield));
         b.shield += soak;
         b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, soaked: soak,
             text: `${ward.name} — braced for ${soak}.`, ability: ward.name, kind: "ward" });
@@ -679,7 +701,9 @@ export async function fightRound(buyerId, opts = {}) {
     if (mine && (command === "guard" || command === "item")) {
         // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.
         if (command === "guard") {
-            const soak = Math.min(Math.round(b.maxHp * GUARD_SOAK), Math.max(0, Math.round(b.maxHp * SHIELD_CAP) - b.shield));
+            // Fortress soaks more on a plain guard, which is the command a shield build spends turns on.
+            const soak = Math.min(Math.round(b.maxHp * (GUARD_SOAK + (P.guardSoak || 0))),
+                Math.max(0, Math.round(b.maxHp * (SHIELD_CAP + (P.shieldCap || 0))) - b.shield));
             b.shield += soak;
             cool(GUARD_COOL);
             b.log.push({ beat: b.beat, who: "you", grade: "guard", damage: 0, soaked: soak,
@@ -755,8 +779,14 @@ export async function fightRound(buyerId, opts = {}) {
         //   strike — timing counts for more. Your hands decide it.
         //   spell  — answers on its OWN element and cuts guard. Your build decides it.
         let gradeAtk = ATTACK;
-        let pierce = 1;
+        // Sunder Guard (a tree passive) cuts what their guard is worth on every swing, not just on a sunder.
+        let pierce = Math.max(0.2, 1 - (P.pierce || 0));
         let clashMult = b.clash?.mult || 1;
+        // Wheelwise: your element bites a little harder and slides off a little less.
+        if (P.elementEdge) clashMult = clashMult >= 1 ? clashMult * (1 + P.elementEdge) : clashMult + (1 - clashMult) * P.elementEdge;
+        // First Blood, and Bloodlust: the opening beat, and fighting hurt.
+        const openMult = b.beat <= 1 ? 1 + (P.openMult || 0) : 1;
+        const lowHpMult = b.hp <= b.maxHp / 3 ? 1 + (P.lowHpDmg || 0) : 1;
         if (ability) {
             b.cd[ability.id] = ability.cooldown || 0;
             power = ability.power;
@@ -774,9 +804,9 @@ export async function fightRound(buyerId, opts = {}) {
                 // Its own affinity against theirs, not the bout-wide one — so what you attuned this specific
                 // piece to at the Forge is a real decision. And magic cuts guard, paid for in raw power.
                 const c = elementClash(ability.element, b.foe.element);
-                clashMult = c.mult;
-                pierce = 0.6;
-                power *= 0.88;
+                clashMult = c.mult * (P.elementEdge ? (c.mult >= 1 ? 1 + P.elementEdge : 1) : 1);
+                pierce = Math.max(0.2, 0.6 - (P.pierce || 0));
+                power *= 0.88 * (1 + (P.spellPower || 0));
                 if (c.note) note += ` — ${c.note}`;
             }
             // ── THE FIVE THAT CHANGE THE SHAPE OF A BOUT ─────────────────────────────────────────────────
@@ -807,7 +837,8 @@ export async function fightRound(buyerId, opts = {}) {
         for (let i = 0; i < hits && power > 0; i += 1) {
             const c = Math.random() < critChance;
             if (c) crit = true;
-            const raw = hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1) * (c ? CRIT_MULT : 1);
+            const raw = hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1)
+                * openMult * lowHpMult * (c ? myCritMult : 1);
             dmg += Math.max(1, Math.round(raw - raw * guard));
         }
         b.foeHp = Math.max(0, b.foeHp - dmg);
@@ -821,7 +852,8 @@ export async function fightRound(buyerId, opts = {}) {
         if (rend && dmg > 0) {
             // Stacks with itself rather than refreshing, so leaning on a burn kit is a real plan — but only
             // up to REND_MAX_STACKS. Uncapped it won 83.8% of simulated bouts in under six beats.
-            const per = Math.max(1, Math.round(b.foeMaxHp * REND_PER_TURN));
+            // Slow Burn: each rank makes the burn tick for more of their vigour.
+            const per = Math.max(1, Math.round(b.foeMaxHp * (REND_PER_TURN + (P.rendTick || 0))));
             const stacks = Math.min(REND_MAX_STACKS, (b.bleed?.stacks || 0) + 1);
             b.bleed = { turns: REND_TURNS, stacks, dmg: per * stacks };
         }
@@ -852,10 +884,23 @@ export async function fightRound(buyerId, opts = {}) {
         const foeCrit = Math.random() < foeCritChance;
         const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back * (foeCrit ? CRIT_MULT : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
-        const blocked = Math.round(raw * BLOCK);
+        // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
+        const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)));
         let through = Math.max(0, raw - blocked);
         let soaked = 0;
         if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
+        // ── IRON THORNS ── a share of the blow comes back off THE WHOLE SWING, not off what got past you.
+        // Off `through` it would have punished the shield build for being good at its one job: the better you
+        // blocked, the less you returned. This is the answer to "I am a shield class and I do no damage" —
+        // your damage is THEIR swing, and the harder they hit the more of it comes back.
+        let thorned = 0;
+        if ((P.thorns || 0) > 0 && raw > 0) {
+            thorned = Math.max(1, Math.round(raw * P.thorns));
+            b.foeHp = Math.max(0, b.foeHp - thorned);
+        }
+        // ── LAST STAND ── once a bout, the blow that would end you leaves you on 1 instead.
+        let stood = false;
+        if (through >= b.hp && (P.lastStand || 0) > 0 && !b.stood) { through = Math.max(0, b.hp - 1); b.stood = true; stood = true; }
         b.hp = Math.max(0, b.hp - through);
         // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
         // which meant the entire payoff of guarding and warding was a line of grey text under the buttons.
@@ -863,15 +908,15 @@ export async function fightRound(buyerId, opts = {}) {
         // then answering is a genuine two-move plan rather than a flat damage bonus.
         let sent = 0;
         if (b.riposte > 0 && through > 0) {
-            sent = Math.max(1, Math.round(through * b.riposte));
+            sent = Math.max(1, Math.round(through * (b.riposte + (P.riposteShare || 0))));
             b.foeHp = Math.max(0, b.foeHp - sent);
             b.riposte = 0;
         }
         b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
-            riposted: sent,
+            riposted: sent + thorned,
             text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${sent ? ` ${sent} comes straight back.` : ""}`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
             ability: theirAbility?.name || null });
 
         // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of
@@ -888,6 +933,12 @@ export async function fightRound(buyerId, opts = {}) {
         }
         if (b.sunder > 0) b.sunder -= 1;
 
+        // ── SECOND WIND ── a trickle back at the top of each of your rounds. Small on purpose: it is what
+        // makes a long defensive bout survivable, not a way to out-heal a swing.
+        if ((P.regen || 0) > 0 && b.hp > 0 && b.hp < b.maxHp) {
+            const back = Math.max(1, Math.round(b.maxHp * P.regen));
+            b.hp = Math.min(b.maxHp, b.hp + back);
+        }
         b.turn = "you";
         b.incoming = null;
         b.beat += 1;

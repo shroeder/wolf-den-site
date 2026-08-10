@@ -49,11 +49,17 @@ export function arenaXpFor({ won, myPower = 1, theirPower = 1 }) {
 
 // ── RESPEC ───────────────────────────────────────────────────────────────────────────────────────────────────
 // Three prices, because they are three different decisions. Pulling one point back is a tweak; emptying the
-// tree is a rebuild; changing class is starting again. Each scales with how invested you are, so respeccing
-// is never free but never a wall either.
-export const RESPEC_ONE = (spent = 0) => 150 + spent * 60;
-export const RESPEC_TREE = (spent = 0) => 400 + spent * 140;
-export const RESPEC_CLASS = (spent = 0) => 1200 + spent * 220;
+// tree is a rebuild; changing class is starting again. Each scales with how invested you are.
+//
+// A TENTH OF WHAT THEY WERE (2026-08-10), plus three free point-refunds a day. The old numbers priced a
+// mistake like a punishment: 150 + 60/point meant a level-20 build cost 1,350 gold to adjust by ONE point and
+// 3,200 to empty. At that price you do not experiment with a tree, you go and look up somebody's build — which
+// is the opposite of what a tree is for. Trying things out should be the cheap part; the cost is only here so
+// that swapping your whole kit per opponent isn't free.
+export const FREE_REFUNDS_PER_DAY = 3;
+export const RESPEC_ONE = (spent = 0) => 15 + spent * 6;
+export const RESPEC_TREE = (spent = 0) => 40 + spent * 14;
+export const RESPEC_CLASS = (spent = 0) => 120 + spent * 22;
 
 // ── THE THREE CLASSES ────────────────────────────────────────────────────────────────────────────────────────
 // One per way of winning a bout, drawn from the eleven kinds the engine already has: hit harder, outlast, or

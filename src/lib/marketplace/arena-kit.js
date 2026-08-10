@@ -332,12 +332,25 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 //
 // SWING scales both sides down so a bout runs about ten beats. PUNCH is the defender's extra bite, because you
 // get abilities and a guard and they get neither.
-export const SWING = 0.30;
+// ── 2026-08-10: DOUBLED, because a bout was not running ten beats, it was running forty ──────────────────
+// Worked through at a real loadout (level 28, 270 gear power: might 51, vigour 270) against a Champion-tier
+// opponent with 367 vigour:
+//   your plain attack   hit(51 * 0.30) = 15.5, x1.15 grade, then MINUS their guard (foeGrade averages 40%
+//                       against a geared opponent) = 10.6 a swing. 367 vigour is 35 swings.
+//   their plain swing   hit(51 * 0.30 * 2.12) = 35, x1.09, minus your flat 34% block = 25 a swing. Your 270
+//                       vigour is 11 swings.
+// So they needed eleven turns and you needed thirty-five. That is the whole of "it takes way too long" and
+// "I don't do any damage" in two lines of arithmetic, and no amount of skill nodes fixes a 3x hole.
+//
+// SWING doubles, so your swing is worth ~22 and the fight is roughly half as long. PUNCH comes down to keep
+// THEIR swing exactly where it was (0.62 * 1.03 = 0.639, against the old 0.30 * 2.12 = 0.636) — the fix is
+// meant to give the present player their half of the fight back, not to make the absent one hit softer.
+export const SWING = 0.62;
 // PUNCH is the absent defender's extra bite, set when the player's kit was much stronger than it is now:
 // "because you get abilities and a guard and they get neither". After capping the burn, the shield stack and
 // the free defensive plays, 2.3 over-corrected — a MIRROR MATCH measured at 39.4% for the present human,
 // which is the wrong way round. A player who is actually there, choosing, should edge an absent loadout.
-export const PUNCH = 2.12;
+export const PUNCH = 1.03;
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a

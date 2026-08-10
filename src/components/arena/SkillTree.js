@@ -56,7 +56,7 @@ function Node({ n, selected, onPick, busy }) {
 // ── THE DETAIL PANEL ─────────────────────────────────────────────────────────────────────────────────────────
 // One of these at a time, docked under the row of the node you tapped, so the answer appears next to the
 // question instead of scrolling the tree out from under you.
-function Detail({ n, busy, points, refundCost, canAfford, onTake, onRefund, onClose }) {
+function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, onTake, onRefund, onClose }) {
     const ranked = (n.ranks || 1) > 1;
     return (
         <div className="skt-detail">
@@ -89,10 +89,14 @@ function Detail({ n, busy, points, refundCost, canAfford, onTake, onRefund, onCl
                 ) : (
                     <span className="skt-detail-lock">Win bouts to earn another point.</span>
                 )}
+                {/* THE FIRST THREE OF THE DAY ARE FREE, and the button says so — a price you have to discover
+                    by tapping is a price that stops people tapping. */}
                 {n.rank > 0 ? (
-                    <button type="button" className="skt-refund" disabled={busy || !canAfford}
+                    <button type="button" className="skt-refund" disabled={busy || (freeLeft <= 0 && !canAfford)}
                         onClick={() => onRefund(n.id)}>
-                        Refund one · 🪙 {money(refundCost)}
+                        {freeLeft > 0
+                            ? <>Refund one · <u>free · {freeLeft} left today</u></>
+                            : <>Refund one · 🪙 {money(refundCost)}</>}
                     </button>
                 ) : null}
             </div>
@@ -198,6 +202,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                         {picked && picked.tier === t ? (
                             <Detail n={picked} busy={busy} points={pts.available}
                                 refundCost={p.respec?.one || 0} canAfford={gold >= (p.respec?.one || 0)}
+                                freeLeft={p.respec?.free || 0}
                                 onClose={() => setSel(null)}
                                 onTake={(id) => onAct("take_node", { nodeId: id })}
                                 onRefund={(id) => onAct("refund_node", { nodeId: id })} />
@@ -428,6 +433,7 @@ function Styles() {
                 padding: 10px 13px; border-radius: 11px; cursor: pointer; font-size: 12px; font-weight: 800;
                 color: #cbd3dc; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14); }
             .skt-respec-btn u { text-decoration: none; color: #ffd75e; }
+            .skt-refund u { text-decoration: none; color: #7fe0a4; font-weight: 800; }
             .skt-respec-btn:disabled { opacity: .4; cursor: default; }
             .skt-swap { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
             .skt-swap-btn { display: grid; justify-items: center; gap: 2px; padding: 9px 6px; border-radius: 12px;
