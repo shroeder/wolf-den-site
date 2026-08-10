@@ -138,13 +138,13 @@ const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 // Same contract as the block above: every number here is the one arena.js actually applies, so a card can
 // never drift away from the behaviour it is describing.
 export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
-export const REND_PER_TURN = 0.045; // of their MAX vigour, per tick
+export const REND_PER_TURN = 0.045; // of their MAX health, per tick
 // A BLEED CAP. Simulated at 3,000 bouts a cell, an uncapped stacking burn won 83.8% and ended fights in 5.7
 // beats — every extra application added another full tick forever, so the correct play was "rend, rend, rend"
 // and the bout was over before any other kind got to matter. Three stacks is still the strongest damage-over-
 // time in the game; it is just no longer a runaway.
 export const REND_MAX_STACKS = 3;
-export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as vigour
+export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as health
 export const SUNDER_CUT = 0.4;      // of their guard, removed
 export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.
@@ -152,8 +152,8 @@ export const RIPOSTE_SHARE = 0.3;   // of their landed blow, sent back at them
 // A SHIELD CEILING. Wards and ripostes are played on THEIR beat and do not cost you a swing, so a loadout of
 // four defensive pieces got a fresh shield almost every enemy turn while still attacking every turn of its
 // own — 86.5% in simulation, the strongest kit in the game by a distance, for the least thought. Soaking is
-// capped as a fraction of your own vigour, so stacking wards has a ceiling and the fifth one is wasted.
-export const SHIELD_CAP = 0.45;     // of your max vigour, total, at any moment
+// capped as a fraction of your own health, so stacking wards has a ceiling and the fifth one is wasted.
+export const SHIELD_CAP = 0.45;     // of your max health, total, at any moment
 
 // ── THE FREE KINDS ── the defensive pair costs you no beat, on EITHER side of the exchange: the effect lands,
 // the cooldown starts, and your turn is still yours to swing with.
@@ -245,7 +245,7 @@ function effectOf(kind, power, element, hits = 1) {
         case "ward":
             return {
                 head: `${Math.round(WARD_SOAK * 100)}%`, sub: "soaked",
-                line: `Soaks ${Math.round(WARD_SOAK * 100)}% of your vigour from the next blow — and you still act`,
+                line: `Soaks ${Math.round(WARD_SOAK * 100)}% of your health from the next blow — and you still act`,
                 tags: [{ t: "Keeps your turn", k: "good" }],
             };
         case "riposte":
@@ -327,34 +327,51 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 }
 
 // ── THE TUNING ───────────────────────────────────────────────────────────────────────────────────────────────
-// Simulated 4,000 bouts a cell to set these. The first cut swung at full Might with no mitigation on the
-// defender's side at all: bouts ended in TWO beats and every level of play won 100% of the time.
+// ── THE ARENA READS YOUR REAL STATS ──────────────────────────────────────────────────────────────────────────
+// It used to invent two: VIGOUR and an arena MIGHT, both derived from `gearPower` — the raw sum of every stat
+// on your kit, so a point of Fortune made you tougher exactly as much as a point of Might did. Then it hid the
+// rest of the fight behind rolls: a +-18% wobble on every swing, and a defender "grade" that secretly rolled
+// 12%, 32% or 55% damage reduction FRESH EVERY BLOW. Two players in identical gear could see 14 and 36 on the
+// same swing at the same opponent and neither number was explainable from anything on screen.
 //
-// SWING scales both sides down so a bout runs about ten beats. PUNCH is the defender's extra bite, because you
-// get abilities and a guard and they get neither.
-// ── 2026-08-10: DOUBLED, because a bout was not running ten beats, it was running forty ──────────────────
-// Worked through at a real loadout (level 28, 270 gear power: might 51, vigour 270) against a Champion-tier
-// opponent with 367 vigour:
-//   your plain attack   hit(51 * 0.30) = 15.5, x1.15 grade, then MINUS their guard (foeGrade averages 40%
-//                       against a geared opponent) = 10.6 a swing. 367 vigour is 35 swings.
-//   their plain swing   hit(51 * 0.30 * 2.12) = 35, x1.09, minus your flat 34% block = 25 a swing. Your 270
-//                       vigour is 11 swings.
-// So they needed eleven turns and you needed thirty-five. That is the whole of "it takes way too long" and
-// "I don't do any damage" in two lines of arithmetic, and no amount of skill nodes fixes a 3x hole.
+// All of it is gone. The arena now reads the SAME stats the boss fight reads, and every number it produces is
+// printed on one of the two cards:
 //
-// SWING doubles, so your swing is worth ~22 and the fight is roughly half as long. PUNCH comes down to keep
-// THEIR swing exactly where it was (0.62 * 1.03 = 0.639, against the old 0.30 * 2.12 = 0.636) — the fix is
-// meant to give the present player their half of the fight back, not to make the absent one hit softer.
-export const SWING = 0.62;
-// PUNCH is the absent defender's extra bite, set when the player's kit was much stronger than it is now:
-// "because you get abilities and a guard and they get neither". After capping the burn, the shield stack and
-// the free defensive plays, 2.3 over-corrected — a MIRROR MATCH measured at 39.4% for the present human,
-// which is the wrong way round. A player who is actually there, choosing, should edge an absent loadout.
-export const PUNCH = 1.03;
+//   damage      SWING_BASE x (1 + Might/100)            <- Might, the real stat, exactly as the boss uses it
+//   crit        min(90%, 25% + Crit Chance/100)         <- the boss fight's own crit model, not a second one
+//   crit damage x(2.5 + Crit Power/100)                 <- likewise
+//   health      HEALTH_BASE + Ferocity x 2.5            <- Ferocity, the real stat
+//   who opens   Ferocity                                <- likewise; you are quick AND you last
+//   armour      a printed number on the card
+//
+// FEROCITY IS THE STAYING-POWER STAT. The first cut of this had health FLAT for everyone, on the grounds that
+// the Den has no vitality stat and inventing one would repeat the health mistake. Simulated, that is a ladder
+// that eats you: an opponent's damage climbs with their tier and your health never climbs at all, so the tier
+// you can beat is decided by how fast you die rather than by anything you built. Ferocity already exists, is
+// already on gear, and does nothing in here but decide who swings first — so it is what keeps you standing.
+// Nothing is invented; a real stat is read for a second real job.
+export const HEALTH_BASE = 200;
+export const HEALTH_PER_FEROCITY = 2.5;
+export const healthFrom = (ferocity = 0) => Math.round(HEALTH_BASE + (Number(ferocity) || 0) * HEALTH_PER_FEROCITY);
+
+// One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
+// to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.
+export const SWING_BASE = 12;
+
+// The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
+// trap on its own — a Fortune kit critted constantly in here and never against the boss.
+export const CRIT_BASE = 0.25;
+export const CRIT_CAP = 0.9;
+export const CRIT_MULT_BASE = 2.5;
+export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / 100 + bonus);
+export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;
+
+/** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
+export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
 
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
-// single bout in 4,000, because vigour scales with gear about five times faster than might does. A first place
+// single bout in 4,000, because health scales with gear about five times faster than might does. A first place
 // nobody can take is not a ladder.
 //
 // The DEADBAND matters as much as the slope. Helping from the first point of difference wiped out moderate gear
@@ -390,7 +407,7 @@ export const GUARD_COOL = 1;        // guarding also shaves a turn off everythin
 // scrap. Using one spends your turn, which is the whole decision — drink, or swing.
 export const BATTLE_ITEMS = [
     { id: "poultice", name: "Field Poultice", count: 2, sprite: "/images/arena/item-poultice.webp",
-        blurb: "Binds a wound. Restores a quarter of your vigour.", kind: "heal", amount: 0.25 },
+        blurb: "Binds a wound. Restores a quarter of your health.", kind: "heal", amount: 0.25 },
     { id: "draught", name: "Quickening Draught", count: 1, sprite: "/images/arena/item-draught.webp",
         blurb: "Every skill you own comes off cooldown at once.", kind: "refresh" },
 ];
@@ -398,7 +415,7 @@ export const BATTLE_ITEMS = [
 // GUARD — no ring, no roll. You give up your swing and take a braced stance: it soaks a slice of the next blow
 // outright and settles you enough to gain Focus. It is the honest answer to a bout going badly, and the reason
 // the command menu is a decision rather than four ways to press attack.
-export const GUARD_SOAK = 0.30;     // of your max vigour, absorbed from what comes next
+export const GUARD_SOAK = 0.30;     // of your max health, absorbed from what comes next
 
 // ── SPEED ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Who opens the bout was hard-coded to the challenger, which made Ferocity — a stat that until now only fed

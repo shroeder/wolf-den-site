@@ -69,16 +69,25 @@ export function npcFor(tier) {
         blurb: band.blurb,
         color: band.color,
         sprite: `/images/arena/npc/${band.key}.webp`,
-        // Vigour and might land in the same range the member curve produces, so a bout against tier N feels
-        // like a bout against a member of comparable power rather than like a different game.
-        vigour: Math.round(70 + power * 1.15),
-        might: Math.round(9 + power * 0.115),
+        // ── FOUR PRINTED NUMBERS ──────────────────────────────────────────────────────────────────────
+        // A tier is harder because these are BIGGER, and all four are on the card you are looking at before
+        // you press challenge. It used to be harder partly because of a hidden per-blow roll that gave the
+        // absent side 12%, 32% or 55% damage reduction; that is gone, and the mitigation it was doing is a
+        // stated armour figure instead.
+        //
+        // Health climbs slowly and armour climbs slower still (capped at 45%, so no tier is ever a wall you
+        // cannot dent) — the ladder's teeth are mostly in DAMAGE, because a fight you lose should feel like
+        // you were out-hit rather than like you were hitting a rock.
+        health: Math.round(power * 2),
+        damage: Math.round((8 + power * 0.07) * 10) / 10,
+        armour: Math.min(0.45, Math.round((0.05 + t * 0.007) * 100) / 100),
+        critChance: Math.min(0.5, Math.round((0.15 + t * 0.004) * 100) / 100),
+        critMult: 2,
         gearPower: power,
         // Element cycles so consecutive tiers are not all answerable with one affinity — the wheel stays a
         // reason to re-attune rather than something you solve once.
         element: ["fire", "water", "earth", "storm", "light", "shadow"][t % 6],
         speed: Math.round(10 + power * 0.09),
-        fortune: Math.round(power * 0.12),
     };
 }
 
@@ -107,7 +116,7 @@ export function npcAbilities(tier) {
     const depth = Math.min(NPC_KIT.length, 1 + Math.floor(t / 9));
     const pick = (offset) => NPC_KIT[(t * 3 + offset) % depth];
     const chosen = depth === 1 ? [NPC_KIT[0]] : [pick(0), pick(1)].filter((v, i, a) => a.indexOf(v) === i);
-    // Tier scales what the moves are worth, gently — the big lever is already their might and vigour.
+    // Tier scales what the moves are worth, gently — the big lever is already their damage and health.
     const scale = 1 + Math.min(0.6, t * 0.006);
     return chosen.map((k, i) => ({
         id: `npc${t}:${k.kind}:${i}`,

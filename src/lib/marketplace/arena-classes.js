@@ -135,20 +135,20 @@ export const TREES = {
         N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.1, needs: 12,
             desc: "+10% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
         N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.25, needs: 12,
-            desc: "+25% damage while under a third of your vigour.", sprite: "/images/arena/node/rv_cap.webp" }),
+            desc: "+25% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
     ],
 
     // ── WARDEN ── mitigation, counters, sustain.
     warden: [
-        N({ id: "wd_vigour", tier: 0, name: "Conditioning", ranks: 5, stat: "vigour", per: 12,
-            desc: "+12 max Vigour per rank.", sprite: "/images/arena/node/wd_vigour.webp" }),
+        N({ id: "wd_vigour", tier: 0, name: "Conditioning", ranks: 5, stat: "health", per: 12,
+            desc: "+12 max Health per rank.", sprite: "/images/arena/node/wd_vigour.webp" }),
         N({ id: "wd_block", tier: 0, name: "Footwork", ranks: 5, stat: "block", per: 0.02,
             desc: "Turn aside 2% more per rank.", sprite: "/images/arena/node/wd_block.webp" }),
         N({ id: "wd_ward", tier: 0, kind: "active", ability: "ward", name: "Bulwark", cd: 4,
             desc: "Brace against the next blow — on either beat, and it never costs you a swing.", sprite: "/images/arena/node/wd_ward.webp" }),
 
         N({ id: "wd_soak", tier: 1, name: "Deep Guard", ranks: 4, stat: "wardSoak", per: 0.02, needs: 3,
-            desc: "Wards soak 2% more of your vigour per rank.", sprite: "/images/arena/node/wd_soak.webp" }),
+            desc: "Wards soak 2% more of your health per rank.", sprite: "/images/arena/node/wd_soak.webp" }),
         N({ id: "wd_riposte", tier: 1, kind: "active", ability: "riposte", name: "Answer", cd: 5, needs: 3,
             desc: "Their next blow comes back at them — and you still act.", sprite: "/images/arena/node/wd_riposte.webp" }),
         N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.05, needs: 3,
@@ -157,14 +157,14 @@ export const TREES = {
         N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.9, cd: 3, needs: 7,
             desc: "You keep half of what it takes off them.", sprite: "/images/arena/node/wd_drain.webp" }),
         N({ id: "wd_regen", tier: 2, name: "Second Wind", ranks: 4, stat: "regen", per: 0.015, needs: 7,
-            desc: "Recover 1.5% of your vigour each round, per rank.", sprite: "/images/arena/node/wd_regen.webp" }),
+            desc: "Recover 1.5% of your health each round, per rank.", sprite: "/images/arena/node/wd_regen.webp" }),
         N({ id: "wd_shieldcap", tier: 2, name: "Unyielding", ranks: 3, stat: "shieldCap", per: 0.06, needs: 7,
             desc: "+6% to the ceiling on stacked wards, per rank.", sprite: "/images/arena/node/wd_shieldcap.webp" }),
 
         N({ id: "wd_reprisal", tier: 3, name: "Reprisal", ranks: 3, stat: "riposteShare", per: 0.08, needs: 12,
             desc: "Ripostes send back 8% more per rank.", sprite: "/images/arena/node/wd_reprisal.webp" }),
         N({ id: "wd_stand", tier: 3, name: "Last Stand", ranks: 1, stat: "lastStand", per: 1, needs: 12,
-            desc: "Once a bout, survive a blow that would end you on 1 vigour.", sprite: "/images/arena/node/wd_stand.webp" }),
+            desc: "Once a bout, survive a blow that would end you on 1 health.", sprite: "/images/arena/node/wd_stand.webp" }),
         N({ id: "wd_fort", tier: 3, name: "Fortress", ranks: 3, stat: "guardSoak", per: 0.05, needs: 12,
             desc: "Guard braces 5% more per rank.", sprite: "/images/arena/node/wd_fort.webp" }),
     ],
@@ -196,8 +196,11 @@ export const TREES = {
             desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
         N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
             desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),
-        N({ id: "rc_fortune", tier: 3, name: "Runes of Fortune", ranks: 3, stat: "fortune", per: 8, needs: 12,
-            desc: "+8 Fortune per rank — the arena's critical stat.", sprite: "/images/arena/node/rc_fortune.webp" }),
+        // Was "+8 Fortune per rank — the arena's critical stat", which stopped being true the moment the ring
+        // started reading the boss fight's crit model. Fortune is the raffle stat and nothing else; this node
+        // now buys the stat whose name says what it does.
+        N({ id: "rc_fortune", tier: 3, name: "Runes of Fortune", ranks: 3, stat: "critStat", per: 5, needs: 12,
+            desc: "+5% critical chance per rank.", sprite: "/images/arena/node/rc_fortune.webp" }),
     ],
 };
 

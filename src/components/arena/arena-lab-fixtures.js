@@ -62,7 +62,7 @@ export const MY_ABILITIES = [
         id: "warden_plate:packTactics", itemId: "warden_plate",
         sprite: "/images/arena/skill-packTactics.webp",
         name: "Pack Wall", from: "Warden Plate", kind: "ward", cooldown: 3, power: 1, hits: 1,
-        effect: { head: "18%", sub: "soaked", line: "Soaks 18% of your vigour from the next blow",
+        effect: { head: "18%", sub: "soaked", line: "Soaks 18% of your health from the next blow",
             tags: [{ t: "On their turn", k: "good" }] },
         defensive: true, blurb: "Braces you against the next blow.", element: "earth", rarity: "epic", rank: 2,
     },
@@ -128,7 +128,7 @@ export const FOE = {
 };
 
 export const ME = {
-    level: 31, gearPower: 141, vigour: 206, might: 24,
+    level: 31, gearPower: 141, health: 206, might: 24,
     sprite: YOU_SPRITE, name: "You", position: 12,
     element: "fire", abilities: MY_ABILITIES,
 };
@@ -184,7 +184,7 @@ const RECAP_RANKUP = {
     vpGain: 168, vpFrom: 1040, vpTo: 1208, rankTo: 6,
     npcTier: 14, npcUnlocked: true,
     feats: [
-        { id: "comeback", name: "Comeback", laurels: 70, vp: 15, color: "#ff9f1c", blurb: "Won from under a fifth of your vigour." },
+        { id: "comeback", name: "Comeback", laurels: 70, vp: 15, color: "#ff9f1c", blurb: "Won from under a fifth of your health." },
         { id: "giantkiller", name: "Giant-Killer", laurels: 65, vp: 15, color: "#b061ff", blurb: "Beat a loadout a quarter stronger than yours." },
         { id: "devastating", name: "Devastating", laurels: 35, vp: 5, color: "#ffd75e", blurb: "Landed three or more critical hits." },
     ],
@@ -201,10 +201,10 @@ const RECAP_LOSS = {
 const MY_POWER = 340;
 
 const TARGETS = [
-    { id: "foe-1", rank: 11, vp: 980, power: 300, name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34, wins: 22, losses: 9, vigour: 241, might: 27 },
-    { id: "foe-2", rank: 9, vp: 1240, power: 372, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, wins: 31, losses: 14, vigour: 258, might: 29 },
-    { id: "foe-3", rank: 6, vp: 1810, power: 448, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, wins: 44, losses: 12, vigour: 279, might: 32 },
-    { id: "foe-4", rank: 4, vp: 2260, power: 520, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, wins: 51, losses: 18, vigour: 296, might: 34 },
+    { id: "foe-1", rank: 11, vp: 980, power: 300, name: "Roan Vasquez", sprite: FOE_SPRITE, level: 34, wins: 22, losses: 9, health: 241, might: 27 },
+    { id: "foe-2", rank: 9, vp: 1240, power: 372, name: "Petra Nkemdirim", sprite: YOU_SPRITE, level: 36, wins: 31, losses: 14, health: 258, might: 29 },
+    { id: "foe-3", rank: 6, vp: 1810, power: 448, name: "Silas Ward", sprite: FOE_SPRITE, level: 39, wins: 44, losses: 12, health: 279, might: 32 },
+    { id: "foe-4", rank: 4, vp: 2260, power: 520, name: "Junie Halloway", sprite: YOU_SPRITE, level: 41, wins: 51, losses: 18, health: 296, might: 34 },
 ].map((t) => ({ ...t, reward: { vp: vpPreview(MY_POWER, t.power), laurels: boutLaurels({ won: true, myPower: MY_POWER, theirPower: t.power }) } }));
 
 const BOARD = [

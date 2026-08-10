@@ -56,7 +56,7 @@ export function boutLaurels({ won, myPower = 1, theirPower = 1 }) {
 export const FEATS = [
     {
         id: "flawless", name: "Flawless", laurels: 55, vp: 10, color: "#fff0a8",
-        blurb: "Won without dropping below nine tenths of your vigour.",
+        blurb: "Won without dropping below nine tenths of your health.",
         test: (b) => b.won && b.hp / Math.max(1, b.maxHp) >= 0.9,
     },
     {
@@ -66,7 +66,7 @@ export const FEATS = [
     },
     {
         id: "comeback", name: "Comeback", laurels: 70, vp: 15, color: "#ff9f1c",
-        blurb: "Won from under a fifth of your vigour.",
+        blurb: "Won from under a fifth of your health.",
         test: (b) => b.won && (b.lowHp ?? b.hp) / Math.max(1, b.maxHp) <= 0.2,
     },
     {
@@ -87,7 +87,7 @@ export const FEATS = [
     },
     {
         id: "bulwark", name: "Bulwark", laurels: 40, vp: 8, color: "#6fd0ff",
-        blurb: "Turned aside half your own vigour over the bout.",
+        blurb: "Turned aside half your own health over the bout.",
         test: (b) => {
             const stopped = (b.log || []).reduce((n, l) => n + (l.blocked || 0) + (l.soaked || 0), 0);
             return b.won && stopped >= Math.max(1, b.maxHp) * 0.5;

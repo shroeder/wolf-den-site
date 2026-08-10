@@ -73,7 +73,7 @@ function makeServer(initial) {
                 if (it.kind === "heal") {
                     const healed = Math.min(b.maxHp - b.hp, Math.round(b.maxHp * it.amount));
                     b.hp += healed;
-                    text = healed > 0 ? `${it.name} — ${healed} vigour back.` : `${it.name} — already whole.`;
+                    text = healed > 0 ? `${it.name} — ${healed} health back.` : `${it.name} — already whole.`;
                     heal = healed;
                 } else { b.cd = {}; text = `${it.name} — every skill is ready.`; }
                 b.log.push({ beat: b.beat, who: "you", grade: "item", damage: 0, healed: heal, text, item: it.id });
@@ -160,17 +160,17 @@ function makeServer(initial) {
                 foe = {
                     ...base, id: n.id, name: n.name, sprite: n.sprite, level: null, npc: true, tier,
                     element: n.element, abilities: npcAbilities(tier), might: n.might, gearPower: n.gearPower,
-                    speed: n.speed, fortune: n.fortune, vigour: n.vigour,
+                    speed: n.speed, fortune: n.fortune, health: n.health,
                 };
                 theirPower = n.gearPower;
             } else {
                 const t = st.targets.find((x) => x.id === body.target) || st.targets[0];
-                foe = { ...base, id: t.id, name: t.name, sprite: t.sprite, level: t.level, vigour: t.vigour };
+                foe = { ...base, id: t.id, name: t.name, sprite: t.sprite, level: t.level, health: t.health };
                 theirPower = t.power;
             }
             st.bout = makeBout({
-                beat: 1, turn: "you", hp: st.me.vigour, maxHp: st.me.vigour,
-                foeHp: foe.vigour, foeMaxHp: foe.vigour,
+                beat: 1, turn: "you", hp: st.me.health, maxHp: st.me.health,
+                foeHp: foe.health, foeMaxHp: foe.health,
                 cd: {}, log: [], shield: 0, surge: 0, bleed: null, sunder: 0, riposte: 0,
                 items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
                 foe,

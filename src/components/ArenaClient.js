@@ -128,7 +128,7 @@ function SkillFace({ ab, left = 0 }) {
 }
 
 // ── THE BAR ──────────────────────────────────────────────────────────────────────────────────────────────────
-// A fighter's name, affinity and vigour, in a band that NEVER moves. This used to be stacked on top of the
+// A fighter's name, affinity and health, in a band that NEVER moves. This used to be stacked on top of the
 // hero inside the stage — which meant the camera push-in during a cast scaled and slid it too, so on every
 // single skill the two name plates drifted across each other and printed one name on top of the other. A HUD
 // that reads the state of the fight cannot be part of the shot.
@@ -172,7 +172,7 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
             <span className="ar-hp">
                 <u className="ar-hp-ghost" style={{ width: `${Math.max(ghost, frac) * 100}%` }} />
                 <i style={{ width: `${frac * 100}%` }} />
-                {/* A ward sits ON the bar as the slab of blue it will eat before your vigour does. It was a
+                {/* A ward sits ON the bar as the slab of blue it will eat before your health does. It was a
                     chip of text elsewhere on screen, which is not where you are looking when a blow lands. */}
                 {shieldPct > 0 ? <s className="ar-hp-shield" style={{ left: `${frac * 100}%`, width: `${shieldPct}%` }} /> : null}
             </span>
@@ -180,6 +180,18 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 {Math.max(0, hp)}<span>/{maxHp}</span>
                 {shield > 0 ? <u>+{shield}</u> : null}
             </em>
+            {/* ── EVERY NUMBER THAT DECIDES THE FIGHT ──────────────────────────────────────────────────────
+                The ring used to roll the defender's mitigation per blow, at 12%, 32% or 55%, and print
+                nothing — so the same kit into the same opponent read 14 on one swing and 36 on the next and
+                there was no way to learn why. Nothing is hidden now, so nothing needs to be: this is the
+                whole calculation, on both cards, before you press anything. DMG x CRIT, minus their ARMOUR. */}
+            <span className="ar-stats">
+                <i title="Damage on a plain swing"><b>{Math.round(f?.damage || 0)}</b> dmg</i>
+                <i title="Chance to crit, and what a crit multiplies by">
+                    <b>{Math.round((f?.critChance || 0) * 100)}%</b> crit &times;{(f?.critMult || 2.5).toFixed(1)}
+                </i>
+                {f?.armour > 0 ? <i title="Damage this fighter turns aside"><b>{Math.round(f.armour * 100)}%</b> armour</i> : null}
+            </span>
         </div>
     );
 }
@@ -326,7 +338,7 @@ function Recap({ bout, busy, onClose }) {
                     {tally.best.n > 0 ? <span><i>Biggest blow</i><b>{tally.best.name} · {money(tally.best.n)}</b></span> : null}
                     {tally.blocked > 0 ? <span><i>Turned aside</i><b>{money(tally.blocked)}</b></span> : null}
                     {tally.crits > 0 ? <span><i>Criticals</i><b>{tally.crits}</b></span> : null}
-                    {tally.healed > 0 ? <span><i>Vigour recovered</i><b>{money(tally.healed)}</b></span> : null}
+                    {tally.healed > 0 ? <span><i>Health recovered</i><b>{money(tally.healed)}</b></span> : null}
                 </div>
 
                 <div className="ar-recap-rows">
@@ -480,7 +492,7 @@ export default function ArenaClient({ initial }) {
     // and the sprites simply get the space that is left after the bars and the deck have taken theirs.
 
 
-    // ── THE MUSIC ── it runs for exactly as long as a bout does, and its INTENSITY is your vigour. Losing is
+    // ── THE MUSIC ── it runs for exactly as long as a bout does, and its INTENSITY is your health. Losing is
     // audible before it is legible: the hats come in, then the tremolo strings, while you are still reading
     // the bar. Stopping on unmount matters as much as starting — a battle theme that follows you back to the
     // ladder is the single most irritating bug a game can ship.
@@ -491,7 +503,7 @@ export default function ArenaClient({ initial }) {
     }, [Boolean(bout), bout?.over]);
     useEffect(() => {
         if (!bout || !bout.maxHp) return;
-        // Full vigour is a calm 0.3; on your last legs it is 1.
+        // Full health is a calm 0.3; on your last legs it is 1.
         setIntensity(0.3 + (1 - Math.max(0, Math.min(1, bout.hp / bout.maxHp))) * 0.7);
     }, [bout?.hp, bout?.maxHp, bout]);
 
@@ -691,7 +703,7 @@ export default function ArenaClient({ initial }) {
     // ── THE BOUT ──
     // Turn-based, and it looks it. A beat begins with a DECISION off a command deck — attack, skill, guard,
     // item — and only the commands that need execution raise the ring. Everything the fight needs now lives
-    // inside the panel: both fighters, both vigour bars, cooldowns, the last beat and the deck itself. It used to
+    // inside the panel: both fighters, both health bars, cooldowns, the last beat and the deck itself. It used to
     // be a picture on top with the controls stacked underneath it like a form, which is why it read as a page
     // rather than a fight.
     if (bout && !stepped) {
@@ -839,7 +851,7 @@ export default function ArenaClient({ initial }) {
 
                     {/* ── THE BARS ── outside the stage, so the camera never touches them. */}
                     <div className="ar-bars">
-                        <FighterBar f={st.me} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
+                        <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
                             active={yourTurn} shield={bout.shield || 0} />
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
@@ -872,7 +884,7 @@ export default function ArenaClient({ initial }) {
                                     <img className="ar-incoming-art" src={bout.incoming.sprite} alt="" draggable="false" />
                                 ) : null}
                                 {/* One line, not three, and the MOVE rather than the mover: their name is on
-                                    the vigour bar six pixels above this and on the cast card when they cast,
+                                    the health bar six pixels above this and on the cast card when they cast,
                                     while "Tidecall" is the part you are deciding against. Fitting both meant
                                     ellipsising the half that matters. */}
                                 <span className="ar-incoming-body">
@@ -1312,7 +1324,7 @@ export default function ArenaClient({ initial }) {
             ) : null}
 
             {/* ── ONE BUTTON ── it was two stacked lists of eighty rows behind a switch, and picking off them
-                is not a decision anybody has the information to make: a name, a level and a vigour number do
+                is not a decision anybody has the information to make: a name, a level and a health number do
                 not tell you whether you can take somebody. The sea answers this with one button and so does
                 this now — the server matches you against someone your own size, member or Gauntlet, aimed a
                 shade in your favour. The Gauntlet's tiers are still there to be climbed; you just meet them
@@ -1780,7 +1792,7 @@ function Styles() {
             .ar-hp > i { display: block; height: 100%; background: linear-gradient(90deg, #4ad07f, #7ce8a4);
                 transition: width .35s cubic-bezier(.2,.8,.3,1); }
             .ar-bar.is-foe .ar-hp > i { background: linear-gradient(90deg, #ff6f7d, #ffb0b8); }
-            /* The ward, sitting on the bar as the slab it will eat before your vigour does. */
+            /* The ward, sitting on the bar as the slab it will eat before your health does. */
             .ar-hp-shield { position: absolute; top: 0; bottom: 0; z-index: 3; text-decoration: none;
                 background: repeating-linear-gradient(115deg, rgba(111,208,255,.95) 0 4px, rgba(111,208,255,.6) 4px 8px);
                 transition: left .35s ease, width .35s ease; }
@@ -1790,9 +1802,14 @@ function Styles() {
                 animation: arDanger .7s ease-in-out infinite alternate; }
             @keyframes arDanger { from { filter: brightness(1) } to { filter: brightness(1.55) } }
             .ar-bar.is-danger .ar-hp { box-shadow: inset 0 1px 3px rgba(0,0,0,.7), 0 0 14px -2px rgba(255,60,80,.9); }
-            /* A heal flashes the bar so it reads as vigour coming back rather than a number being different. */
+            /* A heal flashes the bar so it reads as health coming back rather than a number being different. */
             .ar-bar.is-healing .ar-hp > i { animation: arHealFlash .6s ease-out; }
             @keyframes arHealFlash { 0% { filter: brightness(2.4) saturate(.4) } 100% { filter: none } }
+            .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
+                font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
+            .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
+            .ar-stats i { font-style: normal; white-space: nowrap; }
+            .ar-stats b { color: #ffe9c2; font-weight: 900; }
             .ar-hpnum { display: block; font-size: 10px; font-style: normal; color: #e8dcc8;
                 text-shadow: 0 1px 4px #000; font-variant-numeric: tabular-nums; font-weight: 800; }
             .ar-hpnum span { opacity: .55; font-weight: 600; }
@@ -2024,7 +2041,7 @@ function Styles() {
             .ar-target-body { min-width: 0; }
             .ar-target-body b { display: block; font-size: 13px; color: #e9eef3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             /* Was clipped to a single nowrap line, which on a 375px phone ate the win-loss record entirely —
-               "Lv 34 · 241 vigour · 4…". It wraps now; two short lines beat one truncated one. */
+               "Lv 34 · 241 health · 4…". It wraps now; two short lines beat one truncated one. */
             .ar-target-body em { display: block; font-style: normal; font-size: 10.5px; line-height: 1.35;
                 color: #8a939d; }
             .ar-target-go { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -2207,7 +2224,7 @@ function Styles() {
                the two people fighting are. It announced their move by covering the man about to make it and
                the man about to take it, at exactly the moment you are trying to read both. It hangs over the
                arena wall now: same card, same timing, in the empty band the painting already gives us. */
-            /* A STRIP IN THE ONLY CLEAR BAND. Measured on a 375px phone: the vigour bars end at y159 and the
+            /* A STRIP IN THE ONLY CLEAR BAND. Measured on a 375px phone: the health bars end at y159 and the
                sand starts below them, and the fighters' ART begins about 120px lower still — the top of the
                floor is empty arena wall, because a sprite is bottom-aligned inside a full-height box. That
                band is the only part of this screen that is neither a fighter nor a number, so the warning
@@ -2517,7 +2534,12 @@ function Styles() {
                 .ar-bars { padding: 1px 8px 0; gap: 6px; }
                 .ar-fname { font-size: 10px; }
                 .ar-hp { height: 8px; margin: 2px 0 1px; }
-                .ar-hpnum { font-size: 8.5px; }
+                .ar-stats { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 2px; font-style: normal;
+                font-size: 8.5px; font-weight: 800; letter-spacing: .02em; color: rgba(255,224,176,.72); }
+            .ar-bar.is-foe .ar-stats { justify-content: flex-end; }
+            .ar-stats i { font-style: normal; white-space: nowrap; }
+            .ar-stats b { color: #ffe9c2; font-weight: 900; }
+            .ar-hpnum { font-size: 8.5px; }
                 .ar-turnmark { font-size: 7.5px; padding: 2px 6px; }
                 .ar-focus { padding: 1px 8px 0; gap: 5px; }
                 .ar-cdchip { width: 26px; height: 26px; }

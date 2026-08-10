@@ -145,7 +145,7 @@ const ELEMENT_VOICE = {
 };
 
 // ── THE SOUNDS ───────────────────────────────────────────────────────────────────────────────────────────────
-// `weight` is 0..1 — how much of the target's vigour the blow took. It scales pitch, length and body, so a
+// `weight` is 0..1 — how much of the target's health the blow took. It scales pitch, length and body, so a
 // glancing hit and a fight-ending one are audibly different without a second asset.
 export const Sfx = {
     ui() { tone({ freq: 660, type: "triangle", dur: 0.05, gain: 0.06 }); },
@@ -291,7 +291,7 @@ export const Sfx = {
         noise({ at, dur: 0.2, gain: 0.12, type: "lowpass", freq: 600 });
     },
 
-    /** Vigour coming back. */
+    /** Health coming back. */
     heal(at = 0) {
         [523, 659, 784, 1046].forEach((f, i) => {
             tone({ at: at + i * 0.06, freq: f, type: "sine", dur: 0.3, gain: 0.1 });

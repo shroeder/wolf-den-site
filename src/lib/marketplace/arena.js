@@ -6,7 +6,8 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
-    buildKit, elementClash, SWING, PUNCH, underdogEdge, BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
+    buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge,
+    BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -42,11 +43,31 @@ export const FIGHTS_PER_DAY = 10;
 
 // Same shape as a delve: what you bring is your level and what you are wearing. Reusing the curve deliberately
 // — a member who knows roughly how tough they are underground should not have to learn a second scale here.
-export const arenaVigour = (level = 1, gearPower = 0) => Math.round(60 + level * 2.2 + gearPower * 0.55);
-export const arenaMight = (level = 1, gearPower = 0) => Math.round(9 + level * 0.45 + gearPower * 0.11);
-const powerOf = (level, gearPower) => arenaVigour(level, gearPower) + arenaMight(level, gearPower) * 4;
+// Health comes off Ferocity — see healthFrom in arena-kit.js for why that stat and not a new one.
+export const arenaHealth = (ferocity = 0) => healthFrom(ferocity);
 
-const randInt = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
+/**
+ * A member's ring card, straight off their real equipped stats. ONE function, so the ladder, the target list,
+ * the matchmaker and the fight itself can never disagree about what a loadout is worth — they each used to
+ * recompute it from `gearPower` at four separate call sites.
+ */
+export function ringStats(stats = {}) {
+    return {
+        health: healthFrom(Number(stats.ferocity) || 0),
+        damage: swingFrom(Number(stats.might) || 0),
+        critChance: critChanceFrom(Number(stats.crit_chance) || 0),
+        critMult: critMultFrom(Number(stats.crit_power) || 0),
+        armour: 0,
+        might: Number(stats.might) || 0,
+    };
+}
+
+// A kit's RATING, used for matchmaking and for the ladder. Damage a round times how many rounds you last, which
+// is the only honest one-number summary of a fight — and it is computable by the player from the two cards.
+export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, armour = 0, health = 200 }) {
+    const perSwing = damage * (1 + critChance * (critMult - 1));
+    return Math.round(perSwing * (health / Math.max(0.1, 1 - armour)) / 10);
+}
 
 // ── RANKS ────────────────────────────────────────────────────────────────────────────────────────────────────
 // A rung number is a fact; a RANK is something you tell people. "I'm 34 of 83" says nothing at a glance, and
@@ -119,15 +140,10 @@ function pickIncoming(b) {
     };
 }
 
-// A defender is not present, so their timing is their GEAR: better loadouts brace and land more reliably. It
-// is deliberately capped below a good human — being outplayed by an absent opponent would feel like a cheat.
-const foeGrade = (gearPower) => {
-    const t = Math.max(0, Math.min(1, gearPower / 320));
-    const r = Math.random();
-    if (r < 0.15 + t * 0.35) return { atk: 1.3, def: 0.55 };
-    if (r < 0.55 + t * 0.3) return { atk: 1.0, def: 0.32 };
-    return { atk: 0.6, def: 0.12 };
-};
+// THE DEFENDER'S GRADE IS GONE. It used to roll, per blow, one of { atk 1.3 def 0.55 }, { 1.0, 0.32 } or
+// { 0.6, 0.12 } — a hidden coin flip that was the single biggest term in the whole calculation, so the same
+// kit against the same opponent read 14 on one swing and 36 on the next with nothing on screen to explain it.
+// An opponent is harder now because their ARMOUR NUMBER IS BIGGER, and that number is printed on their card.
 
 // ── THE LADDER ───────────────────────────────────────────────────────────────────────────────────────────────
 // Computed LIVE from everyone's power rather than frozen, so it re-sorts as the pack gears up. One query for
@@ -151,9 +167,8 @@ async function ladderFor(buyerId) {
                 sprite: r.avatar_sprite_url || null,
                 flip: Boolean(r.avatar_sprite_flip),
                 level, gearPower,
-                vigour: arenaVigour(level, gearPower),
-                might: arenaMight(level, gearPower),
-                power: powerOf(level, gearPower),
+                ...ringStats(s),
+                power: arenaRating(ringStats(s)),
             };
         })
         .sort((a, b) => a.power - b.power);
@@ -177,7 +192,7 @@ export async function arenaPower(buyerId) {
     const stats = await getEquippedStats(buyerId).catch(() => ({}));
     const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
     return {
-        level, gearPower, vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
+        level, gearPower, ...ringStats(stats), power: arenaRating(ringStats(stats)),
         sprite: me?.avatar_sprite_url || null,
         name: me?.display_name || me?.alias || "You",
     };
@@ -243,19 +258,19 @@ async function kitFor(buyerId) {
         classId, taken, perks,
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
         speed: speedOf(level, Number(stats.ferocity) || 0) + (perks.speed || 0),
-        // Fortune already means "luck" everywhere else in the Den; in here it is what moves your crit chance,
-        // so the dial sits on the gear you built rather than on anything you do in the moment.
-        fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
-        // CRIT OFF THE GEAR. The ring read Fortune and nothing else, so the two stats that exist specifically
-        // to make you crit — the ones the boss fight has always used — did nothing here. A kit built to crit
-        // critted at the floor. Named critStat/critPower rather than crit/critMult because the skill tree
-        // already owns those two words on the perks map, and the collision would be silent.
-        critStat: Number(stats.crit_chance) || 0,
-        critPower: Number(stats.crit_power) || 0,
-        // The tree and the upgrade tracks both land here, so the engine reads one set of numbers and does not
-        // care which system paid for them.
-        vigour: arenaVigour(level, gearPower) + Math.round(perks.vigour || 0),
-        might: arenaMight(level, gearPower) + (perks.might || 0),
+        // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
+        // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
+        // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
+        // land in `perks` and are added on top, so the engine reads one set of numbers and does not care
+        // which system paid for them.
+        health: healthFrom((Number(stats.ferocity) || 0) + (perks.ferocity || 0)) + Math.round(perks.health || 0),
+        damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0)),
+        critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
+        critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
+        // Your armour is what you CHOOSE, not what you accumulated: a guard you play, not a stat you carry.
+        // The Den has no defence stat, so inventing one here would be the same mistake as health was.
+        armour: Math.min(0.6, perks.armour || 0),
+        might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         element: kit.element, abilities,
     };
 }
@@ -281,7 +296,7 @@ async function arenaRow(buyerId) {
     if (row && row.position == null) {
         const me = await arenaPower(buyerId);
         const ladder = await ladderFor(buyerId);
-        const stronger = ladder.filter((o) => o.power > me.vigour + me.might * 4).length;
+        const stronger = ladder.filter((o) => o.power > arenaRating(me)).length;
         const slot = stronger + 1;
         await db.query(`UPDATE mkt_arena SET position = position + 1 WHERE position >= $1`, [slot]).catch(() => {});
         await db.query(`UPDATE mkt_arena SET position = $2, best_position = $2 WHERE buyer_id = $1`, [buyerId, slot]).catch(() => {});
@@ -320,8 +335,8 @@ async function standings() {
             name: r.display_name || r.alias || "A member",
             sprite: r.avatar_sprite_url || null,
             level, gearPower, wins: r.wins, losses: r.losses,
-            power: powerOf(level, gearPower),
-            vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
+            ...ringStats(stats.get(r.buyer_id) || {}),
+            power: arenaRating(ringStats(stats.get(r.buyer_id) || {})),
         };
     });
 }
@@ -342,7 +357,7 @@ export async function getArenaState(buyerId) {
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
     const pos = Number(row?.position) || board.length;
-    const bout = row?.bout_json || null;
+    const bout = staleBout(row?.bout_json) ? null : (row?.bout_json || null);
 
     // ── HEAL A STALE BOUT ON READ ────────────────────────────────────────────────────────────────────────
     // A bout freezes its abilities into bout_json at the start, so a fight already running when the kit
@@ -378,7 +393,7 @@ export async function getArenaState(buyerId) {
     // old rule produced the dead end at the top of the ladder ("Nobody above you within reach. You are at the
     // top of the Den.") and it existed only because winning SWAPPED positions, which made fighting downward
     // self-harming. Points are accrued now, so a fight can never cost you rank and any opponent is fair game.
-    const myPower = powerOf(me.level, me.gearPower);
+    const myPower = me.power;
     const targets = board
         .filter((o) => o.id !== buyerId)
         .map((o) => ({ ...o, reward: { vp: vpPreview(myPower, o.power), laurels: boutLaurels({ won: true, myPower, theirPower: o.power }) } }))
@@ -516,6 +531,14 @@ export async function seenArena(buyerId) {
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
+// ── A BOUT FROM THE OLD RULES ────────────────────────────────────────────────────────────────────────────────
+// A bout freezes both fighters into bout_json when it opens. One saved before the ring stopped inventing
+// vigour and started reading real stats has `might` and no `damage` — and every multiplication in resolveBeat
+// would come out NaN, which is a health bar that never moves and a fight that can never end. There is no
+// honest way to convert it (the old numbers were derived from a stat sum that no longer means anything), so
+// it is retired rather than migrated: the challenge is not spent, and a new fight is one tap away.
+const staleBout = (b) => Boolean(b) && !b.over && (b.me?.damage == null || b.foe?.damage == null);
+
 // The client never sees the opponent's next pick — only what has already happened.
 function publicBout(b) {
     return {
@@ -537,7 +560,7 @@ function publicBout(b) {
 // ── FINDING A FIGHT ──────────────────────────────────────────────────────────────────────────────────────────
 // One button, the way the sea does it. The list was two stacked lists of eighty rows asking you to compare
 // strangers before you had fought once — and the comparison is not a decision anybody has the information to
-// make, because a name and a vigour number do not tell you whether you can take them.
+// make, because a name and a health number do not tell you whether you can take them.
 //
 // "Someone your own size" is a POWER ratio, aimed a shade in your favour: this is a fight against the Den, not
 // a ladder rung you have to earn. Members and Gauntlet tiers go in the same hat; a real member is weighted up,
@@ -559,7 +582,7 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     for (let t = 1; t <= maxTier; t += 1) {
         const n = npcFor(t);
         if (!n) break;
-        all.push({ kind: "npc", tier: t, boost: 1, d: dist((n.vigour || 0) + (n.might || 0) * 4) });
+        all.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(n)) });
     }
     if (!all.length) return null;
     all.sort((a, z) => a.d - z.d);
@@ -571,7 +594,9 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
 export async function startBout(buyerId, targetId = null) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
-    if (row?.bout_json && !row.bout_json.over) return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
+    if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
+        return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
+    }
     // STAMINA was bought and then ignored HERE: getArenaState added the track to the allowance it displays,
     // and this gate compared against the bare constant — so the counter said you had another challenge and
     // the server refused it. One expression, in both places.
@@ -579,7 +604,7 @@ export async function startBout(buyerId, targetId = null) {
 
     const board = await standings();
     const me = await kitFor(buyerId);
-    const myPower = powerOf(me.level, me.gearPower);
+    const myPower = arenaRating(me);
 
     // ── WHO ARE WE FIGHTING ──────────────────────────────────────────────────────────────────────────────
     // A member, or a tier out of the Gauntlet. Both resolve to the same shape so the engine below needs no
@@ -607,7 +632,7 @@ export async function startBout(buyerId, targetId = null) {
         // An NPC's kit is drawn from the same archetype catalog members use, so it fights with real named
         // moves rather than a bare swing — scaled by tier, and seeded off the tier so a given tier always
         // brings the same two moves and can be planned against.
-        foeKit = { ...n, abilities: npcAbilities(npcTier), vigour: n.vigour };
+        foeKit = { ...n, abilities: npcAbilities(npcTier) };
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
@@ -622,23 +647,28 @@ export async function startBout(buyerId, targetId = null) {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
             npc: Boolean(npcTier), tier: npcTier || null,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            speed: foeKit.speed, fortune: foeKit.fortune, critStat: foeKit.critStat, critPower: foeKit.critPower,
+            speed: foeKit.speed,
+            // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
+            // disagree — the card reads the same fields resolveBeat multiplies.
+            health: foeKit.health, damage: foeKit.damage,
+            critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
         },
         // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
         // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
         // "anything >= 0" and it fired on EVERY win — including beating a Straw Dummy.
         // `perks` RIDES ALONG NOW, and that is the whole fix for a shield build that did nothing. The tree's
-        // stat nodes were merged into vigour/might/speed/fortune at kit time and then thrown away, so the
+        // stat nodes were merged into health/might/speed/fortune at kit time and then thrown away, so the
         // fifteen that are not one of those four — thorns, regen, block, guardSoak, riposteShare, lastStand,
         // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
         // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
-            fortune: me.fortune, critStat: me.critStat, critPower: me.critPower,
+            health: me.health, damage: me.damage,
+            critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
-        hp: me.vigour, maxHp: me.vigour,
-        foeHp: foeKit.vigour, foeMaxHp: foeKit.vigour,
+        hp: me.health, maxHp: me.health,
+        foeHp: foeKit.health, foeMaxHp: foeKit.health,
         cd: {},                                  // abilityId -> turns before it can be used again
         items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
         // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
@@ -688,6 +718,10 @@ export async function fightRound(buyerId, opts = {}) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     const b = row?.bout_json;
+    if (staleBout(b)) {
+        await db.query(`UPDATE mkt_arena SET bout_json = NULL WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+        return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
+    }
     if (!b || b.over) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
 
     // Abilities are frozen into the bout at the start. A fight already in progress when the kit format
@@ -711,9 +745,10 @@ export async function fightRound(buyerId, opts = {}) {
     // was actually getting, so nothing about the balance moves: attacks land at what a "great" tap paid, and
     // a plain block turns aside what an average block did. Guard, wards and the field kit are the defensive
     // levers now, and they are choices rather than reflexes.
-    const ATTACK = 1.15;   // was ATTACK, which averaged ~1.15 across a real spread of taps
+    // Was 1.15, chosen to average out the +-18% swing wobble that has been removed. A plain attack is now
+    // plainly your damage number; only an ABILITY moves it, which is the only multiplier you actually choose.
+    const ATTACK = 1;
     const BLOCK = 0.34;    // was BLOCK, which averaged ~0.34
-    const hit = (m) => randInt(Math.round(m * 0.85), Math.round(m * 1.18));
 
     // ── CRITS ────────────────────────────────────────────────────────────────────────────────────────────
     // Removing the timing ring took the last source of variance a player could feel. Every blow became the
@@ -728,27 +763,15 @@ export async function fightRound(buyerId, opts = {}) {
     // whoever brings the fight — and this is a ladder where every member is on both sides of it, so a rule
     // that only applies when you are the challenger is not a rule, it is a bias. The defender's chance comes
     // off their own gear's Fortune exactly as yours does.
-    const CRIT_BASE = 0.12;
-    const CRIT_PER_FORTUNE = 0.0035;
-    // Crit chance is the scarcer stat — it tops out at 20 on a single piece where Fortune reaches 40 — so a
-    // point of it is worth more than a point of Fortune. Half the rate the boss fight gives it, because the
-    // arena's cap is 38% rather than 90% and a boss-crit kit would otherwise sit on the cap on its own.
-    const CRIT_PER_CHANCE = 0.005;
-    const CRIT_CAP = 0.38;
-    const CRIT_MULT = 1.8;
-    // Everything the skill tree bought you that is not already baked into a stat. `|| {}` because a bout that
-    // was already open when this shipped has no perks on it.
+    // CRIT IS THE ONLY ROLL LEFT, and it is not a hidden one: the chance is printed on your card, the
+    // multiplier beside it, and the word CRITICAL is shouted when it lands. It is the boss fight's model
+    // verbatim (25% + Crit Chance, x2.5 + Crit Power) rather than a second, private one built on Fortune —
+    // a kit that crits against the boss now crits in here, which is the whole point of reading real stats.
     const P = b.me?.perks || {};
-    const critFor = (side) => Math.min(CRIT_CAP, CRIT_BASE
-        + (Number(side?.fortune) || 0) * CRIT_PER_FORTUNE
-        + (Number(side?.critStat) || 0) * CRIT_PER_CHANCE);
-    // Crit power raises the multiplier off the same denominator the boss uses. It sits on a 1.8 base rather
-    // than a 2.5 one, so it is worth proportionally MORE in here — which is the point: it was worth nothing.
-    const critPowerOf = (side) => (Number(side?.critPower) || 0) / 100;
-    const critChance = Math.min(CRIT_CAP + (P.crit || 0), critFor(b.me) + (P.crit || 0));
-    const myCritMult = CRIT_MULT + (P.critMult || 0) + critPowerOf(b.me);
-    const foeCritChance = critFor(b.foe);
-    const foeCritMult = CRIT_MULT + critPowerOf(b.foe);
+    const critChance = b.me?.critChance ?? 0.25;
+    const myCritMult = b.me?.critMult ?? 2.5;
+    const foeCritChance = b.foe?.critChance ?? 0.25;
+    const foeCritMult = b.foe?.critMult ?? 2.5;
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
     const coolFor = (ability) => Math.max(ability.cooldown ? 1 : 0, (ability.cooldown || 0) - Math.floor((P.cdCut || 0) / 3));
@@ -802,7 +825,7 @@ export async function fightRound(buyerId, opts = {}) {
             if (it.kind === "heal") {
                 healed = Math.min(b.maxHp - b.hp, Math.round(b.maxHp * it.amount));
                 b.hp += healed;
-                text = healed > 0 ? `${it.name} — ${healed} vigour back.` : `${it.name} — already whole.`;
+                text = healed > 0 ? `${it.name} — ${healed} health back.` : `${it.name} — already whole.`;
             } else {
                 b.cd = {};
                 text = `${it.name} — every skill is ready.`;
@@ -853,7 +876,7 @@ export async function fightRound(buyerId, opts = {}) {
         let power = 1;
         let note = "";
         let hits = 1;              // flurry lands more than once
-        let drain = 0;             // share of damage returned to you as vigour
+        let drain = 0;             // share of damage returned to you as health
         let rend = false;          // leaves a burn behind
         let sunder = false;        // strips their guard for a few turns
         // ── WHAT MAKES ONE SKILL DIFFERENT FROM ANOTHER ──────────────────────────────────────────────────
@@ -886,7 +909,7 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
-                gradeAtk = 1 + (ATTACK - 1) * 1.45;
+                gradeAtk = 1.45;
             }
             if (ability.kind === "spell") {
                 // Its own affinity against theirs, not the bout-wide one — so what you attuned this specific
@@ -916,7 +939,9 @@ export async function fightRound(buyerId, opts = {}) {
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
         // Their guard, minus whatever a Sunder has already stripped off it.
         const sundered = (b.sunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
-        const guard = foeGrade(b.foe.gearPower || 0).def * pierce * sundered;
+        // Their armour: the number on their card, minus whatever a Sunder has stripped and whatever your
+        // Pierce cuts through. No roll — the same swing into the same armour is the same number every time.
+        const guard = Math.max(0, Math.min(0.85, (Number(b.foe.armour) || 0) * pierce * sundered));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -932,7 +957,7 @@ export async function fightRound(buyerId, opts = {}) {
         for (let i = 0; i < hits && power > 0; i += 1) {
             const c = Math.random() < critChance;
             if (c) crit = true;
-            const raw = hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1)
+            const raw = b.me.damage * gradeAtk * power * surge * clashMult * (b.underdog || 1)
                 * openMult * lowHpMult * (c ? myCritMult : 1);
             turned += Math.round(raw * guard);
             dmg += Math.max(1, Math.round(raw - raw * guard));
@@ -952,7 +977,7 @@ export async function fightRound(buyerId, opts = {}) {
         if (rend && dmg > 0) {
             // Stacks with itself rather than refreshing, so leaning on a burn kit is a real plan — but only
             // up to REND_MAX_STACKS. Uncapped it won 83.8% of simulated bouts in under six beats.
-            // Slow Burn: each rank makes the burn tick for more of their vigour.
+            // Slow Burn: each rank makes the burn tick for more of their health.
             const per = Math.max(1, Math.round(b.foeMaxHp * (REND_PER_TURN + (P.rendTick || 0))));
             // KINDLING: "+1 burn stack per rank" was read by nothing, so two ranks of a tier-1 node did
             // nothing at all. It raises the CEILING — the cap is what the node is worth, since a burn kit
@@ -979,7 +1004,6 @@ export async function fightRound(buyerId, opts = {}) {
         b.turn = "them";
     } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
-        const fg = foeGrade(b.foe.gearPower || 0);
         // Whatever was telegraphed is what lands. Rolling again here would make the warning a lie.
         const incoming = b.incoming || pickIncoming(b);
         const theirAbility = incoming.isAbility ? incoming : null;
@@ -987,7 +1011,7 @@ export async function fightRound(buyerId, opts = {}) {
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const foeCrit = Math.random() < foeCritChance;
-        const raw = Math.max(1, Math.round(hit(b.foe.might * SWING * PUNCH) * fg.atk * power * back * (foeCrit ? foeCritMult : 1)));
+        const raw = Math.max(1, Math.round(b.foe.damage * power * back * (foeCrit ? foeCritMult : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
         // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
         const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)));
@@ -1180,7 +1204,7 @@ export async function seedArenaLadder() {
         .map((m) => {
             const level = levelForXp(Number(m.xp) || 0).level;
             const gearPower = Object.values(stats.get(m.id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
-            return { id: m.id, alias: m.alias, power: powerOf(level, gearPower) };
+            return { id: m.id, alias: m.alias, power: arenaRating(ringStats(stats.get(m.id) || {})) };
         })
         .sort((a, b) => b.power - a.power || String(a.alias).localeCompare(String(b.alias)));
 
