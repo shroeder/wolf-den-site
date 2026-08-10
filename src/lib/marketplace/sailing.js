@@ -9,6 +9,7 @@ import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
 import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
 import { sumPieceSea, COLLECTION_PIECES } from "@/lib/marketplace/collection-pieces.js";
+import { ENCOUNTERS, ENCOUNTER_MARKS, encounterById, encounterArt, encounterZones, lootPreview } from "@/lib/marketplace/encounters.js";
 import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
@@ -148,46 +149,17 @@ const WAVE_SHAVE_MS = 2 * 60 * 1000; // 2 minutes off the remaining voyage
 const wavesPerDay = (luckLevel = 0) => WAVES_PER_DAY + Math.floor(Math.max(0, luckLevel) / WAVE_LUCK_PER);
 
 // ── Marine encounters ── FORTUNE now drives the chance a voyage rolls an encounter at its halfway mark
-// (repurposed from "+buried fragments"). No push / no travel pause — it resolves lazily on the member's next
-// check-in and shows a one-off recap modal.
-const ENCOUNTER_BASE = 0.20;          // base chance to roll a marine encounter at the voyage midpoint
+// (repurposed from "+buried fragments"). It is a FIGHT now — it pushes your phone and stops the voyage dead
+// until you answer it. See encounters.js for the table and resolveDueEncounter() for the interruption.
+const ENCOUNTER_BASE = 0.35;          // base chance the FIRST mark of a voyage has something waiting
 const ENCOUNTER_PER_FORTUNE = 0.015;  // +1.5% per Fortune level → +30% at max (20)
 const ENCOUNTER_CHANCE_CAP = 0.65;    // Fortune can raise the encounter chance up to this cap
 function encounterChance(fortuneLevel = 0) {
     return Math.min(ENCOUNTER_CHANCE_CAP, ENCOUNTER_BASE + Math.max(0, fortuneLevel) * ENCOUNTER_PER_FORTUNE);
 }
-// Reusable low-power loot items (nothing here swings the boss fight). `d(w, item)` = a weighted drop.
-const NONE = { kind: "none" };
-const FRAG1 = { kind: "fragment", n: 1, label: "a Wooden chest fragment", emoji: "🟫", image: fragmentArt("wooden") };
-const FRAG2 = { kind: "fragment", n: 2, label: "2 Wooden chest fragments", emoji: "🟫", image: fragmentArt("wooden") };
-const TREAT_BONE = { kind: "consumable", id: "treat_bone", label: "a Pet Treat", emoji: "🦴" };
-const TREAT_SNACK = { kind: "consumable", id: "treat_snack", label: "a Hearty Snack", emoji: "🍖" };
-const CHEST_WOOD = { kind: "chest", tier: "wooden", label: "a Wooden chest", emoji: "📦" };
-const CHEST_IRON = { kind: "chest", tier: "iron", label: "an Iron chest", emoji: "⚙️" };
-const SPIN = { kind: "consumable", id: "spin_lucky_coin", label: "a Lucky Coin (+2 spins)", emoji: "🎟️" };
-const STONE = { kind: "consumable", id: "stone_storm", label: "a Storm Crystal (+3 strikes)", emoji: "🔷" };
-const d = (w, item) => ({ w, ...item });
+// The encounter TABLE now lives in encounters.js — twenty of them, each a real fight with its own stats and
+// its own named loot, rather than eight emoji with a weighted drop list.
 
-// Foes you can meet at sea. Each has its OWN sprite (enc-<id>.png) + a themed `drops` table so the loot
-// matches the story — pirates hoard chests, the kraken sheds hide (pet treats), the ghost drops spectral luck.
-const ENCOUNTERS = [
-    { id: "pirates",   foe: "roaming pirates",   emoji: "🏴‍☠️", loot: "looted their hold",
-      drops: [d(38, NONE), d(25, CHEST_WOOD), d(10, CHEST_IRON), d(15, FRAG1), d(5, FRAG2), d(7, SPIN)] },
-    { id: "kraken",    foe: "a lurking kraken",  emoji: "🐙", loot: "salvaged its hide",
-      drops: [d(38, NONE), d(26, TREAT_BONE), d(14, TREAT_SNACK), d(12, FRAG1), d(10, STONE)] },
-    { id: "clam",      foe: "a giant clam",      emoji: "🦪", loot: "prised a pearl from its shell",
-      drops: [d(35, NONE), d(22, FRAG1), d(10, FRAG2), d(13, CHEST_WOOD), d(12, SPIN), d(8, TREAT_SNACK)] },
-    { id: "ghost",     foe: "a ghost galleon",   emoji: "👻", loot: "plundered its spectral hold",
-      drops: [d(38, NONE), d(22, FRAG1), d(8, FRAG2), d(16, SPIN), d(10, STONE), d(6, CHEST_IRON)] },
-    { id: "serpent",   foe: "a sea serpent",     emoji: "🐍", loot: "harvested its glittering scales",
-      drops: [d(38, NONE), d(22, TREAT_BONE), d(12, TREAT_SNACK), d(14, STONE), d(14, FRAG1)] },
-    { id: "leviathan", foe: "a rogue leviathan", emoji: "🐋", loot: "carved a trove from the deep",
-      drops: [d(32, NONE), d(24, CHEST_WOOD), d(12, CHEST_IRON), d(16, FRAG2), d(8, FRAG1), d(8, TREAT_SNACK)] },
-    { id: "smuggler",  foe: "a smuggler's sloop", emoji: "⛵", loot: "seized their contraband",
-      drops: [d(38, NONE), d(18, SPIN), d(15, CHEST_WOOD), d(12, TREAT_SNACK), d(10, STONE), d(7, FRAG1)] },
-    { id: "drake",     foe: "a reef drake",      emoji: "🐉", loot: "raided its sunken nest",
-      drops: [d(38, NONE), d(22, FRAG1), d(10, FRAG2), d(14, TREAT_BONE), d(8, STONE), d(8, CHEST_WOOD)] },
-];
 function pickWeighted(list) {
     const total = list.reduce((s, x) => s + x.w, 0) || 1;
     let r = Math.random() * total;
@@ -348,7 +320,11 @@ function seaEffects(sea = {}) {
 async function rollMerchant(buyerId) {
     const row = await readRow(buyerId);
     if (!row || row.dig_state || row.merchant_json != null) return;
-    const arrived = row.departed_at && row.returns_at && Date.now() >= new Date(row.returns_at).getTime();
+    // A PAUSED VOYAGE HAS NOT ARRIVED. The clock stops while something is alongside, and `returns_at` is only
+    // pushed forward when the fight ends — so between those two moments the stored arrival time can pass
+    // while the boat is, in fact, still being boarded.
+    const arrived = row.departed_at && row.returns_at && !row.encounter_paused_at
+        && Date.now() >= new Date(row.returns_at).getTime();
     if (!arrived) return;
     const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
     if (forced) await db.query(`UPDATE mkt_sailing SET force_merchant = FALSE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
@@ -984,16 +960,21 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
     const dig = row?.dig_state || null;
     const now = Date.now();
 
+    // THE CLOCK IS STOPPED while something is alongside. `returns_at` is not moved until the fight ends, so a
+    // long stand-off would otherwise walk the boat right past its own arrival and land it mid-battle.
+    const pausedAt = row?.encounter_paused_at ? new Date(row.encounter_paused_at).getTime() : null;
+    const clock = pausedAt ? Math.min(now, pausedAt) : now;
+
     let status = "idle";
     if (dig && dig.status === "active") status = "digging";
-    else if (departedAt && arrivesAt) status = now >= arrivesAt ? "arrived" : "sailing";
+    else if (departedAt && arrivesAt) status = clock >= arrivesAt ? "arrived" : "sailing";
 
     // Progress is REMAINING-based (how close to arrival vs. the ORIGINAL planned trip) so a tailwind — which
     // shortens the remaining time — visibly jumps the boat forward. Elapsed-based math left it pinned at 0
     // until the trip collapsed. Fall back to the current span for legacy voyages with no stored voyage_ms.
     const voyageTotalMs = Number(row?.voyage_ms) || (departedAt && arrivesAt ? Math.max(1, arrivesAt - departedAt) : 0);
     let progress = 0;
-    if (status === "sailing" && arrivesAt && voyageTotalMs > 0) progress = Math.min(0.999, Math.max(0, 1 - (arrivesAt - now) / voyageTotalMs));
+    if (status === "sailing" && arrivesAt && voyageTotalMs > 0) progress = Math.min(0.999, Math.max(0, 1 - (arrivesAt - clock) / voyageTotalMs));
     else if (status === "arrived" || status === "digging") progress = 1;
 
     const rarityPct = (lvl) => Math.min(90, Math.round((Math.max(0, lvl) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus) * 100));
@@ -1072,8 +1053,23 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             left: Math.max(0, wavesPerDay(luckLevel) + bonusWaves - (row?.wave_is_today ? (row?.wave_count || 0) : 0)),
             xp: WAVE_XP, coins: WAVE_COINS, minutes: WAVE_SHAVE_MS / 60000,
         },
-        // A resolved-but-unacknowledged marine encounter, if any — the client shows it as a one-off recap modal.
-        encounter: (row && row.encounter_result) || null,
+        // SOMETHING IS ALONGSIDE. Deliberately NOT gated with `combat`: the fleet ladder is still under
+        // construction and hidden from everyone outside the allow-list, but any voyage can be interrupted by
+        // an encounter, so this surface has to stand on its own or the boat would be stuck with no way to fight.
+        encounter: (() => {
+            if (!row?.encounter_active) return null;
+            const enc = encounterById(row.encounter_active);
+            const b = readBattle(row);
+            if (!enc || !b) return null;
+            return {
+                id: enc.id, name: enc.name, cls: enc.cls, kind: enc.kind, tier: enc.tier, blurb: enc.blurb,
+                art: encounterArt(enc.id), loot: lootPreview(enc.loot, chestArt),
+                battle: { ...battleView(b.state, b.meta, { row }), events: [], over: false },
+            };
+        })(),
+        // Deliberately NOT sending where the marks are. A tick on the progress bar would be a nice wordless
+        // cue, and it would also tell you on departure that this voyage is safe — which is most voyages, and
+        // which is the whole tension gone.
         // The Gold Merchant offer, if he showed up this landing (shown at "arrived", before the dig). Prices are
         // re-read from the table on the way out rather than served from the stored offer — see warePrice.
         merchant: (row && row.merchant_json && !row.merchant_json.none)
@@ -1131,43 +1127,167 @@ async function readRow(buyerId) {
     ).catch(() => null);
 }
 
-// Resolve a DUE, unresolved encounter exactly once: roll the outcome, atomically CLAIM it (so only the first
-// concurrent caller writes the result), then apply the grants. A no-op when nothing is pending/due.
+// ── SOMETHING IS ALONGSIDE ───────────────────────────────────────────────────────────────────────────────────
+// An encounter used to resolve itself: you looked at your phone later and a modal told you what had already
+// happened. It is a fight now, so this function's job changed completely — it does not decide an outcome, it
+// STOPS THE BOAT and opens a battle, then gets out of the way.
+//
+// The voyage clock freezes at `encounter_paused_at` and does not start again until the fight is over, at
+// which point `returns_at` is pushed forward by exactly the time you took. A trip is not made longer by being
+// interrupted; it is made longer by you leaving the interruption sitting there, which is your business.
+
+/** Difficulty near your own boat level, so a fresh captain never opens with the Elder. */
+function pickEncounterFor(boatLevel = 1) {
+    const want = Math.max(1, Math.min(5, 1 + Math.floor((Number(boatLevel) || 1) / 8)));
+    // One tier either side, so there is variety without a cliff.
+    const pool = ENCOUNTERS.filter((e) => Math.abs(e.tier - want) <= 1);
+    const list = pool.length ? pool : ENCOUNTERS;
+    return list[randInt(list.length)].id;
+}
+
+/** The marks on this voyage, as a live array. */
+const encMarks = (row) => (Array.isArray(row?.encounter_marks) ? row.encounter_marks : []);
+
+/**
+ * Open the battle for the first mark that is due and unfought. A no-op unless one is actually waiting.
+ * Called on every read of sailing state, like the old resolver was.
+ */
 async function resolveDueEncounter(buyerId) {
     const row = await readRow(buyerId);
-    if (!row || !row.encounter_at || row.encounter_result) return; // encounter_at non-null = one is pending this voyage
-    if (row.dig_state) return; // already ashore digging — don't pop a mid-voyage encounter over the dig
-    // Fire at the voyage's PROGRESS midpoint, not a fixed wall-clock time — so a tailwind (which jumps the boat
-    // forward by cutting the remaining time) still triggers it. Progress ≥ 50% ⟺ remaining ≤ half the trip.
-    const arrivesAt = row.returns_at ? new Date(row.returns_at).getTime() : 0;
-    const total = Number(row.voyage_ms) || 0;
-    if (!arrivesAt || total <= 0) return;
-    if (Date.now() < arrivesAt - total / 2) return; // not past the midpoint yet
-    const enc = ENCOUNTERS[randInt(ENCOUNTERS.length)];
-    const xp = 40 + randInt(81);     // modest: 40–120 (was 150–360 — too rich for a ~1-in-5 event)
-    const coins = 10 + randInt(21);  // small: 10–30
-    const loot = pickWeighted(enc.drops); // foe-themed loot
-    const result = {
-        foe: enc.foe, emoji: enc.emoji, art: `/images/sailing/enc-${enc.id}.png`, loot: enc.loot, xp, coins,
-        bonus: loot.kind === "none" ? null : { label: loot.label, emoji: loot.emoji, image: loot.image || null },
-    };
-    // Claim atomically — the WHERE guarantees a single winner, so the grants below run exactly once.
+    if (!row || !row.departed_at) return;
+    if (row.dig_state) return;                 // ashore digging — nothing can come alongside
+    if (row.encounter_active) return;          // one is already open and waiting on the player
+    if (row.battle_state) return;              // never stack an encounter on top of a fleet fight
+    const marks = encMarks(row);
+    if (!marks.length) return;
+    const due = marks.find((m) => !m.done && m.at && Date.now() >= new Date(m.at).getTime());
+    if (!due) return;
+
+    const enc = encounterById(due.enc);
+    if (!enc) return;
+
+    // CLAIM IT AND STOP THE CLOCK in one statement, so two tabs cannot both open the same fight.
     const claimed = await db.queryOne(
-        `UPDATE mkt_sailing SET encounter_result = $2::jsonb, encounters_total = COALESCE(encounters_total, 0) + 1, updated_at = NOW()
-          WHERE buyer_id = $1 AND encounter_at IS NOT NULL AND encounter_result IS NULL AND dig_state IS NULL
-          RETURNING encounters_total`,
-        [buyerId, JSON.stringify(result)]
+        `UPDATE mkt_sailing SET encounter_active = $2, encounter_paused_at = NOW(), updated_at = NOW()
+          WHERE buyer_id = $1 AND encounter_active IS NULL AND encounter_paused_at IS NULL
+            AND battle_state IS NULL AND dig_state IS NULL
+          RETURNING buyer_id`,
+        [buyerId, enc.id]
     ).catch(() => null);
     if (!claimed) return;
-    await awardXp(buyerId, "sail_encounter", { points: xp, gold: coins }).catch(() => {});
-    // Milestone badges for weathering the open sea (cumulative encounters).
-    const et = claimed.encounters_total || 0;
-    if (et >= BADGE_ENC_TESTED) await grantEventBadge(buyerId, "sea_tested").catch(() => {});
-    if (et >= BADGE_ENC_VETERAN) await grantEventBadge(buyerId, "sea_veteran").catch(() => {});
-    if (loot.kind === "fragment") await grantFragment(buyerId, loot.n || 1).catch(() => {});
-    else if (loot.kind === "chest") await addChests(buyerId, { [loot.tier]: 1 }, { source: "sailing" }).catch(() => {});
-    else if (loot.kind === "consumable") await grantConsumable(buyerId, loot.id, 1).catch(() => {});
-    await trackActivity(buyerId, "sail_encounter", { type: enc.id, outcome: loot.kind, gold: coins }).catch(() => {});
+
+    await openEncounterBattle(buyerId, enc, row);
+
+    // Tell the phone. This is the entire reason a fight can interrupt a voyage at all — an encounter you are
+    // not told about is an encounter that stalls your trip until you happen to look.
+    await sendWebPush(buyerId, {
+        kind: "sailing",
+        title: `${enc.kind === "monster" ? "Something surfaced" : "Sail on the horizon"}`,
+        body: `${enc.name} — ${enc.blurb} Your voyage is stopped until you deal with it.`,
+        url: "/marketplace/sailing", tag: "sail-encounter", data: { type: "sail_encounter", enc: enc.id },
+    }).catch(() => {});
+}
+
+/** Build the battle state for an encounter and save it under meta.kind = "encounter". */
+async function openEncounterBattle(buyerId, enc, row) {
+    const me = await db.queryOne(
+        `SELECT alias, display_name, avatar_sprite_url, avatar_sprite_flip, featured_collectible FROM mkt_buyer WHERE id = $1`,
+        [buyerId]
+    ).catch(() => null);
+    const fired = openingLoadout(row);
+    const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
+    const foe = foeProfile({
+        name: enc.name, art: encounterArt(enc.id), flavor: enc.blurb,
+        rank: enc.tier * 3, guns: enc.guns, hits: enc.hits, accuracy: enc.accuracy, rake: enc.rake, ammo: enc.ammo,
+    });
+
+    const crew = await petArtByBuyer([{ buyerId, petId: me?.featured_collectible }]);
+    const savedPorts = await getSavedPorts().catch(() => ({}));
+    const myTier = boatTier(mine.boatLevel);
+    const meta = {
+        kind: "encounter", encId: enc.id, encKind: enc.kind, tier: enc.tier,
+        meProfile: { name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
+            gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
+            sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
+        foeProfile: { ...enc, fleet: true, hits: enc.hits, art: encounterArt(enc.id) },
+        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
+            deck: boatDeck(myTier),
+            ports: portsWithSaved(savedPorts, `boat:${myTier}`, boatDeck(myTier), mine.guns),
+            rider: me?.avatar_sprite_url || null,
+            riderFlip: me?.avatar_sprite_flip === true,
+            pet: crew[buyerId] || null },
+        // A MONSTER HAS NO PARTS. `zones` is normally measured off the sprite; an animal has no rigging and no
+        // gun ports, so the scene is told outright that timber is the only thing to shoot at.
+        foe: { name: enc.name, cls: enc.cls, art: encounterArt(enc.id), guns: enc.guns, hp: enc.hits,
+            ammo: enc.ammo, boss: enc.tier >= 5, flavor: enc.blurb, mirror: false,
+            deck: 42, ports: [], rider: null, riderFlip: false, pet: null,
+            zones: encounterZones(enc) },
+    };
+    // `sys: false` is what turns the foe from a ship into an animal — see initBattleState.
+    const state = initBattleState(mine, { ...foe, sys: enc.kind !== "monster" });
+    state.theirNext = planFoeRound(state, mine, foe);
+    await saveBattle(buyerId, state, meta);
+}
+
+/** Pay out an encounter and let the voyage go again. */
+async function finishEncounterBattle(buyerId, meta, res) {
+    const enc = encounterById(meta.encId);
+    const spoils = [];
+    if (enc && res.win) {
+        for (const l of enc.loot || []) {
+            if (l.kind === "doubloons") {
+                await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, l.n]).catch(() => {});
+                spoils.push({ kind: "doubloons", n: l.n });
+            } else if (l.kind === "fragment") {
+                await grantFragment(buyerId, l.n, l.tier || "wooden").catch(() => {});
+                spoils.push({ kind: "fragments", n: l.n, tier: l.tier || "wooden" });
+            } else if (l.kind === "chest") {
+                await addChests(buyerId, { [l.tier]: 1 }, { source: "sail_encounter" }).catch(() => {});
+                spoils.push({ kind: "chest", tier: l.tier });
+            } else if (l.kind === "consumable") {
+                await grantConsumable(buyerId, l.id, 1).catch(() => {});
+                spoils.push({ kind: "consumable", id: l.id });
+            } else if (l.kind === "parts") {
+                try {
+                    const { addParts } = await import("@/lib/marketplace/crafting.js");
+                    await addParts(buyerId, l.tier, l.n);
+                    spoils.push({ kind: "parts", tier: l.tier, n: l.n });
+                } catch { /* the Forge is optional */ }
+            }
+        }
+        // XP and coin scale with what you actually beat.
+        const xp = 30 + (enc.tier * 34);
+        await awardXp(buyerId, "sail_encounter", { points: xp, gold: 12 + enc.tier * 9 }).catch(() => {});
+        spoils.push({ kind: "xp", n: xp });
+    }
+
+    // THE CLOCK STARTS AGAIN. `returns_at` moves forward by exactly how long the boat sat still, so being
+    // interrupted never costs you sailing time — only the time you left it waiting does.
+    const done = encMarks(await readRow(buyerId)).map((m) => (m.enc === meta.encId && !m.done ? { ...m, done: true } : m));
+    await db.query(
+        `UPDATE mkt_sailing
+            SET returns_at = returns_at + (NOW() - COALESCE(encounter_paused_at, NOW())),
+                encounter_paused_at = NULL, encounter_active = NULL,
+                encounter_marks = $2::jsonb,
+                encounters_fought = COALESCE(encounters_fought,0) + 1,
+                encounters_won = COALESCE(encounters_won,0) + $3,
+                encounters_total = COALESCE(encounters_total,0) + 1,
+                updated_at = NOW()
+          WHERE buyer_id = $1`,
+        [buyerId, JSON.stringify(done), res.win ? 1 : 0]
+    ).catch(() => {});
+
+    const tally = await readRow(buyerId);
+    const won = tally?.encounters_won || 0;
+    const fought = tally?.encounters_fought || 0;
+    if (fought >= BADGE_ENC_TESTED) await grantEventBadge(buyerId, "sea_tested").catch(() => {});
+    if (fought >= BADGE_ENC_VETERAN) await grantEventBadge(buyerId, "sea_veteran").catch(() => {});
+    if (won >= 1) await grantEventBadge(buyerId, "first_blood_sea").catch(() => {});
+    if (won >= 25) await grantEventBadge(buyerId, "monster_hunter").catch(() => {});
+    if (res.win && enc?.tier >= 5) await grantEventBadge(buyerId, "leviathan_slayer").catch(() => {});
+
+    await trackActivity(buyerId, "sail_encounter", { type: meta.encId, outcome: res.win ? "win" : "lose", tier: enc?.tier || 0 }).catch(() => {});
+    return spoils;
 }
 
 // `skyKey` is the ambiance sky the CLIENT says it's rendering. It is accepted for call-site compatibility and
@@ -1253,9 +1373,19 @@ export async function startVoyage(buyerId, optionId = "standard") {
         voyageSpeed += (await getPetSystemPerk(buyerId, "following_sea")) / 100;
     } catch { /* no companion, no speed-up */ }
     const ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
-    // Fortune-scaled roll for a marine encounter at the ORIGINAL halfway mark (Kraken Bait guarantees one).
+    // THREE CHANCES, NOT ONE. Each mark is rolled independently against the Fortune-scaled chance, scaled
+    // down for the later two — a second fight in a voyage should feel like luck and a third like a story.
+    // Kraken Bait still guarantees the first. Difficulty is drawn near your own boat level so a fresh captain
+    // is not handed the Elder in their first hour.
     const forcedEnc = row?.force_encounter === true;
-    const encMs = (forcedEnc || Math.random() < encounterChance(state.fortune.level)) ? String(Math.round(ms / 2)) : null;
+    const chance = encounterChance(state.fortune.level);
+    const marks = [];
+    ENCOUNTER_MARKS.forEach((mk, i) => {
+        const hit = (i === 0 && forcedEnc) || Math.random() < chance * mk.weight;
+        if (!hit) return;
+        marks.push({ at: new Date(Date.now() + Math.round(ms * mk.at)).toISOString(), enc: pickEncounterFor(state.level), done: false });
+    });
+    const encMs = null;   // the old single-mark column is retired; `encounter_marks` carries them now
     await db.query(
         `INSERT INTO mkt_sailing (buyer_id, departed_at, returns_at, dig_state, voyage_quality, voyage_ms, encounter_at, encounter_result, wind_recharges, updated_at)
          VALUES ($1, NOW(), NOW() + ($2 || ' milliseconds')::interval, NULL, $3, $4,
@@ -1263,8 +1393,9 @@ export async function startVoyage(buyerId, optionId = "standard") {
          ON CONFLICT (buyer_id) DO UPDATE SET departed_at = NOW(), returns_at = NOW() + ($2 || ' milliseconds')::interval,
                  dig_state = NULL, voyage_quality = $3, voyage_ms = $4,
                  encounter_at = CASE WHEN $5::bigint IS NULL THEN NULL ELSE NOW() + ($5 || ' milliseconds')::interval END,
-                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, idle_notified_at = NULL, updated_at = NOW()`,
-        [buyerId, String(ms), opt.id, ms, encMs]
+                 encounter_result = NULL, merchant_json = NULL, wind_recharges = 0, force_encounter = FALSE, arrival_notified = FALSE, idle_notified_at = NULL,
+                 encounter_marks = $6::jsonb, encounter_paused_at = NULL, encounter_active = NULL, updated_at = NOW()`,
+        [buyerId, String(ms), opt.id, ms, encMs, JSON.stringify(marks)]
     ).catch(() => {});
     await bumpQuestProgress(buyerId, "voyage_start", 1).catch(() => {}); // "Set sail" daily quest
     await trackActivity(buyerId, "sail_voyage", { option: opt.id, hours: Math.round(ms / 3600000) }).catch(() => {});
@@ -1276,7 +1407,8 @@ export async function startVoyage(buyerId, optionId = "standard") {
 export async function sailingNeedsAttention(buyerId) {
     if (!buyerId) return false;
     const row = await db.queryOne(
-        `SELECT (departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW() AND dig_state IS NULL) AS landed,
+        `SELECT (departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW() AND dig_state IS NULL
+                 AND encounter_paused_at IS NULL) AS landed,
                 (encounter_result IS NOT NULL) AS enc,
                 -- UNUSED CASTS. Fishing's whole problem is that it happens during a voyage nobody is watching:
                 -- you set sail, close the tab, and the ten free casts quietly expire. This lights the Sailing
@@ -1334,7 +1466,7 @@ export async function runSailingArrivals() {
     const due = await db.query(
         `SELECT buyer_id FROM mkt_sailing
           WHERE departed_at IS NOT NULL AND returns_at IS NOT NULL AND returns_at <= NOW()
-            AND dig_state IS NULL AND arrival_notified = FALSE
+            AND dig_state IS NULL AND arrival_notified = FALSE AND encounter_paused_at IS NULL
           LIMIT 500`,
     ).catch(() => []);
     let pushed = 0;
@@ -1343,6 +1475,7 @@ export async function runSailingArrivals() {
         const claimed = await db.queryOne(
             `UPDATE mkt_sailing SET arrival_notified = TRUE
               WHERE buyer_id = $1 AND arrival_notified = FALSE AND returns_at <= NOW() AND dig_state IS NULL
+                AND encounter_paused_at IS NULL
               RETURNING buyer_id`,
             [r.buyer_id],
         ).catch(() => null);
@@ -1408,6 +1541,7 @@ export async function runSailingIdleReminders() {
         const claimed = await db.queryOne(
             `UPDATE mkt_sailing SET idle_notified_at = NOW()
               WHERE buyer_id = $1 AND departed_at IS NOT NULL AND dig_state IS NULL AND returns_at <= NOW()
+                AND encounter_paused_at IS NULL
                 AND (idle_notified_at IS NULL OR idle_notified_at < NOW() - ($2 || ' hours')::interval)
               RETURNING buyer_id`,
             [r.buyer_id, repeat],
@@ -1527,10 +1661,8 @@ export const fishRecords = async (buyerId) => {
 };
 
 // Acknowledge (dismiss) a resolved encounter's recap — clears it so it never shows again.
-export async function ackEncounter(buyerId) {
-    await db.query(`UPDATE mkt_sailing SET encounter_result = NULL, encounter_at = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-    return { ok: true, ...(await getSailingState(buyerId)) };
-}
+// `ackEncounter` is gone with the recap it dismissed. An encounter is not something you acknowledge now — it
+// is something you fight, and it clears itself when the last gun stops (see finishEncounterBattle).
 
 // ── RAIDS ──────────────────────────────────────────────────────────────────────────────────────────────
 const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.avatar_sprite_flip, b.avatar_url, b.featured_collectible,
@@ -2019,7 +2151,10 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     // the hull legible without reading a stat block.
     sys: {
         me: { sails: st.me.sails, guns: st.me.guns },
-        foe: { sails: st.foe.sails, guns: st.foe.guns },
+        // `has: false` on a living thing. It keeps `sails` internally for evasion, but there is no canvas and
+        // no gun deck on a kraken to show a condition chip for — the scene draws only its timber, which for an
+        // animal is the animal.
+        foe: { sails: st.foe.sails, guns: st.foe.guns, has: st.foe.sys !== false },
     },
     caps: { sails: SAILS_MAX, gun: GUN_HP },
     // THE RECKONING. How many of your balls have gone wide, and what it takes to spend it. See ship-battle.
@@ -2031,7 +2166,9 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     // not have would be a button that does nothing.
     zones: {
         me: zonesOn(zoneKeyFromArt(meta.me?.art, meta.me?.level)),
-        foe: zonesOn(zoneKeyFromArt(meta.foe?.art, meta.foe?.level)),
+        // An encounter states its own — a monster has no rigging and no gun ports, so the only thing on it to
+        // aim at is the animal. Everything else is measured off the sprite as before.
+        foe: meta.foe?.zones || zonesOn(zoneKeyFromArt(meta.foe?.art, meta.foe?.level)),
     },
     zoneInfo: ZONE_LIST.map((z) => ({ id: z.id, name: z.name, icon: z.icon, tint: z.tint, effect: z.effect, blurb: z.blurb })),
     // THE RACKS. One round is spent per volley, so the scene shows what is left as you pick.
@@ -2097,17 +2234,24 @@ const readBattle = (row) => {
 // at the hull rather than refusing the volley, because a fight that will not resolve is worse than a shot
 // that went somewhere dull.
 export async function shipBattleVolley(buyerId, aim) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
+    // The under-construction gate is about the FLEET LADDER, which is hidden while it is being built — it is
+    // NOT about being allowed to fire a gun. An encounter can interrupt anyone's voyage, so refusing their
+    // volley here would leave the boat stopped forever with no way to answer.
+    if (open.meta?.kind !== "encounter" && !raidsEnabled(buyerId)) {
+        return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    }
     const { me, foe } = profilesFrom(open.meta);
 
     // NOTHING IS SPENT AND NOTHING IS CHOSEN. The round each barrel loads follows from its MARK and the part
     // you aimed it at (see ammoForShot) — so there is no stock to walk down, no purchase to make mid-fight
     // and no picker to get wrong. What used to be a rack of counts is now the gun deck.
     const laid = sanitizeAims(open.state, "me", aim, {
-        zonesAllowed: zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)),
+        // An encounter states its own targets; everything else is measured off the sprite. A monster answers
+        // with ["hull"] only, so a client asking to shoot its sails is corrected to a shot into the animal.
+        zonesAllowed: open.meta.foe?.zones || zonesOn(zoneKeyFromArt(open.meta.foe?.art, open.meta.foe?.level)),
         gunStats: me.gunStats,
     });
 
@@ -2130,7 +2274,8 @@ export async function shipBattleVolley(buyerId, aim) {
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
     let reward = [];
-    if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
+    if (meta.kind === "encounter") reward = await finishEncounterBattle(buyerId, meta, res);
+    else if (meta.kind === "fleet") reward = await finishFleetBattle(buyerId, meta, res);
     else reward = await finishRaidBattle(buyerId, meta, res);
 
     return {
@@ -2149,10 +2294,12 @@ export async function shipBattleVolley(buyerId, aim) {
 // cannot be folded into shipBattleVolley — it is its own thing, and the state it writes keeps whatever orders
 // she had already trained on you for the round you are still in.
 export async function shipBattleReckoning(buyerId) {
-    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
     const row = await readRow(buyerId);
     const open = readBattle(row);
     if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
+    if (open.meta?.kind !== "encounter" && !raidsEnabled(buyerId)) {
+        return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    }
     const { me, foe } = profilesFrom(open.meta);
 
     const res = resolveReckoning(me, foe, open.state);
@@ -2172,9 +2319,11 @@ export async function shipBattleReckoning(buyerId) {
 
     await saveBattle(buyerId, null, null);
     const meta = open.meta;
-    const reward = meta.kind === "fleet"
-        ? await finishFleetBattle(buyerId, meta, res)
-        : await finishRaidBattle(buyerId, meta, res);
+    const reward = meta.kind === "encounter"
+        ? await finishEncounterBattle(buyerId, meta, res)
+        : meta.kind === "fleet"
+            ? await finishFleetBattle(buyerId, meta, res)
+            : await finishRaidBattle(buyerId, meta, res);
     return {
         ok: true,
         battle: {

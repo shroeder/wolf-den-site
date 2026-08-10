@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, ackEncounter, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -69,7 +69,6 @@ export async function POST(request) {
                 case "upgrade_fishing": return noStore(await upgradeFishing(g.buyer.id, body.track));
                 case "forge_chest": return noStore(await forgeChest(g.buyer.id, body.tier));
                 case "wave": return noStore(await waveAtSailor(g.buyer.id));
-                case "ack_encounter": return noStore(await ackEncounter(g.buyer.id));
                 case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.perfect));
                 case "merchant_buy": return noStore(await merchantBuy(g.buyer.id, body.item));
                 // Fishing. `sky` is what the client says it's rendering — it only gates which SPECIES can bite,

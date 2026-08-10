@@ -239,8 +239,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [gustNonce, setGustNonce] = useState(0);     // bumps each catch so the FX overlay remounts + replays
     const [bountyTick, setBountyTick] = useState(0);   // bumps after a voyage action → FeatureDailies re-fetches so a completed bounty flips to Claim live
     const [waveFx, setWaveFx] = useState(null);        // { xp, coins, minutes, k } — the "you waved!" reward toast
-    const [ackingEnc, setAckingEnc] = useState(false); // dismissing an encounter recap (awaiting the ack round-trip)
-    const [encReady, setEncReady] = useState(false);   // encounter recap accepts its dismiss click (anti-misclick delay)
     const [ambient, setAmbient] = useState([]); // other players' boats sailing past in the background
     const [now, setNow] = useState(Date.now);
     const [upgFlash, setUpgFlash] = useState(null); // key of the upgrade card just bought (brief level-up pop)
@@ -367,15 +365,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         } catch { /* keep prior state */ }
     }, []);
 
-    // Anti-misclick: after an encounter recap appears (and only when NOT digging), ignore its dismiss click for
-    // a beat — players are often mid-tapping something else and would otherwise close it instantly.
-    useEffect(() => {
-        const active = Boolean(state.encounter) && state.status !== "digging";
-        if (!active) { setEncReady(false); return undefined; }
-        setEncReady(false);
-        const t = setTimeout(() => setEncReady(true), 700);
-        return () => clearTimeout(t);
-    }, [state.encounter, state.status]);
+    // The anti-misclick delay that used to arm the recap's dismiss button is gone with the recap: there is no
+    // dismiss to misfire any more, only "Beat to quarters", and tapping that early costs you nothing.
 
     // Every so often, send another sailor's boat drifting across the horizon behind yours.
     useEffect(() => {
@@ -1517,35 +1508,41 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             ) : null}
 
-            {/* Marine encounter recap — a foe met at the voyage's midpoint, resolved while you were away.
-                Never over the dig (a race could otherwise pop it mid-excavation). */}
-            {state.encounter && liveStatus !== "digging" ? (
-                <div className="sail-reward-overlay">
-                    <div className="card sail-recap sail-encounter">
-                        <Confetti />
-                        <div className="sail-recap-hero is-win">
-                            {state.encounter.art ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={state.encounter.art} alt="" className="sail-enc-art" />
-                            ) : <span className="sail-enc-foe">{state.encounter.emoji}</span>}
+            {/* SOMETHING IS ALONGSIDE.
+
+                This used to be a recap: a box that told you what had already happened to you while you were
+                not looking. It is the interruption itself now — the boat is stopped, the thing is on the water
+                beside you, and the only way out of this overlay is to run your guns out. There is no dismiss.
+
+                Everything it needs to say, it says with pictures: the foe, and what is in its hold. The one
+                line of text is the thing's own name. */}
+            {state.encounter && !shipBattle && liveStatus !== "digging" ? (
+                <div className="sail-reward-overlay sail-hail-overlay">
+                    <div className={`card sail-hail is-t${state.encounter.tier} is-${state.encounter.kind}`}>
+                        <div className="sail-hail-sea" aria-hidden="true"><i /><i /><i /></div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={state.encounter.art} alt={state.encounter.name} className="sail-hail-art" />
+                        <div className="sail-hail-name">
+                            <b>{state.encounter.name}</b>
+                            <em>{state.encounter.cls}</em>
                         </div>
-                        <div className="sail-enc-ribbon">⚔️ Marine encounter!</div>
-                        <h2 style={{ margin: "6px 0 2px" }}>You defeated {state.encounter.foe}!</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>You {state.encounter.loot}.</p>
-                        <div className="sail-enc-rewards">
-                            <span className="sail-enc-reward">✨ +{state.encounter.xp} XP</span>
-                            <span className="sail-enc-reward">🪙 +{state.encounter.coins}</span>
-                            {state.encounter.bonus ? (
-                                <span className="sail-enc-reward is-bonus">
-                                    {state.encounter.bonus.image ? (
+                        <p className="sail-hail-blurb">{state.encounter.blurb}</p>
+                        {/* WHAT IS IN ITS HOLD. Sprites and counts, no sentence — the same list the payout
+                            walks, so what is promised here is what is handed over. */}
+                        <div className="sail-hail-loot">
+                            {(state.encounter.loot || []).map((l, i) => (
+                                <span key={i} className="sail-hail-drop" style={l.color ? { borderColor: l.color } : undefined}>
+                                    {l.art
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={state.encounter.bonus.image} alt="" style={{ width: 18, height: 18, objectFit: "contain", verticalAlign: "-3px" }} />
-                                    ) : state.encounter.bonus.emoji} {state.encounter.bonus.label}
+                                        ? <img src={l.art} alt="" />
+                                        : <ChestIcon tier={l.tier || "wooden"} size={22} />}
+                                    <b>{l.n > 1 ? `×${l.n}` : ""}</b>
                                 </span>
-                            ) : null}
+                            ))}
                         </div>
-                        <button className="sail-cta" disabled={ackingEnc || !encReady} onClick={() => { setAckingEnc(true); Promise.resolve(act("ack_encounter")).finally(() => setAckingEnc(false)); }}>
-                            {ackingEnc ? "…" : encReady ? "Onward! ⚓" : "…"}
+                        <button className="sail-cta sail-hail-go" disabled={busy}
+                            onClick={() => setShipBattle(state.encounter.battle)}>
+                            Beat to quarters
                         </button>
                     </div>
                 </div>

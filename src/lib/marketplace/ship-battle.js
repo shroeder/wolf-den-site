@@ -198,6 +198,8 @@ export const RECKONING_NAME = "Reckoning";
 
 /** Somewhere on her ship worth a ball: canvas while she has any, a live gun, or timber. */
 function reckoningTarget(defSide, rng) {
+    // Nothing to take off a living thing — the whole volley goes into it.
+    if (defSide.sys === false) return { zone: "hull", target: null };
     const picks = [];
     if (defSide.sails > 0) picks.push({ zone: "sails", target: null });
     defSide.guns.forEach((hp, i) => { if (hp > 0) picks.push({ zone: "guns", target: i }); });
@@ -408,6 +410,11 @@ export function initBattleState(me, foe) {
         const guns = Array.from({ length: n }, (_, i) => gunHpFor(gunStat(p.gunStats, i).hp));
         return {
             hp: p.hp, max: p.hp, sails: SAILS_MAX,
+            // A LIVING THING HAS NO PARTS. `sys: false` marks a side with no rigging and no gun ports — a
+            // kraken, a swarm, a serpent. It still keeps `sails` internally, because that is what evasionOf
+            // reads and a serpent should be no easier to hit than a sloop; what it loses is the ability to be
+            // DISMASTED or dis-gunned. Nothing can be shot off it, so every ball goes into the animal.
+            sys: p.sys !== false,
             guns,
             // Each gun's own ceiling, so the scene can draw "1 of 3" on a gun you have put iron into and
             // "1 of 2" on the one beside it. Without this every gun's bar would be read against GUN_HP.
@@ -505,6 +512,7 @@ function oneAim(st, who, raw, { zonesAllowed = null, gunStats = null, fixedAmmo 
     if (!["sails", "hull", "guns"].includes(zone)) zone = "hull";
     if (zonesAllowed && !zonesAllowed.includes(zone)) zone = "hull";
     // Canvas already in rags is not a target — it would be a shot spent on nothing at all.
+    if (them.sys === false) zone = "hull";           // a living thing has neither, whatever the client asked for
     if (zone === "sails" && them.sails <= 0) zone = "hull";
     let target = null;
     if (zone === "guns") {
