@@ -1206,7 +1206,18 @@ export async function attackBoss(buyerId) {
             if (Math.random() < 0.20 * await recipeLuck(buyerId)) await grantRecipeReward(buyerId, "boss_kill");
         } catch { /* a recipe is a bonus; never let it fail the kill */ }
     }
-    return { ok: true, damage, crit, ability, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
+    // ── A STONE OFF THE KILL ── the rarest of the four sources to REACH, because the boss falls a few times a
+    // week and only one person lands the last blow — so its rate is the highest of the four and it is still
+    // the one you cannot farm. Best-effort, like the recipe above: a stone is a bonus, never a failed kill.
+    let stone = null;
+    if (defeated) {
+        try {
+            const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
+            const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
+            stone = await rollStone(buyerId, STONE_SOURCES.boss_kill.chance, "boss_kill");
+        } catch { /* never let it fail the kill */ }
+    }
+    return { ok: true, damage, crit, ability, stone, proc: sig.proc || setHit.proc || petProc || elemProc, hp: effectiveHp, autoDps, maxHp: row.max_hp, defeated, attacksLeft: Math.max(0, dailyCap - (used + 1)), name: boss.name };
 }
 
 // ── UNLEASH EVERYTHING ───────────────────────────────────────────────────────────────────────────────────────

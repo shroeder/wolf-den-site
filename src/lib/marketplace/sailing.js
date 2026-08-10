@@ -3271,6 +3271,11 @@ function totalFragments(row) {
 // Resolve a finished dig: each shard unearthed (+ lucky Strike bonuses) rolls a TIER from the voyage's chosen
 // duration, then merges into the per-tier hold. Clears the voyage + board.
 async function finishDig(buyerId, board) {
+    // ── A STONE IN THE DIRT ── one of the four sources (see pet-stones.js). On the DIG rather than on the
+    // voyage, because a dig is the part you actually play; a voyage is a timer you come back to.
+    const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
+    const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
+    const digStone = await rollStone(buyerId, STONE_SOURCES.sail_dig.chance, "sail_dig").catch(() => null);
     const row = await readRow(buyerId);
     const level = decorate(row).level;
     const quality = row?.voyage_quality || "standard";
@@ -3345,7 +3350,7 @@ async function finishDig(buyerId, board) {
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
     const relic = relicFound ? { id: relicFound, name: CONSUMABLES[relicFound]?.name || relicFound, emoji: CONSUMABLES[relicFound]?.emoji || "🎁", art: digArt[relicFound] || null, desc: CONSUMABLES[relicFound]?.desc || "" } : null;
-    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal }, ...state };
+    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal, stone: digStone }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

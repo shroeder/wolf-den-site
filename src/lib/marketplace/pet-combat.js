@@ -19,7 +19,11 @@ export async function getPetCombatBonus(buyerId) {
     const granted = new Set(rows.map((r) => r.ref));
     const owned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, level, { owned: granted }));
     const equipped = buyer?.featured_collectible ? collectibleById(buyer.featured_collectible) : null;
-    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp));
+    // ENSHRINED pets are the fourth input and the reason level 6 exists: their actives apply whether the pet
+    // is equipped or not, which is the whole answer to swapping four times a day.
+    const { getEnshrined } = await import("@/lib/marketplace/pet-ascension.js");
+    const enshrined = await getEnshrined(buyerId).catch(() => []);
+    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp), enshrined);
 }
 
 // Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),
@@ -58,11 +62,21 @@ export function procMultiplier(proc = {}, strikes = 1) {
 
 // Batch (2 queries): each member's raw pet bonus (stats + proc) → Map<buyerId, {stats, proc}>. For boss sizing.
 export async function getPackPetBonuses() {
-    const [members, unlocks, petXpByBuyer] = await Promise.all([
+    const [members, unlocks, petXpByBuyer, enshrinedRows] = await Promise.all([
         db.query(`SELECT id, COALESCE(xp, 0) AS xp, featured_collectible FROM mkt_buyer WHERE alias IS NOT NULL`).catch(() => []),
         db.query(`SELECT buyer_id, ref FROM mkt_cosmetic_unlock WHERE category = 'pet'`).catch(() => []),
         getPetXpForBuyers().catch(() => new Map()),
+        // ONE query for the whole pack rather than one per member — this runs to size the boss against
+        // everybody, and a per-member round trip here is how a nightly job turns into a minute.
+        db.query(`SELECT buyer_id, pet_id, stone FROM mkt_pet_enshrined`).catch(() => []),
     ]);
+    const enshrinedByBuyer = new Map();
+    for (const r of enshrinedRows) {
+        const pet = collectibleById(r.pet_id);
+        if (!pet) continue;
+        if (!enshrinedByBuyer.has(r.buyer_id)) enshrinedByBuyer.set(r.buyer_id, []);
+        enshrinedByBuyer.get(r.buyer_id).push({ petId: r.pet_id, stone: r.stone, pet });
+    }
     const byBuyer = new Map();
     for (const u of unlocks) {
         if (!byBuyer.has(u.buyer_id)) byBuyer.set(u.buyer_id, new Set());
@@ -74,7 +88,7 @@ export async function getPackPetBonuses() {
         const granted = byBuyer.get(mem.id) || new Set();
         const owned = COLLECTIBLES.filter((p) => isCollectibleUnlocked(p, level, { owned: granted }));
         const equipped = mem.featured_collectible ? collectibleById(mem.featured_collectible) : null;
-        out.set(mem.id, combinePetBonuses(owned, equipped, levelsFromXpMap(petXpByBuyer.get(mem.id) || {})));
+        out.set(mem.id, combinePetBonuses(owned, equipped, levelsFromXpMap(petXpByBuyer.get(mem.id) || {}), enshrinedByBuyer.get(mem.id) || []));
     }
     return out;
 }

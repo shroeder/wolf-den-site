@@ -415,6 +415,15 @@ export async function delveAct(buyerId, action, choice = null) {
             bank(run, { gold, xp });
             const isBoss = ev.kind === KIND.boss;
             const got = await rollFightLoot(buyerId, run, d, { mult: ev.lootMult || 1, boss: isBoss });
+            // A dungeon boss is one run per dungeon per day, so this is the most RELIABLE of the four stone
+            // sources — you can plan around it — which is why its rate is the one most carefully kept down.
+            let stone = null;
+            if (isBoss) {
+                const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
+                const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
+                stone = await rollStone(buyerId, STONE_SOURCES.delve_boss.chance, "delve_boss").catch(() => null);
+                if (stone) lines.push(`Something in the rubble is humming. A ${stone.name}.`);
+            }
             const { partName } = await import("@/lib/marketplace/forge-parts.js");
             const extras = lootLine(got, partName);
             lines.push(`${run.foe.name} falls. +${gold} gold, +${xp} XP${extras.length ? `, ${extras.join(", ")}` : ""}.`);
@@ -428,7 +437,7 @@ export async function delveAct(buyerId, action, choice = null) {
                     ? `It was carrying something. ${got.gear.name}.`
                     : isBoss ? "The dungeon is quiet. Take what it owes you." : "It does not get up.",
                 art: felled.sprite,
-                gold, xp,
+                gold, xp, stone,
                 chest: got.chest, potion: got.potion,
                 parts: got.parts ? { ...got.parts, name: partName(got.parts.tier) } : null,
                 frags: got.frags, gear: got.gear,

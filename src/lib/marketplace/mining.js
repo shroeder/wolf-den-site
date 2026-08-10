@@ -501,7 +501,15 @@ export async function surfaceRun(buyerId) {
     // is the whole game the descent is playing.
     if ((Number(run.depth) || 0) >= 10 && paid.length) await grantEventBadge(buyerId, "mine_nerve").catch(() => {});
     await trackActivity(buyerId, "mine_surface", { depth: run.depth, haul: paid.length }).catch(() => {});
-    return { ok: true, surfaced: true, paid, seam, ...(await getMiningState(buyerId)) };
+    // ── A STONE IN THE SEAM ── one of the four things in the game that can turn one up (see pet-stones.js).
+    // Scaled by DEPTH rather than flat, so it pays going deep instead of going often: at depth 12 it is worth
+    // twice what a shallow scrape is. Only on a successful surface — a collapse gets you nothing, as with
+    // everything else down there.
+    const { rollStone } = await import("@/lib/marketplace/pet-ascension.js");
+    const { STONE_SOURCES } = await import("@/lib/marketplace/pet-stones.js");
+    const depthMult = Math.min(2.5, 0.5 + (Number(run.depth) || 0) * 0.15);
+    const stone = paid.length ? await rollStone(buyerId, STONE_SOURCES.mine_seam.chance * depthMult, "mine_seam").catch(() => null) : null;
+    return { ok: true, surfaced: true, paid, seam, stone, ...(await getMiningState(buyerId)) };
 }
 
 // The seam you walked out with becomes the rock you mine.

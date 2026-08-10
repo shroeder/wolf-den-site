@@ -1,6 +1,7 @@
 // Each pet's EQUIPPED signature perk — a unique, flavor-named ability (not just a stat). Perks map to real
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
+import { enshrinedMult, packAuraFrom } from "@/lib/marketplace/pet-stones.js";
 import { petPassive, petSpecialPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
@@ -74,6 +75,9 @@ export const PERK_META = {
 
 // petId → { name, key }. The NAME is the flavor; the KEY is the mechanic. (Passive stat lives in
 // collectibles.js PET_PASSIVE_STAT — every pet is a unique passive+active pairing.)
+// An enshrined pet's active is worth what a level-6 pet's active is worth, because it IS one.
+const PET_ENSHRINED_LEVEL = 6;
+
 export const PET_PERKS = {
     // ── The twenty that fell through ──────────────────────────────────────────────────────────────────────
     // These had NO entry here, so petPerk() fell back to { name: "Companion", key: activeStat || "fortune" }.
@@ -330,7 +334,7 @@ export const SYSTEM_PERK_KEYS = new Set([
     "night_angler", "second_wind", "storm_sense", "following_sea", "beachcomber",
 ]);
 
-export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}) {
+export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = []) {
     const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
@@ -358,6 +362,10 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             if (sp.aura > aura) aura = sp.aura;
         }
     }
+    // A LIGHTSTONE brightens the whole pack, which is exactly what a menagerie aura already does — so it goes
+    // in the same place rather than becoming a second, parallel multiplier nobody could reason about. They ADD
+    // before the cap, so a Lightstone is worth having even to somebody who already owns a mythic.
+    aura = Math.min(0.9, aura + packAuraFrom(enshrined));
     // Menagerie aura amplifies the accumulated PASSIVE totals (applied before the equipped active is layered on).
     if (aura > 0) {
         for (const k of Object.keys(stats)) stats[k] = Math.round(stats[k] * (1 + aura));
@@ -365,25 +373,47 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     }
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
     // pet. Proc magnitudes scale too (chances capped so they stay sane).
-    if (equippedPet) {
-        const def = PET_PERKS[equippedPet.id] || { key: equippedPet.activeStat || "fortune" };
-        const v = petPerkValue(equippedPet.rarity, def.key);
-        const aMult = petActiveLevelMult(Math.max(1, Number(levelByPet[equippedPet.id]) || 1));
+    // ── THE ACTIVE PERK ─────────────────────────────────────────────────────────────────────────────────
+    // One function, applied to the equipped pet AND to every enshrined one, because an enshrined ability is
+    // not a copy of the active — it IS the active, still running with the pet back in the box. Writing it
+    // twice would have been the surest way to end up with two subtly different abilities under one name.
+    //
+    // `boost` is the stone's multiplier: 1 for the pet in your hands and for a Lightstone, 1.5 for a
+    // Darkstone. Proc CHANCES stay capped after the boost — a 150% of a 60% cap is still a coin you can lose.
+    const applyActive = (pet, level, boost = 1) => {
+        const def = PET_PERKS[pet.id] || { key: pet.activeStat || "fortune" };
+        const v = petPerkValue(pet.rarity, def.key);
+        const aMult = petActiveLevelMult(Math.max(1, Number(level) || 1)) * boost;
         const cap = (x, hi) => Math.min(hi, x);
-        if (def.key === "first_hit") proc.firstHitMult = 1 + (v - 1) * aMult; // scale the bonus above ×1
-        else if (def.key === "erupt") { proc.eruptChance = cap(v.chance * aMult, 0.6); proc.eruptMult = v.mult; }
-        else if (def.key === "chain_strike") proc.chainChance = cap(v * aMult, 0.6);
-        else if (def.key === "execute") proc.executePct = cap(v * aMult, 1.2);
-        else if (def.key === "onslaught") proc.onslaughtPct = cap(v * aMult, 1.2);
-        else if (def.key === "first_blood") proc.firstBloodPct = cap(v * aMult, 1.2);
+        const best = (k, x) => { proc[k] = Math.max(proc[k] || 0, x); };
+        if (def.key === "first_hit") best("firstHitMult", 1 + (v - 1) * aMult);
+        else if (def.key === "erupt") { best("eruptChance", cap(v.chance * aMult, 0.6)); proc.eruptMult = Math.max(proc.eruptMult || 0, v.mult); }
+        else if (def.key === "chain_strike") best("chainChance", cap(v * aMult, 0.6));
+        else if (def.key === "execute") best("executePct", cap(v * aMult, 1.2));
+        else if (def.key === "onslaught") best("onslaughtPct", cap(v * aMult, 1.2));
+        else if (def.key === "first_blood") best("firstBloodPct", cap(v * aMult, 1.2));
         else if (def.key === "extra_strike") {
-            // Extra strike is a CHANCE (rolled once/day), not a flat count — so leveling the pet always feels like
-            // an upgrade: 20% at Lv1 → 100% at Lv5 (an extra strike every day). boss.js does the daily roll.
-            const eqLevel = Math.max(1, Number(levelByPet[equippedPet.id]) || 1);
-            proc.extraStrikeChance = Math.min(1, 0.2 + 0.2 * (eqLevel - 1));
-        }
-        else if (SYSTEM_PERK_KEYS.has(def.key)) system[def.key] = capSystemPerk(def.key, v * aMult);
-        else add(def.key, v * aMult);
+            // Extra strike is a CHANCE (rolled once/day), not a flat count — so leveling the pet always feels
+            // like an upgrade: 20% at Lv1 → 100% at Lv5 (an extra strike every day). boss.js does the roll.
+            const eqLevel = Math.max(1, Number(level) || 1);
+            best("extraStrikeChance", Math.min(1, (0.2 + 0.2 * (eqLevel - 1)) * boost));
+        } else if (SYSTEM_PERK_KEYS.has(def.key)) {
+            system[def.key] = Math.max(system[def.key] || 0, capSystemPerk(def.key, v * aMult));
+        } else add(def.key, v * aMult);
+    };
+
+    // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
+    // pet. Proc magnitudes scale too (chances capped so they stay sane).
+    if (equippedPet) applyActive(equippedPet, levelByPet[equippedPet.id] || 1);
+
+    // ── ENSHRINED ── the whole point of level 6. These run whether the pet is in your hands or in the box,
+    // which is what stops the swapping. An enshrined pet that ALSO happens to be equipped is applied once,
+    // not twice: `best()` takes the higher of the two rather than adding them, so carrying your own enshrined
+    // pet around is neither a bonus nor a penalty — it simply stops mattering, which is the promise.
+    for (const e of enshrined) {
+        const pet = e?.pet;
+        if (!pet) continue;
+        applyActive(pet, PET_ENSHRINED_LEVEL, enshrinedMult(e.stone));
     }
     // Cap the OWNED totals. The aura above amplifies stats/economy but deliberately not these — a menagerie
     // aura multiplying a farm bonus that already stacks over sixteen pets compounds twice.

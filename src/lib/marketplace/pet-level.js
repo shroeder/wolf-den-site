@@ -8,7 +8,15 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
 //  - Cut the share + (especially) the free daily trickle so a maxed pet is a real, earned milestone.
 //  - The required XP per level is a QUADRATIC ramp SCALED BY RARITY — a rarer pet is a much longer haul.
-export const PET_MAX_LEVEL = 5;
+// ── SIX, NOT FIVE (2026-08-10) ────────────────────────────────────────────────────────────────────────────
+// Level 6 exists so a pet can be ENSHRINED — see pet-ascension.js. The whole point is to answer the way people
+// were actually playing: swapping pets all day to borrow each one's active ability for the one thing it was
+// good at. A pet you take to 6 and enshrine keeps its active FOREVER, equipped or not, so you can stop.
+//
+// NOTHING IS REVOKED. Every reward that counts a "maxed" pet tests `>= 5` (badges' pets_maxed, the Runebound
+// Drake's 25 maxed pets, the Radiant Phoenix's legendary-at-max) and a level-6 pet still satisfies `>= 5`.
+// Raising the ceiling cannot take a badge back off anybody, and that was checked rather than assumed.
+export const PET_MAX_LEVEL = 6;
 export const PET_XP_SHARE = 0.12; // 12% of member XP flows to the equipped pet (was 25%)
 export const PET_TRICKLE_PER_DAY = 5; // passive XP/day while equipped — the big "free maxing" lever (was 20)
 
@@ -25,7 +33,17 @@ export const PET_TRICKLE_PER_DAY = 5; // passive XP/day while equipped — the b
 // each pet's stored XP by 5 preserves both the level AND the fraction of progress toward the next one:
 // xp >= T is equivalent to 5xp >= 5T, and (xp−T[L])/(T[L+1]−T[L]) is unchanged when both parts are scaled.
 // Migration 341 does exactly that, once. Anyone mid-bar stayed mid-bar at the same percentage.
-const PET_BASE_THRESHOLDS = [0, 750, 3000, 6750, 12000];
+// Levels 1-5 are the old quadratic, untouched. LEVEL SIX IS NOT ON THAT CURVE: quadratic would have put it at
+// 18,750, a mere 1.6x the level-5 total, which is a weekend rather than a commitment. It is 2.5x the level-5
+// threshold instead, and because the whole ramp is multiplied by rarity, a rarer pet is a proportionally
+// longer haul exactly as it already was — the thing Luke asked for and the thing the curve already did.
+//
+// At the measured pace of a dedicated player (~710 pet XP a day, and ONLY the equipped pet earns):
+//   common  30,000  ~42 days      legendary  66,000  ~93 days
+//   epic    51,000  ~72 days      mythic     84,000  ~118 days
+// That is the price of never having to swap that pet in again, and it is meant to read as a decision about
+// which ONE pet you are marrying rather than a box to tick on all of them.
+const PET_BASE_THRESHOLDS = [0, 750, 3000, 6750, 12000, 30000];
 export const PET_XP_RARITY_MULT = { common: 1, rare: 1.3, epic: 1.7, legendary: 2.2, mythic: 2.8, ascendant: 3.6, eternal: 4.6, celestial: 5.8, primordial: 7 };
 export function petRarityMult(rarity) { return PET_XP_RARITY_MULT[rarity] || 1; }
 function rarityOf(petId) { return collectibleById(petId)?.rarity; }
@@ -36,13 +54,16 @@ export function petThresholds(rarity) {
     return PET_BASE_THRESHOLDS.map((t) => Math.round(t * m));
 }
 export function petMaxXp(rarity) { return petThresholds(rarity)[PET_MAX_LEVEL - 1]; }
+// The level-5 total, which is what every "maxed pet" reward in the game has always meant and still means.
+export const PET_ASCEND_LEVEL = 6;
+export function petFullyGrownXp(rarity) { return petThresholds(rarity)[4]; }
 
 // The level-scaling mults live in collectibles.js (pure, client-safe); re-exported here for server callers.
 export { petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 const DAY_MS = 86400000;
 
-// Level (1..5) for a pet-XP total. Pass the pet's RARITY (or its id) so the right rarity curve is used.
+// Level (1..6) for a pet-XP total. Pass the pet's RARITY (or its id) so the right rarity curve is used.
 export function petLevelForXp(xp, rarity = "common") {
     const th = petThresholds(rarity);
     const n = Math.max(0, Number(xp) || 0);
