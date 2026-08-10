@@ -922,11 +922,19 @@ export async function fightRound(buyerId, opts = {}) {
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
         let dmg = 0;
         let crit = false;
+        // WHAT THEIR GUARD ATE. The number was computed and thrown away, and that asymmetry is the whole of
+        // "why do I do so little damage": when THEY swing you are told "you turn aside 21, 17 lands", and when
+        // YOU swing you are told "14" with no account of where the rest went. Their guard is the single
+        // biggest term in the swing — it rolls 12%, 32% or 55% fresh every blow — so a member watching their
+        // own damage jump between 14 and 35 with the same gear against the same opponent has no way to learn
+        // that it is one hidden roll, and concludes their gear does nothing.
+        let turned = 0;
         for (let i = 0; i < hits && power > 0; i += 1) {
             const c = Math.random() < critChance;
             if (c) crit = true;
             const raw = hit(b.me.might * SWING) * gradeAtk * power * surge * clashMult * (b.underdog || 1)
                 * openMult * lowHpMult * (c ? myCritMult : 1);
+            turned += Math.round(raw * guard);
             dmg += Math.max(1, Math.round(raw - raw * guard));
         }
         b.foeHp = Math.max(0, b.foeHp - dmg);
@@ -957,12 +965,13 @@ export async function fightRound(buyerId, opts = {}) {
 
         const extra = [
             healed > 0 ? `+${healed} back` : null,
+            turned > 0 ? `${turned} turned aside` : null,
             rend && dmg > 0 ? `burning ${b.bleed.dmg}/turn` : null,
             sunder ? `guard stripped` : null,
             hits > 1 ? `${hits} hits` : null,
         ].filter(Boolean).join(", ");
         b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg, crit,
-            hits, healed, kind: ability?.kind || "hit",
+            hits, healed, turned, kind: ability?.kind || "hit",
             text: dmg > 0
                 ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"} — ${dmg}${extra ? ` (${extra})` : ""}.`
                 : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`,

@@ -745,51 +745,60 @@ export default function ArenaClient({ initial }) {
                         ))}
                     </span>
 
-                    {/* Everything that used to sit in paragraphs under the panel, now a strip across the top. */}
+                    {/* Everything that used to sit in paragraphs under the panel, now a strip across the top.
+                        THREE COLUMNS, not one centred flex row. The tags used to be loose children of that
+                        row while .ar-tools floated over the top-right corner on position:absolute, so a long
+                        clash line — "Their Storm smothers your Shadow · -25% why?" — ran straight underneath
+                        three opaque buttons and lost its last third. A column cannot be overlapped by a
+                        sibling column: the tools take their width OUT of the row instead of hovering above
+                        it, and the tags wrap inside what is left. */}
                     <div className="ar-hud">
                         <span className="ar-round">Round {bout.beat}</span>
-                        {/* ── THE TOOLS ── mute, leave and the log. A ROW, because .ar-mute is absolutely
-                            positioned at the top-right corner: a second and third button using that class
-                            landed on the exact same 34px square as the first, and only the last one drawn
-                            could be tapped. Caught by a click that Playwright reported as intercepted. */}
+
+                        <span className="ar-hud-tags">
+                            {bout.clash?.note ? (
+                                <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
+                                    onClick={() => setWheel((w) => !w)}>
+                                    {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "−"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}%{" "}<u>why?</u>
+                                </button>
+                            ) : null}
+                            {bout.underdog > 1 ? (
+                                <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
+                            ) : null}
+                            {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here. */}
+                            {bout.beat <= 1 && bout.opener ? (
+                                <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
+                                    {bout.opener === "you" ? "You're faster — you open" : `${bout.foe.name} is faster — they open`}
+                                </span>
+                            ) : null}
+                        </span>
+
+                        {/* ── THE TOOLS ── mute, leave and the log. A ROW, because .ar-mute was once absolutely
+                            positioned: a second and third button using that class landed on the exact same
+                            34px square as the first, and only the last one drawn could be tapped. */}
                         <div className="ar-tools">
-                        {/* A fight with music needs a way to turn the music off, on the fight screen, without
-                            hunting for it. The choice is remembered across bouts. */}
-                        <button type="button" className={`ar-mute${muteOn ? " is-off" : ""}`}
-                            aria-label={muteOn ? "Turn sound on" : "Turn sound off"}
-                            aria-pressed={muteOn}
-                            onClick={() => { const n = !muteOn; setMuteOn(n); setMuted(n); if (!n) { unlock(); Sfx.ui(); } }}>
-                            {muteOn ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
-                        </button>
-                        {/* ── LEAVE ── the bout is a row in the database, not a thing held open by this screen,
-                            so stepping out of it costs nothing at all: no forfeit, no round conceded, the
-                            opponent is not waiting. Same deal a ship battle already offers. */}
-                        <button type="button" className="ar-mute ar-leave" aria-label="Step out of the fight"
-                            onClick={() => { Sfx.ui(); setStepped(true); }}>
-                            <GiExitDoor aria-hidden="true" />
-                        </button>
-                        <button type="button" className={`ar-mute ar-logbtn${logOpen ? "" : " is-off"}`}
-                            aria-label={logOpen ? "Hide the blow-by-blow" : "Show the blow-by-blow"}
-                            aria-pressed={logOpen}
-                            onClick={() => setLogOpen((v) => !v)}>
-                            <GiScrollUnfurled aria-hidden="true" />
-                        </button>
-                        </div>
-                        {bout.clash?.note ? (
-                            <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
-                                onClick={() => setWheel((w) => !w)}>
-                                {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "\u2212"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}%{" "}<u>why?</u>
+                            {/* A fight with music needs a way to turn the music off, on the fight screen,
+                                without hunting for it. The choice is remembered across bouts. */}
+                            <button type="button" className={`ar-mute${muteOn ? " is-off" : ""}`}
+                                aria-label={muteOn ? "Turn sound on" : "Turn sound off"}
+                                aria-pressed={muteOn}
+                                onClick={() => { const n = !muteOn; setMuteOn(n); setMuted(n); if (!n) { unlock(); Sfx.ui(); } }}>
+                                {muteOn ? <GiSoundOff aria-hidden="true" /> : <GiSoundOn aria-hidden="true" />}
                             </button>
-                        ) : null}
-                        {bout.underdog > 1 ? (
-                            <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
-                        ) : null}
-                        {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here. */}
-                        {bout.beat <= 1 && bout.opener ? (
-                            <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
-                                {bout.opener === "you" ? "You're faster — you open" : `${bout.foe.name} is faster — they open`}
-                            </span>
-                        ) : null}
+                            {/* ── LEAVE ── the bout is a row in the database, not a thing held open by this
+                                screen, so stepping out costs nothing: no forfeit, no round conceded, the
+                                opponent is not waiting. Same deal a ship battle already offers. */}
+                            <button type="button" className="ar-mute ar-leave" aria-label="Step out of the fight"
+                                onClick={() => { Sfx.ui(); setStepped(true); }}>
+                                <GiExitDoor aria-hidden="true" />
+                            </button>
+                            <button type="button" className={`ar-mute ar-logbtn${logOpen ? "" : " is-off"}`}
+                                aria-label={logOpen ? "Hide the blow-by-blow" : "Show the blow-by-blow"}
+                                aria-pressed={logOpen}
+                                onClick={() => setLogOpen((v) => !v)}>
+                                <GiScrollUnfurled aria-hidden="true" />
+                            </button>
+                        </div>
                     </div>
 
                     {wheel ? (
@@ -1571,8 +1580,14 @@ function Styles() {
             .ar-ring::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26%;
                 z-index: 1; pointer-events: none;
                 background: linear-gradient(180deg, transparent, rgba(8,5,4,0.42) 70%, rgba(6,4,3,0.62)); }
-            .ar-hud { position: relative; z-index: 5; flex: 0 0 auto; padding: 8px 8px 0; display: flex;
-                align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; pointer-events: none; }
+            /* auto | 1fr | auto — the round on the left, the tags in whatever is left in the middle, the
+               tools on the right. minmax(0,1fr) is load-bearing: a plain 1fr refuses to shrink below its
+               content, which would push the tools back off the edge on a narrow phone. */
+            .ar-hud { position: relative; z-index: 5; flex: 0 0 auto; padding: 8px 8px 0; display: grid;
+                grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 6px;
+                pointer-events: none; }
+            .ar-hud-tags { display: flex; align-items: center; justify-content: center; gap: 6px;
+                flex-wrap: wrap; min-width: 0; }
             .ar-round { font-size: 10px; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
                 color: #ffe0b0; text-shadow: 0 2px 8px #000; }
             /* The affinity read and the underdog bonus used to be paragraphs UNDER the panel, where they were
@@ -2304,8 +2319,7 @@ function Styles() {
             /* ── TOUCH TARGETS ── measured at 28x28, well under the 44px every mobile guideline asks for.
                The box stays small so it does not shout on a crowded HUD; the HIT AREA is grown past it with a
                transparent ::after, which is the standard way to have both. */
-            .ar-tools { position: absolute; top: 7px; right: 8px; z-index: 26; display: flex; gap: 6px;
-                pointer-events: auto; }
+            .ar-tools { position: relative; z-index: 26; display: flex; gap: 6px; pointer-events: auto; }
             .ar-mute { position: relative; width: 34px; height: 34px;
                 padding: 0; appearance: none; -webkit-appearance: none; border-radius: 9px; cursor: pointer;
                 display: grid; place-items: center; pointer-events: auto;
@@ -2492,10 +2506,13 @@ function Styles() {
                    Budget: hud 18 + bars 30 + floor 96 + rail 26 + deck 58 = 228 of 240. */
                 .ar-floor { flex: 1 0 auto; min-height: 96px; }
                 .ar-hud { padding: 2px 6px 0; gap: 4px; min-height: 0; }
+                /* The round number goes, and so does its COLUMN — a leftover auto track would keep the tags
+                   off-centre by the width of a word that is no longer drawn. */
                 .ar-round { display: none; }
+                .ar-hud { grid-template-columns: minmax(0, 1fr) auto; }
                 .ar-hud .ar-tag { font-size: 8.5px; min-height: 20px; padding: 3px 7px; }
                 .ar-hud .ar-tag.is-under { display: none; }
-                .ar-tools { top: 3px; right: 4px; gap: 4px; }
+                .ar-tools { gap: 4px; }
                 .ar-mute { width: 26px; height: 26px; }
                 .ar-bars { padding: 1px 8px 0; gap: 6px; }
                 .ar-fname { font-size: 10px; }
