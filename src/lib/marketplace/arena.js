@@ -11,7 +11,8 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
-import { ARMOURY, boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
+import { boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
+import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
 import {
     arenaLevelFor, arenaXpFor, CLASSES, classById, FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState,
@@ -158,9 +159,11 @@ async function ladderFor(buyerId) {
         .sort((a, b) => a.power - b.power);
 }
 
+// The power figure the LADDER sorts on and the profile prints. Same source as the fight itself — a member
+// shown as weaker than they fight is a matchmaker aiming at the wrong number.
 export async function arenaPower(buyerId) {
-    const [{ sumItemStats }, { getEquippedIds }] = await Promise.all([
-        import("@/lib/marketplace/items.js"),
+    const [{ getEquippedStats }, { getEquippedIds }] = await Promise.all([
+        import("@/lib/marketplace/inventory.js"),
         import("@/lib/marketplace/inventory.js"),
     ]);
     const [me, bySlot] = await Promise.all([
@@ -171,7 +174,7 @@ export async function arenaPower(buyerId) {
         getEquippedIds(buyerId).catch(() => ({})),
     ]);
     const level = levelForXp(Number(me?.xp) || 0).level;
-    const stats = sumItemStats(Object.values(bySlot || {}));
+    const stats = await getEquippedStats(buyerId).catch(() => ({}));
     const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
     return {
         level, gearPower, vigour: arenaVigour(level, gearPower), might: arenaMight(level, gearPower),
@@ -187,13 +190,24 @@ async function kitFor(buyerId) {
         import("@/lib/marketplace/signatures.js"),
         import("@/lib/marketplace/item-element.js"),
     ]);
-    const { sumItemStats } = await import("@/lib/marketplace/items.js");
+    const { getEquippedStats } = await import("@/lib/marketplace/inventory.js");
     // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine here.
     const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
     const ids = Object.values(bySlot || {}).filter(Boolean);
     const me = await db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const level = levelForXp(Number(me?.xp) || 0).level;
-    const gearPower = Object.values(sumItemStats(ids) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+    // ── THE ARENA READS THE GEAR YOU ACTUALLY BUILT ──────────────────────────────────────────────────────
+    // This was `sumItemStats(ids)` — the CATALOG line for each equipped item and nothing else. So a Dragoncape
+    // forged to +6 fought as an unforged one, a completed set bonus did nothing, and a Flawless Ruby set into
+    // a piece changed no number in the ring at all. Every system a player invests in was invisible in the one
+    // place they go to prove it.
+    //
+    // getEquippedStats is what the boss already fights you with: base + set bonuses + forge enhancement +
+    // socketed jewels, merged. Both sides of a member bout run through this same function, so the matchup
+    // stays honest; the Gauntlet's tiers are fixed power, which means investment now tells against them, which
+    // is the entire point of investing.
+    const stats = await getEquippedStats(buyerId).catch(() => ({}));
+    const gearPower = Object.values(stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
     const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
     const flat = {};
     for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
@@ -224,7 +238,6 @@ async function kitFor(buyerId) {
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
     const art = await itemSpriteMap().catch(() => ({}));
     for (const a of kit.abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
-    const stats = sumItemStats(ids) || {};
     return {
         level, gearPower,
         classId, taken, perks,
@@ -418,8 +431,17 @@ export async function getArenaState(buyerId) {
         },
         targets,
         gauntlet,
-        // A shop row you can see and cannot buy is worse than one that is not there.
-        armoury: ARMOURY.filter((x) => x.gated !== "jewels" || jewelsEnabled(buyerId)),
+        // The crates, with the table each one can actually roll FOR THIS MEMBER — a gated row is swapped for
+        // its stand-in rather than dropped, so the odds on screen are the odds they will get.
+        armoury: CRATES.map((c) => ({
+            id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,
+            // Every possible outcome, best first. A crate that will not say what is in it is a slot machine,
+            // and this game does not have those.
+            table: rollable(c, { jewels: jewelsEnabled(buyerId) })
+                .map((r) => ({ label: r.label, worth: r.worth, w: r.w }))
+                .sort((a, z) => z.worth - a.worth),
+            ev: armouryEv(c, { jewels: jewelsEnabled(buyerId) }),
+        })),
         progress,
         upgrades: upgradeView(row?.upgrades || {}),
         gold: Number(row?.gold_now) || 0,

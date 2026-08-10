@@ -132,10 +132,35 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
         const acc = enhByBuyer.get(r.buyer_id);
         for (const [k, v] of Object.entries(b)) acc[k] = (acc[k] || 0) + (Number(v) || 0);
     }
+    // ── AND THE JEWELS ── one query for everyone, same rule as the enhancement above: it only counts while
+    // the item is equipped. Without this the LADDER weighed other members without their gems while the fight
+    // itself counted them, so matchmaking was aiming at a number nobody actually fought with.
+    const gemByBuyer = new Map();
+    try {
+        const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
+        const { sumGemStats } = await import("@/lib/marketplace/gems.js");
+        const eligible = buyerIds.filter((x) => jewelsEnabled(x));
+        if (eligible.length) {
+            const socketRows = await db.query(
+                `SELECT buyer_id, item_id, gem_id FROM mkt_item_socket WHERE buyer_id = ANY($1) AND gem_id IS NOT NULL`,
+                [eligible]
+            ).catch(() => []);
+            const held = new Map();
+            for (const r of socketRows) {
+                if (!byBuyer.get(r.buyer_id)?.includes(r.item_id)) continue;
+                if (!held.has(r.buyer_id)) held.set(r.buyer_id, []);
+                held.get(r.buyer_id).push(r.gem_id);
+            }
+            for (const [bid, gemIds] of held) gemByBuyer.set(bid, sumGemStats(gemIds));
+        }
+    } catch { /* no bench, no gems */ }
+
     for (const [id, ids] of byBuyer) {
         const total = withSetBonuses(ids);
         const enh = enhByBuyer.get(id);
         if (enh) for (const [k, v] of Object.entries(enh)) total[k] = (total[k] || 0) + v;
+        const gem = gemByBuyer.get(id);
+        if (gem) for (const [k, v] of Object.entries(gem)) total[k] = (total[k] || 0) + v;
         out.set(id, total);
     }
     return out;

@@ -211,13 +211,17 @@ export async function setGem(buyerId, itemId, gemId, idx = 0) {
 }
 
 /**
- * Pull a gem back out. IT BREAKS.
+ * Take a gem back out. TWO WAYS, and the difference is the decision.
  *
- * That is the whole reason setting one is a decision — a socket you can shuffle per opponent costs nothing to
- * get wrong, and a gem that survives being pulled makes the last four tiers pointless. The button says so
- * before you press it.
+ * FREE, and it breaks. Setting a jewel has to cost something or a socket is a slot you shuffle per opponent.
+ * PAID, and it survives — the jeweller cuts it out properly for gold scaled to the tier, so a good stone in
+ * the wrong piece is a mistake you can buy your way out of rather than a week of mining thrown away.
+ *
+ * Which one you get is `keep`, and the button says which before you press it rather than after.
  */
-export async function pullGem(buyerId, itemId, idx = 0) {
+export const EXTRACT_COST = (tier = 1) => 800 * Math.max(1, Number(tier) || 1);
+
+export async function pullGem(buyerId, itemId, idx = 0, keep = false) {
     if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     // The old value comes from a FROM subquery, not from RETURNING: RETURNING hands back the row as it is
     // AFTER the update, which for this statement is the NULL we just wrote. The join reads the pre-update

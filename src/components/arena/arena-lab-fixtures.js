@@ -9,6 +9,7 @@ const TREE_CLASS = "reaver";
 const TREE_TAKEN = { rv_might: 3, rv_crit: 2, rv_strike: 1, rv_flurry: 1 };
 const TREE_XP = 2400;
 import { vpPreview, boutLaurels } from "@/lib/marketplace/arena-rewards.js";
+import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
 
 // ── THE ARENA LAB: FIXTURES ──────────────────────────────────────────────────────────────────────────────────
 // DEV ONLY. Handcrafted arena state in exactly the shape `getArenaState` / `publicBout` hand to the client, so
@@ -233,6 +234,13 @@ export function baseState(extra = {}) {
         me: { ...ME, rank: 12, vp: 1040, power: MY_POWER, abilities: treeAbilities(TREE_CLASS, TREE_TAKEN, "fire") },
         rank: 12, size: 84,
         vp: 1040, laurels: 640,
+        // The real crates, through the real tables, so the shelf can be looked at without a login.
+        armoury: CRATES.map((c) => ({
+            id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,
+            table: rollable(c, { jewels: true }).map((r) => ({ label: r.label, worth: r.worth, w: r.w }))
+                .sort((a, z) => z.worth - a.worth),
+            ev: armouryEv(c, { jewels: true }),
+        })),
         band: RANK_HUNTER,
         fightsLeft: 7, fightsPerDay: 10,
         stats: { wins: 34, losses: 19, streak: 3, bestStreak: 5, bestVp: 1040, npcBest: 11 },

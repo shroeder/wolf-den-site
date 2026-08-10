@@ -40,6 +40,9 @@ function Portal({ children }) {
 //
 // Raw <img> everywhere: styled-jsx will not scope a rule aimed at a custom component (see check:styled-jsx).
 
+// The currency's face. It had none — "1,014 laurels" was a word, so the one thing you earn every single bout
+// looked like a number the screen was telling you rather than a thing you hold.
+const LAUREL = "/images/arena/armoury/laurel.png";
 const money = (n) => Number(n || 0).toLocaleString();
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
@@ -379,6 +382,9 @@ export default function ArenaClient({ initial }) {
     const ringRef = useRef(null);
     // The blow-by-blow, off by default — see the drawer note down in the render.
     const [logOpen, setLogOpen] = useState(false);
+    // What came out of the last crate, and which one is mid-open — the lid has to shake before it answers.
+    const [opening, setOpening] = useState(null);
+    const [opened, setOpened] = useState(null);
     // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
     // walking away touches it, which is the whole reason this can exist at all.
     const [stepped, setStepped] = useState(false);
@@ -1141,7 +1147,10 @@ export default function ArenaClient({ initial }) {
                             <b>{money(st.vp)}</b> VP<em>rank · never spent</em>
                         </i>
                         <i title="The arena's own currency. Earned every bout, win or lose. Spent in the Armoury.">
-                            <b>{money(st.laurels)}</b> Laurels<em>spend in the Armoury</em>
+                            <b>{money(st.laurels)}</b>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={LAUREL} alt="" className="ar-laurel" draggable="false" /> Laurels
+                            <em>spend in the Armoury</em>
                         </i>
                     </span>
                 </div>
@@ -1167,39 +1176,93 @@ export default function ArenaClient({ initial }) {
                     onBuy={(id) => { setUpgFlash(id); setTimeout(() => setUpgFlash(null), 700); act("arena_upgrade", { track: id }); }} />
             ) : null}
 
-            {/* ── THE ARMOURY ── the shelf laurels are FOR, which until now was a list the server sent and
-                nothing drew. Every laurel earned since the ladder opened bought nothing, because there was
-                nowhere to spend one and no action behind it if you had found one. */}
+            {/* ── THE ARMOURY ── three crates, and what comes out is rolled. A price list is arithmetic you
+                do once and repeat forever; this is a decision about how much you are willing to stake. Every
+                possible outcome is printed under the crate, because a box that will not say what is in it is
+                a slot machine and this game does not have those. */}
             {tab === "armoury" ? (
                 <section className="card">
                     <div className="ar-arm-head">
                         <b>The Armoury</b>
-                        <span className="ar-arm-purse">{money(st.laurels)} laurels</span>
+                        <span className="ar-arm-purse">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={LAUREL} alt="" className="ar-laurel" draggable="false" />
+                            {money(st.laurels)}
+                        </span>
                     </div>
                     <p className="ar-arm-sub">
-                        Laurels come off every bout, win or lose, and off the feats inside them. This is the
-                        only thing that takes them.
+                        Laurels come off every bout, win or lose, and off the feats inside them. This is the only
+                        thing that takes them.
                     </p>
-                    <div className="ar-arm-grid">
-                        {(st.armoury || []).map((a) => {
-                            const poor = (st.laurels || 0) < a.cost;
-                            // Second Wind hands back challenges you have SPENT, so with a full allowance it
-                            // would take laurels and give you nothing. Off until it is worth something.
-                            const useless = a.kind === "fights" && st.fightsLeft >= st.fightsPerDay;
+                    <div className="ar-crates">
+                        {(st.armoury || []).map((c) => {
+                            const poor = (st.laurels || 0) < c.cost;
+                            const total = (c.table || []).reduce((n, r) => n + r.w, 0) || 1;
                             return (
-                                <div key={a.id} className={`ar-arm${poor || useless ? " is-poor" : ""}`}>
-                                    <b>{a.name}</b>
-                                    <p>{a.blurb}</p>
-                                    {a.note ? <em>{a.note}</em> : null}
-                                    <button type="button" className="ar-btn is-sm" disabled={busy || poor || useless}
-                                        onClick={() => { Sfx.ui(); act("buy_armoury", { id: a.id }); }}>
-                                        {useless ? "Nothing to restore" : `${money(a.cost)} laurels`}
+                                <div key={c.id} className={`ar-crate${poor ? " is-poor" : ""}${opening === c.id ? " is-opening" : ""}`}>
+                                    <div className="ar-crate-top">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img className="ar-crate-art" src={c.art} alt="" draggable="false" />
+                                        <div className="ar-crate-words">
+                                            <b>{c.name}</b>
+                                            <p>{c.blurb}</p>
+                                        </div>
+                                    </div>
+                                    <details className="ar-crate-odds">
+                                        <summary>What is in it</summary>
+                                        <ul>
+                                            {(c.table || []).map((r) => (
+                                                <li key={r.label}>
+                                                    <i>{r.label}</i>
+                                                    <em>{Math.round((r.w / total) * 100)}%</em>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </details>
+                                    <button type="button" className="ar-crate-buy" disabled={busy || poor || Boolean(opening)}
+                                        onClick={async () => {
+                                            unlock(); Sfx.ui(); Haptic.tap();
+                                            setOpening(c.id);
+                                            const r = await act("buy_armoury", { id: c.id });
+                                            // The lid shakes before it answers — the roll is already decided
+                                            // server-side, this beat is so the answer lands rather than appears.
+                                            setTimeout(() => {
+                                                setOpening(null);
+                                                if (r?.opened) {
+                                                    setOpened(r.opened);
+                                                    Sfx.chestOpen?.("gold"); Haptic.chestOpen?.("gold");
+                                                }
+                                            }, 900);
+                                        }}>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={LAUREL} alt="" className="ar-laurel" draggable="false" />
+                                        {opening === c.id ? "Prising it open…" : money(c.cost)}
                                     </button>
                                 </div>
                             );
                         })}
                     </div>
                 </section>
+            ) : null}
+
+            {/* What the crate held. Same shape as every other reveal in the game: the thing, named, at size. */}
+            {opened ? (
+                <div className="ar-open-scrim" role="dialog" aria-modal="true" onClick={() => setOpened(null)}
+                    style={{ "--c": opened.color || "#ffd75e" }}>
+                    <span className="ar-open-rays" aria-hidden="true" />
+                    <div className="ar-open-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="ar-open-kick">{opened.crate?.name}</div>
+                        {opened.art ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="ar-open-art" src={opened.art} alt="" draggable="false" />
+                        ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="ar-open-art" src={opened.crate?.art} alt="" draggable="false" />
+                        )}
+                        <b className="ar-open-name">{opened.label}</b>
+                        <button type="button" className="ar-btn ar-open-go" onClick={() => setOpened(null)}>Take it</button>
+                    </div>
+                </div>
             ) : null}
 
 {tab === "fight" ? (<>
@@ -1954,9 +2017,11 @@ function Styles() {
             .ar-up-row.is-you { border: 1px solid rgba(255,215,94,0.45); background: rgba(255,215,94,0.08); }
 
             /* ── TABS ── */
-            .ar-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 16px; }
-            .ar-tab { position: relative; padding: 10px 8px; border-radius: 12px; cursor: pointer;
-                font-size: 12px; font-weight: 900; letter-spacing: .03em; color: #9aa2ab;
+            /* FOUR now that the Armoury is a tab. The count was hardcoded at three, so the fourth wrapped onto
+               a line of its own and the strip stopped reading as one control. */
+            .ar-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 0 0 16px; }
+            .ar-tab { position: relative; padding: 10px 4px; border-radius: 12px; cursor: pointer;
+                font-size: 11.5px; font-weight: 900; letter-spacing: .01em; color: #9aa2ab;
                 background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.12); }
             .ar-tab.is-on { color: #12101a; background: linear-gradient(180deg,#ffdf86,#e8ab24);
                 border-color: rgba(255,240,200,.5); }
@@ -2315,6 +2380,61 @@ function Styles() {
 
             /* ── FIND A FIGHT ── the one button that replaced two lists. Sized like the thing it is: the
                reason you opened the screen. */
+            /* ── THE ARMOURY ── crates rather than a price list, so the art carries the tier and the odds sit
+               under the lid for anyone who wants them. */
+            .ar-laurel { width: 17px; height: 17px; object-fit: contain; vertical-align: -3px; }
+            .ar-crates { display: grid; gap: 10px; }
+            .ar-crate { display: flex; flex-direction: column; gap: 9px; padding: 12px; border-radius: 15px;
+                background: rgba(255,255,255,0.035); border: 1px solid rgba(255,215,94,0.22); }
+            .ar-crate.is-poor { opacity: .58; }
+            .ar-crate-top { display: flex; align-items: center; gap: 12px; }
+            .ar-crate-art { width: 68px; height: 68px; flex: none; object-fit: contain;
+                filter: drop-shadow(0 5px 12px rgba(0,0,0,0.55)); }
+            .ar-crate.is-opening .ar-crate-art { animation: arCrateShake .3s ease-in-out infinite; }
+            @keyframes arCrateShake {
+                0%,100% { transform: translateX(0) rotate(-2deg) }
+                50% { transform: translateX(3px) rotate(2deg) } }
+            .ar-crate-words { min-width: 0; }
+            .ar-crate-words b { display: block; font-family: var(--font-display); font-size: 1rem; color: #ffe0a8; }
+            .ar-crate-words p { margin: 2px 0 0; font-size: 0.76rem; line-height: 1.4; color: #9aa2ab; }
+            /* Every outcome, with its odds. A box that will not say what is in it is a slot machine. */
+            .ar-crate-odds summary { cursor: pointer; font-size: 0.72rem; font-weight: 800; color: #8f98a3; }
+            .ar-crate-odds ul { list-style: none; margin: 7px 0 0; padding: 0; display: grid; gap: 3px; }
+            .ar-crate-odds li { display: flex; gap: 8px; font-size: 0.72rem; color: #cbd2da;
+                padding: 3px 8px; border-radius: 7px; background: rgba(0,0,0,0.25); }
+            .ar-crate-odds i { font-style: normal; flex: 1; }
+            .ar-crate-odds em { font-style: normal; color: #8f8875; }
+            .ar-crate-buy { display: flex; align-items: center; justify-content: center; gap: 7px;
+                padding: 12px; border-radius: 12px; cursor: pointer; font-family: var(--font-display);
+                font-weight: 900; font-size: 0.95rem; color: #22180a;
+                border: 1px solid rgba(255,236,170,0.85);
+                background: linear-gradient(180deg, #f6c34a, #d99a1e 52%, #a86f10); }
+            .ar-crate-buy:disabled { cursor: default; filter: grayscale(0.7) brightness(0.7); }
+
+            /* The reveal. Same shape as every other one in the game: the thing, named, at size. */
+            .ar-open-scrim { position: fixed; inset: 0; height: 100svh; z-index: 10094; display: grid;
+                place-items: center; padding: 18px; background: rgba(4,3,8,0.86);
+                backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: arOpenIn .2s ease both; }
+            @keyframes arOpenIn { from { opacity: 0 } to { opacity: 1 } }
+            .ar-open-rays { position: absolute; inset: -25%; pointer-events: none;
+                background: conic-gradient(from 0deg, transparent 0 11deg,
+                    color-mix(in srgb, var(--c) 24%, transparent) 11deg 16deg, transparent 16deg 28deg);
+                animation: arOpenSpin 20s linear infinite; }
+            @keyframes arOpenSpin { to { transform: rotate(360deg) } }
+            .ar-open-card { position: relative; width: min(320px, 100%); text-align: center; padding: 22px 18px 18px;
+                border-radius: 20px; border: 2px solid color-mix(in srgb, var(--c) 70%, transparent);
+                background: linear-gradient(180deg, #1e1a12, #12100c);
+                box-shadow: 0 0 60px color-mix(in srgb, var(--c) 32%, transparent), 0 20px 60px rgba(0,0,0,0.7);
+                animation: arOpenPop .4s cubic-bezier(.2,1.25,.35,1) both; }
+            @keyframes arOpenPop { from { opacity: 0; transform: scale(.88) translateY(12px) } to { opacity: 1; transform: none } }
+            .ar-open-kick { font-size: 0.62rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase;
+                color: var(--c); }
+            .ar-open-art { width: 128px; height: 128px; object-fit: contain; margin: 10px 0 6px;
+                filter: drop-shadow(0 8px 18px rgba(0,0,0,0.6));
+                animation: arOpenFloat 2.8s ease-in-out infinite; }
+            @keyframes arOpenFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+            .ar-open-name { display: block; font-family: var(--font-display); font-size: 1.2rem; color: #f7efe0; }
+            .ar-open-go { width: 100%; margin-top: 14px; }
             .ar-arm-head { display: flex; align-items: baseline; gap: 8px; }
             .ar-arm-head b { font-family: var(--font-display); font-size: 1.05rem; color: #e8dcc6; }
             .ar-arm-purse { margin-left: auto; font-family: var(--font-display); font-weight: 900;

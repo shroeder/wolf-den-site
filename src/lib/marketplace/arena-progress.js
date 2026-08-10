@@ -8,7 +8,7 @@ import {
     TIER_GATE, treeFor,
 } from "@/lib/marketplace/arena-classes.js";
 import { ARENA_UPGRADES, upgradeCost } from "@/lib/marketplace/arena-upgrades.js";
-import { armouryItem } from "@/lib/marketplace/arena-rewards.js";
+import { crateById, rollCrate } from "@/lib/marketplace/armoury.js";
 import { GEM_KINDS, gemId } from "@/lib/marketplace/gems.js";
 
 // ── SPENDING WHAT THE ARENA PAYS ─────────────────────────────────────────────────────────────────────────────
@@ -204,85 +204,83 @@ export async function buyArenaUpgrade(buyerId, trackId) {
 }
 
 
-// ── BUYING FROM THE ARMOURY ──────────────────────────────────────────────────────────────────────────────────
-// Laurels had no sink at all: the shelf was exported into the arena's state, rendered by nothing, and there
-// was no action on the route to render. Every laurel earned since the ladder opened bought precisely nothing.
+// ── OPENING A CRATE ──────────────────────────────────────────────────────────────────────────────────────────
+// The Armoury was a price list: eleven rows, each a known thing for a known number, so spending laurels was an
+// arithmetic exercise you did once and repeated forever. It is three crates now and the contents are rolled —
+// the decision is which crate, not which item.
 //
-// Spent conditionally inside the UPDATE, like every other currency in the game — neon() has no transactions,
-// so a balance read followed by a spend is two taps both passing a check only one of them can afford.
+// The roll happens HERE, after the laurels are taken and against the table the player can actually roll (a
+// member without the bench gets the stand-in rows, not a shorter table). Nothing about the outcome comes from
+// the client.
 export async function buyArmoury(buyerId, id) {
-    const item = armouryItem(String(id || ""));
-    if (!buyerId || !item) return { ok: false, error: "bad_item" };
+    const crate = crateById(String(id || ""));
+    if (!buyerId || !crate) return { ok: false, error: "bad_item" };
 
-    // A gated row is not for sale to somebody who cannot use what it sells.
-    if (item.gated === "jewels") {
-        const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
-        if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
-    }
+    const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
+    const jewels = jewelsEnabled(buyerId);
 
-    // ── DO NOT SELL SOMEBODY NOTHING ─────────────────────────────────────────────────────────────────────
-    // Second Wind is spent as a REDUCTION of today's used count, so buying it before you have used any
-    // challenges would take 420 laurels and hand back fights you already had. Refused rather than silently
-    // wasted: a shop that takes your money for a no-op is worse than one that says no.
-    if (item.kind === "fights") {
-        const used = await db.queryOne(
-            `SELECT CASE WHEN fights_day = (NOW() AT TIME ZONE 'America/Chicago')::date
-                         THEN COALESCE(fights_today, 0) ELSE 0 END AS n
-               FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
-        ).catch(() => null);
-        if ((Number(used?.n) || 0) <= 0) return { ok: false, error: "nothing_to_restore" };
-    }
-
+    // Spent conditionally inside the UPDATE — neon() has no transactions, so a balance read followed by a
+    // spend is two taps both passing a check only one of them can afford.
     const paid = await db.queryOne(
         `UPDATE mkt_arena SET laurels = laurels - $2 WHERE buyer_id = $1 AND laurels >= $2 RETURNING laurels`,
-        [buyerId, item.cost]
+        [buyerId, crate.cost]
     ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_laurels", cost: item.cost };
+    if (!paid) return { ok: false, error: "not_enough_laurels", cost: crate.cost };
 
-    // Hand it over. Anything that fails here has already been paid for, so each grant is best-effort and
-    // logged — a member who is charged and given nothing is the one outcome worth avoiding above all.
-    let got = null;
+    const won = rollCrate(crate, { jewels });
+
+    // Hand it over. Anything that throws here has already been paid for, so each grant is best-effort and the
+    // log below is the record — a member charged and given nothing is the one outcome worth avoiding above all.
+    let got = { kind: won.kind, label: won.label, art: null };
     try {
-        if (item.kind === "chest") {
-            const { addChests } = await import("@/lib/marketplace/chests.js");
-            await addChests(buyerId, { [item.chest]: 1 }, { source: "arena_armoury" });
-            got = { kind: "chest", tier: item.chest };
-        } else if (item.kind === "parts") {
+        if (won.kind === "gold") {
+            const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, won.n]).catch(() => null);
+            await logCoin(buyerId, won.n, "arena_armoury", { balanceAfter: g?.gold, meta: { crate: crate.id } });
+            got.art = "/images/ui/coin.png";
+        } else if (won.kind === "chest") {
+            const { addChests, CHEST_TIERS } = await import("@/lib/marketplace/chests.js");
+            await addChests(buyerId, { [won.tier]: won.n || 1 }, { source: "arena_armoury" });
+            got.art = CHEST_TIERS?.[won.tier]?.art || null;
+            got.color = CHEST_TIERS?.[won.tier]?.color || null;
+        } else if (won.kind === "parts") {
             const { addParts } = await import("@/lib/marketplace/crafting.js");
-            await addParts(buyerId, item.tier, item.count);
-            got = { kind: "parts", tier: item.tier, n: item.count };
-        } else if (item.kind === "fragment") {
+            const { partSprite } = await import("@/lib/marketplace/forge-parts.js");
+            await addParts(buyerId, won.tier, won.n);
+            got.art = partSprite(won.tier);
+        } else if (won.kind === "fragment") {
             const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-            await grantFragment(buyerId, item.count, item.tier);
-            got = { kind: "fragment", tier: item.tier, n: item.count };
-        } else if (item.kind === "consumable") {
+            await grantFragment(buyerId, won.n, won.tier);
+            got.art = `/images/sailing/fragment-${won.tier}.png`;
+        } else if (won.kind === "consumable") {
             const { grantConsumable } = await import("@/lib/marketplace/consumables.js");
-            await grantConsumable(buyerId, item.consumable, item.count || 1);
-            got = { kind: "consumable", id: item.consumable, n: item.count || 1 };
-        } else if (item.kind === "gem") {
-            // The KIND is the cutter's choice, not yours — the tier is what you paid for. A shop that sells
-            // you exactly the gem you want makes the mine pointless; one that sells you a good rock of some
-            // colour still leaves the hunt intact.
+            const { consumableSpriteMap } = await import("@/lib/marketplace/consumable-sprites.js");
+            await grantConsumable(buyerId, won.consumable, won.n || 1);
+            got.art = (await consumableSpriteMap().catch(() => ({})))[won.consumable] || null;
+        } else if (won.kind === "gem") {
+            // The KIND is the house's choice, the tier is what the crate promised — a crate that hands you
+            // exactly the colour you wanted makes the mine pointless.
             const { grantGem } = await import("@/lib/marketplace/jeweller.js");
+            const { gemArt } = await import("@/lib/marketplace/gems.js");
             const kind = GEM_KINDS[Math.floor(Math.random() * GEM_KINDS.length)].id;
-            const g = await grantGem(buyerId, gemId(kind, item.gemTier), 1, "bought");
-            got = { kind: "gem", gem: g?.gem || null };
-        } else if (item.kind === "fights") {
-            // Today only, and it does not bank — stored as a negative on today's used count so it expires with
-            // the day like everything else the arena counts.
+            const gid = gemId(kind, won.gemTier);
+            const g = await grantGem(buyerId, gid, 1, "bought");
+            got.label = g?.gem?.name || won.label;
+            got.art = gemArt(gid);
+            got.color = g?.gem?.color || null;
+        } else if (won.kind === "fights") {
+            // Today only, stored as a reduction of today's used count so it expires with the day.
             await db.query(
                 `UPDATE mkt_arena
                     SET fights_today = GREATEST(0, CASE WHEN fights_day = (NOW() AT TIME ZONE 'America/Chicago')::date
                                                         THEN COALESCE(fights_today, 0) ELSE 0 END - $2),
                         fights_day = (NOW() AT TIME ZONE 'America/Chicago')::date
                   WHERE buyer_id = $1`,
-                [buyerId, item.count]
+                [buyerId, won.n]
             );
-            got = { kind: "fights", n: item.count };
         }
-    } catch { /* paid for; the log below is the record */ }
+    } catch { /* paid for; the log is the record */ }
 
-    await logCoin(buyerId, 0, "arena_armoury", { meta: { id: item.id, laurels: item.cost, got } }).catch(() => {});
-    await trackActivity(buyerId, "arena_armoury", { id: item.id, cost: item.cost }).catch(() => {});
-    return { ok: true, bought: { id: item.id, name: item.name, cost: item.cost, got }, laurels: Number(paid.laurels) || 0 };
+    await trackActivity(buyerId, "arena_armoury", { crate: crate.id, cost: crate.cost, won: won.label }).catch(() => {});
+    return { ok: true, opened: { crate: { id: crate.id, name: crate.name, art: crate.art }, ...got, worth: won.worth },
+        laurels: Number(paid.laurels) || 0 };
 }
