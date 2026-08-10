@@ -15223,3 +15223,21 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* 168px of content in a 165px button — three over, which clips the last charge. */
 .sbt-reck-pips i { width: 11px; }
 .sbt-reck { padding-right: 8px; }
+
+/* ══ THE AIM BAR'S GRID, DEFINED ONCE AND LAST ═══════════════════════════════════════════════════════════
+   This template has now been written in FOUR places in this file and I have broken it twice in one day: once
+   by adding `reck` and dropping `rail`, and once by rewriting the Reckoning block wholesale — which deleted
+   the very line that declared `reck`, because it happened to live inside that block. Both times every child
+   with a named grid-area quietly auto-placed into implicit rows, which looks like the layout exploded.
+
+   So: one authoritative declaration, at the end of the file, listing every area the bar owns. If you add a
+   row to the aim bar, add it HERE, and nowhere else. `minmax(0, 1fr)` because a plain `1fr` will not shrink
+   below its content and pushes FIRE off the right edge. */
+.sbt-aimbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "read fire"
+        "rack fire"
+        "reck fire"
+        "rail rail";
+}
