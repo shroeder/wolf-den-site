@@ -1,0 +1,206 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { logCoin } from "@/lib/marketplace/coins.js";
+import { trackActivity } from "@/lib/marketplace/activity.js";
+import { GEMS, GEM_TIERS, MAX_SOCKETS, gemById, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { itemById } from "@/lib/marketplace/items.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
+
+// ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────────────
+// The bench where a gem meets a piece of gear. Two operations and nothing else: CUT a socket into something
+// (expensive, permanent, one per piece), and SET a gem into a socket you have already cut.
+//
+// UNDER CONSTRUCTION. `jewelsEnabled` is the one predicate the whole feature reads — the bench, the drops, the
+// bag and the stat merge — so opening it is one line rather than a hunt. Both halves are gated deliberately:
+// a member who cannot reach the bench must not be finding jewels either, or the drop is a mystery item with
+// nowhere to go and the first thing anybody does is ask what it is for.
+export const jewelsEnabled = (buyerId) => isOwner(buyerId);
+
+// ── THE BAG ──────────────────────────────────────────────────────────────────────────────────────────────────
+export async function getGems(buyerId) {
+    if (!buyerId || !jewelsEnabled(buyerId)) return [];
+    const rows = await db.query(
+        `SELECT gem_id, count FROM mkt_gem WHERE buyer_id = $1 AND count > 0`, [buyerId]
+    ).catch(() => []);
+    const held = new Map(rows.map((r) => [r.gem_id, Number(r.count) || 0]));
+    // Everything you hold, in catalog order, so the bag reads as a set you are filling rather than a list of
+    // whatever happened to drop.
+    return GEMS.filter((g) => held.get(g.id) > 0).map((g) => ({ ...g, count: held.get(g.id) }));
+}
+
+/** Put a gem in the bag. The one way in — drops, purchases and admin grants all land here. */
+export async function grantGem(buyerId, gemId, n = 1, source = "drop") {
+    const g = gemById(gemId);
+    if (!buyerId || !g || n <= 0) return { ok: false };
+    await db.query(
+        `INSERT INTO mkt_gem (buyer_id, gem_id, count) VALUES ($1, $2, $3)
+         ON CONFLICT (buyer_id, gem_id) DO UPDATE SET count = mkt_gem.count + $3`,
+        [buyerId, g.id, n]
+    ).catch(() => {});
+    await db.query(
+        `INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, meta) VALUES ($1, $2, $3, $4::jsonb)`,
+        [buyerId, source === "drop" ? "drop" : "bought", g.id, JSON.stringify({ n, source })]
+    ).catch(() => {});
+    return { ok: true, gem: g, n };
+}
+
+// ── WHAT IS SET INTO WHAT ────────────────────────────────────────────────────────────────────────────────────
+/** Sockets for a member's items → { item_id: [{ idx, gemId }] }. */
+export async function socketsFor(buyerId, itemIds = null) {
+    if (!buyerId) return {};
+    const rows = itemIds?.length
+        ? await db.query(`SELECT item_id, idx, gem_id FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = ANY($2) ORDER BY idx`, [buyerId, itemIds]).catch(() => [])
+        : await db.query(`SELECT item_id, idx, gem_id FROM mkt_item_socket WHERE buyer_id = $1 ORDER BY idx`, [buyerId]).catch(() => []);
+    const out = {};
+    for (const r of rows) {
+        if (!out[r.item_id]) out[r.item_id] = [];
+        out[r.item_id].push({ idx: Number(r.idx) || 0, gemId: r.gem_id || null });
+    }
+    return out;
+}
+
+/**
+ * The combat stats a member's SOCKETED gems are worth, for the items passed in.
+ *
+ * Reads exactly like enhanceBonusFor in inventory.js and merges at the same place, so a socketed ruby and a
+ * forge enhancement are the same kind of number by the time anything fights with them.
+ */
+export async function socketBonusFor(buyerId, itemIds) {
+    if (!buyerId || !itemIds?.length || !jewelsEnabled(buyerId)) return {};
+    const rows = await db.query(
+        `SELECT gem_id FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = ANY($2) AND gem_id IS NOT NULL`,
+        [buyerId, itemIds]
+    ).catch(() => []);
+    return sumGemStats(rows.map((r) => r.gem_id));
+}
+
+// ── CUTTING A SOCKET ─────────────────────────────────────────────────────────────────────────────────────────
+// Expensive on purpose, and priced by the item's rarity: a socket in a mythic is a commitment, a socket in a
+// common is a cheap lesson in what sockets do.
+export async function cutSocket(buyerId, itemId) {
+    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "bad_item" };
+    // You have to own it. Checked against the same table equip checks use, so a crafted POST cannot socket
+    // something out of the catalog it has never held.
+    const owns = await db.queryOne(`SELECT 1 FROM mkt_user_item WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    if (!owns) return { ok: false, error: "not_owned" };
+
+    const have = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
+    if ((have?.n || 0) >= MAX_SOCKETS) return { ok: false, error: "already_socketed" };
+
+    const cost = socketCost(item.rarity);
+    // Charge conditionally inside the UPDATE — neon() has no transactions, so the balance check and the spend
+    // have to be one statement or two taps both pass a check that only one of them can afford.
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2, updated_at = NOW() WHERE id = $1 AND gold >= $2 RETURNING gold`,
+        [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", cost };
+    await logCoin(buyerId, -cost, "socket_cut", { balanceAfter: paid.gold, meta: { itemId } }).catch(() => {});
+
+    await db.query(
+        `INSERT INTO mkt_item_socket (buyer_id, item_id, idx) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        [buyerId, itemId, have?.n || 0]
+    ).catch(() => {});
+    await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, item_id, meta) VALUES ($1, 'socket_cut', $2, $3::jsonb)`,
+        [buyerId, itemId, JSON.stringify({ cost })]).catch(() => {});
+    await trackActivity(buyerId, "socket_cut", { itemId, cost }).catch(() => {});
+    return { ok: true, cost };
+}
+
+// ── SETTING A GEM ────────────────────────────────────────────────────────────────────────────────────────────
+export async function setGem(buyerId, itemId, gemId, idx = 0) {
+    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
+    const gem = gemById(gemId);
+    if (!gem || !itemById(itemId)) return { ok: false, error: "bad_gem" };
+
+    const socket = await db.queryOne(
+        `SELECT gem_id FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = $2 AND idx = $3`,
+        [buyerId, itemId, idx]
+    ).catch(() => null);
+    if (!socket) return { ok: false, error: "no_socket" };
+    if (socket.gem_id) return { ok: false, error: "socket_full" };
+
+    // Spend the gem conditionally, for the same reason the gold is spent conditionally.
+    const spent = await db.queryOne(
+        `UPDATE mkt_gem SET count = count - 1 WHERE buyer_id = $1 AND gem_id = $2 AND count > 0 RETURNING count`,
+        [buyerId, gem.id]
+    ).catch(() => null);
+    if (!spent) return { ok: false, error: "no_gem" };
+
+    await db.query(
+        `UPDATE mkt_item_socket SET gem_id = $3, set_at = NOW() WHERE buyer_id = $1 AND item_id = $2 AND idx = $4`,
+        [buyerId, itemId, gem.id, idx]
+    ).catch(() => {});
+    await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id) VALUES ($1, 'gem_set', $2, $3)`,
+        [buyerId, gem.id, itemId]).catch(() => {});
+    await trackActivity(buyerId, "gem_set", { itemId, gemId: gem.id }).catch(() => {});
+    return { ok: true, gem };
+}
+
+/**
+ * Pull a gem back out. IT BREAKS.
+ *
+ * That is the whole reason setting one is a decision — a socket you can shuffle per opponent costs nothing to
+ * get wrong, and a gem that survives being pulled makes the last four tiers pointless. The button says so
+ * before you press it.
+ */
+export async function pullGem(buyerId, itemId, idx = 0) {
+    if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
+    // The old value comes from a FROM subquery, not from RETURNING: RETURNING hands back the row as it is
+    // AFTER the update, which for this statement is the NULL we just wrote. The join reads the pre-update
+    // snapshot, so `was` is the gem that actually broke.
+    const socket = await db.queryOne(
+        `UPDATE mkt_item_socket s SET gem_id = NULL, set_at = NULL
+           FROM (SELECT gem_id FROM mkt_item_socket
+                  WHERE buyer_id = $1 AND item_id = $2 AND idx = $3) o
+          WHERE s.buyer_id = $1 AND s.item_id = $2 AND s.idx = $3 AND s.gem_id IS NOT NULL
+        RETURNING o.gem_id AS was`,
+        [buyerId, itemId, idx]
+    ).catch(() => null);
+    if (!socket) return { ok: false, error: "empty" };
+    await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id) VALUES ($1, 'gem_pulled', $2, $3)`,
+        [buyerId, socket.was || null, itemId]).catch(() => {});
+    return { ok: true, destroyed: socket.was || null };
+}
+
+// ── THE BENCH, AS A SCREEN ───────────────────────────────────────────────────────────────────────────────────
+// Everything the Jewelcutter renders from, in one read: what you hold, what you own that could take a socket,
+// and what is already set.
+export async function getJewellerState(buyerId) {
+    if (!buyerId) return { unlocked: false };
+    if (!jewelsEnabled(buyerId)) return { unlocked: false };
+
+    const [owned, socketRows, gems, goldRow] = await Promise.all([
+        db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        socketsFor(buyerId),
+        getGems(buyerId),
+        db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+    ]);
+
+    const pieces = owned
+        .map((r) => itemById(r.item_id))
+        // Only real gear: a collection piece is not worn and a store perk is not a weapon.
+        .filter((it) => it && it.slot)
+        .map((it) => {
+            const sockets = socketRows[it.id] || [];
+            return {
+                id: it.id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon,
+                cost: socketCost(it.rarity),
+                sockets: sockets.map((s) => ({ idx: s.idx, gem: s.gemId ? gemById(s.gemId) : null })),
+                canCut: sockets.length < MAX_SOCKETS,
+            };
+        })
+        .sort((a, z) => z.sockets.length - a.sockets.length || a.name.localeCompare(z.name));
+
+    return {
+        unlocked: true,
+        gold: Number(goldRow?.gold) || 0,
+        gems,
+        pieces,
+        tiers: GEM_TIERS,
+        maxSockets: MAX_SOCKETS,
+    };
+}

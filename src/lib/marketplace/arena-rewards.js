@@ -133,6 +133,15 @@ export function featsFor(bout) {
 // The only sink for laurels, so this is where the currency gets its value. Deliberately a mix: things that
 // make you stronger OUTSIDE the arena (chests, forge parts) so laurels matter to someone who mostly cares
 // about the boss or the Forge, and things that change how you play the ladder, which nothing else sells.
+//
+// ⚠️ IT HAD NO TILL. This list was exported into the arena's state and rendered by nothing, and there was no
+// buy action on the route to render — so every laurel earned since the ladder opened bought precisely nothing.
+// The shelf is real now, and longer: fragments for the chest you are three short of, the scrolls that were
+// chest-only, and — once the bench opens — the jewels themselves.
+//
+// `gated` marks a row that only exists for members who can use it (see jewelsEnabled). Filtered server-side in
+// getArenaState rather than hidden in CSS, because a shop row you can see and cannot buy is worse than one
+// that is not there.
 export const ARMOURY = [
     { id: "chest_wooden", kind: "chest", chest: "wooden", cost: 130, name: "Wooden Chest", blurb: "Standard-issue loot." },
     { id: "chest_iron", kind: "chest", chest: "iron", cost: 340, name: "Iron Chest", blurb: "A real shot at something epic." },
@@ -145,6 +154,21 @@ export const ARMOURY = [
         id: "secondwind", kind: "fights", count: 2, cost: 420, name: "Second Wind",
         blurb: "Two more challenges today.", note: "Today only — it does not bank.",
     },
+    // ── FRAGMENTS ── the thing you are always three short of. Cheaper per chest than buying the chest, and
+    // slower, which is the trade: laurels for patience.
+    { id: "frag_iron", kind: "fragment", tier: "iron", count: 3, cost: 150, name: "Iron Fragments ×3", blurb: "Three steps toward an iron chest." },
+    { id: "frag_gold", kind: "fragment", tier: "gold", count: 3, cost: 380, name: "Gold Fragments ×3", blurb: "Three steps toward a gold one." },
+    { id: "frag_mythic", kind: "fragment", tier: "mythic", count: 2, cost: 820, name: "Mythic Fragments ×2", blurb: "The long way round to the best chest there is." },
+    // ── SCROLLS ── all three were chest-only or gold-only. The ladder is the other way to them.
+    { id: "scroll_wisdom", kind: "consumable", consumable: "scroll_wisdom", count: 1, cost: 260, name: "Tome of Wisdom", blurb: "500 XP, on the spot." },
+    { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", count: 1, cost: 900, name: "Ancient Codex", blurb: "2,000 XP, on the spot." },
+    { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", count: 1, cost: 1100, name: "Enchantment Scroll", blurb: "Add an element of your choice to a piece of gear." },
+    { id: "pot_fury", kind: "consumable", consumable: "pot_fury", count: 1, cost: 200, name: "Bottled Fury", blurb: "Triple your daily strike damage for six hours." },
+    // ── JEWELS ── the only place other than the deep mine that gives one up, and it never sells the good ones:
+    // a Polished is as high as the ladder goes, because the top two tiers are what the rock is for.
+    { id: "gem_t1", kind: "gem", gemTier: 1, cost: 240, name: "A Chipped Jewel", blurb: "The cutter's choice — kind unknown until it is in your hand.", gated: "jewels" },
+    { id: "gem_t2", kind: "gem", gemTier: 2, cost: 520, name: "A Flawed Jewel", blurb: "Better rock. Still the cutter's choice of colour.", gated: "jewels" },
+    { id: "gem_t3", kind: "gem", gemTier: 3, cost: 1150, name: "A Polished Jewel", blurb: "As good as the ladder sells. The rest is down the mine.", gated: "jewels" },
 ];
 
 export const armouryItem = (id) => ARMOURY.find((x) => x.id === id) || null;

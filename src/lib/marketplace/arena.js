@@ -18,6 +18,7 @@ import {
     pointsSpent, treeAbilities, treeEffects, treeState,
 } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
+import { jewelsEnabled } from "@/lib/marketplace/jeweller.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -423,7 +424,8 @@ export async function getArenaState(buyerId) {
         },
         targets,
         gauntlet,
-        armoury: ARMOURY,
+        // A shop row you can see and cannot buy is worse than one that is not there.
+        armoury: ARMOURY.filter((x) => x.gated !== "jewels" || jewelsEnabled(buyerId)),
         progress,
         upgrades: upgradeView(row?.upgrades || {}),
         gold: Number(row?.gold_now) || 0,

@@ -89,12 +89,19 @@ async function enhanceBonusFor(buyerId, itemIds) {
     return total;
 }
 
-// Aggregated equipped stats — used by the boss combat. Includes set bonuses + Forge enhancement bonuses.
+// Aggregated equipped stats — used by the boss combat. Includes set bonuses, Forge enhancement AND anything
+// set into a socket. A gem is the same kind of number as an enhancement by the time a fight reads it, so it
+// merges in the same place rather than being a fourth thing every call site has to remember.
 export async function getEquippedStats(buyerId) {
     if (!buyerId) return {};
     const ids = Object.values(await getEquippedIds(buyerId));
     const total = withSetBonuses(ids);
     for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids))) total[k] = (total[k] || 0) + v;
+    // Lazily imported: jeweller.js is server-only and this module is imported widely.
+    try {
+        const { socketBonusFor } = await import("@/lib/marketplace/jeweller.js");
+        for (const [k, v] of Object.entries(await socketBonusFor(buyerId, ids))) total[k] = (total[k] || 0) + v;
+    } catch { /* no jeweller, no gems */ }
     return total;
 }
 

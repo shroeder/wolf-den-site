@@ -1150,7 +1150,7 @@ export default function ArenaClient({ initial }) {
             {/* ── THREE JOBS, THREE TABS ── who to fight, how you fight, what you have trained. This screen
                 carried all of it in one scroll and it was already long before the tree existed. */}
             <div className="ar-tabs" role="tablist">
-                {[["fight", "Fight"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"]].map(([k, label]) => (
+                {[["fight", "Fight"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}
                         className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && st.progress?.points?.available ? " has-dot" : ""}`}
                         onClick={() => { Sfx.ui(); setTab(k); }}>{label}</button>
@@ -1165,6 +1165,38 @@ export default function ArenaClient({ initial }) {
             {tab === "train" ? (
                 <ArenaUpgrades upgrades={st.upgrades || []} gold={st.gold || 0} busy={busy} flash={upgFlash}
                     onBuy={(id) => { setUpgFlash(id); setTimeout(() => setUpgFlash(null), 700); act("arena_upgrade", { track: id }); }} />
+            ) : null}
+
+            {/* ── THE ARMOURY ── the shelf laurels are FOR, which until now was a list the server sent and
+                nothing drew. Every laurel earned since the ladder opened bought nothing, because there was
+                nowhere to spend one and no action behind it if you had found one. */}
+            {tab === "armoury" ? (
+                <section className="card">
+                    <div className="ar-arm-head">
+                        <b>The Armoury</b>
+                        <span className="ar-arm-purse">{money(st.laurels)} laurels</span>
+                    </div>
+                    <p className="ar-arm-sub">
+                        Laurels come off every bout, win or lose, and off the feats inside them. This is the
+                        only thing that takes them.
+                    </p>
+                    <div className="ar-arm-grid">
+                        {(st.armoury || []).map((a) => {
+                            const poor = (st.laurels || 0) < a.cost;
+                            return (
+                                <div key={a.id} className={`ar-arm${poor ? " is-poor" : ""}`}>
+                                    <b>{a.name}</b>
+                                    <p>{a.blurb}</p>
+                                    {a.note ? <em>{a.note}</em> : null}
+                                    <button type="button" className="ar-btn is-sm" disabled={busy || poor}
+                                        onClick={() => { Sfx.ui(); act("buy_armoury", { id: a.id }); }}>
+                                        {money(a.cost)} laurels
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
             ) : null}
 
 {tab === "fight" ? (<>
@@ -2295,6 +2327,19 @@ function Styles() {
 
             /* ── FIND A FIGHT ── the one button that replaced two lists. Sized like the thing it is: the
                reason you opened the screen. */
+            .ar-arm-head { display: flex; align-items: baseline; gap: 8px; }
+            .ar-arm-head b { font-family: var(--font-display); font-size: 1.05rem; color: #e8dcc6; }
+            .ar-arm-purse { margin-left: auto; font-family: var(--font-display); font-weight: 900;
+                font-size: 0.9rem; color: #ffd75e; }
+            .ar-arm-sub { margin: 4px 0 12px; font-size: 0.78rem; line-height: 1.45; color: #9aa2ab; }
+            .ar-arm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 8px; }
+            .ar-arm { display: flex; flex-direction: column; gap: 4px; padding: 11px; border-radius: 13px;
+                background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); }
+            .ar-arm.is-poor { opacity: .55; }
+            .ar-arm b { font-family: var(--font-display); font-size: 0.86rem; color: #e8dcc6; }
+            .ar-arm p { margin: 0; font-size: 0.72rem; line-height: 1.4; color: #9aa2ab; }
+            .ar-arm em { font-style: normal; font-size: 0.68rem; color: #8f8875; }
+            .ar-arm .ar-btn { margin-top: auto; }
             .ar-find { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0 4px;
                 padding: 15px 17px; border-radius: 15px; cursor: pointer; text-align: left;
                 color: #22180a; border: 1px solid rgba(255,236,170,0.85);

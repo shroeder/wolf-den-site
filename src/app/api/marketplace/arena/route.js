@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
-    buyArenaUpgrade, pickClass, refundNode, respecClass, respecTree, takeNode,
+    buyArenaUpgrade, buyArmoury, pickClass, refundNode, respecClass, respecTree, takeNode,
 } from "@/lib/marketplace/arena-progress.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -54,6 +54,8 @@ export async function POST(request) {
                     return noStore({ ...(await respecTree(buyer.id)), ...(await getArenaState(buyer.id)) });
                 case "respec_class":
                     return noStore({ ...(await respecClass(buyer.id, String(b?.classId || ""))), ...(await getArenaState(buyer.id)) });
+                case "buy_armoury":
+                    return noStore({ ...(await buyArmoury(buyer.id, String(b?.id || ""))), ...(await getArenaState(buyer.id)) });
                 case "arena_upgrade":
                     return noStore({ ...(await buyArenaUpgrade(buyer.id, String(b?.track || ""))), ...(await getArenaState(buyer.id)) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });

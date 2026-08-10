@@ -380,6 +380,16 @@ export async function descend(buyerId) {
         else if (found.effect === "consumable") haul.push({ kind: "consumable" });
     } else if (found.kind !== "nothing") haul.push(found);
 
+    // ── A JEWEL IN THE ROCK ── rolled on the way DOWN, independently of the card, so it is the depth you dared
+    // that earns it rather than a lucky draw. Gated with the bench: no bench, no jewels.
+    try {
+        const { jewelsEnabled } = await import("@/lib/marketplace/jeweller.js");
+        if (jewelsEnabled(buyerId)) {
+            const jewel = rollJewel(depth);
+            if (jewel) haul.push({ kind: "gem", gemId: jewel });
+        }
+    } catch { /* the bench is not open */ }
+
     if (depth >= 12) await grantEventBadge(buyerId, "mine_deep").catch(() => {});
 
     const next = { ...run, depth, haul, seamTier, last: { kind: found.kind, label: card.label } };
@@ -418,9 +428,46 @@ async function payHaul(buyerId, haul = []) {
         } else if (item.kind === "consumable") {
             const got = await grantMiningConsumable(buyerId);
             if (got) paid.push({ ...item, ...got });
+        } else if (item.kind === "gem") {
+            const { grantGem } = await import("@/lib/marketplace/jeweller.js");
+            const got = await grantGem(buyerId, item.gemId, 1, "drop");
+            if (got?.ok) paid.push({ ...item, gem: got.gem });
         }
     }
     return paid;
+}
+
+// ── JEWELS ───────────────────────────────────────────────────────────────────────────────────────────────────
+// The rarest thing the mine gives up, and the only source of them in the game. Rolled on the way DOWN rather
+// than at the surface, so a jewel is something the depth you dared earns you: the chance climbs with depth,
+// and the tier you can roll climbs with it too — the top two tiers simply are not in the rock near the top.
+//
+// GATED WITH THE BENCH, deliberately. A member who cannot reach the Jewelcutter must not be finding jewels
+// either, or the drop is a mystery item with nowhere to go and the first thing anybody does is ask what it is.
+const JEWEL_BASE = 0.012;          // at the first depth that can drop one
+const JEWEL_PER_DEPTH = 0.0016;    // and it climbs from there
+const JEWEL_MIN_DEPTH = 4;
+const JEWEL_CAP = 0.075;
+// The secret sixth. One in forty jewels, and nothing anywhere tells you it exists — see WOLF_EYE.
+const WOLF_EYE_CHANCE = 0.025;
+
+function rollJewel(depth) {
+    const d = Number(depth) || 0;
+    if (d < JEWEL_MIN_DEPTH) return null;
+    const chance = Math.min(JEWEL_CAP, JEWEL_BASE + (d - JEWEL_MIN_DEPTH) * JEWEL_PER_DEPTH);
+    if (Math.random() >= chance) return null;
+    // Tier is drawn against depth: deep rock can still give you a chip, shallow rock can never give you a
+    // Flawless. Weighted down so the top tier stays a story rather than a Tuesday.
+    const reach = Math.max(1, Math.min(5, 1 + Math.floor((d - JEWEL_MIN_DEPTH) / 4)));
+    const weights = [46, 27, 15, 8, 4].slice(0, reach);
+    const total = weights.reduce((n, w) => n + w, 0);
+    let roll = Math.random() * total;
+    let tier = 1;
+    for (let i = 0; i < weights.length; i += 1) { if ((roll -= weights[i]) <= 0) { tier = i + 1; break; } }
+    const kind = Math.random() < WOLF_EYE_CHANCE
+        ? "wolfeye"
+        : ["ruby", "sapphire", "emerald", "topaz", "amethyst"][Math.floor(Math.random() * 5)];
+    return `${kind}_t${tier}`;
 }
 
 export async function surfaceRun(buyerId) {
