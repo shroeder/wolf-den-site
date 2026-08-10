@@ -2148,6 +2148,19 @@ function Styles() {
             .ar-ring.is-crit::after { content: ""; position: absolute; inset: 0; z-index: 18; pointer-events: none;
                 background: radial-gradient(70% 60% at 72% 58%, rgba(255,231,150,0.62), transparent 72%);
                 animation: arCrit .5s ease-out both; }
+            /* ── THE FRAME ITSELF TAKES THE HIT ── the flash was a soft wash inside the ring, which on a full
+               screen is a glow somewhere off to one side. A crit now blows the whole scene out for two frames
+               and slams a hot rim around it, so the hardest blow in the game is the one thing on the screen
+               that touches every edge. Four frames, then gone — anything longer reads as a bug. */
+            .ar-fight.ar::before { content: ""; position: absolute; inset: 0; z-index: 40; pointer-events: none;
+                opacity: 0; }
+            .ar-fight.ar:has(.ar-ring.is-crit)::before { animation: arCritFrame .34s ease-out both;
+                background: radial-gradient(120% 90% at 50% 55%, rgba(255,240,190,0.4), transparent 70%);
+                box-shadow: inset 0 0 0 3px rgba(255,226,138,0.9), inset 0 0 70px rgba(255,200,80,0.55); }
+            .ar-fight.ar:has(.ar-ring.is-crit-theirs)::before {
+                background: radial-gradient(120% 90% at 50% 55%, rgba(255,190,200,0.36), transparent 70%);
+                box-shadow: inset 0 0 0 3px rgba(255,120,140,0.9), inset 0 0 70px rgba(255,70,95,0.5); }
+            @keyframes arCritFrame { 0% { opacity: 0 } 12% { opacity: 1 } 40% { opacity: .55 } 100% { opacity: 0 } }
             @keyframes arCrit { from { opacity: 1 } 30% { opacity: .8 } to { opacity: 0 } }
             /* Theirs: your side of the ring, and red. */
             .ar-ring.is-crit-theirs::after {

@@ -155,16 +155,30 @@ export const Sfx = {
         noise({ at, dur: 0.22, gain: 0.1, type: "bandpass", freq: 380, sweepTo: 1900, q: 1.4 });
     },
 
-    /** Flesh-and-steel contact. */
+    /**
+     * Flesh-and-steel contact.
+     *
+     * THREE LAYERS, because a hit that is one layer is a click. The body is the pitch-drop you already hear;
+     * under it a SUB that is felt more than heard, and over it the crack of the contact itself. The sub is
+     * what a phone speaker cannot reproduce and a pair of headphones turns into weight — which is the point,
+     * since the alternative is making the audible layers louder until they distort.
+     */
     impact(weight = 0.3, at = 0) {
         const w = Math.max(0, Math.min(1, weight));
         tone({ at, freq: 150 - w * 55, to: 42, type: "sine", dur: 0.16 + w * 0.16, gain: 0.3 + w * 0.26 });
+        // The sub. Starts fractionally late so it reads as the follow-through rather than the contact.
+        tone({ at: at + 0.008, freq: 74, to: 33, type: "sine", dur: 0.2 + w * 0.24, gain: 0.16 + w * 0.22 });
         noise({ at, dur: 0.1 + w * 0.1, gain: 0.16 + w * 0.2, type: "lowpass", freq: 2600, sweepTo: 300 });
         if (w > 0.45) noise({ at: at + 0.012, dur: 0.1, gain: 0.1, type: "highpass", freq: 3200 });
+        // Above half weight the contact gets its own crack — a very short band of noise, high and dry.
+        if (w > 0.5) noise({ at, dur: 0.045, gain: 0.12 + w * 0.1, type: "bandpass", freq: 1500, q: 1.1 });
     },
 
-    /** A crit: the impact, plus a bright metallic ring on top so it is unmistakable. */
+    /** A crit: a rising tell, the impact, and a bright metallic ring on top so it is unmistakable. */
     crit(weight = 0.6, at = 0) {
+        // THE RISE IS THE WHOLE TRICK. A crit that only differs after it lands is a louder hit; a crit with
+        // 70ms of rising pitch in front of it is an EVENT, because you hear it coming and the ear leans in.
+        tone({ at: Math.max(0, at - 0.07), freq: 300, to: 1500, type: "sawtooth", dur: 0.075, gain: 0.07 });
         Sfx.impact(Math.max(0.65, weight), at);
         tone({ at: at + 0.01, freq: 1180, type: "square", dur: 0.34, gain: 0.13, to: 2360 });
         tone({ at: at + 0.03, freq: 1760, type: "triangle", dur: 0.4, gain: 0.1 });
@@ -344,10 +358,12 @@ export const Sfx = {
 const ROOT = 110;                                   // A2
 const SCALE = [0, 1, 4, 5, 7, 8, 11];               // Phrygian dominant, semitones
 const step = (deg, oct = 0) => ROOT * Math.pow(2, (SCALE[((deg % 7) + 7) % 7] + 12 * (oct + Math.floor(deg / 7))) / 12);
+const semi = (n) => ROOT * Math.pow(2, n / 12);
 
-const BPM = 132;
+const BPM = 138;
 const SPB = 60 / BPM;
 const STEPS = 16;                                   // sixteenth notes per bar
+const BARS = 4;                                     // ...and a phrase is FOUR of them
 const SPS = SPB / 4;
 
 let musicTimer = null;
@@ -356,16 +372,41 @@ let stepIndex = 0;
 let intensity = 0.35;
 let musicOn = false;
 
-const OSTINATO = [0, 0, 2, 0, 4, 0, 2, 3, 0, 0, 2, 0, 5, 4, 2, 1];
+// ── IT WAS ONE BAR, FOREVER ──────────────────────────────────────────────────────────────────────────────────
+// The old theme was a single sixteen-step ostinato over a single unchanging root, looped for as long as the
+// fight lasted. Nothing to arrive at and nothing to leave: no chord moved, no phrase closed, and a twenty-round
+// bout played you the same two seconds a hundred times over. That is not a battle theme, it is a held note with
+// a beat behind it.
+//
+// A FOUR-BAR PHRASE now, and the harmony moves: i - bII - i - V, the Phrygian-dominant cadence the whole mode
+// exists for. The bass walks the chord roots, the ostinato TRANSPOSES with the chord so the tune goes
+// somewhere, the shape alternates bar to bar, and bar four is a turnaround with a snare fill across the end of
+// it — so the loop point is an arrival rather than a splice.
+//
+// ROOTS are semitone offsets from A: 0 = Am (i), 1 = Bb (bII), 7 = E (V).
+const CHORDS = [
+    { root: 0, third: 3 },   // Am
+    { root: 1, third: 4 },   // Bb - the flat second, the sound of the mode
+    { root: 0, third: 3 },   // Am
+    { root: 7, third: 4 },   // E  - the turnaround
+];
+
+// Two shapes, alternating by bar, so even inside the phrase the tune is not a metronome.
+const OSTINATO_A = [0, 0, 2, 0, 4, 0, 2, 3, 0, 0, 2, 0, 5, 4, 2, 1];
+const OSTINATO_B = [0, 4, 2, 4, 0, 4, 5, 4, 2, 4, 2, 0, 4, 5, 4, 2];
 const BASS = [0, null, null, 0, null, 0, null, null, 3, null, null, 3, null, 2, null, null];
 
 function scheduleStep(i, t) {
     if (!ctx || !musicBus) return;
     const beat = i % STEPS;
+    const bar = Math.floor(i / STEPS) % BARS;
+    const chord = CHORDS[bar];
+    const last = bar === BARS - 1;                  // the turnaround
     const barLevel = intensity;
+    const tr = Math.pow(2, chord.root / 12);        // one ratio, so every voice moves together
 
-    // KICK — the floor of the whole thing.
-    if (beat % 4 === 0 || (barLevel > 0.6 && beat === 14)) {
+    // KICK - the floor of the whole thing. The turnaround pushes with an extra off-beat.
+    if (beat % 4 === 0 || (barLevel > 0.6 && beat === 14) || (last && beat === 10)) {
         const g = ctx.createGain();
         const o = ctx.createOscillator();
         o.type = "sine";
@@ -376,66 +417,88 @@ function scheduleStep(i, t) {
         o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.22);
     }
 
-    // SNARE on the backbeat.
-    if (beat === 4 || beat === 12) {
-        const s = ctx.createBufferSource();
-        s.buffer = noiseBuf; s.loop = true;
+    // SNARE on the backbeat, plus a fill across the end of the turnaround - which is the thing that tells you
+    // a phrase closed rather than a loop spliced.
+    const fill = last && barLevel > 0.45 && beat >= 12;
+    if (beat === 4 || beat === 12 || fill) {
+        const s2 = ctx.createBufferSource();
+        s2.buffer = noiseBuf; s2.loop = true;
         const f = ctx.createBiquadFilter();
-        f.type = "bandpass"; f.frequency.value = 1900; f.Q.value = 0.8;
+        f.type = "bandpass"; f.frequency.value = fill ? 1600 + (beat - 12) * 260 : 1900; f.Q.value = 0.8;
         const g = ctx.createGain();
-        g.gain.setValueAtTime(0.17, t);
+        g.gain.setValueAtTime(fill ? 0.1 + (beat - 12) * 0.035 : 0.17, t);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-        s.connect(f); f.connect(g); g.connect(musicBus);
-        s.start(t); s.stop(t + 0.17);
+        s2.connect(f); f.connect(g); g.connect(musicBus);
+        s2.start(t); s2.stop(t + 0.17);
     }
 
-    // HATS — the layer that tells you the fight is getting away from you.
-    if (barLevel > 0.5 && beat % 2 === 1) {
-        const s = ctx.createBufferSource();
-        s.buffer = noiseBuf; s.loop = true;
+    // HATS - the layer that says the fight is getting away from you. Double-time when it really is.
+    if (barLevel > 0.5 && (barLevel > 0.8 || beat % 2 === 1)) {
+        const s2 = ctx.createBufferSource();
+        s2.buffer = noiseBuf; s2.loop = true;
         const f = ctx.createBiquadFilter();
         f.type = "highpass"; f.frequency.value = 7000;
         const g = ctx.createGain();
-        g.gain.setValueAtTime(0.045 * barLevel, t);
+        g.gain.setValueAtTime((beat % 2 === 1 ? 0.045 : 0.026) * barLevel, t);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-        s.connect(f); f.connect(g); g.connect(musicBus);
-        s.start(t); s.stop(t + 0.06);
+        s2.connect(f); f.connect(g); g.connect(musicBus);
+        s2.start(t); s2.stop(t + 0.06);
     }
 
-    // BASS.
-    const b = BASS[beat];
-    if (b !== null && b !== undefined) {
-        const o = ctx.createOscillator();
-        const f = ctx.createBiquadFilter();
-        const g = ctx.createGain();
-        o.type = "sawtooth";
-        o.frequency.value = step(b, -1);
-        f.type = "lowpass";
-        f.frequency.setValueAtTime(240 + barLevel * 500, t);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.16, t + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 3);
-        o.connect(f); f.connect(g); g.connect(musicBus);
-        o.start(t); o.stop(t + SPS * 3.2);
+    // BASS - the chord's root, walked. Two detuned saws rather than one, which is the whole difference between
+    // "a synth note" and "something with a body".
+    const bd = BASS[beat];
+    if (bd !== null && bd !== undefined) {
+        const fr = step(bd, -1) * tr;
+        for (const det of [-7, 7]) {
+            const o = ctx.createOscillator();
+            const f = ctx.createBiquadFilter();
+            const g = ctx.createGain();
+            o.type = "sawtooth";
+            o.frequency.value = fr;
+            o.detune.value = det;
+            f.type = "lowpass";
+            f.frequency.setValueAtTime(240 + barLevel * 560, t);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.095, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 3);
+            o.connect(f); f.connect(g); g.connect(musicBus);
+            o.start(t); o.stop(t + SPS * 3.2);
+        }
     }
 
-    // OSTINATO — the tune. Plucked, dry, relentless.
+    // OSTINATO - the tune, transposed onto the bar's chord, shape alternating bar to bar.
     if (barLevel > 0.25) {
-        const deg = OSTINATO[beat];
+        const shape = bar % 2 === 0 ? OSTINATO_A : OSTINATO_B;
+        const fr = step(shape[beat], 1) * tr;
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.type = "triangle";
-        o.frequency.value = step(deg, 1);
+        o.frequency.value = fr;
         g.gain.setValueAtTime(0.0001, t);
         g.gain.exponentialRampToValueAtTime(0.075 * barLevel, t + 0.008);
         g.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 1.6);
         o.connect(g); g.connect(musicBus);
         o.start(t); o.stop(t + SPS * 1.7);
+        // A fifth above, quieter and a hair late. Width for free, and it makes the pluck read as an
+        // instrument rather than a beep.
+        if (barLevel > 0.55) {
+            const o2 = ctx.createOscillator();
+            const g2 = ctx.createGain();
+            o2.type = "triangle";
+            o2.frequency.value = fr * 1.4983;
+            g2.gain.setValueAtTime(0.0001, t + 0.012);
+            g2.gain.exponentialRampToValueAtTime(0.03 * barLevel, t + 0.02);
+            g2.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 1.4);
+            o2.connect(g2); g2.connect(musicBus);
+            o2.start(t + 0.012); o2.stop(t + SPS * 1.5);
+        }
     }
 
-    // TREMOLO STRINGS — arrive only when it is going badly.
+    // TREMOLO STRINGS - only when it is going badly, and they follow the chord too, so the bad news moves with
+    // the music instead of droning underneath it.
     if (barLevel > 0.72 && beat === 0) {
-        [step(0, 0), step(2, 0), step(4, 0)].forEach((fr) => {
+        [semi(chord.root), semi(chord.root + chord.third), semi(chord.root + 7)].forEach((fr) => {
             const o = ctx.createOscillator();
             const g = ctx.createGain();
             const lfo = ctx.createOscillator();
@@ -444,13 +507,30 @@ function scheduleStep(i, t) {
             lfo.type = "sine"; lfo.frequency.value = 11;
             lg.gain.value = 0.03;
             g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(0.05, t + 0.25);
+            g.gain.exponentialRampToValueAtTime(0.045, t + 0.25);
             g.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 15);
             lfo.connect(lg); lg.connect(g.gain);
             o.connect(g); g.connect(musicBus);
             o.start(t); lfo.start(t);
             o.stop(t + SPS * 16); lfo.stop(t + SPS * 16);
         });
+    }
+
+    // A HORN on the downbeat of the phrase, once it matters. One note, low, and it is what makes the loop feel
+    // like it begins somewhere.
+    if (barLevel > 0.62 && bar === 0 && beat === 0) {
+        const o = ctx.createOscillator();
+        const f = ctx.createBiquadFilter();
+        const g = ctx.createGain();
+        o.type = "sawtooth"; o.frequency.value = semi(0) / 2;
+        f.type = "lowpass";
+        f.frequency.setValueAtTime(700, t);
+        f.frequency.exponentialRampToValueAtTime(1800, t + 0.18);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.08, t + 0.09);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 1.6);
+        o.connect(f); f.connect(g); g.connect(musicBus);
+        o.start(t); o.stop(t + SPB * 1.7);
     }
 }
 
