@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { reconcileCashBalance } from "@/lib/cash/cash-ledger.js";
+import { cashBalance, reconcileCashBalance } from "@/lib/cash/cash-ledger.js";
 
 // ── COUNTING THE DRAWER ──────────────────────────────────────────────────────────────────────────────────────
 // A count at the start and end of every shift. Two things come out of it: the ledger gets corrected to reality,
@@ -11,18 +11,17 @@ import { reconcileCashBalance } from "@/lib/cash/cash-ledger.js";
 // Every count is logged even when it matches exactly. "Counted, and it was right" is the fact that makes the
 // next mismatch meaningful.
 
-export async function recordCashCount(actual, { context = "manual", by = null, note = null } = {}) {
+export async function recordCashCount(actual, { context = "manual", by = null, note = null, device = null } = {}) {
     const amt = Number(actual);
     if (!Number.isFinite(amt) || amt < 0) return { ok: false, error: "bad_amount" };
 
-    const bal = await db.query(`SELECT COALESCE(SUM(amount), 0) AS balance FROM cash_ledger`).catch(() => null);
-    const expected = Math.round(Number(bal?.[0]?.balance ?? 0) * 100) / 100;
+    const expected = await cashBalance();
     const delta = Math.round((amt - expected) * 100) / 100;
 
     await db.query(
-        `INSERT INTO cash_count (actual_amount, expected_amount, delta, context, counted_by, note)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [amt, expected, delta, context, by, note]
+        `INSERT INTO cash_count (actual_amount, expected_amount, delta, context, counted_by, note, counted_by_device)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [amt, expected, delta, context, by, note, device]
     ).catch(() => {});
 
     // Only touch the ledger when it's actually wrong — a matching count shouldn't leave a $0 row behind.

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminAccess } from "@/lib/admin/admin-auth";
 import { listCashCounts, recordCashCount } from "@/lib/cash/cash-count.js";
+import { cashBalance } from "@/lib/cash/cash-ledger.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -15,13 +16,12 @@ export async function GET(request) {
         const authError = await requireAdminAccess(request, "reports.view", logger);
         if (authError) return authError;
         try {
-            const bal = await db.query(`SELECT COALESCE(SUM(amount),0) AS b FROM cash_ledger`).catch(() => null);
             const recent = await db.query(
                 `SELECT occurred_on, description, amount, source FROM cash_ledger
                   ORDER BY occurred_on DESC, id DESC LIMIT 25`
             ).catch(() => []);
             return NextResponse.json({
-                expected: Math.round(Number(bal?.[0]?.b ?? 0) * 100) / 100,
+                expected: await cashBalance(),
                 counts: await listCashCounts(20),
                 recent: recent.map((r) => ({
                     on: String(r.occurred_on).slice(0, 10),
@@ -47,6 +47,7 @@ export async function POST(request) {
                 context: ["clock_in", "clock_out", "manual"].includes(b?.context) ? b.context : "manual",
                 by: b?.by ? String(b.by).slice(0, 80) : null,
                 note: b?.note ? String(b.note).slice(0, 200) : null,
+                device: b?.device ? String(b.device).slice(0, 80) : null,
             });
             if (!res.ok) return NextResponse.json(res, { status: 400 });
             return NextResponse.json(res);

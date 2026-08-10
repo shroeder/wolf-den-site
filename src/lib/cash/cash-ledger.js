@@ -14,7 +14,31 @@ function mapRow(r) {
         entryId: r.entry_id || null,
         source: r.source,
         createdAt: r.created_at,
+        occurredAt: r.occurred_at || null,
+        // True when this row's cash was already inside a physical count, so it does not move the balance.
+        alreadyCounted: Boolean(r.already_counted),
     };
+}
+
+// ── THE BALANCE, IN ONE PLACE ────────────────────────────────────────────────────────────────────────────
+// This sum was written out five separate times across four files. It now has to skip rows flagged
+// `already_counted` (cash that was physically inside a drawer count before it reached the ledger), and five
+// copies of a rule is five chances for one of them to drift. One function, one rule.
+export const CASH_BALANCE_SQL =
+    `SELECT COALESCE(SUM(amount), 0) AS balance FROM cash_ledger WHERE already_counted = FALSE`;
+
+export async function cashBalance() {
+    const rows = await db.query(CASH_BALANCE_SQL).catch(() => null);
+    return Math.round(Number(rows?.[0]?.balance ?? 0) * 100) / 100;
+}
+
+/**
+ * When was the drawer last physically counted? Everything that happened at or before this instant is already
+ * inside that count, so a Square sale syncing in afterwards must not move the balance again.
+ */
+export async function lastCountAt() {
+    const row = await db.queryOne(`SELECT MAX(counted_at) AS at FROM cash_count`).catch(() => null);
+    return row?.at ? new Date(row.at) : null;
 }
 
 export async function listCashLedger({ limit = 2000, offset = 0 } = {}) {
@@ -22,9 +46,7 @@ export async function listCashLedger({ limit = 2000, offset = 0 } = {}) {
         `SELECT * FROM cash_ledger ORDER BY occurred_on DESC, created_at DESC LIMIT $1 OFFSET $2`,
         [Number(limit), Number(offset)],
     );
-    const balRows = await db.query(`SELECT COALESCE(SUM(amount), 0) AS balance FROM cash_ledger`);
-    const balance = Number(balRows[0]?.balance ?? 0);
-    return { rows: rows.map(mapRow), balance };
+    return { rows: rows.map(mapRow), balance: await cashBalance() };
 }
 
 // RECONCILE cash-on-hand to a physically-counted amount. Audit-safe: instead of overwriting history it
@@ -33,8 +55,7 @@ export async function listCashLedger({ limit = 2000, offset = 0 } = {}) {
 export async function reconcileCashBalance(target, { occurredOn = null, note = null, createdBy = null } = {}) {
     const tgt = Number(target);
     if (target == null || Number.isNaN(tgt)) throw new Error("A numeric target balance is required.");
-    const balRows = await db.query(`SELECT COALESCE(SUM(amount), 0) AS balance FROM cash_ledger`);
-    const before = Number(balRows[0]?.balance ?? 0);
+    const before = await cashBalance();
     const delta = Math.round((tgt - before) * 100) / 100;
     const on = occurredOn || new Date().toISOString().slice(0, 10);
     if (delta !== 0) {
@@ -59,31 +80,44 @@ export async function upsertCashEntry(input) {
         paymentMethod = null,
         source = "app",
         createdBy = null,
+        // When the money actually moved. A Square cash sale carries the sale's own timestamp; anything
+        // hand-entered is happening now. This is what the cutoff below compares against — `occurredOn` is a
+        // DATE and cannot tell you which side of a 9pm count a sale fell on.
+        occurredAt = null,
     } = input || {};
 
     if (occurredOn == null || amount == null || Number.isNaN(Number(amount))) {
         throw new Error("occurredOn and a numeric amount are required.");
     }
     const eid = entryId ? String(entryId).trim() : null;
+    const at = occurredAt ? new Date(occurredAt) : null;
+    const when = at && !Number.isNaN(at.getTime()) ? at : new Date();
+
+    // THE CUTOFF. If this money moved at or before the last physical count, its cash was inside the number
+    // somebody counted — the reconcile row for that count already represents it. Adding it to the balance
+    // now would count it twice, which is exactly the bug that made a $3.98 overage read as $100.18 missing.
+    // The row is still written in full; it just does not move the total.
+    const countedAt = await lastCountAt();
+    const alreadyCounted = Boolean(countedAt && when <= countedAt);
 
     if (eid) {
         const rows = await db.query(
-            `INSERT INTO cash_ledger (occurred_on, description, amount, payment_method, entry_id, source, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO cash_ledger (occurred_on, occurred_at, description, amount, payment_method, entry_id, source, created_by, already_counted)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (entry_id) WHERE entry_id IS NOT NULL
              DO UPDATE SET occurred_on = EXCLUDED.occurred_on, description = EXCLUDED.description,
                            amount = EXCLUDED.amount, payment_method = EXCLUDED.payment_method,
                            source = EXCLUDED.source, updated_at = NOW()
              RETURNING *`,
-            [occurredOn, description, Number(amount), paymentMethod, eid, source, createdBy],
+            [occurredOn, when.toISOString(), description, Number(amount), paymentMethod, eid, source, createdBy, alreadyCounted],
         );
         return mapRow(rows[0]);
     }
 
     const rows = await db.query(
-        `INSERT INTO cash_ledger (occurred_on, description, amount, payment_method, entry_id, source, created_by)
-         VALUES ($1, $2, $3, $4, NULL, $5, $6) RETURNING *`,
-        [occurredOn, description, Number(amount), paymentMethod, source, createdBy],
+        `INSERT INTO cash_ledger (occurred_on, occurred_at, description, amount, payment_method, entry_id, source, created_by, already_counted)
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8) RETURNING *`,
+        [occurredOn, when.toISOString(), description, Number(amount), paymentMethod, source, createdBy, alreadyCounted],
     );
     return mapRow(rows[0]);
 }

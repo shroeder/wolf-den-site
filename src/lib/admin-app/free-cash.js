@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { CASH_BALANCE_SQL } from "@/lib/cash/cash-ledger.js";
 import { listOverhead, perDayCents } from "@/lib/admin-app/breakeven.js";
 
 // ── CASH POSITION — what can I actually spend ────────────────────────────────────────────────────────────────────────────────
@@ -182,13 +183,15 @@ async function overheadRemaining() {
 
 export async function cashPosition() {
     const [cashRow, bank, tax, consignors, overhead] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(SUM(amount), 0) AS b FROM cash_ledger`).catch(() => null),
+        db.queryOne(`${CASH_BALANCE_SQL}`).catch(() => null),
         entered("bank_balance"),
         entered("tax_set_aside"),
         consignorPayable(),
         overheadRemaining(),
     ]);
-    const drawer = money(cashRow?.b || 0);
+    // `balance`, not `b` — the shared query aliases it that way. Reading the old key here would have shown
+    // the drawer as $0 on the "where the money is" screen without erroring.
+    const drawer = money(cashRow?.balance || 0);
 
     const have = [
         { label: "In the drawer", amount: drawer, source: "computed", note: "Cash ledger balance" },
