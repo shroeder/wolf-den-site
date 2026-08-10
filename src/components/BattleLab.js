@@ -8,7 +8,7 @@ import GunDeck from "@/components/GunDeck";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
 import { shipProfile, foeProfile, initBattleState, resolveVolley, foeAims, AMMO_LIST, SAILS_MAX, GUN_HP,
-         resolveReckoning, RECKONING_AT, RECKONING_NAME, GUN_TRACKS, gunHpFor, gunUpgradeCost } from "@/lib/marketplace/ship-battle.js";
+         resolveReckoning, RECKONING_AT, RECKONING_NAME, GUN_TRACKS, gunHpFor, gunUpgradeCost, gunArt, gunStage } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
@@ -110,9 +110,12 @@ export default function BattleLab() {
         deck: boatDeck(5),
         doubloons: 240,
         guns: boatGunPorts(5, 6).map((port, i) => {
-            const lv = [{ hp: 3, dmg: 2, acc: 1 }, { hp: 0, dmg: 0, acc: 0 }, { hp: 1, dmg: 0, acc: 4 }][i] || { hp: 0, dmg: 0, acc: 0 };
+            // Spread across the four marks on purpose, so the stage art can be judged side by side.
+            const lv = [{ hp: 4, dmg: 4, acc: 4 }, { hp: 3, dmg: 3, acc: 2 }, { hp: 2, dmg: 2, acc: 0 },
+                        { hp: 1, dmg: 0, acc: 0 }, { hp: 0, dmg: 0, acc: 0 }, { hp: 0, dmg: 0, acc: 0 }][i] || { hp: 0, dmg: 0, acc: 0 };
             return {
-                index: i, port, hits: gunHpFor(lv.hp),
+                index: i, port, hits: gunHpFor(lv.hp), art: gunArt(lv), stage: gunStage(lv),
+                spent: lv.hp + lv.dmg + lv.acc,
                 tracks: Object.values(GUN_TRACKS).map((t) => ({
                     key: t.key, name: t.name, icon: t.icon, desc: t.desc,
                     level: lv[t.key], max: t.max, maxed: lv[t.key] >= t.max,

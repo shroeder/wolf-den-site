@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { GiAnchor, GiCannon, GiMining, GiFishingPole } from "react-icons/gi";
 
 import ChestIcon from "@/components/ChestIcon";
 import CoinCta from "@/components/CoinCta";
@@ -623,20 +622,29 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // The boat's current form name = the highest unlocked milestone, else the base Wood Boat.
     const curForm = (state.forms || []).filter((f) => f.unlocked).slice(-1)[0];
     const boatName = curForm ? curForm.name : "Wood Boat";
+    // PAINTED, NOT EMOJI. Every one of these cards carried an OS emoji — a puff of wind, a shamrock, a
+    // bucket — which is somebody else's art, rendered differently on every device, in the middle of a screen
+    // made entirely of ours. One sprite per track (scripts/gen-track-sprites.mjs); anything without one
+    // still falls back to its old glyph rather than rendering an empty box.
+    const TrackIco = ({ art, fallback }) => (art
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img className="sail-upg-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
+        : <span className="sail-upg-ico">{fallback}</span>);
+
     // The four travel/loot upgrade levers, described with their per-level effect + current → next value.
     const upgrades = [
         // Optional-chained throughout, like the dig tracks below already were. The guard above is the real
         // fix; this is so a half-loaded state degrades to a blank number instead of a white screen.
-        { action: "upgrade_speed", icon: "💨", name: "Speed", data: state.speed,
+        { action: "upgrade_speed", art: "speed", icon: "💨", name: "Speed", data: state.speed,
             desc: <>Faster voyages — shaves <b>{state.speed?.minPerLevel ?? "—"} min</b> off each trip, per level.</>,
             effLabel: "Trip time", now: fmtLeft(state.speed?.voyageNow), next: fmtLeft(state.speed?.voyageNext) },
-        { action: "upgrade_fortune", icon: "🍀", name: "Fortune", data: state.fortune,
+        { action: "upgrade_fortune", art: "fortune", icon: "🍀", name: "Fortune", data: state.fortune,
             desc: <>Draws trouble — <b>+1.5%</b> chance of a marine <b>encounter</b> at your voyage&apos;s midpoint, per level.</>,
             effLabel: "Encounter chance", now: `${state.fortune?.encounterNow ?? 0}%`, next: `${state.fortune?.encounterNext ?? 0}%` },
-        { action: "upgrade_rarity", icon: "💎", name: "Rarity", data: state.rarity,
+        { action: "upgrade_rarity", art: "rarity", icon: "💎", name: "Rarity", data: state.rarity,
             desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
             effLabel: "Chest upgrade", now: `${state.rarity?.pctNow ?? 0}%`, next: `${state.rarity?.pctNext ?? 0}%` },
-        { action: "upgrade_luck", icon: "👋", name: "Luck", data: state.luck,
+        { action: "upgrade_luck", art: "find", icon: "👋", name: "Luck", data: state.luck,
             desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
             effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`, next: `${state.luck?.wavesNext ?? 0}` },
     ];
@@ -644,11 +652,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const pct = (v) => `${Math.round((v || 0) * 100)}%`;
     const dg = state.digUpgrades || {};
     const digTracks = [
-        { track: "stamina", icon: "⛏️", name: "Stamina", data: dg.stamina, desc: <>More digs each trip — <b>+1</b> per level.</>, effLabel: "Digs / trip", now: dg.stamina?.digsNow, next: dg.stamina?.digsNext },
-        { track: "pierce", icon: "🪨", name: "Pierce", data: dg.pierce, desc: <>Chance a dig breaks through <b>every layer</b> of a tile at once.</>, effLabel: "Pierce chance", now: pct(dg.pierce?.valueNow), next: pct(dg.pierce?.valueNext) },
-        { track: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> fragment.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
-        { track: "efficient", icon: "🔧", name: "Tinker", data: dg.efficient, desc: <>Adds to <b>every tool&apos;s proc chance</b> while you dig.</>, effLabel: "Tool proc bonus", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
-        { track: "detonator", icon: "💥", name: "Detonator", data: dg.detonator, desc: <>Chance a dig <b>spawns an explosion</b> (clears a 3×3, one layer).</>, effLabel: "Explosion chance", now: pct(dg.detonator?.valueNow), next: pct(dg.detonator?.valueNext) },
+        { track: "stamina", art: "stamina", icon: "⛏️", name: "Stamina", data: dg.stamina, desc: <>More digs each trip — <b>+1</b> per level.</>, effLabel: "Digs / trip", now: dg.stamina?.digsNow, next: dg.stamina?.digsNext },
+        { track: "pierce", art: "pierce", icon: "🪨", name: "Pierce", data: dg.pierce, desc: <>Chance a dig breaks through <b>every layer</b> of a tile at once.</>, effLabel: "Pierce chance", now: pct(dg.pierce?.valueNow), next: pct(dg.pierce?.valueNext) },
+        { track: "strike", art: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> fragment.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
+        { track: "efficient", art: "tinker", icon: "🔧", name: "Tinker", data: dg.efficient, desc: <>Adds to <b>every tool&apos;s proc chance</b> while you dig.</>, effLabel: "Tool proc bonus", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
+        { track: "detonator", art: "detonator", icon: "💥", name: "Detonator", data: dg.detonator, desc: <>Chance a dig <b>spawns an explosion</b> (clears a 3×3, one layer).</>, effLabel: "Explosion chance", now: pct(dg.detonator?.valueNow), next: pct(dg.detonator?.valueNext) },
     ];
 
     return (
@@ -1060,11 +1068,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     "Dig Site" and "The Rail" all wrapped to two lines at 393px, and only the selected tab had
                     any chrome, so the other three read as loose text rather than controls. Short labels cannot
                     wrap, and stacking gives every tab the same footprint no matter how long the word is. */}
-                {[["helm", GiAnchor, "Helm", "Boat upgrades"],
-                  ...(state.combat ? [["guns", GiCannon, "Guns", "Raiding upgrades"]] : []),
-                  ["dig", GiMining, "Dig", "Tools & excavation"], ["rail", GiFishingPole, "Rail", "Fishing"]].map(([k, Ico, label, sub]) => (
+                {/* PAINTED TABS. These were four flat line glyphs — the only navigation in the whole feature,
+                    rendered in the one visual language the rest of the game does not use. */}
+                {[["helm", "st_helm", "Helm", "Boat upgrades"],
+                  ...(state.combat ? [["guns", "st_guns", "Guns", "Raiding upgrades"]] : []),
+                  ["dig", "st_dig", "Dig", "Tools & excavation"], ["rail", "st_rail", "Rail", "Fishing"]].map(([k, art, label, sub]) => (
                     <button key={k} type="button" className={station === k ? "on" : ""} onClick={() => setStation(k)} title={sub} aria-label={sub}>
-                        <Ico aria-hidden="true" />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sail-station-art" src={`/images/sailing/tracks/${art}.png`} alt="" draggable="false" />
                         <em>{label}</em>
                     </button>
                 ))}
@@ -1094,7 +1105,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     {upgrades.map((u) => (
                         <div className={`sail-upg${u.data.maxed ? " is-maxed" : ""}${upgFlash === u.action ? " is-bought" : ""}`} key={u.action}>
                             <div className="sail-upg-top">
-                                <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                <span className="sail-upg-title"><TrackIco art={u.art} fallback={u.icon} />{u.name}</span>
                                 <span className="muted sail-upg-lv">Lv {u.data.level}/{u.data.max}</span>
                             </div>
                             <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.data.max ? Math.min(100, (u.data.level / u.data.max) * 100) : 0}%` }} /></div>
@@ -1228,7 +1239,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     {digTracks.map((u) => (
                         <div className={`sail-upg${u.data?.maxed ? " is-maxed" : ""}${upgFlash === `dig:${u.track}` ? " is-bought" : ""}`} key={u.track}>
                             <div className="sail-upg-top">
-                                <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                <span className="sail-upg-title"><TrackIco art={u.art} fallback={u.icon} />{u.name}</span>
                                 <span className="muted sail-upg-lv">Lv {u.data?.level ?? 0}/{u.data?.max ?? 0}</span>
                             </div>
                             <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.data?.max ? Math.min(100, ((u.data?.level ?? 0) / u.data.max) * 100) : 0}%` }} /></div>
@@ -1304,7 +1315,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {(state.fishing.tracks || []).map((u) => (
                             <div className="sail-upg" key={u.id}>
                                 <div className="sail-upg-top">
-                                    <span className="sail-upg-title"><span className="sail-upg-ico">{u.icon}</span>{u.name}</span>
+                                    <span className="sail-upg-title"><TrackIco art={u.art} fallback={u.icon} />{u.name}</span>
                                     <span className="muted">Lv {u.level}/{u.max}</span>
                                 </div>
                                 <div className="sail-upg-bar" aria-hidden="true"><span style={{ width: `${u.max ? Math.min(100, (u.level / u.max) * 100) : 0}%` }} /></div>

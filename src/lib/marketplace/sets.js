@@ -429,7 +429,9 @@ export function activeSetBonuses(equippedIds) {
             const n = counts.get(set.id) || 0;
             return {
                 id: set.id, name: set.name, equipped: n, total: set.items.length,
-                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea, farm: t.farm, wheel: t.wheel })),
+                // `text` too — the client renders whatever this says rather than re-deriving it, which is how
+                // a forge bonus came to display as an em-dash on the other payload.
+                tiers: set.bonuses.map((t) => ({ need: t.need, active: n >= t.need, stats: t.stats, sea: t.sea, farm: t.farm, wheel: t.wheel, depth: t.depth, forge: t.forge, text: tierText(t) })),
                 capstone: set.capstone ? { desc: set.capstone.desc, active: n >= fullNeed(set) } : null,
             };
         });

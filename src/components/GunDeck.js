@@ -1,17 +1,15 @@
 "use client";
 
 import { useState } from "react";
-
-import * as Gi from "react-icons/gi";
+import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
 
-// Same one-liner ShipYard uses — a Game-Icons glyph by name, falling back to a cannon so a new track key can
-// never render as a blank square.
-const Icon = ({ name, className }) => {
-    const C = Gi[name] || Gi.GiCannon;
-    return <C className={className} aria-hidden="true" />;
-};
+// PAINTED, NOT LINE ART. These were Game-Icons glyphs — flat single-colour outlines in a sheet made entirely
+// of painted objects. One sprite per track (scripts/gen-gun-sprites.mjs).
+const TRACK_ART = { hp: "iron", dmg: "bore", acc: "lay" };
+// eslint-disable-next-line @next/next/no-img-element
+const TrackArt = ({ k, className }) => <img className={className} src={`/images/sailing/gun/${TRACK_ART[k] || "iron"}.png`} alt="" draggable="false" />;
 
 // ── THE GUN DECK ─────────────────────────────────────────────────────────────────────────────────────────────
 // The Cannons track buys you MORE barrels. This is where one barrel becomes better than the one next to it.
@@ -57,7 +55,8 @@ export default function GunDeck({ deck, purse, busy, onBuy }) {
                             onClick={() => setOpenGun(g.index)}
                             title={`Cannon ${g.index + 1} — ${g.hits} hits`}
                         >
-                            <Icon name="GiCannon" className="gdk-gun-ico" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="gdk-gun-ico" src={g.art || "/images/sailing/gun/cannon-1.png"} alt="" draggable="false" />
                             <b>{g.index + 1}</b>
                             {spent ? <i className="gdk-pips">{"·".repeat(Math.min(9, spent))}</i> : null}
                         </button>
@@ -65,14 +64,19 @@ export default function GunDeck({ deck, purse, busy, onBuy }) {
                 })}
             </div>
 
-            {gun ? (
+            {/* PORTALLED TO THE BODY. `position: fixed` is measured against the nearest transformed ancestor,
+                not the viewport — and this sheet lives inside the sailing page, which has them. That is why it
+                opened halfway down the screen and ran off the bottom with its last buy button unreachable
+                instead of sitting centred and scrolling. Out here it is measured against the viewport. */}
+            {gun && typeof document !== "undefined" ? createPortal((
                 <div className="gdk-sheet" role="dialog" aria-modal="true" onClick={() => setOpenGun(null)}>
                     <div className="gdk-card" onClick={(e) => e.stopPropagation()}>
                         <div className="gdk-card-head">
-                            <Icon name="GiCannon" className="gdk-card-ico" />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="gdk-card-ico" src={gun.art || "/images/sailing/gun/cannon-1.png"} alt="" draggable="false" />
                             <div>
                                 <b>Cannon {gun.index + 1}</b>
-                                <em>{gun.hits} hits to dismount</em>
+                                <em>{gun.hits} hits to dismount{gun.stage > 1 ? ` · mark ${gun.stage}` : ""}</em>
                             </div>
                             <button type="button" className="gdk-x" onClick={() => setOpenGun(null)} aria-label="Close">×</button>
                         </div>
@@ -82,7 +86,7 @@ export default function GunDeck({ deck, purse, busy, onBuy }) {
                             return (
                                 <div key={t.key} className={`gdk-track${t.maxed ? " is-maxed" : ""}`}>
                                     <div className="gdk-track-top">
-                                        <Icon name={t.icon} className="gdk-track-ico" />
+                                        <TrackArt k={t.key} className="gdk-track-ico" />
                                         <b>{t.name}</b>
                                         <span className="gdk-lv">
                                             {Array.from({ length: t.max }).map((_, i) => (
@@ -124,7 +128,7 @@ export default function GunDeck({ deck, purse, busy, onBuy }) {
                         </div>
                     </div>
                 </div>
-            ) : null}
+            ), document.body) : null}
         </div>
     );
 }

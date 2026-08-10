@@ -15174,3 +15174,17 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .gdk-purse { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px;
     border-top: 1px solid rgba(255,255,255,0.07); font-size: 0.76rem; color: #9aa2ab; }
 .gdk-purse img { width: 16px; height: 16px; }
+
+/* Painted track and station icons. They replace OS emoji and flat react-icons glyphs; sized to sit exactly
+   where those did so no card changes shape. */
+.sail-upg-art { width: 30px; height: 30px; object-fit: contain; flex: none; border-radius: 9px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.45)); }
+.sail-station-art { width: 26px; height: 26px; object-fit: contain; display: block; margin: 0 auto 2px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+/* The gun-deck sheet's own art. */
+.gdk-gun-ico { width: 24px; height: 24px; object-fit: contain; }
+.gdk-card-ico { width: 42px; height: 42px; object-fit: contain; flex: none; }
+.gdk-track-ico { width: 26px; height: 26px; object-fit: contain; flex: none; }
+/* The sheet is portalled to <body>, so it needs its own stacking context above everything. */
+.gdk-sheet { z-index: 5000; align-items: start; padding: max(16px, 4svh) 16px; overflow-y: auto; }
+.gdk-card { max-height: none; margin: auto 0; }

@@ -1,4 +1,4 @@
-// Sprites for the four GUN DECK upgrade tracks.
+// Sprites for every UPGRADE TRACK and STATION in sailing.
 //
 // They were react-icons Game-Icons glyphs in flat yellow — a single-colour outline standing in for the four
 // things you actually spend doubloons on. Every other thing this game asks you to buy or tap is a painted
@@ -38,6 +38,34 @@ const TRACKS = {
     hull: P("A thick curved section of a ship's OAK HULL banded with riveted iron plate and a heavy iron strake, one cannonball dented into the plate without breaking through. Deep oak brown, dark iron, cold steel highlights."),
     // Sea-dog nerve — a chance a raid does not use up your daily raid.
     cunning: P("A worn brass PIRATE SPYGLASS extended, wrapped in leather cord, lying across a folded sea chart with a tiny compass rose, one lens catching a bright glint. Antique brass, tan leather and aged parchment."),
+
+    // ── THE HELM: the four boat tracks. These were OS emoji on the cards — a puff of wind, a shamrock — which
+    // is somebody else's art in the middle of a screen made entirely of ours.
+    speed: P("A billowing white ship's SAIL straining full of wind on a short wooden yard, with three curling wind-gust lines sweeping past it. Cream canvas, warm oak spar, pale blue-white gusts."),
+    fortune: P("A four-leaf CLOVER of deep green resting on a scatter of three gold doubloons, one coin on its edge catching a bright glint. Emerald green and warm gold."),
+    rarity: P("A cut violet GEMSTONE with bright facets sitting in a small open iron-bound chest, faint sparkles rising off it. Deep amethyst purple, dark iron, gold trim."),
+    find: P("A brass DIVIDER compass and a rolled sea chart tied with twine, the dividers open across the chart's corner. Antique brass, aged parchment, tan cord."),
+
+    // ── THE DIG SITE.
+    stamina: P("A miner's IRON PICKAXE with a worn oak haft crossed over a leather waterskin, the pick head catching a hard highlight. Dark iron, warm oak, tan leather."),
+    strike: P("A dark stone struck open to reveal a bright GOLD VEIN inside, chips of rock flying off and a hard white spark at the point of impact. Grey stone, brilliant gold, white spark."),
+
+    // ── THE RAIL: fishing.
+    line: P("A wooden FISHING REEL wound with fine line, the line trailing off in a loose curl with a small barbed hook on the end. Warm oak, brass fittings, pale line, steel hook."),
+    lure: P("A painted metal fishing LURE — a small fish-shaped spoon with a red-and-white finish, two treble hooks and a bright glint along its flank. Polished silver, red enamel, steel hooks."),
+    net: P("A knotted rope FISHING NET gathered into a bundle with a cork float and one silver fish caught in the mesh. Tan rope, warm cork, cold silver scales."),
+
+    pierce: P("An iron mining CHISEL driven through a cracked slab of grey stone, the stone splitting cleanly in two with chips flying. Dark iron, cold grey stone, white fracture lines."),
+    tinker: P("A brass ADJUSTABLE WRENCH crossed with a small oilcan, a bright glint on the jaw. Warm brass, dark steel, amber oil."),
+    detonator: P("A round black POWDER BOMB with a lit fuse throwing orange sparks, sitting on a scatter of rubble. Matte black iron, bright orange spark, grey rubble."),
+    gaff: P("A steel FISHING GAFF — a long curved barbed hook on a short oak handle — with a bright highlight along the curve. Cold steel, warm oak grip, leather binding."),
+
+    // ── THE STATION TABS. Four line glyphs sat across the top of sailing as the only navigation in the
+    // feature, in a game where every other control is a painted object.
+    st_helm: P("A ship's WHEEL of dark oak with eight turned spokes and a polished brass hub, seen at a slight three-quarter angle. Deep oak brown, warm brass."),
+    st_guns: P("A single brass naval CANNON on a wooden carriage, muzzle toward the viewer's right, a curl of smoke at the mouth. Warm brass, oiled oak, grey smoke."),
+    st_dig: P("A short-handled IRON SHOVEL biting into a mound of dark earth, one gold coin edge showing in the dirt. Dark iron, warm oak handle, brown soil, a glint of gold."),
+    st_rail: P("A bent wooden FISHING ROD with a taut line running off it and a small brass reel, caught mid-bite. Warm oak, brass, pale taut line."),
 };
 
 const args = process.argv.slice(2);

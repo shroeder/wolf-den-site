@@ -76,7 +76,16 @@ const effStats = (item, ownedById) => {
 const SET_RARITY = { common: "#9aa0a6", rare: "#4aa3ff", epic: "#b76bff", legendary: "#ff9a3c", mythic: "#ff5a7a", ascendant: "#5ad0ff", eternal: "#ffd75e" };
 const capText = (desc) => (desc || "").replace(/^Full set:\s*/i, "");
 // A set tier's bonus as text — stat bonuses and/or sea affinity (the sailing set grants the latter).
-const tierText = (t) => [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : "", t.depth ? describeDepth(t.depth) : ""].filter(Boolean).join(" · ") || "—";
+// THE SERVER ALREADY WROTE THIS LINE. sets.js renders every tier to text with a describer that knows all six
+// kinds of bonus (stats, sea, farm, depth, wheel, forge) and sends it as `text`. This function was a second,
+// client-side copy that only knew four of them — so Blacksmith's Regalia, whose 3-piece bonus is a `forge`
+// bonus, rendered its set-bonus line as a bare em-dash: a set with a real bonus telling you it had none.
+// sets.js is server-only and cannot be imported here, which is why the copy existed; using what it sends
+// means there is nothing left to drift.
+const tierText = (t) => t.text
+    || [describeStats(t.stats || {}), t.sea ? describeSea(t.sea) : "", t.farm ? describeFarm(t.farm) : "",
+        t.depth ? describeDepth(t.depth) : ""].filter(Boolean).join(" · ")
+    || "—";
 
 // A rich, tappable card for one set the player is building: piece dots, a progress bar, the tiered stat
 // bonuses (active ones lit), and — the fun differentiator two sets otherwise hide — the full-set CAPSTONE.

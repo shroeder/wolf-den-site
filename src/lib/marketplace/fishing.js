@@ -424,10 +424,11 @@ async function grantFishingGear(buyerId, fishRarity) {
 // Deliberately capped modestly: a fully-invested angler gets 15 casts a day rather than 10, not 40, because
 // casts are the input to every other reward in the feature.
 export const FISH_TRACKS = {
-    line: { max: 5, per: 1, cap: 5, kind: "count", name: "Line", icon: "🎣", desc: "Extra casts each day." },
-    lure: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Lure", icon: "✨", desc: "Better odds of a rarer species." },
-    net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", icon: "🪣", desc: "More casts bring up treasure instead of a fish." },
-    gaff: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Gaff", icon: "🪝", desc: "A clean landing floors the size on a poor reel." },
+    // `art` is a painted sprite in /images/sailing/tracks; `icon` stays as the fallback glyph only.
+    line: { max: 5, per: 1, cap: 5, kind: "count", name: "Line", art: "line", icon: "🎣", desc: "Extra casts each day." },
+    lure: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Lure", art: "lure", icon: "✨", desc: "Better odds of a rarer species." },
+    net: { max: 5, per: 0.02, cap: 0.10, kind: "pct", name: "Net", art: "net", icon: "🪣", desc: "More casts bring up treasure instead of a fish." },
+    gaff: { max: 5, per: 0.05, cap: 0.25, kind: "pct", name: "Gaff", art: "gaff", icon: "🪝", desc: "A clean landing floors the size on a poor reel." },
 };
 export const FISH_TRACK_COL = {
     line: "fish_line_level", lure: "fish_lure_level", net: "fish_net_level", gaff: "fish_gaff_level",
@@ -602,7 +603,7 @@ export function fishingView(row, angling = 0, status = "idle") {
         tracks: Object.keys(FISH_TRACKS).map((t) => {
             const def = FISH_TRACKS[t], level = lv[t];
             return {
-                id: t, name: def.name, icon: def.icon, desc: def.desc, kind: def.kind,
+                id: t, name: def.name, icon: def.icon, art: def.art || null, desc: def.desc, kind: def.kind,
                 level, max: def.max, maxed: level >= def.max, cost: 100 * (level + 1) * (level + 1),
                 valueNow: fishTrackValue(t, level), valueNext: fishTrackValue(t, level + 1), cap: def.cap,
             };

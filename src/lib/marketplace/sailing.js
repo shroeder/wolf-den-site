@@ -16,7 +16,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V,
-         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning,
+         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage,
          RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
@@ -2487,6 +2487,10 @@ export async function gunDeckView(buyerId, row) {
                 index: i,
                 port: ports[i] || { x: 0.5, y: 0.5 },
                 hits: gunHpFor(lv.hp),
+                // The barrel's own portrait, which changes every four levels you put into it.
+                art: gunArt(lv),
+                stage: gunStage(lv),
+                spent: (lv.hp || 0) + (lv.dmg || 0) + (lv.acc || 0),
                 tracks: Object.values(GUN_TRACKS).map((t) => {
                     const level = lv[t.key] || 0;
                     return {

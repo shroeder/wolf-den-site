@@ -267,6 +267,18 @@ export const gunStat = (stats, i) => (Array.isArray(stats) ? stats[i] : null) ||
 // ONE barrel, and you will want several.
 export const gunUpgradeCost = (level = 0) => Math.round(18 * Math.pow(1.85, Math.max(0, level)));
 
+// ── A GUN YOU HAVE BUILT LOOKS BUILT ─────────────────────────────────────────────────────────────────────────
+// Twelve levels of iron, bore and lay used to leave a barrel looking exactly like the one beside it that had
+// none, which makes the whole point of per-gun upgrades invisible everywhere except a number. One new sprite
+// every four levels spent across its three tracks: plain iron, then banded, then heavy brass, then a
+// masterwork with a wolf's head at the muzzle. Four stages over a twelve-level ceiling.
+export const GUN_ART_STAGES = 4;
+export const gunStage = (lv) => {
+    const spent = Math.max(0, (lv?.hp || 0) + (lv?.dmg || 0) + (lv?.acc || 0));
+    return Math.min(GUN_ART_STAGES, 1 + Math.floor(spent / 4));
+};
+export const gunArt = (lv) => `/images/sailing/gun/cannon-${gunStage(lv)}.png`;
+
 // Build the combat profile a ship brings to a battle. `sea` is the sailing affinity block (broadside/ironclad).
 // AMMUNITION IS NO LONGER PART OF THE PROFILE. It used to be baked in here — one type for the whole battle, its
 // accuracy folded into the ship's — because a broadside was one undifferentiated event. Every gun is laid
