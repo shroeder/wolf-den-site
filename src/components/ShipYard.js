@@ -93,7 +93,7 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 // (matchOpponent in sailing.js), so there is nothing to compare and nothing to pick: this tab is one button
 // and your record.
 
-export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, owner = false }) {
+export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, stoneShop = null, owner = false }) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
     const active = tab || ownTab;
@@ -149,6 +149,8 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, 
                 the room. Three shelves: the locker, the collection manifest, and a gamble. */}
             {active === "shop" ? (
                 <Quartermaster
+                    stoneShop={stoneShop}
+                    onBuyStone={(id) => onAct?.("buy_stone", { stone: id })}
                     shop={combat.shop}
                     locker={combat.locker}
                     purse={purse}

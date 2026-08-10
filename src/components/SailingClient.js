@@ -1,5 +1,7 @@
 "use client";
 
+import { dispatchStoneFound } from "@/components/PetStoneFound";
+
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import ChestIcon from "@/components/ChestIcon";
@@ -488,6 +490,10 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             // with {}. The next render then read state.speed.minPerLevel off undefined and took the page down.
             // Two members hit exactly that. A response we could not read is not a response.
             const d = r.ok ? await r.json().catch(() => null) : null;
+            // A stone out of the dirt. Hooked once here rather than at the dig recap, so any future surface
+            // that starts returning one gets the moment for free.
+            if (d?.result?.stone) dispatchStoneFound(d.result.stone);
+            if (d?.stone) dispatchStoneFound(d.stone);
             // Tailwind feedback: only celebrate (gust + sound) when the server confirms it actually shaved time.
             if (isWind) {
                 if (d && !d.error && d.shavedMinutes) {
@@ -1626,6 +1632,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {battleMsg ? <div className="sail-battle-msg">{battleMsg}</div> : null}
                         <ShipYard
                             combat={state.combat} raid={state.raid} gold={state.gold} busy={busy}
+                            stoneShop={state.stoneShop}
                             owner={state.owner === true}
                             tab={battleTab}
                             onTab={setBattleTab}

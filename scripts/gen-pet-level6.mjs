@@ -16,9 +16,16 @@
 // IDENTITY still holds: same species, same silhouette, same individual. This is the animal transformed, not a
 // different animal. That is the line the whole ladder walks and the only reason the levels feel like one pet.
 //
-// ── COST ─────────────────────────────────────────────────────────────────────────────────────────────────────
-// 108 pets x 2 = 216 images, generated as EDITS of each pet's existing top-level sprite so the pixels carry
-// forward rather than each one being an independent reading of a sentence. Roughly $9 at `high` quality.
+// ── COST — READ THIS BEFORE RERUNNING ANYTHING ───────────────────────────────────────────────────────────────
+// 108 pets x 2 = 216 images, generated as EDITS of each pet's top existing sprite so the pixels carry forward.
+//
+// A FULL PASS IS ABOUT $40, NOT $9. The original estimate here used $0.042/image, which is the MEDIUM-quality
+// rate; these run at `high`, which is roughly $0.19 an image. That error was quoted to Luke as "$9 for the set"
+// and then spent four times over across three prompt revisions, because each revision meant regenerating a
+// half or a whole set at a price nobody had checked.
+//
+// So: PREVIEW ON THREE PETS FIRST, always, and count a full rerun as forty dollars rather than pocket change.
+// --form=light or --form=dark exists precisely so a prompt fix on one stone does not pay for the other.
 //
 // Usage:
 //   node scripts/gen-pet-level6.mjs --list                  # what would be made, and what it would cost
@@ -39,6 +46,8 @@ const ALL = ARGV.includes("--all");
 const RESUME = ARGV.includes("--resume");
 const LIST = ARGV.includes("--list");
 const only = ARGV.filter((a) => !a.startsWith("--"));
+// --form=light | --form=dark, so a prompt fix on one stone does not cost a rerun of the other.
+const ONLY_FORM = (ARGV.find((a) => a.startsWith("--form=")) || "").split("=")[1] || null;
 
 const props = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/local.properties", "utf8");
 const key = props.match(/OPENAI_API_KEY=(.+)/)?.[1]?.trim();
@@ -82,13 +91,23 @@ const KEEP_PALETTE = "ABSOLUTELY DO NOT RECOLOUR THE CREATURE. Its fur, scales, 
 const FORMS = {
     light: {
         label: "Lightstone",
-        line: "ASCENDED — enshrined in LIGHT, but still itself. Its OWN natural markings (stripes, spots, "
-            + "patches, feather edges) now glow as ENGRAVED GOLDEN SIGILS burning along where those markings "
-            + "already were. Its eyes shine solid warm white-gold. The tips of its horns, claws, fangs, beak or "
-            + "mane have become polished translucent crystal, catching gold light. A small crown-like ring of "
-            + "floating light-shards hovers just above its head. A soft warm rim-light traces its back and "
-            + "shoulders. It stands taller and calmer — serene and sanctified, and unmistakably still the same "
-            + "coloured animal it always was.",
+        // SECOND ATTEMPT, for the same reason the dark one needed a third. "Enshrined in light" reads to the
+        // model as "make it out of gold", and the whole contact sheet came back gold — a gilded panda and a
+        // gilded pig are the same picture. Fixed the way dark was: the word "gold" now applies ONLY to the
+        // sigils and the crown, never to the animal; the retained colour is given a number; and the failure is
+        // written out as a prohibition with worked examples.
+        line: "BLESSED — something holy has settled on it, but the animal underneath is untouched. Its coat "
+            + "keeps ITS OWN HUE at full saturation, merely lit warmly: a pink flamingo is still plainly PINK, "
+            + "a black-and-white panda is still plainly BLACK AND WHITE, a brown bear still plainly BROWN. Its "
+            + "OWN natural markings (stripes, spots, patches, feather edges) now glow as ENGRAVED GOLDEN "
+            + "SIGILS along exactly where those markings already were. Its eyes shine solid warm white-gold. "
+            + "The tips of its horns, claws, fangs, beak or mane have become polished translucent crystal. A "
+            + "small crown-like ring of floating gold light-shards hovers just above its head. It stands taller "
+            + "and calmer — serene and sanctified. THE SIGILS ARE FINE THIN LINES, like inlaid gold wire, NOT "
+            + "large filled shapes: they must cover no more than about a FIFTH of the body, and the other four "
+            + "fifths stay the animal's own plain colour. DO NOT GILD THE CREATURE, do not turn it gold, white, "
+            + "cream or metallic. The gold belongs to the SIGILS and the CROWN only. If somebody could not name "
+            + "the animal's original colour from this image, it is WRONG.",
     },
     dark: {
         label: "Darkstone",
@@ -163,13 +182,16 @@ else if (!ALL && !LIST) { console.error("Name pets, or pass --all. --list to see
 const jobs = [];
 for (const p of pets) {
     for (const form of ["light", "dark"]) {
+        if (ONLY_FORM && form !== ONLY_FORM) continue;
         if (RESUME && have.has(`${p.id}:${form}`)) continue;
         if (!topUrl.has(p.id)) continue;   // no art at all yet — the Lv1 pass has to run first
         jobs.push({ ...p, form });
     }
 }
 
-console.log(`${pets.length} pets, ${jobs.length} images to make (~$${(jobs.length * 0.042).toFixed(2)} at high quality)`);
+// $0.19 an image at `high` — the real rate. The old figure here was the medium-quality one and it under-quoted
+// a full run by more than four times.
+console.log(`${pets.length} pets, ${jobs.length} images to make (~$${(jobs.length * 0.19).toFixed(2)} at high quality)`);
 console.log(`${pets.filter((p) => !topUrl.has(p.id)).length} pet(s) skipped — no base sprite yet`);
 if (LIST) process.exit(0);
 

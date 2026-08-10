@@ -1,5 +1,7 @@
 "use client";
 
+import { dispatchStoneFound } from "@/components/PetStoneFound";
+
 import { useCallback, useRef, useState } from "react";
 
 import { clink, quench } from "@/components/mining/kit";
@@ -38,7 +40,11 @@ export function useMine(initial) {
         const r = await fetch("/api/marketplace/mining", {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
         }).catch(() => null);
-        return r ? await r.json().catch(() => null) : null;
+        const d = r ? await r.json().catch(() => null) : null;
+        // ONE hook for the whole surface: a stone can come back on any mining response, and hooking the two
+        // that currently return one would break the day a third does.
+        if (d?.stone) dispatchStoneFound(d.stone);
+        return d;
     }, []);
     const say = useCallback((m) => { setMsg(m); setTimeout(() => setMsg(null), 2400); }, []);
 

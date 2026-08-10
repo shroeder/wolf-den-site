@@ -1,5 +1,7 @@
 "use client";
 
+import { dispatchStoneFound } from "@/components/PetStoneFound";
+
 import { useCallback, useRef, useState } from "react";
 
 import DelveRun from "@/components/delves/DelveRun";
@@ -33,6 +35,9 @@ export default function DelveClient({ initial }) {
             });
             const d = await r.json().catch(() => null);
             if (!d) { setMsg("Something went wrong down there. Try again."); return null; }
+            // A stone in the rubble at the bottom of a dungeon. The floor-ten boss is the most RELIABLE of the
+            // four sources — one run per dungeon per day — which is why its rate is the lowest.
+            if (d.finished?.stone) dispatchStoneFound(d.finished.stone);
             if (d.error) setMsg(ERRORS[d.error] || "That didn't work.");
             // Any reply carrying `unlocked` is a full state; anything else is an error shape that must not
             // replace what the screen is rendering from.

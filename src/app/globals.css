@@ -15796,3 +15796,75 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .penr-line { margin: 0 0 14px; font-size: .85rem; line-height: 1.5; color: rgba(255,255,255,.8); }
 .penr-go { padding: 11px 26px; border-radius: 11px; font-weight: 900; font-size: .88rem; cursor: pointer;
     color: #120c1c; background: var(--stone); border: none; }
+
+/* ── A STONE TURNED UP ─────────────────────────────────────────────────────────────────────────────────────
+   A card, not a takeover — you are usually mid-dig when it lands. The enshrining is the takeover. */
+.pstf { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom));
+    z-index: 10110; display: flex; align-items: center; gap: 12px; width: min(92vw, 380px); text-align: left;
+    padding: 12px 16px 12px 12px; border-radius: 16px; cursor: pointer; appearance: none; color: inherit;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--stone) 22%, rgba(14,10,20,0.97)), rgba(14,10,20,0.97));
+    border: 1.5px solid var(--stone); box-shadow: 0 16px 44px -16px var(--stone), 0 0 0 1px rgba(0,0,0,0.4);
+    animation: pstfIn .5s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes pstfIn { from { opacity: 0; transform: translate(-50%, 26px) scale(.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+.pstf-glow { position: absolute; inset: 0; border-radius: 16px; pointer-events: none;
+    background: radial-gradient(circle at 16% 50%, color-mix(in srgb, var(--stone) 30%, transparent) 0%, transparent 58%); }
+.pstf-art { position: relative; width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 0 12px var(--stone)); animation: pstfBob 2.4s ease-in-out infinite; }
+@keyframes pstfBob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
+.pstf-words { position: relative; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pstf-kick { font-style: normal; font-size: .6rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; color: var(--stone); }
+.pstf-name { font-size: 1.02rem; color: #fff; }
+.pstf-line { font-style: normal; font-size: .72rem; line-height: 1.35; color: rgba(255,255,255,.72); }
+
+/* ── THE STONES YOU ARE HOLDING ────────────────────────────────────────────────────────────────────────────
+   Top of the pets page. Before this, a stone existed only as a number inside a level-6 pet's panel — weeks
+   away from when you find your first one. */
+.pstr { margin: 0 0 14px; padding: 12px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,224,138,0.06), rgba(176,97,255,0.06)); border: 1px solid rgba(255,255,255,0.13); }
+.pstr-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+.pstr-h { font-size: 0.95rem; color: #fff; }
+.pstr-count { font-size: 0.7rem; font-weight: 800; color: rgba(255,255,255,0.5); }
+.pstr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* min-width:0 is load-bearing: a grid track defaults to min-content, so the card refused to shrink and
+   "Darkstone" was cut in half at 390px. The art and the count also come down a little so the name fits. */
+.pstr-card { display: flex; align-items: center; gap: 7px; padding: 9px 9px; border-radius: 12px; cursor: pointer;
+    appearance: none; color: inherit; text-align: left; min-width: 0; overflow: hidden;
+    background: rgba(10,8,14,0.5); border: 1.5px solid rgba(255,255,255,0.12); }
+.pstr-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pstr-card.is-open { border-color: var(--stone); box-shadow: 0 0 0 1px var(--stone); }
+.pstr-card.is-empty { opacity: 0.55; }
+.pstr-art { width: 34px; height: 34px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--stone) 55%, transparent)); }
+.pstr-n { font-size: 1.05rem; font-weight: 900; color: var(--stone); }
+.pstr-name { font-size: 0.7rem; font-weight: 800; color: rgba(255,255,255,0.74); white-space: nowrap; }
+.pstr-detail { margin-top: 10px; padding: 10px 11px; border-radius: 11px;
+    background: rgba(10,8,14,0.45); border: 1px solid color-mix(in srgb, var(--stone) 40%, transparent); }
+.pstr-line { margin: 0 0 3px; font-size: 0.78rem; line-height: 1.45; color: rgba(255,255,255,0.82); }
+.pstr-best { display: block; font-style: normal; font-size: 0.7rem; color: rgba(255,255,255,0.5); margin-bottom: 8px; }
+.pstr-ready-h { display: block; font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); margin-bottom: 5px; }
+.pstr-ready-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pstr-pet { padding: 6px 11px; border-radius: 999px; font-size: 0.76rem; font-weight: 800; cursor: pointer;
+    color: #120c1c; background: var(--stone); border: none; }
+.pstr-closest, .pstr-get { margin: 0; font-size: 0.74rem; line-height: 1.45; color: rgba(255,255,255,0.6); }
+.pstr-closest b { color: #fff; }
+.pstr-get { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
+
+/* ── A STONE, FOR SALE ─────────────────────────────────────────────────────────────────────────────────────
+   The same shelf in both shops, so the two cannot drift into describing one item differently. */
+.psts { margin: 14px 0 4px; padding: 12px; border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,224,138,0.06), rgba(176,97,255,0.06)); border: 1px solid rgba(255,255,255,0.13); }
+.psts-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+.psts-h { font-size: 0.95rem; color: #fff; }
+.psts-sub { font-size: 0.7rem; color: rgba(255,255,255,0.5); }
+.psts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.psts-card { display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center;
+    padding: 10px 8px; border-radius: 12px; background: rgba(10,8,14,0.5); border: 1.5px solid color-mix(in srgb, var(--stone) 45%, transparent); }
+.psts-art { width: 56px; height: 56px; object-fit: contain;
+    filter: drop-shadow(0 0 9px color-mix(in srgb, var(--stone) 55%, transparent)); }
+.psts-name { font-size: 0.86rem; color: #fff; }
+.psts-line { font-size: 0.68rem; line-height: 1.35; color: rgba(255,255,255,0.66); }
+.psts-held { font-style: normal; font-size: 0.66rem; font-weight: 800; color: var(--stone); }
+.psts-buy { margin-top: 6px; width: 100%; padding: 8px 10px; border-radius: 9px; font-size: 0.74rem; font-weight: 900;
+    cursor: pointer; color: #120c1c; background: var(--stone); border: none; }
+.psts-buy:disabled { opacity: 0.45; cursor: default; }
+.psts-note { margin: 9px 0 0; font-size: 0.7rem; line-height: 1.4; color: rgba(255,255,255,0.45); }

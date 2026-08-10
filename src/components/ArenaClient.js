@@ -1,5 +1,7 @@
 "use client";
 
+import PetStoneShelf from "@/components/PetStoneShelf";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -1223,6 +1225,8 @@ export default function ArenaClient({ initial }) {
                         Laurels come off every bout, win or lose, and off the feats inside them. This is the only
                         thing that takes them.
                     </p>
+                    <PetStoneShelf shop={st.stoneShop} currency="laurels" purse={st.laurels} busy={busy}
+                        onBuy={(id) => { Sfx.ui(); act("buy_stone", { stone: id }); }} />
                     <div className="ar-crates">
                         {(st.armoury || []).map((c) => {
                             const poor = (st.laurels || 0) < c.cost;

@@ -5,6 +5,7 @@ import GiftWatcher from "@/components/GiftWatcher";
 import GuideStrip from "@/components/GuideStrip";
 import HappyHourWatcher from "@/components/HappyHourWatcher";
 import LevelUpWatcher from "@/components/LevelUpWatcher";
+import PetStoneFound from "@/components/PetStoneFound";
 import PetLevelUp from "@/components/PetLevelUp";
 import LocationPrompt from "@/components/LocationPrompt";
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
@@ -35,6 +36,9 @@ export default function PublicLayout({ children }) {
             <LevelUpWatcher />
             {/* Site-wide pet level-up / evolution celebration — fires anywhere a pet ticks over a level. */}
             <PetLevelUp />
+            {/* One global listener for a stone turning up, for the same reason the level-up has one: four
+                systems can drop them and four separate celebrations would drift apart within a month. */}
+            <PetStoneFound />
             {/* Every member who fought a boss sees its defeat celebration once, not just the finisher. */}
             <BossCelebrationWatcher />
             {/* When Happy Hour goes live, everyone gets the "it started!" modal once (with a donor recap). */}

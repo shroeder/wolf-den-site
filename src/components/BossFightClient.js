@@ -1,5 +1,7 @@
 "use client";
 
+import { dispatchStoneFound } from "@/components/PetStoneFound";
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -139,6 +141,9 @@ export default function BossFightClient() {
                 await load();
                 return;
             }
+            // A stone off the felling blow — the rarest of the four sources to reach, since the boss falls a
+            // few times a week and only one member lands the last hit.
+            if (res.stone) dispatchStoneFound(res.stone);
             // THE FLURRY. A single "2,700,669" says nothing about having spent three strikes, so each swing
             // throws its OWN number in sequence and the burst names how many landed. The individual hits are
             // real per-swing damage from the server, not the total split three ways.

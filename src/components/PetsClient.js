@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import MemberHeroCard from "@/components/MemberHeroCard";
 import PetArt from "@/components/PetArt";
 import PetEnshrine from "@/components/PetEnshrine";
+import PetStonesRow from "@/components/PetStonesRow";
 import PetEnshrineReveal from "@/components/PetEnshrineReveal";
 import { COLLECTIBLES, collectibleById, petPassive, petSpecialPassive, petPassiveLevelMult, petPrice, petUnlockText, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, petRealWorld } from "@/lib/marketplace/pet-perks";
@@ -456,9 +457,28 @@ export default function PetsClient() {
         );
     };
 
+    // Which of YOUR pets could take a stone right now, and — if none can — the closest one and how far it has
+    // to go. This is the answer to "what do I do with these", and it has to be specific to you or it is a
+    // manual page rather than a prompt.
+    const readyPets = Object.entries(state?.petLevels || {})
+        .filter(([id, l]) => l?.level >= 6 && !(state?.ascension?.enshrined || []).some((e) => e.petId === id))
+        .map(([id]) => ({ id, name: collectibleById(id)?.name || id }));
+    const closestPet = readyPets.length ? null : Object.entries(state?.petLevels || {})
+        .map(([id, l]) => ({ id, name: collectibleById(id)?.name || id, level: l?.level || 1,
+            pct: Math.min(99, Math.round((((l?.level || 1) - 1) / 5) * 100 + ((l?.span ? (l.into / l.span) : 0) / 5) * 100)) }))
+        .sort((a, z) => z.pct - a.pct)[0] || null;
+
     return (
         <div className="stack reveal">
             {!detail && (<>
+            <PetStonesRow
+                stones={state?.ascension?.stones}
+                prices={state?.ascension?.prices}
+                enshrined={state?.ascension?.enshrined || []}
+                ready={readyPets}
+                closest={closestPet}
+                onPick={(id) => setDetail(id)}
+            />
             <section className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                     <div>

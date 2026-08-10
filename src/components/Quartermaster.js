@@ -1,5 +1,7 @@
 "use client";
 
+import PetStoneShelf from "@/components/PetStoneShelf";
+
 import { useState } from "react";
 import * as Gi from "react-icons/gi";
 
@@ -53,7 +55,7 @@ const PieceArt = ({ piece, className }) => (
     ) : <Icon name={piece.icon} className={className} />
 );
 
-export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble }) {
+export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone }) {
     const [tab, setTab] = useState("locker");
     const [reveal, setReveal] = useState(null);   // the gamble's chest
     const [got, setGot] = useState(null);         // the piece a crate turned out to hold
@@ -97,6 +99,10 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                 ))}
                 <span className="qm-purse"><Dbl />{purse}</span>
             </div>
+
+            {tab === "locker" && stoneShop ? (
+                <PetStoneShelf shop={stoneShop} currency="doubloons" purse={purse} busy={busy} onBuy={onBuyStone} />
+            ) : null}
 
             {tab === "locker" ? (
                 <div className="qm-grid">

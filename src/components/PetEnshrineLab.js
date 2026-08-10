@@ -4,6 +4,9 @@ import { useState } from "react";
 
 import PetEnshrine from "@/components/PetEnshrine";
 import PetEnshrineReveal from "@/components/PetEnshrineReveal";
+import PetStoneFound, { dispatchStoneFound } from "@/components/PetStoneFound";
+import PetStonesRow from "@/components/PetStonesRow";
+import PetStoneShelf from "@/components/PetStoneShelf";
 
 // ── THE ENSHRINE LAB ─────────────────────────────────────────────────────────────────────────────────────────
 // Dev only. Mounts the REAL panel against fixture state, so every branch it has can be looked at without
@@ -68,7 +71,36 @@ export default function PetEnshrineLab() {
             <div className="pelab-tabs">
                 <button type="button" className="pelab-tab" onClick={() => setReveal("light")}>▶ Play reveal · light</button>
                 <button type="button" className="pelab-tab" onClick={() => setReveal("dark")}>▶ Play reveal · dark</button>
+                <button type="button" className="pelab-tab" onClick={() => dispatchStoneFound({ stone: "light", source: "mine_seam" })}>▶ Find · light</button>
+                <button type="button" className="pelab-tab" onClick={() => dispatchStoneFound({ stone: "dark", source: "sail_dig" })}>▶ Find · dark</button>
             </div>
+
+            {/* ── THE REST OF THE CHAIN ── every surface a stone passes through, on one page: where it turns
+                up, where you keep it, and where you buy one when the dice never land. */}
+            <h2 className="pelab-h">In your pets page</h2>
+            <div className="pelab-stage">
+                <PetStonesRow
+                    stones={{ light: 2, dark: 1 }}
+                    prices={{ doubloons: 900, laurels: 6000 }}
+                    enshrined={[{ petId: "bunny", stone: "light" }]}
+                    ready={[{ id: "wolf_pup", name: "Wolf Pup" }, { id: "owl", name: "Owl" }]}
+                    closest={null}
+                    onPick={() => {}}
+                />
+            </div>
+
+            <h2 className="pelab-h">In the Quartermaster &amp; the Armoury</h2>
+            <div className="pelab-stage">
+                <PetStoneShelf
+                    shop={{ price: 900, held: { light: 2, dark: 1 }, stones: [
+                        { id: "light", name: "Lightstone", art: "/images/pets/stone-light.png", color: "#ffe08a", line: "Keeps the ability at full strength, and every pet you own gives +12% more of its passive." },
+                        { id: "dark", name: "Darkstone", art: "/images/pets/stone-dark.png", color: "#b061ff", line: "Keeps the ability and raises it to 150% — the strongest a pet ability gets." },
+                    ] }}
+                    currency="doubloons" purse={1200} onBuy={() => {}}
+                />
+            </div>
+
+            <PetStoneFound />
 
             <PetEnshrineReveal
                 open={Boolean(reveal)}
