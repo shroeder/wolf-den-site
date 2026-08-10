@@ -382,6 +382,12 @@ export default function ArenaClient({ initial }) {
     // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
     // walking away touches it, which is the whole reason this can exist at all.
     const [stepped, setStepped] = useState(false);
+    // ── THE END OF A FIGHT NEEDS A BEAT ──────────────────────────────────────────────────────────────────
+    // The recap was rendered on `bout.over` directly, which meant it covered the screen on the same frame the
+    // last blow landed. Everything built for that moment played underneath it and was never seen: the loser's
+    // .6s fall to the sand, the verdict called across the ring, the victory sting. You won, and what you got
+    // was a modal appearing over a fight you did not watch end.
+    const [recapReady, setRecapReady] = useState(false);
     // The spell layer, driven imperatively. React state is the wrong tool for "play this burst now" — by the
     // time a re-render lands, the moment has gone.
     const fxRef = useRef(null);
@@ -431,6 +437,22 @@ export default function ArenaClient({ initial }) {
     const bout = st?.bout || null;
     // Nothing underneath a full-screen fight should move when you swipe.
     useScrollLock(Boolean(bout));
+
+    // Fall (.6s), then the flourish, then the card at 1.9s. Long enough to watch them go down and hear it
+    // land; short enough that nobody taps the screen wondering whether it is stuck.
+    useEffect(() => {
+        if (!bout?.over) { setRecapReady(false); return undefined; }
+        const won = Boolean(bout.won);
+        // The sting goes with the FALL, not with the card — the sound is the thing that says it is over.
+        const sting = setTimeout(() => { if (won) Sfx.victory(); else Sfx.lose?.(); }, 420);
+        // A burst of light off the sand where the loser landed, on the canvas that already draws the spells.
+        const burst = setTimeout(() => {
+            fxRef.current?.play({ kind: won ? "surge" : "hurt", element: won ? "light" : "shadow",
+                side: won ? "them" : "you", big: 1.4 });
+        }, 520);
+        const card = setTimeout(() => setRecapReady(true), 1900);
+        return () => { clearTimeout(sting); clearTimeout(burst); clearTimeout(card); };
+    }, [bout?.over, bout?.won]);
 
     // ── FIT THE FIGHT ON THE PHONE ───────────────────────────────────────────────────────────────────────
     // The ring was sized `min(74vh, 640px)`, which is a fraction of the WHOLE viewport — and this page puts
@@ -939,7 +961,11 @@ export default function ArenaClient({ initial }) {
                     {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
                     {bout.over ? (
                         <div className={`ar-verdict ${bout.won ? "is-win" : "is-loss"}`}>
-                            <b>{bout.won ? "Down" : "You fall"}</b>
+                            {/* Rays behind the word on a win — the one moment in the fight that is allowed to
+                                be loud. They turn slowly, so the frame is still moving while you read it. */}
+                            {bout.won ? <span className="ar-cele" aria-hidden="true" /> : null}
+                            <b>{bout.won ? "Victory" : "You fall"}</b>
+                            {bout.won && bout.foe?.name ? <em className="ar-verdict-sub">{bout.foe.name} is down</em> : null}
                             {/* Present whether or not the recap modal renders. A finished fight must always
                                 have a visible way back to the ladder somewhere on the screen. */}
                             <button type="button" className="ar-btn is-sm" disabled={busy}
@@ -1066,7 +1092,7 @@ export default function ArenaClient({ initial }) {
                     it: the component still existed, the dismiss action still existed, clearBout still existed —
                     only the one line that mounts it was gone. So every bout since then ended on a dead screen
                     with no button, and the only escape was reloading the page. */}
-                {bout.over ? <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} /> : null}
+                {bout.over && recapReady ? <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} /> : null}
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px
@@ -1199,7 +1225,12 @@ export default function ArenaClient({ initial }) {
                 bout is where an opponent actually becomes a name you remember. */}
             <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0}
                 onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
-                <GiCrossedSwords aria-hidden="true" />
+                {/* A PAINTED SPRITE, not a glyph. Line art on a solid gold plate is the one combination that
+                    reads as a placeholder — the sea's equivalent button has had painted art since it shipped.
+                    This is the Reaver tree's own Cleave sprite: steel and flame, already drawn in the house
+                    style, already in the arena's art folder. No new art needed for a button. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="ar-find-ico" src="/images/arena/node/rv_strike.webp" alt="" draggable="false" />
                 <span>
                     <b>{st.fightsLeft > 0 ? "Find a fight" : "No fights left today"}</b>
                     <em>{st.fightsLeft > 0
@@ -1707,6 +1738,15 @@ function Styles() {
             /* Same trap as arBraceFoe: without a from, going down flipped the loser through zero first. */
             @keyframes arDownFoe { from { transform: scaleX(-1) translateY(0) rotate(0deg); opacity: 1; }
                 to { transform: scaleX(-1) translateY(16px) rotate(16deg); opacity: .45; filter: grayscale(1) brightness(.6); } }
+            /* The celebration behind the word. Deliberately BEHIND: the sprite going down on the sand is the
+               thing to look at, and this frames it rather than covering it. */
+            .ar-cele { position: absolute; inset: -30%; z-index: -1; pointer-events: none;
+                background: conic-gradient(from 0deg, transparent 0 9deg, rgba(255,225,140,0.16) 9deg 14deg, transparent 14deg 24deg);
+                animation: arCeleSpin 9s linear infinite, arCeleIn .5s ease-out both; }
+            @keyframes arCeleSpin { to { transform: rotate(360deg) } }
+            @keyframes arCeleIn { from { opacity: 0; transform: scale(.6) } to { opacity: 1; transform: scale(1) } }
+            .ar-verdict-sub { display: block; margin-top: 4px; font-style: normal; font-size: 0.86rem;
+                font-weight: 800; color: #ffe9b8; text-shadow: 0 2px 10px #000; }
             .ar-verdict { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
                 align-content: center; gap: 12px; pointer-events: none; }
             .ar-verdict .ar-btn { pointer-events: auto; }
@@ -2269,6 +2309,8 @@ function Styles() {
                 box-shadow: 0 6px 20px rgba(120,70,220,0.34); }
             .ar-leave svg { width: 15px; height: 15px; }
             .ar-find svg { width: 30px; height: 30px; flex: none; }
+            .ar-find-ico { width: 40px; height: 40px; flex: none; object-fit: contain;
+                filter: drop-shadow(0 2px 3px rgba(60,36,0,0.5)); }
             .ar-find b { display: block; font-family: var(--font-display); font-weight: 900; font-size: 1.06rem; }
             .ar-find em { display: block; font-style: normal; font-size: 0.78rem; opacity: .82; margin-top: 2px; }
             .ar-log { margin-top: 13px; max-height: 150px; overflow-y: auto; display: grid; gap: 4px;

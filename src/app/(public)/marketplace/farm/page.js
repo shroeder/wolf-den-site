@@ -26,5 +26,15 @@ export default async function FarmPage({ searchParams }) {
     // must too, since the client doesn't re-fetch the full farm on mount.
     farm.ownerDebug = !u && isOwner(buyer.id);
 
-    return <FarmClient initial={farm} viewingAlias={farm.mine ? null : u} />;
+    // ── THE KEY IS LOAD-BEARING ──────────────────────────────────────────────────────────────────────────────
+    // FarmClient seeds ALL of its state from `initial` with useState, and a <Link> from one farm to another is
+    // a client-side transition WITHIN THE SAME ROUTE SEGMENT — so React keeps the component instance alive and
+    // every one of those useState calls holds the farm you were already looking at. This page re-rendered with
+    // the right data on the server and the screen did not change: tapping a farm in the standings looked like
+    // a link to the page you were already on.
+    //
+    // The neighbour chips never showed it because they are plain <a> tags — a full page load remounts
+    // everything. Keying on the OWNER makes the client remount on any route that changes who you are looking
+    // at, whichever kind of navigation got you there.
+    return <FarmClient key={farm.owner?.id || ownerId} initial={farm} viewingAlias={farm.mine ? null : u} />;
 }
