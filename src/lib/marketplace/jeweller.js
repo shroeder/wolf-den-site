@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { GEMS, GEM_TIERS, MAX_SOCKETS, gemById, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
-import { itemById } from "@/lib/marketplace/items.js";
+import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
 // ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────────────
@@ -173,12 +173,23 @@ export async function getJewellerState(buyerId) {
     if (!buyerId) return { unlocked: false };
     if (!jewelsEnabled(buyerId)) return { unlocked: false };
 
-    const [owned, socketRows, gems, goldRow] = await Promise.all([
+    const [owned, socketRows, gems, goldRow, equipped, enhRows] = await Promise.all([
         db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []),
         socketsFor(buyerId),
         getGems(buyerId),
         db.queryOne(`SELECT gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // What is on your body right now — the pieces you are most likely to want a socket in.
+        db.query(`SELECT slot, item_id FROM mkt_user_equipment WHERE buyer_id = $1`, [buyerId]).catch(() => []),
+        // And what the Forge has already added to them, so the row shows the piece as it FIGHTS rather than as
+        // the catalog describes it. A +6 ring reading as its base stats on this bench would be the one screen
+        // in the game that lies about your own gear.
+        db.query(`SELECT item_id, level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
+    const wearing = new Set(equipped.map((r) => r.item_id));
+    const enh = new Map(enhRows.map((r) => [r.item_id, {
+        level: Number(r.level) || 0,
+        bonus: typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {}),
+    }]));
 
     const pieces = owned
         .map((r) => itemById(r.item_id))
@@ -186,14 +197,26 @@ export async function getJewellerState(buyerId) {
         .filter((it) => it && it.slot)
         .map((it) => {
             const sockets = socketRows[it.id] || [];
+            const e = enh.get(it.id) || null;
+            // Base + forge enhancement, merged the way the fight merges them.
+            const total = { ...(it.stats || {}) };
+            for (const [k, v] of Object.entries(e?.bonus || {})) total[k] = (total[k] || 0) + (Number(v) || 0);
             return {
                 id: it.id, name: it.name, slot: it.slot, rarity: it.rarity, icon: it.icon,
                 cost: socketCost(it.rarity),
+                equipped: wearing.has(it.id),
+                enhanceLevel: e?.level || 0,
+                stats: total,
+                statLine: describeStats(total),
                 sockets: sockets.map((s) => ({ idx: s.idx, gem: s.gemId ? gemById(s.gemId) : null })),
                 canCut: sockets.length < MAX_SOCKETS,
             };
         })
-        .sort((a, z) => z.sockets.length - a.sockets.length || a.name.localeCompare(z.name));
+        // Worn first, then whatever already has a socket, then by name. The piece you are wearing is the piece
+        // you came here about.
+        .sort((a, z) => Number(z.equipped) - Number(a.equipped)
+            || z.sockets.length - a.sockets.length
+            || a.name.localeCompare(z.name));
 
     return {
         unlocked: true,

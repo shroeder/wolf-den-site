@@ -3,6 +3,7 @@
 import { useState } from "react";
 import * as Gi from "react-icons/gi";
 
+import ItemArt from "@/components/ItemArt";
 import { MAX_SOCKETS } from "@/lib/marketplace/gems.js";
 
 // ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────────────
@@ -105,10 +106,19 @@ export default function JewellerClient({ initial }) {
                         const gem = socket?.gem || null;
                         return (
                             <div key={p.id} className="jw-piece" style={{ "--rar": RARITY[p.rarity] || "#c9d1d9" }}>
-                                <span className="jw-piece-ico"><Icon name={p.icon} /></span>
+                                {/* The item's own painted art, through the same component every other gear grid
+                                    in the game uses — so a piece looks the same here as it does in your bag. */}
+                                <ItemArt id={p.id} icon={p.icon} className="jw-piece-ico" alt="" />
                                 <div className="jw-piece-body">
-                                    <b>{p.name}</b>
-                                    <em>{p.slot.replace(/_/g, " ")} · {p.rarity}</em>
+                                    <b>{p.name}{p.enhanceLevel ? <i className="jw-enh">+{p.enhanceLevel}</i> : null}</b>
+                                    <em>
+                                        {p.slot.replace(/_/g, " ")} · {p.rarity}
+                                        {p.equipped ? <b className="jw-worn">worn</b> : null}
+                                    </em>
+                                    {/* What the piece is worth AS IT FIGHTS — base plus anything the Forge has
+                                        already put into it. Socketing is a decision about a specific item, and
+                                        you cannot make it against a name and a rarity alone. */}
+                                    {p.statLine ? <span className="jw-stats">{p.statLine}</span> : null}
                                     {gem ? <span className="jw-set" style={{ "--c": gem.color }}>{gem.name} — {describe(gem.stats)}</span> : null}
                                 </div>
                                 <div className="jw-piece-go">
@@ -177,7 +187,17 @@ export default function JewellerClient({ initial }) {
                 .jw-piece { display: flex; align-items: center; gap: 11px; padding: 11px; border-radius: 13px;
                     background: rgba(255,255,255,0.03);
                     border: 1px solid color-mix(in srgb, var(--rar) 34%, transparent); }
-                .jw-piece-ico svg { width: 30px; height: 30px; color: var(--rar); flex: none; }
+                .jw-piece-ico { flex: none; display: grid; place-items: center; width: 42px; height: 42px;
+                    border-radius: 10px; color: var(--rar);
+                    background: color-mix(in srgb, var(--rar) 12%, rgba(0,0,0,0.25));
+                    border: 1px solid color-mix(in srgb, var(--rar) 32%, transparent); }
+                .jw-piece-ico :global(svg) { width: 26px; height: 26px; }
+                .jw-piece-ico :global(.item-art-img) { width: 36px; height: 36px; object-fit: contain; }
+                .jw-enh { font-style: normal; margin-left: 5px; font-size: 0.76rem; color: #7fe0a4; }
+                .jw-worn { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+                    font-size: 0.62rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+                    color: #1a1206; background: linear-gradient(180deg,#ffdf85,#d4af37); }
+                .jw-stats { display: block; margin-top: 2px; font-size: 0.74rem; color: #cbd2da; }
                 .jw-piece-body { min-width: 0; flex: 1; }
                 .jw-piece-body b { display: block; font-family: var(--font-display); font-size: 0.88rem; color: var(--rar); }
                 .jw-piece-body em { display: block; font-style: normal; font-size: 0.72rem; text-transform: capitalize; color: #8f98a3; }
