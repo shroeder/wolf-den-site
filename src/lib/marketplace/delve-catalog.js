@@ -50,13 +50,21 @@ export const delveMight = (level = 1, gearPower = 0) => Math.round(9 + level * 0
 // Upgrades roughly HALVE the danger rather than erasing it — the ceilings below were cut for exactly that
 // reason. Walking into the Spire un-upgraded in poor gear is meant to be hopeless; that is what the other
 // three dungeons and the provisions shop are for.
+// ── xpPer CUT 35% (2026-08-09), goldPer UNTOUCHED ────────────────────────────────────────────────────────────
+// Within a fortnight of opening, delving was the biggest HONEST source of XP in the game — 216 XP a run at 30+
+// runs a day and climbing, ~9% of every point the pack earned, second only to a scroll exploit that has since
+// been closed. What makes it the runaway is that nothing gates it: no daily allowance, no cooldown, no torch to
+// burn. You can run the Hollow back to back until you get bored.
+//
+// The XP is what got cut, not the gold — the purse is the dungeon's whole draw and delve gold is a modest 7.5%
+// of minting. Levels are the thing a repeatable loop shouldn't be able to print.
 export const DUNGEONS = [
     {
         id: "hollow", name: "The Hollow Warren", minLevel: 10, tint: "#8fd08a",
         blurb: "A collapsed badger warren under the old orchard. Cramped, damp, and full of things that bite.",
         bg: "/images/delves/bg-hollow.webp",
         loot: { parts: [1, 2], chest: "wooden", bigChest: "iron", frags: [3, 5], gear: ["rare"], gearOdds: 0.06 },
-        foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [7, 12],
+        foeX: 2.5, bossX: 6.0, dmg: [12, 19], goldPer: [18, 34], xpPer: [5, 8],
         boss: { id: "hollow_boss", name: "The Warren Mother", dmg: [16, 26], sprite: "/images/delves/foe-warren-mother.webp",
             blurb: "Something far too large for these tunnels, and it has been waiting." },
         foes: [
@@ -71,7 +79,7 @@ export const DUNGEONS = [
         blurb: "A flooded treasury beneath the docks. The water is cold, the gold is real, and so is what guards it.",
         bg: "/images/delves/bg-sunken.webp",
         loot: { parts: [2, 3], chest: "iron", bigChest: "gold", frags: [4, 7], gear: ["rare", "epic"], gearOdds: 0.07 },
-        foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [11, 19],
+        foeX: 2.7, bossX: 6.5, dmg: [21, 33], goldPer: [30, 55], xpPer: [7, 12],
         boss: { id: "sunken_boss", name: "The Drowned Warden", dmg: [28, 43], sprite: "/images/delves/foe-drowned-warden.webp",
             blurb: "It still wears the vault key on a chain. It has not let go in a very long time." },
         foes: [
@@ -86,7 +94,7 @@ export const DUNGEONS = [
         blurb: "A magma seam the miners broke into and sealed again. Whatever they sealed in is still burning.",
         bg: "/images/delves/bg-ember.webp",
         loot: { parts: [3, 4], chest: "iron", bigChest: "gold", frags: [6, 10], gear: ["epic"], gearOdds: 0.08 },
-        foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [18, 29],
+        foeX: 2.9, bossX: 7.0, dmg: [30, 46], goldPer: [48, 82], xpPer: [12, 19],
         boss: { id: "ember_boss", name: "The Cinder Tyrant", dmg: [41, 62], sprite: "/images/delves/foe-cinder-tyrant.webp",
             blurb: "It was a smith once. Now it is the forge." },
         foes: [
@@ -101,7 +109,7 @@ export const DUNGEONS = [
         blurb: "A tower that is only there on some nights. Ten floors up is the same as ten floors down.",
         bg: "/images/delves/bg-astral.webp",
         loot: { parts: [4, 5], chest: "gold", bigChest: "gold", frags: [8, 14], gear: ["epic", "legendary"], gearOdds: 0.09 },
-        foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [28, 46],
+        foeX: 3.1, bossX: 7.5, dmg: [41, 63], goldPer: [75, 130], xpPer: [18, 30],
         boss: { id: "astral_boss", name: "The Hollow Star", dmg: [56, 84], sprite: "/images/delves/foe-hollow-star.webp",
             blurb: "It has no face, and it is looking at you." },
         foes: [

@@ -34,26 +34,31 @@ const HARVEST_RECIPE_CHANCE = 0.04;
 // that, EVERY harvest rolls one random reward from the shared HARVEST_POOL — and rarer crops shift those odds
 // toward the better loot tiers (that's what "rarity does"). Rarer crops also take longer + sell for more.
 export const SEEDS = {
-    // SELL VALUES CUT ~35% (2026-08-06). Over 30 days the harvest was the biggest single gold faucet in the
-    // game by a distance: 342,800 gold across 2,337 harvests — a fifth of every coin minted, and two and a half
-    // times the next source down. The farm is meant to be a supplement to a day's play, not the economy, and
-    // the multipliers stack on top of these numbers (deco buffs, the Greenhouse, the Harvester capstone's
-    // double yield), which is why the average harvest was paying 147 rather than a common crop's 34.
+    // SELL VALUES HALVED (2026-08-09), on top of the ~35% cut of 2026-08-06.
+    //
+    // THE FIRST CUT WORKED PER HARVEST AND WAS SWALLOWED WHOLE BY VOLUME. Gold per harvest did fall — 145 down
+    // to 101 — but harvests per day went 141 → 370 over the same fortnight as members bought plots, so the
+    // faucet went UP: 20k gold a day before the cut, 38k after it, still 15.8% of every coin minted and still
+    // the biggest single source in the game.
+    //
+    // And it is the BASE PRICES doing it, not the buffs: corn's 160 was paying an average of 184, wheat's 22
+    // was paying 25. The deco/Greenhouse/capstone stack only adds about 15% in practice, so capping multipliers
+    // would have moved nothing. These nine numbers are the whole lever, which is why they are the whole change.
     // Gold values sit against the coin scale ($10 = 2,000 coins, so 1g ≈ ½¢). Farming stays a supplement.
     // Common — quick, cheap, found from everyday actions (the daily grind). (Grow times +20% 2026-07-28.)
-    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 108, sell: 22, xp: 6, rarity: "common" },
-    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 216, sell: 44, xp: 10, rarity: "common" },
-    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 288, sell: 65, xp: 14, rarity: "common" },
+    wheat: { name: "Wheat", emoji: "🌾", sprout: "🌱", growMin: 108, sell: 11, xp: 6, rarity: "common" },
+    carrot: { name: "Carrot", emoji: "🥕", sprout: "🌱", growMin: 216, sell: 22, xp: 10, rarity: "common" },
+    potato: { name: "Potato", emoji: "🥔", sprout: "🌱", growMin: 288, sell: 33, xp: 14, rarity: "common" },
     // Rare — a few hours; from digs, raids, iron chests.
-    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 360, sell: 110, xp: 20, rarity: "rare" },
-    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 504, sell: 160, xp: 26, rarity: "rare" },
+    strawberry: { name: "Strawberries", emoji: "🍓", sprout: "🌱", growMin: 360, sell: 55, xp: 20, rarity: "rare" },
+    corn: { name: "Corn", emoji: "🌽", sprout: "🌱", growMin: 504, sell: 80, xp: 26, rarity: "rare" },
     // Epic — half a day; from raids, gold chests, boss kills.
-    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 720, sell: 180, xp: 40, rarity: "epic" },
-    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 1080, sell: 280, xp: 62, rarity: "epic" },
+    grape: { name: "Grapes", emoji: "🍇", sprout: "🌿", growMin: 720, sell: 90, xp: 40, rarity: "epic" },
+    pumpkin: { name: "Pumpkin", emoji: "🎃", sprout: "🌿", growMin: 1080, sell: 140, xp: 62, rarity: "epic" },
     // Legendary — overnight; from gold chests + boss kills only.
-    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1728, sell: 450, xp: 130, rarity: "legendary" },
+    goldenapple: { name: "Golden Apple", emoji: "🍎", sprout: "✨", growMin: 1728, sell: 225, xp: 130, rarity: "legendary" },
     // Mythic — a day and a half; the jackpot, only from the very best sources.
-    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2592, sell: 940, xp: 300, rarity: "mythic" },
+    starfruit: { name: "Star Fruit", emoji: "⭐", sprout: "✨", growMin: 2592, sell: 470, xp: 300, rarity: "mythic" },
 };
 // How good the shared-pool loot odds are for a crop's rarity (shown in the seed picker).
 export const LOOT_LABEL = { common: "Basic loot", rare: "Better loot", epic: "Good loot", legendary: "Great loot", mythic: "Best loot" };

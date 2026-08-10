@@ -309,7 +309,11 @@ async function grantPrize(buyerId, prize, opts = {}) {
         if (prize.mini) await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
         return { sprite, text: `${amt.toLocaleString()} gold${prize.mini ? " — MINI JACKPOT!" : ""}` };
     }
-    if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
+    // flat: true — the wedge SAYS a number, so the wedge PAYS that number. It rode every earn-rate buff, so an
+    // 800-XP wedge paid 936 and a 2,000 paid 2,288 while the card still read the wedge. Same rule the XP scrolls
+    // got on 2026-08-08 and for the same reason: a fixed prize is not effort, and a spin can be bought with
+    // gold, so multiplying it is the same gold→XP arbitrage through a different door.
+    if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount, flat: true }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
     if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "fragment") {
         // Name the TIER on the result card (and use that tier's shard art) — "dig fragments" alone left people
