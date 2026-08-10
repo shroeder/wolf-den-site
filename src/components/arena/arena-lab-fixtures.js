@@ -262,7 +262,6 @@ export function baseState(extra = {}) {
             };
         })(),
         upgrades: upgradeView({ conditioning: 4, footwork: 2, edge: 1 }),
-        podium: [{ place: 1, chest: "gold" }, { place: 2, chest: "iron" }, { place: 3, chest: "wooden" }],
         bout: null,
         away: null,
         ...extra,
@@ -297,7 +296,7 @@ export const SCENES = {
     },
     ladder: {
         label: "Ladder",
-        note: "The screen you land on. Rank badge, your kit, podium, who you can challenge.",
+        note: "The screen you land on. Rank badge, your kit, who you can challenge.",
         state: () => baseState(),
     },
     away: {

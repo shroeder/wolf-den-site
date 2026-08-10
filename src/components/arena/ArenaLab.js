@@ -232,7 +232,7 @@ export default function ArenaLab() {
     // ── THE CONTRACT CHECK ── these fixtures are mirrored by hand from arena.js. If a required key goes
     // missing the lab says so loudly rather than rendering a subtly wrong screen and being trusted.
     const missing = useMemo(() => {
-        const need = ["unlocked", "me", "position", "size", "rank", "fightsLeft", "stats", "targets", "board", "podium"];
+        const need = ["unlocked", "me", "position", "size", "rank", "fightsLeft", "stats", "targets", "board"];
         const gaps = need.filter((k) => initial[k] === undefined);
         if (initial.bout) {
             const nb = ["foe", "beat", "turn", "hp", "maxHp", "foeHp", "foeMaxHp", "cd", "clash", "me", "items", "log"];

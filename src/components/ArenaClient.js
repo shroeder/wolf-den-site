@@ -1223,16 +1223,6 @@ export default function ArenaClient({ initial }) {
                 <span className="ar-kitline-go" aria-hidden="true">›</span>
             </button>
 
-            {/* The podium was a three-box card for a fact that fits on one line. */}
-            {st.podium?.length ? (
-                <p className="ar-podline">
-                    Top three at the end of the day take a chest —
-                    {st.podium.map((p) => (
-                        <i key={p.place} className={`is-${p.chest}`}> #{p.place} {p.chest}</i>
-                    ))}
-                </p>
-            ) : null}
-
             {/* A fight you stepped out of is still standing, and it owns your next tap: you cannot start
                 another while one is open, so the way back in has to be the loudest thing on the screen. */}
             {bout && !bout.over ? (
@@ -1934,11 +1924,6 @@ function Styles() {
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .ar-kitline-go { flex: 0 0 auto; font-size: 20px; line-height: 1; color: #6f7883; }
 
-            .ar-podline { margin: 0 0 12px; font-size: 10.5px; line-height: 1.5; color: #8a939d; }
-            .ar-podline i { font-style: normal; font-weight: 900; text-transform: capitalize; }
-            .ar-podline i.is-gold { color: #ffd75e; }
-            .ar-podline i.is-iron { color: #cfd6dd; }
-            .ar-podline i.is-wooden { color: #c39b6a; }
 
             /* ── ONE LIST, TWO SOURCES ── */
             .ar-who { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }

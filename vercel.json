@@ -36,10 +36,6 @@
     ],
     "crons": [
         {
-            "path": "/api/jobs/arena-podium",
-            "schedule": "50 4 * * *"
-        },
-        {
             "path": "/api/jobs/town-hours",
             "schedule": "0,30 * * * *"
         },

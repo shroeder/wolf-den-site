@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
@@ -28,11 +27,6 @@ import { jewelsEnabled } from "@/lib/marketplace/jeweller.js";
 // OWNER-GATED while it's built out. Every read and write goes through ARENA_UNLOCKED — one switch to open it,
 // exactly as the mine and the dungeons did.
 export const ARENA_UNLOCKED = (buyerId) => Boolean(buyerId) && isOwner(buyerId);
-
-// Flip BOTH of these together when the arena opens. The podium hands out real chests on a nightly cron, and
-// every member already holds a seeded position — so while the feature is owner-gated it would be paying people
-// for a ladder they cannot open and never entered.
-export const ARENA_PUBLIC = false;
 
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date";
 // Ten, not three. Three was set when the ladder was a bottom-up grind and every fight was progress; on a
@@ -431,7 +425,6 @@ export async function getArenaState(buyerId) {
         gold: Number(row?.gold_now) || 0,
         // The top of the Den, always visible — a ladder you cannot see the top of is just a number.
         board: board.slice(0, 10).map((o) => ({ rank: o.rank, vp: o.vp, name: o.name, sprite: o.sprite, level: o.level, you: o.id === buyerId })),
-        podium: PODIUM,
         bout: bout ? publicBout(bout) : null,
         away: await awayReport(buyerId, row),
     };
@@ -444,12 +437,15 @@ function winReward(myPos, theirPos) {
     return { gold: 60 + climb * 18 + height * 4, xp: 25 + climb * 8 + height * 2 };
 }
 
-// The three chests handed out at the end of each day.
-export const PODIUM = [
-    { place: 1, chest: "gold" },
-    { place: 2, chest: "iron" },
-    { place: 3, chest: "wooden" },
-];
+// ── NO PRIZE FOR STANDING STILL ──────────────────────────────────────────────────────────────────────────────
+// There WAS a podium: first, second and third at the end of each day took a gold, an iron and a wooden chest,
+// paid by a nightly cron. It is gone, and it should never come back in that shape.
+//
+// A guaranteed chest for a PLACEMENT pays you for a number rather than for anything you did that day. Whoever
+// is top stays top by not playing — every fight they take is a chance to lose points they already hold, so the
+// correct move for the leader is to stop. And below them the same three names collect the same three chests
+// every night whether the day was a good one or a nothing, which is the opposite of what the ladder is meant
+// to reward. Bouts pay. Feats pay. Standing does not.
 
 // ── WHAT HAPPENED WHILE YOU WERE AWAY ────────────────────────────────────────────────────────────────────────
 // The arena is asynchronous: you are challenged while you are asleep. Without this a member just finds their
@@ -1129,44 +1125,6 @@ export async function seedArenaLadder() {
     }
     await db.query(`UPDATE mkt_arena SET position = NULL WHERE position < 0`).catch(() => {});
     return { ok: true, seeded: ranked.length, top: ranked.slice(0, 5).map((r) => r.alias) };
-}
-
-// ── THE PODIUM ───────────────────────────────────────────────────────────────────────────────────────────────
-// First, second and third at the end of the day take a gold, iron and wooden chest. Idempotent per day via
-// prize_day, so running the cron twice cannot pay twice.
-export async function payArenaPodium() {
-    // NOT WHILE THE ARENA IS OWNER-GATED. Every member was seeded a position so the ladder exists on day one,
-    // but they cannot open the feature — paying the top three a chest tonight would hand out real rewards for
-    // something nobody can play, to people who never entered. The gate is the same one the rest of the arena
-    // reads, so opening the arena opens the podium with it and this needs no second switch.
-    if (!ARENA_PUBLIC) return { ok: true, skipped: "arena_not_public", paid: [] };
-    const day = await db.queryOne(`SELECT ${DAY}::text AS d`).catch(() => null);
-    if (!day?.d) return { ok: false, error: "no_day" };
-    // BY VICTORY POINTS, not by `position`. That column stopped being authoritative when the ladder moved to
-    // an accrued total, so this would have quietly kept paying the top three of a frozen, retired ordering —
-    // a nightly cron handing out real chests to the wrong people, silently, forever.
-    const top = await db.query(
-        `SELECT a.buyer_id, ROW_NUMBER() OVER (ORDER BY a.vp DESC, a.wins DESC) AS place
-           FROM mkt_arena a JOIN mkt_buyer b ON b.id = a.buyer_id
-          WHERE COALESCE(b.xp,0) > 0 AND a.vp > 0
-            AND (a.prize_day IS DISTINCT FROM ${DAY})
-          ORDER BY a.vp DESC, a.wins DESC LIMIT 3`
-    ).catch(() => []);
-    const paid = [];
-    for (const r of top) {
-        const spec = PODIUM.find((x) => x.place === Number(r.place));
-        if (!spec) continue;
-        // Claim the day FIRST and only pay if the claim took, so a second run finds nothing to do.
-        const claimed = await db.queryOne(
-            `UPDATE mkt_arena SET prize_day = ${DAY} WHERE buyer_id = $1 AND (prize_day IS DISTINCT FROM ${DAY}) RETURNING buyer_id`,
-            [r.buyer_id]
-        ).catch(() => null);
-        if (!claimed) continue;
-        await addChests(r.buyer_id, { [spec.chest]: 1 }, { source: "arena_podium" }).catch(() => {});
-        await trackActivity(r.buyer_id, "arena_podium", { place: Number(r.place), chest: spec.chest }).catch(() => {});
-        paid.push({ buyerId: r.buyer_id, place: Number(r.place), chest: spec.chest });
-    }
-    return { ok: true, day: day.d, paid };
 }
 
 /** Clear a finished bout so the ladder comes back. */

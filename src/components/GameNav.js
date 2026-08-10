@@ -136,6 +136,19 @@ export default function GameNav() {
         return () => { dead = true; };
     }, [pathname]);
 
+    // The Jewelcutter, same contract as everything else under construction: ask the server, never guess. The
+    // endpoint answers { unlocked: false } for anyone off the allow-list, so a non-owner simply has no bench in
+    // their menu — and no jewels either, since the same predicate gates the drops.
+    const [jeweller, setJeweller] = useState(false);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/jeweller", { cache: "no-store", credentials: "same-origin" })
+            .then((r) => r.json())
+            .then((d) => { if (!dead && d?.unlocked) setJeweller(true); })
+            .catch(() => { /* no bench, no menu entry */ });
+        return () => { dead = true; };
+    }, [pathname]);
+
     // Delves, same contract as the Mine: ask the server, never guess. A non-owner simply has no Delves entry.
     const [delves, setDelves] = useState(false);
     const [delveRuns, setDelveRuns] = useState(0);
@@ -371,6 +384,7 @@ export default function GameNav() {
             { href: "/marketplace/pets", emoji: "🐾", label: "Pets", sub: "Collect & equip" },
             { href: "/marketplace/sets", sprite: "helmet", label: "Sets", sub: "Set bonuses" },
             { href: "/marketplace/blacksmith", emoji: "🔨", label: "The Forge", sub: "Salvage & enhance" },
+            ...(jeweller ? [{ href: "/marketplace/jeweller", emoji: "💎", label: "Jewelcutter", sub: "Sockets & jewels" }] : []),
         ] },
         { title: "Shop & Trade", items: [
             { href: "/marketplace/store", emoji: "🛒", label: "Store", sub: "Buy supplies" },
