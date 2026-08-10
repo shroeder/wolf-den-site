@@ -859,16 +859,27 @@ export default function ArenaClient({ initial }) {
                             </div>
                         ) : null}
 
-                        {pop ? pop.items.map((it, i) => (
-                            <span key={`${pop.id}-${it.kind}-${i}`}
-                                className={`ar-pop is-${it.side} is-${it.kind}`}
-                                style={it.at ? { animationDelay: `${it.at}ms` } : undefined}
-                                aria-hidden="true">
-                                {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" ? "" : "−"}
-                                {it.n}
-                                {it.kind === "block" ? <u>blocked</u> : it.kind === "ward" ? <u>soaked</u> : null}
-                            </span>
-                        )) : null}
+                        {/* ── THE NUMBERS STACK, THEY DO NOT SHARE A SPOT ── each of these used to be absolutely
+                            positioned on its own, which is fine for one and a pile-up for two: guard a blow and
+                            the damage and the blocked amount were printed on top of each other. One COLUMN per
+                            side now, bottom-up, so a beat that produces four numbers produces four rows. */}
+                        {pop ? ["left", "right"].map((side) => {
+                            const items = pop.items.filter((it) => it.side === side);
+                            if (!items.length) return null;
+                            return (
+                                <span key={`${pop.id}-${side}`} className={`ar-pops is-${side}`} aria-hidden="true">
+                                    {items.map((it, i) => (
+                                        <span key={`${it.kind}-${i}`}
+                                            className={`ar-pop is-${it.side} is-${it.kind}`}
+                                            style={it.at ? { animationDelay: `${it.at}ms` } : undefined}>
+                                            {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" ? "" : "−"}
+                                            {it.n}
+                                            {it.kind === "block" ? <u>blocked</u> : it.kind === "ward" ? <u>soaked</u> : null}
+                                        </span>
+                                    ))}
+                                </span>
+                            );
+                        }) : null}
 
                         {/* The burst itself, keyed on the beat so every cast replays from scratch. */}
                     </div>
@@ -2121,12 +2132,16 @@ function Styles() {
                blocked amount you had actively spent a turn earning went past before your eye reached it.
                Twice as long now, and the extra time is all HOLD — it rises, stops where you can read it, and
                only then drifts off. Slower, not laggier: the beat behind it is unchanged. */
-            .ar-pop { position: absolute; bottom: 34%; z-index: 21; font-size: 1.9rem; font-weight: 900;
+            /* The COLUMN is the positioned thing. column-reverse so the first number sits lowest and each
+               extra one stacks above it — damage at the bottom, then what you blocked, healed and soaked. */
+            .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
+                align-items: center; gap: 6px; pointer-events: none; }
+            .ar-pops.is-right { right: 18%; }
+            .ar-pops.is-left { left: 18%; }
+            .ar-pop { font-size: 1.9rem; font-weight: 900; line-height: 1.05;
                 letter-spacing: -0.02em; pointer-events: none; text-shadow: 0 3px 12px #000, 0 1px 0 rgba(0,0,0,.9);
                 font-variant-numeric: tabular-nums;
                 animation: arPop 2.1s cubic-bezier(.2,1,.3,1) both; }
-            .ar-pop.is-right { right: 18%; }
-            .ar-pop.is-left { left: 18%; }
             .ar-pop.is-dmg { color: #ffd75e; }
             .ar-pop.is-left.is-dmg { color: #ff8f9a; }
             /* A crit is the biggest number in the game and it should look like it. */
@@ -2136,7 +2151,7 @@ function Styles() {
             /* The half of the exchange your defensive choices actually bought you. Cooler and offset so it is
                never mistaken for damage you took — but no longer TINY. At 1rem next to a 1.9rem hit it read as
                a footnote, which is the wrong way round: the block is the thing you chose. */
-            .ar-pop.is-block, .ar-pop.is-ward { font-size: 1.35rem; color: #9fdcff; bottom: 47%;
+            .ar-pop.is-block, .ar-pop.is-ward { font-size: 1.35rem; color: #9fdcff;
                 text-shadow: 0 3px 12px #000, 0 0 18px rgba(159,220,255,.55); }
             .ar-pop.is-heal { font-size: 1.5rem; color: #8bf0b4; text-shadow: 0 3px 12px #000, 0 0 22px rgba(139,240,180,.7); }
             .ar-pop u { display: block; text-decoration: none; font-size: 8.5px; font-weight: 900;
