@@ -56,12 +56,23 @@ const ABILITY_EDGE = 1.25;
 const GUARD_SHARE = 0.33;
 const BLOCK = 0.34;
 
+// THE PIT CLOSES from round 7: every blow compounds, both ways. So "how many rounds" is no longer
+// health/damage — it is how many rounds of a GROWING share of their health it takes, which is what actually
+// bounds a fight. Solved by walking the rounds rather than dividing, because there is no closed form.
+const PIT_AT = 7, PIT_STEP = 0.35;
+const fever = (r) => (r < PIT_AT ? 1 : 1 + PIT_STEP * (r - PIT_AT + 1));
+function roundsToKill(hp, perRound) {
+    let left = hp;
+    for (let r = 1; r <= 60; r += 1) { left -= perRound * fever(r); if (left <= 0) return r; }
+    return 60;
+}
+
 function bout(kit, foe) {
     const mine = swing(kit.might) * ABILITY_EDGE
         * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1)) * (1 - foe.armour);
     const theirs = foe.damage * (1 + foe.critChance * (foe.critMult - 1)) * (1 - GUARD_SHARE * BLOCK);
-    const roundsIneed = foe.health / Math.max(0.1, mine);
-    const roundsTheyNeed = health(kit.fero) / Math.max(0.1, theirs);
+    const roundsIneed = roundsToKill(foe.health, Math.max(0.1, mine));
+    const roundsTheyNeed = roundsToKill(health(kit.fero), Math.max(0.1, theirs));
     return { mine, theirs, roundsIneed, roundsTheyNeed, win: roundsIneed <= roundsTheyNeed };
 }
 
@@ -82,9 +93,9 @@ for (const kit of KITS) {
     for (let t = 1; t < 200; t += 1) { const r = bout(kit, npc(t)); if (r.win) best = { t, r }; else break; }
     if (!best) { console.log(`  ${kit.name.padEnd(13)} beats NOTHING — the floor is too high`); bad += 1; continue; }
     const rounds = Math.round(best.r.roundsIneed);
-    const ok = rounds >= 6 && rounds <= 20;
+    const ok = rounds >= 5 && rounds <= 13;
     if (!ok) bad += 1;
-    console.log(`  ${kit.name.padEnd(13)} tier ${String(best.t).padStart(3)}  ${String(rounds).padStart(2)} rounds  ${ok ? "ok" : "*** OUT OF THE 6-20 ROUND BAND ***"}`);
+    console.log(`  ${kit.name.padEnd(13)} tier ${String(best.t).padStart(3)}  ${String(rounds).padStart(2)} rounds  ${ok ? "ok" : "*** OUT OF THE 5-13 ROUND BAND ***"}`);
 }
 
 console.log("\nOne swing, so the card can be checked against the fight:");
@@ -92,5 +103,24 @@ for (const kit of KITS) {
     console.log(`  ${kit.name.padEnd(13)} damage ${swing(kit.might).toFixed(1).padStart(5)}   crit ${Math.round(critChance(kit.cc) * 100)}% x${critMult(kit.cp).toFixed(2)}   effective ${(swing(kit.might) * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1))).toFixed(1)}`);
 }
 
-console.log(bad ? `\n${bad} cell(s) out of band.` : "\nEvery kit has a climbable ladder in the 6-20 round band.");
+// ── THE LONGEST FIGHT ANYONE CAN HAVE ────────────────────────────────────────────────────────────────────────
+// The band above is the fight you are MEANT to pick. This is the one you can actually get into: any kit against
+// any tier it might face, win or lose. A beat costs ~2.6s of animation before anybody has decided anything, so
+// the ceiling that matters is wall-clock, not rounds. THIS is the assertion that keeps the promise.
+const SECONDS_PER_ROUND = 4.2;
+let worst = { rounds: 0 };
+for (const kit of KITS) {
+    for (let t = 1; t <= 70; t += 1) {
+        const r = bout(kit, npc(t));
+        const rounds = Math.min(r.roundsIneed, r.roundsTheyNeed);   // it ends when EITHER of them falls
+        if (rounds > worst.rounds) worst = { rounds, kit: kit.name, tier: t, key: npc(t).key };
+    }
+}
+const mins = (worst.rounds * SECONDS_PER_ROUND) / 60;
+const capOk = mins <= 2;
+if (!capOk) bad += 1;
+console.log(`\nLongest fight reachable: ${worst.rounds} rounds - ${worst.kit} vs tier ${worst.tier} (${worst.key})`);
+console.log(`  ~${mins.toFixed(1)} min at ${SECONDS_PER_ROUND}s a round  ${capOk ? "ok" : "*** OVER TWO MINUTES ***"}`);
+
+console.log(bad ? `\n${bad} check(s) failed.` : "\nEvery kit has a climbable ladder, and no reachable fight runs over two minutes.");
 process.exit(bad ? 1 : 0);

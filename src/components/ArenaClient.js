@@ -774,6 +774,13 @@ export default function ArenaClient({ initial }) {
                                     {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "−"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}%{" "}<u>why?</u>
                                 </button>
                             ) : null}
+                            {/* THE PIT CLOSES. An escalation nobody is told about is the hidden roll all over
+                                again, so it says so the round it starts and keeps saying how much. */}
+                            {bout.fever > 1 ? (
+                                <span className="ar-tag is-fever">
+                                    The pit closes · +{Math.round((bout.fever - 1) * 100)}% both ways
+                                </span>
+                            ) : null}
                             {bout.underdog > 1 ? (
                                 <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
                             ) : null}
@@ -1615,6 +1622,9 @@ function Styles() {
                 background: rgba(8,6,10,0.66); border: 1px solid rgba(255,255,255,0.16); backdrop-filter: blur(2px); }
             .ar-tag.is-good { color: #8bf0b4; border-color: rgba(139,240,180,.45); }
             .ar-tag.is-bad { color: #ff9f9f; border-color: rgba(255,159,159,.45); }
+            .ar-tag.is-fever { color: #ff8a4c; border-color: rgba(255,138,76,.6);
+                animation: arFever 1.1s ease-in-out infinite; }
+            @keyframes arFever { 0%, 100% { opacity: .82; } 50% { opacity: 1; } }
             .ar-tag.is-under { color: #ffd75e; border-color: rgba(255,215,94,.5); }
             .ar-hud .ar-tag { pointer-events: auto; cursor: pointer; min-height: 28px; padding: 6px 10px;
                 display: inline-flex; align-items: center; }

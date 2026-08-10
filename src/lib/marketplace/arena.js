@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
-    buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge,
+    buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
@@ -504,7 +504,7 @@ const staleBout = (b) => Boolean(b) && !b.over && (b.me?.damage == null || b.foe
 function publicBout(b) {
     return {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
-        cd: b.cd || {}, clash: b.clash, opener: b.opener || "you",
+        cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
@@ -728,6 +728,8 @@ export async function fightRound(buyerId, opts = {}) {
     // multiplier beside it, and the word CRITICAL is shouted when it lands. It is the boss fight's model
     // verbatim (25% + Crit Chance, x2.5 + Crit Power) rather than a second, private one built on Fortune —
     // a kit that crits against the boss now crits in here, which is the whole point of reading real stats.
+    // The sand runs out from round seven — see pitFever. Both sides, same number, announced on the HUD.
+    const fever = pitFever(b.beat || 1);
     const P = b.me?.perks || {};
     const critChance = b.me?.critChance ?? 0.25;
     const myCritMult = b.me?.critMult ?? 2.5;
@@ -919,7 +921,7 @@ export async function fightRound(buyerId, opts = {}) {
             const c = Math.random() < critChance;
             if (c) crit = true;
             const raw = b.me.damage * gradeAtk * power * surge * clashMult * (b.underdog || 1)
-                * openMult * lowHpMult * (c ? myCritMult : 1);
+                * openMult * lowHpMult * fever * (c ? myCritMult : 1);
             turned += Math.round(raw * guard);
             dmg += Math.max(1, Math.round(raw - raw * guard));
         }
@@ -972,7 +974,7 @@ export async function fightRound(buyerId, opts = {}) {
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
         const foeCrit = Math.random() < foeCritChance;
-        const raw = Math.max(1, Math.round(b.foe.damage * power * back * (foeCrit ? foeCritMult : 1)));
+        const raw = Math.max(1, Math.round(b.foe.damage * power * back * fever * (foeCrit ? foeCritMult : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
         // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
         const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)));

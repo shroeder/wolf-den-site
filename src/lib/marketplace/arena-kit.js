@@ -366,6 +366,22 @@ export const CRIT_MULT_BASE = 2.5;
 export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / 100 + bonus);
 export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;
 
+// ── THE PIT CLOSES ───────────────────────────────────────────────────────────────────────────────────────────
+// A beat costs about 2.6 seconds of animation before anybody has decided anything, so a twenty-round bout is a
+// minute and a half of watching — and the fights that ran longest were the least interesting ones, because a
+// Wall you cannot dent is the same round twenty times. Length is not difficulty.
+//
+// So from round seven the sand runs out and EVERY blow lands harder, both ways, compounding each round. It is
+// symmetric, it is announced on the HUD the round it starts, and it is not a timer that declares a winner:
+// whoever was winning still wins, they just get there. A fight that would have run thirty rounds ends by
+// fifteen, and one that was already short is untouched.
+//
+// A round cap with a points decision was the alternative, and it is worse: ship battles had one, and the thing
+// it produced was "broke off and ran after 14 rounds" while both decks still had guns.
+export const PIT_CLOSES_AT = 7;
+export const PIT_STEP = 0.35;
+export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP * (beat - PIT_CLOSES_AT + 1));
+
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
 
