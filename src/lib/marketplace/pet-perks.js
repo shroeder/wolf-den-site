@@ -380,6 +380,15 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     //
     // `boost` is the stone's multiplier: 1 for the pet in your hands and for a Lightstone, 1.5 for a
     // Darkstone. Proc CHANCES stay capped after the boost — a 150% of a 60% cap is still a coin you can lose.
+    // ── ONE ACTIVE PER PERK KEY, THE BEST ONE ────────────────────────────────────────────────────────────
+    // The `best()` guard below only ever covered the PROC map, and stat perks went through add(), which sums.
+    // So an enshrined pet that was also equipped paid its stat active TWICE — the exact double the promise
+    // rules out, and invisible unless you measure it (scripts/check-enshrined-merge.mjs, which did).
+    //
+    // Actives are collected here first, keyed by perk, taking the highest, and applied once at the end. Two
+    // different enshrined pets with the SAME perk also collapse to the better of the two, which is the same
+    // rule and the one that stops a stack of enshrinements from multiplying.
+    const activeBest = {};
     const applyActive = (pet, level, boost = 1) => {
         const def = PET_PERKS[pet.id] || { key: pet.activeStat || "fortune" };
         const v = petPerkValue(pet.rarity, def.key);
@@ -399,7 +408,9 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             best("extraStrikeChance", Math.min(1, (0.2 + 0.2 * (eqLevel - 1)) * boost));
         } else if (SYSTEM_PERK_KEYS.has(def.key)) {
             system[def.key] = Math.max(system[def.key] || 0, capSystemPerk(def.key, v * aMult));
-        } else add(def.key, v * aMult);
+        } else {
+            activeBest[def.key] = Math.max(activeBest[def.key] || 0, v * aMult);
+        }
     };
 
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
@@ -415,6 +426,9 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
         if (!pet) continue;
         applyActive(pet, PET_ENSHRINED_LEVEL, enshrinedMult(e.stone));
     }
+    // Applied ONCE, after every active has had its say. This is the line that makes "enshrined and equipped"
+    // and "enshrined" the same number.
+    for (const [k, v] of Object.entries(activeBest)) add(k, v);
     // Cap the OWNED totals. The aura above amplifies stats/economy but deliberately not these — a menagerie
     // aura multiplying a farm bonus that already stacks over sixteen pets compounds twice.
     for (const k of Object.keys(system)) {
