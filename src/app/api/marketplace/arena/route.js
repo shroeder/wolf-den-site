@@ -54,6 +54,11 @@ export async function POST(request) {
                     return noStore({ ...(await respecTree(buyer.id)), ...(await getArenaState(buyer.id)) });
                 case "respec_class":
                     return noStore({ ...(await respecClass(buyer.id, String(b?.classId || ""))), ...(await getArenaState(buyer.id)) });
+                case "buy_stone": {
+                    const { buyStone } = await import("@/lib/marketplace/pet-ascension.js");
+                    const r = await buyStone(buyer.id, String(b?.stone || ""), "laurels");
+                    return noStore({ ...r, ...(await getArenaState(buyer.id)) });
+                }
                 case "buy_armoury":
                     return noStore({ ...(await buyArmoury(buyer.id, String(b?.id || ""))), ...(await getArenaState(buyer.id)) });
                 case "arena_upgrade":

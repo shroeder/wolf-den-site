@@ -14,6 +14,8 @@ import {
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
+import { getStones } from "@/lib/marketplace/pet-ascension.js";
+import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
     arenaLevelFor, arenaXpFor, CLASSES, classById, FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState,
@@ -420,6 +422,15 @@ export async function getArenaState(buyerId) {
                 .sort((a, z) => z.worth - a.worth),
             ev: armouryEv(c),
         })),
+        // ── THE ONE FIXED-PRICE THING IN A SHOP OF CRATES ── and deliberately so. The Armoury is random on
+        // purpose: a price list is arithmetic you do once and repeat forever. A pet stone is the exception
+        // because it is the floor under somebody else's bad luck, and a floor that is itself a gamble is not
+        // a floor. It sits apart from the crates for exactly that reason.
+        stoneShop: {
+            price: STONE_PRICE_LAURELS,
+            held: await getStones(buyerId).catch(() => ({ light: 0, dark: 0 })),
+            stones: Object.values(STONES),
+        },
         progress,
         upgrades: upgradeView(row?.upgrades || {}),
         gold: Number(row?.gold_now) || 0,

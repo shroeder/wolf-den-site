@@ -10287,6 +10287,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-stars.lg { font-size: 1rem; gap: 2px; }
 .pet-stars .on { color: #ffd75e; }
 .pet-stars .off { color: rgba(255,255,255,0.22); }
+/* ── THE SIXTH ── a diamond rather than a star, and it never sits quietly. Unearned it pulses faintly, which
+   is the whole job of this row: telling somebody who spent months at five that five was not the end. Earned,
+   it takes the colour of the stone that earned it, so a glance at the row says which rock is in the animal. */
+.pet-stars .last.off { color: rgba(255,255,255,0.34); animation: petSixth 2.6s ease-in-out infinite; }
+.pet-stars .last.on { color: #fff; text-shadow: 0 0 6px currentColor; }
+.pet-stars.is-light .last.on { color: #ffe08a; }
+.pet-stars.is-dark .last.on { color: #b061ff; }
+@keyframes petSixth { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
 /* Pet level bar in the detail modal */
 .petx-level { text-align: left; background: rgba(255,215,94,0.08); border: 1px solid rgba(255,215,94,0.35); border-radius: 12px; padding: 10px 12px; margin: 12px 0 4px; }
 .petx-level-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; color: #ffe9a8; margin-bottom: 6px; }

@@ -90,11 +90,16 @@ const PET_SUMMARY_CSS = `
 .petsum-progress > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #f3b23a, #ffe488); box-shadow: 0 0 10px rgba(255,215,110,0.6); transition: width .6s cubic-bezier(.3,1.2,.4,1); }
 `;
 
-function Stars({ level = 1, max = 5, className = "" }) {
+// SIX stars, not five. The sixth is drawn differently — hollow until it is earned — because the single most
+// important thing this row has to say is "there is another one", to somebody who has spent months believing
+// five was the end. A row of five full stars reads as finished; five full and one waiting reads as a road.
+function Stars({ level = 1, max = 6, className = "", stone = null }) {
     return (
-        <span className={`pet-stars ${className}`} role="img" aria-label={`Level ${level} of ${max}`}>
+        <span className={`pet-stars ${className}${stone ? ` is-${stone}` : ""}`} role="img" aria-label={`Level ${level} of ${max}`}>
             {Array.from({ length: max }, (_, i) => (
-                <span key={i} className={i < level ? "on" : "off"}>★</span>
+                <span key={i} className={`${i < level ? "on" : "off"}${i === max - 1 ? " last" : ""}`}>
+                    {i === max - 1 ? "✦" : "★"}
+                </span>
             ))}
         </span>
     );
@@ -276,7 +281,7 @@ export default function PetsClient() {
                     {lvl ? (
                         <div className="petx-level">
                             <div className="petx-level-head">
-                                <span><Stars level={lvl.level} className="lg" /> <strong className="muted" style={{ fontSize: "0.8rem" }}>Lv {lvl.level}/5</strong></span>
+                                <span><Stars level={lvl.level} className="lg" /> <strong className="muted" style={{ fontSize: "0.8rem" }}>Lv {lvl.level}/6</strong></span>
                                 <span className="muted">{lvl.maxed ? "MAX" : `${lvl.into} / ${lvl.span} XP`}</span>
                             </div>
                             <div className="petx-level-bar"><span style={{ width: `${pct}%` }} /></div>

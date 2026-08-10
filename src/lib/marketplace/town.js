@@ -189,10 +189,10 @@ function activitySlot(id, event, path) {
 
 // The pet sprite at a member's ACTUAL level for their featured pet (evolved art at Lv2-5), so town pets reflect
 // their level like the boss scene does. Returns { url, flip } or null.
-function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels) {
+function petSpriteForLevel(collId, petXp, petSprites, petSpriteLevels, stone = null) {
     if (!collId) return null;
     const lvl = petLevelForXp(petXp || 0, collectibleById(collId)?.rarity) || 1;
-    return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl) || null;
+    return pickPetSpriteForLevel(petSprites[collId], petSpriteLevels[collId], lvl, stone) || null;
 }
 
 // Heartbeat: the caller is on the Town page RIGHT NOW. Bumps town_seen_at every poll; (re)starts town_since when

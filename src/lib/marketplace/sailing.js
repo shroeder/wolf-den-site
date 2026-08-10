@@ -1393,10 +1393,20 @@ export async function getSailingState(buyerId, skyKey = null) {
     // same way chest art and collections are.
     const gunDeck = await gunDeckView(buyerId, row).catch(() => null);   // your guns are how you fight an encounter
     const pieces = await pieceShop(buyerId).catch(() => []);   // the Quartermaster is public — see combatView
+    // ── THE STONE ON THE SHELF ── the floor under the luck. Stones drop from four things including the dig,
+    // but randomness eventually hands somebody nothing for a month, and a chase item you cannot chase is a
+    // wall rather than a chase. Priced at roughly a month of deciding this is what you are saving for.
+    const { STONES: PET_STONES, STONE_PRICE_DOUBLOONS: STONE_DUB } = await import("@/lib/marketplace/pet-stones.js");
+    const { getStones: getPetStones } = await import("@/lib/marketplace/pet-ascension.js");
+    const stoneShop = {
+        price: STONE_DUB,
+        held: await getPetStones(buyerId).catch(() => ({ light: 0, dark: 0 })),
+        stones: Object.values(PET_STONES),
+    };
     // `owner` carries exactly ONE thing now that ship battles are public: whether to draw the gun-placement
     // workshop door in the yard. That route is owner-only and 404s for everybody else, so a link every member
     // can see is a dead end with a nice icon on it.
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea, owner: isOwner(buyerId) };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {

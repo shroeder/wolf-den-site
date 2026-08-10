@@ -149,6 +149,27 @@ export async function buyStone(buyerId, stone, currency) {
     return { ok: false, error: "bad_currency" };
 }
 
+/** { petId: stone } for one member — what art each of their pets should be wearing. */
+export async function stoneMapFor(buyerId) {
+    if (!buyerId) return {};
+    const rows = await db.query(`SELECT pet_id, stone FROM mkt_pet_enshrined WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    return Object.fromEntries(rows.map((r) => [r.pet_id, r.stone]));
+}
+
+/** The same thing for a crowd, in ONE query — the plaza and the boss fight draw dozens of heroes at once. */
+export async function stoneMapForMembers(buyerIds = []) {
+    const out = new Map();
+    if (!buyerIds.length) return out;
+    const rows = await db.query(
+        `SELECT buyer_id, pet_id, stone FROM mkt_pet_enshrined WHERE buyer_id = ANY($1)`, [buyerIds]
+    ).catch(() => []);
+    for (const r of rows) {
+        if (!out.has(r.buyer_id)) out.set(r.buyer_id, {});
+        out.get(r.buyer_id)[r.pet_id] = r.stone;
+    }
+    return out;
+}
+
 /** Everything the pets page needs to draw the ascension panel. */
 export async function ascensionState(buyerId) {
     if (!buyerId) return { stones: Object.fromEntries(STONE_IDS.map((k) => [k, 0])), enshrined: [], stoneDefs: STONES };

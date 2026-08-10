@@ -386,9 +386,12 @@ export async function getBossState(buyerId = null) {
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
     // Base (Lv1) art + evolved (Lv2–5) art; each fighter shows the sprite for THEIR pet's level.
-    const [petSprites, petSpriteLevels, packPetBonuses] = await Promise.all([
+    const [petSprites, petSpriteLevels, petStones, packPetBonuses] = await Promise.all([
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
+        // An enshrined pet wears its stone's form wherever it is drawn, and this is the wall where the Den
+        // actually looks at each other's heroes — so it is the one that matters most.
+        (async () => (await import("@/lib/marketplace/pet-ascension.js")).stoneMapForMembers(members.map((m) => m.id)))().catch(() => new Map()),
         getPackPetBonuses().catch(() => new Map()), // whole-pack fortune, so every roster card's ticket TOTAL is the same for all viewers
     ]);
 
@@ -451,7 +454,8 @@ export async function getBossState(buyerId = null) {
             // Show the equipped pet at THIS member's level for that pet (highest evolved sprite ≤ level).
             const petLvl = m.featured_collectible ? petLevelForXp(m.featured_pet_xp || 0, collectibleById(m.featured_collectible)?.rarity) : null;
             const petArt = m.featured_collectible
-                ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible], petLvl || 1)
+                ? pickPetSpriteForLevel(petSprites[m.featured_collectible], petSpriteLevels[m.featured_collectible],
+                    petLvl || 1, (petStones.get(m.id) || {})[m.featured_collectible] || null)
                 : null;
             const cos = sanitizeCosmetics(m.avatar_cosmetics);
             const badges = fighterBadges.get(m.id) || [];

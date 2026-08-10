@@ -55,6 +55,13 @@ export async function POST(request) {
             else if (b?.action === "share") res = await sharePet(buyer.id, String(b?.petId || ""), String(b?.toAlias || ""));
             else if (b?.action === "accept") res = await acceptShare(String(b?.shareId || ""), buyer.id);
             else if (b?.action === "decline") res = await declineShare(String(b?.shareId || ""), buyer.id);
+            else if (b?.action === "enshrine") {
+                // Permanent, and the server is the only thing that checks it: level 6, owned, not already
+                // enshrined, and a stone actually in hand. See pet-ascension.js — every one of those is a
+                // guard rather than a UI state, because the UI is not where the rules live.
+                const { enshrinePet } = await import("@/lib/marketplace/pet-ascension.js");
+                res = await enshrinePet(buyer.id, String(b?.petId || ""), String(b?.stone || ""));
+            }
             else res = await equipPet(buyer.id, String(b?.petId || ""));
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

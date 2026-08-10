@@ -118,17 +118,32 @@ export async function petsState(buyerId, { sync = false } = {}) {
     // else base). Powers the pets-page sprite display + the level-up "evolution" reveal. Only on page loads.
     const petSprites = {};
     if (sync) {
-        const [base, levelArt] = await Promise.all([getPetSpriteData().catch(() => ({})), getPetSpriteLevelData().catch(() => ({}))]);
+        const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
+        const [base, levelArt, stoneMap] = await Promise.all([
+            getPetSpriteData().catch(() => ({})),
+            getPetSpriteLevelData().catch(() => ({})),
+            stoneMapFor(buyerId).catch(() => ({})),
+        ]);
         for (const petId of ownedIds) {
             const perLevel = {};
-            for (let n = 1; n <= 5; n += 1) {
-                const a = pickPetSpriteForLevel(base[petId], levelArt[petId], n);
+            // 1-5 as before. SIX is the enshrined form and only exists once a stone has been spent, so it is
+            // resolved with this member's own stone — an unenshrined level-6 pet keeps its level-5 art, which
+            // is correct: the transfiguration belongs to the ritual, not to the rung.
+            for (let n = 1; n <= 6; n += 1) {
+                const a = pickPetSpriteForLevel(base[petId], levelArt[petId], n, stoneMap[petId] || null);
                 perLevel[n] = a?.url ? { url: a.url, flip: a.flip === true } : null;
             }
+            // Both forms, so the choice can be PREVIEWED before it is made — this is permanent and the two
+            // sprites are the single most convincing thing about either stone.
+            perLevel.light = levelArt[petId]?.["6:light"] || null;
+            perLevel.dark = levelArt[petId]?.["6:dark"] || null;
             petSprites[petId] = perLevel;
         }
     }
-    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites };
+    // The stones in hand and the pets already enshrined — the whole of the level-6 surface.
+    const { ascensionState } = await import("@/lib/marketplace/pet-ascension.js");
+    const ascension = await ascensionState(buyerId).catch(() => null);
+    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension };
 }
 
 export async function equipPet(buyerId, petId) {

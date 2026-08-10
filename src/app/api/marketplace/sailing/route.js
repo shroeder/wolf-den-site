@@ -63,6 +63,11 @@ export async function POST(request) {
                 case "upgrade_gun": return noStore(await upgradeGun(g.buyer.id, body.gun, body.track));
                 case "battle_reckoning": return noStore(await shipBattleReckoning(g.buyer.id));
                 case "buy_piece": return noStore(await buyPiece(g.buyer.id, body.piece));
+                case "buy_stone": {
+                    const { buyStone } = await import("@/lib/marketplace/pet-ascension.js");
+                    const r = await buyStone(g.buyer.id, String(body?.stone || ""), "doubloons");
+                    return noStore({ ...r, ...(await getSailingState(g.buyer.id)) });
+                }
                 case "gamble_chest": return noStore(await gambleChest(g.buyer.id));
                 case "upgrade_dig": return noStore(await upgradeDig(g.buyer.id, body.track));
                 case "upgrade_tool": return noStore(await upgradeTool(g.buyer.id, body.tool));

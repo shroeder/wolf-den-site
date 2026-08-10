@@ -189,11 +189,15 @@ export async function generateMissingPetSprites(limit = 4) {
 
 // pet_id -> { 2: {url,flip}, 3: {...}, ... } for the evolved (Lv2–5) sprites that exist.
 export async function getPetSpriteLevelData() {
-    const rows = await db.query(`SELECT pet_id, level, url, flip FROM mkt_pet_sprite_level WHERE url IS NOT NULL`).catch(() => []);
+    const rows = await db.query(`SELECT pet_id, level, variant, url, flip FROM mkt_pet_sprite_level WHERE url IS NOT NULL`).catch(() => []);
     const out = {};
     for (const r of rows) {
         if (!out[r.pet_id]) out[r.pet_id] = {};
-        out[r.pet_id][r.level] = { url: r.url, flip: r.flip === true };
+        // Levels 1-5 have one sprite and an empty variant, so they key on the number exactly as before. LEVEL 6
+        // HAS TWO — one per stone — and they key as "6:light" / "6:dark", because which rock you spent is
+        // written on the animal for the rest of its life.
+        const key = r.variant ? `${r.level}:${r.variant}` : String(r.level);
+        out[r.pet_id][key] = { url: r.url, flip: r.flip === true };
     }
     return out;
 }
@@ -218,9 +222,14 @@ export async function petSpriteSet(petId) {
 
 // Pure: given a pet's base sprite ({url,flip}) + its level map, pick the art for `level` — the highest
 // evolved sprite at or below `level`, falling back to the base (Lv1). Used by every render site.
-export function pickPetSpriteForLevel(base, levelMap, level) {
-    const lv = Math.max(1, Math.min(5, Math.floor(Number(level) || 1)));
-    for (let n = lv; n >= 2; n -= 1) {
+export function pickPetSpriteForLevel(base, levelMap, level, stone = null) {
+    const lv = Math.max(1, Math.min(6, Math.floor(Number(level) || 1)));
+    // ENSHRINED FIRST. A level-6 pet wears the form of the stone that enshrined it, and that is the whole
+    // visible payoff of the climb — so it wins over every other rung. A level-6 pet with NO stone (the climb
+    // finished, the ritual not yet performed) correctly falls through to its level-5 art: the transfiguration
+    // belongs to the stone, not to the level.
+    if (lv >= 6 && stone && levelMap?.[`6:${stone}`]?.url) return levelMap[`6:${stone}`];
+    for (let n = Math.min(5, lv); n >= 2; n -= 1) {
         if (levelMap && levelMap[n]?.url) return levelMap[n];
     }
     return base || null;
