@@ -320,6 +320,9 @@ async function standings() {
     });
 }
 const fightsUsed = (row) => (row?.fights_day_text === row?.today ? Number(row?.fights_today) || 0 : 0);
+// The allowance INCLUDING the Stamina track. Read by the screen and by the gate that refuses a fight — those
+// were two different numbers, which is the only way a counter can say "1 left" over a button that says no.
+const dailyFightsFor = (row) => FIGHTS_PER_DAY + Math.round(upgradeEffects(row?.upgrades || {}).fights || 0);
 const saveBout = (buyerId, bout) =>
     db.query(`UPDATE mkt_arena SET bout_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, bout ? JSON.stringify(bout) : null]).catch(() => {});
 
@@ -331,7 +334,7 @@ export async function getArenaState(buyerId) {
     const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
-    const dailyFights = FIGHTS_PER_DAY + Math.round(upgradeEffects(row?.upgrades || {}).fights || 0);
+    const dailyFights = dailyFightsFor(row);
     const pos = Number(row?.position) || board.length;
     const bout = row?.bout_json || null;
 
@@ -563,7 +566,10 @@ export async function startBout(buyerId, targetId = null) {
     if (!ARENA_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over) return { ok: false, error: "bout_in_progress", ...(await getArenaState(buyerId)) };
-    if (fightsUsed(row) >= FIGHTS_PER_DAY) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
+    // STAMINA was bought and then ignored HERE: getArenaState added the track to the allowance it displays,
+    // and this gate compared against the bare constant — so the counter said you had another challenge and
+    // the server refused it. One expression, in both places.
+    if (fightsUsed(row) >= dailyFightsFor(row)) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
 
     const board = await standings();
     const me = await kitFor(buyerId);
@@ -1032,7 +1038,11 @@ async function finishBout(buyerId, row, b, won) {
     const baseLaurels = boutLaurels({ won, myPower, theirPower });
     const { feats, laurels: featLaurels, vp: featVp } = featsFor(b);
     const vp = baseVp + (won ? featVp : 0);
-    const laurels = baseLaurels + featLaurels;
+    // RENOWN. The track says "every bout pays more laurels" and nothing read it — fifteen levels of a gold
+    // sink that changed no number anywhere. Applied to the feats as well as the base, because a feat is a
+    // bout's payout too and splitting them would be a rule nobody could guess from the card.
+    const renown = 1 + (Number(upgradeEffects(row?.upgrades || {}).laurels) || 0);
+    const laurels = Math.round((baseLaurels + featLaurels) * renown);
 
     // Gold and XP still pay on a win, unchanged — this sits on top rather than replacing them.
     let reward = null;
