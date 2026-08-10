@@ -393,7 +393,7 @@ export async function descend(buyerId) {
                 const { gemById } = await import("@/lib/marketplace/gems.js");
                 const g = gemById(jewel);
                 haul.push({ kind: "gem", gemId: jewel, name: g?.name || "A jewel", color: g?.color || "#8fd0ff",
-                    art: "/images/bonus/trove.png" });
+                    art: g?.art || "/images/bonus/trove.png" });
             }
         }
     } catch { /* the bench is not open */ }

@@ -15551,6 +15551,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
 .jw-gem.is-on { box-shadow: 0 0 0 2px var(--c), 0 6px 20px color-mix(in srgb, var(--c) 40%, transparent); }
 .jw-gem-face svg { width: 26px; height: 26px; color: var(--c); }
+/* The painted stone, bigger than the glyph was — it is the thing you are choosing between. */
+.jw-gem-face img { width: 42px; height: 42px; object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
 .jwr-stage { position: relative; }
 .jw-gem b { font-family: var(--font-display); font-size: 0.84rem; color: var(--c); }
 .jw-gem em { font-style: normal; font-size: 0.72rem; color: #cbd2da; }
@@ -15636,6 +15639,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The stone falls in from above and seats. */
 .jwr-gem { position: absolute; left: 58%; top: 56%; display: grid; place-items: center;
     animation: jwrDrop .46s cubic-bezier(.4,0,.7,1) both; }
+.jwr-gem img { width: 74px; height: 74px; object-fit: contain;
+    filter: drop-shadow(0 0 20px color-mix(in srgb, var(--c) 85%, transparent)); }
 .jwr-gem svg { width: 52px; height: 52px; color: var(--c);
     filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 85%, transparent)); }
 @keyframes jwrDrop {

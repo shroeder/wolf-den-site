@@ -53,10 +53,15 @@ export const GEMS = [...GEM_KINDS, WOLF_EYE].flatMap((k) =>
         blurb: k.blurb,
         secret: k.id === WOLF_EYE.id,
         // What it actually pays, in the same vocabulary the rest of the game's stats use.
+        art: `/images/gems/${gemId(k.id, t.tier)}.png`,
         stats: k.stat === "all"
             ? Object.fromEntries(GEM_KINDS.map((x) => [x.stat, t.all]))
             : { [k.stat]: t.value },
     })));
+
+/** Where a gem's painted sprite lives. Thirty of them — the CUT carries the tier, the colour carries the kind,
+ *  so a glance tells you both without reading a word. See scripts/gen-gem-sprites.mjs. */
+export const gemArt = (id) => `/images/gems/${id}.png`;
 
 const BY_ID = new Map(GEMS.map((g) => [g.id, g]));
 export const gemById = (id) => BY_ID.get(String(id || "")) || null;

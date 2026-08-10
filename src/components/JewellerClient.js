@@ -23,6 +23,15 @@ const Icon = ({ name, className }) => {
     return <C className={className} aria-hidden="true" />;
 };
 
+// A jewel, painted. Falls back to the glyph if the art is ever missing, so a sprite that failed to generate
+// costs a picture rather than the whole card.
+function GemArt({ gem, className = "" }) {
+    const [broken, setBroken] = useState(false);
+    if (!gem?.art || broken) return <Icon name="GiCutDiamond" className={className} />;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className={className} src={gem.art} alt="" draggable="false" onError={() => setBroken(true)} />;
+}
+
 const RARITY = { common: "#c9d1d9", rare: "#6bb8ff", epic: "#c98bff", legendary: "#ffb648", mythic: "#ff6b8a",
     ascendant: "#ff8ad8", eternal: "#ffce6b" };
 const STAT = { might: "Might", ferocity: "Ferocity", fortune: "Fortune", crit_chance: "Crit chance", crit_power: "Crit power" };
@@ -109,7 +118,7 @@ export default function JewellerClient({ initial }) {
                                 className={`jw-gem${picked === g.id ? " is-on" : ""}${g.secret ? " is-secret" : ""}`}
                                 style={{ "--c": g.color }}
                                 onClick={() => setPicked((cur) => (cur === g.id ? null : g.id))}>
-                                <span className="jw-gem-face" aria-hidden="true"><Icon name="GiCutDiamond" /></span>
+                                <span className="jw-gem-face" aria-hidden="true"><GemArt gem={g} /></span>
                                 <b>{g.name}</b>
                                 <em>{describe(g.stats)}</em>
                                 {g.count > 1 ? <i className="jw-gem-n">×{g.count}</i> : null}
@@ -248,7 +257,7 @@ export default function JewellerClient({ initial }) {
                         <div className="jwr-stage" aria-hidden="true">
                             <ItemArt id={reveal.piece.id} icon={reveal.piece.icon} className="jwr-item" alt="" />
                             {/* The stone falls into the piece and seats with a ring. */}
-                            <span className="jwr-gem"><Icon name="GiCutDiamond" /></span>
+                            <span className="jwr-gem"><GemArt gem={reveal.gem} /></span>
                             <span className="jwr-ring" />
                             <span className="jwr-ring is-two" />
                             <span className="jwr-shards">
