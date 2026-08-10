@@ -2,6 +2,7 @@
 
 import CollectionPanel from "@/components/CollectionPanel";
 import Leaderboard from "@/components/Leaderboard";
+import Quartermaster from "@/components/Quartermaster";
 import SailingBoards from "@/components/SailingBoards";
 
 // Fixtures for the dev-only lab (see the page). Deliberately awkward: a very long display name, a ten-piece
@@ -35,8 +36,8 @@ const SETS = [
             { id: "wg_shield", name: "Bulwark of the Pack", icon: "GiShield", owned: false },
             { id: "wg_ring", name: "Ring of the Hunt", icon: "GiRing", owned: false },
             { id: "wg_cloak", name: "Nightfall Cloak", icon: "GiCape", owned: false },
-            { id: "wg_amulet", name: "Moonlit Amulet", icon: "GiAmulet", owned: false },
-            { id: "wg_blade", name: "Fanged Saber", icon: "GiSabre", owned: false },
+            { id: "wg_amulet", name: "Moonlit Amulet", icon: "GiNecklaceDisplay", owned: false },
+            { id: "wg_blade", name: "Fanged Saber", icon: "GiCrescentBlade", owned: false },
             { id: "wg_chest", name: "Wolfhide Cuirass", icon: "GiChestArmor", owned: true, utilText: "" },
             { id: "wg_belt", name: "Fangbite Belt", icon: "GiBelt", owned: false },
             { id: "wg_boots", name: "Pathfinder Treads", icon: "GiLeatherBoot", owned: false },
@@ -59,7 +60,7 @@ const SETS = [
             { id: "harvesters_hat", name: "Harvester's Sun Hat", icon: "GiFarmer", owned: true, utilText: "🌱 +4 Grow speed" },
             { id: "reapers_girdle", name: "Reaper's Girdle", icon: "GiBelt", owned: false },
             { id: "sheafbound_cloak", name: "Sheafbound Cloak", icon: "GiCape", owned: false },
-            { id: "amber_grain_pendant", name: "Amber Grain Pendant", icon: "GiAmulet", owned: false },
+            { id: "amber_grain_pendant", name: "Amber Grain Pendant", icon: "GiNecklaceDisplay", owned: false },
         ],
         tiers: [
             { need: 2, active: false, text: "+4% Harvest luck" },
@@ -73,6 +74,63 @@ const SETS = [
         ],
     },
 ];
+
+// ── THE QUARTERMASTER ── the shop is a signed-in, doubloon-gated panel, so the only way to judge the manifest's
+// slot rows at a phone width is against fixtures. Deliberately awkward again: the ten-piece set, one set one
+// piece short, one already finished, and a locker line with NO sprite so the glyph fallback is visible.
+const QM_LOCKER = [
+    { id: "scroll_enchant", name: "Enchantment Scroll", price: 1000, icon: "GiScrollUnfurled", art: null,
+        blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
+    { id: "scroll_ancient", name: "Ancient Codex", price: 500, icon: "GiSpellBook", art: null,
+        blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
+    { id: "pot_fury", name: "Bottled Fury", price: 150, icon: "GiPotionBall", art: null,
+        blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
+    { id: "elixir_renewal", name: "Elixir of Renewal", price: 5000, icon: "GiHealthPotion", art: null,
+        blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },
+];
+const qmPiece = (id, name, icon, rarity, owned) => ({ id, name, icon, rarity, owned, art: null });
+const QM_SHOP = {
+    piecePrice: 1000,
+    gamble: { price: 250, table: [{ tier: "wooden", w: 56 }, { tier: "iron", w: 27 }, { tier: "gold", w: 13 }, { tier: "mythic", w: 4 }] },
+    pieces: [
+        {
+            id: "founder", name: "Founder's Regalia", feature: "depths", have: 3, total: 4, done: false, price: 1000,
+            capstone: "Cold Crucible: an 18% chance a smelt costs you no ore at all.",
+            pieces: [
+                qmPiece("fd_apron", "Founder's Scale Apron", "GiLeatherVest", "epic", true),
+                qmPiece("fd_tongs", "Long Crucible Tongs", "GiPincers", "epic", true),
+                qmPiece("fd_bellows_charm", "Bellows Charm", "GiWindHole", "rare", true),
+                qmPiece("fd_slagsifter", "Slagsifter's Ring", "GiRing", "rare", false),
+            ],
+        },
+        {
+            id: "wheelwarden", name: "Wheelwarden's Fortune", feature: "wheel", have: 2, total: 10, done: false, price: 1000,
+            capstone: "Lucky Streak: a 12% chance each spin is FREE — your spin is refunded.",
+            pieces: [
+                qmPiece("wg_helm", "Dire Wolf Helm", "GiWolfHead", "rare", true),
+                qmPiece("wg_shield", "Wolfcrest Aegis", "GiShield", "rare", false),
+                qmPiece("wg_ring", "Ironclaw Band", "GiClaws", "rare", false),
+                qmPiece("wg_cloak", "Nightprowler Cloak", "GiCape", "rare", false),
+                qmPiece("wg_amulet", "Wolf-Fang Amulet", "GiFangs", "rare", false),
+                qmPiece("wg_blade", "Fanged Saber", "GiCrescentBlade", "rare", true),
+                qmPiece("wg_chest", "Wolfhide Cuirass", "GiChestArmor", "rare", false),
+                qmPiece("wg_belt", "Fangbite Belt", "GiBelt", "rare", false),
+                qmPiece("wg_boots", "Prowler Boots", "GiLeatherBoot", "rare", false),
+                qmPiece("wg_axe", "Moonhowl Axe", "GiBattleAxe", "rare", false),
+            ],
+        },
+        {
+            id: "harvester", name: "Harvester's Garb", feature: "farm", have: 4, total: 4, done: true, price: 1000,
+            capstone: "Bountiful Reaping: each harvest has a 20% chance to yield DOUBLE gold.",
+            pieces: [
+                qmPiece("harvesters_hat", "Harvester's Sun Hat", "GiFarmer", "rare", true),
+                qmPiece("reapers_girdle", "Reaper's Girdle", "GiRolledCloth", "rare", true),
+                qmPiece("sheafbound_cloak", "Sheafbound Cloak", "GiCape", "epic", true),
+                qmPiece("amber_grain_pendant", "Amber Grain Pendant", "GiAmberMosquito", "epic", true),
+            ],
+        },
+    ],
+};
 
 export default function BoardsLab() {
     return (
@@ -96,6 +154,22 @@ export default function BoardsLab() {
                 <Leaderboard
                     rows={LOVE.map((r) => ({ ...r, value: r.score.toLocaleString(), unit: `love · ${r.votes} votes` }))}
                     total={47} unitPlural="farms"
+                />
+            </section>
+
+            <section className="card sby">
+                <div className="sby-head"><h3>Quartermaster</h3></div>
+                <Quartermaster
+                    shop={QM_SHOP} locker={QM_LOCKER} purse={2400} busy={false}
+                    onBuyPiece={async (setId) => {
+                        const s = QM_SHOP.pieces.find((x) => x.id === setId);
+                        const p = s.pieces.find((x) => !x.owned) || s.pieces[0];
+                        // Pretend the crate finished the set when it was the last one, so the biggest state
+                        // the reveal has is reachable in the lab.
+                        return { bought: { ...p, setName: s.name, set: s.id, have: s.have + 1, total: s.total,
+                            completed: s.have + 1 >= s.total, capstone: s.have + 1 >= s.total ? s.capstone : null } };
+                    }}
+                    onGamble={async () => ({ won: { tier: "gold", label: "Gold chest", color: "#ffb648", image: null } })}
                 />
             </section>
 

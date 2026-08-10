@@ -26,8 +26,8 @@ import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fle
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { getSavedPorts, portsWithSaved } from "@/lib/marketplace/gun-ports-store.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
-import { setSeaBonus, setRaidBonus, setDoublesRaidGold, setOpeningReckoning } from "@/lib/marketplace/sets.js";
-import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
+import { setSeaBonus, setRaidBonus, setDoublesRaidGold, setOpeningReckoning, ITEM_SETS } from "@/lib/marketplace/sets.js";
+import { itemSpriteFor, itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge, getBadgeSea } from "@/lib/marketplace/badges.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
@@ -2005,6 +2005,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
         // bug this avoids.
         locker: LOCKER_LIST.map((l) => ({
             id: l.id, name: l.name, blurb: l.blurb, price: l.price, kind: l.kind, tier: l.tier || null,
+            icon: l.icon || null,
             canAfford: (row?.doubloons || 0) >= l.price,
             // ITS OWN PAINTED ART. Every one of these is a real consumable with a sprite in
             // mkt_consumable_sprite, and the shop was drawing the generic teal potion for all five — so the
@@ -2611,16 +2612,20 @@ export async function buyAmmo(buyerId, ammoId, qty = 10) {
 // through a side door, and cheaper than a scroll. They are five figures now: reachable in principle, so the
 // shop is honest about them existing, and never an accident. Anything added here that touches `charged`,
 // `charges` or a cooldown on a charged item belongs in this bracket — check before you price it.
+//
+// `icon` is the FALLBACK only. Every one of these has a painted sprite in mkt_consumable_sprite and the shelf
+// draws that; the glyph is what shows if a sprite is ever missing, so no card is ever a nameplate with a hole
+// above it.
 export const LOCKER = {
-    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 1000,
+    scroll_enchant: { id: "scroll_enchant", kind: "consumable", consumable: "forge_enchant_scroll", name: "Enchantment Scroll", price: 1000, icon: "GiScrollUnfurled",
         blurb: "Permanently adds an element of your choice to a piece of gear. Chest-only until now." },
-    scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 500,
+    scroll_ancient: { id: "scroll_ancient", kind: "consumable", consumable: "scroll_ancient", name: "Ancient Codex", price: 500, icon: "GiSpellBook",
         blurb: "2,000 XP on the spot. The only one in the game you can walk up and buy." },
-    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 150,
+    pot_fury: { id: "pot_fury", kind: "consumable", consumable: "pot_fury", name: "Bottled Fury", price: 150, icon: "GiPotionBall",
         blurb: "Triple your daily strike damage for six hours. Save it for a boss you mean to hurt." },
-    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 5000,
+    elixir_renewal: { id: "elixir_renewal", kind: "consumable", consumable: "elixir_renewal", name: "Elixir of Renewal", price: 5000, icon: "GiHealthPotion",
         blurb: "Fully recharges an in-store perk you thought was spent. Real merchandise — priced like it." },
-    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 5000,
+    sands_of_time: { id: "sands_of_time", kind: "consumable", consumable: "sands_of_time", name: "Sands of Time", price: 5000, icon: "GiSandsOfTime",
         blurb: "Use an in-store perk again today instead of waiting out its cooldown. Real merchandise." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
@@ -2637,23 +2642,65 @@ export const DEFENCE_DOUBLOONS = 12;
 export const PIECE_PRICE = 1000;
 
 /** Every collection piece you do NOT own, priced. */
+// ── THE MANIFEST ─────────────────────────────────────────────────────────────────────────────────────────────
+// You buy a SET, not a piece.
+//
+// It listed all forty-odd unowned pieces as one flat scroll of identical thousand-doubloon cards, which asked
+// the wrong question twice over. First, it is forty cards to read before you can decide anything. Second, and
+// worse, picking WHICH piece is not a decision anyone has information to make: the pieces inside a set are
+// interchangeable until the set is finished, and the only thing that pays out is finishing it.
+//
+// So the shelf is one card per unfinished set, showing how far along you are, and the quartermaster picks
+// which piece comes out of the crate. That turns a list into a progress bar you can push, and it makes the
+// purchase legible without a word of explanation: you can see what you are two pieces short of.
 export async function pieceShop(buyerId) {
     const owned = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
-    return COLLECTION_PIECES
-        .filter((p) => !owned.has(p.id))
-        .map((p) => ({ id: p.id, name: p.name, set: p.set, rarity: p.rarity, icon: p.icon,
-                       flavor: p.flavor || null, price: PIECE_PRICE }))
-        .sort((a, b) => a.set.localeCompare(b.set) || a.name.localeCompare(b.name));
+    // Pieces with painted art live in mkt_item_sprite alongside gear (see scripts/gen-piece-sprites); the ones
+    // without keep their glyph. Cached five minutes in the sprite module, so this costs nothing per open.
+    const sprites = await itemSpriteMap().catch(() => ({}));
+    const sets = new Map();
+    for (const p of COLLECTION_PIECES) {
+        if (!sets.has(p.set)) sets.set(p.set, []);
+        sets.get(p.set).push(p);
+    }
+    return [...sets.entries()]
+        .map(([setId, pieces]) => {
+            const def = ITEM_SETS.find((x) => x.id === setId);
+            const have = pieces.filter((p) => owned.has(p.id)).length;
+            return {
+                id: setId,
+                name: def?.name || setId,
+                feature: def?.feature || null,
+                have, total: pieces.length,
+                done: have >= pieces.length,
+                price: PIECE_PRICE,
+                // What FINISHING it pays, in the set's own words. The card is a progress bar, and a progress
+                // bar with no stated prize is just a chore — this is the reason to push it.
+                capstone: def?.capstone?.desc || null,
+                // Every piece, in order, owned or not — the card draws them as a row of slots, which is the
+                // whole explanation of what buying does. A silhouette you do not have yet is a better
+                // description of a collection than any sentence about one.
+                pieces: pieces.map((p) => ({ id: p.id, name: p.name, icon: p.icon, rarity: p.rarity,
+                                             art: sprites[p.id] || null, owned: owned.has(p.id) })),
+            };
+        })
+        // Closest to finished first: the set you are one piece short of is the one you came here for.
+        .sort((a, b) => Number(a.done) - Number(b.done)
+            || (b.have / b.total) - (a.have / a.total)
+            || a.name.localeCompare(b.name));
 }
 
-export async function buyPiece(buyerId, pieceId) {
+// Buy the next piece of a SET. Which piece is the quartermaster's business, not yours.
+export async function buyPiece(buyerId, setId) {
     // NOT GATED. The under-construction gate covers the FLEET LADDER — the thing still being built. This is
     // the doubloon economy, and doubloons come off encounters, which every member fights. Gating it would mint
     // a currency with nowhere to spend it.
-    const def = COLLECTION_PIECES.find((p) => p.id === String(pieceId));
-    if (!def) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
+    const inSet = COLLECTION_PIECES.filter((p) => p.set === String(setId));
+    if (!inSet.length) return { ok: false, error: "bad_item", ...(await getSailingState(buyerId)) };
     const owned = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
-    if (owned.has(def.id)) return { ok: false, error: "already_owned", ...(await getSailingState(buyerId)) };
+    const pool = inSet.filter((p) => !owned.has(p.id));
+    if (!pool.length) return { ok: false, error: "already_owned", ...(await getSailingState(buyerId)) };
+
     // Charge first and conditionally — neon() has no transactions, so the guard lives inside the UPDATE.
     const paid = await db.queryOne(
         `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
@@ -2661,10 +2708,30 @@ export async function buyPiece(buyerId, pieceId) {
         [buyerId, PIECE_PRICE]
     ).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+
+    // PICKED AFTER THE CHARGE, and re-read rather than reused: two crates opened at once would otherwise both
+    // roll against the same stale `owned` set and could hand out the same piece twice for two thousand.
+    const fresh = new Set(await getOwnedPieceIds(buyerId).catch(() => []));
+    const live = inSet.filter((p) => !fresh.has(p.id));
+    const def = (live.length ? live : pool)[randInt(live.length || pool.length)];
     await grantPiece(buyerId, def.id, "doubloon_shop").catch(() => {});
-    await trackActivity(buyerId, "buy_piece", { id: def.id, cost: PIECE_PRICE, currency: "doubloons" }).catch(() => {});
-    return { ok: true, bought: { id: def.id, name: def.name, rarity: def.rarity, icon: def.icon },
-             ...(await getSailingState(buyerId)) };
+    await trackActivity(buyerId, "buy_piece", { id: def.id, set: setId, cost: PIECE_PRICE, currency: "doubloons" }).catch(() => {});
+
+    const setDef = ITEM_SETS.find((x) => x.id === String(setId));
+    const nowHave = inSet.filter((p) => fresh.has(p.id) || p.id === def.id).length;
+    return {
+        ok: true,
+        // Everything the reveal needs in one payload — including whether that was the last one, because
+        // finishing a set is the entire point of the shelf and it should not read like any other purchase.
+        bought: {
+            id: def.id, name: def.name, rarity: def.rarity, icon: def.icon, flavor: def.flavor || null,
+            art: await itemSpriteFor(def.id).catch(() => null),
+            set: setId, setName: setDef?.name || setId,
+            have: nowHave, total: inSet.length, completed: nowHave >= inSet.length,
+            capstone: nowHave >= inSet.length ? (setDef?.capstone?.desc || null) : null,
+        },
+        ...(await getSailingState(buyerId)),
+    };
 }
 
 // -- THE GAMBLE -------------------------------------------------------------------------------------------
