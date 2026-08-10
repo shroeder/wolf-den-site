@@ -504,6 +504,9 @@ function logLine(ev, me, foe) {
         const what = ev.sys === "sails" ? "canvas is in rags" : "cannon is dismounted";
         return { side: ev.victim === "me" ? "foe" : "me", big: true, text: `${nameOf(ev.victim)}'s ${what}` };
     }
+    // A round she did not fire has to SAY so. Otherwise the capstone's stun is an enemy volley that silently
+    // fails to happen, which reads as a bug rather than as the thing you sailed a hundred ranks for.
+    if (ev.type === "stun") return { side: "me", big: true, text: `${nameOf("foe")}'s crew is reeling — she cannot answer` };
     if (ev.type !== "volley") return null;
     const shots = ev.shots || [];
     const hits = shots.filter((s) => s.hit).length;
@@ -887,6 +890,10 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
             return () => timers.forEach(clearTimeout);
         }
 
+        if (ev.type === "stun") {
+            sfxWreck();
+            setShout({ k: `s${step}`, side: "me", text: "She's reeling — she can't answer!" });
+        }
         if (ev.type === "wreck") {
             sfxWreck();
             setShout({ k: `s${step}`, side: ev.victim === "me" ? "foe" : "me",

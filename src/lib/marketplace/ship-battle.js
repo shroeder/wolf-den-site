@@ -323,7 +323,8 @@ export function ammoForShot(lv, zone) {
 // separately now and may carry a different round, so ammunition belongs to the SHOT (see resolveVolley) and the
 // `ammo` kept here is only what the racks default to.
 export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 0, hullLevel = 0,
-                              ammo = "round", art = null, sea = null, flavor = null, gunStats = null } = {}) {
+                              ammo = "round", art = null, sea = null, flavor = null, gunStats = null,
+                              openingCrit = false, stun = false } = {}) {
     return {
         name: name || "Ship",
         art,
@@ -340,6 +341,13 @@ export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 
         // Broadside adds damage, Ironclad takes it off what lands. Both are sea affinity, unchanged.
         dmgMult: 1 + (Number(sea?.broadside) || 0) / 100,
         dmgTaken: Math.max(0.5, 1 - (Number(sea?.ironclad) || 0) / 100),
+        // THE CAPSTONE'S TWO DEAD PROMISES. The Celestial Warship at rank 100 sold "a guaranteed opening
+        // critical, and a stun each fight"; both were aggregated into the fleet perks and then read by
+        // nothing — the crit by no code at all, the stun by a `canStun` field put on the state and never
+        // looked at by the engine OR the client. The rule stays in sailing.js where the fleet table is; this
+        // only carries it, so there is one place that decides who has it.
+        openingCrit: Boolean(openingCrit),
+        stun: Boolean(stun),
     };
 }
 
@@ -641,14 +649,18 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             // player cannot tell a 90% shot they got unlucky on from a 35% shot they should never have taken
             // — which is the difference between bad luck and a bad decision, and the whole of learning to
             // play. The number is already computed to roll against; it just used to be thrown away.
+            // GUARANTEED OPENING CRITICAL. The first ball of the first round, from a deck that has earned it:
+            // it cannot go wide and it rakes. A "guaranteed crit" that is still allowed to miss would be a
+            // promise kept on a technicality, which is worse than one that was never wired at all.
+            const opener = att.openingCrit && st.round === 1 && !shots.length;
             const chance = hitChance(att, zone, ammo, evasion, gun);
-            if (rng() > chance) {
+            if (!opener && rng() > chance) {
                 // A BALL THAT GOES WIDE IS NOT NOTHING. It winds the Reckoning — see RECKONING_AT.
                 mySide.reck = Math.min(RECKONING_AT, (mySide.reck || 0) + 1);
                 shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false, chance, evasion });
                 continue;
             }
-            const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
+            const rake = opener || rng() < (att.rake + (ammo.rakeBonus || 0));
 
             // HOW MANY PLANKS THIS BALL STAVES IN.
             //
@@ -679,7 +691,7 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             const dmg = landed;   // the event log and the recap both count in planks now
             total += dmg;
             if (landed) theirSide.hp = Math.max(0, theirSide.hp - landed);
-            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits: landed, glanced: false, rake, bore, chance, evasion };
+            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits: landed, glanced: false, rake, bore, chance, evasion, opener };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
             // is especially good at — which is where chain and grape earn their price. Round shot is never
@@ -719,7 +731,13 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
     // enemy answer their own FIRE button. There is no case left where she goes first, so there is no reason
     // to branch on a stored field — `gauge` stays on the state only because it is a saved shape.
     fire("me", mine);
-    fire("foe", theirs);
+    // A STUN EACH FIGHT. Your opening broadside leaves her crew reeling and she does not answer it — one free
+    // round, once, at the top of the battle. Round 1 rather than a saved counter deliberately: a flag stored
+    // on the battle state would be absent on every fight opened before this shipped, and "once per fight" and
+    // "on the first round" are the same sentence when there is only ever one first round.
+    const stunned = Boolean(me?.stun) && st.round === 1 && st.foe.hp > 0;
+    if (stunned) events.push({ type: "stun", side: "foe", hp: hpPair(st) });
+    else fire("foe", theirs);
 
     // IT ENDS WHEN A SHIP GOES DOWN. There used to be a fourteen-round limit and a winner decided on which
     // hull had the greater share of itself left, which is how a fight both captains were still fighting got

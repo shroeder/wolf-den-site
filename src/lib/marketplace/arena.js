@@ -751,6 +751,7 @@ export async function fightRound(buyerId, opts = {}) {
     const foeCritMult = CRIT_MULT + critPowerOf(b.foe);
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
     if (!b.cd) b.cd = {};
+    const coolFor = (ability) => Math.max(ability.cooldown ? 1 : 0, (ability.cooldown || 0) - Math.floor((P.cdCut || 0) / 3));
     const cool = (n) => { for (const k of Object.keys(b.cd)) b.cd[k] = Math.max(0, (b.cd[k] || 0) - n); };
 
     // ── DEFENSIVE SKILL ── played during their wind-up, and it does NOT consume the beat: you still block.
@@ -831,7 +832,10 @@ export async function fightRound(buyerId, opts = {}) {
         //
         // SURGE IS NOT IN HERE. See FREE_KINDS in arena-kit.js: its price genuinely is the turn.
         if (ability && FREE_KINDS.has(ability.kind)) {
-            b.cd[ability.id] = ability.cooldown || 0;
+            // QUICKENING: "every third rank shaves a turn off one cooldown". Three ranks, one turn, read by
+            // nothing — the whole node was a sprite. A cooldown never drops below one turn: an ability you
+            // can play every beat is not an ability, it is the attack button.
+            b.cd[ability.id] = coolFor(ability);
             if (ability.kind === "riposte") {
                 b.riposte = RIPOSTE_SHARE;
                 b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0, free: true,
@@ -872,7 +876,7 @@ export async function fightRound(buyerId, opts = {}) {
         const openMult = b.beat <= 1 ? 1 + (P.openMult || 0) : 1;
         const lowHpMult = b.hp <= b.maxHp / 3 ? 1 + (P.lowHpDmg || 0) : 1;
         if (ability) {
-            b.cd[ability.id] = ability.cooldown || 0;
+            b.cd[ability.id] = coolFor(ability);   // Quickening — see the free-action branch above
             power = ability.power;
             note = ` · ${ability.name}`;
             // ward and riposte never reach here — they resolve above as free actions and keep your beat.
@@ -933,12 +937,20 @@ export async function fightRound(buyerId, opts = {}) {
             healed = Math.min(b.maxHp - b.hp, Math.round(dmg * drain));
             b.hp += healed;
         }
+        // CONFLAGRATION. One rank, tier 3, twelve points deep: "your criticals leave a burn behind" — and
+        // nothing read it, so the deepest node in the Runecaller tree was a sprite and a sentence. A crit now
+        // applies the same burn a rend would, which is exactly what the card says and nothing more.
+        if (crit && (P.burnOnCrit || 0) > 0 && dmg > 0) rend = true;
         if (rend && dmg > 0) {
             // Stacks with itself rather than refreshing, so leaning on a burn kit is a real plan — but only
             // up to REND_MAX_STACKS. Uncapped it won 83.8% of simulated bouts in under six beats.
             // Slow Burn: each rank makes the burn tick for more of their vigour.
             const per = Math.max(1, Math.round(b.foeMaxHp * (REND_PER_TURN + (P.rendTick || 0))));
-            const stacks = Math.min(REND_MAX_STACKS, (b.bleed?.stacks || 0) + 1);
+            // KINDLING: "+1 burn stack per rank" was read by nothing, so two ranks of a tier-1 node did
+            // nothing at all. It raises the CEILING — the cap is what the node is worth, since a burn kit
+            // reaches the old cap of its own accord and then stops.
+            const cap = REND_MAX_STACKS + Math.round(P.rendStacks || 0);
+            const stacks = Math.min(cap, (b.bleed?.stacks || 0) + 1);
             b.bleed = { turns: REND_TURNS, stacks, dmg: per * stacks };
         }
         if (sunder) b.sunder = SUNDER_TURNS;

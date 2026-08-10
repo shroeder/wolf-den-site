@@ -285,6 +285,18 @@ export async function equippedSeaAffinity(buyerId) {
     // Rare Forge "attunement" sea affixes (Dredge / Trove / Tailwind) on equipped gear add points too.
     const utilSea = (await getEquippedUtilTotals(buyerId).catch(() => ({ sea: {} }))).sea || {};
     for (const k in sea) sea[k] += utilSea[k] || 0;
+    // ── THE EQUIPPED PET'S SIGNATURE ── `sea_plunder`, carried by the Tidecaller, the Corsair's Parrot and
+    // the Croc. Its card has always read "+X% gold from raids and the sea merchant" and NOTHING read the key:
+    // it was the one pet system-perk in the game with no consumer, so three signature abilities were a
+    // sentence on a card. Delivered as BOUNTY points rather than a bolted-on multiplier — bounty is already
+    // "+3% raid/merchant gold per point" (see seaEffects), so v/3 points is exactly the v% the card promises,
+    // and it inherits the same +60% cap instead of quietly sailing past it.
+    // Imported here rather than at the top for the same reason its three neighbours in this file are
+    // (following_sea, seafaring, beachcomber): pet-combat pulls in the combat stack, and sailing is already
+    // on the other end of that chain.
+    const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
+    const plunderPct = await getPetSystemPerk(buyerId, "sea_plunder").catch(() => 0);
+    if (plunderPct > 0) sea.bounty += plunderPct / 3;
     return sea;
 }
 // Sea-affinity POINTS → real effects. Plain tunable numbers (no env). Stackers are CAPPED so the rare gear that
@@ -1203,7 +1215,7 @@ async function openEncounterBattle(buyerId, enc, row) {
     const myTier = boatTier(mine.boatLevel);
     const meta = {
         kind: "encounter", encId: enc.id, encKind: enc.kind, tier: enc.tier,
-        meProfile: { name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
+        meProfile: { openingCrit: mine.openingCrit, stun: mine.stun, name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
         foeProfile: { ...enc, fleet: true, hits: enc.hits, art: encounterArt(enc.id) },
@@ -1742,6 +1754,7 @@ export async function doRaid(buyerId, targetId = null) {
     const fired = openingLoadout(row);
     const mine = await myShipProfile(buyerId, { ...row, loadout: fired }, me?.display_name || me?.alias || "Your ship");
     const theirs = shipProfile({
+        openingCrit: boatPerks(foeLevel).openingCrit, stun: boatPerks(foeLevel).raidStun,
         name: target.display_name || target.alias || "Rival ship", boatLevel: foeLevel,
         gunLevel: target.gun_level || 0, gunneryLevel: target.gunnery_level || 0, hullLevel: target.hull_level || 0,
         ammo: target.loadout || "round", art: boatArt(foeLevel),
@@ -1767,7 +1780,7 @@ export async function doRaid(buyerId, targetId = null) {
     const meta = {
         kind: "raid", targetId: target.id, dodged,
         targetName: target.display_name || target.alias,
-        meProfile: { name: mine.name, boatLevel: myLevel, gunLevel: row?.gun_level || 0,
+        meProfile: { openingCrit: mine.openingCrit, stun: mine.stun, name: mine.name, boatLevel: myLevel, gunLevel: row?.gun_level || 0,
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art, sea: mySea,
             gunStats: mine.gunStats || null },
         foeProfile: { name: theirs.name, boatLevel: foeLevel, gunLevel: target.gun_level || 0,
@@ -2035,8 +2048,11 @@ async function myShipProfile(buyerId, row, name) {
     const boatLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
     const gunStats = await gunStatsFor(buyerId);
+    const perks = boatPerks(boatLevel);
     return shipProfile({
         gunStats,
+        openingCrit: perks.openingCrit,
+        stun: perks.raidStun,
         name: name || "Your ship",
         boatLevel,
         gunLevel: row?.gun_level || 0,
@@ -2475,7 +2491,7 @@ export async function doFleetBattle(buyerId, rank = null) {
     const myTier = boatTier(mine.boatLevel);
     const meta = {
         kind: "fleet", rank: want, first,
-        meProfile: { name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
+        meProfile: { openingCrit: mine.openingCrit, stun: mine.stun, name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
         foeProfile: { ...ship, fleet: true },
