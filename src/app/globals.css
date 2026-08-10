@@ -15041,3 +15041,136 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* And the minus lives clear of the text rather than over it. */
 .sbt-target.is-gun .sbt-plaque-minus { transform: translate(38%, -38%); }
 
+
+/* ══ THE RECKONING ═══════════════════════════════════════════════════════════════════════════════════════
+   Every ball of yours that goes wide is counted here, and at full it stops being a meter and becomes the
+   button. The bar IS the button on purpose — there is nothing to learn about where the skill lives, and the
+   thing you have been watching fill is the thing you press.
+
+   While it fills it is deliberately quiet: a dark trough with a slow amber tide in it, no bigger than the
+   rack pills beside it. Full, it goes gold, lifts, and will not stop moving until you spend it. */
+.sbt-aimbar { grid-template-areas: "read fire" "rack fire" "reck fire"; }
+.sbt-reck { grid-area: reck; position: relative; overflow: hidden; width: 100%;
+    display: block; padding: 0; height: 34px; border-radius: 10px; cursor: default;
+    border: 1px solid rgba(255,215,94,0.22); background: rgba(6,10,16,0.72);
+    transition: border-color .3s ease, box-shadow .3s ease, transform .18s ease; }
+/* The tide. Width is the tally, so a miss is visible the instant it happens. */
+.sbt-reck-fill { position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); pointer-events: none;
+    background: linear-gradient(90deg, rgba(140,60,20,0.55), rgba(214,120,32,0.7));
+    transition: width .45s cubic-bezier(.2,.9,.3,1.2); }
+.sbt-reck-shine { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+.sbt-reck-label { position: relative; display: flex; align-items: baseline; justify-content: center; gap: 7px;
+    height: 100%; font-family: var(--font-display); }
+.sbt-reck-label b { font-size: 0.74rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #c8bda6; transition: color .3s ease, text-shadow .3s ease; }
+.sbt-reck-label em { font-style: normal; font-size: 0.62rem; font-weight: 800; color: #8f8875; }
+
+/* FULL. Gold, alive, and it does not stop until it is spent. */
+.sbt-reck.is-ready { cursor: pointer; border-color: rgba(255,225,140,0.9);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 22px rgba(255,180,60,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
+    animation: sbtReckPulse 1.5s ease-in-out infinite; }
+.sbt-reck.is-ready .sbt-reck-fill {
+    background: linear-gradient(90deg, #b8730f, #ffdf85 45%, #ffb43c 70%, #ffdf85);
+    background-size: 220% 100%; animation: sbtReckTide 2.2s linear infinite; }
+.sbt-reck.is-ready .sbt-reck-label b { color: #1a1206; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+.sbt-reck.is-ready .sbt-reck-label em { color: rgba(26,18,6,0.72); }
+/* A bar of light that sweeps the button, so "ready" reads even out of the corner of your eye. */
+.sbt-reck.is-ready .sbt-reck-shine { opacity: 1;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
+    background-size: 250% 100%; animation: sbtReckSweep 2.4s ease-in-out infinite; }
+.sbt-reck.is-ready:active { transform: scale(0.97); }
+@keyframes sbtReckPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,94,0.35), 0 0 18px rgba(255,180,60,0.35), inset 0 1px 0 rgba(255,255,255,0.25); }
+    50% { box-shadow: 0 0 0 1px rgba(255,235,170,0.6), 0 0 30px rgba(255,190,80,0.7), inset 0 1px 0 rgba(255,255,255,0.35); }
+}
+@keyframes sbtReckTide { from { background-position: 0% 0; } to { background-position: 220% 0; } }
+@keyframes sbtReckSweep { 0% { background-position: 130% 0; } 60%, 100% { background-position: -60% 0; } }
+
+/* ── SPENDING IT ─────────────────────────────────────────────────────────────────────────────────────────
+   The volley itself is animated by the machinery every other volley uses; what marks it out is the screen
+   going gold for a beat and her name being called. */
+.sbt-reckflash { position: absolute; inset: 0; z-index: 30; pointer-events: none;
+    animation: sbtReckFlash 900ms ease-out both;
+    background: radial-gradient(120% 80% at 50% 60%, rgba(255,196,80,0.55), rgba(255,140,30,0.22) 45%, transparent 72%); }
+@keyframes sbtReckFlash {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    100% { opacity: 0; }
+}
+.sbt-reckcry { position: absolute; left: 50%; top: 34%; z-index: 31; pointer-events: none;
+    transform: translate(-50%, -50%); white-space: nowrap;
+    font-family: var(--font-display); font-size: 2.1rem; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #fff3d6;
+    text-shadow: 0 2px 0 rgba(120,50,0,0.9), 0 0 26px rgba(255,170,50,0.95), 0 0 60px rgba(255,120,20,0.7);
+    animation: sbtReckCry 1500ms cubic-bezier(.16,.9,.28,1) both; }
+@keyframes sbtReckCry {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(-4deg); letter-spacing: 0.5em; }
+    18% { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(0deg); letter-spacing: 0.16em; }
+    32% { transform: translate(-50%, -50%) scale(1); }
+    78% { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -56%) scale(1.04); }
+}
+@media (max-width: 430px) { .sbt-reckcry { font-size: 1.6rem; } }
+
+/* ══ THE GUN DECK ════════════════════════════════════════════════════════════════════════════════════════
+   Your ship, with your guns on it, and you tap the one you want to work on. A list of "Cannon 1 / Cannon 2"
+   would be the same data and mean nothing — a gun's identity in this game is WHERE IT SITS, because that is
+   how the battle screen asks for it. Same hull art and the same port positions the battle uses. */
+.gdk { margin-top: 12px; }
+.gdk-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.gdk-head b { font-family: var(--font-display); font-size: 0.9rem; color: #e8dcc6; }
+.gdk-head em { font-style: normal; font-size: 0.72rem; color: #8f8875; }
+.gdk-ship { position: relative; width: 100%; border-radius: 14px; overflow: hidden;
+    background: radial-gradient(120% 90% at 50% 20%, rgba(30,60,72,0.5), rgba(8,14,20,0.85));
+    border: 1px solid rgba(255,255,255,0.07); }
+.gdk-boat { display: block; width: 100%; height: auto; }
+/* One button per port, sitting exactly where that barrel sits in a fight. */
+.gdk-gun { position: absolute; transform: translate(-50%, -50%); width: 34px; height: 34px; padding: 0;
+    display: grid; place-items: center; border-radius: 9px; cursor: pointer;
+    background: rgba(8,12,18,0.82); border: 1.5px solid rgba(255,255,255,0.18);
+    color: #cbbfa6; transition: transform .14s ease, border-color .2s ease, box-shadow .2s ease; }
+.gdk-gun:hover, .gdk-gun:focus-visible { transform: translate(-50%, -50%) scale(1.12); border-color: rgba(255,215,94,0.7); }
+.gdk-gun.is-open { border-color: #ffd75e; box-shadow: 0 0 0 2px rgba(255,215,94,0.3), 0 0 16px rgba(255,180,60,0.5); }
+/* A barrel you have put something into looks different ON THE SHIP, before you open anything. */
+.gdk-gun.is-built { border-color: rgba(255,215,94,0.75); color: #ffd75e;
+    box-shadow: 0 0 12px rgba(255,180,60,0.35), inset 0 0 10px rgba(255,180,60,0.15); }
+.gdk-gun-ico { width: 17px; height: 17px; }
+.gdk-gun b { position: absolute; right: -3px; top: -5px; font-size: 0.56rem; font-weight: 900;
+    background: #0c1017; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; padding: 0 3px; color: #e8dcc6; }
+.gdk-pips { position: absolute; bottom: -1px; left: 0; right: 0; font-style: normal; font-size: 0.75rem;
+    line-height: 0.6; letter-spacing: 1px; color: #ffd75e; text-align: center; }
+
+/* The sheet. One barrel, its three tracks, what each is now and what the next level makes it. */
+.gdk-sheet { position: fixed; inset: 0; z-index: 4200; display: grid; place-items: center; padding: 16px;
+    background: rgba(4,8,12,0.72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.gdk-card { width: min(420px, 100%); max-height: 86svh; overflow-y: auto; padding: 14px;
+    border-radius: 16px; background: #12161d; border: 1px solid rgba(255,215,94,0.28);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.gdk-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.gdk-card-ico { width: 30px; height: 30px; color: #ffd75e; flex: none; }
+.gdk-card-head b { display: block; font-family: var(--font-display); font-size: 1.02rem; color: #ffd75e; }
+.gdk-card-head em { font-style: normal; font-size: 0.72rem; color: #9aa2ab; }
+.gdk-x { margin-left: auto; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 1.1rem;
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: #cbbfa6; }
+.gdk-track { padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.07); }
+.gdk-track-top { display: flex; align-items: center; gap: 8px; }
+.gdk-track-ico { width: 18px; height: 18px; color: #e8dcc6; flex: none; }
+.gdk-track-top b { font-family: var(--font-display); font-size: 0.86rem; color: #e8dcc6; }
+.gdk-lv { margin-left: auto; display: flex; gap: 3px; }
+.gdk-lv i { width: 12px; height: 5px; border-radius: 2px; background: rgba(255,255,255,0.13); }
+.gdk-lv i.is-on { background: linear-gradient(180deg, #ffdf85, #d4af37); }
+.gdk-desc { margin: 5px 0 8px; font-size: 0.76rem; line-height: 1.4; color: #9aa2ab; }
+.gdk-track-buy { display: flex; align-items: center; gap: 10px; }
+.gdk-eff { font-size: 0.74rem; font-weight: 700; color: #cbbfa6; }
+.gdk-eff em { font-style: normal; color: #7fe0a4; }
+.gdk-buy { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px;
+    border-radius: 10px; cursor: pointer; font-family: var(--font-display); font-weight: 800; font-size: 0.8rem;
+    color: #1a1206; border: 1px solid rgba(255,225,140,0.6);
+    background: linear-gradient(180deg, #ffdf85, #e6c76b 46%, #c79a2c); }
+.gdk-buy:disabled { cursor: default; filter: grayscale(0.7) brightness(0.62); }
+.gdk-buy img { width: 15px; height: 15px; }
+.gdk-maxed { margin-left: auto; font-size: 0.74rem; font-weight: 800; color: #7fe0a4; }
+.gdk-track.is-maxed { opacity: 0.72; }
+.gdk-purse { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.07); font-size: 0.76rem; color: #9aa2ab; }
+.gdk-purse img { width: 16px; height: 16px; }

@@ -4,9 +4,11 @@ import { useState } from "react";
 
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard from "@/components/ShipYard";
+import GunDeck from "@/components/GunDeck";
 import { fleetDeck, boatDeck } from "@/lib/marketplace/deck-lines.js";
 import { fleetGunPorts, boatGunPorts } from "@/lib/marketplace/gun-ports.js";
-import { shipProfile, foeProfile, initBattleState, resolveVolley, foeAims, AMMO_LIST, SAILS_MAX, GUN_HP } from "@/lib/marketplace/ship-battle.js";
+import { shipProfile, foeProfile, initBattleState, resolveVolley, foeAims, AMMO_LIST, SAILS_MAX, GUN_HP,
+         resolveReckoning, RECKONING_AT, RECKONING_NAME, GUN_TRACKS, gunHpFor, gunUpgradeCost } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { FLEET, fleetView, fleetArt, fleetCaptain } from "@/lib/marketplace/fleet.js";
 
@@ -44,6 +46,9 @@ export default function BattleLab() {
             foe: { sails: st.foe.sails, guns: st.foe.guns },
         },
         caps: { sails: SAILS_MAX, gun: GUN_HP },
+        // The miss meter, so the Reckoning can be filled and spent in the lab exactly as it is in a fight.
+        reck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.me.reck || 0)), name: RECKONING_NAME },
+        gunMax: { me: st.me.gunMax || null, foe: st.foe.gunMax || null },
         zones: {
             me: zonesOn(zoneKeyFromArt(meta.me.art, meta.me.level)),
             foe: zonesOn(zoneKeyFromArt(meta.foe.art, meta.foe.level)),
@@ -88,7 +93,36 @@ export default function BattleLab() {
             r.over && r.win ? [{ kind: "doubloons", n: 14 }, { kind: "gold", n: 320 }] : []));
     };
 
+    const reckoning = () => {
+        if (!live) return;
+        const r = resolveReckoning(live.me, live.foe, live.state);
+        if (!r.ok) return;
+        setLive((l) => ({ ...l, state: r.state }));
+        setBattle(view(r.state, live.meta, r.events, r.over, r.win, r.sunk,
+            r.over && r.win ? [{ kind: "doubloons", n: 14 }] : []));
+    };
+
     // The yard against fixture state, so the gun deck and the ladder can be looked at without a database.
+    // Six barrels along the real deck line, a couple of them already built, so the upgrade sheet and the
+    // "this one is built" treatment on the ship can both be looked at.
+    const gunDeck = {
+        art: "/images/sailing/boat-tier5-galleon.png",
+        deck: boatDeck(5),
+        doubloons: 240,
+        guns: boatGunPorts(5, 6).map((port, i) => {
+            const lv = [{ hp: 3, dmg: 2, acc: 1 }, { hp: 0, dmg: 0, acc: 0 }, { hp: 1, dmg: 0, acc: 4 }][i] || { hp: 0, dmg: 0, acc: 0 };
+            return {
+                index: i, port, hits: gunHpFor(lv.hp),
+                tracks: Object.values(GUN_TRACKS).map((t) => ({
+                    key: t.key, name: t.name, icon: t.icon, desc: t.desc,
+                    level: lv[t.key], max: t.max, maxed: lv[t.key] >= t.max,
+                    cost: lv[t.key] >= t.max ? null : gunUpgradeCost(lv[t.key]),
+                    effect: t.effect(lv[t.key]),
+                    next: lv[t.key] >= t.max ? null : t.effect(lv[t.key] + 1),
+                })),
+            };
+        }),
+    };
     const combat = {
         doubloons: 240,
         ship: { guns: 11, accuracy: 79, hp: 14, boatLevel: 25 },
@@ -133,9 +167,10 @@ export default function BattleLab() {
                 </div>
             </section>
 
+            <GunDeck deck={gunDeck} purse={240} busy={false} onBuy={(g, t) => console.log("buy", g, t)} />
             <ShipYard combat={combat} raid={{ cap: 5, used: 1 }} gold={12000} busy={false} onAct={({ action, rank }) => { if (action === "fleet_battle") fight(rank); }} />
 
-            {battle ? <ShipBattleScene battle={battle} busy={false} onVolley={volley} onClose={() => { setBattle(null); setLive(null); }} /> : null}
+            {battle ? <ShipBattleScene battle={battle} busy={false} onVolley={volley} onReckoning={reckoning} onClose={() => { setBattle(null); setLive(null); }} /> : null}
         </div>
     );
 }

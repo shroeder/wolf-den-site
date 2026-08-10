@@ -15,7 +15,9 @@ import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
-         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V } from "@/lib/marketplace/ship-battle.js";
+         SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V,
+         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning,
+         RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
@@ -968,7 +970,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1053,7 +1055,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         })(),
         // SHIP BATTLES — the gun deck, the racks, the fleet ladder and the purse. Gated with raiding while the
         // rework is under construction; a member outside the allow-list gets null and renders nothing.
-        combat: raidsEnabled(buyerId) ? combatView(row, level, consumableArt) : null,
+        combat: raidsEnabled(buyerId) ? combatView(row, level, consumableArt, gunDeck) : null,
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1230,7 +1232,10 @@ export async function getSailingState(buyerId, skyKey = null) {
         // report every set as 0 collected.
         return collectionsForFeature("sea", await ownedPieces(buyerId).catch(() => []));
     })().catch(() => []);
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt), gold: goldRow?.gold || 0, fleet, sky, sea };
+    // The gun deck is a query, and decorate() is synchronous on purpose — fetched here and handed in, the
+    // same way chest art and collections are.
+    const gunDeck = raidsEnabled(buyerId) ? await gunDeckView(buyerId, row).catch(() => null) : null;
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck), gold: goldRow?.gold || 0, fleet, sky, sea };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1603,7 +1608,8 @@ export async function doRaid(buyerId, targetId = null) {
         kind: "raid", targetId: target.id, dodged,
         targetName: target.display_name || target.alias,
         meProfile: { name: mine.name, boatLevel: myLevel, gunLevel: row?.gun_level || 0,
-            gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art, sea: mySea },
+            gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art, sea: mySea,
+            gunStats: mine.gunStats || null },
         foeProfile: { name: theirs.name, boatLevel: foeLevel, gunLevel: target.gun_level || 0,
             gunneryLevel: target.gunnery_level || 0, hullLevel: target.hull_level || 0,
             ammo: target.loadout || "round", art: boatArt(foeLevel) },
@@ -1751,7 +1757,7 @@ const ammoStock = (row) => (row && typeof row.ammo === "object" && row.ammo) || 
 const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock(row)[id]) || 0);
 
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the ladder and the purse.
-function combatView(row, boatLevel, consumableArt = {}) {
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -1767,6 +1773,8 @@ function combatView(row, boatLevel, consumableArt = {}) {
             hp: hullHitsFor(hull),
             boatLevel,
         },
+        // Every barrel you own, priced — the yard draws these ON the ship.
+        gunDeck,
         tracks: [
             ...Object.values(COMBAT_TRACKS).map((t) => {
                 const level = row?.[t.col] || 0;
@@ -1827,10 +1835,28 @@ function combatView(row, boatLevel, consumableArt = {}) {
 }
 
 // The player's profile for a battle: their boat, their gun deck, their sea affinity and what is loaded.
+// ── ONE ROW PER GUN ──────────────────────────────────────────────────────────────────────────────────────────
+// Absent rows read as level zero, so a fresh captain needs nothing inserted and a new barrel bought from the
+// Cannons track arrives unupgraded without anyone having to create it.
+export async function gunStatsFor(buyerId) {
+    const rows = await db.query(
+        `SELECT gun_index, hp_level, dmg_level, acc_level FROM mkt_sailing_gun WHERE buyer_id = $1`, [buyerId]
+    ).catch(() => []);
+    const out = [];
+    for (const r of rows) {
+        out[Number(r.gun_index)] = {
+            hp: Number(r.hp_level) || 0, dmg: Number(r.dmg_level) || 0, acc: Number(r.acc_level) || 0,
+        };
+    }
+    return out;
+}
+
 async function myShipProfile(buyerId, row, name) {
     const boatLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
     const sea = await equippedSeaAffinity(buyerId).catch(() => ({}));
+    const gunStats = await gunStatsFor(buyerId);
     return shipProfile({
+        gunStats,
         name: name || "Your ship",
         boatLevel,
         gunLevel: row?.gun_level || 0,
@@ -1972,6 +1998,11 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
         foe: { sails: st.foe.sails, guns: st.foe.guns },
     },
     caps: { sails: SAILS_MAX, gun: GUN_HP },
+    // THE RECKONING. How many of your balls have gone wide, and what it takes to spend it. See ship-battle.
+    reck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.me.reck || 0)), name: RECKONING_NAME },
+    // Each gun's own ceiling — a barrel with Iron on it holds more hits than the one beside it, and the
+    // scene has to read "1 of 3" against the right number.
+    gunMax: { me: st.me.gunMax || null, foe: st.foe.gunMax || null },
     // Which parts each hull actually has, measured off its own art — a marker for a part the sprite does
     // not have would be a button that does nothing.
     zones: {
@@ -1989,6 +2020,8 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
 
 // Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.
 function profilesFrom(meta) {
+    // meProfile carries gunStats from the opening (see the battle openers) so the resolver keeps rolling the
+    // barrels you built rather than a flat battery.
     return { me: shipProfile(meta.meProfile), foe: meta.foeProfile.fleet ? foeProfile(meta.foeProfile) : shipProfile(meta.foeProfile) };
 }
 
@@ -2095,6 +2128,47 @@ export async function shipBattleVolley(buyerId, aim) {
             ...battleView(res.state, meta, { row: await readRow(buyerId) }), events: res.events, over: true,
             win: res.win, sunk: res.sunk, reward,
             yourAim: res.mine, theirAim: res.theirs,
+        },
+        ...(await getSailingState(buyerId)),
+    };
+}
+
+// ── SPENDING THE RECKONING ───────────────────────────────────────────────────────────────────────────────────
+// The free volley the miss meter pays for. It does not consume the round and she does not answer it, so it
+// cannot be folded into shipBattleVolley — it is its own thing, and the state it writes keeps whatever orders
+// she had already trained on you for the round you are still in.
+export async function shipBattleReckoning(buyerId) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    const open = readBattle(row);
+    if (!open) return { ok: false, error: "no_battle", ...(await getSailingState(buyerId)) };
+    const { me, foe } = profilesFrom(open.meta);
+
+    const res = resolveReckoning(me, foe, open.state);
+    if (!res.ok) return { ok: false, error: res.error || "not_ready", ...(await getSailingState(buyerId)) };
+
+    if (!res.over) {
+        // Her orders survive: you took a free shot inside the round, you did not skip it.
+        res.state.theirNext = open.state.theirNext || planFoeRound(res.state, me, foe);
+        await saveBattle(buyerId, res.state, open.meta);
+        const after = await readRow(buyerId);
+        return {
+            ok: true,
+            battle: { ...battleView(res.state, open.meta, { row: after }), events: res.events, over: false, reckoning: true },
+            ...(await getSailingState(buyerId)),
+        };
+    }
+
+    await saveBattle(buyerId, null, null);
+    const meta = open.meta;
+    const reward = meta.kind === "fleet"
+        ? await finishFleetBattle(buyerId, meta, res)
+        : await finishRaidBattle(buyerId, meta, res);
+    return {
+        ok: true,
+        battle: {
+            ...battleView(res.state, meta, { row: await readRow(buyerId) }), events: res.events, over: true,
+            win: res.win, sunk: res.sunk, reward, reckoning: true,
         },
         ...(await getSailingState(buyerId)),
     };
@@ -2230,7 +2304,7 @@ export async function doFleetBattle(buyerId, rank = null) {
         kind: "fleet", rank: want, first,
         meProfile: { name: mine.name, boatLevel: mine.boatLevel, gunLevel: row?.gun_level || 0,
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
-            sea: await equippedSeaAffinity(buyerId).catch(() => ({})) },
+            sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
         foeProfile: { ...ship, fleet: true },
         me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
             // Your own hull's deck line, so your hero stands on the boat rather than hovering over it, and the
@@ -2389,6 +2463,74 @@ export async function setLoadout(buyerId, ammoId) {
     if (!def.basic && ammoCount(row, def.id) <= 0) return { ok: false, error: "no_stock", ...(await getSailingState(buyerId)) };
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
     await db.query(`UPDATE mkt_sailing SET loadout = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, def.id]).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
+// ── THE GUN DECK, FOR THE YARD ───────────────────────────────────────────────────────────────────────────────
+// One entry per barrel you actually own, each carrying its three tracks priced and described, plus where the
+// gun sits on the drawn hull so the yard can put the card ON the cannon rather than in a list beside it.
+export async function gunDeckView(buyerId, row) {
+    const r = row || (await readRow(buyerId));
+    const boatLevel = boatLevelFromUpgrades(r?.speed_level || 0, r?.luck_level || 0, r?.rarity_level || 0, r?.find_level || 0, r?.raid_level || 0);
+    const n = gunsFor(r?.gun_level || 0);
+    const stats = await gunStatsFor(buyerId);
+    const tier = boatTier(boatLevel);
+    const saved = await getSavedPorts().catch(() => ({}));
+    const ports = portsWithSaved(saved, `boat:${tier}`, boatDeck(tier), n);
+    return {
+        art: boatArt(boatLevel),
+        deck: boatDeck(tier),
+        doubloons: r?.doubloons || 0,
+        guns: Array.from({ length: n }, (_, i) => {
+            const lv = stats[i] || { hp: 0, dmg: 0, acc: 0 };
+            return {
+                index: i,
+                port: ports[i] || { x: 0.5, y: 0.5 },
+                hits: gunHpFor(lv.hp),
+                tracks: Object.values(GUN_TRACKS).map((t) => {
+                    const level = lv[t.key] || 0;
+                    return {
+                        key: t.key, name: t.name, icon: t.icon, desc: t.desc,
+                        level, max: t.max, maxed: level >= t.max,
+                        cost: level >= t.max ? null : gunUpgradeCost(level),
+                        effect: t.effect(level),
+                        next: level >= t.max ? null : t.effect(level + 1),
+                    };
+                }),
+            };
+        }),
+    };
+}
+
+// Buy one level of one track on ONE gun.
+export async function upgradeGun(buyerId, gunIndex, track) {
+    if (!raidsEnabled(buyerId)) return { ok: false, error: "under_construction", ...(await getSailingState(buyerId)) };
+    const def = GUN_TRACKS[String(track)];
+    const idx = Math.floor(Number(gunIndex));
+    if (!def || !Number.isFinite(idx) || idx < 0) return { ok: false, error: "bad_upgrade", ...(await getSailingState(buyerId)) };
+    const row = await readRow(buyerId);
+    // You cannot put iron into a barrel you have not bought — the Cannons track decides how many exist.
+    if (idx >= gunsFor(row?.gun_level || 0)) return { ok: false, error: "no_such_gun", ...(await getSailingState(buyerId)) };
+
+    const stats = await gunStatsFor(buyerId);
+    const level = (stats[idx] || {})[def.key] || 0;
+    if (level >= def.max) return { ok: false, error: "maxed", ...(await getSailingState(buyerId)) };
+    const cost = gunUpgradeCost(level);
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+
+    const col = `${def.key}_level`;
+    await db.query(
+        `INSERT INTO mkt_sailing_gun (buyer_id, gun_index, ${col}) VALUES ($1, $2, 1)
+         ON CONFLICT (buyer_id, gun_index) DO UPDATE SET ${col} = mkt_sailing_gun.${col} + 1, updated_at = NOW()`,
+        [buyerId, idx]
+    ).catch(() => {});
+    await trackActivity(buyerId, "buy_upgrade", { track: `gun_${def.key}`, gun: idx, level: level + 1, cost, currency: "doubloons" }).catch(() => {});
     return { ok: true, ...(await getSailingState(buyerId)) };
 }
 

@@ -130,6 +130,35 @@ function sfxWreck() {
         o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + 0.65);
     } catch { /* ok */ }
 }
+// THE RECKONING. Not another cannon — a low bell tolling under a rising swell, so the moment eight misses
+// finally pay reads as an event and not as one more broadside. Built from the same oscillators as everything
+// else here (no audio files anywhere in this scene).
+function sfxReckoning() {
+    const a = ac(); if (!a) return;
+    try {
+        const t = a.currentTime;
+        // The toll: two struck bells a fifth apart, ringing long.
+        for (const [f, d] of [[196, 0], [293.66, 0.06]]) {
+            const o = a.createOscillator(), g = a.createGain();
+            o.type = "triangle"; o.frequency.setValueAtTime(f, t + d);
+            g.gain.setValueAtTime(0.0001, t + d);
+            g.gain.exponentialRampToValueAtTime(0.3, t + d + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + d + 1.5);
+            o.connect(g); g.connect(a.destination); o.start(t + d); o.stop(t + d + 1.6);
+        }
+        // The swell under it, rising rather than falling — this is a wind-up, not an impact.
+        const o2 = a.createOscillator(), g2 = a.createGain();
+        o2.type = "sawtooth";
+        o2.frequency.setValueAtTime(48, t); o2.frequency.exponentialRampToValueAtTime(150, t + 0.75);
+        g2.gain.setValueAtTime(0.0001, t);
+        g2.gain.exponentialRampToValueAtTime(0.22, t + 0.5);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+        o2.connect(g2); g2.connect(a.destination); o2.start(t); o2.stop(t + 1.05);
+        // Spray off the top of it.
+        noise(a, { dur: 0.9, type: "highpass", freq: 900, q: 0.7, gain: 0.16, sweepTo: 3200 });
+    } catch { /* ok */ }
+}
+
 function sfxResult(win) {
     const a = ac(); if (!a) return;
     try {
@@ -489,7 +518,7 @@ function logLine(ev, me, foe) {
     };
 }
 
-export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
+export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, onClose }) {
     const me = battle?.me || {};
     const foe = battle?.foe || {};
     const events = useMemo(() => battle?.events || [], [battle?.events]);
@@ -559,6 +588,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
     // answer to "what just happened", which is a question you have for about three seconds. It plays, it
     // goes, and the chrome keeps a Recap button so it is never lost.
     const [recapOpen, setRecapOpen] = useState(false);
+    // The gold flash + shout when the Reckoning is spent.
+    const [reckCry, setReckCry] = useState(null);
     const [pops, setPops] = useState([]);
     // Where each ball came down, keyed by shot. A ref, not state: it is written while the volley is playing
     // and read 460ms later by the same sequence — putting it in state would re-render the scene mid-flight
@@ -795,6 +826,13 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
 
         if (ev.type === "volley") {
             const shots = ev.shots || [];
+            // The occasion. One beat of gold over the whole scene and her name called, then the volley plays
+            // through the ordinary machinery.
+            if (ev.reckoning) {
+                sfxReckoning();
+                setReckCry({ k: `rk${step}`, text: battle?.reck?.name || "Reckoning" });
+                timers.push(setTimeout(() => setReckCry(null), 1600));
+            }
             const from = ev.side, to = from === "me" ? "foe" : "me";
             const fromBox = boxesRef.current?.[from];
             setFiringSide(from);
@@ -884,6 +922,18 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
         setBalls([]);
         onVolley?.(aim);
     }, [aim, allLaid, busy, onVolley]);
+
+    // ── THE RECKONING ────────────────────────────────────────────────────────────────────────────────────
+    // Every ball of yours that goes wide winds this up. Full, it stops being a meter and becomes the button.
+    const reck = battle?.reck || null;
+    const reckN = Math.max(0, Math.min(reck?.at || 8, reck?.n || 0));
+    const reckAt = reck?.at || 8;
+    const reckReady = reckN >= reckAt;
+    const reckFire = useCallback(() => {
+        if (!reckReady || busy || phase !== "aim") return;
+        setBalls([]);
+        onReckoning?.();
+    }, [reckReady, busy, phase, onReckoning]);
 
     const sinkingSide = phase === "sinking" || phase === "result" ? battle?.sunk : null;
     const win = Boolean(battle?.win);
@@ -1009,6 +1059,12 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                         </span>
                     ))}
 
+                    {reckCry ? (
+                        <>
+                            <span key={`f${reckCry.k}`} className="sbt-reckflash" aria-hidden="true" />
+                            <span key={reckCry.k} className="sbt-reckcry">{reckCry.text}</span>
+                        </>
+                    ) : null}
                     {shout ? (
                         <span key={shout.k} className={`sbt-shout ${shout.side === "me" ? "on-foe" : "on-me"}`}>{shout.text}</span>
                     ) : null}
@@ -1102,6 +1158,32 @@ export default function ShipBattleScene({ battle, busy, onVolley, onClose }) {
                             );
                         })}
                     </div>
+
+                    {/* THE RECKONING. A tally of every ball of yours that has gone wide, and when it is full
+                        it stops being a meter and becomes the button — the bar IS the button, so there is
+                        nothing to learn about where the skill lives. Spending it fires one unanswered volley
+                        at parts of her ship chosen at random, canvas, timber or a barrel.
+
+                        Built out of MISSES on purpose: a bad run is the least interesting thing that can
+                        happen in a fight, and this makes the worst stretch of a battle pay for the best
+                        moment in it. */}
+                    {reck ? (
+                        <button type="button"
+                            className={`sbt-reck${reckReady ? " is-ready" : ""}`}
+                            style={{ "--fill": `${Math.round((reckN / reckAt) * 100)}%` }}
+                            disabled={!reckReady || busy || phase !== "aim"}
+                            onClick={reckFire}
+                            title={reckReady
+                                ? `${reck.name} — one free volley, every ball lands, targets chosen at random`
+                                : `${reckAt - reckN} more misses`}>
+                            <i className="sbt-reck-fill" aria-hidden="true" />
+                            <i className="sbt-reck-shine" aria-hidden="true" />
+                            <span className="sbt-reck-label">
+                                <b>{reckReady ? reck.name.toUpperCase() : reck.name}</b>
+                                <em>{reckReady ? "unleash" : `${reckN}/${reckAt}`}</em>
+                            </span>
+                        </button>
+                    ) : null}
 
                     {/* EVERY GUN, THEN FIRE. Nothing follows anything, so a barrel with no order would simply
                         not go off — better to wait for it than to waste it silently. */}

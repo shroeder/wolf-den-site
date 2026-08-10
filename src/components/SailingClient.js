@@ -10,6 +10,7 @@ import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard, { Track as ShipTrack } from "@/components/ShipYard";
+import GunDeck from "@/components/GunDeck";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import useScrollLock from "@/lib/useScrollLock";
@@ -1147,10 +1148,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         </div>
                         <div className="sby-stat">
                             <img className="sby-stat-ico" src="/images/sailing/tracks/hull.png" alt="" draggable="false" />
-                            <span><b>{state.combat.ship.armor}%</b><em>armour</em></span>
+
                         </div>
                         {/* eslint-enable @next/next/no-img-element */}
                     </div>
+                    {/* ONE BARREL AT A TIME. The tracks below buy things for the whole ship; this buys them
+                        for one gun, on the gun, so the barrel you build here is visibly the barrel you lay in
+                        the battle screen. */}
+                    <GunDeck deck={state.combat.gunDeck} purse={state.combat.doubloons || 0} busy={busy}
+                        onBuy={(gun, track) => act("upgrade_gun", { gun, track })} />
                     <div className="sby-tracks" style={{ marginTop: 12 }}>
                         {(state.combat.tracks || []).map((t) => (
                             <ShipTrack key={t.key} t={t} purse={state.combat.doubloons || 0} gold={state.gold} busy={busy}
@@ -1596,6 +1602,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {shipBattle ? (
                 <ShipBattleScene battle={shipBattle} busy={busy}
                     onVolley={async (aim) => { const d = await act("battle_volley", { aim }); if (d?.battle) setShipBattle(d.battle); }}
+                    onReckoning={async () => { const d = await act("battle_reckoning"); if (d?.battle) setShipBattle(d.battle); }}
                     onClose={() => setShipBattle(null)} />
             ) : null}
 

@@ -178,6 +178,35 @@ export const hullGrade = (hits = 0) => HULL_GRADES.find((g) => hits <= g.max) ||
 // predicts with the engine's formula rather than a second copy that can drift. This exists so the read-out
 // can put a damage number next to the hit chance: change the ammunition and BOTH move, which is how a player
 // discovers what each round is for by watching the numbers move. Nothing has to say so in words.
+// ── THE RECKONING ────────────────────────────────────────────────────────────────────────────────────────────
+// Every ball of yours that goes wide is counted, and at RECKONING_AT the crew stop taking it. Spending it
+// fires one unanswered volley: every gun still on your deck, every ball lands, each one at a part of her ship
+// chosen at random — canvas, timber, or a barrel of hers.
+//
+// It is built out of MISSES on purpose. A run of bad luck is the least interesting thing that can happen in a
+// fight; this turns the worst stretch of a battle into the thing that pays for the best moment in it, without
+// touching the odds themselves. It cannot be farmed either — the only way to fill it is to be missing, which
+// is already costing you the round.
+//
+// Random targeting is the honest price. It is free damage, so you do not also get to choose where it goes;
+// what you get is a broadside that cannot miss, and the chance it takes a gun off her while it is there.
+// FOUR, MEASURED. Simulating the ladder, a whole fight accumulates 4.2 misses at the bottom and 5.0 at the
+// top across 2.5-3.6 rounds — so the eight it was first written at would have meant a skill nobody ever saw
+// fire. At four it lands roughly once a fight, later in the ones you are missing in, which is the point.
+export const RECKONING_AT = 4;
+export const RECKONING_NAME = "Reckoning";
+
+/** Somewhere on her ship worth a ball: canvas while she has any, a live gun, or timber. */
+function reckoningTarget(defSide, rng) {
+    const picks = [];
+    if (defSide.sails > 0) picks.push({ zone: "sails", target: null });
+    defSide.guns.forEach((hp, i) => { if (hp > 0) picks.push({ zone: "guns", target: i }); });
+    // Timber three times. Weighted, because with a full battery of hers alive the unweighted draw sent almost
+    // every ball into her gun deck and the payoff for eight misses read as a system wipe with no damage on it.
+    picks.push({ zone: "hull", target: null }, { zone: "hull", target: null }, { zone: "hull", target: null });
+    return picks[Math.floor(rng() * picks.length)] || { zone: "hull", target: null };
+}
+
 export function expectedDamage(att, def, zone, ammo) {
     if (!zone || !ammo) return 0;
     // Only timber is counted in planks; a shot into canvas or a gun deck is measured by what it WRECKS, which
@@ -194,12 +223,49 @@ export function expectedDamage(att, def, zone, ammo) {
 // There were briefly two more (a rudder and a powder store) and both are gone: nobody could say in one line
 // what a rudder did, and a magazine that ends a fight on one lucky ball is a coin toss wearing a target.
 export const SAILS_MAX = 6;      // hits to strip her canvas. Chain takes two at a time, so three volleys of it.
-export const GUN_HP = 4;         // hits to dismount one cannon. Grape counts double.
+export const GUN_HP = 2;         // hits to dismount one cannon. Grape counts double.
 //
-// BOTH OF THESE WERE HALVED, and measured back up. With one target for the whole broadside, concentrating
-// seven guns on a two-hit cannon dismounted one or two a round: a mid build went from 0% to 89% against rank
-// nine on that alone, which is not a decision, it is a switch. Deeper pools mean breaking something is a
-// COMMITMENT of several volleys rather than a free action.
+// GUN_HP WAS 4, and went back to 2 when cannons became things you upgrade individually. Four was chosen when
+// every barrel on every ship was identical and a gun deck was just a number: at two hits, concentrating a
+// whole broadside dismounted one or two guns a round, which is a switch rather than a decision. What makes
+// two workable now is that it is a FLOOR you build off — a gun you have put hits into is genuinely harder to
+// take than the one beside it, so shooting a gun deck is a read of which barrel is worth the balls.
+
+// ── ONE CANNON AT A TIME ─────────────────────────────────────────────────────────────────────────────────────
+// Three things you can buy for a single gun, on the gun. The Cannons track buys you MORE barrels; this is how
+// one barrel becomes better than the one next to it — and it is what makes "which gun fires at what" a real
+// question rather than a formality, because the guns are no longer interchangeable.
+//
+// Damage is a CHANCE of an extra plank rather than a fraction of one. A hull is counted in whole planks, so
+// "+15% damage" would round to nothing on most shots; a one-in-six chance of taking two boards is the same
+// expectation and you can actually see it happen.
+export const GUN_TRACKS = {
+    hp: {
+        key: "hp", name: "Iron", max: 4, icon: "GiUpgrade",
+        desc: "Bolts and bracing — one more hit before this gun is dismounted.",
+        effect: (lvl) => `${GUN_HP + lvl} hits to dismount`,
+    },
+    dmg: {
+        key: "dmg", name: "Bore", max: 4, icon: "GiCannon",
+        desc: "A wider bore throws a heavier ball — a chance this gun staves in two planks instead of one.",
+        effect: (lvl) => `${Math.round(gunDmgChance(lvl) * 100)}% for a second plank`,
+    },
+    acc: {
+        key: "acc", name: "Lay", max: 4, icon: "GiTargeting",
+        desc: "Truer trunnions and a marked quoin — this barrel lays closer than the rest of the battery.",
+        effect: (lvl) => `+${Math.round(gunAccBonus(lvl) * 100)}% to hit`,
+    },
+};
+export const gunHpFor = (hpLevel = 0) => GUN_HP + Math.max(0, Math.min(GUN_TRACKS.hp.max, hpLevel));
+export const gunDmgChance = (dmgLevel = 0) => Math.max(0, Math.min(GUN_TRACKS.dmg.max, dmgLevel)) * 0.09;
+export const gunAccBonus = (accLevel = 0) => Math.max(0, Math.min(GUN_TRACKS.acc.max, accLevel)) * 0.025;
+
+/** A gun's upgrade levels, defaulted — an unbought gun has no row and reads as all zeroes. */
+export const gunStat = (stats, i) => (Array.isArray(stats) ? stats[i] : null) || { hp: 0, dmg: 0, acc: 0 };
+
+// What one more level on one gun costs. Deliberately cheaper than a whole-ship track: you are buying it for
+// ONE barrel, and you will want several.
+export const gunUpgradeCost = (level = 0) => Math.round(18 * Math.pow(1.85, Math.max(0, level)));
 
 // Build the combat profile a ship brings to a battle. `sea` is the sailing affinity block (broadside/ironclad).
 // AMMUNITION IS NO LONGER PART OF THE PROFILE. It used to be baked in here — one type for the whole battle, its
@@ -207,13 +273,16 @@ export const GUN_HP = 4;         // hits to dismount one cannon. Grape counts do
 // separately now and may carry a different round, so ammunition belongs to the SHOT (see resolveVolley) and the
 // `ammo` kept here is only what the racks default to.
 export function shipProfile({ name, boatLevel = 1, gunLevel = 0, gunneryLevel = 0, hullLevel = 0,
-                              ammo = "round", art = null, sea = null, flavor = null } = {}) {
+                              ammo = "round", art = null, sea = null, flavor = null, gunStats = null } = {}) {
     return {
         name: name || "Ship",
         art,
         flavor,
         boatLevel,
         guns: gunsFor(gunLevel),
+        // Per-barrel upgrade levels, indexed by the gun's place in the broadside. Null everywhere else — a
+        // fleet ship's guns are all the same, which is part of what makes yours worth building.
+        gunStats: Array.isArray(gunStats) ? gunStats : null,
         accuracy: accuracyFor(gunneryLevel, boatLevel),
         rake: rakeFor(gunneryLevel),
         hp: hullHitsFor(hullLevel),
@@ -273,8 +342,11 @@ export const evasionOf = (sails = SAILS_MAX) =>
 
 /** One gun's chance to land on one part of one ship. Everything that decides a shot is in this line, and the
  *  scene shows the result of it on every target marker — that percentage IS the explanation of the trade. */
-export function hitChance(att, zone, ammo, evasion) {
-    const base = Math.max(0.15, Math.min(0.97, (att?.accuracy || 0.6) + (ammo?.accuracy || 0)));
+export function hitChance(att, zone, ammo, evasion, gunIndex = null) {
+    // A barrel with Lay on it is truer than the battery average, so the odds on the marker have to know
+    // WHICH gun is about to fire — otherwise the number you are shown is not the number you are rolling.
+    const lay = gunIndex == null ? 0 : gunAccBonus(gunStat(att?.gunStats, gunIndex).acc);
+    const base = Math.max(0.15, Math.min(0.97, (att?.accuracy || 0.6) + (ammo?.accuracy || 0) + lay));
     return Math.max(0.05, Math.min(0.97, base * (zone?.aim ?? 1) * (1 - evasion)));
 }
 
@@ -283,10 +355,20 @@ const hpPair = (st) => ({ me: st.me.hp, foe: st.foe.hp });
 
 // The opening state of a fight. Kept JSON-safe: it is stored on the sailing row between rounds.
 export function initBattleState(me, foe) {
-    const fresh = (p) => ({
-        hp: p.hp, max: p.hp, sails: SAILS_MAX,
-        guns: Array.from({ length: Math.max(1, p.guns) }, () => GUN_HP),
-    });
+    const fresh = (p) => {
+        const n = Math.max(1, p.guns);
+        const guns = Array.from({ length: n }, (_, i) => gunHpFor(gunStat(p.gunStats, i).hp));
+        return {
+            hp: p.hp, max: p.hp, sails: SAILS_MAX,
+            guns,
+            // Each gun's own ceiling, so the scene can draw "1 of 3" on a gun you have put iron into and
+            // "1 of 2" on the one beside it. Without this every gun's bar would be read against GUN_HP.
+            gunMax: [...guns],
+            // MISSES REMEMBERED. Every ball of yours that goes wide winds this up; at RECKONING_AT it is spent
+            // as one free, unanswered volley. See resolveVolley.
+            reck: 0,
+        };
+    };
     // YOU ALWAYS FIRE FIRST. This used to be a coin weighted by who carried fewer guns, and roughly half of
     // all battles therefore answered the FIRE button by playing HER broadside — you pressed fire and watched
     // the enemy shoot. Worse, the recap lists YOU above THEM whatever happened, so those fights showed you an
@@ -300,6 +382,68 @@ export function initBattleState(me, foe) {
     // v4: `hp` counts PLANKS now, not hit points. A v3 state carries 419 in that field and would be read as
     // four hundred planks, so those battles are dropped rather than migrated.
     return { v: BATTLE_STATE_V, round: 0, gauge: "me", me: fresh(me), foe: fresh(foe) };
+}
+
+// ── SPENDING THE RECKONING ───────────────────────────────────────────────────────────────────────────────────
+// One volley, every gun still standing, every ball lands, each at a part of her ship picked at random. She
+// does not answer it — that is what makes it worth eight misses — and the round counter does not move, so it
+// is genuinely extra rather than a turn you spent.
+//
+// Same event shape as a normal volley so the scene animates it with the machinery it already has; the volley
+// event is flagged `reckoning` so the presentation can make an occasion of it.
+export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
+    const st = {
+        v: BATTLE_STATE_V, round: state.round, gauge: state.gauge,
+        me: { ...state.me, guns: [...state.me.guns], gunMax: [...(state.me.gunMax || state.me.guns)] },
+        foe: { ...state.foe, guns: [...state.foe.guns], gunMax: [...(state.foe.gunMax || state.foe.guns)] },
+    };
+    if ((st.me.reck || 0) < RECKONING_AT) return { ok: false, error: "not_ready", state: st, events: [] };
+    st.me.reck = 0;
+
+    const events = [];
+    const after = [];
+    const shots = [];
+    let total = 0;
+    const live = st.me.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
+
+    for (const gun of live) {
+        if (st.foe.hp <= 0) break;
+        const aim = reckoningTarget(st.foe, rng);
+        const zone = zoneById(aim.zone);
+        const shot = { gun, zone: aim.zone, target: aim.target, ammo: "round", hit: true, chance: 1, evasion: 0, rake: false, reckoning: true };
+
+        if (aim.zone === "hull") {
+            const bore = rng() < gunDmgChance(gunStat(me?.gunStats, gun).dmg);
+            const hits = 1 + (bore ? 1 : 0);
+            const landed = (st.foe.dmgTaken < 1 && rng() > st.foe.dmgTaken) ? Math.max(0, hits - 1) : hits;
+            st.foe.hp = Math.max(0, st.foe.hp - landed);
+            shot.dmg = landed; shot.hits = landed; shot.bore = bore;
+            total += landed;
+        } else if (aim.zone === "sails") {
+            shot.dmg = 0; shot.hits = 0;
+            if (st.foe.sails > 0) {
+                st.foe.sails = Math.max(0, st.foe.sails - 1);
+                shot.wrecked = "sails";
+                if (st.foe.sails === 0) after.push({ type: "wreck", victim: "foe", sys: "sails" });
+            }
+        } else {
+            shot.dmg = 0; shot.hits = 0;
+            const pick = aim.target;
+            if (pick != null && st.foe.guns[pick] > 0) {
+                st.foe.guns[pick] = Math.max(0, st.foe.guns[pick] - 1);
+                shot.wrecked = "guns"; shot.target = pick;
+                if (st.foe.guns[pick] === 0) after.push({ type: "wreck", victim: "foe", sys: "guns", index: pick });
+            }
+        }
+        shots.push(shot);
+    }
+
+    events.push({ type: "volley", side: "me", shots, dmg: total, guns: shots.length, hp: hpPair(st), reckoning: true });
+    for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
+
+    const sunk = st.foe.hp <= 0 ? "foe" : null;
+    const over = Boolean(sunk);
+    return { ok: true, events, state: st, over, win: over, sunk, stalemate: false, mine: [], theirs: [] };
 }
 
 // ── WHAT THE CLIENT IS ALLOWED TO HAVE ASKED FOR ─────────────────────────────────────────────────────────────
@@ -399,8 +543,8 @@ export function foeAims(me, foe, st, { rng = Math.random } = {}) {
 export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrders = null } = {}) {
     const st = {
         v: BATTLE_STATE_V, round: state.round, gauge: state.gauge,
-        me: { ...state.me, guns: [...state.me.guns] },
-        foe: { ...state.foe, guns: [...state.foe.guns] },
+        me: { ...state.me, guns: [...state.me.guns], gunMax: [...(state.me.gunMax || state.me.guns)] },
+        foe: { ...state.foe, guns: [...state.foe.guns], gunMax: [...(state.foe.gunMax || state.foe.guns)] },
     };
     const events = [];
     st.round += 1;
@@ -436,8 +580,13 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             // player cannot tell a 90% shot they got unlucky on from a 35% shot they should never have taken
             // — which is the difference between bad luck and a bad decision, and the whole of learning to
             // play. The number is already computed to roll against; it just used to be thrown away.
-            const chance = hitChance(att, zone, ammo, evasion);
-            if (rng() > chance) { shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false, chance, evasion }); continue; }
+            const chance = hitChance(att, zone, ammo, evasion, gun);
+            if (rng() > chance) {
+                // A BALL THAT GOES WIDE IS NOT NOTHING. It winds the Reckoning — see RECKONING_AT.
+                mySide.reck = Math.min(RECKONING_AT, (mySide.reck || 0) + 1);
+                shots.push({ gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: false, chance, evasion });
+                continue;
+            }
             const rake = rng() < (att.rake + (ammo.rakeBonus || 0));
 
             // HOW MANY PLANKS THIS BALL STAVES IN.
@@ -449,7 +598,9 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             // NO ARMOUR. Every ball that lands, lands. Plate used to sit here as a per-hit glance roll — a
             // shot could be turned aside and count for nothing — which meant a hit you had already earned
             // could silently do nothing, on a stat that was a percentage on a card. A hit is a plank.
-            const hits = 1 + (ammo.hull || 0) + (rake ? 1 : 0);
+            // ...and one more again if this particular barrel is bored wide enough to throw a heavier ball.
+            const bore = rng() < gunDmgChance(gunStat(att?.gunStats, gun).dmg);
+            const hits = 1 + (ammo.hull || 0) + (rake ? 1 : 0) + (bore ? 1 : 0);
             const turned = 0;
             // Sea affinity's Ironclad is left alone: it is a gear effect you go and earn, not a stat every
             // hull carries for free, and it is the one thing still able to shrug a ball.
@@ -458,7 +609,7 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
             const dmg = landed;   // the event log and the recap both count in planks now
             total += dmg;
             theirSide.hp = Math.max(0, theirSide.hp - landed);
-            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits: landed, glanced: false, rake, chance, evasion };
+            const shot = { gun, zone: order.zone, target: order.target, ammo: ammo.id, hit: true, dmg, hits: landed, glanced: false, rake, bore, chance, evasion };
 
             // WHAT THE SHOT BROKE, on top of the hole it made. One point for landing, plus whatever this round
             // is especially good at — which is where chain and grape earn their price. Round shot is never
