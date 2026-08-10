@@ -87,8 +87,19 @@ export const SOCKET_COST = {
 export const socketCost = (rarity) => SOCKET_COST[rarity] || SOCKET_COST.common;
 
 // Three of a kind make one of the tier above. Three rather than two because two is an upgrade path so cheap
-// that the lower tiers stop being drops and start being currency; three keeps a Flawless rare.
+// that the lower tiers stop being drops and start being currency.
 export const FUSE_COUNT = 3;
+
+// ── AND THE LADDER STOPS AT POLISHED ─────────────────────────────────────────────────────────────────────────
+// Fusing tops out at tier 3. Anything above it has to come out of the rock.
+//
+// Without this ceiling the top of the game is arithmetic: nine Polished make a Flawless, Polished are on sale
+// in the Armoury for laurels, so the best jewel in the game costs about ten thousand laurels and a spreadsheet
+// — no depth, no risk, no luck. A Brilliant should be a good year and a Flawless should be a thing the Den
+// hears about, and neither is possible if they can be assembled.
+//
+// Chipped through Polished still fuse, which is what keeps the shallow mine's chips worth picking up.
+export const FUSE_MAX_TIER = 3;
 
 // ONE socket per piece for now. Written as a number rather than a boolean because the bench is the only thing
 // that would have to change to allow two, and every read below already counts rather than tests.

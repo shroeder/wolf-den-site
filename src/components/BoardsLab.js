@@ -139,8 +139,7 @@ const QM_SHOP = {
 const JW = {
     unlocked: true, gold: 48000, maxSockets: 1,
     gems: [
-        { id: "ruby_t4", kind: "ruby", tier: 4, name: "Brilliant Ruby", color: "#ff5a6a", art: "/images/gems/ruby_t4.png", stats: { might: 11 }, count: 2,
-            canFuse: false, fuseCount: 3, fuseInto: { id: "ruby_t5", name: "Flawless Ruby", stats: { might: 16 } } },
+        { id: "ruby_t4", kind: "ruby", tier: 4, name: "Brilliant Ruby", color: "#ff5a6a", art: "/images/gems/ruby_t4.png", stats: { might: 11 }, count: 2, canFuse: false, fuseCount: 3, fuseInto: null },
         { id: "emerald_t2", kind: "emerald", tier: 2, name: "Flawed Emerald", color: "#4fd18b", art: "/images/gems/emerald_t2.png", stats: { fortune: 4 },
             count: 4, canFuse: true, fuseCount: 3, fuseInto: { id: "emerald_t3", name: "Polished Emerald", stats: { fortune: 7 } } },
         { id: "wolfeye_t5", kind: "wolfeye", tier: 5, name: "Flawless Wolf's Eye", color: "#e8dcc6", secret: true, art: "/images/gems/wolfeye_t5.png",

@@ -168,7 +168,7 @@ export const ARMOURY = [
     // a Polished is as high as the ladder goes, because the top two tiers are what the rock is for.
     { id: "gem_t1", kind: "gem", gemTier: 1, cost: 240, name: "A Chipped Jewel", blurb: "The cutter's choice — kind unknown until it is in your hand.", gated: "jewels" },
     { id: "gem_t2", kind: "gem", gemTier: 2, cost: 520, name: "A Flawed Jewel", blurb: "Better rock. Still the cutter's choice of colour.", gated: "jewels" },
-    { id: "gem_t3", kind: "gem", gemTier: 3, cost: 1150, name: "A Polished Jewel", blurb: "As good as the ladder sells. The rest is down the mine.", gated: "jewels" },
+    { id: "gem_t3", kind: "gem", gemTier: 3, cost: 1150, name: "A Polished Jewel", blurb: "As good as anything sold, fused or traded gets. Brilliant and Flawless come out of deep rock or not at all.", gated: "jewels" },
 ];
 
 export const armouryItem = (id) => ARMOURY.find((x) => x.id === id) || null;

@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { FUSE_COUNT, GEMS, GEM_TIERS, MAX_SOCKETS, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { FUSE_COUNT, FUSE_MAX_TIER, GEMS, GEM_TIERS, MAX_SOCKETS, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -27,7 +27,9 @@ export async function getGems(buyerId) {
     // Everything you hold, in catalog order, so the bag reads as a set you are filling rather than a list of
     // whatever happened to drop.
     return GEMS.filter((g) => held.get(g.id) > 0).map((g) => {
-        const next = GEMS.find((x) => x.kind === g.kind && x.tier === g.tier + 1) || null;
+        const next = g.tier + 1 <= FUSE_MAX_TIER
+            ? GEMS.find((x) => x.kind === g.kind && x.tier === g.tier + 1) || null
+            : null;
         return {
             ...g,
             count: held.get(g.id),
@@ -122,6 +124,9 @@ export async function fuseGems(buyerId, id) {
     if (!jewelsEnabled(buyerId)) return { ok: false, error: "not_available" };
     const gem = gemById(id);
     if (!gem) return { ok: false, error: "bad_gem" };
+    // The ladder stops at Polished — above that a jewel is mined or it is not had. Checked here as well as
+    // hidden in the bag, because a shop rule that only exists in the UI is not a rule.
+    if (gem.tier + 1 > FUSE_MAX_TIER) return { ok: false, error: "max_tier" };
     const next = gemById(gemId(gem.kind, gem.tier + 1));
     if (!next) return { ok: false, error: "max_tier" };
 

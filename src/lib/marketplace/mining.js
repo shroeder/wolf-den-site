@@ -465,9 +465,19 @@ function rollJewel(depth) {
     const chance = Math.min(JEWEL_CAP, JEWEL_BASE + (d - JEWEL_MIN_DEPTH) * JEWEL_PER_DEPTH);
     if (Math.random() >= chance) return null;
     // Tier is drawn against depth: deep rock can still give you a chip, shallow rock can never give you a
-    // Flawless. Weighted down so the top tier stays a story rather than a Tuesday.
-    const reach = Math.max(1, Math.min(5, 1 + Math.floor((d - JEWEL_MIN_DEPTH) / 4)));
-    const weights = [46, 27, 15, 8, 4].slice(0, reach);
+    // Flawless.
+    //
+    // PAST POLISHED IT IS MEANT TO BE ALMOST IMPOSSIBLE. Fusing stops at tier 3 (see FUSE_MAX_TIER), so these
+    // two weights are the ONLY way a Brilliant or a Flawless enters the game, and the depth they need is far
+    // past where a careless run ends: tier 4 is not in the rock until depth 18 and tier 5 not until 24, at
+    // which point the roof is falling in constantly. Even standing there, a Flawless is 1% of a jewel drop
+    // that is itself under a twentieth of a step.
+    //   depth  4-11 -> chips and flawed only
+    //   depth 12-17 -> polished becomes possible
+    //   depth 18-23 -> brilliant, at 4% of drops
+    //   depth 24+   -> flawless, at 1% of drops
+    const reach = d >= 24 ? 5 : d >= 18 ? 4 : d >= 12 ? 3 : d >= 8 ? 2 : 1;
+    const weights = [50, 28, 17, 4, 1].slice(0, reach);
     const total = weights.reduce((n, w) => n + w, 0);
     let roll = Math.random() * total;
     let tier = 1;
