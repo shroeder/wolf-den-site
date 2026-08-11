@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { itemById } from "@/lib/marketplace/items.js";
 import { itemElement, ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
+import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Grant an event badge WITHOUT a static import of badges.js (that would create a cycle:
 // item-element → badges → xp → pet-level → item-element). Dynamic import, best-effort.
@@ -18,7 +19,10 @@ const grantBadge = (buyerId, slug) => import("@/lib/marketplace/badges.js").then
 export const DUAL_ELEMENT_CHANCE = 0.12; // small chance a reforge yields dual affinity instead of replacing
 // Gold cost by rarity (a solid sink — reforging is a meta reroll).
 const REFORGE_GOLD = { common: 400, rare: 900, epic: 1800, legendary: 3500, mythic: 6000, ascendant: 9000, eternal: 12000, celestial: 18000, primordial: 26000 };
-export const reforgeCost = (rarity) => REFORGE_GOLD[rarity] || 1500;
+// The Reforging Right halves it. A cost function is the cleanest possible place for a power to reach —
+// one number, one caller, no branch anywhere else.
+export const reforgeCost = (rarity, halved = false) =>
+    Math.round((REFORGE_GOLD[rarity] || 1500) * (halved ? 0.5 : 1));
 
 // A reforge yields at most 2 (dual); the Enchantment Scroll can push an item past that, so the STORAGE cap is
 // higher (6 = all elements). Dedupe.
@@ -95,7 +99,7 @@ export async function reforgeItemElement(buyerId, itemId, target, replaceKey = n
     if (!owns) return { ok: false, error: "not_owned" };
     const cur = (await getElementOverrides(buyerId, [itemId]))[itemId] || (itemElement(itemId) ? [itemElement(itemId)] : []);
     if (cur.includes(target)) return { ok: false, error: "already_has", elements: cur };
-    const cost = reforgeCost(item.rarity);
+    const cost = reforgeCost(item.rarity, await hasPower(buyerId, "reforging_right"));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold", cost };
     await logCoin(buyerId, -cost, "reforge_element", { balanceAfter: paid.gold, meta: { itemId, target } }).catch(() => {});

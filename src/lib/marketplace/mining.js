@@ -13,6 +13,7 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { setDepthCapstones } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
+import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -91,7 +92,12 @@ export const TRIP_RECHARGE_MAX_PER_DAY = 3;
 export const tripRechargeCost = (bought = 0) => TRIP_RECHARGE_BASE * (2 ** Math.max(0, bought));
 const tripsBoughtToday = (row) => Number(row?.trips_bought) || 0;
 // The whole day's allowance: the free three plus anything paid for.
-export const tripsAllowed = (row) => TRIPS_PER_DAY + tripsBoughtToday(row);
+// The Night Cage buys a trip a day, and The Long Day buys one on every allowance in the game. Both land
+// here because this function IS the allowance — anything else would be a second opinion about it.
+export const tripsAllowed = (row, powers = null) =>
+    TRIPS_PER_DAY + tripsBoughtToday(row)
+    + (powers?.has?.("night_cage") ? 1 : 0)
+    + (powers?.has?.("long_day") ? 1 : 0);
 // What the roof leaves you. Deliberately the bottom of ORE_TIERS: you still get to play the timing game, and
 // the bag it pays from is the poorest one in the mine.
 const COLLAPSE_SEAM_TIER = 1;
@@ -280,7 +286,9 @@ export async function startTrip(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
     if (row?.run_json && !row.run_json.over) return { ok: false, error: "run_in_progress", ...(await getMiningState(buyerId)) };
-    const allowed = tripsAllowed(row);
+    // The Night Cage and The Long Day each buy a trip. Resolved once and handed in, rather than read four
+    // times inside a function that is also called from a synchronous view.
+    const allowed = tripsAllowed(row, await equippedPowers(buyerId));
     if ((Number(row?.trips_used) || 0) >= allowed) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
     const spent = await db.queryOne(
         `UPDATE mkt_mining SET trips_used = trips_used + 1, updated_at = NOW()
@@ -300,7 +308,7 @@ export async function buyTrip(buyerId) {
     if (!MINING_UNLOCKED(buyerId)) return { ok: false, error: "locked" };
     const row = await minerRow(buyerId);
     const used = Number(row?.trips_used) || 0;
-    if (used < tripsAllowed(row)) return { ok: false, error: "still_have_trips", ...(await getMiningState(buyerId)) };
+    if (used < tripsAllowed(row, await equippedPowers(buyerId))) return { ok: false, error: "still_have_trips", ...(await getMiningState(buyerId)) };
     const bought = tripsBoughtToday(row);
     if (bought >= TRIP_RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed", ...(await getMiningState(buyerId)) };
 

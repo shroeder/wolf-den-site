@@ -11,6 +11,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -244,6 +245,12 @@ export async function openChest(buyerId, tier) {
     // A chest-luck companion can promote the roll one rarity band up — stated exactly on the pet card.
     const RARITY_LADDER = RARITIES;   // shared ladder — it now runs two tiers past eternal
     let rarity = rollRarity(def.weights);
+    // The Locksmith promotes one chest in three, on top of whatever chest_luck rolls below. AFTER the roll,
+    // obviously — the first pass put it above the `let` and lint:undef caught the temporal dead zone.
+    if (await hasPower(buyerId, "locksmith") && oneIn(3)) {
+        const li = RARITY_LADDER.indexOf(rarity);
+        if (li >= 0 && li < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[li + 1];
+    }
     try {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
         const luck = await getPetSystemPerk(buyerId, "chest_luck");

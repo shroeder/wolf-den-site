@@ -18,6 +18,7 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
+import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -339,7 +340,14 @@ export async function plantSeed(buyerId, slot, seedId) {
         const sp = await getPetSystemPerk(buyerId, "farm_speed");
         if (sp > 0) petGrow = 1 - Math.min(0.25, sp / 100);
     } catch { /* no companion, no speed-up */ }
-    const growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow * townGrow * petGrow);
+    // ── ASCENSION POWERS ON A PLANTING ───────────────────────────────────────────────────────────
+    // Hothouse Glass puts the crop a third of the way in; The Cold Frame skips the wait entirely one time in
+    // three; The Long Furrow caps anything at eight hours. Read here because this is the ONE line that decides
+    // how long a crop takes, so a power that changes that has nowhere else to be.
+    let growMs = Math.round(SEEDS[seedId].growMin * 60000 * growMultiplier(up) * decoGrow * capGrow * plotGrow * townGrow * petGrow);
+    if (await hasPower(buyerId, "hothouse_glass")) growMs = Math.round(growMs * (2 / 3));
+    if (await hasPower(buyerId, "long_furrow")) growMs = Math.min(growMs, 8 * 3600000);
+    if (await hasPower(buyerId, "cold_frame") && oneIn(3)) growMs = 0;
     const row = await db.queryOne(
         `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
          VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)

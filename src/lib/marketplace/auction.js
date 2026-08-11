@@ -12,6 +12,7 @@ import { describeUtil } from "@/lib/marketplace/item-affix.js";
 import { transferItemElement, describeItemElements, getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Merge base item stats with a forge stat-bonus into effective totals.
 function mergeStats(base = {}, bonus = {}) {
@@ -78,7 +79,9 @@ export const LIST_FEE_PCT = 0.05;
 export const DURATIONS = [1, 3, 5, 7];
 const MIN_PRICE = 10;
 const MAX_PRICE = 10_000_000;
-export const listingFee = (price) => Math.max(1, Math.ceil((Number(price) || 0) * LIST_FEE_PCT));
+// The Auctioneer's Seat waives it outright.
+export const listingFee = (price, waived = false) =>
+    waived ? 0 : Math.max(1, Math.ceil((Number(price) || 0) * LIST_FEE_PCT));
 
 // A public shape for one listing (item meta merged in). `me`/`owned` are viewer-relative.
 function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
@@ -270,7 +273,7 @@ export async function listAuctionItem(buyerId, itemId, price, days) {
     if (!owns) return { ok: false, error: "not_owned" };
     const equipped = await getEquippedIds(buyerId).catch(() => ({}));
     if (Object.values(equipped).includes(itemId)) return { ok: false, error: "equipped" };
-    const fee = listingFee(p);
+    const fee = listingFee(p, await hasPower(buyerId, "auctioneer_s_seat"));
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, fee]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     // Remove the item from inventory (guarded so a race can't double-list) and create the listing.

@@ -6,6 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
+import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -646,7 +647,10 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     // Sea companions: dredge widens the treasure window, bite pushes toward rarer species, size stretches the
     // measurement. All three are stated exactly on the pet card.
     const seaPets = await seaPetPerks(buyerId);
-    const isTreasure = Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100);
+// The Dredge Net turns one cast in four into treasure outright — read beside the roll it replaces.
+    const dredgeNet = await hasPower(buyerId, "dredge_net");
+    const isTreasure = (dredgeNet && oneIn(4))
+        || Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100);
     const species = rollSpecies(anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100);
     const state = {
         species: species.id,
