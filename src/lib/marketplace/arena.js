@@ -11,7 +11,7 @@ import {
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
-import { pickIncoming, AI_BRACE_GUARD } from "@/lib/marketplace/arena-ai.js";
+import { pickIncoming, AI_BRACE_GUARD, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
@@ -708,6 +708,9 @@ export async function startBout(buyerId, targetId = null) {
         hp: me.health, maxHp: me.health,
         foeHp: foeKit.health, foeMaxHp: foeKit.health,
         cd: {},                                  // abilityId -> turns before it can be used again
+        // The defender's satchel. Seeded here so a bout saved before items existed still gets them on its
+        // next beat (the picker falls back to a fresh set if this is missing) rather than fighting empty.
+        foeItems: itemsFor(foeKit),
         items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
         // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
         // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
@@ -1061,7 +1064,25 @@ export async function fightRound(buyerId, opts = {}) {
         // Handled at the top of their turn so it falls through to the SAME tail every other outcome uses
         // (hand the turn back, tick cooldowns, check whether anybody has fallen). An early return here skipped
         // all three, which is the sort of thing that only shows up as a bout that will not end.
-        if (b.incoming?.brace) {
+        // ── AN ITEM THEY REACHED FOR ── the same two the player carries, in the same counts. Resolved here
+        // rather than in the picker, because the picker is pure and spending a charge is state.
+        if (b.incoming?.kind === "item") {
+            if (!b.foeItems) b.foeItems = itemsFor(b.foe);
+            const it = b.incoming.item;
+            if ((b.foeItems[it] || 0) > 0) {
+                b.foeItems[it] -= 1;
+                if (it === "poultice") {
+                    const back = Math.min(b.foeMaxHp - b.foeHp, Math.round(b.foeMaxHp * POULTICE_HEAL));
+                    b.foeHp += back;
+                    b.log.push({ beat: b.beat, who: "them", grade: "item", damage: 0, healed: back,
+                        text: `${b.foe.name} binds a wound — ${back} back.`, ability: "Field Poultice" });
+                } else {
+                    b.foeCd = {};
+                    b.log.push({ beat: b.beat, who: "them", grade: "item", damage: 0,
+                        text: `${b.foe.name} drains a draught — everything they have is ready again.`, ability: "Quickening Draught" });
+                }
+            }
+        } else if (b.incoming?.brace) {
             b.foeBrace = 1;
             b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
                 text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });

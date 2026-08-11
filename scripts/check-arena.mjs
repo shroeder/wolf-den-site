@@ -63,7 +63,13 @@ const BLOCK = 0.34;
 //
 // It only happens in the last third of the foe's health, and costs them a full attack, so it is folded in as a
 // modest haircut on each side rather than a phase: roughly a tenth of the fight spent bracing.
-const BRACE_SHARE = 0.10;
+// The defender is a real opponent now: it always plays a skill when one is off cooldown, it braces on rounds
+// where it has nothing better rather than only when nearly dead, and it carries two poultices and a draught.
+// That is a straight increase in how long it survives, and the model has to carry it or the two-minute promise
+// is measured against a game nobody plays. A poultice is a quarter of its health, twice.
+// Scaled by tier, like the real thing: nothing under 10, one poultice to 19, the full satchel above.
+const foeItemHeal = (t) => (t < 10 ? 0 : t < 20 ? 0.25 : 0.5);
+const BRACE_SHARE = 0.16;    // was 0.10 — it now also braces when its kit is cooling, not only when cornered
 const MY_BRACE_LOSS = 1 - BRACE_SHARE * 0.4;   // their raised guard eating part of my swings
 const THEIR_BRACE_LOSS = 1 - BRACE_SHARE;      // rounds they spend not swinging at all
 
@@ -82,7 +88,7 @@ function bout(kit, foe) {
     const mine = swing(kit.might) * ABILITY_EDGE
         * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1)) * (1 - foe.armour) * MY_BRACE_LOSS;
     const theirs = foe.damage * (1 + foe.critChance * (foe.critMult - 1)) * (1 - GUARD_SHARE * BLOCK) * THEIR_BRACE_LOSS;
-    const roundsIneed = roundsToKill(foe.health, Math.max(0.1, mine));
+    const roundsIneed = roundsToKill(foe.health * (1 + foeItemHeal(foe.tier)), Math.max(0.1, mine));
     const roundsTheyNeed = roundsToKill(health(kit.fero), Math.max(0.1, theirs));
     return { mine, theirs, roundsIneed, roundsTheyNeed, win: roundsIneed <= roundsTheyNeed };
 }
