@@ -39,7 +39,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 
 | # | Name | Effect | Class |
 |---|---|---|---|
-| 1 | **Perennial Root** | Every harvest returns the seed you planted. | B |
+| 1 | **Perennial Root** | One crop of your choosing never consumes its seed. Plant it forever. | B |
 | 2 | **Hothouse Glass** | Crops go into the ground already one full growth stage along. | B |
 | 3 | **Second Sowing** | Two extra plots, permanently. | A |
 | 4 | **Nightsoil** | Fertilizer is never consumed. | B |
@@ -50,7 +50,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 9 | **Harvest Home** | Harvesting a plot replants the same crop immediately, free. | B |
 | 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
 | 11 | **Kind Neighbour** | Every farm you rate rates you back the same day. | B |
-| 12 | **The Almanac** | You see a seed's exact yield before you plant it. | B |
+| 12 | **Crop Rotation** | Plant something different from what was last in that plot and it grows in half the time. | B |
 | 13 | **Terrace Farming** | Your farm holds twice as many decorations. | A |
 
 ## Fishing
@@ -65,7 +65,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 19 | **Unbreakable Leader** | No fish ever snaps your line, at any size. | B |
 | 20 | **The Full Creel** | Your first cast each day lands the rarest fish in the water. | B |
 | 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
-| 22 | **Cartographer's Float** | You see what is under the water before you cast. | B |
+| 22 | **The Salt Cure** | Fish in your pantry never spoil, and each one counts as two ingredients when you cook. | B |
 | 23 | **The Gaff** | Landing a record fish refunds the cast and pays its bonus twice. | B |
 | 24 | **The Tithe of Scales** | Every tenth fish you land becomes a treasure-chest fragment. | B |
 | 25 | **Deep Water Licence** | The rarest tier of fish can appear on any cast, not only at depth. | A |
@@ -75,12 +75,12 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 26 | **Press-Ganged Crew** | Voyages finish in half the time. | A |
-| 27 | **The Sounding Line** | A dig site shows how many finds it holds before you spend a shovel. | B |
+| 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A |
 | 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A |
 | 29 | **Diviner's Rod** | Your first dig of every voyage uncovers a chest. | B |
 | 30 | **The Shipwright's Debt** | Boat upgrades cost you nothing. | A |
 | 31 | **The Prize Court** | Every encounter you win pays a second time in doubloons. | B |
-| 32 | **Reading the Weather** | You see every encounter on the route before you sail, and may decline one. | B |
+| 32 | **Letters of Marque** | Any encounter you lose may be fought again, once each, at no cost. | B |
 | 33 | **The Full Manifest** | Every voyage returns with one item from the Quartermaster's locker, free. | B |
 | 34 | **Beachhead** | A dig reveals the whole grid at once. | B |
 | 35 | **Following Star** | You choose the hour a voyage returns. | B |
@@ -95,14 +95,14 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 39 | **Shored Timbers** | The first collapse of each trip does nothing at all. | B |
 | 40 | **The Long Vein** | Every seam you crack pays out twice over. | B |
 | 41 | **The Assay Office** | Smelting costs half the ore. | A |
-| 42 | **Lodestone Heart** | Every seam on the level is visible the moment you arrive. | B |
+| 42 | **The Wide Seam** | Every seam you crack comes out one grade richer than it rolled. | A |
 | 43 | **The Deep Key** | You start every descent ten floors down. | A |
 | 44 | **Second Pick** | Every swing cracks two seams. | B |
-| 45 | **The Dowsing Chain** | The richest seam on a floor stays lit until you take it. | B |
+| 45 | **The Deep Cart** | You carry twice as much ore out of every trip. | A |
 | 46 | **The Night Cage** | One extra trip a day, and the first bought trip costs nothing. | A |
 | 47 | **Assayer's Eye** | Every haul comes back at the best grade it contained. | B |
 | 48 | **The Dungeon Ledger** | Dungeon bosses may be fought twice a day. | A |
-| 49 | **Cavernlight** | Dungeon floors are revealed as you enter, traps and all. | B |
+| 49 | **The Iron Door** | A dungeon floor you have cleared stays cleared. You never walk the same one twice. | B |
 | 50 | **The Gem Cutter's Eye** | Every dungeon boss drops a gem. | B |
 
 ## The Kitchen
@@ -113,12 +113,12 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 52 | **Iron Palate** | Every dish you cook comes out at the highest tier. | B |
 | 53 | **Mise en Place** | Ingredients arrive prepped. Prepping is skipped. | B |
 | 54 | **The Long Larder** | Cooked dishes never expire and never lose their buff. | A |
-| 55 | **The Tasting Spoon** | You see exactly what a dish will produce before you commit the ingredients. | B |
+| 55 | **The Second Seasoning** | Every dish you cook carries two buffs instead of one. | A |
 | 56 | **The Tasting Menu** | One cook a day makes every dish those ingredients could have made. | B |
 | 57 | **The Standing Recipe** | One recipe of your choosing can be cooked with any ingredients. | B |
 | 58 | **The Copper Pot** | Every dish makes a second helping. | B |
 | 59 | **The Cellar Key** | Every harvest and every landing puts a second copy in your pantry. | B |
-| 60 | **The Menu Board** | You see which recipes you are missing and where each one drops. | B |
+| 60 | **Family Recipe** | A recipe you have cooked ten times can be made forever without its rarest ingredient. | B |
 | 61 | **Chef's Pick** | One dish a day cooks at perfect timing without playing it. | B |
 
 ## The Forge & the Jewelcutter
@@ -129,12 +129,12 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 63 | **The Smith's Certainty** | Enhancement never fails and never downgrades. | B |
 | 64 | **Twice-Struck** | Salvage returns double parts. | A |
 | 65 | **Attuning Fire** | Every enhance rolls an attunement. | A |
-| 66 | **The Fourth Socket** | Every piece of gear you own gains an extra socket. | A |
+| 66 | **The Second Socket** | Every piece of gear you own takes a second gem. | A |
 | 67 | **Jeweller's Patience** | Gems come back out of a socket free, and unbroken. | B |
 | 68 | **The Steady Bench** | A failed fuse returns all three gems. | B |
 | 69 | **Master's Mark** | Anything you forge is bound to you and can never be traded away by mistake. | A |
 | 70 | **The Reforging Right** | Reforging an element is free and may be repeated. | A |
-| 71 | **The Grading Loupe** | You see an enhance's result and its attunement odds before you commit. | B |
+| 71 | **The Deep Temper** | Your gear's enhancement ceiling is five levels higher than anyone else's. | A |
 | 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B |
 | 73 | **The Socket Punch** | Sockets can be cut into an item of any rarity. | A |
 
@@ -147,7 +147,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A |
 | 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B |
 | 78 | **The Warden's Key** | You may release one person from the Stockade each week. | B |
-| 79 | **The Bell Tower** | You know a raid, a boss or an event is coming an hour before it is announced. | B |
+| 79 | **The Charter of Passage** | Town raids cost you none of your daily allowance. | A |
 | 80 | **The Guild Ledger** | You can see any member's public loadout and collection progress. | B |
 | 81 | **The Toll House** | Every member who visits your farm pays you a toll — from the house, not from them. | B |
 | 82 | **Standing Invitation** | Anyone may visit your farm without spending one of their daily visits. | B |
@@ -164,9 +164,9 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 88 | **Day's Double** | Your daily check-in pays out twice. | B |
 | 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B |
 | 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A |
-| 91 | **The Glass Chest** | You see a chest's contents before you decide to open it. | B |
+| 91 | **The Master Key** | Every chest you open also drops the chest one tier below it, already open. | B |
 | 92 | **The Sorting Table** | A chest reward you already own comes out one rarity up instead. | B |
-| 93 | **The Long Weekend** | Every daily allowance in the game refreshes on Saturday as well as at midnight. | A |
+| 93 | **The Long Day** | Every daily allowance in the game is one larger. Every single one. | A |
 
 ## Pets
 
@@ -177,7 +177,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 96 | **The Long Leash** | Your pet's ability keeps working while you are on someone else's farm. | B |
 | 97 | **Breeder's Eye** | You choose which pet a random pet reward gives you. | B |
 | 98 | **First Light** | Every pet you unlock arrives at level three. | A |
-| 99 | **The Kennel Book** | You see every pet's ability and both of its stones before you own it. | B |
+| 99 | **The Prize Litter** | Every pet you own counts as one rarity higher for its passive. | A |
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
 | 102 | **Ancestral Line** | Every pet you own gains one level, once, the day you equip this. | B |
@@ -189,7 +189,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 |---|---|---|---|
 | 104 | **The Auctioneer's Seat** | You pay no auction fees, on either side. | A |
 | 105 | **Merchant's Word** | Trades you offer never expire and never decay. | A |
-| 106 | **The Honest Broker** | You see the full value of anything offered to you in a trade. | B |
+| 106 | **The Consignment Note** | Anything you sell to the shop pays what the auction house last paid for one. | B |
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
 | 108 | **The Bonded Warehouse** | Items you list at auction stay equipped and usable until they sell. | B |
 | 109 | **The Assay Stamp** | Any listing shows its true worth — attunement, gems and enhancement included. | B |
@@ -203,7 +203,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 |---|---|---|---|
 | 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A |
 | 114 | **Herald's Licence** | Your badges show on every screen in the game. | A |
-| 115 | **The Archivist** | You see exactly what you are missing from every collection, and where it drops. | B |
+| 115 | **The Standing Exhibit** | A collection piece you own counts toward every set it could belong to. | A |
 | 116 | **The Seal of Office** | Collection capstones fire one piece short of the full set. | A |
 | 117 | **The Long Service Record** | Every badge you hold pays its bonus twice. | A |
 | 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
@@ -254,14 +254,47 @@ than from the other member, and **The Chronicle** records a fact rather than let
 **1 cut for touching real money.** The Standing Account — store credit is bought with dollars, and refunding
 it as coins at full value while the credit is still spent is a giveaway with a real cost attached.
 
-## Settled
+## Third pass — 2026-08-11
 
-**Attuning Fire (65)**, **The Long Weekend (93)** and **The Seal of Office (116)** were flagged as the three
-survivors worth a second look. Luke's call, 2026-08-11: all three stand as written.
+**Attuning Fire (65)** and **The Seal of Office (116)** stand as written. Both are deliberate exceptions to a
+rule the game otherwise enforces — a 10x on an attunement chance that was cut to 0.4x three days earlier, and
+a capstone that fires before its set is complete. Chosen, not overlooked.
 
-Recorded here rather than left implicit, because each one is a deliberate exception to a rule the game
-otherwise enforces — a 10x on a chance that was cut to 0.4x three days earlier, a change to every daily
-allowance at once, and a capstone that fires before its set is complete. If any of the three later looks wrong
-in play, it was chosen, not overlooked.
+**The Long Weekend was incoherent and is gone.** It read "every daily allowance refreshes on Saturday as well
+as at midnight", which is not a power at all — every allowance already refreshes daily, Saturday included. It
+is now **The Long Day (93)**: every daily allowance in the game is one larger. Same intent, and it means
+something.
 
-**The list is closed.** 120 entries, every one bounded and every one class A or B.
+**Perennial Root (1) was too strong** and is now scoped to a single crop of your choosing rather than every
+harvest you ever take.
+
+**The Second Socket (66)**, formerly The Fourth Socket. `MAX_SOCKETS = 1` in gems.js, with a note above it
+saying the number is written as a number precisely so the bench is the only thing that has to change for two —
+and `mkt_item_socket` is keyed on `(buyer_id, item_id, idx)`, so several sockets were always in the data model.
+Class A confirmed against the source. Scaled to two rather than four: 1 → 2 doubles the gems on every piece,
+which is enough.
+
+**All 15 information powers are gone.** Every one was a "you can see / you now know", which is a wiki page on
+an item rather than a chase reward. They crept in because they are trivially class B and the build-cost test
+was the newest thing on my mind. Replaced with:
+
+| # | Was | Now |
+|---|---|---|
+| 12 | The Almanac | **Crop Rotation** — a different crop in that plot grows in half the time |
+| 22 | Cartographer's Float | **The Salt Cure** — pantry fish never spoil and count double as ingredients |
+| 27 | The Sounding Line | **Twice-Landed** — every voyage makes landfall twice |
+| 32 | Reading the Weather | **Letters of Marque** — refight any encounter you lose, once each, free |
+| 42 | Lodestone Heart | **The Wide Seam** — every seam comes out one grade richer |
+| 45 | The Dowsing Chain | **The Deep Cart** — twice as much ore out of every trip |
+| 49 | Cavernlight | **The Iron Door** — a cleared dungeon floor stays cleared |
+| 55 | The Tasting Spoon | **The Second Seasoning** — every dish carries two buffs |
+| 60 | The Menu Board | **Family Recipe** — a recipe cooked ten times drops its rarest ingredient forever |
+| 71 | The Grading Loupe | **The Deep Temper** — your enhancement ceiling is five levels higher |
+| 79 | The Bell Tower | **The Charter of Passage** — town raids cost none of your daily allowance |
+| 91 | The Glass Chest | **The Master Key** — every chest also drops the tier below it, already open |
+| 99 | The Kennel Book | **The Prize Litter** — every pet counts one rarity higher for its passive |
+| 106 | The Honest Broker | **The Consignment Note** — shop sales pay the last auction price |
+| 115 | The Archivist | **The Standing Exhibit** — a piece counts toward every set it could belong to |
+
+**The list is closed.** 120 entries, no duplicates, every one bounded, every one class A or B, and not one of
+them is a tooltip.
