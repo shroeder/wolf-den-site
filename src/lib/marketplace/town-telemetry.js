@@ -113,13 +113,20 @@ export async function getTownTelemetry() {
                FROM mkt_town_event WHERE status = 'active' LIMIT 1`
         ).catch(() => null),
 
-        // How many phones could receive an app push AT ALL. A per-raid reach of 0 is ambiguous — it could be a
-        // broken send or an empty audience — and this is the number that tells the two apart.
-        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_push_token WHERE token IS NOT NULL AND token <> ''`).catch(() => null),
+        // How many phones could receive an app push AT ALL, split by WHICH app. A per-raid reach of 0 is
+        // ambiguous — broken send, or empty audience — and this is the number that tells the two apart. They
+        // are separate columns because they were the bug: the member app (mkt_push_token) has never had a
+        // single registration, while the owner's phone sits in app_device and nothing in the game sent to it.
+        db.queryOne(
+            `SELECT (SELECT COUNT(*)::int FROM mkt_push_token WHERE token IS NOT NULL AND token <> '') AS member_app,
+                    (SELECT COUNT(*)::int FROM app_device
+                      WHERE channel = 'full' AND revoked = FALSE AND fcm_token IS NOT NULL AND fcm_token <> '') AS owner_app`
+        ).catch(() => null),
     ]);
 
     const p = participation || {};
-    const appTokens = Number(appTokenRow?.n) || 0;
+    const appTokens = Number(appTokenRow?.member_app) || 0;
+    const ownerDevices = Number(appTokenRow?.owner_app) || 0;
     const emptyPct = p.events ? Math.round((p.empty_events / p.events) * 100) : 0;
     const todayN = summary?.today ?? 0;
 
@@ -158,11 +165,15 @@ export async function getTownTelemetry() {
         flags.push({ sev: avgEnd > 0 ? "good" : "warn", text: `"Raid over" reaching ~${avgEnd} browser${avgEnd === 1 ? "" : "s"}${app ? ` and ${app} phone${app === 1 ? "" : "s"}` : ""} per raid.` });
     }
 
-    // The phone app has never registered a push token, so every app-channel broadcast in the game — rally,
-    // raid over, boss, sailing — has been sending to an empty list. Worth saying out loud on the screen whose
-    // whole job is "did anyone hear this", rather than leaving it to be inferred from a zero.
+    // Two different phone audiences, and telling them apart is the whole point. The MEMBER app has never had a
+    // single registration, so its reach is legitimately 0 and always has been. The OWNER phone is registered and
+    // heartbeating — it just was not being sent to, which is now fixed; if this ever reads 0 the notifications
+    // have genuinely stopped rather than never having started.
+    if (!ownerDevices) {
+        flags.push({ sev: "warn", text: "No owner phone is registered for app push — raid notifications cannot reach it. Open the ledger app once to re-register." });
+    }
     if (appTokens === 0) {
-        flags.push({ sev: "warn", text: "No phone has registered for app push (0 tokens), so every app notification reaches nobody. Browser push is unaffected." });
+        flags.push({ sev: "info", text: "No member has installed the marketplace app (0 tokens), so that channel reaches nobody. Browser push and the owner phone are unaffected." });
     }
 
     if (summary?.silent) flags.push({ sev: "info", text: `${summary.silent} silent owner test spawn${summary.silent === 1 ? "" : "s"} excluded from these numbers.` });
@@ -179,6 +190,7 @@ export async function getTownTelemetry() {
             targetMin: TARGET_MIN,
             targetMax: TARGET_MAX,
             appTokens,
+            ownerDevices,
         },
         live: live ? { id: live.id, kind: live.kind, hp: Number(live.hp), hpMax: Number(live.hp_max), secsLeft: Number(live.secs_left) } : null,
         participation: {

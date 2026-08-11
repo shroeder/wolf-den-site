@@ -2,8 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { broadcastWebPush } from "@/lib/push/web-push.js";
-import { broadcastBuyerPushAll } from "@/lib/push/send.js";
+import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
 import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
@@ -450,15 +449,15 @@ export async function spawnTownEvent(kind = "bandit_raid", { silent = false } = 
     // (and the owner's spawn button) actually shows whether anyone was reached.
     let push = null;
     if (!silent) {
-        const [web, app] = await Promise.all([
-            broadcastWebPush({ kind: "raid", title: type.pushTitle, body: type.pushBody, url: "/marketplace/town", tag: "town-event", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
-            broadcastBuyerPushAll({ title: type.pushTitle, body: type.pushBody, route: "town", data: { type: "town_event" } }).catch((e) => ({ error: String(e?.message || e) })),
-        ]);
-        push = { web, app };
+        push = await broadcastToEveryone({
+            kind: "raid", title: type.pushTitle, body: type.pushBody,
+            url: "/marketplace/town", route: "town", tag: "town-event", data: { type: "town_event" },
+        });
         // Stamp the reach onto the event so the admin Raids screen can show whether anyone was actually told,
-        // instead of leaving it to be inferred from turnout.
+        // instead of leaving it to be inferred from turnout. `pushOwner` is the count that was missing: the
+        // owner's phone is an app_device, which nothing in the game used to send to.
         await db.query(`UPDATE mkt_town_event SET meta = meta || $2::jsonb WHERE id = $1`,
-            [row.id, JSON.stringify({ pushWeb: Number(web?.sent) || 0, pushApp: Number(app?.sent) || 0 })]).catch(() => {});
+            [row.id, JSON.stringify({ pushWeb: push.web, pushApp: push.app, pushOwner: push.owner })]).catch(() => {});
     }
     return { ok: true, id: Number(row.id), name: type.name, silent: Boolean(silent), push };
 }
@@ -685,12 +684,12 @@ async function resolveTownEvent(eventId, outcome) {
  */
 async function announceRaidOver(ev, { title, body }) {
     if (ev?.meta?.silent) return;
-    const [web, app] = await Promise.all([
-        broadcastWebPush({ kind: "raid", title, body, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => ({ sent: 0 })),
-        broadcastBuyerPushAll({ title, body, route: "town", data: { type: "town_event_end" } }).catch(() => ({ sent: 0 })),
-    ]);
+    const push = await broadcastToEveryone({
+        kind: "raid", title, body,
+        url: "/marketplace/town", route: "town", tag: "town-event", data: { type: "town_event_end" },
+    });
     await db.query(`UPDATE mkt_town_event SET meta = meta || $2::jsonb WHERE id = $1`,
-        [ev.id, JSON.stringify({ endPushWeb: Number(web?.sent) || 0, endPushApp: Number(app?.sent) || 0 })]).catch(() => {});
+        [ev.id, JSON.stringify({ endPushWeb: push.web, endPushApp: push.app, endPushOwner: push.owner })]).catch(() => {});
 }
 
 // ── PASSIVE DPS FOR BEING IN THE SQUARE ──────────────────────────────────────────────────────────────────────

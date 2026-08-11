@@ -2,8 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendSailingLaunchEmail } from "@/lib/marketplace/email.js";
-import { broadcastBuyerPushAll } from "@/lib/push/send.js";
-import { broadcastWebPush } from "@/lib/push/web-push.js";
+import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { SITE_URL } from "@/lib/site";
 import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
@@ -17,9 +16,9 @@ export async function broadcastSailingLaunch({ channels } = {}) {
 
     if (want.discord) { await postDiscordLaunch().then(() => { result.discord = true; }).catch(() => {}); }
     if (want.push) {
-        await broadcastWebPush({ kind: "announce", title, body, url: "/marketplace/sailing", tag: "sailing-launch", data: { type: "sailing_launch" } }).catch(() => {});
-        await broadcastBuyerPushAll({ title, body, route: "sailing", data: { type: "sailing_launch" } }).catch(() => {});
-        result.push = true;
+        // Browser + member app + the owner's phone (see push/broadcast.js — the third one was never wired).
+        const reach = await broadcastToEveryone({ kind: "announce", title, body, url: "/marketplace/sailing", route: "sailing", tag: "sailing-launch", data: { type: "sailing_launch" } }).catch(() => null);
+        result.push = reach || true;
     }
     if (want.email) {
         const members = await db.query(`SELECT id, email, display_name FROM mkt_buyer WHERE email IS NOT NULL AND email_verified = TRUE`).catch(() => []);

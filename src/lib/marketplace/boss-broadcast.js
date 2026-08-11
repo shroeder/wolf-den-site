@@ -2,8 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { sendBossDefeatedEmail } from "@/lib/marketplace/email.js";
-import { broadcastBuyerPushAll } from "@/lib/push/send.js";
-import { broadcastWebPush } from "@/lib/push/web-push.js";
+import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { SITE_URL } from "@/lib/site";
 import { denWebhook } from "@/lib/marketplace/discord-channels.js";
 
@@ -15,8 +14,8 @@ export async function broadcastBoss(boss) {
         : "A new boss just dropped — join the fight!";
 
     await postDiscordBoss(boss).catch(() => {});
-    await broadcastWebPush({ kind: "bossevent", title, body, url: "/marketplace/boss", tag: "boss", data: { type: "boss" } }).catch(() => {});
-    await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss" } }).catch(() => {});
+    // Browser + member app + THE OWNER'S PHONE. That last one was missing here too — see push/broadcast.js.
+    await broadcastToEveryone({ kind: "bossevent", title, body, url: "/marketplace/boss", route: "boss", tag: "boss", data: { type: "boss" } }).catch(() => {});
 }
 
 // The KILL event — a big deal. Announce everywhere + email every member.
@@ -48,8 +47,7 @@ export async function broadcastBossDefeated(boss, { champion = null, raffleWinne
             : `The pack brought down ${boss.name}! See the final stats →`;
 
     await postDiscordDefeated(boss, winnerLabel, championLabel).catch(() => {});
-    await broadcastWebPush({ kind: "bossevent", title, body, url: `/marketplace/boss/recap/${boss.id}`, tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
-    await broadcastBuyerPushAll({ title, body, route: "boss", data: { type: "boss_defeated" } }).catch(() => {});
+    await broadcastToEveryone({ kind: "bossevent", title, body, url: `/marketplace/boss/recap/${boss.id}`, route: "boss", tag: "boss-defeated", data: { type: "boss_defeated" } }).catch(() => {});
 
     // Email every member. Only a genuine raffle winner gets the "come claim" version.
     const members = await db.query(
