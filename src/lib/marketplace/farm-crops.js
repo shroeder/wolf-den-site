@@ -18,7 +18,7 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
-import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, oneIn, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -318,6 +318,8 @@ export async function plantSeed(buyerId, slot, seedId) {
     // Consume one seed atomically.
     const dec = await db.queryOne(`UPDATE mkt_farm_seed SET count = count - 1 WHERE buyer_id = $1 AND seed_id = $2 AND count > 0 RETURNING count`, [buyerId, seedId]).catch(() => null);
     if (!dec) return { ok: false, error: "no_seed" };
+    // Nightsoil: the plot goes in already fertilized, and the bag is never touched.
+    const freeFert = await hasPower(buyerId, "nightsoil");
     // Farm grow-speed buff (decorations + equipped gear farm affix + equipped pet) stacks on top of the Green
     // Thumb upgrade (both cut grow time).
     const buffs = await farmBonuses(buyerId).catch(() => null);
@@ -349,10 +351,10 @@ export async function plantSeed(buyerId, slot, seedId) {
     if (await hasPower(buyerId, "long_furrow")) growMs = Math.min(growMs, 8 * 3600000);
     if (await hasPower(buyerId, "cold_frame") && oneIn(3)) growMs = 0;
     const row = await db.queryOne(
-        `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at)
-         VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval)
+        `INSERT INTO mkt_farm_plot (buyer_id, slot, seed_id, planted_at, ready_at, fertilized)
+         VALUES ($1, $2, $3, NOW(), NOW() + ($4 || ' milliseconds')::interval, $5)
          ON CONFLICT (buyer_id, slot) DO NOTHING RETURNING id`,
-        [buyerId, slot, seedId, growMs]
+        [buyerId, slot, seedId, freeFert ? Math.round(growMs * (1 - FERTILIZER_CUT)) : growMs, freeFert]
     ).catch(() => null);
     if (!row) {
         // Plot was occupied — refund the seed.
@@ -365,6 +367,19 @@ export async function plantSeed(buyerId, slot, seedId) {
 }
 
 // Harvest a READY plot: sell it for gold + XP, small weighted chance at a loot chest, then clear the plot.
+// Bumper Season pays double on the FIRST harvest of a day. A harvest writes no per-day marker of its own, so
+// the question is answered off the coin ledger, which already records every harvest payout with a date.
+async function harvestedTodayAlready(buyerId) {
+    const row = await db.queryOne(
+        `SELECT 1 FROM mkt_coin_event
+          WHERE buyer_id = $1 AND kind = 'harvest'
+            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+          LIMIT 1`,
+        [buyerId]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
 export async function harvestPlot(buyerId, slot) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     // Atomically claim the plot only if it's actually ready (guards against double-harvest).
@@ -397,6 +412,18 @@ export async function harvestPlot(buyerId, slot) {
     // Harvester's Garb capstone — same rule: owned, not worn.
     const dblChance = setFarmDoubleHarvest(await getOwnedSetIds(buyerId).catch(() => [])) + petFarm.yield / 100;
     if (dblChance > 0 && Math.random() < dblChance) { gold *= 2; doubled = true; }
+    // ── ASCENSION POWERS ON A HARVEST ────────────────────────────────────────────────────────────────────
+    // Bumper Season doubles the FIRST harvest of the day, so it is checked before the roll above can make the
+    // same claim twice. Perennial Root and The Seed Drill both put a seed back in the bag — different odds and
+    // different reasons, so they roll separately rather than sharing one branch.
+    const powers = await equippedPowers(buyerId);
+    if (powers.has("bumper_season") && !doubled && !(await harvestedTodayAlready(buyerId))) { gold *= 2; doubled = true; }
+    if (powers.has("perennial_root") && oneIn(3)) {
+        await db.query(`UPDATE mkt_farm_seed SET count = count + 1 WHERE buyer_id = $1 AND seed_id = $2`, [buyerId, claimed.seed_id]).catch(() => {});
+    }
+    if (powers.has("seed_drill") && oneIn(4)) {
+        await db.query(`UPDATE mkt_farm_seed SET count = count + 1 WHERE buyer_id = $1 AND seed_id = $2`, [buyerId, claimed.seed_id]).catch(() => {});
+    }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
     // YOU ALSO KEEP THE CROP. The gold above still reads as selling the surplus and the farm economy is

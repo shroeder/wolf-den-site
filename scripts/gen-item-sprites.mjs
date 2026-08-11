@@ -6,11 +6,16 @@
 // rarity materials extracted from the table itself), so anything generated here is indistinguishable from what
 // is already there. Do not "improve" the wording — matching the existing set is the whole point.
 //
+// QUALITY IS MEDIUM, matching the 334 originals. This script was written at "low" ($0.011 against $0.042),
+// which is a quarter of the price and visibly different art — 14 items were generated that way and sit in the
+// bag next to 334 that were not. Matching the existing set is the whole point of this file.
+//
 // Usage:  node scripts/gen-item-sprites.mjs [itemId ...]   (no args = every item missing art)
 import fs from "node:fs";
 
 import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
+import sharp from "sharp";
 
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
 
@@ -65,6 +70,12 @@ const RARITY_MATERIAL = {
     mythic: "otherworldly materials with vivid teal-green crystal inlays and glowing energy veins across the object",
     ascendant: "divine craftsmanship with shifting pink-violet cosmic gemstones and star-metal filigree",
     eternal: "celestial forged look, blazing orange starfire etched along its edges, radiant molten trim",
+    // The two tiers added above eternal. WITHOUT THESE they fall through to `common` — "plain worn materials,
+    // rough wood, dull grey iron, muted and battered" — so the two rarest tiers in the game would have been
+    // drawn as the cheapest. Written to continue the ladder rather than restart it: eternal is molten and
+    // burning, so celestial goes cold and vast, and primordial goes older than metal altogether.
+    celestial: "deep indigo void-glass with a drifting starfield held inside it, silver-white constellation lines traced across its surface, cold and vast",
+    primordial: "unpolished world-stone veined with molten gold, older than metalwork, rough-hewn and heavy with the first light still caught in its cracks",
 };
 
 function buildItemPrompt(it) {
@@ -88,7 +99,7 @@ async function generate(prompt) {
             const resp = await fetch("https://api.openai.com/v1/images/generations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI}` },
-                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "low", n: 1 }),
+                body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024", background: "transparent", quality: "medium", n: 1 }),
             });
             if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 160)}`);
             const b64 = (await resp.json())?.data?.[0]?.b64_json;
@@ -102,7 +113,13 @@ async function generate(prompt) {
     return null;
 }
 
-async function upload(buf) {
+// The existing 334 are 384x384. gpt-image-1 only returns 1024, so it is resized here rather than shipped at
+// three times the pixels — gear renders at icon size, and 117 unresized PNGs is a slower bag for no visible
+// gain. Matching the set is the whole point of this file, and that includes its dimensions.
+const SPRITE_PX = 384;
+
+async function upload(raw) {
+    const buf = await sharp(raw).resize(SPRITE_PX, SPRITE_PX, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
     const path = `marketplace/item/${Date.now()}-${Math.round(Math.random() * 1e6)}.png`;
     const blob = await put(path, buf, { access: "public", contentType: "image/png", token: BLOB });
     return blob.url;
