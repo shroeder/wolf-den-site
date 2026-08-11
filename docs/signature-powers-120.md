@@ -49,7 +49,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B |
 | 9 | **The Cold Frame** | One crop in three ignores its grow time entirely and is ready the moment it goes in. | B |
 | 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
-| 11 | **Kind Neighbour** | Every farm you rate rates you back the same day. | B |
+| 11 | **The Open Gate** | Visiting another member's farm never spends one of your daily visits. | A |
 | 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B |
 | 13 | **The Garden Path** | Every decoration on your farm gives a buff, whatever its rarity — cosmetics included. | B |
 
@@ -66,7 +66,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 20 | **The Full Creel** | Your daily casts refresh at noon as well as at midnight. | A |
 | 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
 | 22 | **The Long Haul** | One fish in four comes up two tiers rarer than it rolled. | B |
-| 23 | **The Gaff** | A fish that beats your record for its species refunds the cast. | B |
+| 23 | **The Gaff** | A fish that beats your personal best for its species refunds the cast. | B |
 | 24 | **The Tithe of Scales** | Every fish you land also gives a random chest fragment. | B |
 | 25 | **The Trawl** | One cast in five lands the whole tier — one of every fish at that rarity. | B |
 
@@ -80,12 +80,12 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A |
 | 30 | **The Shipwright's Debt** | Boat upgrades cost half. | A |
 | 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
-| 32 | **Letters of Marque** | An encounter you lose costs you no sortie. | B |
+| 32 | **The Quiet Passage** | One encounter in three lets you pass without a fight and keeps the spoils. | B |
 | 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B |
 | 34 | **Beachhead** | One dig site in three is already half uncovered when you arrive. | B |
 | 35 | **The Press Gang** | One voyage a day returns the moment you send it out. | B |
 | 36 | **The Kraken's Toll** | Sea monsters you meet pay you to be left alone. | B |
-| 37 | **Salvager's Claim** | One wreck in three leaves a piece of gear in your hold. | B |
+| 37 | **Salvager's Claim** | One voyage in three comes home with a piece of gear in the hold. | B |
 | 38 | **Chartwright** | It takes half as many fragments to complete a chest. | A |
 
 ## The Depths
@@ -173,7 +173,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 94 | **The Long Vigil** | Your equipped pet earns pet XP at triple the rate. | A |
-| 95 | **The Full Trough** | One feed does the whole day — every meal at once. | B |
+| 95 | **The Deep Bowl** | One treat in three feeds your pet without being used up. | B |
 | 96 | **The Long Leash** | Your pet's ability keeps working while you are on someone else's farm. | B |
 | 97 | **Breeder's Eye** | You choose which pet a random pet reward gives you. | B |
 | 98 | **The Second Sitting** | One time in three, your equipped pet's ability fires twice. | B |
@@ -187,7 +187,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 
 | # | Name | Effect | Class |
 |---|---|---|---|
-| 104 | **The Auctioneer's Seat** | You pay no auction fees, on either side. | A |
+| 104 | **The Auctioneer's Seat** | You pay no listing fee at auction, at any price. | A |
 | 105 | **Merchant's Word** | Trades you offer never expire and never decay. | A |
 | 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B |
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
@@ -208,7 +208,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 117 | **The Long Service Record** | Every badge you hold pays its bonus twice. | A |
 | 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
 | 119 | **The Founder's Plate** | One collection piece a week is delivered to you, chosen from what you are missing. | B |
-| 120 | **The Standing Ovation** | Cheering pays you what it pays the hero you cheered. | B |
+| 120 | **The Standing Ovation** | A cheer pays you twice over — both times you cheer and when the hero lands their strike. | B |
 
 ---
 
@@ -476,6 +476,25 @@ fragments it can hold.** Base three becomes twelve, on a board that only has six
 That leaves the four sailing dig powers each on a different lever, which is the point: **Deep Ballast** buys
 stamina, **Beachhead** buys a head start on the board, **Chartwright** halves what a chest costs
 (`FRAGMENTS_PER_CHEST` 10 → 5), and **Diviner's Rod** fills the ground.
+
+## Eleventh pass — read the system, then write the power
+
+Luke: *"can you just audit all of these and use common sense given you should understand how each of these
+systems practically works."* Fair. Seven more, found by reading the modules rather than by remembering them.
+
+| # | Was | What the code says |
+|---|---|---|
+| 11 | Kind Neighbour — "every farm you rate rates you back" | A rating is another member's VOTE. This would have written a vote in somebody else's name. Now **The Open Gate** — visiting never spends a daily visit. |
+| 23 | The Gaff — "beats your record" | Records are kept by WEIGHT and there is a Den-wide record board as well as a personal best. Scoped to the personal best, which is the one you beat often enough for a power to matter. |
+| 32 | Letters of Marque — "an encounter you lose costs you no sortie" | **Encounters never cost a sortie.** Sorties belong to raids, and the Cunning track already buys "a chance a raid does not use up your daily raid". Dead twice over. Now **The Quiet Passage**. |
+| 37 | Salvager's Claim — "every wreck you pass" | **There are no wrecks.** The word appears once in the whole codebase, in a battle-aim comment. Repointed at the voyage itself. |
+| 95 | The Full Trough — "one feed does the whole day" | **Feeding is already unlimited** from your own bag; treats are the limit, not the feeding. Now **The Deep Bowl** — one treat in three is not used up. |
+| 104 | The Auctioneer's Seat — "no fees, either side" | There is only ONE side. `LIST_FEE_PCT = 0.05`, paid up front by the lister; the buyer pays nothing. |
+| 120 | The Standing Ovation | Cheering already pays the cheerer XP and gold. Rewritten so it pays twice rather than describing what it already does. |
+
+Two nearby entries were checked and stand: **The Bonded Warehouse (108)** is real because listing genuinely
+removes the item from your bags, and **The Free Spin (85)** is real because the wheel gives exactly one free
+spin a day and everything else is a token.
 
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
 state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
