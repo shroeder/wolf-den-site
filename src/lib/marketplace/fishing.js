@@ -6,7 +6,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
-import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, oneIn, equippedPowers, powerRoll } from "@/lib/marketplace/ascension-powers.js";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
 // A voyage is four hours of nothing happening. That dead time is where fishing lives: while the boat is at sea
@@ -630,6 +630,20 @@ export function fishingView(row, angling = 0, status = "idle") {
 // ── CAST ─────────────────────────────────────────────────────────────────────────────────────────────────────
 // Spends a cast, rolls the fish, and parks it on the line. Returns only the bite TIMING — never the species,
 // because the surprise of what surfaces is most of the fun.
+// The Tide Table's bank: whole days you did not fish, times the daily allowance, capped at a week.
+//
+// Read from SQL rather than by building a JS Date off fish_day — the comment on castsUsed says exactly why,
+// and that bug has already broken the daily check-in once. The row does not carry fish_day at all (only the
+// boolean fish_is_today), so the gap is asked for directly.
+async function bankedCasts(buyerId, dailyMax) {
+    const row = await db.queryOne(
+        `SELECT GREATEST(0, ((NOW() AT TIME ZONE 'America/Chicago')::date - fish_day) - 1)::int AS missed
+           FROM mkt_sailing WHERE buyer_id = $1 AND fish_day IS NOT NULL`,
+        [buyerId]
+    ).catch(() => null);
+    return Math.min(7, Number(row?.missed) || 0) * Math.max(1, dailyMax);
+}
+
 export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     if (status === "digging") return { ok: false, error: "not_at_sea" }; // ashore with a shovel, not on the boat
@@ -639,8 +653,14 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const lv = fishTrackLevels(row);
     // castsAvailable, NOT castsPerDay — a member who has paid for an extra cast must actually get it. This is
     // the same trap that once let the view promise "2/13 left" while the mutator refused at 11.
-    const max = castsFor(row, angling).max;
+    let max = castsFor(row, angling).max;
+    // The Tide Table banks what you did not spend, up to a week's worth. `fish_day` already tells us the last
+    // day fished, so the bank is the days missed times the daily allowance — no new column.
+    if (await hasPower(buyerId, "tide_table")) max += await bankedCasts(buyerId, max);
     if (castsUsed(row) >= max) return { ok: false, error: "out_of_casts" };
+    // The Chummed Water refunds every fifth cast — decided here, applied to the counter below, so a refunded
+    // cast never has to be un-spent after the fact.
+    const refundCast = (castsUsed(row) + 1) % 5 === 0 && await hasPower(buyerId, "chummed_water");
 
     // Fish or treasure is decided HERE, at cast time, along with everything else that matters — the client
     // learns which it was only when it surfaces.
@@ -651,7 +671,21 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     const dredgeNet = await hasPower(buyerId, "dredge_net");
     const isTreasure = (dredgeNet && oneIn(4))
         || Math.random() < (TREASURE_CHANCE + fishTrackValue("net", lv.net) + seaPets.dredge / 100);
-    const species = rollSpecies(anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100);
+    // ── ASCENSION POWERS ON A CAST ───────────────────────────────────────────────────────────────────────
+    // Every one of these decides WHAT IS ON THE LINE, so they all read at the species roll rather than being
+    // scattered through the reel. Cold Bait and The Full Creel are first-cast-of-the-day powers, so they need
+    // the used count, which is already in hand two lines up.
+    const castPowers = await equippedPowers(buyerId);
+    const firstCastToday = castsUsed(row) === 0;
+    let rareTilt = anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100;
+    if (castPowers.has("long_haul") && oneIn(4)) rareTilt += 2;        // two tiers rarer than it rolled
+    if (castPowers.has("full_creel") && firstCastToday) rareTilt += 9; // the rarest thing in the water
+    let species = rollSpecies(rareTilt);
+    // Cold Bait: the day's first cast cannot land a common. Re-rolled rather than promoted, so the fish is a
+    // real one off the table instead of a common wearing another tier's name.
+    if (castPowers.has("cold_bait") && firstCastToday) {
+        for (let i = 0; i < 8 && species.rarity === "common"; i += 1) species = rollSpecies(rareTilt + 3);
+    }
     const state = {
         species: species.id,
         treasure: isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
@@ -665,7 +699,7 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
         `UPDATE mkt_sailing
             SET fish_state = $2::jsonb,
                 fish_casts = CASE WHEN fish_day = (NOW() AT TIME ZONE 'America/Chicago')::date
-                                  THEN COALESCE(fish_casts, 0) + 1 ELSE 1 END,
+                                  THEN COALESCE(fish_casts, 0) + ${refundCast ? 0 : 1} ELSE ${refundCast ? 0 : 1} END,
                 -- fish_recharges MUST roll over here too. This statement stamped fish_day forward while
                 -- leaving yesterday's paid recharges sitting in the row, so the moment you cast on a new day
                 -- they became "today's" recharges: a one-off purchase of N casts turned into +N casts EVERY
@@ -764,14 +798,40 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // (spent in castLine) and then failed to land anything.
     const seaPets = await seaPetPerks(buyerId);
     const cm = weightFor(species, state.roll, q, gaffLvl) * (1 + seaPets.size / 100);   // pounds; column renamed to lb in mig287
+    // ── ASCENSION POWERS ON A LANDING ────────────────────────────────────────────────────────────────────
+    // The Gaff refunds the cast when the fish beats your personal best; The Tithe of Scales drops a fragment on
+    // every landing. Both read here because both need the fish in hand.
+    const landPowers = await equippedPowers(buyerId);
+    if (landPowers.has("tithe_of_scales")) {
+        await grantHaul(buyerId, "fragment", pickWeighted(TREASURE_TIER)).catch(() => {});
+    }
+    if (landPowers.has("gaff")) {
+        const best = await db.queryOne(
+            `SELECT MAX(lb)::float AS lb FROM mkt_fish_catch WHERE buyer_id = $1 AND species = $2`,
+            [buyerId, species.id]
+        ).catch(() => null);
+        if (!best?.lb || cm > best.lb) {
+            await db.query(
+                `UPDATE mkt_sailing SET fish_casts = GREATEST(0, COALESCE(fish_casts, 0) - 1) WHERE buyer_id = $1`,
+                [buyerId]
+            ).catch(() => {});
+        }
+    }
     const pct = percentileOf(species, cm);
     // Payout scales from 45% of the species value at the small end to full value at the top of its typical
     // range — and beyond, for a trophy that clears it, which is the one place the overshoot pays extra.
     const scale = 0.45 + 0.55 * Math.min(1.6, pct);
     // Night Angler pays more for a cast made while the shop is shut — see seaPetPerks. Folded in at the
     // declaration so every downstream consumer (the haul, the log, the coin ledger) sees the same figure.
-    const nightMult = 1 + (seaPets.payoutBonus || 0);
-    const gold = Math.max(1, Math.round(species.gold * scale * nightMult));
+    // The Lantern doubles a cast made while the shop is shut. Rides the same closed-hours check the Night
+    // Angler pet already uses, so "closed" means one thing in this file.
+    let nightMult = 1 + (seaPets.payoutBonus || 0);
+    if (!shopIsOpen() && await hasPower(buyerId, "lantern")) nightMult *= 2;
+    // The Fishmonger's Standing Order pays one fish in three at the next rarity's price. `gold` is per-species,
+    // so "the next rarity up" is the same species valued one band higher — a flat 1.6x, which is what the gap
+    // between adjacent bands averages across the table.
+    let gold = Math.max(1, Math.round(species.gold * scale * nightMult));
+    if (await powerRoll(buyerId, "fishmonger_s_standing_order", 3)) gold = Math.round(gold * 1.6);
     const xp = Math.max(1, Math.round(species.xp * scale * nightMult));
 
     const log = (taken.fish_log && typeof taken.fish_log === "object") ? taken.fish_log : {};
@@ -985,7 +1045,10 @@ export async function buyRecharge(buyerId) {
     if (!row) return { ok: false, error: "no_ship" };
     const lv = fishTrackLevels(row);
     const used = castsUsed(row);
-    const max = castsFor(row, angling).max;
+    let max = castsFor(row, angling).max;
+    // The Tide Table banks what you did not spend, up to a week's worth. `fish_day` already tells us the last
+    // day fished, so the bank is the days missed times the daily allowance — no new column.
+    if (await hasPower(buyerId, "tide_table")) max += await bankedCasts(buyerId, max);
     if (used < max) return { ok: false, error: "still_have_casts" };
     const bought = rechargesToday(row);
     if (bought >= RECHARGE_MAX_PER_DAY) return { ok: false, error: "recharge_maxed" };
