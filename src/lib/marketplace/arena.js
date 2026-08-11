@@ -605,12 +605,28 @@ const TARGET_RATIO = 0.95;   // their power against yours: a shade in your favou
 const SHORTLIST = 7;         // how many of the closest go in the hat
 const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your size
 
+// ── BOTH KINDS, ALWAYS ───────────────────────────────────────────────────────────────────────────────────────
+// This used to rank members and Gauntlet tiers in one pile by closeness and take the seven nearest, which made
+// the Gauntlet a GAP-FILLER: with ten members near your power you would never see an NPC again, and at the top
+// of the pack you would see nothing else. Measured, it went from 100% NPC to 0% across a handful of members.
+//
+// That is wrong in both directions. The Gauntlet is where the ARCHETYPES live — a Wall that wants its guard
+// stripped, a Berserker that folds if you survive its opening — and those are the fights that teach you how
+// the systems work. A member's loadout cannot teach you that; it is whatever they happened to build.
+//
+// So the shortlist RESERVES seats. At least two go to Gauntlet tiers and at least two to people, whenever each
+// exists, and the rest is filled by closeness as before. The Gauntlet stays woven through the whole ladder
+// instead of appearing only when the Den is asleep — and somebody at the very top still meets people.
+const RESERVE_NPC = 2;
+const RESERVE_MEMBER = 2;
+
 function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
-    const all = [];
+    const members = [];
+    const npcs = [];
     for (const o of board) {
         if (String(o.id) === String(buyerId)) continue;
-        all.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
+        members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
     }
     // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can
     // never hand you a tier a crafted POST would have been refused.
@@ -618,11 +634,29 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     for (let t = 1; t <= maxTier; t += 1) {
         const n = npcFor(t);
         if (!n) break;
-        all.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(n)) });
+        npcs.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(n)) });
     }
-    if (!all.length) return null;
-    all.sort((a, z) => a.d - z.d);
-    const shortlist = all.slice(0, SHORTLIST).map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
+    if (!members.length && !npcs.length) return null;
+    members.sort((a, z) => a.d - z.d);
+    npcs.sort((a, z) => a.d - z.d);
+
+    // Seat the reserved places first, then fill what is left with whoever is closest overall.
+    const picked = [...npcs.slice(0, RESERVE_NPC), ...members.slice(0, RESERVE_MEMBER)];
+    const rest = [...members.slice(RESERVE_MEMBER), ...npcs.slice(RESERVE_NPC)].sort((a, z) => a.d - z.d);
+    picked.push(...rest.slice(0, Math.max(0, SHORTLIST - picked.length)));
+
+    // ── WEIGHTED WITHIN ITS OWN KIND, NOT ACROSS THE WHOLE LIST ──────────────────────────────────────────
+    // The first cut of this re-sorted the seated shortlist by distance and weighted by GLOBAL position, which
+    // quietly undid the reservation: on a crowded board the two reserved tiers landed in seats six and seven,
+    // took a weight of 1/6 and 1/7, and the Gauntlet came out at 12% — barely better than the gap-filler it
+    // replaced. Ranking each kind against ITSELF means the closest tier is always worth a full share, however
+    // many people happen to be standing near you, and the split holds at roughly a third across any roster.
+    const rank = { member: 0, npc: 0 };
+    const shortlist = picked.map((c) => {
+        const i = rank[c.kind];
+        rank[c.kind] += 1;
+        return { ...c, w: c.boost / (1 + i) };
+    });
     let roll = Math.random() * shortlist.reduce((sum, c) => sum + c.w, 0);
     return shortlist.find((c) => (roll -= c.w) <= 0) || shortlist[0];
 }
