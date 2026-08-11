@@ -128,15 +128,15 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 62 | **The Cold Hammer** | Every third enhance consumes no parts. | B |
 | 63 | **The Smith's Certainty** | Enhancement never fails and never downgrades. | B |
 | 64 | **Twice-Struck** | Salvage returns double parts. | A |
-| 65 | **Attuning Fire** | Every enhance rolls an attunement. | A |
-| 66 | **The Second Socket** | Every piece of gear you own takes a second gem. | A |
+| 65 | **The Attuned Bench** | Every attunement you carry counts at double its level. | A |
+| 66 | **The Jeweller's Eye** | Every gem you have set counts as one tier higher than it is. | A |
 | 67 | **Jeweller's Patience** | Gems come back out of a socket free, and unbroken. | B |
 | 68 | **The Steady Bench** | A failed fuse returns all three gems. | B |
 | 69 | **Master's Mark** | Anything you forge is bound to you and can never be traded away by mistake. | A |
 | 70 | **The Reforging Right** | Reforging an element is free and may be repeated. | A |
-| 71 | **The Deep Temper** | Your gear's enhancement ceiling is five levels higher than anyone else's. | A |
+| 71 | **The Tempered Edge** | Your gear's enhancement bonuses count double. | A |
 | 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B |
-| 73 | **The Socket Punch** | Sockets can be cut into an item of any rarity. | A |
+| 73 | **The Deep Facet** | A gem set in any one piece gives its stat to every piece you are wearing. | B |
 
 ## The Town
 
@@ -180,7 +180,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 99 | **The Prize Litter** | Every pet you own counts as one rarity higher for its passive. | A |
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
-| 102 | **Ancestral Line** | Every pet you own gains one level, once, the day you equip this. | B |
+| 102 | **The Long Table** | Your pets' passives ignore the menagerie ceiling entirely. | A |
 | 103 | **The Whistle** | Swapping your equipped pet costs nothing and has no cooldown. | A |
 
 ## Market, Trade & Credit
@@ -296,5 +296,39 @@ was the newest thing on my mind. Replaced with:
 | 106 | The Honest Broker | **The Consignment Note** — shop sales pay the last auction price |
 | 115 | The Archivist | **The Standing Exhibit** — a piece counts toward every set it could belong to |
 
-**The list is closed.** 120 entries, no duplicates, every one bounded, every one class A or B, and not one of
-them is a tooltip.
+## Fourth pass — the laundering test
+
+Luke, on The Second Socket: *"if you pull that powered item off, does it remove the sockets from all your gear?
+And can people just farm the second socket and then trade the gear away?"* Yes to both, and it generalises into
+a third test.
+
+**TEST 3 — NO MINTED STATE.** A power may not permanently alter an item's own properties while being conditional
+on wearing something else. Two failures, always together: pull the source off and you orphan whatever it
+created, and in between you can equip it, upgrade a stack of gear, unequip, and sell gear carrying value nobody
+paid for. `mkt_item_enhance` holds the enhancement level AND the attunement per item, and the attunement follows
+the item to whoever buys it — so this is a real trade, not a theoretical one.
+
+Generating LOOT while equipped is fine and is not this. The flaw is specifically **upgrading an item that
+already exists.** Five entries failed:
+
+| # | Was | Now | The laundering |
+|---|---|---|---|
+| 65 | Attuning Fire | **The Attuned Bench** | Enhance a stack, every one attunes, unequip, sell attuned gear |
+| 66 | The Second Socket | **The Jeweller's Eye** | Cut sockets into ten pieces, unequip, sell them socketed |
+| 71 | The Deep Temper | **The Tempered Edge** | Enhance past the ceiling, unequip, sell overlevelled gear |
+| 73 | The Socket Punch | **The Deep Facet** | Same as 66, at rarities that cannot normally hold a socket |
+| 102 | Ancestral Line | **The Long Table** | Level every pet once, unequip, trade the levelled pets |
+
+All five replacements are **conditional** — they change what your gear is worth while you wear it and leave
+nothing behind when you take it off. The Jeweller's Eye makes a Polished act as a Flawless; The Deep Facet
+spreads one gem's stat across all nine slots; The Long Table lifts the menagerie ceiling (a real cap:
+`SYSTEM_PASSIVE_CAP` is 30 on the farm stats, 25 on the sea stats, 4 on stamina).
+
+**Open question, not a flaw.** **Second Sowing (3)** and **Terrace Farming (13)** grant account capacity rather
+than item state, so nothing can be laundered — but they still need an answer for what happens when the item
+comes off. The intended behaviour is that the extra plots and decoration slots go dormant rather than being
+destroyed: crops keep growing, decorations stay placed, and neither can be interacted with until the item is
+worn again. Worth confirming before either is built.
+
+**The list is closed.** 120 entries, no duplicates, every one bounded, every one class A or B, not one of them
+is a tooltip, and none of them mints state that outlives the item.
