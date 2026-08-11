@@ -311,7 +311,7 @@ const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 9
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
-import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, hasPower, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,
@@ -469,19 +469,6 @@ async function buyPiece(buyerId, piece) {
 // Sell an owned item back for gold. Unequips it first if worn, credits the rarity sell value, and records
 // the sale so a 'level' item never auto-re-grants itself (which would be an infinite gold farm). Charged
 // real-world-perk items can't be sold.
-// The Standing Offer is once a day. A sale already writes a coin event, which is the only per-day trace it
-// leaves, so that answers it rather than a new column.
-async function soldTodayAlready(buyerId) {
-    const row = await db.queryOne(
-        `SELECT 1 FROM mkt_coin_event
-          WHERE buyer_id = $1 AND kind = 'sell_gear'
-            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
-          LIMIT 1`,
-        [buyerId]
-    ).catch(() => null);
-    return Boolean(row);
-}
-
 export async function sellItem(buyerId, itemId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const item = itemById(itemId);
@@ -492,7 +479,7 @@ export async function sellItem(buyerId, itemId) {
     // The Standing Offer: once a day, the shop pays what it SELLS for rather than the sell-back value. The
     // gap is the whole point — sell-back is deliberately a fraction of the shelf price.
     let value = sellValueOf(item);
-    if (item?.price && await hasPower(buyerId, "standing_offer") && !(await soldTodayAlready(buyerId))) {
+    if (item?.price && await claimPowerUse(buyerId, "standing_offer")) {
         value = Math.max(value, Math.round(Number(item.price) || 0));
     }
     // Remove ownership atomically-ish: delete the owned row (source of truth) and only pay out if it existed.

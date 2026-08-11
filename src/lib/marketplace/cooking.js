@@ -18,7 +18,7 @@ import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
 // same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
@@ -891,7 +891,10 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     const conSprites = Object.fromEntries(
         (await db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).catch(() => [])).map((r) => [r.consumable_id, r.url])
     );
-    const q = quality == null ? 0.5 : Math.max(0, Math.min(1, Number(quality) || 0));
+    // Chef's Pick: one dish a day is cooked to perfect timing without playing the minigame. Claimed atomically
+    // so it is genuinely once — a rationed power resolved by a plain read would double on a double-tap.
+    const chefsPick = await claimPowerUse(buyerId, "chef_s_pick");
+    const q = chefsPick ? 1 : (quality == null ? 0.5 : Math.max(0, Math.min(1, Number(quality) || 0)));
     const chainN = Math.max(0, Math.min(50, Math.floor(Number(chain) || 0)));
 
     // HOW YOU REACH A HIGHER TIER — the rule, in one place, because it wasn't obvious from playing:

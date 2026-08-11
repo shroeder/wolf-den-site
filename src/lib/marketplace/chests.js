@@ -11,7 +11,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { hasPower, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
 // you go up — but NONE guarantee a rarity, so even the top chest can under-roll and even a wooden chest has
@@ -245,8 +245,12 @@ export async function openChest(buyerId, tier) {
     // A chest-luck companion can promote the roll one rarity band up — stated exactly on the pet card.
     const RARITY_LADDER = RARITIES;   // shared ladder — it now runs two tiers past eternal
     let rarity = rollRarity(def.weights);
+    // ── THE CHEST POWERS ─────────────────────────────────────────────────────────────────────────────────
     // The Locksmith promotes one chest in three, on top of whatever chest_luck rolls below. AFTER the roll,
     // obviously — the first pass put it above the `let` and lint:undef caught the temporal dead zone.
+    // Twin Hinges is a once-a-day double, claimed atomically so two taps cannot both take it.
+    const twinHinges = await claimPowerUse(buyerId, "twin_hinges");
+    const masterKey = await hasPower(buyerId, "master_key") && oneIn(3);
     if (await hasPower(buyerId, "locksmith") && oneIn(3)) {
         const li = RARITY_LADDER.indexOf(rarity);
         if (li >= 0 && li < RARITY_LADDER.length - 1) rarity = RARITY_LADDER[li + 1];
@@ -281,10 +285,37 @@ export async function openChest(buyerId, tier) {
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         await grantItem(buyerId, item.id, isEliteRarity ? "elite" : "chest");
-        return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
+        // Twin Hinges pays the chest twice: a SECOND un-owned item of the same rarity, not the same one again.
+        let second = null;
+        if (twinHinges) {
+            const rest = candidates.filter((c) => c.id !== item.id);
+            if (rest.length) {
+                second = rest[Math.floor(Math.random() * rest.length)];
+                await grantItem(buyerId, second.id, isEliteRarity ? "elite" : "chest");
+            }
+        }
+        // The Master Key also hands you the chest one tier BELOW, unopened, so you get to open it yourself.
+        if (masterKey) {
+            const below = CHEST_ORDER[Math.max(0, CHEST_ORDER.indexOf(tier) - 1)];
+            if (below && below !== tier) await addChests(buyerId, { [below]: 1 }, { source: "master_key" }).catch(() => {});
+        }
+        return { ok: true, remaining: dec.count, second: second ? { id: second.id, name: second.name, rarity: second.rarity } : null, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null } };
     }
-    const gold = DUST[rarity] || 25;
+    // THE SORTING TABLE. Dust is what a chest pays when you already own every item of the rolled rarity, so
+    // this is the exact moment the power exists for: widen a rarity instead of paying out consolation gold.
+    // One retry only — if you own the tier above as well, the dust stands rather than walking the whole ladder.
+    if (await hasPower(buyerId, "sorting_table")) {
+        const up = RARITY_LADDER[Math.min(RARITY_LADDER.length - 1, RARITY_LADDER.indexOf(rarity) + 1)];
+        const wider = pool.filter((i) => i.rarity === up && !owned.has(i.id));
+        if (wider.length) {
+            const item = wider[Math.floor(Math.random() * wider.length)];
+            await grantItem(buyerId, item.id, "chest");
+            return { ok: true, remaining: dec.count, item: { id: item.id, name: item.name, rarity: item.rarity, slot: item.slot, icon: item.icon, stats: item.stats, reqLevel: item.reqLevel, signature: signatureFor(item.id), charged: Boolean(item.charged), chargeReward: item.chargeRewardLabel || null }, sorted: true };
+        }
+    }
+    let gold = DUST[rarity] || 25;
+    if (twinHinges) gold *= 2;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
-    return { ok: true, remaining: dec.count, gold, rarity };
+    return { ok: true, remaining: dec.count, gold, rarity, doubled: twinHinges };
 }

@@ -1462,19 +1462,6 @@ export async function getSailingState(buyerId, skyKey = null) {
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
-// The Press Gang lands ONE voyage a day the moment it is sent. A voyage records itself as an activity, which
-// is the only per-day trace it leaves, so that is what answers the question.
-async function sailedTodayAlready(buyerId) {
-    const row = await db.queryOne(
-        `SELECT 1 FROM mkt_activity
-          WHERE buyer_id = $1 AND kind = 'sail_voyage'
-            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
-          LIMIT 1`,
-        [buyerId]
-    ).catch(() => null);
-    return Boolean(row);
-}
-
 export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
@@ -1492,7 +1479,10 @@ export async function startVoyage(buyerId, optionId = "standard") {
     const sailPowers = await equippedPowers(buyerId);
     if (sailPowers.has("press_ganged_crew")) voyageSpeed = 1 - (1 - voyageSpeed) * 0.5;
     let ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
-    if (sailPowers.has("press_gang") && !(await sailedTodayAlready(buyerId))) ms = MIN_VOYAGE_MS;
+    // The Press Gang: one voyage a day comes home the moment it leaves. Claimed off the shared ledger rather
+    // than inferred from the activity log — an activity row is written for every voyage, so "have you sailed
+    // today" answered "yes" after the first ordinary trip and the power could never fire again that day.
+    if (await claimPowerUse(buyerId, "press_gang")) ms = MIN_VOYAGE_MS;
     // THREE CHANCES, NOT ONE. Each mark is rolled independently against the Fortune-scaled chance, scaled
     // down for the later two — a second fight in a voyage should feel like luck and a third like a story.
     // Kraken Bait still guarantees the first. Difficulty is drawn near your own boat level so a fresh captain
@@ -1796,7 +1786,7 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
-import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {

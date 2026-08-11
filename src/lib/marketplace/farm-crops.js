@@ -18,7 +18,7 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
-import { hasPower, oneIn, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, oneIn, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -367,19 +367,6 @@ export async function plantSeed(buyerId, slot, seedId) {
 }
 
 // Harvest a READY plot: sell it for gold + XP, small weighted chance at a loot chest, then clear the plot.
-// Bumper Season pays double on the FIRST harvest of a day. A harvest writes no per-day marker of its own, so
-// the question is answered off the coin ledger, which already records every harvest payout with a date.
-async function harvestedTodayAlready(buyerId) {
-    const row = await db.queryOne(
-        `SELECT 1 FROM mkt_coin_event
-          WHERE buyer_id = $1 AND kind = 'harvest'
-            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
-          LIMIT 1`,
-        [buyerId]
-    ).catch(() => null);
-    return Boolean(row);
-}
-
 export async function harvestPlot(buyerId, slot) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     // Atomically claim the plot only if it's actually ready (guards against double-harvest).
@@ -417,7 +404,10 @@ export async function harvestPlot(buyerId, slot) {
     // same claim twice. Perennial Root and The Seed Drill both put a seed back in the bag — different odds and
     // different reasons, so they roll separately rather than sharing one branch.
     const powers = await equippedPowers(buyerId);
-    if (powers.has("bumper_season") && !doubled && !(await harvestedTodayAlready(buyerId))) { gold *= 2; doubled = true; }
+    // Bumper Season doubles ONE harvest a day. Claimed off the shared ledger — the coin-event check it used
+    // before answered "yes, you have harvested today" the moment you took any harvest, so the power could only
+    // ever have fired on a day's very first one and never after a single ordinary pick.
+    if (!doubled && await claimPowerUse(buyerId, "bumper_season")) { gold *= 2; doubled = true; }
     if (powers.has("perennial_root") && oneIn(3)) {
         await db.query(`UPDATE mkt_farm_seed SET count = count + 1 WHERE buyer_id = $1 AND seed_id = $2`, [buyerId, claimed.seed_id]).catch(() => {});
     }

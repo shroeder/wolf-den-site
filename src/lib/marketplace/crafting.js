@@ -18,7 +18,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { rollUtil, parseUtil, describeUtil, getEquippedUtilTotals, UTIL_BASE_CHANCE } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements, reforgeCost, DUAL_ELEMENT_CHANCE } from "@/lib/marketplace/item-element.js";
 import { ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
-import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -413,19 +413,6 @@ export async function combineAllAtTier(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
-// The Whetstone guarantees one critical enhance a day. The forge already keeps a per-day row for its daily
-// card (mkt_forge_daily), so that is what answers "have you had today's yet" rather than a new column.
-async function enhancedTodayAlready(buyerId) {
-    const row = await db.queryOne(
-        `SELECT 1 FROM mkt_activity
-          WHERE buyer_id = $1 AND kind = 'forge_enhance'
-            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
-          LIMIT 1`,
-        [buyerId]
-    ).catch(() => null);
-    return Boolean(row);
-}
-
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
@@ -471,7 +458,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // The Whetstone guarantees ONE critical success a day — the top scenario, which is what a critical is here.
     // The Smith's Certainty stops a whiff being a wasted swing: below the threshold it lifts you to the first
     // real band rather than nothing, which is the "costs you nothing and may be tried again" on the card.
-    if (enhancePowers.has("whetstone") && !(await enhancedTodayAlready(buyerId))) scenario = 4;
+    if (await claimPowerUse(buyerId, "whetstone")) scenario = 4;
     if (enhancePowers.has("smith_s_certainty") && scenario === 0) scenario = 1;
     const upg = await upgradeLevels(buyerId);
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost double-gain odds

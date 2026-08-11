@@ -202,3 +202,42 @@ export const oneIn = (n, rand = Math.random) => rand() < 1 / Math.max(1, n);
 export async function powerRoll(buyerId, key, n, rand = Math.random) {
     return (await hasPower(buyerId, key)) && oneIn(n, rand);
 }
+
+// ── RATIONED POWERS ──────────────────────────────────────────────────────────────────────────────────────────
+// "One chest a day gives its rewards twice." "One dish a day cooks itself." A dozen of the 120 are capped per
+// day, and none of the systems they touch had anywhere to record that.
+//
+// claimPowerUse is the whole mechanism: it asks for one use and either gets it or does not. ATOMIC by design —
+// the INSERT ... ON CONFLICT DO UPDATE ... WHERE is what stops two taps in the same second both being told yes,
+// which is exactly how a "once a day" power becomes a twice-a-day power on a flaky connection.
+//
+// It returns false when the power is not equipped, so a caller never has to ask twice:
+//
+//     if (await claimPowerUse(buyerId, "twin_hinges")) rewards = rewards.concat(rewards);
+//
+export async function claimPowerUse(buyerId, key, perDay = 1) {
+    if (!buyerId || !key) return false;
+    if (!(await hasPower(buyerId, key))) return false;
+    const row = await db.queryOne(
+        `INSERT INTO mkt_power_use (buyer_id, power_key, day, used)
+         VALUES ($1, $2, (NOW() AT TIME ZONE 'America/Chicago')::date, 1)
+         ON CONFLICT (buyer_id, power_key, day)
+         DO UPDATE SET used = mkt_power_use.used + 1, updated_at = NOW()
+           WHERE mkt_power_use.used < $3
+         RETURNING used`,
+        [buyerId, key, Math.max(1, perDay)]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
+/** How many uses are left today, for a card that wants to say so. Never claims. */
+export async function powerUsesLeft(buyerId, key, perDay = 1) {
+    if (!buyerId || !key) return 0;
+    if (!(await hasPower(buyerId, key))) return 0;
+    const row = await db.queryOne(
+        `SELECT used FROM mkt_power_use
+          WHERE buyer_id = $1 AND power_key = $2 AND day = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+        [buyerId, key]
+    ).catch(() => null);
+    return Math.max(0, Math.max(1, perDay) - (Number(row?.used) || 0));
+}
