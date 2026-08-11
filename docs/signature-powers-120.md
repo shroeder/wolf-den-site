@@ -254,11 +254,14 @@ than from the other member, and **The Chronicle** records a fact rather than let
 **1 cut for touching real money.** The Standing Account — store credit is bought with dollars, and refunding
 it as coins at full value while the credit is still spent is a giveaway with a real cost attached.
 
-## Still to settle before any of this is built
+## Settled
 
-- **Attuning Fire (65)** is the one survivor I am least sure of. Base attunement chance is 1.6% and tops out
-  around 9%; making it certain is a 10x on a system that was deliberately cut to 0.4x on 2026-08-08.
-- **The Long Weekend (93)** touches every daily allowance in the game with one number. That is either the best
-  power on the list or the most dangerous, and it depends on numbers I have not measured yet.
-- **The Seal of Office (116)** fires a capstone one piece short. Capstones are the payoff for a complete set,
-  so this needs a decision about whether "complete" still means anything.
+**Attuning Fire (65)**, **The Long Weekend (93)** and **The Seal of Office (116)** were flagged as the three
+survivors worth a second look. Luke's call, 2026-08-11: all three stand as written.
+
+Recorded here rather than left implicit, because each one is a deliberate exception to a rule the game
+otherwise enforces — a 10x on a chance that was cut to 0.4x three days earlier, a change to every daily
+allowance at once, and a capstone that fires before its set is complete. If any of the three later looks wrong
+in play, it was chosen, not overlooked.
+
+**The list is closed.** 120 entries, every one bounded and every one class A or B.
