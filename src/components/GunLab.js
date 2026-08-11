@@ -99,7 +99,11 @@ export default function GunLab() {
     }, [draft]);
 
     const doneCount = Object.values(draft).filter((v) => v?.length).length;
-    const total = FLEET.length + BOAT_TIERS.length;
+    // Encounter ships count too. Adding ten hulls to the picker without adding them here left the readout
+    // saying "23 of 26" while there were 36 to place — a progress number that stops counting part of its own
+    // job is worse than no number, because it reads as finished.
+    const ENC_SHIPS = ENCOUNTERS.filter((e) => e.kind === "ship");
+    const total = FLEET.length + BOAT_TIERS.length + ENC_SHIPS.length;
 
     return (
         <div className="stack">
@@ -125,7 +129,7 @@ export default function GunLab() {
                     entirely, which is half of why their guns look wrong: nobody could place them. Monsters
                     are excluded — a kraken has limbs, not a gun deck (see monster-parts.js). */}
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                    {ENCOUNTERS.filter((e) => e.kind === "ship").map((e) => (
+                    {ENC_SHIPS.map((e) => (
                         <button key={e.id} type="button" className={`sby-mini${artKey === `enc:${e.id}` ? " is-load" : ""}`}
                             onClick={() => { setArtKey(`enc:${e.id}`); setStatus(""); }} title={e.name}
                             style={draft[`enc:${e.id}`]?.length ? { borderColor: "#7ce8a4", color: "#7ce8a4" } : undefined}>
