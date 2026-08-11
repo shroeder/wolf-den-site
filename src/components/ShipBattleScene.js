@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
 import SceneMusic from "@/components/SceneMusic";
+import { MONSTER_ZONES, limbWords } from "@/lib/marketplace/monster-parts.js";
 import { ZONES, zoneById, zoneBox, zoneRects, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
 import { hitChance, evasionOf, ammoById, expectedDamage } from "@/lib/marketplace/ship-battle.js";
 
@@ -389,9 +390,10 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                     damage in the fight — it is a shot she never fires again — and it was the
                                     one part with no number anywhere, readable only by noticing a cannon on
                                     the deck had gone dark. */}
-                                {!alive && gunHp.length ? (
+                                {gunHp.length ? (
                                     <PartChip zone="guns" left={gunHp.filter((h) => h > 0).length}
-                                        max={gunHp.length} label="cannon" />
+                                        max={gunHp.length}
+                                        label={alive ? limbWords(f?.limb).many : "cannon"} />
                                 ) : null}
                             </span>
                         );
@@ -681,15 +683,21 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                 dmg: expectedDamage(att, def, ZONES[id], shot),
             });
         }
-        // ...and no gun ports on it either. A kraken has no barrels to knock out.
-        const ports = living ? [] : (foe?.ports || []);
+        // A creature's LIMBS come through the same `ports` field, arranged by monster-parts.js rather than
+        // measured off a hull. Severing one removes an attack for the rest of the fight, which is the same
+        // trade a gun deck offers — so the engine needs no second path and only the words change.
+        const ports = foe?.ports || [];
+        const words = living ? limbWords(foe?.limb) : null;
         ports.forEach((p, i) => {
             const hp = foeSys?.guns?.[i] ?? caps?.gun ?? 4;
             // A DISMOUNTED GUN STAYS ON THE BOARD, crossed out. Removing it made the deck quietly change shape
             // between rounds; leaving it there is how you see what you have already done to her.
             out.push({
                 key: `gun${i}`, kind: "gun", zone: "guns", target: i, dead: hp <= 0,
-                name: `${ZONES.guns.name} ${i + 1}`, icon: ZONES.guns.icon, tint: ZONES.guns.tint, effect: ZONES.guns.effect,
+                name: living ? `${words.one} ${i + 1}` : `${ZONES.guns.name} ${i + 1}`,
+                icon: living ? MONSTER_ZONES.limb.icon : ZONES.guns.icon,
+                tint: living ? MONSTER_ZONES.limb.tint : ZONES.guns.tint,
+                effect: living ? MONSTER_ZONES.limb.effect : ZONES.guns.effect,
                 x: p.x * 100, y: p.y * 100, box: null,
                 hpPct: clampPct(hp, caps?.gun || 4), hp, hpMax: caps?.gun || 4,
                 chance: hitChance(att, ZONES.guns, shot, evasion),

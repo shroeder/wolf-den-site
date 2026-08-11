@@ -41,7 +41,7 @@ export const ENCOUNTERS = [
         guns: 1, hits: 5, accuracy: 0.5, rake: 0.04, ammo: "round",
         loot: [L.doubloons(6), L.fragments(1, "wooden")] },
     { id: "reef_crabs", kind: "monster", tier: 1, name: "Reef Crawler", cls: "Shell-backed crab",
-        blurb: "It has mistaken your hull for a rival. It is not entirely wrong.",
+        blurb: "It has mistaken your hull for a rival. It is not entirely wrong.", limb: "crab",
         guns: 1, hits: 6, accuracy: 0.52, rake: 0.05, ammo: "round",
         loot: [L.fragments(2, "wooden"), L.consumable("treat_bone")] },
     { id: "salvage_scow", kind: "ship", tier: 1, name: "The Bilge Rat", cls: "Salvage scow",
@@ -49,7 +49,7 @@ export const ENCOUNTERS = [
         guns: 2, hits: 6, accuracy: 0.52, rake: 0.05, ammo: "round",
         loot: [L.doubloons(8), L.chest("wooden")] },
     { id: "gull_swarm", kind: "monster", tier: 1, name: "Storm Petrels", cls: "Screaming flock",
-        blurb: "Hundreds of them, and every one wants what is in your hold.",
+        blurb: "Hundreds of them, and every one wants what is in your hold.", limb: "swarm",
         guns: 3, hits: 4, accuracy: 0.44, rake: 0.03, ammo: "grape",
         loot: [L.fragments(2, "wooden"), L.doubloons(5)] },
 
@@ -59,7 +59,7 @@ export const ENCOUNTERS = [
         guns: 3, hits: 9, accuracy: 0.56, rake: 0.07, ammo: "round",
         loot: [L.doubloons(14), L.chest("wooden"), L.consumable("spin_lucky_coin")] },
     { id: "glass_eels", kind: "monster", tier: 2, name: "Glass Eel Bloom", cls: "Swarm",
-        blurb: "They chew the caulking out from between your planks while you watch.",
+        blurb: "They chew the caulking out from between your planks while you watch.", limb: "swarm",
         guns: 4, hits: 8, accuracy: 0.5, rake: 0.05, ammo: "grape",
         loot: [L.fragments(3, "wooden"), L.consumable("treat_snack")] },
     { id: "tidewatch", kind: "ship", tier: 2, name: "Tidewatch", cls: "Revenue cutter",
@@ -67,7 +67,7 @@ export const ENCOUNTERS = [
         guns: 3, hits: 11, accuracy: 0.58, rake: 0.08, ammo: "chain",
         loot: [L.doubloons(16), L.fragments(2, "iron")] },
     { id: "shalefin", kind: "monster", tier: 2, name: "Shalefin", cls: "Armoured ray",
-        blurb: "It surfaces under you like a slab of moving slate.",
+        blurb: "It surfaces under you like a slab of moving slate.", limb: "jaws",
         guns: 2, hits: 13, accuracy: 0.55, rake: 0.1, ammo: "round",
         loot: [L.parts(1, 2), L.fragments(2, "iron")] },
 
@@ -76,8 +76,11 @@ export const ENCOUNTERS = [
         blurb: "No crew answers the hail. The gun ports run out anyway.",
         guns: 5, hits: 16, accuracy: 0.62, rake: 0.11, ammo: "chain",
         loot: [L.doubloons(24), L.chest("iron"), L.consumable("stone_storm")] },
+    // `limb` names what its arms are called; `guns` IS how many attacks it makes a turn, because the engine
+    // gives a foe one order per live gun. The blurb said "three arms" while guns was 4 — the card and the
+    // fight disagreed, and the fight was the honest one.
     { id: "kraken_young", kind: "monster", tier: 3, name: "Kraken Whelp", cls: "Young kraken",
-        blurb: "Only a juvenile. Only three arms across your deck.",
+        blurb: "Only a juvenile. Only four arms across your deck.", limb: "kraken",
         guns: 4, hits: 18, accuracy: 0.6, rake: 0.12, ammo: "round",
         loot: [L.parts(2, 3), L.consumable("treat_snack"), L.fragments(3, "iron")] },
     { id: "corsair_wolves", kind: "ship", tier: 3, name: "The Wolfpack", cls: "Corsair pair",
@@ -85,7 +88,7 @@ export const ENCOUNTERS = [
         guns: 6, hits: 15, accuracy: 0.64, rake: 0.13, ammo: "grape",
         loot: [L.doubloons(30), L.parts(2, 2)] },
     { id: "anglerdeep", kind: "monster", tier: 3, name: "The Lantern", cls: "Abyssal angler",
-        blurb: "You saw the light first. That was the point of the light.",
+        blurb: "You saw the light first. That was the point of the light.", limb: "jaws",
         guns: 3, hits: 21, accuracy: 0.66, rake: 0.14, ammo: "explosive",
         loot: [L.chest("iron"), L.fragments(4, "iron")] },
 
@@ -95,7 +98,7 @@ export const ENCOUNTERS = [
         guns: 7, hits: 24, accuracy: 0.68, rake: 0.15, ammo: "explosive",
         loot: [L.doubloons(44), L.chest("gold"), L.parts(3, 3)] },
     { id: "leviathan_old", kind: "monster", tier: 4, name: "Old Grief", cls: "Grey leviathan",
-        blurb: "It has been hit before, by better ships than yours, and it is still here.",
+        blurb: "It has been hit before, by better ships than yours, and it is still here.", limb: "jaws",
         guns: 5, hits: 30, accuracy: 0.67, rake: 0.16, ammo: "round",
         loot: [L.parts(3, 4), L.fragments(4, "gold"), L.consumable("treat_snack")] },
     { id: "black_liturgy", kind: "ship", tier: 4, name: "Black Liturgy", cls: "Cult barque",
@@ -103,7 +106,7 @@ export const ENCOUNTERS = [
         guns: 7, hits: 26, accuracy: 0.7, rake: 0.16, ammo: "chain",
         loot: [L.doubloons(48), L.consumable("scroll_ancient"), L.fragments(3, "gold")] },
     { id: "reef_drake", kind: "monster", tier: 4, name: "Reef Drake", cls: "Sea drake",
-        blurb: "It nests in a wreck it made itself, and it is bored.",
+        blurb: "It nests in a wreck it made itself, and it is bored.", limb: "jaws",
         guns: 6, hits: 27, accuracy: 0.69, rake: 0.18, ammo: "explosive",
         loot: [L.chest("gold"), L.parts(3, 3)] },
 
@@ -113,7 +116,7 @@ export const ENCOUNTERS = [
         guns: 9, hits: 36, accuracy: 0.74, rake: 0.2, ammo: "explosive",
         loot: [L.doubloons(70), L.chest("mythic"), L.parts(4, 4)] },
     { id: "elder_kraken", kind: "monster", tier: 5, name: "The Elder", cls: "Elder kraken",
-        blurb: "Every chart you own has the same word written over this water.",
+        blurb: "Every chart you own has the same word written over this water.", limb: "kraken",
         guns: 7, hits: 42, accuracy: 0.72, rake: 0.22, ammo: "round",
         loot: [L.parts(4, 5), L.chest("gold"), L.fragments(5, "mythic")] },
     { id: "drowned_admiral", kind: "ship", tier: 5, name: "The Drowned Admiral", cls: "Sunken flagship",
@@ -121,7 +124,7 @@ export const ENCOUNTERS = [
         guns: 9, hits: 40, accuracy: 0.75, rake: 0.22, ammo: "chain",
         loot: [L.doubloons(80), L.chest("mythic"), L.consumable("scroll_enchant")] },
     { id: "world_serpent", kind: "monster", tier: 5, name: "The Long Coil", cls: "World serpent",
-        blurb: "You can see two parts of it at once and they are very far apart.",
+        blurb: "You can see two parts of it at once and they are very far apart.", limb: "serpent",
         guns: 8, hits: 46, accuracy: 0.73, rake: 0.24, ammo: "explosive",
         loot: [L.parts(5, 4), L.chest("mythic"), L.fragments(6, "mythic")] },
 ];
@@ -136,7 +139,10 @@ export const encounterArt = (id) => `/images/sailing/enc/${id}.png`;
  * animal. This is the whole mechanical difference between the two shapes, and it is why a monster fight is a
  * race rather than a dismantling: you cannot blunt it first.
  */
-export const encounterZones = (enc) => (enc?.kind === "monster" ? ["hull"] : ["sails", "hull", "guns"]);
+// A ship offers canvas, timber and barrels. A creature offers its body and its LIMBS — which resolve through
+// the same "guns" slot in the engine (severing one removes an attack, exactly as dismounting a cannon does),
+// so nothing downstream needs a second code path. Only the words and the markers change.
+export const encounterZones = (enc) => (enc?.kind === "monster" ? ["hull", "guns"] : ["sails", "hull", "guns"]);
 
 /**
  * A voyage's encounter marks. Each is a fraction of the trip at which something may be waiting.

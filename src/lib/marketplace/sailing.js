@@ -10,6 +10,7 @@ import { grantItem, getEquippedStats, getEquippedIds } from "@/lib/marketplace/i
 import { itemById, ITEMS, STAT_META, sumItemSea, isTradeLocked, randomDropPool } from "@/lib/marketplace/items.js";
 import { sumPieceSea, COLLECTION_PIECES } from "@/lib/marketplace/collection-pieces.js";
 import { ENCOUNTERS, ENCOUNTER_MARKS, encounterById, encounterArt, encounterZones, lootPreview } from "@/lib/marketplace/encounters.js";
+import { limbPoints } from "@/lib/marketplace/monster-parts.js";
 import { getOwnedPieceIds, getOwnedSetIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
@@ -1254,11 +1255,19 @@ async function openEncounterBattle(buyerId, enc, row) {
             rider: me?.avatar_sprite_url || null,
             riderFlip: me?.avatar_sprite_flip === true,
             pet: crew[buyerId] || null },
-        // A MONSTER HAS NO PARTS. `zones` is normally measured off the sprite; an animal has no rigging and no
-        // gun ports, so the scene is told outright that timber is the only thing to shoot at.
+        // A MONSTER HAS PARTS, THEY ARE JUST NOT A SHIP'S. It has no rigging and no gun ports — but it does
+        // have LIMBS, and the engine has always given a foe one attack per live gun, so its arms have been its
+        // broadside from the day encounters shipped. What was missing is that `ports: []` meant you could not
+        // AIM at one: they hit you every round and there was nothing to shoot back at but the body.
+        //
+        // Limb markers are arranged rather than measured (see monster-parts.js) because a creature's arms are
+        // wherever the artist put them on thirty-odd different sprites, and a hand-placed table would rot the
+        // first time one was redrawn.
         foe: { name: enc.name, cls: enc.cls, art: encounterArt(enc.id), guns: enc.guns, hp: enc.hits,
             ammo: enc.ammo, boss: enc.tier >= 5, flavor: enc.blurb, mirror: false,
-            deck: 42, ports: [], rider: null, riderFlip: false, pet: null,
+            deck: 42, rider: null, riderFlip: false, pet: null,
+            ports: enc.kind === "monster" ? limbPoints(enc.guns) : [],
+            limb: enc.kind === "monster" ? (enc.limb || "default") : null,
             zones: encounterZones(enc) },
     };
     // `sys: false` is what turns the foe from a ship into an animal — see initBattleState.
