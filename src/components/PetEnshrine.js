@@ -135,14 +135,14 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
             ) : picked ? (
                 <p className="pens-none">
                     You have no {STONE_META[picked].name}. They turn up in a deep seam, on a dig, off a boss kill
-                    and in the dungeons — or the Quartermaster takes {(prices?.doubloons || 900).toLocaleString()} doubloons
-                    and the Armoury takes {(prices?.laurels || 6000).toLocaleString()} laurels for one.
+                    and in the dungeons — or the Quartermaster takes {(prices?.doubloons || 4000).toLocaleString()} doubloons
+                    and the Armoury takes {(prices?.laurels || 7500).toLocaleString()} laurels for one.
                 </p>
             ) : !any ? (
                 <p className="pens-none">
                     {pet.name} is ready and you have no stones. They turn up in a deep seam, on a dig, off a boss
-                    kill and in the dungeons — or buy one for {(prices?.doubloons || 900).toLocaleString()} doubloons
-                    at the Quartermaster, or {(prices?.laurels || 6000).toLocaleString()} laurels at the Armoury.
+                    kill and in the dungeons — or buy one for {(prices?.doubloons || 4000).toLocaleString()} doubloons
+                    at the Quartermaster, or {(prices?.laurels || 7500).toLocaleString()} laurels at the Armoury.
                 </p>
             ) : (
                 <p className="pens-none">Pick a stone to see what it does.</p>

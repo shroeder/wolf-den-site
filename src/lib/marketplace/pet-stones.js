@@ -112,7 +112,20 @@ export const STONE_SOURCES = {
 // hands somebody nothing for a month. So both stones sit in both shops at a deliberately unfriendly price —
 // affordable, but only if you decide it is the thing you are saving for.
 //
-// Priced at roughly a month of dedicated earning in each currency, which is the same order as the pet's own
-// climb to level 6. Nobody buys one by accident.
-export const STONE_PRICE_DOUBLOONS = 900;
-export const STONE_PRICE_LAURELS = 6000;
+// ── PRICED AGAINST WHAT THE CURRENCIES ACTUALLY EARN, NOT AGAINST A FEELING ─────────────────────────────────
+// The first pass put a stone at 900 doubloons "because that is roughly a month". It is not: a fleet win pays
+// `6 + rank*2` and you get five raids a day, so a maxed captain earns 180 a day and clears 900 in FIVE. It was
+// also cheaper than a single collection piece (1,000) while being worth considerably more — and the whole
+// point of these is to be the floor under bad luck, not a shortcut past the luck entirely.
+//
+// Both are now about THREE WEEKS of dedicated earning in their own currency, which is the same order as the
+// pet's own climb to level six and keeps the two routes level — otherwise whichever is cheaper becomes the
+// only one anybody uses:
+//
+//   doubloons  180/day at rank 15 with 5 raids  ->  4,000 is ~22 days
+//   laurels    ~350/day at 10 bouts a day        ->  7,500 is ~21 days
+//
+// scripts/check-stones.mjs prints those days from the real earn formulas, so the claim is checked rather than
+// asserted in a comment that slowly stops being true.
+export const STONE_PRICE_DOUBLOONS = 4000;
+export const STONE_PRICE_LAURELS = 7500;

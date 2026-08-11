@@ -60,10 +60,30 @@ for (const [who, rates] of Object.entries(PLAYERS)) {
     }
 }
 
-console.log("\nThe floor under the luck — if the dice never land, you can still buy one:");
-console.log(`  Quartermaster  ${STONE_PRICE_DOUBLOONS.toLocaleString()} doubloons   (a won ship battle pays ~40, so ~23 wins)`);
-console.log(`  Armoury        ${STONE_PRICE_LAURELS.toLocaleString()} laurels      (a bout pays ~35 either way, so ~170 bouts)`);
-console.log("  Both are a month of deciding that is what you are saving for. Nobody buys one by accident.");
+// ── THE FLOOR UNDER THE LUCK, PRICED IN DAYS ─────────────────────────────────────────────────────────────────
+// A price in currency means nothing without the earn rate beside it, and this section had a hand-written
+// sentence claiming "roughly a month" while 900 doubloons was FIVE DAYS for a maxed captain. Both numbers are
+// derived from the live formulas now, so the claim cannot quietly stop being true:
+//   a fleet win pays 6 + rank*2 (fleet.js) across 5 raids a day
+//   an arena bout pays ~18 + 34*ratio either way (arena-rewards.js) across 10 challenges
+console.log("\nThe floor under the luck — what buying one actually costs in DAYS:");
+const DUB_PER_DAY = 5 * (6 + 15 * 2);   // maxed captain: rank 15, five raids
+const LAU_PER_DAY = 10 * 35;            // ten bouts, ~35 laurels each, win or lose
+const dubDays = STONE_PRICE_DOUBLOONS / DUB_PER_DAY;
+const lauDays = STONE_PRICE_LAURELS / LAU_PER_DAY;
+console.log(`  Quartermaster  ${String(STONE_PRICE_DOUBLOONS.toLocaleString()).padStart(6)} doubloons = ${dubDays.toFixed(0).padStart(2)} days at ${DUB_PER_DAY}/day (rank 15, 5 raids)`);
+console.log(`  Armoury        ${String(STONE_PRICE_LAURELS.toLocaleString()).padStart(6)} laurels   = ${lauDays.toFixed(0).padStart(2)} days at ${LAU_PER_DAY}/day (10 bouts)`);
+
+// Neither route may be materially cheaper than the other, or the cheaper one becomes the only one anybody uses.
+const skew = Math.abs(dubDays - lauDays);
+if (skew > 5) bad += 1;
+console.log(`  the two routes are ${skew.toFixed(0)} days apart${skew <= 5 ? "" : "   *** ONE ROUTE IS THE CHEAP ONE ***"}`);
+
+// And a stone must cost meaningfully more than a collection piece (1,000 doubloons), which is worth far less.
+// At 900 it was CHEAPER than one, which is how a chase item stops being a chase.
+const vsPiece = STONE_PRICE_DOUBLOONS / 1000;
+if (vsPiece < 2) bad += 1;
+console.log(`  and ${vsPiece.toFixed(1)}x the price of a collection piece${vsPiece >= 2 ? "" : "   *** CHEAPER THAN A TRINKET ***"}`);
 
 console.log("\nAnd the climb itself, for reference:");
 for (const [rarity, mult] of RARITIES) {

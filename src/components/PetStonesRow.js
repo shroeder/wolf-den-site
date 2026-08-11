@@ -90,8 +90,8 @@ export default function PetStonesRow({ stones, prices, ready = [], closest = nul
                     {!held[open] ? (
                         <p className="pstr-get">
                             None in hand. They turn up in a deep seam, on a dig, off a boss kill and in the
-                            dungeons — or the Quartermaster takes {(prices?.doubloons || 900).toLocaleString()} doubloons
-                            and the Armoury {(prices?.laurels || 6000).toLocaleString()} laurels.
+                            dungeons — or the Quartermaster takes {(prices?.doubloons || 4000).toLocaleString()} doubloons
+                            and the Armoury {(prices?.laurels || 7500).toLocaleString()} laurels.
                         </p>
                     ) : null}
                 </div>
