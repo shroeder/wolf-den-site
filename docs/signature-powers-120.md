@@ -37,178 +37,178 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 
 ## The Farm
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 1 | **Perennial Root** | One harvest in three returns the seed you planted. | B |
-| 2 | **Hothouse Glass** | Your crops go into the ground already a third grown. | B |
-| 3 | **Second Sowing** | Two extra plots, permanently. | A |
-| 4 | **Nightsoil** | Every plant you put in the ground goes in already fertilized, free. | B |
-| 5 | **The Rain Barrel** | It is always raining on your farm, whatever the sky is doing. | B |
-| 6 | **Bumper Season** | The first harvest you take each day pays double. | B |
-| 7 | **Windfall Orchard** | The first crop you harvest each day also drops a chest. | B |
-| 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B |
-| 9 | **The Cold Frame** | One crop in three ignores its grow time entirely and is ready the moment it goes in. | B |
-| 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
-| 11 | **The Open Gate** | Petting and feeding on other people's farms never spends your daily budget. | B |
-| 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B |
-| 13 | **The Garden Path** | Every decoration on your farm gives a buff, whatever its rarity — cosmetics included. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 1 | **Perennial Root** | One harvest in three returns the seed you planted. | B | Celestial |
+| 2 | **Hothouse Glass** | Your crops go into the ground already a third grown. | B | Eternal |
+| 3 | **Second Sowing** | Two extra plots, permanently. | A | Primordial |
+| 4 | **Nightsoil** | Every plant you put in the ground goes in already fertilized, free. | B | Celestial |
+| 5 | **The Rain Barrel** | It is always raining on your farm, whatever the sky is doing. | B | Celestial |
+| 6 | **Bumper Season** | The first harvest you take each day pays double. | B | Celestial |
+| 7 | **Windfall Orchard** | The first crop you harvest each day also drops a chest. | B | Eternal |
+| 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B | Eternal |
+| 9 | **The Cold Frame** | One crop in three ignores its grow time entirely and is ready the moment it goes in. | B | Celestial |
+| 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A | Primordial |
+| 11 | **The Open Gate** | Petting and feeding on other people's farms never spends your daily budget. | B | Ascendant |
+| 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B | Eternal |
+| 13 | **The Garden Path** | Every decoration on your farm gives a buff, whatever its rarity — cosmetics included. | B | Celestial |
 
 ## Fishing
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 14 | **The Tide Table** | Casts you don't use roll over. Bank up to a week and spend the lot at once. | B |
-| 15 | **The Fishmonger's Standing Order** | One fish in three sells at the price of the next rarity up. | B |
-| 16 | **Two Hooks** | One cast in three lands a second fish. | B |
-| 17 | **The Lantern** | Casts made while the shop is closed pay double. | A |
-| 18 | **The Dredge Net** | One cast in four brings up treasure instead of a fish. | B |
-| 19 | **Cold Bait** | Your first cast each day cannot land a common. | B |
-| 20 | **The Full Creel** | Your daily casts refresh at noon as well as at midnight. | A |
-| 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
-| 22 | **The Long Haul** | One fish in four comes up two tiers rarer than it rolled. | B |
-| 23 | **The Gaff** | A fish that beats your personal best for its species refunds the cast. | B |
-| 24 | **The Tithe of Scales** | Every fish you land also gives a random chest fragment. | B |
-| 25 | **The Trawl** | One cast in five lands the whole tier — one of every fish at that rarity. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 14 | **The Tide Table** | Casts you don't use roll over. Bank up to a week and spend the lot at once. | B | Celestial |
+| 15 | **The Fishmonger's Standing Order** | One fish in three sells at the price of the next rarity up. | B | Eternal |
+| 16 | **Two Hooks** | One cast in three lands a second fish. | B | Primordial |
+| 17 | **The Lantern** | Casts made while the shop is closed pay double. | A | Eternal |
+| 18 | **The Dredge Net** | One cast in four brings up treasure instead of a fish. | B | Eternal |
+| 19 | **Cold Bait** | Your first cast each day cannot land a common. | B | Ascendant |
+| 20 | **The Full Creel** | Your daily casts refresh at noon as well as at midnight. | A | Celestial |
+| 21 | **The Chummed Water** | Every fifth cast is refunded. | B | Eternal |
+| 22 | **The Long Haul** | One fish in four comes up two tiers rarer than it rolled. | B | Celestial |
+| 23 | **The Gaff** | A fish that beats your personal best for its species refunds the cast. | B | Ascendant |
+| 24 | **The Tithe of Scales** | Every fish you land also gives a random chest fragment. | B | Eternal |
+| 25 | **The Trawl** | One cast in five lands the whole tier — one of every fish at that rarity. | B | Celestial |
 
 ## Sailing
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 26 | **Press-Ganged Crew** | Voyages finish in half the time. | A |
-| 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A |
-| 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A |
-| 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A |
-| 30 | **The Shipwright's Debt** | One boat upgrade in three costs you nothing. | B |
-| 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
-| 32 | **The Quiet Passage** | One encounter in three lets you pass without a fight and keeps the spoils. | B |
-| 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B |
-| 34 | **Beachhead** | One dig site in three is already half uncovered when you arrive. | B |
-| 35 | **The Press Gang** | One voyage a day returns the moment you send it out. | B |
-| 36 | **The Kraken's Toll** | Sea monsters you meet pay you to be left alone. | B |
-| 37 | **Salvager's Claim** | One voyage in three comes home with a piece of gear in the hold. | B |
-| 38 | **Chartwright** | It takes half as many fragments to complete a chest. | A |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 26 | **Press-Ganged Crew** | Voyages finish in half the time. | A | Primordial |
+| 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A | Primordial |
+| 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A | Celestial |
+| 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A | Primordial |
+| 30 | **The Shipwright's Debt** | One boat upgrade in three costs you nothing. | B | Eternal |
+| 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B | Celestial |
+| 32 | **The Quiet Passage** | One encounter in three lets you pass without a fight and keeps the spoils. | B | Ascendant |
+| 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B | Celestial |
+| 34 | **Beachhead** | One dig site in three is already half uncovered when you arrive. | B | Eternal |
+| 35 | **The Press Gang** | One voyage a day returns the moment you send it out. | B | Celestial |
+| 36 | **The Kraken's Toll** | Sea monsters you meet pay you to be left alone. | B | Eternal |
+| 37 | **Salvager's Claim** | One voyage in three comes home with a piece of gear in the hold. | B | Eternal |
+| 38 | **Chartwright** | It takes half as many fragments to complete a chest. | A | Primordial |
 
 ## The Depths
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 39 | **Shored Timbers** | The first collapse of each trip does nothing at all. | B |
-| 40 | **The Long Vein** | One seam in three pays out twice over. | B |
-| 41 | **The Assay Office** | One smelt in three costs no ore at all. | B |
-| 42 | **The Wide Seam** | One seam in three comes out a grade richer than it rolled. | B |
-| 43 | **The Deep Key** | You start every descent five floors down. | A |
-| 44 | **The Miner's Lamp** | Your trips start at the depth you reached last time, not at the top. | B |
-| 45 | **The Deep Cart** | One trip in three brings back twice the ore. | B |
-| 46 | **The Night Cage** | One extra trip a day, and the first bought trip costs nothing. | A |
-| 47 | **Assayer's Eye** | One haul in three comes back at the best grade it contained. | B |
-| 48 | **The Delver's Rope** | A dungeon run that ends badly does not count against your run for the day. | B |
-| 49 | **The Warren Map** | Every dungeon run has one extra floor before the boss. | A |
-| 50 | **The Gem Cutter's Eye** | One dungeon boss in two drops a gem. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 39 | **Shored Timbers** | The first collapse of each trip does nothing at all. | B | Eternal |
+| 40 | **The Long Vein** | One seam in three pays out twice over. | B | Celestial |
+| 41 | **The Assay Office** | One smelt in three costs no ore at all. | B | Celestial |
+| 42 | **The Wide Seam** | One seam in three comes out a grade richer than it rolled. | B | Celestial |
+| 43 | **The Deep Key** | You start every descent five floors down. | A | Primordial |
+| 44 | **The Miner's Lamp** | Your trips start at the depth you reached last time, not at the top. | B | Eternal |
+| 45 | **The Deep Cart** | One trip in three brings back twice the ore. | B | Celestial |
+| 46 | **The Night Cage** | One extra trip a day, and the first bought trip costs nothing. | A | Primordial |
+| 47 | **Assayer's Eye** | One haul in three comes back at the best grade it contained. | B | Eternal |
+| 48 | **The Delver's Rope** | A dungeon run that ends badly does not count against your run for the day. | B | Eternal |
+| 49 | **The Warren Map** | Every dungeon run has one extra floor before the boss. | A | Eternal |
+| 50 | **The Gem Cutter's Eye** | One dungeon boss in two drops a gem. | B | Celestial |
 
 ## The Kitchen
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 51 | **The Banked Fire** | Every third cook consumes no ingredients. | B |
-| 52 | **The Hot Stone** | One cook in three comes out a tier better than the recipe. | B |
-| 53 | **The Prep Bench** | One prep in three yields an extra ingredient. | B |
-| 54 | **The Big Pot** | One cook in three makes more of whatever it made. | B |
-| 55 | **The Head Chef** | A cook never pays the bottom rung. The consolation is off your ladder. | B |
-| 56 | **The Tasting Menu** | One cook a day makes every dish you KNOW those ingredients could have made. | B |
-| 57 | **The Standing Recipe** | Twice a day, a recipe may be cooked with any ingredients you hold. | B |
-| 58 | **The Copper Pot** | One cook in four makes a second helping. | B |
-| 59 | **The Cellar Key** | One harvest or landing in three puts a second copy in your pantry. | B |
-| 60 | **The Substitution** | Three times a day, one ingredient a recipe asks for may be swapped for any other you hold. | B |
-| 61 | **Chef's Pick** | One dish a day cooks at perfect timing without playing it. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 51 | **The Banked Fire** | Every third cook consumes no ingredients. | B | Eternal |
+| 52 | **The Hot Stone** | One cook in three comes out a tier better than the recipe. | B | Primordial |
+| 53 | **The Prep Bench** | One prep in three yields an extra ingredient. | B | Eternal |
+| 54 | **The Big Pot** | One cook in three makes more of whatever it made. | B | Celestial |
+| 55 | **The Head Chef** | A cook never pays the bottom rung. The consolation is off your ladder. | B | Eternal |
+| 56 | **The Tasting Menu** | One cook a day makes every dish you KNOW those ingredients could have made. | B | Celestial |
+| 57 | **The Standing Recipe** | Twice a day, a recipe may be cooked with any ingredients you hold. | B | Ascendant |
+| 58 | **The Copper Pot** | One cook in four makes a second helping. | B | Celestial |
+| 59 | **The Cellar Key** | One harvest or landing in three puts a second copy in your pantry. | B | Eternal |
+| 60 | **The Substitution** | Three times a day, one ingredient a recipe asks for may be swapped for any other you hold. | B | Ascendant |
+| 61 | **Chef's Pick** | One dish a day cooks at perfect timing without playing it. | B | Ascendant |
 
 ## The Forge & the Jewelcutter
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 62 | **The Cold Hammer** | Every third enhance consumes no parts. | B |
-| 63 | **The Smith's Certainty** | An enhance that fails costs you nothing and may be tried again at once. | B |
-| 64 | **Twice-Struck** | One salvage in three returns double parts. | B |
-| 65 | **The Attuned Bench** | Every attunement you carry counts at double its level. | A |
-| 66 | **The Jeweller's Eye** | Every gem you have set counts as one tier higher than it is. | A |
-| 67 | **Jeweller's Patience** | One gem in three survives being pulled from its socket. | B |
-| 68 | **The Steady Bench** | A failed fuse returns all three gems. | B |
-| 69 | **The Master's Mark** | One enhance in three counts as two levels instead of one. | B |
-| 70 | **The Reforging Right** | Reforging an element costs half. | A |
-| 71 | **The Tempered Edge** | Your gear's enhancement bonuses count double. | A |
-| 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B |
-| 73 | **The Deep Facet** | A gem set in one piece also gives its stat to the piece beside it. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 62 | **The Cold Hammer** | Every third enhance consumes no parts. | B | Primordial |
+| 63 | **The Smith's Certainty** | An enhance that fails costs you nothing and may be tried again at once. | B | Primordial |
+| 64 | **Twice-Struck** | One salvage in three returns double parts. | B | Celestial |
+| 65 | **The Attuned Bench** | Every attunement you carry counts at double its level. | A | Primordial |
+| 66 | **The Jeweller's Eye** | Every gem you have set counts as one tier higher than it is. | A | Primordial |
+| 67 | **Jeweller's Patience** | One gem in three survives being pulled from its socket. | B | Eternal |
+| 68 | **The Steady Bench** | A failed fuse returns all three gems. | B | Eternal |
+| 69 | **The Master's Mark** | One enhance in three counts as two levels instead of one. | B | Celestial |
+| 70 | **The Reforging Right** | Reforging an element costs half. | A | Ascendant |
+| 71 | **The Tempered Edge** | Your gear's enhancement bonuses count double. | A | Primordial |
+| 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B | Celestial |
+| 73 | **The Deep Facet** | A gem set in one piece also gives its stat to the piece beside it. | B | Primordial |
 
 ## The Town
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 74 | **Founder's Charter** | The travelling merchant sells to you at half price. | A |
-| 75 | **The Standing Order** | The travelling merchant's one-a-day chest limit becomes three of each. | A |
-| 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A |
-| 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B |
-| 78 | **The Warden's Key** | You may release one person from the Stockade each week. | B |
-| 79 | **The Free Company** | Your spoils ceiling on a town raid is doubled. | A |
-| 80 | **The Muster** | You may fight in a town raid from anywhere. You need not be stood in the plaza. | B |
-| 81 | **The Toll House** | Every member who visits your farm pays you a toll — from the house, not from them. | B |
-| 82 | **Standing Invitation** | Anyone may visit your farm without spending one of their daily visits. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 74 | **Founder's Charter** | The travelling merchant sells to you at half price. | A | Ascendant |
+| 75 | **The Standing Order** | The travelling merchant's one-a-day chest limit becomes three of each. | A | Ascendant |
+| 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A | Eternal |
+| 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B | Ascendant |
+| 78 | **The Warden's Key** | You may release one person from the Stockade each week. | B | Ascendant |
+| 79 | **The Free Company** | Your spoils ceiling on a town raid is doubled. | A | Eternal |
+| 80 | **The Muster** | You may fight in a town raid from anywhere. You need not be stood in the plaza. | B | Ascendant |
+| 81 | **The Toll House** | Every member who visits your farm pays you a toll — from the house, not from them. | B | Ascendant |
+| 82 | **Standing Invitation** | Anyone may visit your farm without spending one of their daily visits. | B | Ascendant |
 
 ## Chests, the Wheel & the Daily
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 83 | **The Locksmith** | One chest in three opens a rarity higher. | B |
-| 84 | **Twin Hinges** | One chest a day gives its rewards twice. | B |
-| 85 | **The Free Spin** | Your first three spins each day cost nothing. | A |
-| 86 | **Dealer's Choice** | Re-roll any wheel result once and keep whichever you prefer. | B |
-| 87 | **The Standing Streak** | Your check-in streak never breaks, and it counts double toward every streak reward. | A |
-| 88 | **Day's Double** | Your daily check-in pays out twice. | B |
-| 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B |
-| 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A |
-| 91 | **The Master Key** | One chest in three also gives you the chest one tier below it, to open yourself. | B |
-| 92 | **The Sorting Table** | A chest that would pay you dust widens to the rarity above instead. | B |
-| 93 | **The Long Day** | Every daily allowance in the game is one larger. Every single one. | A |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 83 | **The Locksmith** | One chest in three opens a rarity higher. | B | Primordial |
+| 84 | **Twin Hinges** | One chest a day gives its rewards twice. | B | Celestial |
+| 85 | **The Free Spin** | Your first three spins each day cost nothing. | A | Eternal |
+| 86 | **Dealer's Choice** | Re-roll any wheel result once and keep whichever you prefer. | B | Ascendant |
+| 87 | **The Standing Streak** | Your check-in streak never breaks, and it counts double toward every streak reward. | A | Eternal |
+| 88 | **Day's Double** | Your daily check-in pays out twice. | B | Celestial |
+| 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B | Ascendant |
+| 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A | Ascendant |
+| 91 | **The Master Key** | One chest in three also gives you the chest one tier below it, to open yourself. | B | Eternal |
+| 92 | **The Sorting Table** | A chest that would pay you dust widens to the rarity above instead. | B | Eternal |
+| 93 | **The Long Day** | Every daily allowance in the game is one larger. Every single one. | A | Primordial |
 
 ## Pets
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 94 | **The Long Vigil** | Your equipped pet earns pet XP at triple the rate. | A |
-| 95 | **The Deep Bowl** | One treat in three feeds your pet without being used up. | B |
-| 96 | **The Long Leash** | Your pet's ability keeps working while you are on someone else's farm. | B |
-| 97 | **Breeder's Eye** | You choose which pet a random pet reward gives you. | B |
-| 98 | **The Second Sitting** | One time in three, your equipped pet's ability fires twice. | B |
-| 99 | **The Beast's Share** | Your equipped pet's ability works at the strength it would have one level higher. | A |
-| 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
-| 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
-| 102 | **The Long Table** | Your menagerie ceiling is half again as high. | A |
-| 103 | **The Whistle** | A pet you swap out keeps its ability for the rest of the day. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 94 | **The Long Vigil** | Your equipped pet earns pet XP at triple the rate. | A | Primordial |
+| 95 | **The Deep Bowl** | One treat in three feeds your pet without being used up. | B | Ascendant |
+| 96 | **The Long Leash** | Your pet's ability keeps working while you are on someone else's farm. | B | Ascendant |
+| 97 | **Breeder's Eye** | You choose which pet a random pet reward gives you. | B | Ascendant |
+| 98 | **The Second Sitting** | One time in three, your equipped pet's ability fires twice. | B | Celestial |
+| 99 | **The Beast's Share** | Your equipped pet's ability works at the strength it would have one level higher. | A | Celestial |
+| 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A | Primordial |
+| 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A | Celestial |
+| 102 | **The Long Table** | Your menagerie ceiling is half again as high. | A | Primordial |
+| 103 | **The Whistle** | A pet you swap out keeps its ability for the rest of the day. | B | Ascendant |
 
 ## Market, Trade & Credit
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 104 | **The Auctioneer's Seat** | You pay no listing fee, and listing never takes the item out of your bags. | A |
-| 105 | **Merchant's Word** | A trade you offer holds its items in escrow without taking them off you. | B |
-| 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B |
-| 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
-| 108 | **The Counting House** | The gold in your purse earns interest, paid at every check-in. | B |
-| 109 | **The Merchant's Eye** | One daily deal each day is offered to you at half price. | A |
-| 110 | **No Reserve** | An auction that does not sell is relisted for you, free, until it does. | B |
-| 111 | **The Bulk Buyer** | One purchase in three from the gold shop comes in pairs. | B |
-| 112 | **The Merchant's Ledger** | The travelling merchant stocks his whole catalogue for you, whatever your Trading Post level. | A |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 104 | **The Auctioneer's Seat** | You pay no listing fee, and listing never takes the item out of your bags. | A | Ascendant |
+| 105 | **Merchant's Word** | A trade you offer holds its items in escrow without taking them off you. | B | Ascendant |
+| 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B | Ascendant |
+| 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B | Ascendant |
+| 108 | **The Counting House** | The gold in your purse earns interest, paid at every check-in. | B | Ascendant |
+| 109 | **The Merchant's Eye** | One daily deal each day is offered to you at half price. | A | Ascendant |
+| 110 | **No Reserve** | An auction that does not sell is relisted for you, free, until it does. | B | Ascendant |
+| 111 | **The Bulk Buyer** | One purchase in three from the gold shop comes in pairs. | B | Ascendant |
+| 112 | **The Merchant's Ledger** | The travelling merchant stocks his whole catalogue for you, whatever your Trading Post level. | A | Ascendant |
 
 ## Collections & Standing
 
-| # | Name | Effect | Class |
-|---|---|---|---|
-| 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A |
-| 114 | **Herald's Licence** | One badge a month is granted to you outright, chosen from what you are missing. | B |
-| 115 | **The Loaned Exhibit** | One collection piece you do not own counts as owned. You choose which. | B |
-| 116 | **The Seal of Office** | A collection you have completed keeps paying if you lend a piece away. | B |
-| 117 | **The Long Service Record** | Your ten best badges pay their bonus twice. | A |
-| 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
-| 119 | **The Founder's Plate** | One collection piece a week is delivered to you, chosen from what you are missing. | B |
-| 120 | **The Standing Ovation** | A cheer pays you twice over — both times you cheer and when the hero lands their strike. | B |
+| # | Name | Effect | Class | Tier |
+|---|---|---|---|---|
+| 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A | Primordial |
+| 114 | **Herald's Licence** | One badge a month is granted to you outright, chosen from what you are missing. | B | Ascendant |
+| 115 | **The Loaned Exhibit** | One collection piece you do not own counts as owned. You choose which. | B | Ascendant |
+| 116 | **The Seal of Office** | A collection you have completed keeps paying if you lend a piece away. | B | Primordial |
+| 117 | **The Long Service Record** | Your ten best badges pay their bonus twice. | A | Primordial |
+| 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B | Ascendant |
+| 119 | **The Founder's Plate** | One collection piece a week is delivered to you, chosen from what you are missing. | B | Primordial |
+| 120 | **The Standing Ovation** | A cheer pays you twice over — both times you cheer and when the hero lands their strike. | B | Ascendant |
 
 ---
 
@@ -312,7 +312,7 @@ Generating LOOT while equipped is fine and is not this. The flaw is specifically
 already exists.** Five entries failed:
 
 | # | Was | Now | The laundering |
-|---|---|---|---|
+|---|---|---|---|---|
 | 65 | Attuning Fire | **The Attuned Bench** | Enhance a stack, every one attunes, unequip, sell attuned gear |
 | 66 | The Second Socket | **The Jeweller's Eye** | Cut sockets into ten pieces, unequip, sell them socketed |
 | 71 | The Deep Temper | **The Tempered Edge** | Enhance past the ceiling, unequip, sell overlevelled gear |
@@ -344,7 +344,7 @@ assumed. Luke caught all of them. What the code actually says:
 - **People like opening chests.** A power that opens one for you takes away the part they came for.
 
 | # | Was | Why it was wrong | Now |
-|---|---|---|---|
+|---|---|---|---|---|
 | 22 | The Salt Cure | Nothing spoils | **The Long Haul** — fish come up two tiers rarer than they rolled |
 | 49 | The Iron Door | No persistent floors, and it read as a debuff | **The Cartographer's Coin** — take both options at a choice floor |
 | 55 | The Second Seasoning | Dishes have no buffs | **The Top of the Ladder** — every cook pays the top rung, never the consolation |
@@ -383,7 +383,7 @@ stat** (attunements count double while worn).
 ### Named individually by Luke
 
 | # | Was | Why | Now |
-|---|---|---|---|
+|---|---|---|---|---|
 | 1 | Perennial Root | Must stop when the item comes off; "of your choosing" needed farm UI | **One harvest in three returns its seed** |
 | 4 | Nightsoil | Luke's own rewrite | **Every plant goes in already fertilized, free** |
 | 5 | The Pig's Standing Invitation | The Loot Pig already comes daily | **Sun Trap** — sunny weather halves grow time |
@@ -542,7 +542,7 @@ both already free.
 Three were quietly enormous. Numbers first:
 
 | # | Power | The measurement | Fix |
-|---|---|---|---|
+|---|---|---|---|---|
 | 117 | The Long Service Record — every badge pays twice | **131 badges carry a bonus. All of them together are +356 Might / +74 crit chance / +64 crit power.** Best-in-slot gear across all nine slots is +202 Might — the badge pool is already bigger than the best gear in the game, and this doubled it. | **Your ten best badges** pay twice |
 | 73 | The Deep Facet — one gem's stat on every piece | Gem tiers run 2 / 4 / 7 / 11 / **16**. Nine slots × a Flawless = **+144**, against +202 for an entire best-in-slot set — one gem worth three-quarters of a full kit. | The piece **beside** it, not all nine |
 | 113 + 116 | One piece counts as two, and capstones fire one short | Sets are 4–6 pieces. "One counts as two" fires a four-piece capstone at **two pieces** — and 116 was a weaker version of the same idea, so they were competing. | 113 stands; **116 repointed** at lending a piece away |
@@ -638,7 +638,7 @@ app; `chargeState()` gates it on `charges_left` and the cooldown.
 The five at the top already exist:
 
 | Item | Rarity | Pays | Owner |
-|---|---|---|---|
+|---|---|---|---|---|
 | `ascendant_crown` | ascendant | **$100 store credit** | **aannw** |
 | `ascendant_blade` | ascendant | a $30 bundle | **ericd** |
 | `ascendant_aegis` | ascendant | a $25 pack | — |
@@ -706,3 +706,49 @@ exists than it looked. Three things follow:
 - **`SELL_VALUES` has no celestial or primordial entry** (it stops at eternal: 6000). Minting either tier
   without adding them means those items sell back for `undefined`. Charged items are already blocked from being
   sold at all, which covers the 22, but not the other 33.
+
+
+---
+
+# Tiering — which power goes on which rarity
+
+Luke, 2026-08-11: *"I trust that you can figure out which ones are better than others to elevate to the higher
+rarity items, and the lower rarity items that carry these powers would get the less powerful affixes."*
+
+**35 ascendant · 30 eternal · 30 celestial · 25 primordial.** Every one of the 120 placed exactly once,
+verified by script rather than by counting down a list.
+
+The line between the bands is what a power MOVES, not how it reads:
+
+| Tier | The test | Examples |
+|---|---|---|
+| **Primordial** (25) | Changes what a whole system pays, or lifts a structural ceiling | Diviner's Rod (buried fragments 3 → 12), The Long Day (+1 on every daily allowance in the game), The Completionist's Ledger (one set piece counts as two), Second Sowing (two extra plots), Press-Ganged Crew (voyages in half the time) |
+| **Celestial** (30) | Changes an outcome often enough to reshape how you play a feature | The Long Vein (one seam in three pays twice), The Hot Stone (one cook in three a tier better), Twin Hinges, The Tide Table, The Beast's Share |
+| **Eternal** (30) | A strong, reliable edge inside one loop | Windfall Orchard, The Lantern, Shored Timbers, The Banked Fire, The Master Key |
+| **Ascendant** (35) | A convenience, a cost shaved, or a once-a-day nicety | The Reforging Right, Market Day, Chef's Pick, The Substitution, Dealer's Choice |
+
+Two deliberate calls worth naming, because they look like exceptions:
+
+- **The Forge and Jewelcutter powers sit high.** The Jeweller's Eye, The Tempered Edge, The Attuned Bench, The
+  Deep Facet and both enhance powers are all primordial or celestial. They multiply gear you have already
+  built, which compounds with everything else you are wearing in a way a farm perk does not.
+- **The market powers sit low.** No auction fee, the daily deal at half price, the gold shop in pairs — every
+  one is real, and none of them changes an outcome, only a price. That is the definition of the bottom band,
+  and it is why seven of them are ascendant.
+
+# Store credit — the amounts
+
+Luke's bands: $5–10, $20–40, $40–60, $60–120, with $120 the ceiling. One charge on everything new, so the
+liability is countable rather than recurring.
+
+| Tier | Carrying credit | Amounts | Exposure |
+|---|---|---|---|
+| Celestial | 8 of 30 | 4 × $20, 3 × $30, 1 × $40 | $210 |
+| Primordial | 6 of 25 | 3 × $60, 2 × $80, 1 × $120 | $460 |
+| | **14 of 55** | | **$670** |
+
+**Already outstanding: $315**, and that number matters because it is live right now — the five converted items
+carry 2–3 charges each, not one. aannw's ascendant_crown alone is $100 × 2. Nothing has been redeemed yet.
+
+**All-in: $985**, once each, across 19 items. The lever is the COUNT rather than the amounts — 5 celestial and
+4 primordial would be $430 new instead of $670.
