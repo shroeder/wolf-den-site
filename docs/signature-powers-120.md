@@ -77,7 +77,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 26 | **Press-Ganged Crew** | Voyages finish in half the time. | A |
 | 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A |
 | 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A |
-| 29 | **Diviner's Rod** | Your first dig of every voyage uncovers a chest. | B |
+| 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A |
 | 30 | **The Shipwright's Debt** | Boat upgrades cost half. | A |
 | 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
 | 32 | **Letters of Marque** | An encounter you lose costs you no sortie. | B |
@@ -462,6 +462,20 @@ mattering — no waiting for a wet day, no cooldown between them.
 A gear power that only works when paired with one specific pet is not a power, it is a footnote. Replaced with
 **The Dredge Net** — one cast in four brings up treasure instead of a fish, which uses `TREASURE_CHANCE`, the
 lever `dredge` already widens and that nothing else on this list touches.
+
+## Tenth pass — a dig turns up fragments, not chests
+
+**Diviner's Rod (29)** said the first dig of every voyage uncovers a chest. Digs do not uncover chests. They
+uncover FRAGMENTS — `FRAGMENTS_BURIED = 3` scattered through a 16-tile board, Fortune adding one per level, to
+a ceiling of `MAX_BURIED = 12` — and ten fragments make a chest. Everybody already turns up a chest eventually
+by digging; that is the loop, not a prize to hand out.
+
+So the power now moves the number that actually decides a dig's worth: **every dig site is buried with the most
+fragments it can hold.** Base three becomes twelve, on a board that only has sixteen tiles.
+
+That leaves the four sailing dig powers each on a different lever, which is the point: **Deep Ballast** buys
+stamina, **Beachhead** buys a head start on the board, **Chartwright** halves what a chest costs
+(`FRAGMENTS_PER_CHEST` 10 → 5), and **Diviner's Rod** fills the ground.
 
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
 state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
