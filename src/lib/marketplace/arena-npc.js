@@ -1,3 +1,5 @@
+import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
+
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
 // Pure. No DB, no server-only — the ladder screen and the engine read the same catalog.
 //
@@ -201,6 +203,44 @@ export function npcAbilities(tier) {
  * because being told to grind tier 7 before you may look at tier 9 is the treadmill this is meant to replace.
  */
 export const NPC_REACH = 5;
+
+/**
+ * The tier whose stat budget matches a given rating — i.e. where you ALREADY belong, before you have beaten
+ * anything.
+ *
+ * THE REACH USED TO START AT ZERO. `npc_best` is 0 until you win a Gauntlet fight, so a member who arrived
+ * fully geared could only ever be offered tiers 1-5 — every one of them a joke — and once the matchmaker
+ * started RESERVING seats for the Gauntlet, that guaranteed a run of Straw Dummies to exactly the players
+ * least interested in one. The ladder was gating on "what have you proven here" when it had a much better
+ * answer available: what you are carrying.
+ */
+export function tierForRating(rating) {
+    if (!(rating > 0)) return 1;
+    // SEARCHED, NOT SOLVED WITH A MAGIC NUMBER. The first cut multiplied npcPower by a constant I guessed at
+    // (4.2) and put a rating of 400 at tier 17 — wildly wrong, and wrong in the direction that would have
+    // handed a beginner the Nightmare band. Rating is health x damage x crit x armour and none of that
+    // collapses to one coefficient, so this walks the ladder and takes the closest tier. It is thirty
+    // comparisons of arithmetic, once per matchmake.
+    let best = 1;
+    let bestGap = Infinity;
+    for (let t = 1; t <= 200; t += 1) {
+        const n = npcFor(t);
+        // Derived with the SHARED helpers, not a second copy of the formulas. A Gauntlet tier is a stat block
+        // now — might / crit / ferocity, exactly like a member's gear — so its damage and health come from the
+        // same three functions the fight uses. Restating them here is how the ladder and the engine end up
+        // disagreeing about how strong tier 20 is.
+        const damage = swingFrom(n.might);
+        const hp = healthFrom(n.ferocity);
+        const cc = critChanceFrom(n.crit_chance);
+        const cm = critMultFrom(n.crit_power);
+        const perSwing = damage * (1 + cc * (cm - 1));
+        const r = Math.round((perSwing * (hp / Math.max(0.1, 1 - (n.armour || 0)))) / 10);
+        const gap = Math.abs(r - rating);
+        if (gap < bestGap) { bestGap = gap; best = t; }
+        if (r > rating * 1.5) break;   // past it — the curve only climbs
+    }
+    return best;
+}
 export function npcOffer(bestTier = 0, count = 6) {
     const top = Math.max(1, bestTier + NPC_REACH);
     const out = [];

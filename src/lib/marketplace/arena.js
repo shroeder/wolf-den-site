@@ -12,7 +12,7 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { pickIncoming, AI_BRACE_GUARD } from "@/lib/marketplace/arena-ai.js";
-import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
+import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
@@ -221,7 +221,10 @@ async function kitFor(buyerId) {
     // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
     const art = await itemSpriteMap().catch(() => ({}));
-    for (const a of kit.abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
+    // `abilities` — the ones actually in play. This looped over kit.abilities, the GEAR-derived list, which
+    // stopped being what the fight uses when the tree took over: every ability in the bout went without its
+    // art, and the loop dutifully decorated a list nobody read.
+    for (const a of abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
     return {
         level, gearPower,
         classId, taken, perks,
@@ -559,7 +562,9 @@ const RESERVE_MEMBER = 2;
 // The alternative is tuning MEMBER_WEIGHT and the reserve counts until the measured number lands near the
 // target, which is how you end up with three constants nobody can explain and a split that drifts the next
 // time the roster changes shape. This holds at any roster size by construction.
-const GAUNTLET_SHARE = 0.45;
+// 0.45 was too much: three Gauntlet fights in a row is a run nobody wants, and at 45% that happens roughly
+// once every eleven matches. At 30% it is once every thirty-seven, which reads as variety rather than a rut.
+const GAUNTLET_SHARE = 0.3;
 
 function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
@@ -571,7 +576,11 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     }
     // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can
     // never hand you a tier a crafted POST would have been refused.
-    const maxTier = Math.max(1, (Number(bestTier) || 0) + NPC_REACH);
+    //
+    // The floor is WHERE YOUR GEAR PUTS YOU, not what you have beaten here. Starting from `npc_best` alone
+    // meant a fully geared newcomer could be offered nothing but tiers 1-5, and reserving Gauntlet seats then
+    // handed them a run of Straw Dummies — the exact complaint.
+    const maxTier = Math.max(1, Math.max(Number(bestTier) || 0, tierForRating(myPower)) + NPC_REACH);
     for (let t = 1; t <= maxTier; t += 1) {
         const n = npcFor(t);
         if (!n) break;
@@ -582,8 +591,13 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     npcs.sort((a, z) => a.d - z.d);
 
     // Seat the reserved places first, then fill what is left with whoever is closest overall.
-    const picked = [...npcs.slice(0, RESERVE_NPC), ...members.slice(0, RESERVE_MEMBER)];
-    const rest = [...members.slice(RESERVE_MEMBER), ...npcs.slice(RESERVE_NPC)].sort((a, z) => a.d - z.d);
+    // A RESERVED SEAT IS NOT A BLANK CHEQUE. A tier more than half a power-step away from you is not a fight,
+    // it is a formality — and forcing one in was what put Straw Dummies in front of a geared player. If no
+    // tier is close enough, the Gauntlet simply does not take its seats this time.
+    const FAIR = 0.5;
+    const fairNpcs = npcs.filter((n) => n.d <= FAIR);
+    const picked = [...fairNpcs.slice(0, RESERVE_NPC), ...members.slice(0, RESERVE_MEMBER)];
+    const rest = [...members.slice(RESERVE_MEMBER), ...npcs.filter((n) => !picked.includes(n))].sort((a, z) => a.d - z.d);
     picked.push(...rest.slice(0, Math.max(0, SHORTLIST - picked.length)));
 
     // ── WEIGHTED WITHIN ITS OWN KIND, THEN NORMALISED TO THE SPLIT ──────────────────────────────────────
@@ -809,7 +823,10 @@ export async function fightRound(buyerId, opts = {}) {
         const ward = (b.me.abilities || []).find((x2) => x2.id === opts.abilityId && x2.defensive);
         if (!ward) return { ok: false, error: "no_ability", ...(await getArenaState(buyerId)) };
         if ((b.cd[ward.id] || 0) > 0) return { ok: false, error: "cooling", ...(await getArenaState(buyerId)) };
-        b.cd[ward.id] = ward.cooldown || 0;
+        // Quickening applies here too. This set the raw cooldown while the offensive path used coolFor(), so
+        // three ranks of a node that says "shaves a turn off your cooldowns" shaved nothing off the two
+        // abilities a defensive build actually leans on.
+        b.cd[ward.id] = coolFor(ward);
         // A RIPOSTE is the other defensive answer: it does not soak anything, it sends their blow back. That
         // makes the defensive slot a real choice — eat less, or make them pay for swinging.
         // One defensive play at a time — a second ward while one is already up is wasted, which is what
@@ -904,6 +921,7 @@ export async function fightRound(buyerId, opts = {}) {
         let drain = 0;             // share of damage returned to you as health
         let rend = false;          // leaves a burn behind
         let sunder = false;        // strips their guard for a few turns
+        let justSurged = false;    // cast THIS turn, so it must not be spent on the cast itself
         // ── WHAT MAKES ONE SKILL DIFFERENT FROM ANOTHER ──────────────────────────────────────────────────
         // Using a skill has always mattered enormously — 4,000 bouts a cell says a good hand goes from 15% to
         // 95% against +30% gear with them, and bouts run 8.8 beats instead of 15. But STRIKE and SPELL were
@@ -928,7 +946,11 @@ export async function fightRound(buyerId, opts = {}) {
             power = ability.power;
             note = ` · ${ability.name}`;
             // ward and riposte never reach here — they resolve above as free actions and keep your beat.
-            if (ability.kind === "surge") { b.surge = SURGE_SWINGS; power = 0; note += " — sharpened"; }
+            // SURGE USED TO EAT ONE OF ITS OWN CHARGES. It set b.surge = 3 and then fell through to the
+            // spender twenty lines below, which multiplied a ZERO-power cast by 1.5 and decremented to 2. You
+            // paid a whole turn for three sharpened swings and got two, with the first 1.5x spent on a hit
+            // that dealt nothing. `justSurged` holds the spender off for exactly the turn you cast it.
+            if (ability.kind === "surge") { b.surge = SURGE_SWINGS; power = 0; justSurged = true; note += " — sharpened"; }
             if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
             if (ability.kind === "strike") {
@@ -958,8 +980,8 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "sunder") sunder = true;
         }
         // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
-        const surge = b.surge > 0 ? 1.5 : 1;
-        if (b.surge > 0) b.surge -= 1;
+        const surge = (b.surge > 0 && !justSurged) ? 1.5 : 1;
+        if (b.surge > 0 && !justSurged) b.surge -= 1;
         // Their gear defends them too. Without this the attacker always lands full and the better loadout
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
         // Their guard, minus whatever a Sunder has already stripped off it.
