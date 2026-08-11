@@ -612,19 +612,44 @@ Luke, 2026-08-11: *"real world perks are cool but they should only be in the two
 about to create. Additionally they should just be X store credit instead of the ones we have, which are pretty
 abstract and hard to apply."*
 
-## What is there today, and why moving it costs nothing
+## What is there today — CORRECTED
+
+An earlier version of this section said nobody owned a charged item and that no ascendant or eternal item
+carried one. **Both were wrong.** I parsed items.js with a brace-walk that returned `rarity: null` on all 46
+rows, and reported the conclusion instead of noticing that a table where every rarity is null has not been read.
+Luke caught it: his wife holds one and so does Eric.
 
 A real-world perk is a separate field set from a signature power. It lives on the item:
 `charged: true, charges: N, cooldownDays: D, chargeReward: "<key>"`. Redeemed at the counter through the admin
 app; `chargeState()` gates it on `charges_left` and the cooldown.
 
-- **46 of 306 items carry one.** All of them common → mythic. All `source: "admin"` or `"elite"`.
-- **Nobody owns a single one.** Zero rows in `mkt_user_item` for any of the 46, and 2 redemptions ever
-  recorded in the game's lifetime.
-- **Zero ascendant or eternal items carry one.**
+**46 of 306 items carry one, and they span every rarity:**
 
-So the system exists, is enforced, and has never actually been issued. Moving it up to the top two tiers takes
-nothing away from anybody.
+| Rarity | Charged items |
+|---|---|
+| common | 7 |
+| rare | 11 |
+| epic | 12 |
+| legendary | 7 |
+| mythic | 4 |
+| **ascendant** | **3** |
+| **eternal** | **2** |
+
+The five at the top already exist:
+
+| Item | Rarity | Pays | Owner |
+|---|---|---|---|
+| `ascendant_crown` | ascendant | **$100 store credit** | **aannw** |
+| `ascendant_blade` | ascendant | a $30 bundle | **ericd** |
+| `ascendant_aegis` | ascendant | a $25 pack | — |
+| `eternal_wolf_crown` | eternal | a $120 box | — |
+| `eternal_infinity` | eternal | the elite grail | — |
+
+**Five members hold a charged item:** ericd and aannw as above, plus vital (`linecutter_token`, skip the line),
+alstier1 (`premium_sleeve_charm`) and Nynebreaker (`starter_pack_charm`). No redemptions recorded yet.
+
+So the idea is not new — the top two rarities ALREADY carry real-world perks, and `ascendant_crown` is already
+pure store credit, which is the shape Luke wants everything to take.
 
 ## The reward vocabulary shrinks to one thing
 
@@ -658,6 +683,20 @@ the shape is what matters.
 
 Deliberately NOT every top-tier item. Two-thirds of the apex gear pays in game terms only, so a real-world
 payout stays a genuine surprise rather than the expected outcome of a tier.
+
+## What this changes about the plan
+
+Luke's rule — real-world perks only in the top two tiers, and only as store credit — is closer to what already
+exists than it looked. Three things follow:
+
+1. **The five top-tier charged items stay.** Two of them are held by real members. Nothing gets taken away.
+2. **Their rewards want converting, not removing.** `ascendant_crown` is already `$100 store credit`. The other
+   four pay a $30 bundle, a $25 pack, a $120 box and "the elite grail" — exactly the abstract kind Luke wants
+   gone. Converting them to the credit ladder is roughly value-neutral and strictly easier to hand over. But
+   **ericd's item changes what it pays**, so that is Luke's call, not mine.
+3. **The 41 below ascendant are the real question.** Three are owned — vital, alstier1 and Nynebreaker each
+   hold one. Stripping `charged` from those three takes something from somebody, however small. The other 38
+   are unissued and can lose it for free.
 
 ## Two things to settle when these are minted
 
