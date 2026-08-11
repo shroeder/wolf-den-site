@@ -12,7 +12,7 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor, npcOffer, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
-import { boutLaurels, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
+import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
@@ -472,25 +472,32 @@ function winReward(myPos, theirPos) {
 // know: somebody came for your spot while you weren't looking.
 async function awayReport(buyerId, row) {
     const since = row?.last_seen_at || null;
+    // ── GROUPED BY WHO, NOT ONE ROW PER BOUT ─────────────────────────────────────────────────────────────
+    // Eric fighting you three times printed three identical rows saying the same sentence. The interesting
+    // fact is "Eric came at you three times and lost twice", which is one line.
     const rows = await db.query(
-        `SELECT ab.challenger_id, ab.defender_id, ab.challenger_won, ab.challenger_pos, ab.defender_pos, ab.rounds, ab.created_at,
-                bc.display_name AS c_name, bc.alias AS c_alias, bc.avatar_sprite_url AS c_sprite,
-                bd.display_name AS d_name, bd.alias AS d_alias, bd.avatar_sprite_url AS d_sprite
+        `SELECT ab.challenger_id,
+                SUM(CASE WHEN ab.challenger_won THEN 1 ELSE 0 END)::int AS lost,
+                SUM(CASE WHEN ab.challenger_won THEN 0 ELSE 1 END)::int AS held,
+                SUM(COALESCE(ab.defender_laurels, 0))::int AS laurels,
+                COUNT(*)::int AS bouts,
+                MAX(ab.created_at) AS last_at,
+                bc.display_name AS c_name, bc.alias AS c_alias, bc.avatar_sprite_url AS c_sprite
            FROM mkt_arena_bout ab
            JOIN mkt_buyer bc ON bc.id = ab.challenger_id
-           JOIN mkt_buyer bd ON bd.id = ab.defender_id
           WHERE ab.defender_id = $1
             AND ($2::timestamptz IS NULL OR ab.created_at > $2)
-          ORDER BY ab.created_at DESC LIMIT 12`,
+          GROUP BY ab.challenger_id, bc.display_name, bc.alias, bc.avatar_sprite_url
+          ORDER BY MAX(ab.created_at) DESC LIMIT 12`,
         [buyerId, since]
     ).catch(() => []);
     if (!rows.length) return null;
     return rows.map((r) => ({
-        defending: true,
         them: { name: r.c_name || r.c_alias, sprite: r.c_sprite },
-        won: !r.challenger_won,          // you held the spot if the challenger lost
-        myPos: r.defender_pos,
-        rounds: r.rounds,
+        bouts: r.bouts,
+        held: r.held,          // times your loadout turned them away
+        lost: r.lost,          // times they beat it
+        laurels: r.laurels,    // what defending earned you, already paid
     }));
 }
 
@@ -1132,11 +1139,33 @@ async function finishBout(buyerId, row, b, won) {
     // Recorded from BOTH sides. A defender was asleep; this is the only way they ever find out. An NPC has no
     // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
     await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
         [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
-            JSON.stringify(feats.map((f) => f.id))]
+            JSON.stringify(feats.map((f) => f.id)), defencePaid]
     ).catch(() => {});
+
+    // ── THE DEFENDER'S CUT ───────────────────────────────────────────────────────────────────────────────
+    // Paid HERE, at the moment the bout resolves, rather than when the away report is read. Paying on read
+    // would mean the report has to know what it has already paid for, and the first bug in that design is
+    // somebody refreshing the page.
+    //
+    // Conditional inside the UPDATE and capped in the same statement — neon() has no transactions, so two
+    // challengers finishing at once must not both see room under the cap and both take it.
+    let defencePaid = 0;
+    if (npcTier === 0 && !won && b.foe?.id) {
+        const cut = defenceLaurels({ myPower: theirPower, theirPower: myPower });
+        const paid = await db.queryOne(
+            `UPDATE mkt_arena
+                SET laurels = laurels + LEAST($2::int, GREATEST(0, $3::int - CASE WHEN defence_day = ${DAY} THEN defence_laurels_today ELSE 0 END)),
+                    defence_laurels_today = LEAST($3::int, CASE WHEN defence_day = ${DAY} THEN defence_laurels_today ELSE 0 END + $2::int),
+                    defence_day = ${DAY}
+              WHERE buyer_id = $1
+              RETURNING defence_laurels_today`,
+            [b.foe.id, cut, DEFENCE_LAURELS_PER_DAY]
+        ).catch(() => null);
+        if (paid) defencePaid = cut;
+    }
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss",
         { foe: b.foe.id, vp, laurels, npcTier: npcTier || null, feats: feats.map((f) => f.id) }).catch(() => {});

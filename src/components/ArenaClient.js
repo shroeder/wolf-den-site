@@ -1389,17 +1389,38 @@ export default function ArenaClient({ initial }) {
 // You get fought while you are asleep. Without this a member simply finds their place changed and no
 // explanation anywhere in the game — so this is shown once, on the visit after it happened, and dismissing it
 // stamps last_seen_at.
+// ── WHILE YOU WERE AWAY ──────────────────────────────────────────────────────────────────────────────────────
+// This was built on the ladder and outlived it. Every row said somebody "took your spot" — there are no spots
+// any more — and printed `#{myPos}` off a `defender_pos` column that stopped meaning anything when the rungs
+// were deleted, so it rendered a bare hash. Three fights from one person printed the same sentence three
+// times.
+//
+// It says the two things that are actually true now: how your build did against each person who came at you,
+// and what turning them away paid you. A defender is asleep for all of this, so the report IS the feature —
+// it is the only moment the game gets to tell you your loadout was working without you.
 function AwayReport({ rows, onClose }) {
     useScrollLock(true);
+    const earned = rows.reduce((n, r) => n + (r.laurels || 0), 0);
+    const held = rows.reduce((n, r) => n + (r.held || 0), 0);
+    const bouts = rows.reduce((n, r) => n + (r.bouts || 0), 0);
     return (
         <Portal>
             <div className="ar-away" role="dialog" aria-modal="true">
                 <div className="ar-away-card">
                     <span className="ar-recap-kick">While you were away</span>
-                    <b className="ar-recap-title">{rows.length} bout{rows.length === 1 ? "" : "s"}</b>
+                    <b className="ar-recap-title">
+                        {bouts} bout{bouts === 1 ? "" : "s"}{held ? ` · you held ${held}` : ""}
+                    </b>
+                    {/* The payout, up top, because it is the part that is new and the part nobody expects. */}
+                    {earned > 0 ? (
+                        <div className="ar-away-earned">
+                            <img src={LAUREL} alt="" className="ar-laurel" draggable="false" />
+                            <b>+{money(earned)}</b> laurels — your build fought for you
+                        </div>
+                    ) : null}
                     <div className="ar-away-list">
                         {rows.map((r, i) => (
-                            <div key={i} className={`ar-away-row ${r.won ? "is-win" : "is-loss"}`}>
+                            <div key={i} className={`ar-away-row ${r.held > r.lost ? "is-win" : "is-loss"}`}>
                                 <div className="ar-portrait is-tiny">
                                     {r.them.sprite ? (
                                         // eslint-disable-next-line @next/next/no-img-element
@@ -1408,11 +1429,14 @@ function AwayReport({ rows, onClose }) {
                                 </div>
                                 <span className="ar-away-text">
                                     <b>{r.them.name}</b>
-                                    <em>{r.defending
-                                        ? (r.won ? "challenged you and lost" : "took your spot")
-                                        : (r.won ? "you took their spot" : "you challenged and lost")}</em>
+                                    <em>
+                                        {r.bouts > 1 ? `${r.bouts} times · ` : ""}
+                                        {r.held && r.lost ? `you turned them away ${r.held}, they won ${r.lost}`
+                                            : r.held ? (r.held > 1 ? `turned away ${r.held} times` : "came at you and lost")
+                                            : (r.lost > 1 ? `beat you ${r.lost} times` : "beat you")}
+                                    </em>
                                 </span>
-                                <span className="ar-away-pos">#{r.myPos}</span>
+                                {r.laurels > 0 ? <span className="ar-away-pos">+{r.laurels}</span> : null}
                             </div>
                         ))}
                     </div>
@@ -2107,6 +2131,10 @@ function Styles() {
                 border-radius: 20px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid #6f5a9c; box-shadow: 0 24px 70px rgba(0,0,0,0.8);
                 animation: arCardIn .4s cubic-bezier(.2,1.5,.35,1) both; }
+            .ar-away-earned { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 2px 0 10px;
+                padding: 7px 10px; border-radius: 10px; font-size: .8rem; color: #ffe9c2;
+                background: rgba(255,215,94,.1); border: 1px solid rgba(255,215,94,.35); }
+            .ar-away-earned b { color: #ffd75e; }
             .ar-away-list { display: grid; gap: 6px; margin: 13px 0 15px; }
             .ar-away-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
                 padding: 8px 11px; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05);

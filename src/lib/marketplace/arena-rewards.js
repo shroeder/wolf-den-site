@@ -41,6 +41,20 @@ export const vpPreview = (myPower, theirPower) => vpFor({ won: true, myPower, th
 // correct play — a treadmill wearing a ladder's clothes. A defeat is a fraction of a win against the same
 // opponent, so throwing yourself at something far too big is a consolation, never a strategy.
 export const LOSS_SHARE = 0.3;
+// ── WHAT TURNING SOMEBODY AWAY IS WORTH ──────────────────────────────────────────────────────────────────────
+// A defender did not choose the fight, was not present for it, and spent nothing — so this is deliberately a
+// fraction of what the challenger risked, not a mirror of it. It is a dividend on a good build, not a wage.
+//
+// Capped per DAY, because the alternative rewards being popular rather than being good: without a ceiling the
+// optimal play is to make yourself the most attractive target on the board and then stop opening the app.
+export const DEFENCE_SHARE = 0.4;          // of what the challenger would have earned for winning
+export const DEFENCE_LAURELS_PER_DAY = 120;
+
+export function defenceLaurels({ myPower = 1, theirPower = 1 }) {
+    // Their power over yours: turning away somebody BIGGER than you is worth more, exactly as beating them is.
+    return Math.max(4, Math.round(boutLaurels({ won: true, myPower, theirPower }) * DEFENCE_SHARE));
+}
+
 export function boutLaurels({ won, myPower = 1, theirPower = 1 }) {
     const ratio = Math.max(VP_FLOOR, Math.min(VP_CEIL, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
     const win = Math.round(18 + 34 * ratio);
