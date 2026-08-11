@@ -695,6 +695,23 @@ export async function syncEarnedBadges(buyerId) {
     return granted;
 }
 
+/**
+ * A badge off the board the member has not earned — The Herald's Licence.
+ *
+ * "Chosen from what you are missing", so the pool is every badge they do not hold. SECRET badges are excluded:
+ * a secret is a thing you find out about by doing it, and having one handed over by a licence would spoil the
+ * only reward it has. Returns the badge def, or null when the board is complete.
+ */
+export async function grantMissingBadge(buyerId) {
+    if (!buyerId) return null;
+    const all = await listBadges().catch(() => []);
+    const held = await heldSlugs(buyerId);
+    const pool = all.filter((b) => !held.has(b.slug) && !b.secret);
+    if (!pool.length) return null;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    return (await grantEventBadge(buyerId, pick.slug)) ? pick : null;
+}
+
 // Grant a specific badge directly (for EVENT badges that aren't metric-threshold based — e.g. "met the Gold
 // Merchant", "perfect coin toss"). Idempotent; rewards XP/gold + browser-pushes only on a genuinely new grant.
 // Returns true if it was newly granted.

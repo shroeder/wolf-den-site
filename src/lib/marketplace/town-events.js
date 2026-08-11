@@ -10,6 +10,7 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds, grantSalvageFodder } from "@/lib/marketplace/inventory.js";
 import { getPetCombatBonus } from "@/lib/marketplace/pet-combat.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { rollWeaponSkill } from "@/lib/marketplace/raid-skills.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
@@ -929,13 +930,17 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
           WHERE buyer_id = $1 AND reason = 'town_duel' AND ref = $2 AND delta > 0`,
         [buyerId, String(eventId)]
     ).catch(() => null);
-    const goldLeft = Math.max(0, DUEL_GOLD_BUDGET - Number(spent?.gold || 0));
+    // THE FREE COMPANY doubles the ceiling — both halves of it, because the gold budget and the XP budget are
+    // one promise about how much a raid can pay and lifting only one would read as a bug. It moves the CAP,
+    // never the per-duel payout: a fight still pays what a fight pays, the day just stops paying later.
+    const budgetX = (await hasPower(buyerId, "free_company")) ? 2 : 1;
+    const goldLeft = Math.max(0, DUEL_GOLD_BUDGET * budgetX - Number(spent?.gold || 0));
     const xpSpent = await db.queryOne(
         `SELECT COALESCE(SUM(points), 0)::int AS xp FROM mkt_xp_event
           WHERE buyer_id = $1 AND action = 'town_duel' AND created_at > $2`,
         [buyerId, ev.started_at || new Date(Date.now() - 3600000)]
     ).catch(() => null);
-    const xpLeft = Math.max(0, DUEL_XP_BUDGET - Number(xpSpent?.xp || 0));
+    const xpLeft = Math.max(0, DUEL_XP_BUDGET * budgetX - Number(xpSpent?.xp || 0));
     const cappedGold = coin > 0 && goldLeft <= 0;
     const cappedXp = xp > 0 && xpLeft <= 0;
     coin = Math.min(coin, goldLeft);

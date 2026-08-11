@@ -11,11 +11,58 @@ import { isPieceId, pieceById } from "@/lib/marketplace/collection-pieces.js";
 // Ownership is BINARY and PERMANENT: you have the piece or you do not. There is no quantity, no equipping and
 // no losing it, so this file has exactly two verbs.
 
-/** Every piece id this member owns. */
-export async function getOwnedPieceIds(buyerId) {
+/**
+ * Every piece id this member owns — and, by default, the one they have on loan.
+ *
+ * THE LOANED EXHIBIT (an ascension power) names a single piece the member does NOT own and makes it count. It
+ * is folded in HERE rather than at each aggregate because this function is the choke point every set bonus in
+ * the game reads through: the farm, the mine, the sea, the forge, the wheel and the sets page all come down
+ * this path, and a loan added anywhere else would apply to some of them and silently not to others — which is
+ * this codebase's single most common bug.
+ *
+ * `includeLoan: false` is for the two places that must see the TRUTH: the drop pools. A loan that read as
+ * ownership there would remove the piece from the pool it comes out of, so the one piece you most want would
+ * become the one piece you can never win — the loan would quietly cost you the real thing.
+ *
+ * The loan is not ownership in any other sense either: it is never granted, never tradeable, and it stops the
+ * moment the piece that grants it comes off.
+ */
+export async function getOwnedPieceIds(buyerId, { includeLoan = true } = {}) {
     if (!buyerId) return [];
     const rows = await db.query(`SELECT piece_id FROM mkt_user_collection WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    return (rows || []).map((r) => r.piece_id).filter(isPieceId);
+    const owned = (rows || []).map((r) => r.piece_id).filter(isPieceId);
+    if (!includeLoan) return owned;
+    const loan = await loanedPiece(buyerId);
+    return loan && !owned.includes(loan) ? [...owned, loan] : owned;
+}
+
+/** The piece on loan right now, or null. Null the instant the piece granting the power is unequipped. */
+export async function loanedPiece(buyerId) {
+    if (!buyerId) return null;
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "loaned_exhibit"))) return null;
+    const r = await db.queryOne(`SELECT exhibit_piece FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    return isPieceId(r?.exhibit_piece) ? r.exhibit_piece : null;
+}
+
+/**
+ * Name the piece you are borrowing. Refuses one you already own — a loan of something in the cabinet is a
+ * wasted slot, and the screen should say so rather than accept it silently.
+ */
+export async function setLoanedPiece(buyerId, pieceId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "loaned_exhibit"))) return { ok: false, error: "no_power" };
+    const id = String(pieceId || "");
+    if (!id) {
+        await db.query(`UPDATE mkt_buyer SET exhibit_piece = NULL WHERE id = $1`, [buyerId]).catch(() => {});
+        return { ok: true, exhibit: null };
+    }
+    if (!isPieceId(id)) return { ok: false, error: "not_found" };
+    const owned = await getOwnedPieceIds(buyerId, { includeLoan: false });
+    if (owned.includes(id)) return { ok: false, error: "already_owned" };
+    await db.query(`UPDATE mkt_buyer SET exhibit_piece = $2 WHERE id = $1`, [buyerId, id]).catch(() => {});
+    return { ok: true, exhibit: id };
 }
 
 /** Owned piece ids for MANY members at once, as { buyerId: [pieceId, ...] }. For rosters and leaderboards. */
@@ -76,8 +123,28 @@ export async function rollPieceDrop(buyerId, { source, rarity = null, chance = 1
     if (!buyerId || !source) return null;
     if (chance < 1 && Math.random() >= chance) return null;
     const { COLLECTION_PIECES } = await import("@/lib/marketplace/collection-pieces.js");
-    const owned = new Set(await getOwnedPieceIds(buyerId));
+    // TRUTH, not the loan — see getOwnedPieceIds. A borrowed piece must still be winnable.
+    const owned = new Set(await getOwnedPieceIds(buyerId, { includeLoan: false }));
     const pool = COLLECTION_PIECES.filter((p) => p.source === source && !owned.has(p.id) && (!rarity || p.rarity === rarity));
+    if (!pool.length) return null;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const got = await grantPiece(buyerId, pick.id, source);
+    return got ? pick : null;
+}
+
+/**
+ * A piece off ANY set the member is short of — The Founder's Plate.
+ *
+ * rollPieceDrop above is deliberately keyed to a `source`, because every ordinary acquisition path is: a chest
+ * gives chest trophies, the mine gives mine trophies. This one is not a path, it is a delivery, so it draws
+ * from everything unowned regardless of where it would normally come from — which is exactly what makes it
+ * worth the item slot. Returns the piece def, or null when the collection is complete.
+ */
+export async function grantMissingPiece(buyerId, source = "grant") {
+    if (!buyerId) return null;
+    const { COLLECTION_PIECES } = await import("@/lib/marketplace/collection-pieces.js");
+    const owned = new Set(await getOwnedPieceIds(buyerId, { includeLoan: false }));
+    const pool = COLLECTION_PIECES.filter((p) => !owned.has(p.id));
     if (!pool.length) return null;
     const pick = pool[Math.floor(Math.random() * pool.length)];
     const got = await grantPiece(buyerId, pick.id, source);

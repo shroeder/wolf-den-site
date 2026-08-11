@@ -174,6 +174,7 @@ export default function PetsClient() {
 
     const ERRORS = {
         not_enough_gold: "Not enough gold.",
+        no_power: "You need to be wearing the piece that grants the Breeder's Eye.",
         already_owned: "You already own that pet.",
         not_owned: "You don't own that pet yet.",
         not_tradeable: "That pet has already been traded once — it can't be traded again.",
@@ -268,6 +269,7 @@ export default function PetsClient() {
         const price = petPrice(p);
         const canBuy = p.source === "shop" && !owned && state?.signedIn && state.gold >= price;
         const lvl = owned ? state?.petLevels?.[p.id] : null;
+        const isWished = state?.petWish === p.id;
         const pct = lvl && !lvl.maxed && lvl.span > 0 ? Math.round((lvl.into / lvl.span) * 100) : 100;
         return (
             <div className="petx-page">
@@ -424,6 +426,14 @@ export default function PetsClient() {
                         ) : (
                             <button type="button" className="btn-ghost" disabled style={{ width: "100%" }}>🔒 {petUnlockText(p)}</button>
                         )}
+                        {/* THE BREEDER'S EYE. Only drawn for someone actually wearing the piece, and only on a
+                            pet they do not own — a wish for something already in the collection can never come
+                            true, and the server refuses it for the same reason. */}
+                        {!owned && state?.breedersEye ? (
+                            isWished
+                                ? <button type="button" className="btn-ghost is-active" onClick={() => action("", "wish")} disabled={busy === p.id} style={{ width: "100%" }}>Hoping for this one · tap to clear</button>
+                                : <button type="button" className="btn-ghost" onClick={() => action(p.id, "wish")} disabled={busy === p.id} style={{ width: "100%" }}>Hope for this one</button>
+                        ) : null}
                     </div>
 
                     {giftPending ? (

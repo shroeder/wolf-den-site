@@ -304,6 +304,17 @@ const saveBout = (buyerId, bout) =>
 
 // What a win at a given rung is worth. Climbing has to pay more than grinding the bottom, or the ladder is
 // decoration on a farming loop.
+// What the exchange panel needs, or null. Kept beside getArenaState rather than inside it so the extra query
+// is genuinely skipped for the ~everyone who does not hold the power.
+async function purserBits(buyerId) {
+    if (!buyerId) return null;
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "purser_s_exchange"))) return null;
+    const { PURSER_RATE, PURSER_MAX } = await import("@/lib/marketplace/arena-progress.js");
+    const sail = await db.queryOne(`SELECT COALESCE(doubloons,0) AS d FROM mkt_sailing WHERE buyer_id = $1`, [buyerId]).catch(() => null);
+    return { doubloons: Number(sail?.d) || 0, rate: PURSER_RATE, max: PURSER_MAX };
+}
+
 export async function getArenaState(buyerId) {
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
@@ -398,6 +409,10 @@ export async function getArenaState(buyerId) {
         size: board.length,
         vp: myVp, laurels: Number(row?.laurels) || 0,
         fightsLeft: Math.max(0, dailyFights - used), fightsPerDay: dailyFights,
+        // THE PURSER'S EXCHANGE. Null for everybody not wearing the piece, which is what the screen keys off —
+        // the panel is not drawn at all rather than drawn disabled, because a shop you can never use is worse
+        // than no shop. The doubloon purse is only read when the power is held; it lives in another table.
+        purser: await purserBits(buyerId).catch(() => null),
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
             streak: Number(row?.streak) || 0, bestStreak: Number(row?.best_streak) || 0,

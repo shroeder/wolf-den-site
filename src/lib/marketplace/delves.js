@@ -13,6 +13,7 @@ import {
     potionCount, potionHealFrac, wardCut,
 } from "@/lib/marketplace/delve-catalog.js";
 import { advanceFloor, finishDelveRun, offerChoice } from "@/lib/marketplace/delve-floors.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 // ── DUNGEON DELVES ───────────────────────────────────────────────────────────────────────────────────────────
 // Ten floors, one encounter each, a boss at the bottom. You bring HP and potions; you leave with whatever you
@@ -63,7 +64,11 @@ async function delveRow(buyerId) {
 // short on fights, the shortfall is filled by CONVERTING the least interesting floors (rest and quiet stretches
 // first, then traps) rather than appending fights at the end — so the guarantee never shows up as five brawls
 // in a row at the bottom.
-function dealFloors(dungeon) {
+// `extra` is The Warren Map: one more floor before the boss. The depth is a PARAMETER rather than the module
+// constant so a run carries its own length — the boss must still be the LAST floor, and every downstream read
+// of "how deep does this go" comes off run.floors.length instead of DELVE_FLOORS.
+function dealFloors(dungeon, extra = 0) {
+    const depth = DELVE_FLOORS + Math.max(0, extra);
     const pool = [...eventsFor(dungeon.id)];
 
     // WITHOUT REPLACEMENT. The first cut drew independently each floor and only blocked ADJACENT repeats, which
@@ -84,7 +89,7 @@ function dealFloors(dungeon) {
     };
 
     const floors = [];
-    for (let i = 0; i < DELVE_FLOORS - 1; i += 1) {
+    for (let i = 0; i < depth - 1; i += 1) {
         const e = drawOnce();
         if (!e) break;
         floors.push({ n: i + 1, event: e, done: false });
@@ -126,7 +131,7 @@ function dealFloors(dungeon) {
         f.foeId = roster.pop();
     }
 
-    floors.push({ n: DELVE_FLOORS, event: { id: "boss", kind: KIND.boss, title: dungeon.boss.name, text: dungeon.boss.blurb }, done: false });
+    floors.push({ n: depth, event: { id: "boss", kind: KIND.boss, title: dungeon.boss.name, text: dungeon.boss.blurb }, done: false });
     return floors;
 }
 
@@ -201,7 +206,7 @@ function publicRun(run) {
         tint: d?.tint,
         // The backdrop is the ROOM THIS ENCOUNTER HAPPENS IN, not one plate for the whole dungeon.
         bg: encounterBg(run.dungeonId, cur?.event) || d?.bg,
-        floor: run.floor, floors: DELVE_FLOORS,
+        floor: run.floor, floors: run.floors?.length || DELVE_FLOORS,
         hp: run.hp, maxHp: run.maxHp,
         potions: run.potions, potionHeal: run.potionHeal,
         over: Boolean(run.over), died: Boolean(run.died), cleared: Boolean(run.cleared),
@@ -265,7 +270,7 @@ export async function startDelve(buyerId, dungeonId) {
         potions: potionCount(row?.satchel_level),
         potionHeal: potionHealFrac(row?.flask_level),
         ward: wardCut(row?.ward_level),
-        floors: dealFloors(d),
+        floors: dealFloors(d, (await hasPower(buyerId, "warren_map")) ? 1 : 0),
         banked: { gold: 0, xp: 0, chests: [] },
         log: [],
         potionsUsed: 0,

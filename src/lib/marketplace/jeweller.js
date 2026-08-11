@@ -56,6 +56,28 @@ export async function grantGem(buyerId, gemId, n = 1, source = "drop") {
     return { ok: true, gem: g, n };
 }
 
+/**
+ * A gem out of somewhere that is NOT the rock.
+ *
+ * The mine rolls its own (see rollJewel — its tier is drawn against DEPTH, which is the whole point of going
+ * deep) and nothing else in the game had a way to produce one. The Gem Cutter's Eye needed one off a dungeon
+ * boss, and a boss has no depth, so it draws from the bottom of the ladder instead: chips and flawed mostly,
+ * a polished occasionally, and never the two top tiers.
+ *
+ * PAST POLISHED STAYS THE ROCK'S ALONE. Brilliant and Flawless are unfusable and only the deepest descents
+ * carry them; a second source would quietly undo the one genuinely hard thing in the gem economy.
+ */
+export async function grantRandomGem(buyerId, source = "drop") {
+    const weights = [56, 30, 14];   // chip, flawed, polished
+    const total = weights.reduce((n, w) => n + w, 0);
+    let roll = Math.random() * total;
+    let tier = 1;
+    for (let i = 0; i < weights.length; i += 1) { if ((roll -= weights[i]) <= 0) { tier = i + 1; break; } }
+    // The secret sixth kind keeps the same odds it has in the rock — see WOLF_EYE in gems.js.
+    const kind = oneIn(40) ? "wolfeye" : ["ruby", "sapphire", "emerald", "topaz", "amethyst"][Math.floor(Math.random() * 5)];
+    return grantGem(buyerId, `${kind}_t${tier}`, 1, source);
+}
+
 // ── WHAT IS SET INTO WHAT ────────────────────────────────────────────────────────────────────────────────────
 /** Sockets for a member's items → { item_id: [{ idx, gemId }] }. */
 export async function socketsFor(buyerId, itemIds = null) {

@@ -410,7 +410,7 @@ export const SYSTEM_PERK_KEYS = new Set([
  *   THE LONG TABLE       the menagerie ceiling is half again as high
  * All three are conditional — take the gear off and the pack is ordinary again.
  */
-export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null) {
+export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null, lingeringPet = null) {
     const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
@@ -513,7 +513,23 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
 
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
     // pet. Proc magnitudes scale too (chances capped so they stay sane).
-    if (equippedPet) applyActive(equippedPet, levelByPet[equippedPet.id] || 1);
+    // ── THREE ASCENSION POWERS ON THE ONE PET YOU CARRY ──────────────────────────────────────────────────
+    // The Beast's Share runs the ability at the strength of the level above — read straight off the level,
+    // because petActiveLevelMult is the only thing that turns a level into a magnitude.
+    //
+    // The Second Sitting says the ability fires twice one time in three. An ability here is a STANDING VALUE,
+    // not an event — this function is pure, and it drives the pet card and the boss sizing as well as the
+    // damage — so a die rolled inside it would make the card flicker between reloads and make the nightly boss
+    // maths unreproducible. "Twice, one time in three" is therefore spent where it is felt: a third again on
+    // the magnitude, which is the same thing over any run of days and is stable to look at.
+    if (equippedPet) {
+        const lv = (levelByPet[equippedPet.id] || 1) + (powers?.has?.("beast_s_share") ? 1 : 0);
+        applyActive(equippedPet, lv, powers?.has?.("second_sitting") ? 4 / 3 : 1);
+    }
+    // THE WHISTLE — the pet swapped out today, still working. Run at its own level and with no boost: it is
+    // the same ability it had in the slot, not a better one, and best() collapses it against the current pet
+    // if they happen to share a perk.
+    if (lingeringPet) applyActive(lingeringPet, levelByPet[lingeringPet.id] || 1);
 
     // ── ENSHRINED ── the whole point of level 6. These run whether the pet is in your hands or in the box,
     // which is what stops the swapping. An enshrined pet that ALSO happens to be equipped is applied once,

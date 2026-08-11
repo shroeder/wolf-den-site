@@ -13,8 +13,9 @@ import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signatures.js";
 import { PUBLIC_COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
+import { grantMissingBadge } from "@/lib/marketplace/badges.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
@@ -30,6 +31,12 @@ const STREAK_REWARDS = [
     { gold: 480, chest: "iron", label: "480 gold + an Iron chest", emoji: "🏆" }, // day-7 reward (Iron, not Gold — free weekly legendary was too rich)
 ];
 const rewardForStreak = (streak) => STREAK_REWARDS[((Math.max(1, streak) - 1) % 7)];
+
+// The Counting House (ascension power): what a purse pays at check-in, and the ceiling on it. Two percent a
+// day is a real reason to hold gold; the cap is what stops a hoard becoming a wage — past it the rate stops
+// mattering and the right move is to go and spend, which is the behaviour the Den wants anyway.
+const COUNTING_HOUSE_RATE = 0.02;
+const COUNTING_HOUSE_CAP = 2000;
 
 // Store-timezone day helpers (America/Chicago), as "YYYY-MM-DD" strings.
 const dayStr = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
@@ -160,11 +167,45 @@ export async function claimDailyCheckin(buyerId) {
     if (reward.gold) await logCoin(buyerId, reward.gold, "checkin", { meta: { streak: nextStreak } }).catch(() => {});
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
     if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }, { source: "daily_checkin", meta: { streak: nextStreak } }).catch(() => {});
+    // ── THE COUNTING HOUSE ───────────────────────────────────────────────────────────────────────────────
+    // The gold sitting in your purse earns interest, paid here. Read AFTER the streak reward so today's
+    // check-in is in the balance it is paid on, and capped — a member with a seven-figure purse would
+    // otherwise out-earn every other power on the list by simply not spending.
+    //
+    // The cap is what makes this a savings account rather than a printing press: past the ceiling the rate
+    // stops mattering and the right move is to go and spend it, which is the behaviour the Den wants anyway.
+    let interest = 0;
+    if (dailyPowers.has("counting_house")) {
+        const purse = await db.queryOne(`SELECT COALESCE(gold,0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+        interest = Math.min(COUNTING_HOUSE_CAP, Math.floor((Number(purse?.gold) || 0) * COUNTING_HOUSE_RATE));
+        if (interest > 0) {
+            const after = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, interest]).catch(() => null);
+            await logCoin(buyerId, interest, "checkin_interest", { balanceAfter: after?.gold, meta: { rate: COUNTING_HOUSE_RATE } }).catch(() => {});
+        }
+    }
+    // ── THE HERALD'S LICENCE AND THE FOUNDER'S PLATE ─────────────────────────────────────────────────────
+    // A badge a month and a collection piece a week, delivered. Both land at the check-in because it is the
+    // one thing every member does exactly once a day: a cron would need a table of who is owed what, and a
+    // page load would need a guard against firing on every render. The claim itself is what makes it periodic
+    // — mkt_power_use stores the first of the month / the Monday, and the primary key does the rest.
+    //
+    // "Chosen from what you are missing" is the whole promise, so both pools are the UNOWNED ones. When there
+    // is nothing left to give, the claim is not spent: the row is only written after a successful grant.
+    const delivered = [];
+    if (dailyPowers.has("herald_s_licence") && (await claimPowerUsePeriod(buyerId, "herald_s_licence", "month"))) {
+        const got = await grantMissingBadge(buyerId).catch(() => null);
+        if (got) delivered.push({ kind: "badge", name: got.name });
+    }
+    if (dailyPowers.has("founder_s_plate") && (await claimPowerUsePeriod(buyerId, "founder_s_plate", "week"))) {
+        const { grantMissingPiece } = await import("@/lib/marketplace/collection-owned.js");
+        const got = await grantMissingPiece(buyerId, "founder_s_plate").catch(() => null);
+        if (got) delivered.push({ kind: "piece", name: got.name });
+    }
     await trackActivity(buyerId, "daily_checkin", { streak: nextStreak }).catch(() => {});
     // Every 7-day streak milestone also grants a spin-wheel token.
     if (nextStreak % 7 === 0) await db.query(`UPDATE mkt_buyer SET spin_tokens = spin_tokens + 1 WHERE id = $1`, [buyerId]).catch(() => {});
     // Equipped login-proc items get their once-a-day roll here too.
     const logins = await resolveLoginProcs(buyerId).catch(() => []);
 
-    return { ok: true, streak: nextStreak, reward: { label: reward.label, emoji: reward.emoji }, jackpot: nextStreak % 7 === 0, logins };
+    return { ok: true, streak: nextStreak, reward: { label: reward.label, emoji: reward.emoji }, jackpot: nextStreak % 7 === 0, logins, interest, delivered };
 }

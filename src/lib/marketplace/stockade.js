@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { editImage } from "@/lib/marketplace/openai-image.js";
+import { hasPower, powerUsesLeft, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 import sharp from "sharp";
 
 
@@ -107,7 +108,42 @@ export async function getStockadeState(viewerId) {
         isOccupant: Boolean(viewerId) && viewerId === occupant.buyer_id,
         shame: { used: used.shame || 0, max: SHAME_PER_DAY, xp: SHAME_XP },
         fruit: { used: used.fruit || 0, max: FRUIT_PER_DAY, xp: FRUIT_XP, coin: FRUIT_COIN },
+        // THE WARDEN'S KEY (an ascension power): one release a week. False for everyone else, so the button is
+        // simply not drawn — a lever that is always there and always refuses is worse than no lever.
+        wardensKey: Boolean(viewerId) && viewerId !== occupant.buyer_id
+            && (await powerUsesLeft(viewerId, "warden_s_key")) >= 0
+            && (await hasPower(viewerId, "warden_s_key")),
     };
+}
+
+/**
+ * Turn the key — The Warden's Key.
+ *
+ * A sentence is served or it is pardoned, and until now only the owner could pardon. This is the one thing in
+ * the game that lets a MEMBER undo something done to another member, which is why it is rationed by the week
+ * rather than the day: mercy that is available every afternoon stops being mercy and becomes an exemption.
+ *
+ * You cannot free yourself. The claim happens before the release and only after the target is confirmed, so a
+ * tap on an empty stockade never costs the week's use.
+ */
+export async function unlockStockade(viewerId) {
+    if (!viewerId) return { ok: false, error: "unauthorized" };
+    const occupant = await getOccupant();
+    if (!occupant) return { ok: false, error: "empty" };
+    if (String(occupant.buyer_id) === String(viewerId)) return { ok: false, error: "not_yourself" };
+    if (!(await claimPowerUsePeriod(viewerId, "warden_s_key", "week"))) return { ok: false, error: "no_key" };
+    await releaseFromStockade(occupant.buyer_id);
+    await trackActivity(viewerId, "stockade_release", { target: occupant.buyer_id }).catch(() => {});
+    // Said out loud in the one place the whole Den reads, because a pardon nobody sees is just an empty
+    // stockade — and the point of the key is that somebody chose to use it on you.
+    const me = await db.queryOne(`SELECT COALESCE(NULLIF(display_name,''), alias) AS name FROM mkt_buyer WHERE id = $1`, [viewerId]).catch(() => null);
+    if (me?.name) {
+        await db.query(
+            `INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`,
+            [viewerId, `${me.name} turned the warden's key. ${occupant.display_name || occupant.alias} walks free.`]
+        ).catch(() => {});
+    }
+    return { ok: true, freed: occupant.display_name || occupant.alias };
 }
 
 /**

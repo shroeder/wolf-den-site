@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare } from "@/lib/marketplace/pets.js";
+import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish } from "@/lib/marketplace/pets.js";
 import { settlePetIncome, petIncomeRate } from "@/lib/marketplace/pet-income.js";
 import { db } from "@/lib/db";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -52,6 +52,9 @@ export async function POST(request) {
             let res;
             if (b?.action === "unequip") res = await unequipPet(buyer.id);
             else if (b?.action === "buy") res = await buyPet(buyer.id, String(b?.petId || ""));
+            // The Breeder's Eye. setPetWish is the gate — it refuses anyone not wearing the piece, so the
+            // route does not need to know which item grants what.
+            else if (b?.action === "wish") res = await setPetWish(buyer.id, String(b?.petId || ""));
             else if (b?.action === "share") res = await sharePet(buyer.id, String(b?.petId || ""), String(b?.toAlias || ""));
             else if (b?.action === "accept") res = await acceptShare(String(b?.shareId || ""), buyer.id);
             else if (b?.action === "decline") res = await declineShare(String(b?.shareId || ""), buyer.id);

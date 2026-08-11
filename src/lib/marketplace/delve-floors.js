@@ -11,6 +11,7 @@ import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
 import { DELVE_FLOORS, DUNGEONS, KIND, dungeonById, encounterArt } from "@/lib/marketplace/delve-catalog.js";
+import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // ── DELVE: CHOICES, ADVANCING AND THE PAYOUT ─────────────────────────────────────────────────────────────────
 // Split out of delves.js purely for size: that file owns the run (start, state, strike, potion) and this one
@@ -395,7 +396,9 @@ export async function advanceFloor(ctx, run, { outcome = null } = {}) {
     const floor = run.floors[run.floor - 1];
     if (floor) { floor.done = true; if (outcome) floor.outcome = outcome; }
     const wasBoss = floor?.event?.kind === KIND.boss;
-    if (wasBoss || run.floor >= DELVE_FLOORS) return finishRun(buyerId, run, { cleared: wasBoss });
+    // The run's OWN length, not the module constant — The Warren Map deals an eleventh floor, and reading the
+    // constant here would end the run one floor early and skip the boss it was dealt.
+    if (wasBoss || run.floor >= (run.floors?.length || DELVE_FLOORS)) return finishRun(buyerId, run, { cleared: wasBoss });
     run.floor += 1;
     // Everything that belonged to the floor you just left dies with it. `awaiting` used to survive the walk:
     // an unresolved merchant offer from floor three was still on the run when floor four dealt a fight, and the
@@ -492,6 +495,26 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
             cleared ? 1 : 0, died ? 1 : 0, floorsDone, run.floor]
     ).catch(() => null);
 
+    // ── ASCENSION POWERS ON THE WAY OUT ──────────────────────────────────────────────────────────────────
+    // The Delver's Rope gives the day back when a run ends BADLY. The day is claimed at the door (see
+    // startDelve — otherwise dying and restarting is free), so giving it back means clearing this dungeon's
+    // stamp out of runs_json. Clearing the boss is not "badly", and neither is walking out early with a full
+    // purse: fleeing is a decision that already paid you.
+    const outPowers = await equippedPowers(buyerId).catch(() => new Set());
+    if (died && !cleared && outPowers.has("delver_s_rope")) {
+        await db.query(`UPDATE mkt_delve SET runs_json = COALESCE(runs_json,'{}'::jsonb) - $2::text WHERE buyer_id = $1`, [buyerId, run.dungeonId]).catch(() => {});
+    }
+    // The Gem Cutter's Eye — one boss in two gives up a gem. Only on a boss actually felled, so it rides the
+    // hardest floor in the game rather than the act of starting a run.
+    let gemOut = null;
+    if (cleared && outPowers.has("gem_cutter_s_eye") && oneIn(2)) {
+        try {
+            const { grantRandomGem } = await import("@/lib/marketplace/jeweller.js");
+            const got = await grantRandomGem(buyerId, "delve_boss");
+            if (got?.ok) gemOut = got.gem;
+        } catch { /* a gem is a bonus; never fail the wrap card over one */ }
+    }
+
     if (cleared) await grantEventBadge(buyerId, "delve_first_boss").catch(() => {});
     if ((Number(stats?.floors_cleared) || 0) >= 100) await grantEventBadge(buyerId, "delve_floors_100").catch(() => {});
     if ((Number(stats?.floors_cleared) || 0) >= 500) await grantEventBadge(buyerId, "delve_floors_500").catch(() => {});
@@ -522,6 +545,7 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
             parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n, name: partName(Number(tier)), sprite: partSprite(Number(tier)) })),
             frags: run.banked.frags || 0,
             gear: gearOut,
+            gem: gemOut,
             chestArt,
         },
         ...(await state(buyerId)),

@@ -230,6 +230,32 @@ export async function claimPowerUse(buyerId, key, perDay = 1) {
     return Boolean(row);
 }
 
+/**
+ * The same claim, over a longer period.
+ *
+ * Two powers are rationed by the WEEK (a collection piece delivered) and one by the MONTH (a badge granted),
+ * and neither needed a second table: mkt_power_use is keyed on a DATE, so a weekly claim simply stores the
+ * Monday and a monthly one the first of the month. The primary key then does the enforcing exactly as it does
+ * for a daily claim — no read-then-write, no window for a double-tap.
+ *
+ * `period` is 'week' or 'month'; anything else falls back to the day, which is claimPowerUse's behaviour.
+ */
+export async function claimPowerUsePeriod(buyerId, key, period = "week", perPeriod = 1) {
+    if (!buyerId || !key) return false;
+    if (!(await hasPower(buyerId, key))) return false;
+    const trunc = period === "month" ? "month" : period === "week" ? "week" : "day";
+    const row = await db.queryOne(
+        `INSERT INTO mkt_power_use (buyer_id, power_key, day, used)
+         VALUES ($1, $2, date_trunc('${trunc}', (NOW() AT TIME ZONE 'America/Chicago'))::date, 1)
+         ON CONFLICT (buyer_id, power_key, day)
+         DO UPDATE SET used = mkt_power_use.used + 1, updated_at = NOW()
+           WHERE mkt_power_use.used < $3
+         RETURNING used`,
+        [buyerId, key, Math.max(1, perPeriod)]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
 /** How many uses are left today, for a card that wants to say so. Never claims. */
 export async function powerUsesLeft(buyerId, key, perDay = 1) {
     if (!buyerId || !key) return 0;

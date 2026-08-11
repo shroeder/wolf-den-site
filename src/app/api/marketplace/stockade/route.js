@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { actOnOccupant, getStockadeState } from "@/lib/marketplace/stockade.js";
+import { actOnOccupant, getStockadeState, unlockStockade } from "@/lib/marketplace/stockade.js";
 import { getElection, nominate, castVote } from "@/lib/marketplace/stockade-election.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -42,6 +42,12 @@ export async function POST(request) {
             if (kind === "vote") {
                 const r = await castVote(buyer.id, String(body?.target || ""));
                 return NextResponse.json(r, { status: r.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
+            }
+            // The Warden's Key. unlockStockade is the gate — it claims the week's single use and refuses
+            // anyone not wearing the piece, so this route never has to know which item grants what.
+            if (kind === "unlock") {
+                const r = await unlockStockade(buyer.id);
+                return NextResponse.json({ ...r, ...(await getStockadeState(buyer.id)) }, { status: r.ok ? 200 : 400, headers: { "Cache-Control": "no-store" } });
             }
             const res = await actOnOccupant(buyer.id, kind);
             if (!res.ok) return NextResponse.json(res, { status: res.error === "out_of_turns" ? 429 : 400 });

@@ -862,7 +862,8 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // Lazy import, and it must stay lazy: cooking.js imports FISH from this file, so importing it back
     // statically is a cycle, and an ESM cycle yields `undefined` at call time instead of failing the build.
     const { addToPantry, grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-    await addToPantry(buyerId, "fish", species.id, 1).catch(() => {});
+    // The Cellar Key: one landing in three puts a second copy of the fish on the pantry shelf.
+    await addToPantry(buyerId, "fish", species.id, (await powerRoll(buyerId, "cellar_key", 3)) ? 2 : 1).catch(() => {});
     // The sea drops recipes too. It carried the pantry hook but never a recipe roll, so every recipe in the
     // game came from one 4% chance on a farm harvest.
     // A SEALED BOTTLE comes up with the catch — one of the things the line can land, at the same odds as any
@@ -885,6 +886,37 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // No emoji, and no celebrating here: RecipeFoundWatcher shows the card site-wide. This stays as the quiet
     // inline receipt on the catch itself.
     if (recipeFound) extras.push({ kind: "recipe", label: `A sealed bottle — ${recipeFound.name}`, recipe: recipeFound.id });
+
+    // ── ASCENSION POWERS ON A LANDING ────────────────────────────────────────────────────────────────────────
+    // Two Hooks lands a SECOND fish of the same species; The Trawl brings up one of every fish sharing this
+    // one's rarity. Both resolve HERE rather than back at the cast, because everything a landing needs — the
+    // size roll, the log merge, the pantry copy, the payout — is already settled by this point, and running a
+    // second pass through the cast would also re-roll the bottle and the haul, which are once-per-cast.
+    //
+    // A bonus fish is a TYPICAL one: it takes the middle of its species' range rather than rolling, so a power
+    // can never hand out a trophy or a Den record. Those stay things you have to actually catch.
+    const castPowers = await equippedPowers(buyerId);
+    const bonusFish = [];
+    if (castPowers.has("trawl") && oneIn(5)) bonusFish.push(...FISH.filter((f) => f.rarity === species.rarity && f.id !== species.id));
+    else if (castPowers.has("two_hooks") && oneIn(3)) bonusFish.push(species);
+    for (const sp of bonusFish) {
+        const size = round1((sp.lb[0] + sp.lb[1]) / 2);
+        const bonusGold = Math.max(1, Math.round(sp.gold * 0.7 * nightMult));
+        const was = log[sp.id] || null;
+        await db.query(
+            `UPDATE mkt_sailing
+                SET fish_log = COALESCE(fish_log, '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb),
+                    fish_caught = COALESCE(fish_caught, 0) + 1,
+                    updated_at = NOW()
+              WHERE buyer_id = $1`,
+            [buyerId, sp.id, JSON.stringify({ n: (Number(was?.n) || 0) + 1, best: Math.max(size, Number(was?.best) || 0), firstAt: was?.firstAt || new Date().toISOString() })]
+        ).catch(() => {});
+        await addToPantry(buyerId, "fish", sp.id, 1).catch(() => {});
+        await awardXp(buyerId, "sail_fish", { points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold }).catch(() => {});
+        await logCoin(buyerId, bonusGold, "fishing", { meta: { species: sp.id, bonus: true } }).catch(() => {});
+        extras.push({ kind: "fish", label: `${sp.name} — ${size}cm`, gold: bonusGold });
+    }
+    if (bonusFish.length) await checkFishingBadges(buyerId).catch(() => {});
 
     await trackActivity(buyerId, "fish_caught", { species: species.id, rarity: species.rarity, cm, quality: q, gold, xp, firstEver, personalBest }).catch(() => {});
     await checkFishingBadges(buyerId).catch(() => {});

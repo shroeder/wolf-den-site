@@ -904,6 +904,14 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <button className="sail-cta sail-cta-dig" disabled={busy} onClick={() => act("begin_dig")}>
                                     <span className="sail-cta-ico">⛏️</span> {busy ? "Landing…" : "Dig for treasure"}
                                 </button>
+                                {/* MARKET DAY. Only the member wearing the piece sees this, and only while
+                                    the day's single restock is unspent — the server claims it atomically, so a
+                                    double-tap cannot produce two shelves. */}
+                                {state.marketDay ? (
+                                    <button className="sail-cta sail-cta-market" disabled={busy} onClick={() => act("market_day")}>
+                                        <span className="sail-cta-ico">⚖️</span> {busy ? "Sending word…" : "Call for the merchant"}
+                                    </button>
+                                ) : null}
                             </div>
                         )}
                         {/* Gold Merchant island event — the interstitial before the dig when he rolls in. */}

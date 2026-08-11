@@ -60,8 +60,27 @@ export async function maybeGrantChestPet(buyerId, openedTier) {
     const eligible = COLLECTIBLES.filter(unlocked(buyerId))
         .filter((p) => p.source === "chest" && CHEST_TIER_ORDER.indexOf(p.chestTier) <= openedIdx && !owned.has(p.id));
     if (!eligible.length) return null;
-    const pet = pickWeighted(eligible);
+    const pet = (await wishedFrom(buyerId, eligible)) || pickWeighted(eligible);
     return grantDrop(buyerId, pet, "chest", { tier: openedTier });
+}
+
+
+// ── THE BREEDER'S EYE ────────────────────────────────────────────────────────────────────────────────────────
+// The member names one pet they are hoping for (mkt_buyer.pet_wish, set on the pets page) and a random pet
+// reward gives them THAT one instead of a roll.
+//
+// It only ever steers a drop that was already going to happen: the wish is honoured when the wished pet is
+// in the very pool this source was about to draw from, so it can never reach a fishing-exclusive pet out of a
+// chest, or a raid trophy off a boss. Every source below funnels its pool through here, which is also why the
+// power did not need six separate wirings.
+async function wishedFrom(buyerId, pool) {
+    if (!buyerId || !pool.length) return null;
+    const row = await db.queryOne(`SELECT pet_wish FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const wish = row?.pet_wish;
+    if (!wish) return null;
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "breeder_s_eye"))) return null;
+    return pool.find((p) => p.id === wish) || null;
 }
 
 /** Weighted pick over a pet pool by rarity. Falls back to a uniform pick if every weight is unknown. */
@@ -89,7 +108,7 @@ export async function maybeGrantBossPet(buyerId, { chance = 0.12 } = {}) {
     const legendary = eligible.filter((p) => p.rarity === "legendary");
     // 90% of drops draw only from legendary boss pets; mythic boss pets need the 10% sub-roll.
     const pool = legendary.length && Math.random() > 0.1 ? legendary : eligible;
-    const pet = pool[Math.floor(Math.random() * pool.length)];
+    const pet = (await wishedFrom(buyerId, eligible)) || pool[Math.floor(Math.random() * pool.length)];
     return grantDrop(buyerId, pet, "boss", {});
 }
 
@@ -108,7 +127,7 @@ export async function maybeGrantFishingPet(buyerId, fishRarity = "common") {
         .filter((p) => p.source === "fishing" && (p.fishTier ?? 0) <= cap && !owned.has(p.id))
         .sort((a, b) => (b.fishTier ?? 0) - (a.fishTier ?? 0));
     if (!eligible.length) return null;
-    return grantDrop(buyerId, eligible[0], "fishing", { fishRarity });
+    return grantDrop(buyerId, (await wishedFrom(buyerId, eligible)) || eligible[0], "fishing", { fishRarity });
 }
 
 // EXCLUSIVE raid pets — the ONLY source is completing a live Town raid, so they stay a genuine prestige trophy.
@@ -123,8 +142,9 @@ export async function maybeGrantRaidPet(buyerId, { boss = false, killed = false 
     if (!eligible.length) return null;
     // Rarest first, so on a (near-impossible) double hit the scarcer pet wins.
     eligible.sort((a, b) => a.raidChance - b.raidChance);
+    const raidWish = await wishedFrom(buyerId, eligible);
     for (const p of eligible) {
-        if (Math.random() < p.raidChance) return grantDrop(buyerId, p, "raid", { boss, killed });
+        if (Math.random() < p.raidChance) return grantDrop(buyerId, raidWish || p, "raid", { boss, killed });
     }
     return null;
 }
@@ -149,8 +169,9 @@ export async function maybeGrantSeaFightPet(buyerId, { tier = 1 } = {}) {
         .filter((p) => p.seaFightChance > 0 && !owned.has(p.id))
         // Rarest first, so a lucky roll that clears two thresholds pays the scarcer pet.
         .sort((a, b) => a.seaFightChance - b.seaFightChance);
+    const seaWish = await wishedFrom(buyerId, eligible);
     for (const p of eligible) {
-        if (Math.random() < p.seaFightChance * mult) return grantDrop(buyerId, p, "sea_fight", { tier });
+        if (Math.random() < p.seaFightChance * mult) return grantDrop(buyerId, seaWish || p, "sea_fight", { tier });
     }
     return null;
 }

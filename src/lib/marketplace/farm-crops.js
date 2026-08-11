@@ -18,7 +18,7 @@ import { addEquippedPetXp } from "@/lib/marketplace/pet-level.js";
 import { getPlotUpgrades, plotEffects, plotTracksFor } from "@/lib/marketplace/farm-plot-upgrades.js";
 import { maybeStartEncounter } from "@/lib/marketplace/farm-encounters.js";
 import { getTownBonuses } from "@/lib/marketplace/town-projects.js";
-import { hasPower, oneIn, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, oneIn, equippedPowers, claimPowerUse, powerRoll } from "@/lib/marketplace/ascension-powers.js";
 
 // How often working the field turns up a recipe card. Low — recipes should feel like a find, and the farm is
 // only one of several sources (chests, digs, raids, the merchant).
@@ -164,7 +164,10 @@ const RARITY_TIER_WEIGHTS = {
 
 const lvl = (up, key) => Math.max(0, Math.min(FARM_UPGRADES[key]?.max || 0, Number(up?.[key]) || 0));
 const growMultiplier = (up) => Math.max(0.4, 1 - 0.08 * lvl(up, "grow")); // Green Thumb
-export const plotCount = (up) => BASE_PLOTS + lvl(up, "plots");
+// Second Sowing buys two more plots. `powers` is optional so every existing synchronous caller keeps working
+// and simply sees the base count — the plots only appear for the reader that knows who is asking.
+export const plotCount = (up, powers = null) =>
+    BASE_PLOTS + lvl(up, "plots") + (powers?.has?.("second_sowing") ? 2 : 0);
 export const farmPetCapBonus = (up) => lvl(up, "petcap");
 export const seedLuckMult = (up) => 1 + 0.25 * lvl(up, "seedluck");
 const luckyHarvestLevel = (up) => lvl(up, "chest"); // Lucky Harvest: bumps the loot tier (see rollHarvestReward)
@@ -314,7 +317,7 @@ export async function plantSeed(buyerId, slot, seedId) {
     if (!buyerId || !SEEDS[seedId]) return { ok: false, error: "bad_request" };
     const buyer = await loadFarmBuyer(buyerId);
     const up = buyer?.farm_upgrades || {};
-    if (slot < 0 || slot >= plotCount(up)) return { ok: false, error: "bad_slot" };
+    if (slot < 0 || slot >= plotCount(up, await equippedPowers(buyerId))) return { ok: false, error: "bad_slot" };
     // Consume one seed atomically.
     const dec = await db.queryOne(`UPDATE mkt_farm_seed SET count = count - 1 WHERE buyer_id = $1 AND seed_id = $2 AND count > 0 RETURNING count`, [buyerId, seedId]).catch(() => null);
     if (!dec) return { ok: false, error: "no_seed" };
@@ -370,9 +373,13 @@ export async function plantSeed(buyerId, slot, seedId) {
 export async function harvestPlot(buyerId, slot) {
     if (!buyerId) return { ok: false, error: "bad_request" };
     // Atomically claim the plot only if it's actually ready (guards against double-harvest).
-    const claimed = await db.queryOne(`DELETE FROM mkt_farm_plot WHERE buyer_id = $1 AND slot = $2 AND ready_at <= NOW() RETURNING seed_id`, [buyerId, slot]).catch(() => null);
+    const claimed = await db.queryOne(
+        `DELETE FROM mkt_farm_plot WHERE buyer_id = $1 AND slot = $2 AND ready_at <= NOW()
+         RETURNING seed_id, (planted_at > ready_at - INTERVAL '1 day') AS quick`, [buyerId, slot]).catch(() => null);
     if (!claimed) return { ok: false, error: "not_ready" };
     const def = seedById(claimed.seed_id);
+    // A plot that rested: the crop took its full time rather than being rushed straight back in.
+    const plantedAfterRest = claimed.quick === false;
     // This plot's own specialization (Rich Loam / Nurturing Bed / Greenhouse / Warding Totem).
     const pEff = plotEffects((await getPlotUpgrades(buyerId).catch(() => ({})))[slot] || {});
     // Farm buffs (decorations + equipped gear farm affix + equipped pet): more harvest gold, better loot odds,
@@ -408,6 +415,13 @@ export async function harvestPlot(buyerId, slot) {
     // before answered "yes, you have harvested today" the moment you took any harvest, so the power could only
     // ever have fired on a day's very first one and never after a single ordinary pick.
     if (!doubled && await claimPowerUse(buyerId, "bumper_season")) { gold *= 2; doubled = true; }
+    // The Fallow Deed pays double on a plot that sat empty overnight. `planted_at` is the only trace of when
+    // the plot was last used, so "left fallow" is read as a gap of a day between clearing and re-planting.
+    if (!doubled && powers.has("fallow_deed") && plantedAfterRest) { gold *= 2; doubled = true; }
+    // Windfall Orchard drops a chest on the day's first harvest.
+    if (await claimPowerUse(buyerId, "windfall_orchard")) {
+        await addChests(buyerId, { wooden: 1 }, { source: "windfall_orchard" }).catch(() => {});
+    }
     if (powers.has("perennial_root") && oneIn(3)) {
         await db.query(`UPDATE mkt_farm_seed SET count = count + 1 WHERE buyer_id = $1 AND seed_id = $2`, [buyerId, claimed.seed_id]).catch(() => {});
     }
@@ -425,7 +439,10 @@ export async function harvestPlot(buyerId, slot) {
     // instead of failing the build. Same trap as stockade-penalty.js; the fix there was a leaf module, here a
     // deferred import is the smaller change.
     const { addToPantry } = await import("@/lib/marketplace/cooking.js");
-    await addToPantry(buyerId, "crop", claimed.seed_id, doubled ? 2 : 1).catch(() => {});
+    // The Cellar Key puts a second copy on the shelf one harvest in three. It stacks with a doubled harvest
+    // rather than replacing it — the two are different things (the harvest itself vs what reaches the pantry).
+    const cellarKey = await powerRoll(buyerId, "cellar_key", 3);
+    await addToPantry(buyerId, "crop", claimed.seed_id, (doubled ? 2 : 1) + (cellarKey ? 1 : 0)).catch(() => {});
     // Harvest is a huge XP minter, so the PLAYER only banks a fraction of the crop's XP (tuned down). The full
     // crop XP still feeds the PET below — the farm stays a pet-XP engine, it just doesn't flood player levels.
     const harvestPlayerXp = Math.round(xp * HARVEST_PLAYER_XP_MULT);
@@ -535,14 +552,18 @@ export async function applyFertilizer(buyerId, slot) {
 // guarded so it can only help each plot once every RAIN_GUARD_HOURS.
 export async function applyRainBoost(buyerId) {
     if (!buyerId) return { ok: false };
+    // THE RAIN BARREL: it is always raining on your farm. Two things follow — the client's weather report stops
+    // mattering (the caller applies it unconditionally, see the farm poll) and the once-every-six-hours guard
+    // comes off, which is the half of it a member actually feels.
+    const barrel = await hasPower(buyerId, "rain_barrel");
     const res = await db.query(
         `UPDATE mkt_farm_plot
             SET ready_at = NOW() + (GREATEST(0, EXTRACT(EPOCH FROM (ready_at - NOW())) * $2) || ' seconds')::interval,
                 rain_at = NOW()
           WHERE buyer_id = $1 AND ready_at > NOW()
-            AND (rain_at IS NULL OR rain_at < NOW() - ($3 || ' hours')::interval)
+            AND ($4 OR rain_at IS NULL OR rain_at < NOW() - ($3 || ' hours')::interval)
           RETURNING slot`,
-        [buyerId, 1 - RAIN_CUT, RAIN_GUARD_HOURS]
+        [buyerId, 1 - RAIN_CUT, RAIN_GUARD_HOURS, barrel]
     ).catch(() => []);
     const boosted = (res?.rows || res || []).length;
     return { ok: true, boosted, garden: boosted ? await getGarden(buyerId) : null };

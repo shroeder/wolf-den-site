@@ -1280,6 +1280,7 @@ export default function ArenaClient({ initial }) {
                             );
                         })}
                     </div>
+                    <PurserPanel st={st} busy={busy} act={act} />
                 </section>
             ) : null}
 
@@ -1403,6 +1404,43 @@ export default function ArenaClient({ initial }) {
 // It says the two things that are actually true now: how your build did against each person who came at you,
 // and what turning them away paid you. A defender is asleep for all of this, so the report IS the feature —
 // it is the only moment the game gets to tell you your loadout was working without you.
+// ── THE PURSER'S EXCHANGE ────────────────────────────────────────────────────────────────────────────────────
+// Drawn only for the member wearing the piece — st.purser is null for everyone else, which is why this is a
+// bare early return rather than a disabled panel. A shop you can never use is worse than no shop.
+//
+// It lives in the Armoury tab because that is the one screen where a laurel is already a number you are
+// deciding what to do with. The doubloon side is deliberately shown at the same size: the whole point of the
+// power is that the two purses are one purse now.
+function PurserPanel({ st, busy, act }) {
+    const [from, setFrom] = useState("doubloons");
+    const [amount, setAmount] = useState("");
+    if (!st?.purser) return null;
+    const held = from === "doubloons" ? st.purser.doubloons : st.laurels;
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    const ok = n > 0 && n <= Math.min(held, st.purser.max);
+    return (
+        <div className="ar-purser">
+            <b>The Purser&apos;s Exchange</b>
+            <p className="ar-arm-sub">
+                One for one, either way. You hold {money(st.purser.doubloons)} doubloons and {money(st.laurels)} laurels.
+                Gold stays out of it.
+            </p>
+            <div className="ar-purser-row">
+                <button type="button" className={`btn-ghost${from === "doubloons" ? " is-active" : ""}`} onClick={() => setFrom("doubloons")}>Doubloons → laurels</button>
+                <button type="button" className={`btn-ghost${from === "laurels" ? " is-active" : ""}`} onClick={() => setFrom("laurels")}>Laurels → doubloons</button>
+            </div>
+            <div className="ar-purser-row">
+                <input className="ar-purser-in" inputMode="numeric" value={amount} placeholder={`up to ${money(Math.min(held, st.purser.max))}`}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))} />
+                <button type="button" className="btn-gold" disabled={!ok || busy}
+                    onClick={async () => { await act("purser", { from, amount: n }); setAmount(""); }}>
+                    {busy ? "…" : "Exchange"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function AwayReport({ rows, onClose }) {
     useScrollLock(true);
     const earned = rows.reduce((n, r) => n + (r.laurels || 0), 0);

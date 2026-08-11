@@ -21,7 +21,7 @@ import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js"
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting } from "@/lib/settings.js";
-import { powerRoll, hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { powerRoll, hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
 const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
@@ -46,6 +46,10 @@ const PET_OTHERS_PER_DAY = 3; // SEPARATE free daily pettings on OTHER members' 
 // same 3/day budget as petting your own.
 const PET_OTHER_GOLD = 8;
 const PET_OTHER_PLAYER_XP = 5;
+// The Toll House (ascension power): what a visitor is worth to the farm's owner, and how many visitors a day
+// pay. Ten a day is above what any farm currently sees, so it reads as uncapped without being one.
+const TOLL_HOUSE_GOLD = 40;
+const TOLL_HOUSE_PER_DAY = 10;
 // Feeding a FRIEND'S pet (unlimited — it costs one of YOUR treats): a small generosity bonus to the feeder.
 // Always worth less than a treat, so it can't be farmed for profit.
 const FEED_OTHER_GOLD = 15;
@@ -221,7 +225,10 @@ async function pettingBudget(buyerId) {
     // pools — otherwise recharging while visiting a friend's farm did nothing (you'd buy more but still be capped).
     const bought = recharges * PET_RECHARGE_AMOUNT + extra;
     const ownAllowance = PET_PETS_PER_DAY + farmPetCapBonus(b?.farm_upgrades || {}) + bought;
-    const othersAllowance = PET_OTHERS_PER_DAY + bought;
+    // The Open Gate: tending OTHER people's animals stops costing you anything. The pool is still counted —
+    // the recap and the visit UI both read `used` — it simply never runs out. Lifting the allowance is what
+    // does the work, because the allowance is also the value the reservation guard checks against.
+    const othersAllowance = (await hasPower(buyerId, "open_gate")) ? 999 : PET_OTHERS_PER_DAY + bought;
     return {
         own: { used: usedOwn, allowance: ownAllowance, left: Math.max(0, ownAllowance - usedOwn) },
         others: { used: usedOthers, allowance: othersAllowance, left: Math.max(0, othersAllowance - usedOthers) },
@@ -570,6 +577,33 @@ export async function petPet(petterId, petId, ownerId = null) {
                 if (mine) await addPetXp(petterId, mine, Math.max(1, Math.round(petXpAmt * share / 100))).catch(() => {});
             }
         } catch { /* a share is a bonus; never fail the visit */ }
+    }
+
+    // ── ASCENSION POWERS ON A VISIT ──────────────────────────────────────────────────────────────────────
+    // Two of these belong to the FARM OWNER and one to the visitor, which is why both sets are read. Read
+    // after the pet has already been credited so a power can never be the reason a visit fails.
+    if (!own) {
+        const [mine, theirs] = await Promise.all([
+            equippedPowers(petterId).catch(() => new Set()),
+            equippedPowers(petOwner).catch(() => new Set()),
+        ]);
+        // Standing Invitation is the owner's, and it refunds the VISITOR's charge — the slot was reserved
+        // above, so the refund is the same statement the failure paths already use.
+        if (theirs.has("standing_invitation")) {
+            await db.query(`UPDATE mkt_buyer SET ${col} = GREATEST(0, ${col} - 1) WHERE id = $1 AND pet_farm_day = ${DAY}`, [petterId]).catch(() => {});
+        }
+        // The Toll House pays the owner FROM THE HOUSE — the visitor is never charged, which is the whole
+        // point of the card. Ten tolls a day, so a popular farm is a good day rather than a gold printer.
+        if (theirs.has("toll_house") && (await claimPowerUse(petOwner, "toll_house", TOLL_HOUSE_PER_DAY))) {
+            await awardXp(petOwner, "farm_toll", { points: 0, gold: TOLL_HOUSE_GOLD }).catch(() => {});
+        }
+        // The Long Leash. On someone else's land it is the OWNER's farm bonuses that scale the XP — your own
+        // pet's pet-bond passive is doing nothing. This tops the pet up by the share yours would have paid.
+        if (mine.has("long_leash")) {
+            const bonus = await farmBonuses(petterId).catch(() => null);
+            const extra = Math.round(PET_PET_XP * ((bonus?.petXp || 0) / 100));
+            if (extra > 0) await addPetXp(petOwner, petId, extra).catch(() => {});
+        }
     }
 
     // Reward the petter: your own pet pays a bit more (the bond); a friend's pet a small thank-you.

@@ -80,13 +80,17 @@ export async function getOwnedGearIds(buyerId) {
 
 // Forge enhancement stat bonuses for a member's given items → merged combat-stat totals. Only the items that
 // are actually equipped should be passed in (enhancement rides with the item wherever it's equipped).
-async function enhanceBonusFor(buyerId, itemIds) {
+async function enhanceBonusFor(buyerId, itemIds, powers = null) {
     if (!buyerId || !itemIds?.length) return {};
     const rows = await db.query(`SELECT stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2)`, [buyerId, itemIds]).catch(() => []);
+    // The Tempered Edge counts every enhancement twice. It multiplies the BONUS, never the item's own base
+    // stats — an enhance level is the thing the card is about, and doubling the whole piece would make the
+    // power worth more on your best item than on your most-worked one, which is backwards.
+    const mult = powers?.has?.("tempered_edge") ? 2 : 1;
     const total = {};
     for (const r of rows) {
         const b = typeof r.stat_bonus === "string" ? (() => { try { return JSON.parse(r.stat_bonus); } catch { return {}; } })() : (r.stat_bonus || {});
-        for (const [k, v] of Object.entries(b)) total[k] = (total[k] || 0) + (Number(v) || 0);
+        for (const [k, v] of Object.entries(b)) total[k] = (total[k] || 0) + (Number(v) || 0) * mult;
     }
     return total;
 }
@@ -97,8 +101,9 @@ async function enhanceBonusFor(buyerId, itemIds) {
 export async function getEquippedStats(buyerId) {
     if (!buyerId) return {};
     const ids = Object.values(await getEquippedIds(buyerId));
-    const total = withSetBonuses(ids, await equippedPowers(buyerId));
-    for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids))) total[k] = (total[k] || 0) + v;
+    const powers = await equippedPowers(buyerId);
+    const total = withSetBonuses(ids, powers);
+    for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids, powers))) total[k] = (total[k] || 0) + v;
     // Lazily imported: jeweller.js is server-only and this module is imported widely.
     try {
         const { socketBonusFor } = await import("@/lib/marketplace/jeweller.js");

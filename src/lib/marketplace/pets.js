@@ -11,6 +11,7 @@ import { memberPetPerks } from "@/lib/marketplace/pet-redemption.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 const nameOf = (r) => r?.display_name || r?.alias || "Member";
 
@@ -80,7 +81,7 @@ export async function petsState(buyerId, { sync = false } = {}) {
         await accrueEquippedPetTrickle(buyerId).catch(() => {});
     }
     const [buyer, rows, incoming, outgoing, realWorld, petXp] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(gold,0) AS gold, featured_collectible, pet_wish FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref, tradeable FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         incomingShares(buyerId).catch(() => []),
         outgoingShares(buyerId).catch(() => ({})),
@@ -143,7 +144,25 @@ export async function petsState(buyerId, { sync = false } = {}) {
     // The stones in hand and the pets already enshrined — the whole of the level-6 surface.
     const { ascensionState } = await import("@/lib/marketplace/pet-ascension.js");
     const ascension = await ascensionState(buyerId).catch(() => null);
-    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension };
+    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
+}
+
+/**
+ * The Whistle — the pet you just put down keeps its ability for the rest of the day.
+ *
+ * Called on the way OUT of the slot (both equip-something-else and unequip), because that is the only moment
+ * the outgoing pet is still known. Only the last one is remembered: see the migration note — keeping every
+ * pet swapped out today would let a big collection carry its whole menagerie at once.
+ */
+async function blowTheWhistle(buyerId, replacingWith = null) {
+    if (!(await hasPower(buyerId, "whistle"))) return;
+    const row = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const outgoing = row?.featured_collectible;
+    if (!outgoing || outgoing === replacingWith) return;
+    await db.query(
+        `UPDATE mkt_buyer SET whistle_pet = $2, whistle_day = (NOW() AT TIME ZONE 'America/Chicago')::date WHERE id = $1`,
+        [buyerId, outgoing]
+    ).catch(() => {});
 }
 
 export async function equipPet(buyerId, petId) {
@@ -154,6 +173,7 @@ export async function equipPet(buyerId, petId) {
     if (!state.ownedIds.includes(petId)) return { ok: false, error: "not_owned" };
     // Settle the currently-equipped pet's trickle before swapping, then start the new pet's clock.
     await accrueEquippedPetTrickle(buyerId).catch(() => {});
+    await blowTheWhistle(buyerId, petId).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET featured_collectible = $2, updated_at = NOW() WHERE id = $1`, [buyerId, petId]).catch(() => {});
     await startPetTrickleClock(buyerId, petId).catch(() => {});
     await bumpQuestProgress(buyerId, "equip", 1).catch(() => {});
@@ -165,8 +185,33 @@ export async function unequipPet(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // Settle the equipped pet's trickle before it stops accruing.
     await accrueEquippedPetTrickle(buyerId).catch(() => {});
+    await blowTheWhistle(buyerId).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET featured_collectible = NULL, updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
     return { ok: true };
+}
+
+/**
+ * Name the pet you are hoping for — The Breeder's Eye.
+ *
+ * A wish is only ever a STEER. pet-drops.js honours it when the wished pet is already in the pool that roll
+ * would have drawn from, so it cannot reach a pet the source could not have given you, and it does nothing at
+ * all for a member not wearing the piece. Naming a pet you already own is refused rather than silently kept —
+ * a wish that can never come true is worse than no wish.
+ */
+export async function setPetWish(buyerId, petId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    if (!(await hasPower(buyerId, "breeder_s_eye"))) return { ok: false, error: "no_power" };
+    const id = String(petId || "");
+    if (!id) { // clearing it is always allowed
+        await db.query(`UPDATE mkt_buyer SET pet_wish = NULL, updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {});
+        return { ok: true, petWish: null };
+    }
+    const pet = collectibleById(id);
+    if (!pet) return { ok: false, error: "not_found" };
+    const owned = await db.queryOne(`SELECT 1 AS x FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = $2`, [buyerId, id]).catch(() => null);
+    if (owned) return { ok: false, error: "already_owned" };
+    await db.query(`UPDATE mkt_buyer SET pet_wish = $2, updated_at = NOW() WHERE id = $1`, [buyerId, id]).catch(() => {});
+    return { ok: true, petWish: id };
 }
 
 export async function buyPet(buyerId, petId) {

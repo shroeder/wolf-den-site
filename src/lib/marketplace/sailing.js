@@ -22,6 +22,7 @@ import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
          RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
+import { hasPower, equippedPowers, claimPowerUse, powerUsesLeft, powerRoll, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
@@ -338,6 +339,26 @@ async function rollMerchant(buyerId) {
     const arrived = row.departed_at && row.returns_at && !row.encounter_paused_at
         && Date.now() >= new Date(row.returns_at).getTime();
     if (!arrived) return;
+
+    // ── ASCENSION POWERS ON A LANDING ────────────────────────────────────────────────────────────────────────
+    // This is the one hook in the file that fires EXACTLY ONCE PER VOYAGE — merchant_json is the latch, and it
+    // is set unconditionally at the end of this function. Anything "one voyage in three" belongs here; put it
+    // on the dig or the collect and it fires per fragment or per re-read instead.
+    const landfall = await equippedPowers(buyerId);
+    if (landfall.has("salvager_s_claim") && oneIn(3)) {
+        const pool = randomDropPool();
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        if (pick) await grantItem(buyerId, pick.id, { source: "sail_salvage" }).catch(() => {});
+    }
+    // The Full Manifest draws from the locker — but NOT the whole locker. The Elixir and the Sands are
+    // re-redemption tokens for real merchandise (see the note on LOCKER), which is why they are priced at five
+    // thousand doubloons. A power that hands one out free is the same hole in the till by another door.
+    if (landfall.has("full_manifest") && oneIn(3)) {
+        const safe = LOCKER_LIST.filter((l) => !MANIFEST_EXCLUDED.has(l.id));
+        const pick = safe[Math.floor(Math.random() * safe.length)];
+        if (pick) await grantConsumable(buyerId, pick.consumable, 1).catch(() => {});
+    }
+
     const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
     if (forced) await db.query(`UPDATE mkt_sailing SET force_merchant = FALSE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     const chance = forced ? 1 : MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
@@ -790,7 +811,7 @@ const digItemCount = (tier, bonus = 0) => Math.min(5 + bonus, 2 + Math.floor(tie
 // One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
 const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
-function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false) {
+function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardPowers = null) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
@@ -814,7 +835,7 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false) {
     const fragTiers = frag.map(() => artifactTier);
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
-    frag.forEach(([fr, fc], i) => { depth[fr][fc] = perks.surface && i === 0 ? 1 : (1 + randInt(cap)); });
+    frag.forEach(([fr, fc], i) => { depth[fr][fc] = (perks.surface && i === 0) || halfDug ? 1 : (1 + randInt(cap)); });
     // Scatter real consumable ITEMS (1×1) on random non-chest tiles — bonus finds you dig up along the way.
     const chestSet = new Set(frag.map(([fr, fc]) => `${fr},${fc}`));
     const free = [];
@@ -823,13 +844,20 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false) {
     // Diviner's Rod fills the ground. `petFinds` is already the "more scattered finds" lever, so the power
     // rides the same number rather than inventing a parallel one.
     const finds = digItemCount(tier, petFinds) + (divinersRod ? digItemCount(tier, petFinds) : 0);
+    // Beachhead: a third of sites arrive half dug, so the shallow layers are already gone.
+    const halfDug = boardPowers?.has?.("beachhead") && Math.random() < 1 / 3;
     const items = free.slice(0, Math.min(free.length, finds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     // petStamina comes from the caller: every owned seafaring pet adds a dig, capped at +4 across the whole
     // menagerie. A count rather than a percentage, so stacking converges instead of compounding. Passed in
     // because newBoard is synchronous and the lookup is a query.
-    const stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2 + petStamina; // a few more digs on the bigger boards
+    // Deep Ballast buys four more digs; Twice-Landed makes landfall twice, which is a second board's worth of
+    // digging on the same island rather than a second island — the board is the island, so doubling the budget
+    // is what "twice" means here.
+    let stamina = digStamina(row?.dig_stamina_level || 0) + (tier - 1) * 2 + petStamina;
+    if (boardPowers?.has?.("deep_ballast")) stamina += 4;
+    if (boardPowers?.has?.("twice_landed")) stamina *= 2;
     const maxSenses = digSenseBudget(tier);
     // Bake the digging-upgrade proc chances + unlocked tools onto the board so every dig can apply them.
     const up = {
@@ -969,7 +997,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1108,6 +1136,9 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             }
             : null,
         merchantGold: { floor: MERCHANT_GOLD_FLOOR, ceil: MERCHANT_GOLD_CEIL },
+        // MARKET DAY (an ascension power): a restock on demand, once a day. `false` for everyone not wearing
+        // the piece, so the button is simply not drawn rather than drawn and refused.
+        marketDay,
         // Once-a-day "favorable winds" boost (shaves an hour off the trip) — only offered mid-voyage.
         windAvailable: status === "sailing" && !row?.wind_used_today,
         // After the free one is spent, extra tailwinds can be bought for this much gold (0 while testing).
@@ -1297,11 +1328,22 @@ async function openEncounterBattle(buyerId, enc, row) {
 async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } = {}) {
     const enc = encounterById(meta.encId);
     const spoils = [];
+    // ── ASCENSION POWERS ON AN ENCOUNTER ─────────────────────────────────────────────────────────────────
+    // The Prize Court pays the doubloons twice, one fight in three. The Kraken's Toll pays you for a MONSTER
+    // you did not have to beat — the loot table only fires on a win, so it is added here rather than folded
+    // into the win branch below. The Full Manifest is a locker item on a third of voyages, claimed after.
+    const encPowers = await equippedPowers(buyerId);
+    if (enc?.kind === "monster" && !res.win && encPowers.has("kraken_s_toll")) {
+        const toll = 40 + (enc.tier || 1) * 20;
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, toll]).catch(() => {});
+        spoils.push({ kind: "doubloons", n: toll, toll: true });
+    }
     if (enc && res.win) {
         for (const l of enc.loot || []) {
             if (l.kind === "doubloons") {
-                await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, l.n]).catch(() => {});
-                spoils.push({ kind: "doubloons", n: l.n });
+                const n = l.n * (encPowers.has("prize_court") && oneIn(3) ? 2 : 1);
+                await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, n]).catch(() => {});
+                spoils.push({ kind: "doubloons", n });
             } else if (l.kind === "fragment") {
                 await grantFragment(buyerId, l.n, l.tier || "wooden").catch(() => {});
                 spoils.push({ kind: "fragments", n: l.n, tier: l.tier || "wooden" });
@@ -1356,6 +1398,16 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
               WHERE buyer_id = $1`,
             [buyerId, JSON.stringify([meta.encId])]
         ).catch(() => {});
+    }
+    // The Quiet Passage: a lost encounter costs nothing. Encounters do not spend a sortie (that is raids), so
+    // what losing actually costs is the fight itself — this hands the spoils over anyway, one time in three.
+    if (!res.win && encPowers.has("quiet_passage") && oneIn(3) && enc) {
+        for (const l of enc.loot || []) {
+            if (l.kind === "doubloons") {
+                await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, l.n]).catch(() => {});
+                spoils.push({ kind: "doubloons", n: l.n, passage: true });
+            }
+        }
     }
 
     const tally = await readRow(buyerId);
@@ -1459,7 +1511,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     // `owner` carries exactly ONE thing now that ship battles are public: whether to draw the gun-placement
     // workshop door in the yard. That route is owner-only and 404s for everybody else, so a link every member
     // can see is a dead end with a nice icon on it.
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1786,7 +1838,6 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
-import { hasPower, equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {
@@ -2675,6 +2726,29 @@ async function finishFleetBattle(buyerId, meta, res) {
     return paid;
 }
 
+// ── MARKET DAY ───────────────────────────────────────────────────────────────────────────────────────────────
+// "The travelling merchant restocks for you, on demand, once a day."
+//
+// The merchant is rolled ONCE per voyage at the moment you land (rollMerchant), and merchant_json is the latch
+// that stops it rolling again. Restocking is therefore clearing the latch and rolling a fresh one — with
+// force_merchant set, because a restock that produces "no merchant today" is not a restock.
+//
+// Once a day, claimed atomically, so a double-tap cannot produce two shelves. And only when you are ASHORE:
+// the merchant is somebody you meet on the island, and conjuring one mid-crossing would make the landing —
+// the whole beat the roll exists to decorate — mean nothing.
+export async function marketDay(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const row = await readRow(buyerId);
+    const ashore = row?.departed_at && row?.returns_at && !row.encounter_paused_at
+        && Date.now() >= new Date(row.returns_at).getTime();
+    if (!ashore) return { ok: false, error: "not_ashore", ...(await getSailingState(buyerId)) };
+    if (!(await claimPowerUse(buyerId, "market_day"))) return { ok: false, error: "no_market_day", ...(await getSailingState(buyerId)) };
+    await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, force_merchant = TRUE, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    await rollMerchant(buyerId).catch(() => {});
+    await trackActivity(buyerId, "market_day", {}).catch(() => {});
+    return { ok: true, ...(await getSailingState(buyerId)) };
+}
+
 // ── THE QUARTERMASTER ────────────────────────────────────────────────────────────────────────────────────────
 export async function buyAmmo(buyerId, ammoId, qty = 10) {
     const def = AMMO[String(ammoId)];
@@ -2748,6 +2822,10 @@ export const LOCKER = {
         blurb: "Use an in-store perk again today instead of waiting out its cooldown. Real merchandise." },
 };
 export const LOCKER_LIST = Object.values(LOCKER);
+// What The Full Manifest may NOT pull off the shelf. Both of these recharge or un-cool a charged item, and a
+// charge is a real-merchandise redemption at the counter — the two lines the shop deliberately prices at five
+// thousand doubloons. Anything added to LOCKER that touches `charged`, `charges` or a cooldown belongs here.
+export const MANIFEST_EXCLUDED = new Set(["elixir_renewal", "sands_of_time"]);
 
 // What repelling one raid is worth. Deliberately modest: it is income you did not spend a raid to earn, and
 // the cheapest gun-deck level costs 18.
@@ -3336,7 +3414,8 @@ export async function beginDig(buyerId) {
         // /10 to match the description: 20 at cap -> +2 finds.
         petFinds = Math.max(0, Math.round((await getPetSystemPerk(buyerId, "beachcomber")) / 10));
     } catch { /* no companion, no extra finds */ }
-    const board = newBoard(row, petStamina, petFinds, await hasPower(buyerId, "diviner_s_rod"));
+    const boardPowers = await equippedPowers(buyerId);
+    const board = newBoard(row, petStamina, petFinds, boardPowers.has("diviner_s_rod"), boardPowers);
     // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
     const eff = seaEffects(await equippedSeaAffinity(buyerId));
     if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;
@@ -3563,11 +3642,17 @@ async function buyUpgrade(buyerId, kind) {
     const row = await readRow(buyerId);
     const cur = row?.[col] || 0;
     if (cur >= UPGRADE_MAX[kind]) return { ok: false, error: "maxed", ...(await getSailingState(buyerId)) };
-    const cost = upgradeCost(cur);
+    // The Shipwright's Debt settles one upgrade in three for you. Rolled BEFORE the gold is taken, so a free
+    // one goes through even when the purse is short — a debt the yard eats is not a discount you have to
+    // afford first.
+    const onTheYard = await powerRoll(buyerId, "shipwright_s_debt", 3);
+    const cost = onTheYard ? 0 : upgradeCost(cur);
     await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
+    const paid = cost === 0
+        ? { gold: null }
+        : await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]).catch(() => null);
     if (!paid) return { ok: false, error: "not_enough_gold", ...(await getSailingState(buyerId)) };
-    await logCoin(buyerId, -cost, "upgrade", { meta: { kind }, balanceAfter: paid.gold }).catch(() => {});
+    if (cost > 0) await logCoin(buyerId, -cost, "upgrade", { meta: { kind }, balanceAfter: paid.gold }).catch(() => {});
     await trackActivity(buyerId, "buy_upgrade", { track: kind, level: cur + 1, cost }).catch(() => {});
     await db.query(`UPDATE mkt_sailing SET ${col} = ${col} + 1, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     // Achievement badges (hard): commanding the two apex hulls (Leviathan tier 10 @ lvl 90, Celestial tier 11 @ lvl 100).
@@ -3581,7 +3666,7 @@ async function buyUpgrade(buyerId, kind) {
         const allMaxed = Object.entries(UPGRADE_COLS).every(([k, c]) => ((row?.[c] || 0) + (c === col ? 1 : 0)) >= UPGRADE_MAX[k]);
         if (allMaxed) await grantEventBadge(buyerId, "sail_sovereign").catch(() => {});
     }
-    return { ok: true, spent: cost, ...(await getSailingState(buyerId)) };
+    return { ok: true, spent: cost, onTheYard, ...(await getSailingState(buyerId)) };
 }
 export const upgradeSpeed = (buyerId) => buyUpgrade(buyerId, "speed");
 export const upgradeFortune = (buyerId) => buyUpgrade(buyerId, "fortune");

@@ -123,16 +123,38 @@ function shapeListing(row, sprites, viewerId, ownedSet, enhMap, elemMap) {
 
 // Lazily expire any past-due active listings, returning each item to its seller. Idempotent (status guard).
 export async function expireAuctions() {
-    const due = await db.query(`UPDATE mkt_auction SET status = 'expired' WHERE status = 'active' AND expires_at < NOW() RETURNING seller_id, item_id`, []).catch(() => []);
-    for (const r of due) await grantItem(r.seller_id, r.item_id, "auction_return").catch(() => {});
+    const due = await db.query(`UPDATE mkt_auction SET status = 'expired' WHERE status = 'active' AND expires_at < NOW() RETURNING id, seller_id, item_id, price`, []).catch(() => []);
+    // ── NO RESERVE ───────────────────────────────────────────────────────────────────────────────────────
+    // A listing that does not sell is put straight back up, free, at the same price and for the same three
+    // days. The seller never touches it, so this has to happen BEFORE the item is returned to inventory —
+    // relisting a piece that is already back in the bag would create a second copy of it.
+    //
+    // The fee is genuinely zero rather than refunded: the Auctioneer's Seat is the power that waives fees,
+    // and charging one here only to hand it back would make the two read as the same card.
+    const relisted = new Set();
+    for (const r of due) {
+        if (!(await hasPower(r.seller_id, "no_reserve"))) continue;
+        const again = await db.queryOne(
+            `INSERT INTO mkt_auction (seller_id, item_id, price, fee, expires_at)
+             VALUES ($1, $2, $3, 0, NOW() + INTERVAL '3 days') RETURNING id`,
+            [r.seller_id, r.item_id, r.price]
+        ).catch(() => null);
+        if (again?.id) relisted.add(r.id);
+    }
+    for (const r of due) {
+        if (relisted.has(r.id)) continue;
+        await grantItem(r.seller_id, r.item_id, "auction_return").catch(() => {});
+    }
     // Tell the seller their listing died. It used to just quietly reappear in their inventory, so unless they
     // went looking they never learned it hadn't sold — and couldn't decide to relist it cheaper.
     for (const r of due) {
         const it = itemById(r.item_id);
         await sendWebPush(r.seller_id, {
             kind: "auction",
-            title: "⌛ Listing expired",
-            body: `${it?.name || "Your listing"} didn't sell and is back in your inventory. Relist it any time.`,
+            title: relisted.has(r.id) ? "⌛ Listed again" : "⌛ Listing expired",
+            body: relisted.has(r.id)
+                ? `${it?.name || "Your listing"} didn't sell, so No Reserve put it straight back up for another three days.`
+                : `${it?.name || "Your listing"} didn't sell and is back in your inventory. Relist it any time.`,
             url: "/marketplace/auction",
             tag: "auction-expired",
             data: { type: "auction_expired", itemId: r.item_id },

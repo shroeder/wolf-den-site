@@ -531,6 +531,49 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
     ).catch(() => {});
 }
 
+// ── SUBSTITUTING OFF THE SHELF ───────────────────────────────────────────────────────────────────────────────
+// Two ascension powers let a recipe be satisfied with something other than what it asked for. Both need the
+// same thing: pull `qty` units out of the pantry from whatever is actually on it.
+//
+// Biggest stack first, so a substitution eats the thing you have too much of rather than the last of something
+// rare. Refs the recipe itself asked for are SKIPPED — otherwise a dish short on one line would quietly eat the
+// ingredients it had already set aside for the others.
+//
+// All-or-nothing: if the shelf can't cover it, everything taken goes straight back. Returns the taken list in
+// the same shape the caller's refund loop expects, or null.
+const STANDING_RECIPE_PER_DAY = 2;
+const SUBSTITUTION_PER_DAY = 3;
+// The Tasting Menu's ceiling. A pantry-heavy feast can cover a lot of small recipes at once, and a menu that
+// paid twenty rungs off one cook would out-earn every other power on the list by an order of magnitude.
+const TASTING_MENU_MAX = 4;
+
+async function takeAnyFromPantry(buyerId, qty, skip = {}) {
+    const rows = await db.query(
+        `SELECT ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0 ORDER BY qty DESC`,
+        [buyerId]
+    ).catch(() => []);
+    const taken = [];
+    let need = Math.max(0, Math.round(Number(qty) || 0));
+    for (const r of rows) {
+        if (need <= 0) break;
+        if (skip[r.ref] != null) continue;
+        const n = Math.min(need, Number(r.qty) || 0);
+        if (n <= 0) continue;
+        const got = await db.queryOne(
+            `UPDATE mkt_pantry SET qty = qty - $3 WHERE buyer_id = $1 AND ref = $2 AND qty >= $3 RETURNING qty`,
+            [buyerId, r.ref, n]
+        ).catch(() => null);
+        if (!got) continue;
+        taken.push({ kind: ingredientMeta(r.ref).kind, ref: r.ref, qty: n });
+        need -= n;
+    }
+    if (need > 0) {
+        for (const t of taken) await addToPantry(buyerId, t.kind, t.ref, t.qty);
+        return null;
+    }
+    return taken;
+}
+
 // ── THE REVEAL ───────────────────────────────────────────────────────────────────────────────────────────────
 // Finding a recipe is PENDING STATE, not a return value.
 //
@@ -867,19 +910,35 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         || Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
     if (!freeCook) {
         const taken = [];
+        // The Standing Recipe (twice a day, the whole dish) and The Substitution (three times a day, ONE
+        // line) both cover a short ingredient out of whatever else is on the shelf. Claimed LAZILY — only
+        // once a line actually comes up short — so a day's uses are never spent on a cook that had the
+        // ingredients all along.
+        let standing = null;   // null = not asked yet, so the claim happens at most once per cook
+        let subUsed = false;
         for (const [ref, qty] of Object.entries(rec.need)) {
             const meta = ingredientMeta(ref);
             const got = await db.queryOne(
                 `UPDATE mkt_pantry SET qty = qty - $3 WHERE buyer_id = $1 AND ref = $2 AND qty >= $3 RETURNING qty`,
                 [buyerId, ref, qty]
             ).catch(() => null);
-            if (!got) {
-                // Put back whatever we already took — a half-consumed cook is worse than a failed one.
-                for (const t of taken) await addToPantry(buyerId, t.kind, t.ref, t.qty);
-                await db.query(`UPDATE mkt_kitchen SET cooks_today = GREATEST(0, cooks_today - 1) WHERE buyer_id = $1`, [buyerId]).catch(() => {});
-                return { ok: false, error: "missing_ingredients", missing: meta.name };
+            if (got) { taken.push({ kind: meta.kind, ref, qty }); continue; }
+
+            if (standing === null && cookPowers.has("standing_recipe")) {
+                standing = await claimPowerUse(buyerId, "standing_recipe", STANDING_RECIPE_PER_DAY);
             }
-            taken.push({ kind: meta.kind, ref, qty });
+            let subbed = standing ? await takeAnyFromPantry(buyerId, qty, rec.need) : null;
+            if (!subbed && !subUsed && cookPowers.has("substitution")
+                && (await claimPowerUse(buyerId, "substitution", SUBSTITUTION_PER_DAY))) {
+                subUsed = true;
+                subbed = await takeAnyFromPantry(buyerId, qty, rec.need);
+            }
+            if (subbed) { taken.push(...subbed); continue; }
+
+            // Put back whatever we already took — a half-consumed cook is worse than a failed one.
+            for (const t of taken) await addToPantry(buyerId, t.kind, t.ref, t.qty);
+            await db.query(`UPDATE mkt_kitchen SET cooks_today = GREATEST(0, cooks_today - 1) WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+            return { ok: false, error: "missing_ingredients", missing: meta.name };
         }
     }
 
@@ -914,6 +973,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
 
     let made = null;
     let goldPaid = 0;
+    const alsoMade = [];   // The Tasting Menu's ride-along dishes, so the result card can name them
     let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) + equippedKitchen.portion / 100 ? 1 : 0);
     // The Copper Pot is a second helping one cook in four; The Big Pot makes the helping itself bigger one in
     // three. Two different levers on purpose — portions is "how many", potLift is "how much of each".
@@ -962,45 +1022,64 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
             chests: await getChestArt().then((a) => Object.fromEntries(Object.entries(a || {}).map(([k, v]) => [k, typeof v === "string" ? v : v?.url || null]))).catch(() => ({})),
             crops: spriteMap,
         });
-        let extraSprite = null;
-        switch (r.kind) {
+        // ONE RUNG, PAID. Extracted from the branch it used to be written inline in, because The Tasting Menu
+        // pays several rungs in a row — the alternative was a second copy of this switch, which would have
+        // drifted from the first the next time a reward kind was added to a ladder.
+        const payRung = async (rw, forRecipe, tierN) => {
+        switch (rw.kind) {
             case "gold": {
-                const bonus = rint(r.min, r.max);
-                const bonusN = serve(bonus);
+                const bonusN = serve(rint(rw.min, rw.max));
                 const p2 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, bonusN]).catch(() => null);
-                await logCoin(buyerId, bonusN, "cooking", { balanceAfter: p2?.gold, meta: { recipe: rec.id, tier } }).catch(() => {});
+                await logCoin(buyerId, bonusN, "cooking", { balanceAfter: p2?.gold, meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {});
                 goldPaid += bonusN;
                 break;
             }
             // `portions` is the Seasoning track's second helping. It used to be applied ONLY to gold, so
             // "the same dish, twice" quietly meant "the same dish once" for six of the seven reward kinds —
             // the track read as broken to anyone who bought it and then won a chest.
-            case "parts": await addParts(buyerId, r.partTier, serve(rint(r.min, r.max))).catch(() => {}); break;
-            case "chest": await addChests(buyerId, { [r.chestTier]: serve(1) }, { source: "cooking", meta: { recipe: rec.id } }).catch(() => {}); break;
+            case "parts": await addParts(buyerId, rw.partTier, serve(rint(rw.min, rw.max))).catch(() => {}); break;
+            case "chest": await addChests(buyerId, { [rw.chestTier]: serve(1) }, { source: "cooking", meta: { recipe: forRecipe.id } }).catch(() => {}); break;
             case "seed": {
-                const id = r.pool[Math.floor(Math.random() * r.pool.length)];
-                for (let i = 0, n = serve(rint(r.min, r.max)); i < n; i += 1) await grantSeed(buyerId, id).catch(() => {});
+                const id = rw.pool[Math.floor(Math.random() * rw.pool.length)];
+                for (let i = 0, n = serve(rint(rw.min, rw.max)); i < n; i += 1) await grantSeed(buyerId, id).catch(() => {});
                 break;
             }
             // Cooking teaching you the next thing to cook is the one recipe source that was always thematically
             // right — it just wasn't ON the ladder, it was a 4.5% roll after the fact. Now it is a rung.
             case "recipe": {
-                const rec = await grantRecipeReward(buyerId, r.band).catch(() => null);
-                if (!rec) { // knows them all in this band — pay the rung below rather than nothing
-                    const g = 240 + tier * 60;
+                const learned = await grantRecipeReward(buyerId, rw.band).catch(() => null);
+                if (!learned) { // knows them all in this band — pay the rung below rather than nothing
+                    const g = 240 + tierN * 60;
                     const p3 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
-                    await logCoin(buyerId, g, "cooking", { balanceAfter: p3?.gold, meta: { recipe: rec, fallback: true } }).catch(() => {});
+                    await logCoin(buyerId, g, "cooking", { balanceAfter: p3?.gold, meta: { recipe: forRecipe.id, fallback: true } }).catch(() => {});
                     goldPaid += g;
                 }
                 break;
             }
-            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, serve(r.n)]).catch(() => {}); break;
-            case "creation": await grantCustomCredit(buyerId, serve(r.n), { source: "cooking", meta: { recipe: rec.id, tier } }).catch(() => {}); break;
-            case "consumable":
-                await grantConsumable(buyerId, r.id, serve(1)).catch(() => {});
-                extraSprite = conSprites[r.id] || null;
-                break;
+            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, serve(rw.n)]).catch(() => {}); break;
+            case "creation": await grantCustomCredit(buyerId, serve(rw.n), { source: "cooking", meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {}); break;
+            case "consumable": await grantConsumable(buyerId, rw.id, serve(1)).catch(() => {}); break;
             default: break;
+        }
+        };
+        await payRung(r, rec, tier);
+
+        // ── THE TASTING MENU ─────────────────────────────────────────────────────────────────────────────
+        // Once a day, the ingredients this dish used also make every OTHER dish you know they could have
+        // made — every known recipe whose whole shopping list is covered by this one's. Each pays a rung off
+        // its OWN tier's ladder, so a humble side dish riding along with a feast still pays like a side dish.
+        //
+        // Preps are excluded: they hand back an ingredient rather than a reward, and a menu that quietly
+        // refilled the pantry with the thing you just spent would be a loop, not a bonus.
+        if (cookPowers.has("tasting_menu") && (await claimPowerUse(buyerId, "tasting_menu"))) {
+            const knownIds = new Set((await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => [])).map((k) => k.recipe_id));
+            const covered = RECIPES.filter((other) => other.id !== rec.id && other.kind !== "prep" && knownIds.has(other.id)
+                && Object.entries(other.need).every(([ref, n]) => (rec.need[ref] || 0) >= n));
+            for (const other of covered.slice(0, TASTING_MENU_MAX)) {
+                const oLadder = tierMeta(other.tier).rewards;
+                await payRung(oLadder[rungFor(q, oLadder.length, petBonus.hot_hands || 0)], other, other.tier);
+                alsoMade.push({ id: other.id, name: other.name, tier: other.tier, sprite: spriteMap[other.id] || null });
+            }
         }
         made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind, rung: rung + 1, rungs: ladder.length }, sprite: spriteMap[rec.id] || null };
     }
@@ -1032,7 +1111,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     return {
         ok: true,
         made: { ...made, tier, tierName: tierMeta(tier).name, tierColor: tierMeta(tier).color },
-        portions, bumped, freeCook, xp, quality: q, chain: chainN, goldPaid,
+        portions, bumped, freeCook, xp, quality: q, chain: chainN, goldPaid, alsoMade,
         grade: q >= 0.92 ? "flawless" : q >= 0.72 ? "perfect" : q >= 0.45 ? "good" : "rough",
         ...(await getKitchenState(buyerId)),
     };

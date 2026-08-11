@@ -707,15 +707,17 @@ export default function TownClient({ initial }) {
     };
     const stockAct = async (kind) => {
         if (stockBusy) return;
-        if ((kind === "fruit" ? stockade?.fruit : stockade?.shame)?.used < (kind === "fruit" ? stockade?.fruit : stockade?.shame)?.max) lob(kind);
+        // The key is a pardon, not a projectile — no throwing animation, and no daily-cap check, because it
+        // is rationed by the week on the server rather than by a count this screen carries.
+        if (kind !== "unlock" && (kind === "fruit" ? stockade?.fruit : stockade?.shame)?.used < (kind === "fruit" ? stockade?.fruit : stockade?.shame)?.max) lob(kind);
         setStockBusy(true);
         try {
             const r = await fetch("/api/marketplace/stockade", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind }) });
             const d = await r.json();
             if (d?.ok) {
                 setStockade(d.occupant ? d : null);
-                setStockFlash(kind === "fruit" ? `SPLAT! +${d.xp} XP · +${d.gold} 🪙` : `+${d.xp} XP`);
-                setTimeout(() => setStockFlash(null), 1400);
+                setStockFlash(kind === "unlock" ? `${d.freed} walks free.` : kind === "fruit" ? `SPLAT! +${d.xp} XP · +${d.gold} 🪙` : `+${d.xp} XP`);
+                setTimeout(() => setStockFlash(null), kind === "unlock" ? 2600 : 1400);
             } else if (d?.error === "out_of_turns") {
                 setStockFlash("That's your lot for today.");
                 setTimeout(() => setStockFlash(null), 1600);
@@ -1698,6 +1700,17 @@ export default function TownClient({ initial }) {
                                     <span className="tw-stock-meta">+{stockade.fruit.xp} XP · +{stockade.fruit.coin} 🪙</span>
                                     <span className="tw-stock-left">{Math.max(0, stockade.fruit.max - stockade.fruit.used)}/{stockade.fruit.max}</span>
                                 </button>
+                                {/* THE WARDEN'S KEY. Drawn only for the member wearing the piece that grants
+                                    it — the flag is false for everybody else, so nobody is shown a mercy they
+                                    cannot extend. One a week, claimed server-side. */}
+                                {stockade.wardensKey ? (
+                                    <button type="button" className="tw-stock-btn is-key" disabled={stockBusy} onClick={() => stockAct("unlock")}>
+                                        <span className="tw-stock-ico" aria-hidden="true">🗝️</span>
+                                        <span className="tw-stock-lbl">Turn the warden&apos;s key</span>
+                                        <span className="tw-stock-meta">Let them out</span>
+                                        <span className="tw-stock-left">1/week</span>
+                                    </button>
+                                ) : null}
                             </div>
                         )}
 

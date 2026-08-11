@@ -80,7 +80,56 @@ export async function trackActivity(buyerId, event, meta = null, { path = null, 
             .then((m) => m.bumpTownQuest(buyerId, questKey, 1))
             .catch(() => {});
     }
+
+    if (buyerId) await chronicle(buyerId, String(event)).catch(() => {});
 }
+
+// ── THE CHRONICLE ────────────────────────────────────────────────────────────────────────────────────────────
+// "Anything you are first in the Den to do is written into the Live Feed under your name."
+//
+// The Live Feed the card names is the ADMIN firehose — a screen exactly one person can open — so writing there
+// would have been the purest form of the Den's favourite bug: an effect nobody can see. The feed a MEMBER
+// actually reads is the global chat, which is the same stream the Arbiter announces launches in, so that is
+// where a first goes.
+//
+// "First in the Den" is measured off this very table, which is the only honest measure available: the row for
+// THIS action has just been written, so a genuine first is the one where this member's row is the only one
+// there has ever been. That also means the claim can never be made twice for the same deed.
+//
+// Deliberately narrow about WHICH deeds count. Most of the forty-odd event names are ordinary traffic (a page
+// view, a swing, a purchase) and announcing "first in the Den to look at the shop" would turn the chat into
+// noise within an hour. Only the events that are already treated as milestones elsewhere qualify.
+const CHRONICLE_EVENTS = new Set([
+    "pet_drop", "delve_start", "mine_surface", "fish_caught", "craft_salvage", "cooked",
+    "buy_upgrade", "sail_encounter", "arena_win", "town_duel", "harvest", "enshrine_pet",
+]);
+
+async function chronicle(buyerId, event) {
+    if (!CHRONICLE_EVENTS.has(event)) return;
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "chronicle"))) return;
+    // Two rows means somebody got there first — including this member on an earlier day, which is right: a
+    // first is a first, not a first-per-day.
+    const others = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM (SELECT 1 FROM mkt_activity_event WHERE event = $1 LIMIT 2) t`, [event]
+    ).catch(() => null);
+    if ((Number(others?.n) || 0) !== 1) return;
+    const me = await db.queryOne(`SELECT COALESCE(NULLIF(display_name,''), alias) AS name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    if (!me?.name) return;
+    const what = CHRONICLE_LABEL[event] || event.replace(/_/g, " ");
+    await db.query(
+        `INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`,
+        [buyerId, `${me.name} is the first in the Den to ${what}. Written into the chronicle.`]
+    ).catch(() => {});
+}
+
+const CHRONICLE_LABEL = {
+    pet_drop: "be found by a pet", delve_start: "walk into a dungeon", mine_surface: "come back up from the deep",
+    fish_caught: "land a fish", craft_salvage: "melt something down at the Forge", cooked: "cook a meal",
+    buy_upgrade: "put money into a boat", sail_encounter: "meet something out at sea",
+    arena_win: "win in the ring", town_duel: "cut down a raider", harvest: "bring in a harvest",
+    enshrine_pet: "enshrine a companion",
+};
 
 // Roll up one row per visitor (keyed by anon_id — every browser has one, member or not). first_seen,
 // landing_path, referrer + all attribution are FIRST-TOUCH (set on insert only, never overwritten);

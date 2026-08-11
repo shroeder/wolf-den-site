@@ -203,11 +203,15 @@ export const decoLight = (id) => DECO_LIGHT[id] || null;
 export const BUFF_CAP = { growSpeed: 40, seedLuck: 50, harvestLuck: 40, petXp: 50, fertPower: 40, goldHarvest: 60 };
 // A fresh zeroed farm-bonus object (the canonical shape every farm bonus source contributes to).
 export const emptyFarmBuffs = () => ({ growSpeed: 0, seedLuck: 0, harvestLuck: 0, petXp: 0, fertPower: 0, goldHarvest: 0 });
-export function decorationBuffs(placedIds) {
+// `allRarities` is The Garden Path: commons and most rares carry `buff: null` on purpose, so the power gives
+// them the buff their rarity band would have had. Everything epic and up already has one and is untouched.
+const FALLBACK_BUFF = { common: { stat: "growSpeed", value: 2 }, rare: { stat: "harvestLuck", value: 3 } };
+export function decorationBuffs(placedIds, allRarities = false) {
     const out = emptyFarmBuffs();
     for (const id of new Set(placedIds || [])) { // dedupe → one bonus per decoration type, no dup stacking
         const d = BY_ID.get(id);
-        if (d?.buff?.stat && out[d.buff.stat] != null) out[d.buff.stat] += d.buff.value;
+        const buff = d?.buff || (allRarities ? FALLBACK_BUFF[d?.rarity] : null);
+        if (buff?.stat && out[buff.stat] != null) out[buff.stat] += buff.value;
     }
     for (const k of Object.keys(out)) out[k] = Math.min(BUFF_CAP[k], out[k]);
     return out;

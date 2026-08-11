@@ -15904,3 +15904,73 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    INSIDE itself, which is the one place a nested scroll is right: the list is the content. */
 .farm-neigh-grid .farm-neigh-chip { width: auto; min-width: 0; }
 .farm-neigh-grid .farm-neigh-chip b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ── THE MUSTER HORN ──────────────────────────────────────────────────────────────────────────────────────
+   A raid panel that rides every page for the one member wearing the piece that grants it. Bottom-LEFT on
+   purpose: the SocialHub owns the bottom-right corner site-wide, and two floating pills fighting for the same
+   thumb is how a good feature becomes an annoyance. Sits under the modals (z 900 vs their 1000+) so a
+   celebration card is never blocked by a raid pill. */
+.muster { position: fixed; left: 12px; bottom: 12px; z-index: 900; max-width: min(340px, calc(100vw - 24px)); }
+.muster-horn {
+    display: inline-flex; align-items: center; gap: .5rem; padding: .55rem .85rem;
+    border-radius: 999px; border: 1px solid rgba(220,160,60,.55);
+    background: linear-gradient(180deg, rgba(38,26,14,.96), rgba(24,16,9,.96));
+    color: #f4e2c0; font-weight: 800; font-size: .82rem; cursor: pointer;
+    box-shadow: 0 8px 22px rgba(0,0,0,.45);
+}
+.muster-horn:hover { border-color: rgba(240,190,90,.85); }
+/* The pulse is the whole point of the pill: a raid is a thing that is happening NOW and stops on its own. */
+.muster-horn-dot { width: 8px; height: 8px; border-radius: 50%; background: #e0533a; box-shadow: 0 0 0 0 rgba(224,83,58,.7); animation: musterPulse 1.6s ease-out infinite; }
+@keyframes musterPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(224,83,58,.7); }
+    70%  { box-shadow: 0 0 0 10px rgba(224,83,58,0); }
+    100% { box-shadow: 0 0 0 0 rgba(224,83,58,0); }
+}
+.muster-panel {
+    padding: .8rem .85rem .7rem; border-radius: 14px; border: 1px solid rgba(220,160,60,.5);
+    background: linear-gradient(180deg, rgba(34,23,13,.98), rgba(20,14,8,.98));
+    box-shadow: 0 14px 34px rgba(0,0,0,.5);
+}
+.muster-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.muster-name { font-weight: 900; color: #f6dfae; font-size: .92rem; }
+.muster-x { background: none; border: none; color: #b9a382; cursor: pointer; font-size: .9rem; line-height: 1; padding: .2rem; }
+.muster-sub { margin: .35rem 0 .5rem; color: #b9a382; font-size: .74rem; line-height: 1.35; }
+.muster-strike { width: 100%; }
+.muster-foes { display: grid; gap: .35rem; max-height: 46vh; overflow-y: auto; }
+.muster-foe {
+    display: grid; gap: .25rem; text-align: left; width: 100%; cursor: pointer;
+    padding: .4rem .5rem; border-radius: 10px; border: 1px solid rgba(220,160,60,.28);
+    background: rgba(0,0,0,.35); color: #efdcb8; font-weight: 700; font-size: .78rem;
+}
+.muster-foe:hover { border-color: rgba(240,190,90,.7); }
+.muster-foe.is-mine { border-color: rgba(120,200,140,.7); }
+.muster-foe-hp { display: block; height: 4px; border-radius: 999px; background: rgba(0,0,0,.5); overflow: hidden; }
+.muster-foe-hp i { display: block; height: 100%; background: linear-gradient(90deg, #c0452f, #e5a13c); }
+.muster-flash { margin: .45rem 0 0; color: #8fd6a2; font-size: .76rem; font-weight: 700; }
+.muster-link { display: inline-block; margin-top: .5rem; color: #c9a24a; font-size: .72rem; text-decoration: underline; }
+
+/* The Purser's Exchange — the one bridge between the two sealed currencies, drawn in the Armoury because that
+   is where a laurel is already a number you are deciding about. */
+.ar-purser { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid rgba(220,160,60,.22); }
+.ar-purser > b { color: #f6dfae; font-size: .95rem; }
+.ar-purser-row { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+.ar-purser-row .btn-ghost.is-active { border-color: rgba(240,190,90,.9); color: #f6dfae; }
+.ar-purser-in {
+    flex: 1 1 8rem; min-width: 0; padding: .5rem .65rem; border-radius: 10px;
+    border: 1px solid rgba(220,160,60,.35); background: rgba(0,0,0,.35); color: #f0dcb4;
+    font-weight: 700; font-variant-numeric: tabular-nums;
+}
+
+/* Dealer's Choice — two wedges on the table, neither paid until one is taken. */
+.cw-dealer { margin: .8rem auto 0; max-width: 520px; padding: .75rem .8rem; border-radius: 14px;
+    border: 1px solid rgba(220,160,60,.45); background: rgba(0,0,0,.35); text-align: center; }
+.cw-dealer > b { color: #f6dfae; }
+.cw-dealer > p { margin: .3rem 0 .55rem; color: #b9a382; font-size: .78rem; }
+.cw-dealer-row { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.cw-dealer-pick { display: grid; justify-items: center; gap: .25rem; cursor: pointer; min-width: 8rem;
+    padding: .5rem .6rem; border-radius: 12px; border: 1px solid rgba(220,160,60,.35);
+    background: rgba(0,0,0,.4); color: #efdcb8; font-weight: 800; font-size: .78rem; }
+.cw-dealer-pick:hover { border-color: rgba(240,190,90,.85); }
+.cw-dealer-pick img { width: 46px; height: 46px; object-fit: contain; }
+.cw-dealer-again { align-self: center; padding: .5rem .8rem; border-radius: 999px; cursor: pointer;
+    border: 1px dashed rgba(220,160,60,.5); background: none; color: #c9a24a; font-weight: 800; font-size: .78rem; }

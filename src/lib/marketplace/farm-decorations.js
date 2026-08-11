@@ -8,6 +8,7 @@ import { DECORATIONS, decorationById, isDecoration, decorationBuffs, decoLight, 
 import { trophyMap } from "@/lib/marketplace/boss-trophy.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
 import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 const isCustom = (id) => String(id).startsWith("custom:");
 // Boss trophies are decorations too — `trophy:<bossEventId>`, granted to whoever topped the damage board.
@@ -82,7 +83,7 @@ export async function buyDecoration(buyerId, decoId) {
 export async function placedDecoBuffs(buyerId) {
     if (!buyerId) return decorationBuffs([]);
     const rows = await db.query(`SELECT deco_id FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    return decorationBuffs((rows || []).map((r) => r.deco_id));
+    return decorationBuffs((rows || []).map((r) => r.deco_id), await hasPower(buyerId, "garden_path"));
 }
 
 // Placed decorations for rendering (position + sprite + flip), newest last so higher z / later placements draw on top.

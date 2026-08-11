@@ -955,7 +955,7 @@ const PROC_BOSSES = [
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as REWARD_RARITY_RANK } from "@/lib/marketplace/rarity.js";
-import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 // A boss is a ten-day fight for the whole pack. Its drops had only a CAP, no floor, so the roll could hand out
 // three commons — a week and a half of everyone's effort paying out in grey. There is now a floor as well:
 // rare (blue) at minimum, epic at most. `floorRarity` is a parameter rather than a constant so raising the bar
@@ -1332,6 +1332,12 @@ export async function cheer(buyerId, targetId) {
     if (row1) {
         hp = row1.hp; maxHp = row1.max_hp;
         await db.query(`INSERT INTO boss_hit (boss_id, buyer_id, damage, kind) VALUES ($1, $2, $3, 'cheer')`, [boss.id, targetId, dmg]).catch(() => {});
+        // THE STANDING OVATION — the cheer pays you a second time, when the hero's surge actually lands. It is
+        // inside the `row1` guard on purpose: a cheer thrown at a boss that dies between the insert and this
+        // update never produced a strike, and the card is explicit that the second payment is for the strike.
+        if (await hasPower(buyerId, "standing_ovation")) {
+            await awardXp(buyerId, "cheer", { points: xpGain, gold: goldGain }).catch(() => {});
+        }
     }
     // First-cheer-of-day item proc: YOU also strike the boss.
     if (procs.selfDamage > 0 && row1) {

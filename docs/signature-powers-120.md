@@ -752,3 +752,45 @@ carry 2–3 charges each, not one. aannw's ascendant_crown alone is $100 × 2. N
 
 **All-in: $985**, once each, across 19 items. The lever is the COUNT rather than the amounts — 5 celestial and
 4 primordial would be $430 new instead of $670.
+
+# Wiring — all 120 are live (2026-08-11)
+
+Every key in `ASCENSION_POWERS` is now read by code outside the registry. Verified programmatically rather than
+by eye: the check walks `src/**`, excludes `ascension-powers.js` itself, and looks for each key as a string
+literal. `120 keys, 0 unwired`. Re-run it after adding a power.
+
+Five landed as new player-facing surfaces, because the mechanic they name genuinely did not exist:
+
+- **The Muster** — the town raid was never gated on presence in the SERVER; what held people to the plaza is
+  that the Town page is the only client that draws a foe. So it is a horn (`MusterHorn`) mounted site-wide,
+  fed by a deliberately narrow `/api/marketplace/muster`, striking through the endpoints the plaza already
+  uses. Not a second Town: no walking, chat, roster or art.
+- **Dealer's Choice** — "keep whichever you prefer" only means something if neither prize has been handed
+  over, so a spin taken with the power held pays NOTHING until the member decides (`mkt_buyer.spin_pending`).
+  Spinning again settles an open choice in the member's favour, so a prize can never be stranded.
+- **The Breeder's Eye** — `mkt_buyer.pet_wish`, honoured by every one of the five pet-drop sources through one
+  helper, and only when the wished pet was already in the pool that roll would have drawn from.
+- **The Purser's Exchange** — the only bridge between doubloons and laurels, which are otherwise sealed
+  currencies. One for one, both directions, gold deliberately excluded.
+- **The Warden's Key** — the first thing in the game that lets a MEMBER undo something done to another member.
+  Rationed by the WEEK, and it announces itself in global chat, because a pardon nobody sees is just an empty
+  stockade.
+
+Three audit catches worth keeping:
+
+- **The Full Manifest may not draw the whole locker.** The Elixir and the Sands recharge a CHARGED item, and a
+  charge is a real-merchandise redemption at the counter — which is why the shop prices them at 5,000
+  doubloons. `MANIFEST_EXCLUDED` keeps them out; anything added to `LOCKER` touching `charged`, `charges` or a
+  cooldown belongs there too.
+- **The Loaned Exhibit must not hide the piece from its own drop pool.** It folds into `getOwnedPieceIds`,
+  which is the choke point every set bonus reads through — but the two grant paths pass `includeLoan: false`,
+  or the piece you most want becomes the one you can never win.
+- **The Chronicle's "Live Feed" is the ADMIN firehose**, a screen exactly one person can open. It writes to
+  global chat instead, off a short allow-list of milestone events — announcing "first in the Den to look at the
+  shop" would be noise within an hour.
+
+And one honest limit: **The Second Sitting** says the pet ability fires twice one time in three. An ability
+there is a standing value, not an event, and `combinePetBonuses` is pure — it drives the pet card and the
+nightly boss sizing as well as the damage. A die rolled inside it would make the card flicker between reloads
+and the boss maths unreproducible, so it is spent on magnitude: a third again, which is the same thing over any
+run of days and is stable to look at.

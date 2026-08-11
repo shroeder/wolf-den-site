@@ -8,6 +8,7 @@ import LevelUpWatcher from "@/components/LevelUpWatcher";
 import PetStoneFound from "@/components/PetStoneFound";
 import PetLevelUp from "@/components/PetLevelUp";
 import LocationPrompt from "@/components/LocationPrompt";
+import MusterHorn from "@/components/MusterHorn";
 import PresenceHeartbeat from "@/components/PresenceHeartbeat";
 import RecipeFoundWatcher from "@/components/RecipeFoundWatcher";
 import RewardNudge from "@/components/RewardNudge";
@@ -61,6 +62,9 @@ export default function PublicLayout({ children }) {
             <PresenceHeartbeat />
             {/* Asks every visitor for location (once/session) to power "near you" features — not just the map. */}
             <LocationPrompt />
+            {/* The Muster (an ascension power): a raid horn on every page for the one member wearing the piece.
+                Returns null for everybody else after one cheap query, so it costs nothing to mount site-wide. */}
+            <MusterHorn />
         </>
     );
 }

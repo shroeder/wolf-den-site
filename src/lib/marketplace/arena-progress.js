@@ -282,3 +282,51 @@ export async function buyArmoury(buyerId, id) {
     return { ok: true, opened: { crate: { id: crate.id, name: crate.name, art: crate.art }, ...got, worth: won.worth },
         laurels: Number(paid.laurels) || 0 };
 }
+
+// ── THE PURSER'S EXCHANGE ────────────────────────────────────────────────────────────────────────────────────
+// "Doubloons and laurels convert freely into one another. Gold stays out of it."
+//
+// The two currencies are otherwise sealed: doubloons only come out of a won sea fight and only the
+// Quartermaster takes them; laurels only come out of the ring and only the Armoury takes them. So a member
+// who lives in one of those two places has a full purse of something they can never spend on the other, and
+// this power is the only bridge between them.
+//
+// GOLD IS DELIBERATELY OUT. Gold is the currency everything else in the game mints — the farm, the boss, the
+// wheel, cooking — and a rate into either of these would turn two earned currencies into a shop you can farm.
+// That is the whole reason the card says so out loud.
+//
+// ONE-FOR-ONE, and the same rate both ways. A spread would make the power a tax on using it, and an uneven
+// rate would make one direction the only correct direction, which is not a decision.
+export const PURSER_RATE = 1;
+export const PURSER_MAX = 5000;   // per conversion, so a slip of the thumb is never the whole purse
+
+export async function purserExchange(buyerId, from, amount) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    if (!(await hasPower(buyerId, "purser_s_exchange"))) return { ok: false, error: "no_power" };
+    const dir = from === "laurels" ? "laurels" : "doubloons";
+    const n = Math.floor(Number(amount) || 0);
+    if (n <= 0 || n > PURSER_MAX) return { ok: false, error: "bad_amount" };
+    const paid = n * PURSER_RATE;
+
+    if (dir === "doubloons") {
+        // Taken CONDITIONALLY, so a purse that is short simply refuses rather than going negative.
+        const took = await db.queryOne(
+            `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2 WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+            [buyerId, n]
+        ).catch(() => null);
+        if (!took) return { ok: false, error: "not_enough_doubloons" };
+        await db.query(`INSERT INTO mkt_arena (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+        await db.query(`UPDATE mkt_arena SET laurels = COALESCE(laurels,0) + $2 WHERE buyer_id = $1`, [buyerId, paid]).catch(() => {});
+    } else {
+        const took = await db.queryOne(
+            `UPDATE mkt_arena SET laurels = COALESCE(laurels,0) - $2 WHERE buyer_id = $1 AND COALESCE(laurels,0) >= $2 RETURNING laurels`,
+            [buyerId, n]
+        ).catch(() => null);
+        if (!took) return { ok: false, error: "not_enough_laurels" };
+        await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, paid]).catch(() => {});
+    }
+    await trackActivity(buyerId, "purser_exchange", { from: dir, n, paid }).catch(() => {});
+    return { ok: true, from: dir, spent: n, gained: paid };
+}

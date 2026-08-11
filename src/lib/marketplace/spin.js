@@ -18,7 +18,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
-import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
@@ -435,10 +435,26 @@ export async function getSpinState(buyerId) {
 }
 
 // Do a spin (uses the free daily spin first, else a token). Returns the winning segment index + prize.
+// The open decision, dressed for the wheel. Reads off the wheel the spin was TAKEN on rather than the one the
+// member is on now — a level-up between the spin and the choice must not change what was offered.
+async function pendingChoiceView(buyerId, fallbackWheel) {
+    const pend = await pendingOf(buyerId);
+    if (!pend) return null;
+    const wheel = wheelForLevel(pend.level) || fallbackWheel;
+    return {
+        rerolled: pend.offered.length > 1,
+        offered: pend.offered.map((i) => ({ index: i, label: wheel.prizes[i].label, ...previewPrize(wheel.prizes[i]) })),
+    };
+}
+
 export async function doSpin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_signed_in" };
+    // A choice left open is settled before another spin is allowed — in the member's favour, since they never
+    // said no to either wedge. Without this, walking away mid-decision would quietly bin the prize.
+    const stranded = await pendingOf(buyerId);
+    if (stranded) await spinKeep(buyerId, stranded.offered[stranded.offered.length - 1]).catch(() => {});
     const freeAvailable = asDay(row.free_spin_day) !== today();
     let grantedFree = false;
     // ── THE FREE SPIN ────────────────────────────────────────────────────────────────────────────────────
@@ -478,15 +494,29 @@ export async function doSpin(buyerId) {
     const luckChance = setWheelBonus(owned).luck || 0;  // % CHANCE for a Lucky Spin proc this spin
     const respinChance = setWheelRespinChance(owned);   // capstone: 0..0.5
     const lucky = luckChance > 0 && Math.random() * 100 < luckChance; // did the wheel set proc this spin?
-    const wheel = wheelForLevel(levelForXp(row.xp).level);
+    const level = levelForXp(row.xp).level;
+    const wheel = wheelForLevel(level);
     const idx = pickIndex(wheel);
     const prize = wheel.prizes[idx];
     // Special wedges roll a sub-game; everything else is a direct grant.
     let display;
     let miniWheel = null;
     let bonusGame = null;
+    // ── DEALER'S CHOICE ──────────────────────────────────────────────────────────────────────────────────
+    // The claim is made HERE, after the wedge is known, and never for a sub-game wedge: the Mini Wheel and the
+    // Bonus Game resolve into a second interaction that has already paid out by the time anyone could choose,
+    // so offering a re-roll on one would either strand the sub-game or pay it twice. Spending the day's single
+    // use on a wedge it cannot apply to would be the worst of both.
+    const subGame = prize.kind === "mini_wheel" || prize.kind === "bonus_game";
+    const dealer = !subGame && (await claimPowerUse(buyerId, "dealer_s_choice"));
     if (prize.kind === "mini_wheel") { miniWheel = await rollMiniWheel(buyerId); display = { sprite: P(prize.sprite), text: "Mini Wheel bonus!" }; }
     else if (prize.kind === "bonus_game") { bonusGame = await rollBonusGame(buyerId); display = { sprite: P(prize.sprite), text: "Bonus Game — pick your gear!" }; }
+    // Held, not paid. The member has not chosen yet, and a prize that has been handed over cannot be swapped
+    // for the other one without clawing it back.
+    else if (dealer) {
+        display = previewPrize(prize);
+        await db.query(`UPDATE mkt_buyer SET spin_pending = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ level, lucky, offered: [idx] })]).catch(() => {});
+    }
     else display = await grantPrize(buyerId, prize, { goldPct: lucky ? LUCKY_GOLD_PCT : 0 });
     await db.query(`UPDATE mkt_buyer SET spin_count = spin_count + 1 WHERE id = $1`, [buyerId]).catch(() => {});
     // Capstone: a chance the spin is refunded (a free spin token back).
@@ -505,7 +535,58 @@ export async function doSpin(buyerId) {
         respin: Boolean(prize.kind === "respin"),
         miniWheel: Boolean(prize.kind === "mini_wheel"), bonusGame: Boolean(prize.kind === "bonus_game"),
     };
-    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, lucky, ...(await getSpinState(buyerId)) };
+    return { ok: true, prizeIndex: idx, prize: prizeOut, miniWheel, bonusGame, refunded, lucky, dealer, ...(await getSpinState(buyerId)) };
+}
+
+// ── DEALER'S CHOICE: THE SECOND WEDGE, AND THE DECISION ──────────────────────────────────────────────────────
+// A spin taken with the power in hand pays nothing until one of these two is called. Between them the prize
+// lives on mkt_buyer.spin_pending — see the migration for why it cannot simply be granted and swapped later.
+
+/** What a wedge looks like without handing it over. Pure — the display half of grantPrize, and nothing else. */
+const previewPrize = (prize) => ({ sprite: prize.sprite ? P(prize.sprite) : null, text: prize.label });
+
+const pendingOf = async (buyerId) => {
+    const r = await db.queryOne(`SELECT spin_pending FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const p = r?.spin_pending;
+    return p && Array.isArray(p.offered) && p.offered.length ? p : null;
+};
+
+/** Roll the second wedge. Grants nothing — it puts both on the table so the member can pick. */
+export async function spinReroll(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const pend = await pendingOf(buyerId);
+    if (!pend) return { ok: false, error: "nothing_pending" };
+    if (pend.offered.length > 1) return { ok: false, error: "already_rerolled" };
+    const wheel = wheelForLevel(pend.level);
+    // A re-roll that lands on a sub-game wedge would resolve into a second interaction the member has not
+    // chosen yet, so it is drawn again off the non-sub-game wedges. Bounded rather than looped: a wheel is
+    // twenty wedges and this cannot spin forever on an unlucky table.
+    let idx = pickIndex(wheel);
+    for (let i = 0; i < 12 && (wheel.prizes[idx].kind === "mini_wheel" || wheel.prizes[idx].kind === "bonus_game"); i += 1) idx = pickIndex(wheel);
+    const offered = [...pend.offered, idx];
+    await db.query(`UPDATE mkt_buyer SET spin_pending = $2::jsonb WHERE id = $1`, [buyerId, JSON.stringify({ ...pend, offered })]).catch(() => {});
+    return {
+        ok: true, prizeIndex: idx,
+        offered: offered.map((i) => ({ index: i, label: wheel.prizes[i].label, ...previewPrize(wheel.prizes[i]) })),
+        ...(await getSpinState(buyerId)),
+    };
+}
+
+/** Take one of them. `index` must be one of the wedges actually offered — never a number off a client. */
+export async function spinKeep(buyerId, index) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const pend = await pendingOf(buyerId);
+    if (!pend) return { ok: false, error: "nothing_pending" };
+    const idx = Number(index);
+    if (!pend.offered.includes(idx)) return { ok: false, error: "not_offered" };
+    const wheel = wheelForLevel(pend.level);
+    // Cleared FIRST, guarded on the pending value still being there, so two taps cannot both pay out.
+    const cleared = await db.queryOne(
+        `UPDATE mkt_buyer SET spin_pending = NULL WHERE id = $1 AND spin_pending IS NOT NULL RETURNING id`, [buyerId]
+    ).catch(() => null);
+    if (!cleared) return { ok: false, error: "nothing_pending" };
+    const display = await grantPrize(buyerId, wheel.prizes[idx], { goldPct: pend.lucky ? LUCKY_GOLD_PCT : 0 });
+    return { ok: true, prizeIndex: idx, prize: { ...display, label: wheel.prizes[idx].label }, ...(await getSpinState(buyerId)) };
 }
 
 // OWNER-ONLY debug helper: refill the free daily spin so you can spin freely while testing. Gives exactly ONE

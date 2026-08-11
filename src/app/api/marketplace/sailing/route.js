@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, forgeChest, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, marketDay, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -76,6 +76,9 @@ export async function POST(request) {
                 case "wave": return noStore(await waveAtSailor(g.buyer.id));
                 case "merchant_play": return noStore(await merchantMinigame(g.buyer.id, body.collected, body.perfect));
                 case "merchant_buy": return noStore(await merchantBuy(g.buyer.id, body.item));
+                // Market Day (an ascension power). marketDay is the gate — it claims the day's single use and
+                // refuses anyone not wearing the piece, so the route never checks either.
+                case "market_day": return noStore(await marketDay(g.buyer.id));
                 // Fishing. `sky` is what the client says it's rendering — it only gates which SPECIES can bite,
                 // and the time-of-day half of that gate is recomputed server-side (see fishing.js).
                 case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky }));

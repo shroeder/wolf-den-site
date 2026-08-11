@@ -91,11 +91,17 @@ export async function getEquippedUtilTotals(buyerId) {
     const ids = eq.map((r) => r.item_id);
     if (!ids.length) return out;
     const rows = await db.query(`SELECT item_id, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = ANY($2) AND util IS NOT NULL`, [buyerId, ids]).catch(() => []);
+    // The Attuned Bench counts every attunement at double its LEVEL, not double its value — so it runs through
+    // affixValue the normal way and still respects each affix's own cap. A level-4 attunement reads as a 5 (the
+    // ladder stops there), which is the honest reading of the card: doubling a maxed attunement cannot invent a
+    // sixth rung that does not exist.
+    const { equippedPowers } = await import("@/lib/marketplace/ascension-powers.js");
+    const bench = (await equippedPowers(buyerId).catch(() => new Set())).has("attuned_bench");
     for (const r of rows) {
         const u = parseUtil(r.util);
         if (!u) continue;
         const def = UTIL_AFFIXES[u.key];
-        const val = affixValue(u.key, u.level);
+        const val = affixValue(u.key, bench ? u.level * 2 : u.level);
         if (def.bucket === "farm") out.farm[def.stat] = (out.farm[def.stat] || 0) + val;
         else if (def.bucket === "sea") out.sea[def.stat] = (out.sea[def.stat] || 0) + val;
         else if (def.bucket === "depth") out.depth[def.stat] = (out.depth[def.stat] || 0) + val;

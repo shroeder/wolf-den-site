@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
-    buyArenaUpgrade, buyArmoury, pickClass, refundNode, respecClass, respecTree, takeNode,
+    buyArenaUpgrade, buyArmoury, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
 } from "@/lib/marketplace/arena-progress.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -61,6 +61,10 @@ export async function POST(request) {
                 }
                 case "buy_armoury":
                     return noStore({ ...(await buyArmoury(buyer.id, String(b?.id || ""))), ...(await getArenaState(buyer.id)) });
+                // The Purser's Exchange. purserExchange is the gate — it refuses anyone not wearing the
+                // piece, so this route never has to know which item grants what.
+                case "purser":
+                    return noStore({ ...(await purserExchange(buyer.id, String(b?.from || ""), b?.amount)), ...(await getArenaState(buyer.id)) });
                 case "arena_upgrade":
                     return noStore({ ...(await buyArenaUpgrade(buyer.id, String(b?.track || ""))), ...(await getArenaState(buyer.id)) });
                 default: return noStore({ error: "bad_action" }, { status: 400 });

@@ -455,6 +455,13 @@ async function payHaul(buyerId, haul = [], powers = null) {
     if (powers?.has?.("deep_cart") && oneIn(3)) {
         haul = haul.flatMap((h) => (h?.kind === "seam" || h?.kind === "ore" ? [h, h] : [h]));
     }
+    // The Assayer's Eye: one haul in three is graded at the BEST tier it contained, so a deep run that came
+    // back mostly with rubble is paid as if all of it were the good stuff. It can only ever look UP the haul
+    // you actually carried — a trip that found nothing above tier 1 is still a tier-1 trip.
+    if (powers?.has?.("assayer_s_eye") && oneIn(3)) {
+        const best = haul.reduce((n, h) => (h?.kind === "ore" ? Math.max(n, Number(h.tier) || 0) : n), 0);
+        if (best > 0) haul = haul.map((h) => (h?.kind === "ore" ? { ...h, tier: best, assayed: true } : h));
+    }
     const paid = [];
     for (const item of haul) {
         if (item.kind === "ore") {

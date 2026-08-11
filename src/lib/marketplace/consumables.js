@@ -193,9 +193,14 @@ export async function buyConsumable(buyerId, id) {
     if (!row) return { ok: false, error: "not_enough_gold" };
     await logCoin(buyerId, -cp.price, "buy_consumable", { meta: { name: c.name }, balanceAfter: row.gold }).catch(() => {});
     if (cp.pct > 0) await consumeShopCoupon(buyerId);
-    await grantConsumable(buyerId, id, 1);
-    await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.pct || 0 });
-    return { ok: true, gold: row.gold, couponPct: cp.pct || 0 };
+    // The Bulk Buyer: one purchase in three comes in pairs. Rolled AFTER the gold is taken, so it is a second
+    // one free rather than a discount — and it rides the quantity, which is the only thing on this counter a
+    // power can touch without becoming a price cut that stacks with the coupon.
+    const { powerRoll } = await import("@/lib/marketplace/ascension-powers.js");
+    const paired = await powerRoll(buyerId, "bulk_buyer", 3).catch(() => false);
+    await grantConsumable(buyerId, id, paired ? 2 : 1);
+    await trackActivity(buyerId, "buy_consumable", { id, name: c.name, couponPct: cp.pct || 0, paired });
+    return { ok: true, gold: row.gold, couponPct: cp.pct || 0, paired };
 }
 
 // Use one from the stash. Targeted relics (recharge / reset) take a charged item id; validated BEFORE the

@@ -11,7 +11,10 @@ import { getPetXpMap, getPetXpForBuyers, levelsFromXpMap } from "@/lib/marketpla
 export async function getPetCombatBonus(buyerId) {
     if (!buyerId) return { stats: {}, economy: {}, proc: {} };
     const [buyer, rows, petXp] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(xp,0) AS xp, featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.queryOne(
+            `SELECT COALESCE(xp,0) AS xp, featured_collectible, whistle_pet,
+                    (whistle_day = (NOW() AT TIME ZONE 'America/Chicago')::date) AS whistle_today
+               FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
         getPetXpMap(buyerId).catch(() => ({})),
     ]);
@@ -24,7 +27,15 @@ export async function getPetCombatBonus(buyerId) {
     const { getEnshrined } = await import("@/lib/marketplace/pet-ascension.js");
     const enshrined = await getEnshrined(buyerId).catch(() => []);
     const { equippedPowers } = await import("@/lib/marketplace/ascension-powers.js");
-    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp), enshrined, await equippedPowers(buyerId));
+    const powers = await equippedPowers(buyerId);
+    // THE WHISTLE — the pet you put down today is still working. The "is it still today" comparison is done in
+    // SQL rather than by building a JS Date from the DATE column: read through JS that column is a day behind
+    // on Vercel, which is the bug that once made the daily check-in unclaimable.
+    const lingering = powers.has("whistle") && buyer?.whistle_today
+        && buyer.whistle_pet && buyer.whistle_pet !== buyer.featured_collectible
+        ? collectibleById(buyer.whistle_pet)
+        : null;
+    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp), enshrined, powers, lingering);
 }
 
 // Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),

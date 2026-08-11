@@ -241,6 +241,24 @@ export default function SpinWheel() {
         chainRef.current = 0; runSpin();
     }, [spinning, mini, bonus, st, runSpin]);
 
+    // ── DEALER'S CHOICE ──────────────────────────────────────────────────────────────────────────────────
+    // Both calls go through the same endpoint as everything else and both return the WHOLE spin state, so the
+    // panel redraws off the server rather than off anything guessed here — which is also what makes a reload
+    // mid-decision harmless.
+    const reroll = useCallback(async () => {
+        if (spinning) return;
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reroll" }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        if (d?.ok) { setResult(null); setSt(d); }
+    }, [spinning]);
+
+    const choose = useCallback(async (index) => {
+        if (spinning) return;
+        const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "keep", index }) }).catch(() => null);
+        const d = r ? await r.json().catch(() => null) : null;
+        if (d?.ok) { setSt(d); setResult(d.prize); if (typeof window !== "undefined") window.dispatchEvent(new Event("wolfden-hud-refresh")); }
+    }, [spinning]);
+
     const buy = useCallback(async () => {
         if (spinning) return;
         const r = await fetch("/api/marketplace/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy" }) }).catch(() => null);
@@ -362,6 +380,29 @@ export default function SpinWheel() {
                     ) : null}
                     <span className="cw-result-kicker">{resultKind === "jackpot" ? "JACKPOT!" : resultKind === "mini" ? "MINI JACKPOT!" : resultKind === "bonus" ? "BONUS SPIN!" : resultKind === "rare" ? "Rare!" : "You won"}</span>
                     <span className="cw-result-prize">{result.text}</span>
+                </div>
+            ) : null}
+            {/* A wedge held rather than paid. Drawn straight off the server's pending state, so a reload puts
+                the same decision back rather than losing it — and there is no "cancel": spinning again settles
+                it in the member's favour, exactly as the server does. */}
+            {st.pendingChoice ? (
+                <div className="cw-dealer">
+                    <b>Dealer&apos;s Choice</b>
+                    <p>{st.pendingChoice.rerolled ? "Take whichever you prefer." : "Take it, or deal a second wedge and choose between them."}</p>
+                    <div className="cw-dealer-row">
+                        {st.pendingChoice.offered.map((o) => (
+                            <button key={o.index} type="button" className="cw-dealer-pick" disabled={spinning} onClick={() => choose(o.index)}>
+                                {o.sprite ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={o.sprite} alt="" draggable="false" />
+                                ) : null}
+                                <span>{o.text}</span>
+                            </button>
+                        ))}
+                        {!st.pendingChoice.rerolled ? (
+                            <button type="button" className="cw-dealer-again" disabled={spinning} onClick={reroll}>Deal again</button>
+                        ) : null}
+                    </div>
                 </div>
             ) : null}
             {msg ? <div className="cw-msg">{msg}{lowCoins ? <span style={{ marginLeft: 8 }}><CoinCta label="Get coins" /></span> : null}</div> : null}
