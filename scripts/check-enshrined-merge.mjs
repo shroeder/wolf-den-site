@@ -42,12 +42,19 @@ check("a Lightstone restores it in full", cc(light) >= cc(equipped) - 0.05);
 check("a Darkstone is worth more than a Lightstone", cc(dark) > cc(light));
 check("enshrined AND equipped does not double", cc(both) === cc(dark));
 
-console.log("\nThe Lightstone's pack aura, across every owned pet's passive:");
+// ── THE PACK AURA IS GONE ────────────────────────────────────────────────────────────────────────────────────
+// This used to assert that a Lightstone lifted every owned pet's passive. It did — by half a point on the
+// biggest real collection in the Den, and by nothing at all on a small one, while being unbounded in principle.
+// Deleted in favour of per-pet authored effects, so the assertion is INVERTED: neither stone may touch a pet it
+// was not spent on. If a future change reintroduces a pack-wide multiplier this fails, which is the point.
+console.log("\nNeither stone touches the rest of the pack any more:");
 console.log(`  no stone    ${total(away)}`);
-console.log(`  lightstone  ${total(light)}  (+${Math.round((total(light) / total(away) - 1) * 100)}%)`);
-console.log(`  darkstone   ${total(dark)}  (the aura is Light-only, by design)`);
-check("a Lightstone lifts the whole pack", total(light) > total(away));
-check("a Darkstone does not", total(dark) <= total(away) + 0.05);
+console.log(`  lightstone  ${total(light)}`);
+console.log(`  darkstone   ${total(dark)}`);
+// The Eagle's own effects are crit-flavoured, so MIGHT is untouched by either stone — which is exactly the
+// property being tested: a stone spent on one pet does not raise an unrelated stat across the collection.
+check("a Lightstone does not lift the whole pack", total(light) === total(away));
+check("a Darkstone does not either", total(dark) === total(away));
 
 console.log(bad ? `\n${bad} check(s) failed.` : "\nEnshrining does what it says on the card.");
 process.exit(bad ? 1 : 0);

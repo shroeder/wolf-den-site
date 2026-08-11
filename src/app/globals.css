@@ -15716,6 +15716,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .pens-stone-name { font-size: 0.9rem; color: #fff; }
 .pens-stone-line { font-size: 0.7rem; line-height: 1.35; color: rgba(255,255,255,0.72); }
 .pens-stone-best { font-size: 0.66rem; font-style: normal; color: rgba(255,255,255,0.5); }
+/* The flavour line under an effect. Quieter than the mechanic above it on purpose — it is the reason the
+   effect is called what it is, not something you need in order to choose. */
+.pens-stone-note { font-size: 0.64rem; line-height: 1.35; font-style: italic; color: rgba(255,255,255,0.42); }
 .pens-stone-have { margin-top: 2px; font-size: 0.66rem; font-weight: 800; color: var(--stone); }
 .pens-stone-have.is-none { color: rgba(255,255,255,0.38); }
 .pens-go { margin-top: 10px; }
@@ -15733,6 +15736,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .pens-done-art img, .pens-done-art svg { width: 100%; height: 100%; object-fit: contain; }
 .pens-done-h { display: block; font-size: 0.95rem; color: #fff; margin: 2px 0 3px; }
 .pens-done-p { margin: 0; font-size: 0.78rem; line-height: 1.4; color: rgba(255,255,255,0.72); }
+/* What the stone actually bought, kept on screen for good. The choice cannot be revisited, so the least the
+   panel can do is never stop telling you what it was. */
+.pens-done-eff { margin: 6px 0 0; font-size: 0.74rem; line-height: 1.4; color: var(--stone); }
 @media (max-width: 380px) { .pens-form { width: 78px; height: 78px; } }
 
 /* ── ENSHRINE LAB (dev only) ── */

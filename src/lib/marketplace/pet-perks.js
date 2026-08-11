@@ -1,7 +1,7 @@
 // Each pet's EQUIPPED signature perk — a unique, flavor-named ability (not just a stat). Perks map to real
 // mechanics that feed the boss fight (see pet-combat.js + boss.js). Client-safe (no server-only / db) so the
 // pets page can render them and the server can compute combat bonuses from the same source.
-import { enshrinedMult, packAuraFrom } from "@/lib/marketplace/pet-stones.js";
+import { effectFor } from "@/lib/marketplace/pet-ascension-effects.js";
 import { petPassive, petSpecialPassive, petActiveLevelMult, petPassiveLevelMult } from "@/lib/marketplace/collectibles.js";
 
 export const PET_ACTIVE_BY_RARITY = { common: 3, rare: 5, epic: 8, legendary: 12, mythic: 16, ascendant: 22, eternal: 30 };
@@ -71,6 +71,16 @@ export const PERK_META = {
     following_sea:{ icon: "🌊", kind: "sea" },
     beachcomber:  { icon: "🏖️", kind: "sea" },
     recipe_nose:  { icon: "📜", kind: "kitchen" },
+    // ── THE PASSIVE STATS, AS GRAFT TARGETS ──────────────────────────────────────────────────────────────
+    // These are normally carried by every owned pet rather than granted by an ability, so they were never in
+    // this table — nothing looked one up. A Lightstone that teaches a seahorse to hold a line grafts
+    // `reelStrength`, and without an entry here the card rendered with no icon and, worse, no sentence at all.
+    seedLuck:     { icon: "🌱", kind: "farm" },
+    growSpeed:    { icon: "⏱️", kind: "farm" },
+    petXp:        { icon: "🐾", kind: "farm" },
+    angling:      { icon: "🎣", kind: "sea" },
+    reelStrength: { icon: "🪢", kind: "sea" },
+    seafaring:    { icon: "🧭", kind: "sea" },
 };
 
 // petId → { name, key }. The NAME is the flavor; the KEY is the mechanic. (Passive stat lives in
@@ -196,6 +206,20 @@ export const SYSTEM_PERK_CAP = {
     beachcomber: 20,    // /10 in the description -> +2 finds at cap
 };
 
+// ── THE PROC CEILINGS, IN ONE PLACE ──────────────────────────────────────────────────────────────────────────
+// These were written inline at the point of use — `cap(v * aMult, 1.2)` — which was fine while the only thing
+// that read them was the engine. The enshrining panel has to show what a stone WOULD do before an irreversible
+// choice, and it was computing that number without the ceilings: the Molten Phoenix's Darkstone advertised
+// "+170% damage" against an onslaught cap of 120%. A card that overstates by fifty points on a permanent
+// decision is worse than no card. One table, read by both.
+export const PROC_CAP = {
+    erupt: 0.6,          // the chance, not the multiplier
+    chain_strike: 0.6,
+    execute: 1.2,
+    onslaught: 1.2,
+    first_blood: 1.2,
+};
+
 export function petPerkValue(rarity, key) {
     if (key === "extra_strike") return 1; // a pet grants EXACTLY one extra daily strike — never rarity/level-scaled
     if (key === "first_hit") return FIRST_HIT_BY_RARITY[rarity] || 1.5;
@@ -240,6 +264,9 @@ function perkDesc(key, v, level = 1) {
         case "seedLuck": return `+${v}% seed luck on your farm while equipped — more seeds found and kept`;
         case "growSpeed": return `−${v}% crop grow time on your farm while equipped`;
         case "petXp": return `+${v}% pet XP from tending your farm while equipped`;
+        case "angling": return `+${v} angling — your casts hook better fish`;
+        case "reelStrength": return `+${v} reel strength — big fish are far less likely to break the line`;
+        case "seafaring": return `+${v} dig stamina on every voyage — that many more holes before you are done`;
         // ── SYSTEM PERKS ─────────────────────────────────────────────────────────────────────────────────
         // Every one states the exact number and exactly what it changes. "+2 seed luck" tells a member nothing;
         // "1 harvest in 12 comes up double" tells them whether they want it.
@@ -287,6 +314,47 @@ export function petPerk(pet) {
     const desc = perkDesc(def.key, value, pet.level || 1) + (def.note ? `. ${def.note}` : "");
     return { name: def.name, key: def.key, icon: meta.icon, value, desc, note: def.note || null };
 }
+
+// ── WHAT A STONE WOULD DO TO THIS PET, IN WORDS ──────────────────────────────────────────────────────────────
+// Generated, never typed. The enshrining panel has to show BOTH stones at their real numbers before an
+// irreversible choice is made, and a hand-written line is a line that goes stale the first time a multiplier
+// moves. So the sentence comes out of the same perkDesc() the pet's own card uses, fed the value the engine
+// will actually apply.
+export function ascensionEffectView(pet, stone) {
+    if (!pet) return null;
+    const eff = effectFor(pet.id, stone);
+    const ownKey = (PET_PERKS[pet.id] || {}).key || pet.activeStat || "fortune";
+    const key = eff.kind === "graft" ? eff.key : ownKey;
+    const factor = eff.kind === "graft" ? (Number(eff.scale) || 1) : (Number(eff.mult) || 1);
+    const raw = petPerkValue(pet.rarity, key);
+    // Erupt is the one perk whose value is an object. Scaling it means scaling the CHANCE — multiplying the
+    // damage multiplier as well would compound two numbers that were balanced separately.
+    // Capped the way the ENGINE caps, not the way the old card did. A system perk goes through capSystemPerk, a
+    // proc through PROC_CAP; anything left is an uncapped stat. Rounded to a tenth because an amplify of 2.2 on
+    // a whole number produces things like "+6.6000000000000005/hr", which is a number nobody wrote.
+    const round1 = (x) => Math.round(x * 10) / 10;
+    const procCap = PROC_CAP[key];
+    const scaled = raw && typeof raw === "object"
+        ? { ...raw, chance: round1(Math.min(procCap ?? 1, raw.chance * factor) * 100) / 100 }
+        : round1(procCap != null ? Math.min(procCap, raw * factor) : capSystemPerk(key, raw * factor));
+    const meta = PERK_META[key] || { icon: "🐾" };
+    return {
+        stone,
+        name: eff.name,
+        kind: eff.kind,
+        key,
+        icon: meta.icon,
+        // A grafted ability is a SECOND thing the pet learns; an amplified one is the thing it already did,
+        // harder. Worth saying which, because it changes whether the pet's own card still tells the whole story.
+        adds: eff.kind === "graft",
+        value: scaled,
+        desc: perkDesc(key, scaled, PET_ENSHRINED_LEVEL),
+        note: eff.note || null,
+    };
+}
+
+/** Both stones for a pet, for the side-by-side panel. */
+export const ascensionChoice = (pet) => ({ light: ascensionEffectView(pet, "light"), dark: ascensionEffectView(pet, "dark") });
 
 // A handful of marquee pets carry a REAL-WORLD store perk (honor/staff-honored, like the charged-item
 // rewards). Placeholder benefits — confirm the exact reward + policy with the owner before promoting.
@@ -362,10 +430,13 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             if (sp.aura > aura) aura = sp.aura;
         }
     }
-    // A LIGHTSTONE brightens the whole pack, which is exactly what a menagerie aura already does — so it goes
-    // in the same place rather than becoming a second, parallel multiplier nobody could reason about. They ADD
-    // before the cap, so a Lightstone is worth having even to somebody who already owns a mythic.
-    aura = Math.min(0.9, aura + packAuraFrom(enshrined));
+    // ── THE LIGHTSTONE'S PACK AURA IS GONE ───────────────────────────────────────────────────────────────
+    // It used to add √n × 12% here, capped at 50%. Measured against the biggest real collection in the Den
+    // (thirteen pets) one Lightstone moved Might by half a point — it multiplied a passive total small enough
+    // to round away, and only bit past twenty-five pets, which nobody owns. Invisible now and ungovernable
+    // later. What a stone does is per pet and authored (pet-ascension-effects.js); the aura below is the
+    // mythic menagerie aura only, which is what it always should have been.
+    aura = Math.min(0.9, aura);
     // Menagerie aura amplifies the accumulated PASSIVE totals (applied before the equipped active is layered on).
     if (aura > 0) {
         for (const k of Object.keys(stats)) stats[k] = Math.round(stats[k] * (1 + aura));
@@ -389,18 +460,23 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     // different enshrined pets with the SAME perk also collapse to the better of the two, which is the same
     // rule and the one that stops a stack of enshrinements from multiplying.
     const activeBest = {};
-    const applyActive = (pet, level, boost = 1) => {
-        const def = PET_PERKS[pet.id] || { key: pet.activeStat || "fortune" };
-        const v = petPerkValue(pet.rarity, def.key);
+    // ── ONE APPLIER, ANY ABILITY ─────────────────────────────────────────────────────────────────────────
+    // This used to read the pet's own perk key off PET_PERKS and could apply nothing else. A Lightstone that
+    // GRAFTS a second ability onto a pet (see pet-ascension-effects.js) needs to run an arbitrary key at that
+    // pet's rarity — and it has to run down this exact path, not a parallel one, or a grafted ability would
+    // skip the caps and the best-of merge and become the one effect in the game nobody had tested.
+    const applyPerk = (key, rarity, level, boost = 1) => {
+        const def = { key };
+        const v = petPerkValue(rarity, def.key);
         const aMult = petActiveLevelMult(Math.max(1, Number(level) || 1)) * boost;
         const cap = (x, hi) => Math.min(hi, x);
         const best = (k, x) => { proc[k] = Math.max(proc[k] || 0, x); };
         if (def.key === "first_hit") best("firstHitMult", 1 + (v - 1) * aMult);
-        else if (def.key === "erupt") { best("eruptChance", cap(v.chance * aMult, 0.6)); proc.eruptMult = Math.max(proc.eruptMult || 0, v.mult); }
-        else if (def.key === "chain_strike") best("chainChance", cap(v * aMult, 0.6));
-        else if (def.key === "execute") best("executePct", cap(v * aMult, 1.2));
-        else if (def.key === "onslaught") best("onslaughtPct", cap(v * aMult, 1.2));
-        else if (def.key === "first_blood") best("firstBloodPct", cap(v * aMult, 1.2));
+        else if (def.key === "erupt") { best("eruptChance", cap(v.chance * aMult, PROC_CAP.erupt)); proc.eruptMult = Math.max(proc.eruptMult || 0, v.mult); }
+        else if (def.key === "chain_strike") best("chainChance", cap(v * aMult, PROC_CAP.chain_strike));
+        else if (def.key === "execute") best("executePct", cap(v * aMult, PROC_CAP.execute));
+        else if (def.key === "onslaught") best("onslaughtPct", cap(v * aMult, PROC_CAP.onslaught));
+        else if (def.key === "first_blood") best("firstBloodPct", cap(v * aMult, PROC_CAP.first_blood));
         else if (def.key === "extra_strike") {
             // Extra strike is a CHANCE (rolled once/day), not a flat count — so leveling the pet always feels
             // like an upgrade: 20% at Lv1 → 100% at Lv5 (an extra strike every day). boss.js does the roll.
@@ -408,10 +484,18 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
             best("extraStrikeChance", Math.min(1, (0.2 + 0.2 * (eqLevel - 1)) * boost));
         } else if (SYSTEM_PERK_KEYS.has(def.key)) {
             system[def.key] = Math.max(system[def.key] || 0, capSystemPerk(def.key, v * aMult));
+        } else if (SYSTEM_PASSIVE_STATS.has(def.key)) {
+            // A GRAFTED passive stat. These are normally carried by every owned pet rather than granted by an
+            // ability, so they never came down this path — and without this branch they would fall through to
+            // activeBest and be silently dropped by add(), which only knows combat and economy keys. That is
+            // the whole "declared but never read" failure in one line, so it is handled rather than avoided.
+            system[def.key] = (system[def.key] || 0) + v * aMult;
         } else {
             activeBest[def.key] = Math.max(activeBest[def.key] || 0, v * aMult);
         }
     };
+    const applyActive = (pet, level, boost = 1) =>
+        applyPerk((PET_PERKS[pet.id] || {}).key || pet.activeStat || "fortune", pet.rarity, level, boost);
 
     // ACTIVE: the equipped pet's signature perk, scaled by ITS level (Lv5 ×3) — the payoff for leveling one
     // pet. Proc magnitudes scale too (chances capped so they stay sane).
@@ -421,10 +505,20 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     // which is what stops the swapping. An enshrined pet that ALSO happens to be equipped is applied once,
     // not twice: `best()` takes the higher of the two rather than adding them, so carrying your own enshrined
     // pet around is neither a bonus nor a penalty — it simply stops mattering, which is the promise.
+    //
+    // ── AND THE STONE IS PER PET NOW ─────────────────────────────────────────────────────────────────────
+    // Both stones KEEP the ability — that is what enshrining means, and it is true whichever rock you spend.
+    // What differs is what happens on top, and it differs per pet: AMPLIFY runs the pet's own ability at a
+    // multiplier chosen against that ability's own ceiling, GRAFT gives it a second one. A grafted ability is
+    // applied through applyPerk at the pet's own rarity, so it is capped and merged like any other.
     for (const e of enshrined) {
         const pet = e?.pet;
         if (!pet) continue;
-        applyActive(pet, PET_ENSHRINED_LEVEL, enshrinedMult(e.stone));
+        const eff = effectFor(pet.id, e.stone);
+        applyActive(pet, PET_ENSHRINED_LEVEL, eff?.kind === "amplify" ? (Number(eff.mult) || 1) : 1);
+        if (eff?.kind === "graft" && eff.key) {
+            applyPerk(eff.key, pet.rarity, PET_ENSHRINED_LEVEL, Number(eff.scale) || 1);
+        }
     }
     // Applied ONCE, after every active has had its say. This is the line that makes "enshrined and equipped"
     // and "enshrined" the same number.

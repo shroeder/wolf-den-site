@@ -13,66 +13,45 @@
 // pet's active ability becomes PERMANENT: it works whether the pet is equipped or not, forever. You are free.
 //
 // ── WHY TWO STONES ───────────────────────────────────────────────────────────────────────────────────────────
-// A single stone would make this a formality: reach 6, press the button, done. Two make it a decision you have
-// to actually think about, and — because the choice is per pet and the stones are scarce — one you will make
-// differently on different pets.
+// A single stone would make this a formality: reach 6, press the button, done. Two make it a decision — but
+// only if the two are actually different ON THIS PET, and the first cut of these was not.
 //
-// Neither stone takes anything away. Both enshrine the ability exactly as it worked. They differ in what they
-// add on top, and they are deliberately not comparable by arithmetic:
+// ── WHAT THE FIRST CUT GOT WRONG ─────────────────────────────────────────────────────────────────────────────
+// Light was "+12% to a pack-wide aura" and Dark was "x1.5 on the ability", for every one of the ninety-eight
+// pets in the game. Thirty-eight distinct abilities and one question, worded identically every time, so the pet
+// being enshrined never entered into it. Two options is not the same thing as a decision.
 //
-//   LIGHTSTONE — BREADTH. The ability is permanent at full strength, and your whole PACK gets brighter: every
-//   pet you own contributes more of its passive. Best on a pet whose active you want kept, when what you
-//   really have is a big menagerie doing quiet work in the background.
+// The numbers were wrong as well. Against the biggest real collection in the Den — thirteen pets — a Lightstone
+// moved Might by half a point, because the aura multiplied a pack passive total small enough to round away. It
+// only became meaningful past twenty-five pets, which nobody owns and the drop rate cannot deliver. And on five
+// ability keys the Darkstone did nothing at all: x1.5 landed above an existing cap and was discarded in silence.
 //
-//   DARKSTONE — DEPTH. The ability is permanent at HALF AGAIN its strength — stronger than it has ever been,
-//   including while you were carrying the pet around. It gives nothing to anybody else. Best when one specific
-//   ability is the thing you actually care about and you want it to hit as hard as it possibly can.
+// So the pack aura is DELETED and what a stone does now lives per pet, authored, in pet-ascension-effects.js.
+// There is no fixed axis — Light is not always "wider" and Dark is not always "harder". On some pets the
+// interesting stone is the one that doubles what it already does; on others it is the one that teaches it a
+// second trade. Read the pet.
 //
-// Neither is the "good" one. Light is worth more the more pets you own; Dark is worth more the better the
-// single ability is. A member with sixty pets and a member with one great one should reach for different rocks.
+// What both stones still share, and always will: enshrining keeps the ability PERMANENTLY, whether that pet is
+// equipped or not. That is the promise, and it is the same promise on both.
 export const STONES = {
     light: {
         id: "light",
         name: "Lightstone",
         art: "/images/pets/stone-light.png",
         color: "#ffe08a",
-        kick: "Breadth",
-        blurb: "The ability is kept exactly as it is, forever — and the whole pack shines with it.",
-        // What it does to the ability it enshrines: nothing. It is preserved at the value it already had.
-        activeMult: 1,
-        // ...and every owned pet's PASSIVE gets this much better. Stacks with the menagerie aura the top
-        // rarities already grant, and is capped alongside it so a wall of Lightstones cannot run away.
-        packAura: 0.12,
-        line: "Keeps the ability at full strength, and every pet you own gives +12% more of its passive.",
+        blurb: "Keeps the ability forever, and changes the pet — differently on every pet there is.",
     },
     dark: {
         id: "dark",
         name: "Darkstone",
         art: "/images/pets/stone-dark.png",
         color: "#b061ff",
-        kick: "Depth",
-        blurb: "The ability is kept and sharpened — stronger enshrined than it ever was in your hands.",
-        activeMult: 1.5,
-        packAura: 0,
-        line: "Keeps the ability and raises it to 150% — the strongest a pet ability gets.",
+        blurb: "Keeps the ability forever, and changes the pet — differently on every pet there is.",
     },
 };
 
 export const STONE_IDS = Object.keys(STONES);
 export const stoneById = (id) => STONES[String(id || "")] || null;
-
-// The aura a set of enshrinements contributes. Lightstones ADD UP — a second one is worth having — but with
-// sharply diminishing returns, so the tenth is nearly nothing and the number cannot be farmed into absurdity.
-// √n rather than n: two Lightstones are worth 1.41 of one, four are worth 2, sixteen are worth 4.
-export const PACK_AURA_CAP = 0.5;
-export function packAuraFrom(enshrined = []) {
-    const lights = enshrined.filter((e) => e?.stone === "light").length;
-    if (!lights) return 0;
-    return Math.min(PACK_AURA_CAP, STONES.light.packAura * Math.sqrt(lights));
-}
-
-/** The multiplier an enshrined pet's active perk is worth, by the stone that enshrined it. */
-export const enshrinedMult = (stone) => stoneById(stone)?.activeMult || 1;
 
 // ── WHERE STONES COME FROM ───────────────────────────────────────────────────────────────────────────────────
 // Luke's brief, and the two failure modes he named: "I want it to end up in a place where people want them but

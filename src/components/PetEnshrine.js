@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import PetArt from "@/components/PetArt";
+import { ascensionChoice } from "@/lib/marketplace/pet-perks.js";
+import { STONES } from "@/lib/marketplace/pet-stones.js";
 
 // ── THE ENSHRINING ───────────────────────────────────────────────────────────────────────────────────────────
 // The panel under a pet that has reached level 6. It has one job and it is not "let you press a button": it is
@@ -19,17 +21,15 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
     const [picked, setPicked] = useState(null);
     const [confirming, setConfirming] = useState(false);
 
+    // ── THE TWO STONES, ON THIS PET ──────────────────────────────────────────────────────────────────────
+    // This panel used to print the same two sentences under every pet in the game, because that is what the
+    // stones used to do. They are per pet now, so the copy is read off the pet in front of you: the effect's
+    // own name, the exact mechanical sentence the engine will pay, and whether it is a second ability the pet
+    // is learning or the one it already had, harder.
+    const choice = ascensionChoice(pet);
     const STONE_META = {
-        light: {
-            name: "Lightstone", kick: "Breadth", color: "#ffe08a",
-            line: "Keeps the ability exactly as it is — and every pet you own gives +12% more of its passive.",
-            best: "Better the bigger your pack.",
-        },
-        dark: {
-            name: "Darkstone", kick: "Depth", color: "#b061ff",
-            line: "Keeps the ability and raises it to 150% — the strongest a pet ability gets.",
-            best: "Better the better the ability.",
-        },
+        light: { name: STONES.light.name, color: STONES.light.color, eff: choice.light },
+        dark: { name: STONES.dark.name, color: STONES.dark.color, eff: choice.dark },
     };
 
     // ── ALREADY DONE ── the pet wears its stone, and the ability is running whether it is equipped or not.
@@ -42,11 +42,14 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                 </div>
                 <div className="pens-done-body">
                     <span className="pens-kick">Enshrined · {m.name}</span>
-                    <b className="pens-done-h">Its ability is yours for good</b>
+                    <b className="pens-done-h">{m.eff?.icon} {m.eff?.name}</b>
                     <p className="pens-done-p">
                         {pet.name}&rsquo;s ability runs whether it is equipped or not. Put something else out —
                         it keeps working.
                     </p>
+                    {/* What the stone chose, kept on screen afterwards. A permanent decision whose result you
+                        can no longer read is a decision you cannot learn from. */}
+                    <p className="pens-done-eff">{m.eff?.desc}</p>
                 </div>
             </div>
         );
@@ -65,7 +68,8 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                 <b className="pens-h">Enshrine {pet.name}</b>
                 <p className="pens-p">
                     Spend a stone and this ability becomes permanent — it works whether {pet.name} is equipped or
-                    not. You will never have to swap back for it again. <b>The choice of stone is forever.</b>
+                    not. You will never have to swap back for it again. Both stones keep the ability; what they
+                    do on top is different, and it is different on every pet. <b>The choice is forever.</b>
                 </p>
             </div>
 
@@ -86,10 +90,15 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
                             <span className="pens-form">
                                 <PetArt id={pet.id} url={sprites?.[id]?.url} flip={sprites?.[id]?.flip} />
                             </span>
-                            <span className="pens-stone-kick">{m.kick}</span>
-                            <b className="pens-stone-name">{m.name}</b>
-                            <span className="pens-stone-line">{m.line}</span>
-                            <em className="pens-stone-best">{m.best}</em>
+                            <span className="pens-stone-kick">{m.name}</span>
+                            {/* The EFFECT's name is the headline, not the stone's — the stone is the same rock
+                                on every pet and the effect is the thing being chosen. */}
+                            <b className="pens-stone-name">{m.eff?.icon} {m.eff?.name}</b>
+                            <span className="pens-stone-line">{m.eff?.desc}</span>
+                            <em className="pens-stone-best">
+                                {m.eff?.adds ? "A second ability, on top of its own." : "Its own ability, harder."}
+                            </em>
+                            {m.eff?.note ? <span className="pens-stone-note">{m.eff.note}</span> : null}
                             <span className={`pens-stone-have${have ? "" : " is-none"}`}>
                                 {have ? `${have} in hand` : "none in hand"}
                             </span>

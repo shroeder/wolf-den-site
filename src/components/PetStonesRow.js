@@ -14,16 +14,20 @@ import { useState } from "react";
 //
 // That last part is the one that matters. A currency with no visible use is a mystery, and the answer here is
 // specific to you: either a name you can tap, or an honest "nothing yet, and here is what's closest".
+// Both stones do the same ONE thing everywhere — keep the ability forever — and everything else about them is
+// decided by the pet you spend them on. So this panel deliberately refuses to summarise them: a line here
+// claiming "light is the wide one" would be wrong on about half the roster, and the honest answer is to send
+// you to the pet, where both effects are drawn side by side at their real numbers.
 const META = {
     light: {
         name: "Lightstone", color: "#ffe08a", art: "/images/pets/stone-light.png",
-        line: "Keeps a pet's ability forever and brightens the whole pack — every pet you own gives more of its passive.",
-        best: "Worth more the more pets you own.",
+        line: "Keeps a pet's ability forever, and changes that pet — differently on every pet there is.",
+        best: "Open the pet to see what it would do to that one.",
     },
     dark: {
         name: "Darkstone", color: "#b061ff", art: "/images/pets/stone-dark.png",
-        line: "Keeps a pet's ability forever and raises it to 150% — the strongest a pet ability gets.",
-        best: "Worth more the better the ability.",
+        line: "Keeps a pet's ability forever, and changes that pet — differently on every pet there is.",
+        best: "Neither stone is the better one. It depends entirely on the pet.",
     },
 };
 

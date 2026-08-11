@@ -93,8 +93,8 @@ export default function PetEnshrineLab() {
             <div className="pelab-stage">
                 <PetStoneShelf
                     shop={{ price: 900, held: { light: 2, dark: 1 }, stones: [
-                        { id: "light", name: "Lightstone", art: "/images/pets/stone-light.png", color: "#ffe08a", line: "Keeps the ability at full strength, and every pet you own gives +12% more of its passive." },
-                        { id: "dark", name: "Darkstone", art: "/images/pets/stone-dark.png", color: "#b061ff", line: "Keeps the ability and raises it to 150% — the strongest a pet ability gets." },
+                        { id: "light", name: "Lightstone", art: "/images/pets/stone-light.png", color: "#ffe08a", line: "Keeps the ability forever, and does something different on every pet." },
+                        { id: "dark", name: "Darkstone", art: "/images/pets/stone-dark.png", color: "#b061ff", line: "Keeps the ability forever, and does something different on every pet." },
                     ] }}
                     currency="doubloons" purse={1200} onBuy={() => {}}
                 />

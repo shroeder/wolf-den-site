@@ -16,8 +16,8 @@ import { createPortal } from "react-dom";
 // when it lands, and stopping the world for an item you cannot spend yet would be the wrong size of moment.
 // The ENSHRINING is the takeover; this is the good news.
 const STONE_META = {
-    light: { name: "Lightstone", color: "#ffe08a", art: "/images/pets/stone-light.png", line: "Keeps a pet's ability forever, and brightens your whole pack." },
-    dark: { name: "Darkstone", color: "#b061ff", art: "/images/pets/stone-dark.png", line: "Keeps a pet's ability forever, and raises it to 150%." },
+    light: { name: "Lightstone", color: "#ffe08a", art: "/images/pets/stone-light.png", line: "Keeps a pet's ability forever, and changes it — differently on every pet." },
+    dark: { name: "Darkstone", color: "#b061ff", art: "/images/pets/stone-dark.png", line: "Keeps a pet's ability forever, and changes it — differently on every pet." },
 };
 
 const WHERE = {
