@@ -40,14 +40,14 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 1 | **Perennial Root** | One harvest in three returns the seed you planted. | B |
-| 2 | **Hothouse Glass** | Crops go into the ground already one full growth stage along. | B |
+| 2 | **Hothouse Glass** | Your crops go into the ground already a third grown. | B |
 | 3 | **Second Sowing** | Two extra plots, permanently. | A |
 | 4 | **Nightsoil** | Every plant you put in the ground goes in already fertilized, free. | B |
-| 5 | **Sun Trap** | While it is actually sunny over the shop, your crops grow in half the time. | B |
-| 6 | **Bumper Season** | Your largest harvest each day pays double. | B |
+| 5 | **The Rain Barrel** | Rain takes half your crops' remaining time instead of a third, and never goes on cooldown. | A |
+| 6 | **Bumper Season** | The first harvest you take each day pays double. | B |
 | 7 | **Windfall Orchard** | The first crop you harvest each day also drops a chest. | B |
-| 8 | **The Fallow Deed** | One plot on your farm always yields twice. | A |
-| 9 | **Harvest Home** | Harvesting a plot replants the same crop immediately, free. | B |
+| 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B |
+| 9 | **The Cold Frame** | One crop in three ignores its grow time entirely and is ready the moment it goes in. | B |
 | 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
 | 11 | **Kind Neighbour** | Every farm you rate rates you back the same day. | B |
 | 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B |
@@ -58,17 +58,17 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 14 | **The Tide Table** | Casts you don't use roll over. Bank up to a week and spend the lot at once. | B |
-| 15 | **The Fishmonger's Standing Order** | Fish you land sell at the price of the next rarity up. | A |
+| 15 | **The Fishmonger's Standing Order** | One fish in three sells at the price of the next rarity up. | B |
 | 16 | **Two Hooks** | One cast in three lands a second fish. | B |
 | 17 | **The Lantern** | Casts made while the shop is closed pay double. | A |
-| 18 | **Stormglass** | It is always raining over your water, whatever the sky is doing. | A |
+| 18 | **Stormglass** | One cast in three is treated as though it were raining over your water. | B |
 | 19 | **Cold Bait** | Your first cast each day cannot land a common. | B |
-| 20 | **The Full Creel** | Your first cast each day lands the rarest fish in the water. | B |
+| 20 | **The Full Creel** | Your daily casts refresh at noon as well as at midnight. | A |
 | 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
 | 22 | **The Long Haul** | One fish in four comes up two tiers rarer than it rolled. | B |
-| 23 | **The Gaff** | Landing a record fish refunds the cast and pays its bonus twice. | B |
+| 23 | **The Gaff** | A fish that beats your record for its species refunds the cast. | B |
 | 24 | **The Tithe of Scales** | Every fish you land also gives a random chest fragment. | B |
-| 25 | **Deep Water Licence** | The rarest tier of fish can appear on any cast, not only at depth. | A |
+| 25 | **The Trawl** | One cast in five lands the whole tier — one of every fish at that rarity. | B |
 
 ## Sailing
 
@@ -80,9 +80,9 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 29 | **Diviner's Rod** | Your first dig of every voyage uncovers a chest. | B |
 | 30 | **The Shipwright's Debt** | Boat upgrades cost half. | A |
 | 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
-| 32 | **Letters of Marque** | Any encounter you lose may be fought again, once each, at no cost. | B |
+| 32 | **Letters of Marque** | An encounter you lose costs you no sortie. | B |
 | 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B |
-| 34 | **Beachhead** | A dig reveals the whole grid at once. | B |
+| 34 | **Beachhead** | One dig site in three is already half uncovered when you arrive. | B |
 | 35 | **The Press Gang** | One voyage a day returns the moment you send it out. | B |
 | 36 | **The Kraken's Toll** | Sea monsters you meet pay you to be left alone. | B |
 | 37 | **Salvager's Claim** | One wreck in three leaves a piece of gear in your hold. | B |
@@ -97,10 +97,10 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 41 | **The Assay Office** | Smelting costs half the ore. | A |
 | 42 | **The Wide Seam** | One seam in three comes out a grade richer than it rolled. | B |
 | 43 | **The Deep Key** | You start every descent five floors down. | A |
-| 44 | **The Miner's Lamp** | The deepest seams appear five floors shallower for you. | A |
-| 45 | **The Deep Cart** | You carry twice as much ore out of every trip. | A |
+| 44 | **The Miner's Lamp** | Your trips start at the depth you reached last time, not at the top. | B |
+| 45 | **The Deep Cart** | One trip in three brings back twice the ore. | B |
 | 46 | **The Night Cage** | One extra trip a day, and the first bought trip costs nothing. | A |
-| 47 | **Assayer's Eye** | Every haul comes back at the best grade it contained. | B |
+| 47 | **Assayer's Eye** | One haul in three comes back at the best grade it contained. | B |
 | 48 | **The Delver's Rope** | A dungeon run that ends badly does not count against your run for the day. | B |
 | 49 | **The Warren Map** | Every dungeon run has one extra floor before the boss. | A |
 | 50 | **The Gem Cutter's Eye** | One dungeon boss in two drops a gem. | B |
@@ -118,7 +118,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 57 | **The Standing Recipe** | Twice a day, a recipe may be cooked with any ingredients you hold. | B |
 | 58 | **The Copper Pot** | One cook in four makes a second helping. | B |
 | 59 | **The Cellar Key** | One harvest or landing in three puts a second copy in your pantry. | B |
-| 60 | **The Substitution** | Any one ingredient a recipe asks for may be swapped for any other you hold. | B |
+| 60 | **The Substitution** | Three times a day, one ingredient a recipe asks for may be swapped for any other you hold. | B |
 | 61 | **Chef's Pick** | One dish a day cooks at perfect timing without playing it. | B |
 
 ## The Forge & the Jewelcutter
@@ -130,9 +130,9 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 64 | **Twice-Struck** | One salvage in three returns double parts. | B |
 | 65 | **The Attuned Bench** | Every attunement you carry counts at double its level. | A |
 | 66 | **The Jeweller's Eye** | Every gem you have set counts as one tier higher than it is. | A |
-| 67 | **Jeweller's Patience** | Gems come back out of a socket free, and unbroken. | B |
+| 67 | **Jeweller's Patience** | One gem in three survives being pulled from its socket. | B |
 | 68 | **The Steady Bench** | A failed fuse returns all three gems. | B |
-| 69 | **Master's Mark** | Anything you forge is bound to you and can never be traded away by mistake. | A |
+| 69 | **The Master's Mark** | One enhance in three counts as two levels instead of one. | B |
 | 70 | **The Reforging Right** | Reforging an element costs half. | A |
 | 71 | **The Tempered Edge** | Your gear's enhancement bonuses count double. | A |
 | 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B |
@@ -142,7 +142,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 
 | # | Name | Effect | Class |
 |---|---|---|---|
-| 74 | **Founder's Charter** | The travelling merchant sells to you at cost. | A |
+| 74 | **Founder's Charter** | The travelling merchant sells to you at half price. | A |
 | 75 | **The Plaza Key** | Town buildings you have not unlocked are open to you anyway. | A |
 | 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A |
 | 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B |
@@ -180,8 +180,8 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 99 | **The Beast's Share** | Your equipped pet's ability works at the strength it would have one level higher. | A |
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
-| 102 | **The Long Table** | Your pets' passives ignore the menagerie ceiling entirely. | A |
-| 103 | **The Whistle** | Swapping your equipped pet costs nothing and has no cooldown. | A |
+| 102 | **The Long Table** | Your menagerie ceiling is half again as high. | A |
+| 103 | **The Whistle** | Your pet keeps earning for a full hour after you swap it out. | B |
 
 ## Market, Trade & Credit
 
@@ -193,9 +193,9 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
 | 108 | **The Bonded Warehouse** | Items you list at auction stay equipped and usable until they sell. | B |
 | 109 | **The Merchant's Eye** | One daily deal each day is offered to you at half price. | A |
-| 110 | **No Reserve** | Your auctions may be listed with no minimum; the house guarantees the floor. | B |
-| 111 | **The Bulk Buyer** | Anything you buy from the gold shop comes in pairs. | B |
-| 112 | **The Merchant's Ledger** | The daily deal refreshes for you a second time each day. | B |
+| 110 | **No Reserve** | An auction that does not sell is relisted for you, free, until it does. | B |
+| 111 | **The Bulk Buyer** | One purchase in three from the gold shop comes in pairs. | B |
+| 112 | **The Merchant's Ledger** | The travelling merchant's stock is twice as large for you. | A |
 
 ## Collections & Standing
 
@@ -207,7 +207,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 116 | **The Seal of Office** | Collection capstones fire one piece short of the full set. | A |
 | 117 | **The Long Service Record** | Every badge you hold pays its bonus twice. | A |
 | 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
-| 119 | **The Founder's Plate** | Your profile carries your join date and every first you still hold. | B |
+| 119 | **The Founder's Plate** | One collection piece a week is delivered to you, chosen from what you are missing. | B |
 | 120 | **The Standing Ovation** | Cheering pays you what it pays the hero you cheered. | B |
 
 ---
@@ -407,6 +407,35 @@ stat** (attunements count double while worn).
 | 57 | The Standing Recipe | Needed a limit | **Twice a day** |
 | 58 | The Copper Pot | Needed a chance | **One cook in four makes a second helping** |
 
-**The list is closed.** 120 entries, no duplicates, every one bounded, every one class A or B, not one of them
-is a tooltip, none of them mints state that outlives the item, every one is aimed at a mechanic that exists,
-and the big ones land on a roll rather than on every single action.
+## Seventh pass — a self-audit against every rule so far
+
+Twenty-five more reworked, this time without being asked entry by entry. Three were aimed at limits that do
+not exist, which is the fourth pass running that has produced at least one:
+
+| # | Was | What the code actually says |
+|---|---|---|
+| 2 | Hothouse Glass — "one growth stage along" | Growth **stages are purely visual** — FarmClient swaps a sprite at 33% and 72% progress. The server has `planted_at` and `ready_at` and nothing else. Now: **a third grown**, which is a real shift of `ready_at`. |
+| 5 | Sun Trap — "while it is sunny" | There is **no sun**. Only rain, reported by the client, `RAIN_CUT = 0.3`, once per plot per 6h. Now **The Rain Barrel** — rain takes half instead of a third, with no cooldown. |
+| 103 | The Whistle — "swapping costs nothing" | Swapping is **already free and has no cooldown** (`equipPet` just writes the column). Now: your pet keeps earning for an hour after you swap it out, which is a real change to the trickle clock. |
+
+The other twenty-two were failures of the rules already agreed:
+
+- **Still deterministic where it should roll** — The Fishmonger's Standing Order, Stormglass, The Deep Cart,
+  Assayer's Eye, The Bulk Buyer, Jeweller's Patience.
+- **Needed UI that does not exist** — The Fallow Deed wanted you to nominate a plot; Bumper Season had to know
+  which harvest was "largest", which cannot be known until the day is over.
+- **Removed a deliberate rule outright** — Jeweller's Patience undid `UNSOCKET_DESTROYS`, which the code calls
+  "the point of the choice"; The Long Table deleted `SYSTEM_PASSIVE_CAP` rather than raising it; Founder's
+  Charter sold at cost where `town_haggle` caps at 30%.
+- **Redundant with a neighbour** — Deep Water Licence against The Long Haul, The Full Creel against Cold Bait,
+  The Merchant's Ledger against The Merchant's Eye, Harvest Home against Perennial Root.
+- **Not a power at all** — Master's Mark was a restriction; Beachhead deleted the dig minigame the way an
+  already-opened chest deletes the opening; The Founder's Plate was a profile ornament.
+- **Gold from nothing** — No Reserve had the house guarantee a floor price.
+
+Four absolutes remain and all four are deliberate: **The Rain Barrel** ("never on cooldown" — the cooldown is
+the thing being bought), **The Head Chef** ("never the bottom rung" — a floor, not a jackpot), **The Standing
+Streak**, and **Merchant's Word**. None is a per-event faucet.
+
+**The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
+state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
