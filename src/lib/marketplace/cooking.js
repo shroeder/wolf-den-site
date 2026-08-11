@@ -18,6 +18,7 @@ import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
+import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // What the member's OWNED kitchen pets add, as flat percentage points on each odds key. Owned, not equipped —
 // same rule the Forge set uses, so collecting them is the reward rather than juggling which one is out.
@@ -856,7 +857,14 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         ]);
         equippedKitchen = { heat: h, larder: l, portion: po, prep: pr };
     } catch { /* no companion, no bonus */ }
-    const freeCook = Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
+    // ── ASCENSION POWERS ON A COOK ───────────────────────────────────────────────────────────────────────
+    // The Banked Fire makes every third cook free. Counted off the member's own cook tally rather than a die,
+    // so "every third" is literally every third — a roll would have made it a 1-in-3 chance, which is a
+    // different promise and a worse one.
+    const cookPowers = await equippedPowers(buyerId);
+    const bankedFire = cookPowers.has("banked_fire") && ((Number(row?.cooks_total) || 0) + 1) % 3 === 0;
+    const freeCook = bankedFire
+        || Math.random() < trackValue("larder", row?.larder_level) + (petBonus.thrifty || 0) + equippedKitchen.larder / 100;
     if (!freeCook) {
         const taken = [];
         for (const [ref, qty] of Object.entries(rec.need)) {
@@ -897,12 +905,16 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // was a coin flip, which makes practising feel pointless.
     const FLAWLESS = 0.92;
     const bumpChance = trackValue("heat", row?.heat_level) + Math.max(0, q - 0.5) * 0.36 + (petBonus.hot_hands || 0) + equippedKitchen.heat / 100;
-    const bumped = q >= FLAWLESS || Math.random() < bumpChance;
+    // The Hot Stone is a flat one-in-three tier bump on top of whatever Heat and the Hearth Cat already buy.
+    const bumped = q >= FLAWLESS || Math.random() < bumpChance || (cookPowers.has("hot_stone") && oneIn(3));
     const tier = Math.min(TIERS.length, rec.tier + (bumped ? 1 : 0));
 
     let made = null;
     let goldPaid = 0;
     let portions = 1 + (Math.random() < trackValue("season", row?.season_level) + Math.max(0, q - 0.7) * 0.3 + (petBonus.generous || 0) + equippedKitchen.portion / 100 ? 1 : 0);
+    // The Copper Pot is a second helping one cook in four; The Big Pot makes the helping itself bigger one in
+    // three. Two different levers on purpose — portions is "how many", potLift is "how much of each".
+    if (cookPowers.has("copper_pot") && oneIn(4)) portions += 1;
 
     // THE BIG POT. Seasoning gives you a second DISH; the pot makes the dish you cooked BIGGER. It multiplies
     // the serving rather than rolling for one, so every level is felt on every cook instead of being a coin
@@ -913,7 +925,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     // Flat rounding would have thrown away the entire upgrade on every reward small enough to matter.
     // Big Pot no longer touches quantity — see the note on the track table. It rides on cooking XP now, so
     // `serve` is portions only and potLift is applied where the XP is worked out.
-    const potLift = trackValue("batch", row?.batch_level);
+    const potLift = trackValue("batch", row?.batch_level) + (cookPowers.has("big_pot") && oneIn(3) ? 1 : 0);
     const potMult = 1;
     const serve = (n) => {
         const exact = Math.max(0, Number(n) || 0) * portions * potMult;
@@ -926,7 +938,8 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
         // Prep Cook (Copper Kettle) is its own roll on top of the portion roll — prepping is the grind, so the
         // pet that helps with it should be felt on the prep chain specifically.
-        const prepBonus = Math.random() < ((petBonus.prep_cook || 0) + equippedKitchen.prep / 100) ? 1 : 0;
+        const prepBonus = (Math.random() < ((petBonus.prep_cook || 0) + equippedKitchen.prep / 100) ? 1 : 0)
+            + (cookPowers.has("prep_bench") && oneIn(3) ? 1 : 0);
         portions += prepBonus;
         await addToPantry(buyerId, "prep", rec.out, serve(1));
         const m = PREPS[rec.out];
@@ -936,7 +949,9 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
         const ladder = tierMeta(tier).rewards;
-        const rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        let rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        // The Head Chef takes the consolation rung off your ladder entirely — a floor, never a jackpot.
+        if (cookPowers.has("head_chef") && ladder.length > 1) rung = Math.max(1, rung);
         const r = ladder[rung];
         const lbl = rewardLabel(r, {
             consumables: conSprites,
