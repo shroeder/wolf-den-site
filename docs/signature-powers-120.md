@@ -65,7 +65,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 19 | **Unbreakable Leader** | No fish ever snaps your line, at any size. | B |
 | 20 | **The Full Creel** | Your first cast each day lands the rarest fish in the water. | B |
 | 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
-| 22 | **The Salt Cure** | Fish in your pantry never spoil, and each one counts as two ingredients when you cook. | B |
+| 22 | **The Long Haul** | Every fish you land comes up two tiers rarer than it rolled. | A |
 | 23 | **The Gaff** | Landing a record fish refunds the cast and pays its bonus twice. | B |
 | 24 | **The Tithe of Scales** | Every tenth fish you land becomes a treasure-chest fragment. | B |
 | 25 | **Deep Water Licence** | The rarest tier of fish can appear on any cast, not only at depth. | A |
@@ -102,7 +102,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 46 | **The Night Cage** | One extra trip a day, and the first bought trip costs nothing. | A |
 | 47 | **Assayer's Eye** | Every haul comes back at the best grade it contained. | B |
 | 48 | **The Dungeon Ledger** | Dungeon bosses may be fought twice a day. | A |
-| 49 | **The Iron Door** | A dungeon floor you have cleared stays cleared. You never walk the same one twice. | B |
+| 49 | **The Cartographer's Coin** | At any choice floor in a dungeon, you may take both options. | B |
 | 50 | **The Gem Cutter's Eye** | Every dungeon boss drops a gem. | B |
 
 ## The Kitchen
@@ -113,12 +113,12 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 52 | **Iron Palate** | Every dish you cook comes out at the highest tier. | B |
 | 53 | **Mise en Place** | Ingredients arrive prepped. Prepping is skipped. | B |
 | 54 | **The Long Larder** | Cooked dishes never expire and never lose their buff. | A |
-| 55 | **The Second Seasoning** | Every dish you cook carries two buffs instead of one. | A |
+| 55 | **The Top of the Ladder** | Every cook pays the top rung of its tier. Never the consolation. | B |
 | 56 | **The Tasting Menu** | One cook a day makes every dish those ingredients could have made. | B |
 | 57 | **The Standing Recipe** | One recipe of your choosing can be cooked with any ingredients. | B |
 | 58 | **The Copper Pot** | Every dish makes a second helping. | B |
 | 59 | **The Cellar Key** | Every harvest and every landing puts a second copy in your pantry. | B |
-| 60 | **Family Recipe** | A recipe you have cooked ten times can be made forever without its rarest ingredient. | B |
+| 60 | **The Substitution** | Any one ingredient a recipe asks for may be swapped for any other you hold. | B |
 | 61 | **Chef's Pick** | One dish a day cooks at perfect timing without playing it. | B |
 
 ## The Forge & the Jewelcutter
@@ -147,7 +147,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A |
 | 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B |
 | 78 | **The Warden's Key** | You may release one person from the Stockade each week. | B |
-| 79 | **The Charter of Passage** | Town raids cost you none of your daily allowance. | A |
+| 79 | **The Free Company** | Your spoils ceiling on a town raid is doubled. | A |
 | 80 | **The Guild Ledger** | You can see any member's public loadout and collection progress. | B |
 | 81 | **The Toll House** | Every member who visits your farm pays you a toll — from the house, not from them. | B |
 | 82 | **Standing Invitation** | Anyone may visit your farm without spending one of their daily visits. | B |
@@ -164,7 +164,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 88 | **Day's Double** | Your daily check-in pays out twice. | B |
 | 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B |
 | 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A |
-| 91 | **The Master Key** | Every chest you open also drops the chest one tier below it, already open. | B |
+| 91 | **The Master Key** | Every chest you open also gives you the chest one tier below it, to open yourself. | B |
 | 92 | **The Sorting Table** | A chest reward you already own comes out one rarity up instead. | B |
 | 93 | **The Long Day** | Every daily allowance in the game is one larger. Every single one. | A |
 
@@ -176,8 +176,8 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 95 | **The Full Trough** | One feed does the whole day — every meal at once. | B |
 | 96 | **The Long Leash** | Your pet's ability keeps working while you are on someone else's farm. | B |
 | 97 | **Breeder's Eye** | You choose which pet a random pet reward gives you. | B |
-| 98 | **First Light** | Every pet you unlock arrives at level three. | A |
-| 99 | **The Prize Litter** | Every pet you own counts as one rarity higher for its passive. | A |
+| 98 | **The Second Sitting** | Your equipped pet's ability fires twice. | B |
+| 99 | **The Beast's Share** | Your equipped pet's ability works at the strength it would have one level higher. | A |
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
 | 102 | **The Long Table** | Your pets' passives ignore the menagerie ceiling entirely. | A |
@@ -189,7 +189,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 |---|---|---|---|
 | 104 | **The Auctioneer's Seat** | You pay no auction fees, on either side. | A |
 | 105 | **Merchant's Word** | Trades you offer never expire and never decay. | A |
-| 106 | **The Consignment Note** | Anything you sell to the shop pays what the auction house last paid for one. | B |
+| 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B |
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
 | 108 | **The Bonded Warehouse** | Items you list at auction stay equipped and usable until they sell. | B |
 | 109 | **The Assay Stamp** | Any listing shows its true worth — attunement, gems and enhancement included. | B |
@@ -203,7 +203,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 |---|---|---|---|
 | 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A |
 | 114 | **Herald's Licence** | Your badges show on every screen in the game. | A |
-| 115 | **The Standing Exhibit** | A collection piece you own counts toward every set it could belong to. | A |
+| 115 | **The Loaned Exhibit** | One collection piece you do not own counts as owned. You choose which. | B |
 | 116 | **The Seal of Office** | Collection capstones fire one piece short of the full set. | A |
 | 117 | **The Long Service Record** | Every badge you hold pays its bonus twice. | A |
 | 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
@@ -330,5 +330,36 @@ comes off. The intended behaviour is that the extra plots and decoration slots g
 destroyed: crops keep growing, decorations stay placed, and neither can be interacted with until the item is
 worn again. Worth confirming before either is built.
 
+## Fifth pass — stop inventing mechanics
+
+Ten of the fifteen replacements written in the third pass were aimed at systems that do not work the way I
+assumed. Luke caught all of them. What the code actually says:
+
+- **Dishes have no buffs and are not consumed.** A cook rolls a reward off a TIER ladder — seeds, gold, parts,
+  consumables, recipes, chests — where index 0 is the consolation and the last entry is the prize.
+- **Nothing spoils.** There is no food decay, and no pantry cap.
+- **Dungeon floors are not persistent.** A run generates its own floors, one run per dungeon per day. There is
+  no "cleared" state for a power to act on.
+- **Town raids have no daily allowance.** There is no limit to hand back.
+- **People like opening chests.** A power that opens one for you takes away the part they came for.
+
+| # | Was | Why it was wrong | Now |
+|---|---|---|---|
+| 22 | The Salt Cure | Nothing spoils | **The Long Haul** — fish come up two tiers rarer than they rolled |
+| 49 | The Iron Door | No persistent floors, and it read as a debuff | **The Cartographer's Coin** — take both options at a choice floor |
+| 55 | The Second Seasoning | Dishes have no buffs | **The Top of the Ladder** — every cook pays the top rung, never the consolation |
+| 60 | Family Recipe | Permanent effect on gear you can take off | **The Substitution** — swap any one ingredient for any other you hold |
+| 79 | The Charter of Passage | Town raids have no allowance | **The Free Company** — your raid spoils ceiling is doubled |
+| 91 | The Master Key | Opening it for you removes the fun | **The Master Key** — you get the tier below to open yourself |
+| 98 | First Light | Minted permanent pet levels (Test 3) | **The Second Sitting** — your pet's ability fires twice |
+| 99 | The Prize Litter | Too strong across every pet you own | **The Beast's Share** — the equipped pet's ability acts one level higher |
+| 106 | The Consignment Note | A money printer | **The Standing Offer** — one item a day, the shop buys at its selling price |
+| 115 | The Standing Exhibit | Did not mean anything | **The Loaned Exhibit** — one piece you do not own counts as owned |
+
+**TEST 4 — VERIFY THE MECHANIC FIRST.** Three passes running, the same failure: a power aimed at something the
+game does not do. Dead on arrival in pass two (no bag cap, no pantry cap, no location gate), incoherent in pass
+three (an allowance that already refreshes daily), invented in pass four (buffs, spoilage, persistent floors,
+raid allowances). Nothing goes on this list again without reading the system it touches.
+
 **The list is closed.** 120 entries, no duplicates, every one bounded, every one class A or B, not one of them
-is a tooltip, and none of them mints state that outlives the item.
+is a tooltip, none of them mints state that outlives the item, and every one is aimed at a mechanic that exists.
