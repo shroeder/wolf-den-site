@@ -19,13 +19,11 @@
 // ── COST — READ THIS BEFORE RERUNNING ANYTHING ───────────────────────────────────────────────────────────────
 // 108 pets x 2 = 216 images, generated as EDITS of each pet's top existing sprite so the pixels carry forward.
 //
-// A FULL PASS IS ABOUT $40, NOT $9. The original estimate here used $0.042/image, which is the MEDIUM-quality
-// rate; these run at `high`, which is roughly $0.19 an image. That error was quoted to Luke as "$9 for the set"
-// and then spent four times over across three prompt revisions, because each revision meant regenerating a
-// half or a whole set at a price nobody had checked.
+// A FULL PASS AT `high` IS ABOUT $40, NOT $9 — the original estimate here used the MEDIUM rate for a HIGH run
+// and under-quoted the set by 4.5x, which was then spent several times over across three prompt revisions.
 //
-// So: PREVIEW ON THREE PETS FIRST, always, and count a full rerun as forty dollars rather than pocket change.
-// --form=light or --form=dark exists precisely so a prompt fix on one stone does not pay for the other.
+// It runs at MEDIUM now (gen-guard.mjs), and the guard prints the real bill and refuses a big run without
+// --yes. --form=light or --form=dark exists so a prompt fix on one stone does not pay for the other.
 //
 // Usage:
 //   node scripts/gen-pet-level6.mjs --list                  # what would be made, and what it would cost
@@ -39,6 +37,7 @@ import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
 
 import "./lib/ai-trace.mjs";
+import { quality, priceRun, requirePreview } from "./lib/gen-guard.mjs";
 
 const ARGV = process.argv.slice(2);
 const APPLY = ARGV.includes("--apply");
@@ -55,6 +54,11 @@ if (!key) throw new Error("no OPENAI_API_KEY");
 const env = fs.readFileSync("../accounting_app/.env", "utf8");
 const sql = neon(env.match(/^DATABASE_URL=(.*)$/m)[1].trim());
 const blobToken = env.match(/^BLOB_READ_WRITE_TOKEN=(.*)$/m)?.[1]?.trim();
+
+// MEDIUM unless --high is passed. This script is the reason gen-guard.mjs exists: it inherited `high` from
+// regen-pet-levels.mjs and nobody chose it, and at 216 images that inheritance cost about thirty dollars more
+// than the same run at medium.
+const QUALITY = quality();
 
 const OUT = "C:/Users/Luke/AppData/Local/Temp/claude/C--Users-Luke-Projects/60d564f9-a65a-42a5-8919-cca195dbfa73/scratchpad/pets6";
 fs.mkdirSync(OUT, { recursive: true });
@@ -149,7 +153,7 @@ async function editTo(srcBuf, form) {
     body.append("image", new Blob([srcBuf], { type: "image/png" }), "base.png");
     body.append("prompt", prompt);
     body.append("size", "1024x1024");
-    body.append("quality", "high");
+    body.append("quality", QUALITY);
     // The edits endpoint does NOT inherit the source image's alpha — omit this and every form comes back on an
     // opaque plate. Learned the hard way on the Lv2-5 run; see regen-pet-levels.mjs.
     body.append("background", "transparent");
@@ -189,11 +193,10 @@ for (const p of pets) {
     }
 }
 
-// $0.19 an image at `high` — the real rate. The old figure here was the medium-quality one and it under-quoted
-// a full run by more than four times.
-console.log(`${pets.length} pets, ${jobs.length} images to make (~$${(jobs.length * 0.19).toFixed(2)} at high quality)`);
-console.log(`${pets.filter((p) => !topUrl.has(p.id)).length} pet(s) skipped — no base sprite yet`);
+console.log(`${pets.length} pets, ${pets.filter((p) => !topUrl.has(p.id)).length} skipped (no base sprite yet)`);
+const bill = priceRun({ count: jobs.length, quality: QUALITY, edit: true });
 if (LIST) process.exit(0);
+requirePreview({ count: jobs.length, total: bill });
 
 // ── RUN THEM IN PARALLEL ─────────────────────────────────────────────────────────────────────────────────────
 // This was a serial for-loop, and a serial for-loop over 216 network calls that each take ~90 seconds is five

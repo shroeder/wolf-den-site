@@ -76,8 +76,27 @@ globalThis.fetch = async function tracedFetch(input, init) {
     if (!url.includes("api.openai.com")) return realFetch(input, init);
 
     // Read what the script was already sending; never mutate it.
+    //
+    // ── FORMDATA COUNTS TOO, AND FOR A LONG TIME IT DID NOT ──────────────────────────────────────────────
+    // /images/generations sends JSON; /images/EDITS sends multipart FormData, because it carries a file. This
+    // only ever parsed the JSON case, so on every edit `quality` came back undefined and fell to the "medium"
+    // default below — 1,056 tokens instead of high's 4,160, a FOUR-FOLD under-count.
+    //
+    // Every per-level pet sprite in the game is an edit. So the one art category with the most images in it
+    // was the one the AI Costs screen was quietly reporting at a quarter price, which is most of why that
+    // screen never reconciled against the invoice. Today it logged a $41 run as $9.19.
     let body = null;
-    try { body = init?.body && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch { body = null; }
+    try {
+        if (typeof init?.body === "string") body = JSON.parse(init.body);
+        else if (init?.body instanceof FormData) {
+            body = {};
+            for (const k of ["model", "size", "quality", "prompt", "background", "n"]) {
+                const v = init.body.get(k);
+                if (v != null && typeof v === "string") body[k] = v;
+            }
+            body.edit = true;
+        }
+    } catch { body = null; }
     const isImage = url.includes("/images/");
     const res = await realFetch(input, init);
 
@@ -105,10 +124,14 @@ globalThis.fetch = async function tracedFetch(input, init) {
             const size = body?.size || "1024x1024";
             const quality = body?.quality || "medium";
             const tokens = (IMG_TOKENS[size] || IMG_TOKENS["1024x1024"])[quality] ?? 1056;
+            // An EDIT also pays for the reference image it was handed — roughly a low-quality render's worth
+            // of input tokens on top. Small per call, and it is the difference between reconciling and not
+            // across a 216-image run.
+            const refTokens = body?.edit ? (IMG_TOKENS[size] || IMG_TOKENS["1024x1024"]).low : 0;
             await record({
                 kind: "image", model: body?.model || "gpt-image-1", size, quality,
                 source: `script/${scriptName}`, label: scriptName, prompt: body?.prompt,
-                ok: true, cost: Math.round(tokens * (40 / 1e6) * 1e5) / 1e5,
+                ok: true, cost: Math.round((tokens + refTokens) * (40 / 1e6) * 1e5) / 1e5,
             });
         } else {
             // Text/vision: OpenAI reports exact token counts, so this is measured rather than inferred.

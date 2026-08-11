@@ -172,6 +172,27 @@ async function _getAiCosts({ days = 30 } = {}) {
     // Itemize image spend by source (blob-attributed) so flags + the screen can name what the art dollars drew.
     const features = await getImageSpendByFeature();
 
+    // ── SAY HOW MUCH OF THE REAL BILL THIS ACTUALLY EXPLAINS ──────────────────────────────────────────────
+    // "Why can't it just read from OpenAI?" It DOES — every dollar above is OpenAI's own Costs API. What is
+    // estimated is only the PER-FEATURE split, because OpenAI cannot tell an avatar from a decoration; that
+    // attribution is ours, from blob path prefixes times a per-image price.
+    //
+    // And it drifts, for two reasons worth naming rather than hiding:
+    //   BLOBS ARE NOT GENERATIONS. A regenerated sprite writes a new blob and the old one is orphaned, so a
+    //   feature that has been redrawn reads as more images than were ever paid for. Today alone left 216
+    //   orphaned pet blobs behind.
+    //   THE UNIT PRICES ARE PER-PREFIX GUESSES. They cannot know that one run used `high` and the next `low`.
+    //
+    // So the gap is published instead of quietly absorbed. A breakdown that silently accounts for 40% of the
+    // invoice is worse than one that says it accounts for 40%.
+    const imageReal = round2((byModel.find((m) => String(m.label || "").startsWith("gpt-image-1"))?.cost) || 0);
+    const explained = imageReal > 0 ? Math.round((features.estTotal / imageReal) * 100) : null;
+    features.realImageTotal = imageReal;
+    features.explainedPct = explained;
+    features.note = explained == null
+        ? "Per-feature attribution is ours (blob prefixes), not OpenAI's."
+        : `These add to $${features.estTotal.toFixed(2)} of the $${imageReal.toFixed(2)} OpenAI actually billed for images (${explained}%). The split is attributed from blob paths — OpenAI cannot tell an avatar from a decoration — and redrawn art leaves orphaned blobs that inflate counts.`;
+
     // ── Auto-flagged findings — the "so what" ─────────────────────────────────────────────────────────────
     const flags = [];
     if (trendPct != null) {
@@ -183,6 +204,11 @@ async function _getAiCosts({ days = 30 } = {}) {
     if (topModel) flags.push({ sev: "info", text: `${topModel.label} is ${topModel.pct}% of all spend ($${topModel.cost.toFixed(2)}).` });
     const topFeat = features.rows[0];
     if (topFeat) flags.push({ sev: "info", text: `${topFeat.label} is your biggest image cost (~$${topFeat.est.toFixed(2)}, ${topFeat.count} images).` });
+    // The reconciliation, as a flag rather than a footnote — this is the number that tells you whether to
+    // trust the breakdown at all.
+    if (features.explainedPct != null && features.explainedPct < 70) {
+        flags.push({ sev: "warn", text: `The per-feature image breakdown only accounts for ${features.explainedPct}% of the $${features.realImageTotal.toFixed(2)} OpenAI billed for images. The rest is art whose blobs were replaced or deleted — the TOTALS are real, the per-feature split is an attribution.` });
+    }
     if (peak.cost > avgDaily * 2.5 && peak.date) flags.push({ sev: "warn", text: `Biggest day was ${peak.date} at $${peak.cost.toFixed(2)} — ${(peak.cost / (avgDaily || 1)).toFixed(1)}× the daily average (a mass-generation day).` });
     const scanner = byModel.find((m) => /gpt-4o$/i.test(m.label) || /scanner/i.test(m.feature));
     if (scanner && scanner.cost < 1) flags.push({ sev: "good", text: `The card scanner costs ~$${scanner.cost.toFixed(2)} — effectively free.` });
