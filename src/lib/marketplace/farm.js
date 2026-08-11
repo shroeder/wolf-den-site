@@ -72,13 +72,15 @@ const treatXp = (id) => {
 
 // Directory of members to visit, as hero-card data (avatar + level + pet count). Newest-active first; optional
 // name/alias search.
-export async function farmDirectory(viewerId, { q = "", limit = 60 } = {}) {
+// The default was 60 while the Den has 95 members — fine when this only ever answered a search term, and
+// silently a third short the moment it became the browsable directory the farm page now renders.
+export async function farmDirectory(viewerId, { q = "", limit = 250 } = {}) {
     const term = String(q || "").trim().toLowerCase().replace(/^@/, "");
     const params = [];
     let where = "b.alias IS NOT NULL";
     if (viewerId) { params.push(viewerId); where += ` AND b.id <> $${params.length}`; }
     if (term) { params.push(`%${term}%`); where += ` AND (LOWER(b.alias) LIKE $${params.length} OR LOWER(COALESCE(b.display_name,'')) LIKE $${params.length})`; }
-    params.push(Math.min(100, limit));
+    params.push(Math.min(500, limit));
     // Farm search is about the FARM, not pets: rank by rating quality (tier-weighted likes) then decoration
     // count, so the best-kept farms surface first.
     const rows = await db

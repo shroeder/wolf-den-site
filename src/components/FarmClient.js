@@ -2873,22 +2873,35 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
     // days and the wrong one the day you want to go and look at a particular person's farm. There WAS a way:
     // a search box, inside the collapsed rating summary, under the standings. Nobody found it. It is here now,
     // beside the faces, because this is the card that is about going somewhere.
+    // ── A DIRECTORY, NOT A LOOKUP ────────────────────────────────────────────────────────────────────────
+    // This was a search box: type two letters, wait for a request, get up to twelve matches. Which means you
+    // could only visit somebody whose NAME YOU ALREADY KNEW — and the whole point of visiting is finding a
+    // farm you have not seen. A directory you cannot browse is a phone book with no pages.
+    //
+    // Everybody is fetched ONCE, on open, and the box filters what is already on screen. No debounce, no
+    // request per keystroke, and no empty state while you wait: the cards are there before you type and they
+    // narrow as you do.
     const [q, setQ] = useState("");
-    const [hits, setHits] = useState(null);
-    const [seeking, setSeeking] = useState(false);
+    const [all, setAll] = useState(null);
     useEffect(() => {
-        const term = q.trim();
-        if (term.length < 2) { setHits(null); setSeeking(false); return undefined; }
-        setSeeking(true);
-        // Debounced: a farm directory is not worth a request per keystroke.
-        const t = setTimeout(() => {
-            fetch(`/api/marketplace/farm?list=1&q=${encodeURIComponent(term)}`, { cache: "no-store" })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => { setHits(Array.isArray(d?.members) ? d.members.slice(0, 12) : []); setSeeking(false); })
-                .catch(() => { setHits([]); setSeeking(false); });
-        }, 260);
-        return () => clearTimeout(t);
-    }, [q]);
+        let alive = true;
+        fetch("/api/marketplace/farm?list=1", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => { if (alive) setAll(Array.isArray(d?.members) ? d.members : []); })
+            .catch(() => { if (alive) setAll([]); });
+        return () => { alive = false; };
+    }, []);
+    // The neighbours strip stays FIRST and keeps its "came by" marks — those are the visits that pay you back,
+    // and burying them in an alphabetical wall would lose the one thing worth acting on.
+    const roster = useMemo(() => {
+        const owedIds = new Set((neighbours || []).map((n) => n.id));
+        const rest = (all || []).filter((m) => !owedIds.has(m.id));
+        return [...(neighbours || []), ...rest];
+    }, [all, neighbours]);
+    const term = q.trim().toLowerCase().replace(/^@/, "");
+    const shown = term
+        ? roster.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(term))
+        : roster;
     if (!neighbours?.length) return null;
     const togo = neighbours.filter((n) => !n.ratedToday);
     const spent = ratesLeft <= 0 && petsLeft <= 0;
@@ -2917,59 +2930,43 @@ function NeighbourStrip({ neighbours, ratesLeft, petsLeft }) {
                         ? <><b style={{ color: "#ffd75e" }}>{owed.length === 1 ? `${owed[0].name} came by` : `${owed.length} of these came by`}</b> in the last few days — pay it back.</>
                         : "Their pets gain the XP and their farm gains the vote — and both pay you back."}
             </p>
-            {/* Any member, by name or @handle — not only the ones the strip picked for you. */}
+            {/* FILTERS what is already here rather than fetching what you typed. */}
             <label className="farm-find">
                 <SearchIcon />
                 <input type="search" value={q} onChange={(e) => setQ(e.target.value)}
-                    placeholder="Visit anyone — search a name or @handle" aria-label="Find a farm to visit" />
+                    placeholder={all ? `Filter ${roster.length} farms` : "Loading farms…"}
+                    aria-label="Filter farms" />
             </label>
-            {hits ? (
-                hits.length ? (
-                    <div className="farm-neigh-row">
-                        {hits.map((m) => {
-                            const face = m.spriteUrl || m.avatarUrl;
-                            return (
-                                <a key={m.id} className="farm-neigh-chip"
-                                    href={`/marketplace/farm?u=${encodeURIComponent(m.alias)}`}
-                                    title={`Visit ${m.name}'s farm`}>
-                                    <span className="farm-neigh-face">
-                                        {face ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={face} alt="" style={{ transform: m.spriteFlip ? "scaleX(-1)" : "none" }} />
-                                        ) : <span aria-hidden="true">🐾</span>}
-                                    </span>
-                                    <b>{m.name}</b>
-                                    <em>{m.decoCount ? `${m.decoCount} placed` : "@" + m.alias}</em>
-                                </a>
-                            );
-                        })}
-                    </div>
-                ) : <p className="farm-neigh-sub">{seeking ? "Looking…" : "Nobody by that name."}</p>
+
+            {/* ── EVERY FARM, AS A CARD ────────────────────────────────────────────────────────────────────
+                A wrapping grid, not a horizontal strip: a strip shows four and hides the rest behind a
+                sideways scroll nobody performs, which is how a directory of ninety-five people read as a
+                directory of four. The ones who came by keep their gold mark and stay at the front. */}
+            {shown.length ? (
+                <div className="farm-neigh-grid">
+                    {shown.map((n) => {
+                        const avatar = n.spriteUrl || n.avatarUrl;
+                        return (
+                            <a key={n.id}
+                                className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}${n.cameBy && !n.ratedToday ? " is-owed" : ""}`}
+                                href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
+                                title={n.ratedToday ? `${n.name} — rated today` : n.cameBy ? `${n.name} visited you recently` : `Visit ${n.name}'s farm`}>
+                                <span className="farm-neigh-face">
+                                    {avatar ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
+                                    ) : <span aria-hidden="true">🐾</span>}
+                                </span>
+                                <b>{n.name}</b>
+                                <em>{n.ratedToday ? "rated today" : n.cameBy ? "came by" : n.decoCount ? `${n.decoCount} placed` : "say hi"}</em>
+                            </a>
+                        );
+                    })}
+                </div>
             ) : (
-            <div className="farm-neigh-row">
-                {neighbours.map((n) => {
-                    const avatar = n.spriteUrl || n.avatarUrl;
-                    return (
-                        <a key={n.id} className={`farm-neigh-chip${n.ratedToday ? " is-done" : ""}${n.cameBy && !n.ratedToday ? " is-owed" : ""}`}
-                            href={`/marketplace/farm?u=${encodeURIComponent(n.alias)}`}
-                            title={n.ratedToday ? `${n.name} — rated today` : n.cameBy ? `${n.name} visited you recently` : `Visit ${n.name}'s farm`}>
-                            <span className="farm-neigh-face">
-                                {avatar ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={avatar} alt="" style={{ transform: n.spriteFlip ? "scaleX(-1)" : "none" }} />
-                                ) : <span aria-hidden="true">🐾</span>}
-                                {n.ratedToday ? <i className="farm-neigh-tick" aria-hidden="true">✓</i> : null}
-                            </span>
-                            <b>{n.name}</b>
-                            {/* Why this face is here, in the one line there is room for. "Came by" beats a pet
-                                count every time — it is the only one of these that is about you. */}
-                            <em>{n.ratedToday ? "rated"
-                                : n.cameBy ? <span className="farm-neigh-owed">came by</span>
-                                    : n.petCount ? `${n.petCount} pet${n.petCount === 1 ? "" : "s"}` : "say hi"}</em>
-                        </a>
-                    );
-                })}
-            </div>
+                <p className="farm-neigh-sub">
+                    {all === null ? "Loading farms…" : term ? "Nobody by that name." : "No farms to visit yet."}
+                </p>
             )}
         </section>
     );
