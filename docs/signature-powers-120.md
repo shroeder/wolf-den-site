@@ -39,7 +39,7 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 
 | # | Name | Effect |
 |---|---|---|
-| 14 | **Endless Line** | Your casts never run out. No recharge, no cost, ever. |
+| 14 | **The Tide Table** | Casts you don't use roll over. Bank up to a full week of them and spend the lot in one sitting. |
 | 15 | **The Deep Register** | Every fish you land is recorded at its species' record length. |
 | 16 | **Two Hooks** | Every cast lands two fish instead of one. |
 | 17 | **Moonwater** | Night-fishing bonuses apply at every hour of the day. |
@@ -48,7 +48,7 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 | 20 | **The Full Creel** | Your first cast each day lands the rarest fish in the water. |
 | 21 | **Chum Barrel** | Every cast that lands a common fish immediately gives you a second cast. |
 | 22 | **Cartographer's Float** | You can see what is under the water before you cast. |
-| 23 | **Ice Auger** | Fishing is available anywhere — you no longer need to be at water. |
+| 23 | **The Set Line** | A second line fishes on its own while you are elsewhere — one fish an hour, straight into your pantry, up to eight while you sleep. |
 | 24 | **The Tithe of Scales** | Every tenth fish you land turns into a treasure-chest fragment. |
 | 25 | **Old Hand** | Fish you release come back bigger. Release one and the next is a size up. |
 
@@ -83,7 +83,7 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 | 45 | **Miner's Pension** | Ore you lose to a collapse is delivered to you the following day anyway. |
 | 46 | **Second Pick** | Every swing cracks two seams. |
 | 47 | **The Dowsing Chain** | The richest seam on a floor lights up and stays lit until you take it. |
-| 48 | **Nightshift** | The Depths never close to you. No daily limit, no cooldown. |
+| 48 | **Bedrock Claim** | One seam is yours in perpetuity. It is waiting on every trip, already cracked, at the richest grade the floor can hold. |
 | 49 | **Assayer's Eye** | Ore is sorted for you — every haul comes back as the best grade it contained. |
 | 50 | **The Dungeon Ledger** | Dungeon bosses may be fought again the same day. |
 | 51 | **Cavernlight** | Dungeon floors are revealed as you enter, traps and all. |
@@ -102,7 +102,7 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 | 59 | **Baker's Dozen** | Every cook produces a spare portion you can give away. |
 | 60 | **The Tasting Spoon** | You see exactly what a dish will produce before you commit the ingredients. |
 | 61 | **Feast Day** | One cook a day feeds the whole Den — everyone online gets the dish's buff. |
-| 62 | **Cold Store** | Your pantry holds unlimited ingredients of every kind. |
+| 62 | **The Tasting Menu** | One cook a day produces every dish those ingredients could have made, not only the one you chose. |
 | 63 | **The Recipe Hunter's Nose** | Any activity that can drop a recipe drops one, every time, until you have them all. |
 
 ## The Forge & the Jewelcutter
@@ -178,9 +178,9 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 | 110 | **The Sealed Bid** | One auction a week is yours at the opening price, uncontested. |
 | 111 | **Merchant's Word** | Trades you offer never expire and never decay. |
 | 112 | **The Honest Broker** | You may inspect the full value of anything offered to you in a trade. |
-| 113 | **Coin of the Realm** | Doubloons, laurels and gold are interchangeable in your purse. |
+| 113 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it — you earn far more of that, on purpose. |
 | 114 | **The Standing Account** | Store credit you spend in-store is refunded as game coins at full value. |
-| 115 | **Deep Pockets** | Your bags and your vault are unlimited. |
+| 115 | **Vaultwright** | You may keep a second full loadout and swap your whole kit between them instantly, at any time. |
 
 ## Collections, Badges & Standing
 
@@ -194,17 +194,78 @@ signature tiers**. Not yet assigned to items and not yet in code — `signatures
 
 ---
 
-## Flagged for a second look before any of these ship
+## Already resolved (2026-08-11)
 
-- **Deep Pockets (115)**, **Coin of the Realm (113)**, **Endless Line (14)**, **Bottomless Hold (28)** and
-  **Nightshift (48)** remove a limit outright rather than raising it. That is the chunkiest a power gets and
-  also the hardest to walk back — a removed daily cap is an economy change, not an item.
-- **Twin Souls (102)** and **The Founder's Seal (118)** undo a permanence the game currently sells as
-  permanent (the enshrinement choice; owning the pieces). Both need a decision about which promise wins.
-- **The Crier's Bell (80)** and **Chronicle Rights (119)** hand a member a broadcast channel. They need the
-  profanity filter (`text-filter.js`) and probably a rate limit before they are safe.
-- **Feast Day (61)** is the only one that affects other members' play directly. Worth keeping — it is the most
-  interesting thing on the list — but it needs a cap.
+| # | Was | Now | Why |
+|---|---|---|---|
+| 14 | Endless Line | **The Tide Table** | Uncapped casts. The game prices 6 extra casts at 6,300 gold — this deleted the ceiling rather than raising it. |
+| 23 | Ice Auger | **The Set Line** | **Dead.** Fishing has no location gate, so there was nothing to remove. |
+| 48 | Nightshift | **Bedrock Claim** | Uncapped mining, and the Depths are the only source of gems — it would have unmetered the Jewelcutter downstream. |
+| 62 | Cold Store | **The Tasting Menu** | **Dead.** The pantry has no cap; it is a plain quantity table. The limit was always supply, never storage. |
+| 113 | Coin of the Realm | **The Purser's Exchange** | Merging gold in made both hard currencies gold-buyable. Doubloons ↔ laurels only, per Luke. |
+| 115 | Deep Pockets | **Vaultwright** | **Dead.** No bag cap, no vault cap, no inventory limit exists anywhere in the codebase. |
+
+## Risk register — the rest of the 120
+
+Nothing below has been changed. These need a call before any of them are written into an item.
+
+### A. Unbounded or self-compounding — would need a rewrite to ship
+
+| # | Power | The loop |
+|---|---|---|
+| 21 | Chum Barrel | A common fish grants another cast. Commons are the bulk of the water, so casts may never go down — Endless Line by the back door. |
+| 25 | Old Hand | A released fish comes back a size up. Release and re-release repeats forever with no ceiling. |
+| 26 | Sealed Orders | Instant voyages. Time is what caps sailing; removing it uncaps digs, doubloons and encounters at once. |
+| 28 | Bottomless Hold | Dig stamina never depletes. Same shape — the stamina IS the dig budget. *(Flagged in the first pass, then dropped from "the four" by mistake.)* |
+| 31 | Salt Ledger | Doubloons refunded the next morning. You keep the goods and the money — the Quartermaster becomes free forever. |
+| 42 | Cold Furnace | Smelting costs no ore. Parts out of nothing. |
+| 66 | Whole Salvage | Salvage returns the parts AND keeps the item. One item salvages forever. |
+| 67 | The Transmuter's Hand | Always the next tier, twice over. Feed the output back in and parts escalate without limit. |
+| 79 | Patron of Works | Contribution counts double AND is refunded. Town projects fund themselves. |
+| 89 | The Unspent Spin | Spins are never consumed. The wheel is a daily reward with no per-spin cost. |
+| 96 | Hoarder's Blessing | Unopened chests double overnight. Exponential, and chests are the widest reward vector in the game. |
+| 101 | The Shrine Keeper | Stones are returned. Stones are a deliberate three-week chase; this makes the first one the last one you need. |
+| 105 | The Menagerie Deed | Gifted pets stay yours. Pet duplication, and pet sharing is once-per-member by design. |
+| 118 | The Founder's Seal | Keep the capstone after selling the pieces. Sell, rebuy, repeat. |
+
+### B. Bounded, but they delete a chase or a designed tension
+
+| # | Power | What it deletes |
+|---|---|---|
+| 40 + 45 | Shored Timbers, Miner's Pension | Both negate a collapse. Collapse is the risk half of the Depths' risk/reward — and the two are redundant with each other. |
+| 52 | The Bell of the Fourth Level | A floor of guaranteed gems a day. Gems are mined-only on purpose. |
+| 53 | The Standing Pot | Ingredients are the kitchen's meter. |
+| 56 + 63 | Grandmother's Book, The Recipe Hunter's Nose | Both end the recipe collection outright, and they overlap each other. |
+| 64 | Cold Anvil | Parts are the Forge's meter. |
+| 71 | The Perfect Cut | "Past Polished the odds turn hard on purpose, so a Flawless is a story rather than a Tuesday." This makes it a Tuesday. |
+| 72 | Wolf's Eye Sight | May leak the secret sixth gem before anyone has found it. |
+| 98 + 100 | The Whole Kennel, Feast for the Pack | Level six is built on "only the pet you carry earns, so you must choose one companion." This is the opposite of that, twice. |
+| 102 | Twin Souls | Undoes the permanent stone choice the enshrining panel makes you confirm. |
+
+### C. Takes something from other members — social, not economic
+
+| # | Power | Concern |
+|---|---|---|
+| 81 | Sharp Eyes | The plaza glint is a first-come contest between members. This makes one person always win it. |
+| 109 | Right of First Refusal | An hour's head start on every auction is a licence to snipe the whole market. |
+| 110 | The Sealed Bid | Takes an auction off the people bidding on it. |
+| 84 | Guildhall Standing | A permanent top-of-roster is a leaderboard that lies. |
+| 82 | Right of Sanctuary | Immunity from the Stockade, which is a social mechanic the town votes on. |
+| 85 | The Open Door | Visiting without an invitation is a privacy decision, not a power. |
+| 61, 80, 119 | Feast Day, The Crier's Bell, Chronicle Rights | All three reach other people. The two broadcast ones need `text-filter.js` and a rate limit; Feast Day needs a cap. |
+
+### D. Touches real money
+
+| # | Power | Concern |
+|---|---|---|
+| 114 | The Standing Account | Store credit is bought with real dollars. Refunding it as game coins at full value while the credit is still spent is a real-money giveaway, not an item bonus. Needs a hard cap or a rewrite. |
+
+### E. Redundant pairs to merge or re-cut
+
+- **1 Perennial Root / 8 Seedvault** — both solve seed supply.
+- **9 Open Gate + 13 Gleaner's Right** — unlimited visits multiplied by paid harvests on other people's farms.
+- **95 The Glass Chest + 97 The Last Word** — see the contents, then refuse and reroll: together they let you pick your reward.
+- Plus **40/45**, **56/63** and **98/100** noted above.
 
 ## Placement note (as of 2026-08-11)
 
