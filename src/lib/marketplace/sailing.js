@@ -2196,9 +2196,16 @@ async function payFleetReward(buyerId, reward) {
 const withGuns = (side, saved) => {
     if (!side) return side;
     const deck = side.deck ?? (side.art?.includes("/fleet/") ? 30 : boatDeck(1));
-    const art = side.art?.includes("/fleet/")
-        ? side.art.split("/").pop().replace(/\.png$/, "")
-        : `boat:${boatTier(side.level || 1)}`;
+    // ── AN ENCOUNTER IS NOT A PLAYER BOAT ────────────────────────────────────────────────────────────────
+    // This tested only for "/fleet/" and fell through to `boat:<tier>` for everything else — and encounter art
+    // lives at /images/sailing/enc/<id>.png. So the Drowned Admiral was being drawn with a PLAYER'S gun
+    // layout, keyed off a tier derived from her level: nine barrels arranged for a hull that is not hers, on a
+    // key nobody could ever have placed because the lab does not offer player boats for enemy ships.
+    const art = side.art?.includes("/enc/")
+        ? `enc:${side.art.split("/").pop().replace(/\.png$/, "")}`
+        : side.art?.includes("/fleet/")
+            ? side.art.split("/").pop().replace(/\.png$/, "")
+            : `boat:${boatTier(side.level || 1)}`;
     return { ...side, deck, ports: side.ports?.length ? side.ports : portsWithSaved(saved, art, deck, side.guns || 1) };
 };
 // EVERYTHING THE SCENE NEEDS TO LET YOU AIM. The client hit-tests taps against the same measured zone maps the

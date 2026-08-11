@@ -28,7 +28,7 @@ function fallbackPorts(deckPct, n) {
     // themselves (COMBAT_TRACKS.guns.max is 6, plus the free one). Nine barrels did not fit on the narrower
     // hulls: the placement tool ran out of rail before it ran out of guns, and the spread packed them into an
     // uncountable dark fringe, which defeats the one job drawing them has.
-    const drawn = Math.min(7, n);
+    const drawn = Math.min(9, n);
     const span = Math.min(0.68, 0.3 + drawn * 0.055);
     const out = [];
     for (let i = 0; i < drawn; i += 1) {
@@ -48,7 +48,7 @@ function fallbackPorts(deckPct, n) {
  * Returns at most `n` — a twelve-gun man-o'-war with five placed ports draws five rather than inventing seven.
  */
 export function gunPortsFor(art, deckPct, n) {
-    const count = Math.max(0, Math.min(7, Math.floor(n) || 0)); // 7 = the hard gun cap
+    const count = Math.max(0, Math.min(9, Math.floor(n) || 0)); // 9 — the biggest enemy battery, not the player cap
     if (!count) return [];
     const placed = GUN_PORTS[art];
     if (placed?.length) return placed.slice(0, count);

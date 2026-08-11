@@ -16,9 +16,10 @@ import { GUN_PORTS, gunPortsFor } from "@/lib/marketplace/gun-ports.js";
 // Cached per request rather than per process: a placement edited on the phone has to show up on the next
 // battle, and a five-minute process cache would make the lab feel broken.
 
-// Seven, the same cap the Cannons track enforces — a saved battery longer than any ship can field is
-// just work nobody will ever see, and silently storing it invites the placement tool to offer it.
-const MAX_PORTS = 7;
+// Seven was the cap the Cannons track enforces — right for a PLAYER'S boat, and two short for the enemy.
+// Encounter ships field up to nine (the Dread Corsair and the Drowned Admiral both do), so a saved battery
+// was silently truncated and the last two barrels could never be placed at all.
+const MAX_PORTS = 9;
 
 /** Trim anything the lab sends to the shape the renderer needs: {x,y} in 0-1, at most one battery's worth. */
 export function sanitizePorts(raw) {

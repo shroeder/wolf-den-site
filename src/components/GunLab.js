@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ENCOUNTERS } from "@/lib/marketplace/encounters.js";
 import { FLEET } from "@/lib/marketplace/fleet.js";
 import { fleetDeck, boatDeck, BOAT_DECK } from "@/lib/marketplace/deck-lines.js";
 import { GUN_PORTS, gunPortsFor } from "@/lib/marketplace/gun-ports.js";
@@ -45,9 +46,14 @@ export default function GunLab() {
     }, []);
 
     const isBoat = artKey.startsWith("boat:");
+    const isEnc = artKey.startsWith("enc:");
     const tier = isBoat ? Number(artKey.slice(5)) : null;
-    const src = isBoat ? `/images/sailing/boat-tier${tier}-${BOAT_ART[tier - 1]}.png` : `/images/fleet/${artKey}.png`;
-    const deck = isBoat ? boatDeck(tier) : fleetDeck(artKey);
+    const src = isBoat ? `/images/sailing/boat-tier${tier}-${BOAT_ART[tier - 1]}.png`
+        : isEnc ? `/images/sailing/enc/${artKey.slice(4)}.png`
+        : `/images/fleet/${artKey}.png`;
+    // Encounter hulls have no measured deck line of their own; 42% is what the battle already assumes for
+    // them, so the fallback spread the lab draws underneath matches what the fight would draw.
+    const deck = isBoat ? boatDeck(tier) : isEnc ? 42 : fleetDeck(artKey);
     const placed = useMemo(() => draft[artKey] || [], [draft, artKey]);
     // What the game would actually draw right now — hand-placed if there are any, the even spread if not.
     const effective = useMemo(
@@ -115,6 +121,18 @@ export default function GunLab() {
                         </button>
                     ))}
                 </div>
+                {/* ── ENCOUNTER SHIPS ── the ones you meet mid-voyage. They were absent from this picker
+                    entirely, which is half of why their guns look wrong: nobody could place them. Monsters
+                    are excluded — a kraken has limbs, not a gun deck (see monster-parts.js). */}
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {ENCOUNTERS.filter((e) => e.kind === "ship").map((e) => (
+                        <button key={e.id} type="button" className={`sby-mini${artKey === `enc:${e.id}` ? " is-load" : ""}`}
+                            onClick={() => { setArtKey(`enc:${e.id}`); setStatus(""); }} title={e.name}
+                            style={draft[`enc:${e.id}`]?.length ? { borderColor: "#7ce8a4", color: "#7ce8a4" } : undefined}>
+                            {e.name.split(" ").pop()}
+                        </button>
+                    ))}
+                </div>
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                     {BOAT_TIERS.map((t) => (
                         <button key={t} type="button" className={`sby-mini${artKey === `boat:${t}` ? " is-load" : ""}`}
@@ -139,10 +157,11 @@ export default function GunLab() {
                     at six can look absurd at one — the lone starting gun is the one most members will ever see. */}
                 <div style={{ display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
                     <span className="muted" style={{ fontSize: "0.78rem" }}>preview guns</span>
-                    {/* Stops at SEVEN because seven is the cap now (COMBAT_TRACKS.guns.max is 6, plus the free
-                        one). Offering 8, 10 and 13 was asking you to place batteries no ship can ever field —
-                        which is exactly the wasted work that made the cap necessary in the first place. */}
-                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    {/* Seven is the cap on a PLAYER's boat (COMBAT_TRACKS.guns.max is 6, plus the free one) —
+                        and the enemy is not bound by it: the Dread Corsair and the Drowned Admiral both field
+                        NINE. Stopping at seven meant their last two barrels could not be previewed or placed,
+                        which is two guns firing at you from wherever the fallback happened to put them. */}
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
                         <button key={n} type="button" className={`sby-mini${preview === n ? " is-load" : ""}`} onClick={() => setPreview(n)}>{n}</button>
                     ))}
                 </div>
