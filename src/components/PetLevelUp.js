@@ -163,7 +163,14 @@ export default function PetLevelUp() {
         if (a) out.push(line("Active", a.stat, a.value, petActiveLevelMult));
         return out;
     })();
-    const maxed = current.to >= 5;
+    // SIX, NOT FIVE. This said `>= 5` and stamped "MAX LEVEL" on the celebration for reaching level five —
+    // which is now the moment a pet is HALFWAY through its last stretch, not the end of it. Luke's exact worry
+    // when he asked for level six: "I don't wanna give people the misconception that they're done leveling."
+    // The one screen that shouts at you about levelling was still saying they were.
+    const maxed = current.to >= 6;
+    // And at five it should say the opposite — loudly, because this is the only moment we have somebody's
+    // attention on the subject.
+    const atFive = current.to === 5;
 
     return createPortal(
         <div className="plu-scrim" onClick={dismiss} role="dialog" aria-modal="true" aria-label={`${current.pet.name} leveled up`}>
@@ -196,11 +203,27 @@ export default function PetLevelUp() {
 
                 <div className="plu-banner">{evolves ? "EVOLVED!" : "LEVEL UP!"}</div>
                 <h2 className="plu-title">{current.pet.name} reached Lv {current.to}</h2>
-                <div className="plu-stars" aria-label={`Level ${current.to} of 5`}>
-                    {Array.from({ length: 5 }).map((_, i) => (
+                <div className="plu-stars" aria-label={`Level ${current.to} of 6`}>
+                    {Array.from({ length: 6 }).map((_, i) => (
                         <span key={i} className={i < current.to ? "on" : "off"} style={i < current.to ? { animationDelay: `${2 + i * 0.12}s` } : undefined}>★</span>
                     ))}
                 </div>
+                {/* ── THE ROAD IS NOT OVER AT FIVE ── the one moment we have somebody's attention on the
+                    subject of levelling, so it is the moment to say there is another rung. Without this the
+                    screen that shouts "LEVEL UP" hardest is the same screen that used to imply five was the
+                    end, which is precisely the misconception level six was built to avoid. */}
+                {atFive ? (
+                    <p className="plu-sixth">
+                        One more to go. At <b>Lv 6</b> you can ENSHRINE {current.pet.name} — its ability becomes
+                        permanent, working whether it is equipped or not.
+                    </p>
+                ) : null}
+                {maxed ? (
+                    <p className="plu-sixth">
+                        The top. {current.pet.name} can be <b>enshrined</b> now — spend a stone and its ability
+                        is yours whether it is out or not.
+                    </p>
+                ) : null}
                 {/* BEFORE → AFTER, for both stats. The whole point of a level is the number moving. */}
                 {gains.length ? (
                     <div className="plu-gains">
@@ -232,6 +255,10 @@ export default function PetLevelUp() {
 }
 
 const PLU_CSS = `
+.plu-sixth { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; font-size: .78rem; line-height: 1.45;
+    color: #ffe9c2; background: rgba(255,224,138,.10); border: 1px solid rgba(255,224,138,.34); }
+.plu-sixth b { color: #ffe08a; }
+
 /* WHAT THE LEVEL BOUGHT — one row per stat, before › after. */
 .plu-gains { margin-top: 14px; display: grid; gap: 7px; text-align: left; }
 .plu-gain { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px;

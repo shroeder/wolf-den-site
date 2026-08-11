@@ -103,12 +103,19 @@ export default async function UserProfilePage({ params }) {
     // Same viewer-gate as the fishing log, and for the same reason: the Kitchen is still owner-only, so a
     // recipe book must not appear on every profile in the Den before the feature is public.
     const recipeBook = viewer ? await getMemberRecipeBook(viewer.id, profile.id).catch(() => null) : null;
+    // ── AN ENSHRINED PET HAS TO BE VISIBLE TO OTHER PEOPLE ───────────────────────────────────────────────
+    // It is six weeks on one animal plus a stone somebody had to find, it permanently transfigures the sprite,
+    // and until now the ONLY person who could see any of that was its owner. A prestige item nobody else can
+    // see is half a prestige item — and the enshrined forms are the best-looking art in the game.
+    const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
+    const petStones = await stoneMapFor(profile.id).catch(() => ({}));
     const petsData = (pets.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
             if (!def) return null;
             const lvl = pets.petLevels?.[id]?.level || 1;
-            const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl);
+            const stone = petStones[id] || null;
+            const art = pickPetSpriteForLevel(petSpriteBase[id], petSpriteLevels[id], lvl, stone);
             const active = petActive(def);
             const passive = petPassive(def);
             const pl = pets.petLevels?.[id] || {};
@@ -129,11 +136,18 @@ export default async function UserProfilePage({ params }) {
                 into: pl.into ?? 0,
                 span: pl.span ?? 0,
                 maxed: Boolean(pl.maxed),
+                stone,
                 tradeable: (pets.earnedTradeableIds || []).includes(id),
                 featured: pets.featured === id,
                 spriteUrl: art?.url || null,
                 spriteFlip: art?.flip || false,
-                activeDesc: active ? `+${activeVal}% ${fmtStat(active.stat)} when equipped (Lv ${lvl})` : null,
+                // An enshrined pet's active is not "when equipped" any more — that is the entire point of it,
+                // and describing it the old way on a public card would be the card contradicting the fight.
+                activeDesc: active
+                    ? (stone
+                        ? `+${activeVal}% ${fmtStat(active.stat)} ALWAYS — enshrined, works unequipped (Lv ${lvl})`
+                        : `+${activeVal}% ${fmtStat(active.stat)} when equipped (Lv ${lvl})`)
+                    : null,
                 passiveDesc: passive ? `+${pets.petLevels?.[id]?.value ?? passive.value} ${fmtStat(passive.stat)} owned (all pets stack)` : null,
                 specialDesc,
             };

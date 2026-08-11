@@ -63,7 +63,15 @@ export default function PublicPets({ pets = [], canTrade = false, targetAlias = 
                             {detail.source ? <span className="petsheet-src">{detail.source}</span> : null}
                         </div>
                         <div className="petsheet-lvl">
-                            <div className="petsheet-lvl-top"><span>Level {detail.level}{detail.maxed ? " · MAX" : " / 5"}</span>{!detail.maxed && detail.span ? <span className="muted">{detail.into}/{detail.span} XP</span> : null}</div>
+                            <div className="petsheet-lvl-top"><span>Level {detail.level}{detail.maxed ? " · MAX" : " / 6"}</span>{!detail.maxed && detail.span ? <span className="muted">{detail.into}/{detail.span} XP</span> : null}</div>
+                            {/* ENSHRINED, on somebody else's profile. The permanent form and what it means,
+                                because this is the one thing in the pets system that takes six weeks and a
+                                chase item, and it was visible only to its owner. */}
+                            {detail.stone ? (
+                                <div className={`petsheet-enshrined is-${detail.stone}`}>
+                                    ✦ Enshrined with the {detail.stone === "dark" ? "Darkstone" : "Lightstone"} — its ability is permanent
+                                </div>
+                            ) : null}
                             <div className="petsheet-bar"><span style={{ width: `${detail.maxed ? 100 : detail.span ? Math.round((detail.into / detail.span) * 100) : 0}%` }} /></div>
                         </div>
                         {detail.activeDesc ? <p className="petsheet-active">⚔️ {detail.activeDesc}</p> : null}

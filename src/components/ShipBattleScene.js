@@ -462,6 +462,11 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
 // Hull, canvas and guns per ship. The two systems are pips rather than numbers: the question they answer is
 // "has she anything left to shoot off", which is a shape.
 function Bar({ f, hp, max, side, sys, caps }) {
+    // A creature keeps `sails` internally purely as its evasion (see initBattleState) — a serpent should be no
+    // easier to hit than a sloop. That is correct, but the chip explaining it said "canvas keeps her dodging"
+    // over an animal with no canvas, and once the sail pips were (rightly) hidden the player was left missing
+    // shots for a reason nothing on screen mentioned.
+    const beast = sys?.has === false;
     const pct = clampPct(hp, max);
     // Read off the SAME function the engine rolls against, so the panel cannot promise a dodge the fight does
     // not honour.
@@ -495,7 +500,8 @@ function Bar({ f, hp, max, side, sys, caps }) {
                     a game built entirely out of painted sprites, and nothing anywhere saying which percentage
                     was which. The sprites come from the badge-power family so they match the rest of the app,
                     and each carries the one word that says what it is. */}
-                <span className={`sbt-syschip is-dodge${dodgePct <= 5 ? " is-out" : ""}`} title="How often a ball misses her — canvas keeps her dodging">
+                <span className={`sbt-syschip is-dodge${dodgePct <= 5 ? " is-out" : ""}`}
+                    title={beast ? "How often a ball misses it — it is fast in the water, and nothing you shoot off will slow it" : "How often a ball misses her — canvas keeps her dodging"}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/images/bonus/tailwind.png" alt="" className="sbt-sysart" draggable="false" />
                     <span className="sbt-syslabel">Dodge</span>

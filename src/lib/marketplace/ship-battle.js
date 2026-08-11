@@ -76,6 +76,16 @@ export const AMMO = {
 export const AMMO_LIST = Object.values(AMMO);
 export const ammoById = (id) => AMMO[String(id || "round")] || AMMO.round;
 
+// AMMUNITION AGAINST A CREATURE NEEDED NO WARNING, WHICH IS WORTH RECORDING. I wrote a helper to tell players
+// that chain shot is wasted on a monster — then found ammoForShot picks the round FROM THE TARGET ZONE
+// ("sails" wants chain), and a creature has no sails zone, so chain can never be loaded at one. The helper
+// warned about something the game already makes impossible, and shipping it would have been a
+// declared-but-never-read function added on the same day I audited the codebase for exactly those.
+//
+// What the existing rule already does for a monster is right: aim at a limb and the gun loads GRAPE, which
+// sweeps systems twice as fast, so severing arms is naturally the thing grape is for. Aim at the body and it
+// loads EXPLOSIVE, two planks a hit. Nothing to add.
+
 // ── THE GUN DECK ─────────────────────────────────────────────────────────────────────────────────────────────
 // Tracks are capped low and deliberately cheap-feeling per level: the interesting decision is meant to be what
 // you LOAD, not how many times you tapped Upgrade.

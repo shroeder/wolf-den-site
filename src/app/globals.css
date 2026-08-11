@@ -15874,3 +15874,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sail-hail-tier { padding: 3px 10px; border-radius: 999px; font-size: .66rem; font-weight: 900; letter-spacing: .1em;
     text-transform: uppercase; color: #0e0a14; background: #e0a552; }
 .sail-hail-kind { font-size: .74rem; color: rgba(255,255,255,.62); }
+
+/* An enshrined pet, seen by somebody who is not its owner. */
+.petsheet-enshrined { margin: 6px 0; padding: 6px 9px; border-radius: 9px; font-size: .74rem; font-weight: 800; }
+.petsheet-enshrined.is-light { color: #ffe08a; background: rgba(255,224,138,.1); border: 1px solid rgba(255,224,138,.36); }
+.petsheet-enshrined.is-dark { color: #d3b0ff; background: rgba(176,97,255,.12); border: 1px solid rgba(176,97,255,.42); }
