@@ -602,3 +602,68 @@ every check-in.
 state that outlives the item, none reaching into another member's account, every one aimed at a mechanic that
 exists, 29 landing on a roll, the three that measured as game-breaking cut down to size, and the two largest
 survivors measured and cleared.
+
+
+---
+
+# Real-world perks on the new tiers
+
+Luke, 2026-08-11: *"real world perks are cool but they should only be in the two topmost tiers, which we are
+about to create. Additionally they should just be X store credit instead of the ones we have, which are pretty
+abstract and hard to apply."*
+
+## What is there today, and why moving it costs nothing
+
+A real-world perk is a separate field set from a signature power. It lives on the item:
+`charged: true, charges: N, cooldownDays: D, chargeReward: "<key>"`. Redeemed at the counter through the admin
+app; `chargeState()` gates it on `charges_left` and the cooldown.
+
+- **46 of 306 items carry one.** All of them common → mythic. All `source: "admin"` or `"elite"`.
+- **Nobody owns a single one.** Zero rows in `mkt_user_item` for any of the 46, and 2 redemptions ever
+  recorded in the game's lifetime.
+- **Zero ascendant or eternal items carry one.**
+
+So the system exists, is enforced, and has never actually been issued. Moving it up to the top two tiers takes
+nothing away from anybody.
+
+## The reward vocabulary shrinks to one thing
+
+The 42 keys in `REWARDS` include a free grading, a box-break slot, a tournament seat, "first restock pick",
+"skip the line", "wall of champions", and ten different discount shapes. Every one of them needs a judgement
+call at the counter. **Store credit does not.** The ladder is just an amount:
+
+    store_credit_10 · store_credit_15 · store_credit_25 · store_credit_50 · store_credit_100
+
+Five of those already exist as keys. The abstract ones stay defined (nothing references them once the 46 are
+cleared, and deleting a key that a past redemption row points at would orphan the log) but nothing new uses
+them.
+
+## The exposure, which is the number that matters
+
+`charges_left` DECREMENTS AND DOES NOT REFILL — the cooldown only spaces multiple charges apart. So an item
+with one charge is a one-time cost, for ever, not a recurring one. That makes the whole liability countable up
+front.
+
+Proposed, at one charge each:
+
+| Tier | Items | Carry credit | Amounts | Exposure |
+|---|---|---|---|---|
+| Celestial | 30 | 12 | 8 × $10, 4 × $15 | **$140** |
+| Primordial | 25 | 10 | 6 × $25, 3 × $50, 1 × $100 | **$400** |
+| | | **22 of 55** | | **$540 total, once, ever** |
+
+That is the worst case where every one of the 22 is earned by somebody and every charge is redeemed — spread
+over however long it takes the Den to chase down 22 apex items. Scale it by moving the count or the amounts;
+the shape is what matters.
+
+Deliberately NOT every top-tier item. Two-thirds of the apex gear pays in game terms only, so a real-world
+payout stays a genuine surprise rather than the expected outcome of a tier.
+
+## Two things to settle when these are minted
+
+- **The 46 existing charged items.** They keep their stats either way. The question is whether `charged` comes
+  off them entirely (they become ordinary admin-granted gear) or stays as a hand-granting tool that is simply
+  never rolled. Nobody holds one, so either is free today.
+- **`SELL_VALUES` has no celestial or primordial entry** (it stops at eternal: 6000). Minting either tier
+  without adding them means those items sell back for `undefined`. Charged items are already blocked from being
+  sold at all, which covers the 22, but not the other 33.
