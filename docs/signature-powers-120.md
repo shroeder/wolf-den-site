@@ -78,7 +78,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A |
 | 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A |
 | 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A |
-| 30 | **The Shipwright's Debt** | Every boat upgrade you buy refunds its cost as doubloons. | B |
+| 30 | **The Shipwright's Debt** | One boat upgrade in three costs you nothing. | B |
 | 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
 | 32 | **The Quiet Passage** | One encounter in three lets you pass without a fight and keeps the spoils. | B |
 | 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B |
@@ -181,17 +181,17 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
 | 102 | **The Long Table** | Your menagerie ceiling is half again as high. | A |
-| 103 | **The Whistle** | Every pet you own earns the equipped pet's trickle while it sits in the box. | A |
+| 103 | **The Whistle** | A pet you swap out keeps its ability for the rest of the day. | B |
 
 ## Market, Trade & Credit
 
 | # | Name | Effect | Class |
 |---|---|---|---|
-| 104 | **The Auctioneer's Seat** | An auction of yours that sells pays you the listing fee back, twice over. | B |
-| 105 | **Merchant's Word** | A trade you offer cannot be refused twice — the second offer to the same member is binding for a day. | B |
+| 104 | **The Auctioneer's Seat** | You pay no listing fee, and listing never takes the item out of your bags. | A |
+| 105 | **Merchant's Word** | A trade you offer holds its items in escrow without taking them off you. | B |
 | 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B |
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
-| 108 | **The Bonded Warehouse** | Items you list at auction stay equipped and usable until they sell. | B |
+| 108 | **The Counting House** | The gold in your purse earns interest, paid at every check-in. | B |
 | 109 | **The Merchant's Eye** | One daily deal each day is offered to you at half price. | A |
 | 110 | **No Reserve** | An auction that does not sell is relisted for you, free, until it does. | B |
 | 111 | **The Bulk Buyer** | One purchase in three from the gold shop comes in pairs. | B |
@@ -202,7 +202,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A |
-| 114 | **Herald's Licence** | Every badge you have not yet earned shows its progress, and one a month is granted outright. | B |
+| 114 | **Herald's Licence** | One badge a month is granted to you outright, chosen from what you are missing. | B |
 | 115 | **The Loaned Exhibit** | One collection piece you do not own counts as owned. You choose which. | B |
 | 116 | **The Seal of Office** | A collection you have completed keeps paying if you lend a piece away. | B |
 | 117 | **The Long Service Record** | Your ten best badges pay their bonus twice. | A |
@@ -568,6 +568,37 @@ totals. **Diviner's Rod (29)** takes buried fragments from three to twelve on a 
 4x on the main sailing output. Both are defensible on an apex item; neither has been measured the way the badge
 pool just was.
 
+## Fourteenth pass — the two measurements, and five of my own mistakes
+
+### The two I said I would measure
+
+**The Long Day (93)** — one extra on every daily allowance. The allowances are: fishing casts 5, mine trips 3,
+sailing raids 5, cheers 3, daily quests 3, free wheel spin 1, arena bouts 10. So +1 is between +10% and +33%
+everywhere, and +100% on the wheel's free spin — broad, but it multiplies how OFTEN you play rather than what
+each action pays, and none of it compounds. **Safe. Stands as written.**
+
+**Diviner's Rod (29)** — buried fragments from 3 to `MAX_BURIED = 12`, on a 16-tile board with
+`BASE_STAMINA = 12` digs a voyage and 10 fragments to a chest. That is roughly one chest a voyage against one
+every three. A 4x, but on small absolute numbers and against a ceiling the game itself already defines.
+**Safe on an apex item. Stands.**
+
+### Five I broke myself in the thirteenth pass
+
+Fixing "boring" made me break rules that were already agreed. Worth recording, because it is the same failure
+mode as optimising for whichever test is newest:
+
+| # | What I wrote | What was wrong with it |
+|---|---|---|
+| 30 | Boat upgrades refund as doubloons | Gold in, doubloons out — a currency bridge, which is the exact thing Coin of the Realm was cut for. Now: **one upgrade in three is free.** |
+| 103 | Every pet earns the trickle from the box | This is The Whole Kennel, cut in pass two for undoing the premise of level six — only the pet you carry earns. Now: **a pet you swap out keeps its ability for the day.** |
+| 104 | A sale refunds the listing fee twice over | A 5% fee paid back double is loose change dressed as a power. Merged with the genuinely useful half of 108. |
+| 105 | A second offer is binding for a day | This **forces another member to accept a trade.** Straightforwardly taking from someone else. Now: escrow that does not empty your bags. |
+| 114 | Shows progress on badges you have not earned | "Shows" is a tooltip, and the tooltips were culled in pass three. Kept only the half that grants one. |
+
+**108 The Counting House** is new, filling the slot freed by the merge: gold in your purse earns interest at
+every check-in.
+
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
-state that outlives the item, every one aimed at a mechanic that exists, 29 landing on a roll, and the three
-that measured as game-breaking cut down to size.
+state that outlives the item, none reaching into another member's account, every one aimed at a mechanic that
+exists, 29 landing on a roll, the three that measured as game-breaking cut down to size, and the two largest
+survivors measured and cleared.
