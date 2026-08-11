@@ -570,6 +570,13 @@ function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrac
 function fragmentsBuried(level = 1) {
     return Math.min(MAX_BURIED, FRAGMENTS_BURIED + boatPerks(level).buried);
 }
+
+// NOTE — fragmentsBuried() above is DEAD. Nothing calls it. The buried-fragment model it belongs to was
+// replaced by the chest-cells one (a 2xN chest is buried and you uncover it tile by tile), and the count that
+// actually decides what a dig is worth is now the SCATTERED ITEMS: digItemCount(tier, petFinds).
+//
+// Diviner's Rod was written against fragmentsBuried and would have done exactly nothing. It is wired to
+// digItemCount instead — see newBoard.
 // The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 5 tracks.
 function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
     return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l) + Math.max(0, rd);
@@ -783,7 +790,7 @@ const digItemCount = (tier, bonus = 0) => Math.min(5 + bonus, 2 + Math.floor(tie
 // One-shot SAILING RELICS that can drop (rarely) at the end of a dig — the map/drum/lure/etc.
 const SAIL_RELIC_DROPS = ["sail_war_drum", "sail_treasure_map", "sail_lucky_lure", "sail_storm_bottle", "sail_kraken_bait"];
 
-function newBoard(row, petStamina = 0, petFinds = 0) {
+function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false) {
     const fortuneLevel = row?.luck_level || 0;
     const luckLevel = row?.find_level || 0;
     const level = boatLevelFromUpgrades(row?.speed_level || 0, fortuneLevel, row?.rarity_level || 0, luckLevel, row?.raid_level || 0);
@@ -813,7 +820,10 @@ function newBoard(row, petStamina = 0, petFinds = 0) {
     const free = [];
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (!chestSet.has(`${r},${c}`)) free.push([r, c]);
     for (let i = free.length - 1; i > 0; i--) { const j = randInt(i + 1); [free[i], free[j]] = [free[j], free[i]]; }
-    const items = free.slice(0, digItemCount(tier, petFinds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
+    // Diviner's Rod fills the ground. `petFinds` is already the "more scattered finds" lever, so the power
+    // rides the same number rather than inventing a parallel one.
+    const finds = digItemCount(tier, petFinds) + (divinersRod ? digItemCount(tier, petFinds) : 0);
+    const items = free.slice(0, Math.min(free.length, finds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
     // petStamina comes from the caller: every owned seafaring pet adds a dig, capped at +4 across the whole
@@ -1452,6 +1462,19 @@ export async function getSailingState(buyerId, skyKey = null) {
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
+// The Press Gang lands ONE voyage a day the moment it is sent. A voyage records itself as an activity, which
+// is the only per-day trace it leaves, so that is what answers the question.
+async function sailedTodayAlready(buyerId) {
+    const row = await db.queryOne(
+        `SELECT 1 FROM mkt_activity
+          WHERE buyer_id = $1 AND kind = 'sail_voyage'
+            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+          LIMIT 1`,
+        [buyerId]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
 export async function startVoyage(buyerId, optionId = "standard") {
     const row = await readRow(buyerId);
     const state = decorate(row);
@@ -1464,7 +1487,12 @@ export async function startVoyage(buyerId, optionId = "standard") {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
         voyageSpeed += (await getPetSystemPerk(buyerId, "following_sea")) / 100;
     } catch { /* no companion, no speed-up */ }
-    const ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
+    // Press-Ganged Crew halves it, and The Press Gang lands the day's first voyage instantly. Both read here
+    // because this is the one line that decides how long a trip takes.
+    const sailPowers = await equippedPowers(buyerId);
+    if (sailPowers.has("press_ganged_crew")) voyageSpeed = 1 - (1 - voyageSpeed) * 0.5;
+    let ms = Math.max(MIN_VOYAGE_MS, Math.round(voyageDurationMs(state.speed.level, state.level) * opt.mult * (1 - voyageSpeed)));
+    if (sailPowers.has("press_gang") && !(await sailedTodayAlready(buyerId))) ms = MIN_VOYAGE_MS;
     // THREE CHANCES, NOT ONE. Each mark is rolled independently against the Fortune-scaled chance, scaled
     // down for the later two — a second fight in a voyage should feel like luck and a third like a story.
     // Kraken Bait still guarantees the first. Difficulty is drawn near your own boat level so a fresh captain
@@ -1522,7 +1550,9 @@ export async function forgeableChests(buyerId) {
     if (!buyerId) return 0;
     const row = await readRow(buyerId).catch(() => null);
     if (!row) return 0;
-    const cost = boatPerks(decorate(row).level).forgeCost;
+    // Chartwright halves what a chest costs in fragments.
+    let cost = boatPerks(decorate(row).level).forgeCost;
+    if (await hasPower(buyerId, "chartwright")) cost = Math.max(1, Math.ceil(cost / 2));
     if (!(cost > 0)) return 0;
     const counts = (typeof row.fragments_json === "object" && row.fragments_json) || {};
     return Object.entries(counts).reduce(
@@ -1766,6 +1796,7 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
+import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {
@@ -3315,7 +3346,7 @@ export async function beginDig(buyerId) {
         // /10 to match the description: 20 at cap -> +2 finds.
         petFinds = Math.max(0, Math.round((await getPetSystemPerk(buyerId, "beachcomber")) / 10));
     } catch { /* no companion, no extra finds */ }
-    const board = newBoard(row, petStamina, petFinds);
+    const board = newBoard(row, petStamina, petFinds, await hasPower(buyerId, "diviner_s_rod"));
     // Sea affinity (Dredge, from equipped gear/pet) raises every dig-tool's proc chance for this excavation.
     const eff = seaEffects(await equippedSeaAffinity(buyerId));
     if (eff.digProcBonus && board.up) board.up.efficient = (board.up.efficient || 0) + eff.digProcBonus;
