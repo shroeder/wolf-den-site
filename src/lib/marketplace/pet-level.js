@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 // Pet leveling (equipped pet only). Re-tuned 2026-07-21:
 //  - The equipped pet earns PET_XP_SHARE of every XP the member gains, plus PET_TRICKLE_PER_DAY over time.
@@ -215,7 +216,10 @@ export async function levelUpPet(buyerId, petId) {
 // Credit the member's EQUIPPED pet its share (25%) of an XP award. Best-effort. Called from awardXp so every
 // XP the member earns trickles into their active pet.
 export async function creditEquippedPetXp(buyerId, memberXp) {
-    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE);
+    // The Long Vigil triples the share. Applied to the SHARE rather than to the pet's XP after the fact, so a
+    // level-up fires on the same call that earned it instead of on the next read.
+    const vigil = await hasPower(buyerId, "long_vigil");
+    const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE * (vigil ? 3 : 1));
     if (share <= 0) return;
     await addEquippedPetXp(buyerId, share).catch(() => {});
 }

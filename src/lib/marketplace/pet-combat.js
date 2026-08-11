@@ -23,7 +23,8 @@ export async function getPetCombatBonus(buyerId) {
     // is equipped or not, which is the whole answer to swapping four times a day.
     const { getEnshrined } = await import("@/lib/marketplace/pet-ascension.js");
     const enshrined = await getEnshrined(buyerId).catch(() => []);
-    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp), enshrined);
+    const { equippedPowers } = await import("@/lib/marketplace/ascension-powers.js");
+    return combinePetBonuses(owned, equipped, levelsFromXpMap(petXp), enshrined, await equippedPowers(buyerId));
 }
 
 // Pure: manual-damage multiplier from a combined stats object (Might, Crit chance/power, Extra strike),

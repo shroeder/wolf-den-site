@@ -402,7 +402,15 @@ export const SYSTEM_PERK_KEYS = new Set([
     "night_angler", "second_wind", "storm_sense", "following_sea", "beachcomber",
 ]);
 
-export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = []) {
+/**
+ * `powers` is the member's ascension power set. Three of them change what a menagerie is worth, and this is
+ * the one place that answer is computed:
+ *   THE SECOND BOWL      the EQUIPPED pet's passive counts twice
+ *   THE SHEPHERD'S CROOK an ENSHRINED pet's passive counts twice
+ *   THE LONG TABLE       the menagerie ceiling is half again as high
+ * All three are conditional — take the gear off and the pack is ordinary again.
+ */
+export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null) {
     const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
@@ -420,7 +428,13 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     let aura = 0;
     for (const pet of ownedPets) {
         const p = petPassive(pet);
-        const lm = petPassiveLevelMult(Math.max(1, Number(levelByPet[pet.id]) || 1));
+        // The Second Bowl and The Shepherd's Crook each double ONE pet's passive — the one you carry, and the
+        // ones you have enshrined. A pet that is both counts twice, not four times: they are the same promise
+        // about the same pet, so the larger of the two applies rather than the product.
+        const isEquipped = equippedPet && pet.id === equippedPet.id;
+        const isEnshrined = enshrined.some((e) => e?.petId === pet.id);
+        const twice = (powers?.has?.("second_bowl") && isEquipped) || (powers?.has?.("shepherd_s_crook") && isEnshrined);
+        const lm = petPassiveLevelMult(Math.max(1, Number(levelByPet[pet.id]) || 1)) * (twice ? 2 : 1);
         // System stats go to the `system` bucket; add() would drop them. Everything else is combat/econ.
         if (SYSTEM_PASSIVE_STATS.has(p.stat)) system[p.stat] = (system[p.stat] || 0) + p.value * lm;
         else add(p.stat, p.value * lm);
@@ -525,8 +539,11 @@ export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet
     for (const [k, v] of Object.entries(activeBest)) add(k, v);
     // Cap the OWNED totals. The aura above amplifies stats/economy but deliberately not these — a menagerie
     // aura multiplying a farm bonus that already stacks over sixteen pets compounds twice.
+    // The Long Table raises the menagerie ceiling by half. The cap still exists — it is the thing being bought,
+    // and removing it outright was cut in an earlier pass for exactly that reason.
+    const capMult = powers?.has?.("long_table") ? 1.5 : 1;
     for (const k of Object.keys(system)) {
-        if (SYSTEM_PASSIVE_CAP[k] != null) system[k] = Math.min(SYSTEM_PASSIVE_CAP[k], system[k]);
+        if (SYSTEM_PASSIVE_CAP[k] != null) system[k] = Math.min(SYSTEM_PASSIVE_CAP[k] * capMult, system[k]);
     }
     return { stats, economy, proc, system };
 }

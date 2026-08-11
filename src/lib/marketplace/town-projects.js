@@ -5,6 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 // ── TOWN DEVELOPMENT ────────────────────────────────────────────────────────────────────────────────────────
 // A shared, community-funded upgrade catalog. Everyone pools gold into PROJECTS; each level costs more, grants a
@@ -145,15 +146,18 @@ export async function contributeToProject(buyerId, projectId, amount) {
     if ((levels[def.id]?.level || 0) >= def.maxLevel) return { ok: false, error: "maxed" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, amt]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
+    // Patron of Works: what you give counts DOUBLE toward the project. You still pay `amt` — the town simply
+    // banks twice as much of it, which is a gift to the town rather than a discount to you.
+    const credited = (await hasPower(buyerId, "patron_of_works")) ? amt * 2 : amt;
     await logCoin(buyerId, -amt, "town_project", { balanceAfter: paid.gold, meta: { project: projectId } }).catch(() => {});
-    await db.query(`INSERT INTO mkt_town_project_gift (project_id, buyer_id, amount) VALUES ($1, $2, $3)`, [projectId, buyerId, amt]).catch(() => {});
+    await db.query(`INSERT INTO mkt_town_project_gift (project_id, buyer_id, amount) VALUES ($1, $2, $3)`, [projectId, buyerId, credited]).catch(() => {});
 
     // Bank the gold, then level up as many times as it now affords (atomic-ish read/modify/write on one row).
     let row = await db.queryOne(
         `INSERT INTO mkt_town_project (project_id, level, gold_in, updated_at) VALUES ($1, 0, $2, NOW())
          ON CONFLICT (project_id) DO UPDATE SET gold_in = mkt_town_project.gold_in + $2, updated_at = NOW()
          RETURNING level, gold_in`,
-        [projectId, amt]
+        [projectId, credited]
     ).catch(() => null);
     let level = Number(row?.level) || 0;
     let goldIn = Number(row?.gold_in) || 0;

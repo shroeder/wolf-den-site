@@ -24,6 +24,7 @@ import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { checkTownContribBadges, checkMerchantBadges } from "@/lib/marketplace/town-badges.js";
 import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { setSetting } from "@/lib/settings.js";
+import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -40,15 +41,24 @@ const MERCHANT_STOCK = [
     // Ascendant+ chests stay exclusive to real gameplay (boss/sailing/forge), not something you can just buy.
     { tier: "mythic", price: 8000, minTier: 3, capPerDay: 1 },
 ];
-function merchantWaresForTier(tier = 0, chestArt = {}, boughtToday = {}) {
-    const disc = Math.min(0.45, MERCHANT_BASE_DISCOUNT + tier * 0.03); // deeper discount as the Trading Post levels
-    return MERCHANT_STOCK.filter((w) => tier >= w.minTier).map((w) => {
+// `powers` is the viewer's ascension set. Three of them reach the merchant and all three are about what he
+// will SELL YOU, so they resolve together here rather than in three places:
+//   FOUNDER'S CHARTER      half price, past the 45% discount ceiling the Trading Post tops out at
+//   THE STANDING ORDER     his one-a-day chest limit becomes three of each
+//   THE MERCHANT'S LEDGER  his whole catalogue, whatever your Trading Post level
+function merchantWaresForTier(tier = 0, chestArt = {}, boughtToday = {}, powers = null) {
+    const charter = powers?.has?.("founder_s_charter");
+    const disc = charter ? 0.5 : Math.min(0.45, MERCHANT_BASE_DISCOUNT + tier * 0.03);
+    const capMult = powers?.has?.("standing_order") ? 3 : 1;
+    const wares = powers?.has?.("merchant_s_ledger") ? MERCHANT_STOCK : MERCHANT_STOCK.filter((w) => tier >= w.minTier);
+    return wares.map((w) => {
+        const cap = w.capPerDay * capMult;
         const bought = boughtToday[w.tier] || 0;
         return {
             tier: w.tier, price: Math.round(w.price * (1 - disc)), orig: w.price, discountPct: Math.round(disc * 100),
             label: CHEST_TIERS[w.tier]?.label || w.tier, emoji: CHEST_TIERS[w.tier]?.emoji || "📦",
             image: chestArt[w.tier] || null,
-            capPerDay: w.capPerDay, boughtToday: bought, remaining: Math.max(0, w.capPerDay - bought),
+            capPerDay: cap, boughtToday: bought, remaining: Math.max(0, cap - bought),
         };
     });
 }
@@ -337,7 +347,7 @@ export async function getTownState(buyerId) {
     // survives a refresh and reaches everyone, not just whoever landed the killing blow.
     const raidRecap = event ? null : await lastRaidRecap(buyerId).catch(() => null);
     const boughtToday = await merchantBoughtToday(buyerId);
-    const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday);
+    const merchantWares = merchantWaresForTier(bonuses.merchantTier || 0, chestArt, boughtToday, await equippedPowers(buyerId));
     // Wishing Well: only surfaced once the town has funded it (wellGold > 0). Tells the client the daily payout
     // and whether THIS member has already tossed their coin today (so the fountain shows a claim prompt or not).
     const well = (bonuses.wellGold || 0) > 0
@@ -509,7 +519,7 @@ export async function setTownEventsLive(buyerId, on) {
 export async function buyMerchantChest(buyerId, tier) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const [bonuses, boughtToday] = await Promise.all([getTownBonuses().catch(() => ({})), merchantBoughtToday(buyerId)]);
-    const ware = merchantWaresForTier(bonuses.merchantTier || 0, {}, boughtToday).find((w) => w.tier === tier);
+    const ware = merchantWaresForTier(bonuses.merchantTier || 0, {}, boughtToday, await equippedPowers(buyerId)).find((w) => w.tier === tier);
     if (!ware) return { ok: false, error: "not_for_sale" };
     if (ware.remaining <= 0) return { ok: false, error: "daily_limit" };
     // A haggling companion knocks its stated percentage off the asking price.

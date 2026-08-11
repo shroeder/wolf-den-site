@@ -21,6 +21,7 @@ import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js"
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting } from "@/lib/settings.js";
+import { powerRoll, hasPower } from "@/lib/marketplace/ascension-powers.js";
 
 // Loot-pig crown placement (owner-calibrated via the crown tool). left = flip ? 50+side% : 50-side%.
 const CROWN_DEFAULT = { top: 9, side: 8, size: 22 };
@@ -439,7 +440,13 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
 
     // Feeding a FRIEND'S pet: spend one of the feeder's treats, land the XP on the OWNER's pet, and thank the
     // feeder for the generosity. Unlimited (each feed costs a real treat).
-    const dec = await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [feederId, consumableId]).catch(() => null);
+    // The Deep Bowl: one treat in three feeds the pet without being used up. Checked as a SPEND OF ZERO rather
+    // than as a refund — a refund would need the decrement to have succeeded first, and a member on their last
+    // treat would still have been told they had none.
+    const keepTreat = await powerRoll(feederId, "deep_bowl", 3);
+    const dec = keepTreat
+        ? await db.queryOne(`SELECT count FROM mkt_user_consumable WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0`, [feederId, consumableId]).catch(() => null)
+        : await db.queryOne(`UPDATE mkt_user_consumable SET count = count - 1 WHERE buyer_id = $1 AND consumable_id = $2 AND count > 0 RETURNING count`, [feederId, consumableId]).catch(() => null);
     if (!dec) return { ok: false, error: "insufficient" };
     const applied = c.effect.type === "pet_level"
         ? await levelUpPet(petOwner, petId).catch(() => ({ ok: false }))
