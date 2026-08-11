@@ -340,8 +340,13 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                             const dead = gunHp.length ? (gunHp[i] ?? 0) <= 0 : false;
                             const hurtGun = gunHp.length ? (gunHp[i] ?? 0) === 1 : false;
                             return (
+                                // MIRRORED SHIPS NEED MIRRORED GUNS. Sails and hull go through zoneBox, which
+                                // takes `mirror` and flips its columns — the cannons were placed straight off
+                                // the raw x, so on a flipped hull (a rival captain) every barrel sat on the
+                                // wrong end of the ship: guns at the stern, an empty bow, and the art facing
+                                // the other way to its own battery.
                                 <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}${dead ? " is-dead" : ""}${hurtGun ? " is-damaged" : ""}`}
-                                    style={{ left: `${g.x * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 80}ms` }}>
+                                    style={{ left: `${(mirror ? 1 - g.x : g.x) * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 80}ms` }}>
                                     <i className="sbt-gun-barrel" />
                                     {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 80}ms` }} /> : null}
                                     {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 80}ms` }} /> : null}
@@ -704,7 +709,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                 icon: living ? MONSTER_ZONES.limb.icon : ZONES.guns.icon,
                 tint: living ? MONSTER_ZONES.limb.tint : ZONES.guns.tint,
                 effect: living ? MONSTER_ZONES.limb.effect : ZONES.guns.effect,
-                x: p.x * 100, y: p.y * 100, box: null,
+                // Mirrored with the hull, for the same reason the drawn barrels are: a marker on the wrong
+                // end is worse than a barrel on the wrong end, because you tap it.
+                x: (mirror ? 1 - p.x : p.x) * 100, y: p.y * 100, box: null,
                 hpPct: clampPct(hp, caps?.gun || 4), hp, hpMax: caps?.gun || 4,
                 chance: hitChance(att, ZONES.guns, shot, evasion),
                 dmg: expectedDamage(att, def, ZONES.guns, shot),

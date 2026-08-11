@@ -29,6 +29,12 @@ export default function GunLab() {
     // really deciding is where barrels one through N sit — and the only way to see that is to change N.
     // Defaults to the CAP: place the full battery first and the smaller counts are just its opening subset.
     const [preview, setPreview] = useState(7);
+    // ── WHICH WAY IS IT FACING ───────────────────────────────────────────────────────────────────────────
+    // The lab drew every hull in its raw orientation, and the hulls do not agree: your boats face one way and
+    // several encounter ships face the other. So you place a battery along what looks like the near rail and
+    // it comes out on the far side in the fight. The flip is a VIEW — it never changes what is stored, it
+    // just shows the hull the way the battle will draw it so you can aim at the right rail.
+    const [flip, setFlip] = useState(false);
     const [status, setStatus] = useState("");
     const [busy, setBusy] = useState(false);
     const [loaded, setLoaded] = useState(false);
@@ -63,7 +69,11 @@ export default function GunLab() {
 
     const add = (e) => {
         const r = e.currentTarget.getBoundingClientRect();
-        const x = Math.round(((e.clientX - r.left) / r.width) * 1000) / 1000;
+        // STORED IN ART SPACE, ALWAYS. The flip is a view; if a tap while flipped were saved as-is, every
+        // placement made in that mode would come out mirrored in the fight — which is the exact bug the flip
+        // exists to help you avoid, reintroduced by the tool meant to prevent it.
+        const raw = Math.round(((e.clientX - r.left) / r.width) * 1000) / 1000;
+        const x = flip ? Math.round((1 - raw) * 1000) / 1000 : raw;
         const y = Math.round(((e.clientY - r.top) / r.height) * 1000) / 1000;
         setDraft((d) => ({ ...d, [artKey]: [...(d[artKey] || []), { x, y }] }));
         setStatus("");
@@ -156,6 +166,10 @@ export default function GunLab() {
                     <button type="button" className="sby-mini" onClick={() => setShowFallback((v) => !v)}>
                         {showFallback ? "Hide" : "Show"} fallback
                     </button>
+                    <button type="button" className={`sby-mini${flip ? " is-load" : ""}`} onClick={() => setFlip((v) => !v)}
+                        title="Show the hull the way the battle draws it. A view only — placements are stored unflipped.">
+                        {flip ? "Flipped" : "Flip view"}
+                    </button>
                 </div>
                 {/* Preview count. Ships carry 1 to 13 guns off the Cannons track, and a battery that looks right
                     at six can look absurd at one — the lone starting gun is the one most members will ever see. */}
@@ -174,12 +188,12 @@ export default function GunLab() {
                 <div style={{ position: "relative", width: "100%", maxWidth: 520, margin: "0 auto", aspectRatio: "1", background: "radial-gradient(70% 70% at 50% 75%, rgba(70,140,190,0.25), rgba(4,12,20,0.6))", borderRadius: 14, cursor: "crosshair", touchAction: "manipulation" }}
                     onClick={add}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt="" draggable="false" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+                    <img src={src} alt="" draggable="false" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none", transform: flip ? "scaleX(-1)" : "none" }} />
                     <span style={{ position: "absolute", left: 0, right: 0, top: `${100 - deck}%`, height: 1, background: "rgba(255,215,94,0.55)", pointerEvents: "none" }} />
                     {effective.map((g, i) => (
                         <button key={i} type="button" title={`${g.x}, ${g.y} — tap to remove`}
                             onClick={(e) => { e.stopPropagation(); if (placed.length) removeAt(i); }}
-                            style={{ position: "absolute", left: `${g.x * 100}%`, top: `${g.y * 100}%`, width: 34, height: 24,
+                            style={{ position: "absolute", left: `${(flip ? 1 - g.x : g.x) * 100}%`, top: `${g.y * 100}%`, width: 34, height: 24,
                                 border: placed.length ? "1px solid #ffd75e" : "1px dashed rgba(255,255,255,0.4)",
                                 borderRadius: 4, background: `url("/images/sailing/deck-cannon.png") center/contain no-repeat`,
                                 // FLEET HULLS FACE LEFT (fleet.js draws them that way on purpose — the enemy
