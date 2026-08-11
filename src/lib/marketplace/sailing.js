@@ -25,7 +25,7 @@ import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones
 import { consumableSpriteMap } from "@/lib/marketplace/consumable-sprites.js";
 import { FLEET, MAX_FLEET_RANK, fleetShip, fleetReward, fleetView, fleetArt, fleetCaptain, fleetRankForShip, fleetDeckOf } from "@/lib/marketplace/fleet.js";
 import { boatDeck } from "@/lib/marketplace/deck-lines.js";
-import { getSavedPorts, portsWithSaved } from "@/lib/marketplace/gun-ports-store.js";
+import { getSavedPorts, getSavedHulls, portsWithSaved, facing } from "@/lib/marketplace/gun-ports-store.js";
 import { DEFAULT_AVATAR_URL } from "@/lib/marketplace/avatar-options.js";
 import { setSeaBonus, setRaidBonus, setDoublesRaidGold, setOpeningReckoning, ITEM_SETS } from "@/lib/marketplace/sets.js";
 import { itemSpriteFor, itemSpriteMap } from "@/lib/marketplace/item-sprites.js";
@@ -959,7 +959,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = []) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1048,7 +1048,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             };
         })(),
         // SHIP BATTLES — the gun deck, the racks, the fleet and the purse.
-        combat: combatView(row, level, consumableArt, gunDeck, pieces),
+        combat: combatView(row, level, consumableArt, gunDeck, pieces, hulls),
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1077,7 +1077,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
                 art: encounterArt(enc.id),
                 loot: lootPreview(enc.loot, chestArt, Object.fromEntries(Object.entries(CONSUMABLES).map(
                     ([id, c]) => [id, { name: c.name, emoji: c.emoji, art: consumableArt[id] || null }]))),
-                battle: { ...battleView(b.state, b.meta, { row }), events: [], over: false },
+                battle: { ...buildBattleView(b.state, b.meta, { row, hulls }), events: [], over: false },
             };
         })(),
         // Deliberately NOT sending where the marks are. A tick on the progress bar would be a nice wordless
@@ -1434,6 +1434,8 @@ export async function getSailingState(buyerId, skyKey = null) {
     // same way chest art and collections are.
     const gunDeck = await gunDeckView(buyerId, row).catch(() => null);   // your guns are how you fight an encounter
     const pieces = await pieceShop(buyerId).catch(() => []);   // the Quartermaster is public — see combatView
+    // Where every hull's guns sit and which way its art faces, for the battle this state may be handing back.
+    const hulls = await getSavedHulls().catch(() => ({ ports: {}, flip: {} }));
     // ── THE STONE ON THE SHELF ── the floor under the luck. Stones drop from four things including the dig,
     // but randomness eventually hands somebody nothing for a month, and a chase item you cannot chase is a
     // wall rather than a chase. Priced at roughly a month of deciding this is what you are saving for.
@@ -1447,7 +1449,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     // `owner` carries exactly ONE thing now that ship battles are public: whether to draw the gun-placement
     // workshop door in the yard. That route is owner-only and 404s for everybody else, so a link every member
     // can see is a dead end with a nice icon on it.
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -1785,7 +1787,7 @@ export async function doRaid(buyerId, targetId = null) {
     const openNow = readBattle(row);
     if (openNow) {
         return { ok: true, resumed: true,
-            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
+            battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
@@ -1858,7 +1860,7 @@ export async function doRaid(buyerId, targetId = null) {
     const state = initBattleState(mine, theirs);
     state.theirNext = planFoeRound(state, mine, theirs);
     await saveBattle(buyerId, state, meta);
-    return { ok: true, battle: { ...battleView(state, meta, { row }), events: [], over: false }, ...(await getSailingState(buyerId)) };
+    return { ok: true, battle: { ...(await battleView(state, meta, { row })), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
 
 // Paying out a finished RAID. ONE REWARD POOL: a rival's ship is matched to the fleet rank it most resembles
@@ -1997,7 +1999,7 @@ const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the fleet and the purse. The
 // `ladder` flag that used to gate the fleet and the Cunning track went with the launch gate — a member sees
 // all of it now.
-function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = []) {
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = [], hulls = null) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -2074,7 +2076,7 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
         // A battle you walked away from — closed the tab, locked the phone, reloaded. The sortie is already
         // spent, so this fight is the only one you have; handing it back on every state read is what lets the
         // screen put you straight back on deck instead of leaving a saved fight nobody can reach.
-        openBattle: (() => { const b = readBattle(row); return b ? { ...battleView(b.state, b.meta, { row }), events: [], over: false } : null; })(),
+        openBattle: (() => { const b = readBattle(row); return b ? { ...buildBattleView(b.state, b.meta, { row, hulls }), events: [], over: false } : null; })(),
     };
 }
 
@@ -2193,7 +2195,7 @@ async function payFleetReward(buyerId, reward) {
 // with a bare deck — and the fleet path got ports before the rival path did, so member-vs-member fights (the
 // common ones) had none at all. Deriving them on every read makes a stored meta's age irrelevant: any fight,
 // however old, draws the guns the ship is holding right now.
-const withGuns = (side, saved) => {
+const withGuns = (side, hulls) => {
     if (!side) return side;
     const deck = side.deck ?? (side.art?.includes("/fleet/") ? 30 : boatDeck(1));
     // ── AN ENCOUNTER IS NOT A PLAYER BOAT ────────────────────────────────────────────────────────────────
@@ -2206,12 +2208,31 @@ const withGuns = (side, saved) => {
         : side.art?.includes("/fleet/")
             ? side.art.split("/").pop().replace(/\.png$/, "")
             : `boat:${boatTier(side.level || 1)}`;
-    return { ...side, deck, ports: side.ports?.length ? side.ports : portsWithSaved(saved, art, deck, side.guns || 1) };
+    // ── WHICH WAY THE DRAWING FACES ──────────────────────────────────────────────────────────────────────
+    // Resolved here, at view time, for the same reason the guns are: `mirror` was written into the meta when
+    // the battle opened, so a hull marked as flipped would not straighten up until every fight in progress
+    // had ended. It is a property of the ART, and the art is read fresh on every round.
+    return {
+        ...side, deck,
+        mirror: facing(hulls?.flip, art, side.mirror),
+        ports: side.ports?.length ? side.ports : portsWithSaved(hulls?.ports || {}, art, deck, side.guns || 1),
+    };
 };
 // EVERYTHING THE SCENE NEEDS TO LET YOU AIM. The client hit-tests taps against the same measured zone maps the
 // server resolves with (ship-zones.js), so the aiming is instant and the arbitration is still ours: what comes
 // back here is which zones each hull HAS, what state its systems are in, and what is in the racks.
-const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
+// ── THE SAVED HULLS WERE NEVER BEING READ ────────────────────────────────────────────────────────────────────
+// This took `{ saved }` and not one of its eleven callers passed it, so `saved` was `{}` every single time. Your
+// own boat survived that by accident — its ports are baked into the meta when the fight opens, where a saved
+// placement HAD been read — but the enemy's are resolved here, which means every gun placed on an encounter
+// ship in the lab was written to the database, read back by the lab, and then ignored by the battle.
+//
+// So the view fetches them itself rather than trusting a caller to remember. One query per read of a fight,
+// against a table with a few dozen rows, and it cannot be forgotten at a twelfth call site.
+// decorate() is synchronous on purpose (see its own note about reaching for the database from inside it), so
+// the view splits in two: a pure builder that takes the hulls it was handed, and an async wrapper that fetches
+// them for the ten callers that CAN await. decorate is the one caller that passes its own.
+const buildBattleView = (st, meta, { row = null, hulls = null } = {}) => ({
     // YOUR GUNNERY, so the scene can put a real hit percentage on every target marker. It is the same number
     // the server will roll against (hitChance in ship-battle.js) rather than a client-side guess at it — a
     // marker that advertises 74% and then resolves at something else is worse than showing nothing.
@@ -2231,7 +2252,7 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
         };
     })(),
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
-    me: withGuns(meta.me, saved),
+    me: withGuns(meta.me, hulls),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
     // a fight resumed across it would come back to an empty enemy deck. Fill it from the rank rather than
     // migrating the jsonb: these rows are transient and a read is the cheaper place to be forgiving.
@@ -2239,7 +2260,7 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
         meta.kind === "fleet" && meta.foe && !meta.foe.rider && meta.rank
             ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false }
             : meta.foe,
-        saved,
+        hulls,
     ),
     myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,
     round: st.round,
@@ -2276,6 +2297,9 @@ const battleView = (st, meta, { saved = {}, row = null } = {}) => ({
     })),
     loadout: row?.loadout || "round",
 });
+
+const battleView = async (st, meta, opts = {}) =>
+    buildBattleView(st, meta, { ...opts, hulls: await getSavedHulls().catch(() => ({ ports: {}, flip: {} })) });
 
 // Rebuild both profiles from the stored meta, so a round resolved an hour later fights the same two ships.
 function profilesFrom(meta) {
@@ -2356,7 +2380,7 @@ export async function shipBattleVolley(buyerId, aim) {
         const after = await readRow(buyerId);
         return {
             ok: true,
-            battle: { ...battleView(res.state, open.meta, { row: after }), events: res.events, over: false,
+            battle: { ...(await battleView(res.state, open.meta, { row: after })), events: res.events, over: false,
                 yourAim: res.mine, theirAim: res.theirs },
             ...(await getSailingState(buyerId)),
         };
@@ -2373,7 +2397,7 @@ export async function shipBattleVolley(buyerId, aim) {
     return {
         ok: true,
         battle: {
-            ...battleView(res.state, meta, { row: await readRow(buyerId) }), events: res.events, over: true,
+            ...(await battleView(res.state, meta, { row: await readRow(buyerId) })), events: res.events, over: true,
             win: res.win, sunk: res.sunk, reward,
             yourAim: res.mine, theirAim: res.theirs,
         },
@@ -2401,7 +2425,7 @@ export async function shipBattleReckoning(buyerId) {
         const after = await readRow(buyerId);
         return {
             ok: true,
-            battle: { ...battleView(res.state, open.meta, { row: after }), events: res.events, over: false, reckoning: true },
+            battle: { ...(await battleView(res.state, open.meta, { row: after })), events: res.events, over: false, reckoning: true },
             ...(await getSailingState(buyerId)),
         };
     }
@@ -2416,7 +2440,7 @@ export async function shipBattleReckoning(buyerId) {
     return {
         ok: true,
         battle: {
-            ...battleView(res.state, meta, { row: await readRow(buyerId) }), events: res.events, over: true,
+            ...(await battleView(res.state, meta, { row: await readRow(buyerId) })), events: res.events, over: true,
             win: res.win, sunk: res.sunk, reward, reckoning: true,
         },
         ...(await getSailingState(buyerId)),
@@ -2486,7 +2510,7 @@ export async function doBattle(buyerId) {
     const openNow = readBattle(row);
     if (openNow) {
         return { ok: true, resumed: true,
-            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
+            battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
     const myLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
@@ -2511,7 +2535,7 @@ export async function doFleetBattle(buyerId, rank = null) {
     const openNow = readBattle(row);
     if (openNow) {
         return { ok: true, resumed: true,
-            battle: { ...battleView(openNow.state, openNow.meta, { row }), events: [], over: false },
+            battle: { ...(await battleView(openNow.state, openNow.meta, { row })), events: [], over: false },
             ...(await getSailingState(buyerId)) };
     }
     const myBattleLevel = boatLevelFromUpgrades(row?.speed_level || 0, row?.luck_level || 0, row?.rarity_level || 0, row?.find_level || 0, row?.raid_level || 0);
@@ -2574,7 +2598,7 @@ export async function doFleetBattle(buyerId, rank = null) {
     await trackActivity(buyerId, "ship_battle", { rank: want, ship: ship.name, ammo: fired, first }).catch(() => {});
     await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
 
-    return { ok: true, battle: { ...battleView(state, meta, { row }), events: [], over: false }, ...(await getSailingState(buyerId)) };
+    return { ok: true, battle: { ...(await battleView(state, meta, { row })), events: [], over: false }, ...(await getSailingState(buyerId)) };
 }
 
 // Paying out a finished FLEET battle — called once, from shipBattleVolley, after the state row is cleared.

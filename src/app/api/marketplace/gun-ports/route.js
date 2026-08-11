@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
-import { getSavedPorts, savePorts } from "@/lib/marketplace/gun-ports-store.js";
+import { getSavedHulls, savePorts } from "@/lib/marketplace/gun-ports-store.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -26,7 +26,8 @@ export async function GET(request) {
         try {
             const g = await gate();
             if (g.error) return g.error;
-            return noStore({ saved: await getSavedPorts() });
+            const hulls = await getSavedHulls();
+            return noStore({ saved: hulls.ports, flipped: hulls.flip });
         } catch (error) {
             return internalError(error, { event: "marketplace.gunports.get.failure" });
         }
@@ -41,10 +42,13 @@ export async function POST(request) {
             const body = await request.json().catch(() => ({}));
             const art = String(body?.art || "").trim();
             if (!art) return noStore({ error: "bad_art" }, { status: 400 });
-            // An empty array is a legitimate save: it clears the hull back to the even spread.
-            const res = await savePorts(art, Array.isArray(body?.ports) ? body.ports : [], g.buyer.id);
+            // An empty array is a legitimate save: it clears the hull back to the even spread. So is an empty
+            // array with `flipped` set — that is a hull whose art faces the wrong way and whose guns are fine
+            // where the fallback puts them.
+            const res = await savePorts(art, Array.isArray(body?.ports) ? body.ports : [], g.buyer.id, body?.flipped === true);
             if (!res.ok) return noStore(res, { status: 400 });
-            return noStore({ ...res, saved: await getSavedPorts() });
+            const hulls = await getSavedHulls();
+            return noStore({ ...res, saved: hulls.ports, flippedMap: hulls.flip });
         } catch (error) {
             return internalError(error, { event: "marketplace.gunports.post.failure" });
         }

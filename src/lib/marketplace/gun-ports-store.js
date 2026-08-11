@@ -37,16 +37,38 @@ export function sanitizePorts(raw) {
     return out;
 }
 
-/** Every saved placement, as { art: [{x,y}] }. One query — there are twenty-six hulls, not twenty-six thousand. */
-export async function getSavedPorts() {
-    const rows = await db.query(`SELECT art, ports FROM mkt_gun_port`).catch(() => []);
-    const out = {};
+/**
+ * Everything saved about every hull, in ONE query — there are thirty-six hulls, not thirty-six thousand.
+ *
+ * Two maps rather than one, because they answer different questions and a hull can have either without the
+ * other: `ports` is where its cannons sit, `flip` is whether its art was drawn facing the wrong way. A hull
+ * marked as flipped with no guns placed is a real and expected row.
+ */
+export async function getSavedHulls() {
+    const rows = await db.query(`SELECT art, ports, flipped FROM mkt_gun_port`).catch(() => []);
+    const ports = {};
+    const flip = {};
     for (const r of rows) {
-        const ports = sanitizePorts(typeof r.ports === "string" ? JSON.parse(r.ports || "[]") : r.ports);
-        if (ports.length) out[r.art] = ports;
+        const p = sanitizePorts(typeof r.ports === "string" ? JSON.parse(r.ports || "[]") : r.ports);
+        if (p.length) ports[r.art] = p;
+        if (r.flipped === true) flip[r.art] = true;
     }
-    return out;
+    return { ports, flip };
 }
+
+/** Every saved placement, as { art: [{x,y}] }. For callers that only draw guns and never a whole hull. */
+export async function getSavedPorts() {
+    return (await getSavedHulls()).ports;
+}
+
+/**
+ * Which way a hull is drawn, folded into the facing the scene was already going to use.
+ *
+ * `base` is what the fight wants — a rival captain is mirrored so the two ships face each other, an encounter
+ * is not. A flipped SPRITE is the opposite question, about the drawing rather than the fight, so the two
+ * compose with XOR: an already-mirrored ship whose art is backwards ends up drawn the right way round.
+ */
+export const facing = (flip, art, base = false) => Boolean(base) !== Boolean(flip?.[art]);
 
 /**
  * The ports to draw for one hull, saved placements taking precedence.
@@ -62,20 +84,28 @@ export function portsWithSaved(saved, art, deckPct, n) {
     return gunPortsFor(art, deckPct, count);
 }
 
-/** Write one hull's whole battery. An empty array clears the row back to the fallback, which is a real edit. */
-export async function savePorts(art, ports, buyerId = null) {
+/**
+ * Write one hull: its whole battery and which way its art faces.
+ *
+ * Clearing the guns no longer deletes the row outright — a hull can be marked as flipped and have no cannons
+ * placed, and dropping the row would silently throw the facing away the next time someone hit Clear. The row
+ * only goes when there is genuinely nothing left to remember about the hull.
+ */
+export async function savePorts(art, ports, buyerId = null, flipped = false) {
     const clean = sanitizePorts(ports);
+    const flip = flipped === true;
     if (!art) return { ok: false, error: "bad_art" };
-    if (!clean.length) {
+    if (!clean.length && !flip) {
         await db.query(`DELETE FROM mkt_gun_port WHERE art = $1`, [String(art)]).catch(() => {});
-        return { ok: true, art, ports: [], cleared: true };
+        return { ok: true, art, ports: [], flipped: false, cleared: true };
     }
     await db.query(
-        `INSERT INTO mkt_gun_port (art, ports, updated_by, updated_at) VALUES ($1, $2::jsonb, $3, NOW())
-         ON CONFLICT (art) DO UPDATE SET ports = EXCLUDED.ports, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-        [String(art), JSON.stringify(clean), buyerId]
+        `INSERT INTO mkt_gun_port (art, ports, flipped, updated_by, updated_at) VALUES ($1, $2::jsonb, $3, $4, NOW())
+         ON CONFLICT (art) DO UPDATE SET ports = EXCLUDED.ports, flipped = EXCLUDED.flipped,
+                                         updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
+        [String(art), JSON.stringify(clean), flip, buyerId]
     ).catch(() => {});
-    return { ok: true, art, ports: clean };
+    return { ok: true, art, ports: clean, flipped: flip };
 }
 
 /** The source-of-truth table, for the lab's "promote to source" copy box. */

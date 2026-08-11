@@ -30,11 +30,17 @@ export default function GunLab() {
     // Defaults to the CAP: place the full battery first and the smaller counts are just its opening subset.
     const [preview, setPreview] = useState(7);
     // ── WHICH WAY IS IT FACING ───────────────────────────────────────────────────────────────────────────
-    // The lab drew every hull in its raw orientation, and the hulls do not agree: your boats face one way and
-    // several encounter ships face the other. So you place a battery along what looks like the near rail and
-    // it comes out on the far side in the fight. The flip is a VIEW — it never changes what is stored, it
-    // just shows the hull the way the battle will draw it so you can aim at the right rail.
-    const [flip, setFlip] = useState(false);
+    // This started as a VIEW — a toggle that showed you the hull the other way round so you could place a
+    // battery on the right rail. That helped you aim and fixed nothing: a sprite drawn bow-right (the Black
+    // Liturgy) still sailed backwards past every other ship in the fight, and the only cure was re-exporting
+    // the art, which fixes one ship and teaches the game nothing.
+    //
+    // So it is SAVED, per hull, alongside the guns. The scene already knew how to draw a hull the other way
+    // round — `mirror` flips the art, the measured zone boxes and the barrels — and this is the switch that
+    // says which drawings need it. Taps are still stored in ART space, so a placement never comes out
+    // mirrored no matter which way you were looking at the ship when you made it.
+    const [flips, setFlips] = useState({});
+    const flip = Boolean(flips[artKey]);
     const [status, setStatus] = useState("");
     const [busy, setBusy] = useState(false);
     const [loaded, setLoaded] = useState(false);
@@ -45,7 +51,11 @@ export default function GunLab() {
         let alive = true;
         fetch("/api/marketplace/gun-ports")
             .then((r) => (r.ok ? r.json() : null))
-            .then((j) => { if (alive && j?.saved) setDraft((d) => ({ ...d, ...j.saved })); })
+            .then((j) => {
+                if (!alive || !j) return;
+                if (j.saved) setDraft((d) => ({ ...d, ...j.saved }));
+                if (j.flipped) setFlips(j.flipped);
+            })
             .catch(() => {})
             .finally(() => { if (alive) setLoaded(true); });
         return () => { alive = false; };
@@ -88,17 +98,22 @@ export default function GunLab() {
             const res = await fetch("/api/marketplace/gun-ports", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ art: artKey, ports: placed }),
+                body: JSON.stringify({ art: artKey, ports: placed, flipped: flip }),
             });
             const j = await res.json().catch(() => ({}));
             // An empty save is a real edit — it puts the hull back on the even spread — so say which happened.
-            setStatus(res.ok ? (j.cleared ? "Cleared — back to the even spread." : `Saved ${j.ports?.length ?? placed.length} port(s). Live now.`) : `Failed: ${j.error || res.status}`);
+            // The facing is saved with it, and is worth naming: it is the half of this screen that changes what
+            // everyone else sees in a fight rather than just where the barrels sit.
+            const facingNote = flip ? " Facing flipped." : "";
+            setStatus(res.ok
+                ? (j.cleared ? "Cleared — back to the even spread, drawn as the art is." : `Saved ${j.ports?.length ?? placed.length} port(s).${facingNote} Live now.`)
+                : `Failed: ${j.error || res.status}`);
         } catch {
             setStatus("Failed — no connection.");
         } finally {
             setBusy(false);
         }
-    }, [artKey, placed]);
+    }, [artKey, placed, flip]);
 
     // Only hulls you actually placed something on — pasting back a table full of empty arrays would bury the
     // fallback for every ship you did not touch.
@@ -161,14 +176,17 @@ export default function GunLab() {
             <section className="card">
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
                     <b style={{ fontSize: "0.95rem" }}>{artKey}</b>
-                    <span className="muted" style={{ fontSize: "0.78rem" }}>deck {deck}% · {placed.length} placed</span>
+                    <span className="muted" style={{ fontSize: "0.78rem" }}>
+                        deck {deck}% · {placed.length} placed{flip ? " · flipped" : ""}
+                    </span>
                     <button type="button" className="sby-mini" onClick={clear} style={{ marginLeft: "auto" }}>Clear</button>
                     <button type="button" className="sby-mini" onClick={() => setShowFallback((v) => !v)}>
                         {showFallback ? "Hide" : "Show"} fallback
                     </button>
-                    <button type="button" className={`sby-mini${flip ? " is-load" : ""}`} onClick={() => setFlip((v) => !v)}
-                        title="Show the hull the way the battle draws it. A view only — placements are stored unflipped.">
-                        {flip ? "Flipped" : "Flip view"}
+                    <button type="button" className={`sby-mini${flip ? " is-load" : ""}`}
+                        onClick={() => { setFlips((f) => ({ ...f, [artKey]: !f[artKey] })); setStatus("Facing changed — save the hull."); }}
+                        title="This drawing faces the wrong way. Saved with the hull, so the battle draws it turned round — guns and target markers with it.">
+                        {flip ? "Facing: flipped" : "Facing: as drawn"}
                     </button>
                 </div>
                 {/* Preview count. Ships carry 1 to 13 guns off the Cannons track, and a battery that looks right
