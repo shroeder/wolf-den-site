@@ -43,7 +43,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 2 | **Hothouse Glass** | Your crops go into the ground already a third grown. | B |
 | 3 | **Second Sowing** | Two extra plots, permanently. | A |
 | 4 | **Nightsoil** | Every plant you put in the ground goes in already fertilized, free. | B |
-| 5 | **The Rain Barrel** | Rain takes half your crops' remaining time instead of a third, and never goes on cooldown. | A |
+| 5 | **The Rain Barrel** | It is always raining on your farm, whatever the sky is doing. | B |
 | 6 | **Bumper Season** | The first harvest you take each day pays double. | B |
 | 7 | **Windfall Orchard** | The first crop you harvest each day also drops a chest. | B |
 | 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B |
@@ -61,7 +61,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 15 | **The Fishmonger's Standing Order** | One fish in three sells at the price of the next rarity up. | B |
 | 16 | **Two Hooks** | One cast in three lands a second fish. | B |
 | 17 | **The Lantern** | Casts made while the shop is closed pay double. | A |
-| 18 | **Stormglass** | One cast in three is treated as though it were raining over your water. | B |
+| 18 | **The Dredge Net** | One cast in four brings up treasure instead of a fish. | B |
 | 19 | **Cold Bait** | Your first cast each day cannot land a common. | B |
 | 20 | **The Full Creel** | Your daily casts refresh at noon as well as at midnight. | A |
 | 21 | **The Chummed Water** | Every fifth cast is refunded. | B |
@@ -450,6 +450,18 @@ carry nothing at all: `buff` is simply null on them.
 So the power now uses the mechanic that exists: **every decoration on your farm gives a buff, whatever its
 rarity.** That turns roughly seventy cosmetic pieces into working ones without touching the placement cap,
 which is a performance limit and not a design one.
+
+## Ninth pass — rain
+
+**The Rain Barrel (5)** is now simply: it is always raining on your farm. Rain already cuts 30% off every
+growing crop's remaining time (`RAIN_CUT`, once per plot per 6h), so the power is that the weather stops
+mattering — no waiting for a wet day, no cooldown between them.
+
+**Stormglass (18)** is gone. Rain reaches FISHING only through the `storm_sense` pet perk — `stormOn = storm >
+0 && await denIsRaining()`, so the rain check does nothing unless you are already carrying the Scarecrow Crow.
+A gear power that only works when paired with one specific pet is not a power, it is a footnote. Replaced with
+**The Dredge Net** — one cast in four brings up treasure instead of a fish, which uses `TREASURE_CHANCE`, the
+lever `dredge` already widens and that nothing else on this list touches.
 
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
 state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
