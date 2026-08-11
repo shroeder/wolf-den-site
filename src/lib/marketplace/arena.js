@@ -619,6 +619,15 @@ const MEMBER_WEIGHT = 1.6;   // a person beats a dummy, when there is one your s
 // instead of appearing only when the Den is asleep — and somebody at the very top still meets people.
 const RESERVE_NPC = 2;
 const RESERVE_MEMBER = 2;
+// ── AND THE SPLIT IS A NUMBER, NOT AN OUTCOME ────────────────────────────────────────────────────────────────
+// Reserving seats and weighting by rank got the Gauntlet to "somewhere between 29% and 60%, depending on how
+// crowded your rating is" — which is better than 0-100%, and still not a thing anybody chose. Luke wants 45%,
+// so 45% is written down and the weights are normalised to hit it.
+//
+// The alternative is tuning MEMBER_WEIGHT and the reserve counts until the measured number lands near the
+// target, which is how you end up with three constants nobody can explain and a split that drifts the next
+// time the roster changes shape. This holds at any roster size by construction.
+const GAUNTLET_SHARE = 0.45;
 
 function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
@@ -645,18 +654,32 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     const rest = [...members.slice(RESERVE_MEMBER), ...npcs.slice(RESERVE_NPC)].sort((a, z) => a.d - z.d);
     picked.push(...rest.slice(0, Math.max(0, SHORTLIST - picked.length)));
 
-    // ── WEIGHTED WITHIN ITS OWN KIND, NOT ACROSS THE WHOLE LIST ──────────────────────────────────────────
-    // The first cut of this re-sorted the seated shortlist by distance and weighted by GLOBAL position, which
-    // quietly undid the reservation: on a crowded board the two reserved tiers landed in seats six and seven,
-    // took a weight of 1/6 and 1/7, and the Gauntlet came out at 12% — barely better than the gap-filler it
-    // replaced. Ranking each kind against ITSELF means the closest tier is always worth a full share, however
-    // many people happen to be standing near you, and the split holds at roughly a third across any roster.
+    // ── WEIGHTED WITHIN ITS OWN KIND, THEN NORMALISED TO THE SPLIT ──────────────────────────────────────
+    // Rank each candidate against ITS OWN KIND, so the closest tier is always worth a full share however many
+    // people happen to be standing nearby. (Weighting by GLOBAL position was the first cut and it quietly
+    // undid the reservation: on a crowded board the two reserved tiers landed in seats six and seven, took
+    // 1/6 and 1/7, and the Gauntlet came out at 12%.)
+    //
+    // Then scale each block so the Gauntlet gets exactly GAUNTLET_SHARE of the roll. WITHIN a block the
+    // closest is still the likeliest — the normalising decides how often you face a monster, not which one.
     const rank = { member: 0, npc: 0 };
-    const shortlist = picked.map((c) => {
+    const weighted = picked.map((c) => {
         const i = rank[c.kind];
         rank[c.kind] += 1;
         return { ...c, w: c.boost / (1 + i) };
     });
+    const sumOf = (kind) => weighted.filter((c) => c.kind === kind).reduce((n, c) => n + c.w, 0);
+    const npcSum = sumOf("npc");
+    const memSum = sumOf("member");
+    // Only one kind on the board? It takes the whole roll — there is nothing to split with.
+    const shortlist = (npcSum > 0 && memSum > 0)
+        ? weighted.map((c) => ({
+            ...c,
+            w: c.kind === "npc"
+                ? (c.w / npcSum) * GAUNTLET_SHARE
+                : (c.w / memSum) * (1 - GAUNTLET_SHARE),
+        }))
+        : weighted;
     let roll = Math.random() * shortlist.reduce((sum, c) => sum + c.w, 0);
     return shortlist.find((c) => (roll -= c.w) <= 0) || shortlist[0];
 }
