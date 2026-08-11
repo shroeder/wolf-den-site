@@ -150,7 +150,9 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
                 if (!held.has(r.buyer_id)) held.set(r.buyer_id, []);
                 held.get(r.buyer_id).push(r.gem_id);
             }
-            for (const [bid, gemIds] of held) gemByBuyer.set(bid, sumGemStats(gemIds));
+            // Per BUYER, so each one's own powers decide what their gems are worth. Resolved in a loop
+            // rather than in the map above because equippedPowers is a query and this runs for a whole pack.
+            for (const [bid, gemIds] of held) gemByBuyer.set(bid, sumGemStats(gemIds, await equippedPowers(bid)));
         }
     } catch { /* no bench, no gems */ }
 
@@ -305,6 +307,7 @@ const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 9
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
+import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,

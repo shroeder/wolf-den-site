@@ -66,13 +66,25 @@ export const gemArt = (id) => `/images/gems/${id}.png`;
 const BY_ID = new Map(GEMS.map((g) => [g.id, g]));
 export const gemById = (id) => BY_ID.get(String(id || "")) || null;
 
-/** Merge a set of socketed gem ids into one stat total, the way sumItemStats does for gear. */
-export function sumGemStats(gemIds = []) {
+/**
+ * Merge a set of socketed gem ids into one stat total, the way sumItemStats does for gear.
+ *
+ * `powers` is the wearer's ascension power set, because two of them change what a set gem is worth and this is
+ * the only place that answer is computed:
+ *   THE JEWELLER'S EYE  every gem counts as one tier higher (a Polished pays like a Brilliant)
+ *   THE DEEP FACET      a gem also gives its stat to the piece beside it, so each one counts twice
+ * Both are conditional on the gear being worn — they change what your gems are WORTH, and write nothing back
+ * onto the gem or the socket.
+ */
+export function sumGemStats(gemIds = [], powers = null) {
+    const upTier = powers?.has?.("jeweller_s_eye");
+    const doubled = powers?.has?.("deep_facet");
     const total = {};
     for (const id of gemIds) {
-        const g = gemById(id);
+        let g = gemById(id);
         if (!g) continue;
-        for (const [k, v] of Object.entries(g.stats)) total[k] = (total[k] || 0) + v;
+        if (upTier) g = gemById(gemId(g.kind, Math.min(GEM_TIERS.length, g.tier + 1))) || g;
+        for (const [k, v] of Object.entries(g.stats)) total[k] = (total[k] || 0) + v * (doubled ? 2 : 1);
     }
     return total;
 }
@@ -89,6 +101,10 @@ export const socketCost = (rarity) => SOCKET_COST[rarity] || SOCKET_COST.common;
 // Three of a kind make one of the tier above. Three rather than two because two is an upgrade path so cheap
 // that the lower tiers stop being drops and start being currency.
 export const FUSE_COUNT = 3;
+// The Steady Bench drops it to two. The fuse CANNOT FAIL — it is a deterministic spend-three-get-one — so the
+// power as first written ("a failed fuse returns all three gems") was aimed at an outcome that does not exist.
+// What it can honestly do is make the ladder cheaper.
+export const fuseCountFor = (powers) => (powers?.has?.("steady_bench") ? 2 : FUSE_COUNT);
 
 // ── AND THE LADDER STOPS AT POLISHED ─────────────────────────────────────────────────────────────────────────
 // Fusing tops out at tier 3. Anything above it has to come out of the rock.

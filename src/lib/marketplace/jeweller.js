@@ -3,7 +3,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
-import { FUSE_COUNT, FUSE_MAX_TIER, GEMS, GEM_TIERS, MAX_SOCKETS, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { FUSE_COUNT, FUSE_MAX_TIER, GEMS, GEM_TIERS, MAX_SOCKETS, fuseCountFor, gemById, gemId, socketCost, sumGemStats } from "@/lib/marketplace/gems.js";
+import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 import { describeStats, itemById } from "@/lib/marketplace/items.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
@@ -34,7 +35,7 @@ export async function getGems(buyerId) {
             // What three of them would make, and whether you are holding three.
             fuseInto: next ? { id: next.id, name: next.name, stats: next.stats } : null,
             canFuse: Boolean(next) && held.get(g.id) >= FUSE_COUNT,
-            fuseCount: FUSE_COUNT,
+            fuseCount: FUSE_COUNT,   // display only; fuseCountFor() decides what is actually spent
         };
     });
 }
@@ -82,7 +83,8 @@ export async function socketBonusFor(buyerId, itemIds) {
         `SELECT gem_id FROM mkt_item_socket WHERE buyer_id = $1 AND item_id = ANY($2) AND gem_id IS NOT NULL`,
         [buyerId, itemIds]
     ).catch(() => []);
-    return sumGemStats(rows.map((r) => r.gem_id));
+    // The wearer's powers decide what a set gem is worth — see sumGemStats.
+    return sumGemStats(rows.map((r) => r.gem_id), await equippedPowers(buyerId));
 }
 
 // ── WHEN THE ITEM LEAVES YOUR HANDS ──────────────────────────────────────────────────────────────────────────
@@ -129,15 +131,16 @@ export async function fuseGems(buyerId, id) {
 
     // Spend conditionally — three at once, in one statement, so two taps cannot both pass a count check that
     // only one of them can afford.
+    const need = fuseCountFor(await equippedPowers(buyerId));
     const spent = await db.queryOne(
         `UPDATE mkt_gem SET count = count - $3 WHERE buyer_id = $1 AND gem_id = $2 AND count >= $3 RETURNING count`,
-        [buyerId, gem.id, FUSE_COUNT]
+        [buyerId, gem.id, need]
     ).catch(() => null);
     if (!spent) return { ok: false, error: "not_enough" };
 
     await grantGem(buyerId, next.id, 1, "fuse");
     await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, meta) VALUES ($1, 'fused', $2, $3::jsonb)`,
-        [buyerId, next.id, JSON.stringify({ from: gem.id, spent: FUSE_COUNT })]).catch(() => {});
+        [buyerId, next.id, JSON.stringify({ from: gem.id, spent: need })]).catch(() => {});
     await trackActivity(buyerId, "gem_fuse", { from: gem.id, to: next.id }).catch(() => {});
     return { ok: true, from: gem, to: next };
 }
@@ -252,6 +255,14 @@ export async function pullGem(buyerId, itemId, idx = 0, keep = false) {
         return { ok: true, kept: gem, cost };
     }
 
+    // Jeweller's Patience: one gem in three comes out of the socket whole rather than broken. UNSOCKET_DESTROYS
+    // stays the rule — this is an exception a member is wearing, not a change to the bench.
+    if (gem && await (async () => (await equippedPowers(buyerId)).has("jeweller_s_patience"))() && oneIn(3)) {
+        await grantGem(buyerId, gem.id, 1, "patience");
+        await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id) VALUES ($1, 'gem_saved', $2, $3)`,
+            [buyerId, gem.id, itemId]).catch(() => {});
+        return { ok: true, saved: gem };
+    }
     await db.query(`INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, item_id) VALUES ($1, 'gem_pulled', $2, $3)`,
         [buyerId, socket.was || null, itemId]).catch(() => {});
     return { ok: true, destroyed: socket.was || null };

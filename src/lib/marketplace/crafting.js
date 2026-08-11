@@ -18,6 +18,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { rollUtil, parseUtil, describeUtil, getEquippedUtilTotals, UTIL_BASE_CHANCE } from "@/lib/marketplace/item-affix.js";
 import { getElementOverrides, describeItemElements, reforgeCost, DUAL_ELEMENT_CHANCE } from "@/lib/marketplace/item-element.js";
 import { ELEMENTS } from "@/lib/marketplace/boss-weakness.js";
+import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // ── The Forge (owner-gated blacksmith): salvage → tiered parts → combine → enhance equipped gear via a timing
 // mini-game. Phase 1 core loop. All actions are owner-gated at the API layer.
@@ -289,7 +290,10 @@ export async function salvageItem(buyerId, itemId) {
         ]);
         forgePet = { salvage: sv, spark: sp };
     } catch { /* no companion, no bonus */ }
-    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus + forgePet.salvage / 100) { n *= 2; doubled = true; } // Efficient Salvage + Regalia + companion
+    // Twice-Struck is a flat one-in-three double on top of Efficient Salvage, the Regalia and the companion.
+    const salvagePowers = await equippedPowers(buyerId);
+    if (Math.random() < chance(upg, "efficient", bf) + rb.doubleBonus + forgePet.salvage / 100
+        || (salvagePowers.has("twice_struck") && oneIn(3))) { n *= 2; doubled = true; }
     n += rb.flatParts;
     // Melt-down recovery: ~40% of the parts forged into this item (same tier as its salvage parts).
     let enhanceBonus = 0;
@@ -409,12 +413,26 @@ export async function combineAllAtTier(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
+// The Whetstone guarantees one critical enhance a day. The forge already keeps a per-day row for its daily
+// card (mkt_forge_daily), so that is what answers "have you had today's yet" rather than a new column.
+async function enhancedTodayAlready(buyerId) {
+    const row = await db.queryOne(
+        `SELECT 1 FROM mkt_activity
+          WHERE buyer_id = $1 AND kind = 'forge_enhance'
+            AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date
+          LIMIT 1`,
+        [buyerId]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
     if (!new Set(Object.values(await getEquippedIds(buyerId))).has(itemId)) return { ok: false, error: "not_equipped" };
     const cur = await db.queryOne(`SELECT level, stat_bonus, best_grade, util FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]).catch(() => null);
     const level = cur?.level || 0;
+    const enhancePowers = await equippedPowers(buyerId);
     if (level >= MAX_FORGE_LEVEL) return { ok: false, error: "maxed", ...(await getForgeState(buyerId)) }; // peak enchantment reached
     const { tier, qty } = enhanceCost(item, level);
     // A POWER SCROLL is a free enhance — consume one instead of salvaged parts.
@@ -430,6 +448,9 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
             const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");
             const spark = await getPetSystemPerk(buyerId, "forge_spark");
             sparked = spark > 0 && Math.random() < spark / 100;
+            // The Cold Hammer spares the parts outright on every third enhance. Counted off the item's own
+            // level rather than rolled, so "every third" means every third.
+            if (!sparked && enhancePowers.has("cold_hammer") && (level + 1) % 3 === 0) sparked = true;
         } catch { /* no companion, no bonus */ }
         if (!sparked) {
             const paid = await db.queryOne(`UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`, [buyerId, tier, qty]).catch(() => null);
@@ -446,10 +467,18 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // Below 25% the forge WHIFFS: no stat gain (it still levels + grants XP). Each stat is capped so it can't run
     // away. Master's Touch bumps you up one tier.
     let scenario = q >= 0.92 ? 4 : q >= 0.75 ? 3 : q >= 0.5 ? 2 : q >= 0.25 ? 1 : 0;
+    // ── ASCENSION POWERS ON AN ENHANCE ───────────────────────────────────────────────────────────────────
+    // The Whetstone guarantees ONE critical success a day — the top scenario, which is what a critical is here.
+    // The Smith's Certainty stops a whiff being a wasted swing: below the threshold it lifts you to the first
+    // real band rather than nothing, which is the "costs you nothing and may be tried again" on the card.
+    if (enhancePowers.has("whetstone") && !(await enhancedTodayAlready(buyerId))) scenario = 4;
+    if (enhancePowers.has("smith_s_certainty") && scenario === 0) scenario = 1;
     const upg = await upgradeLevels(buyerId);
     const bf = await getForgeBonus(buyerId); // earned forge badges + owned forge pets boost double-gain odds
     let doubled = false;
     if (scenario > 0 && Math.random() < chance(upg, "masters_touch", bf)) { scenario = Math.min(4, scenario + 1); doubled = true; }
+    // The Master's Mark: one enhance in three advances TWO levels instead of one.
+    const doubleLevel = enhancePowers.has("master_s_mark") && oneIn(3);
 
     const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
     const ADDABLE = ["might", "crit_chance", "crit_power", "ferocity", "fortune"]; // stats a strong forge can ADD (never extra_strike)
@@ -479,7 +508,8 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
         .query(
             `INSERT INTO mkt_item_enhance (buyer_id, item_id, level, stat_bonus, best_grade, util, updated_at) VALUES ($1,$2,$3,$4::jsonb,$5,$6::jsonb,NOW())
              ON CONFLICT (buyer_id, item_id) DO UPDATE SET level = $3, stat_bonus = $4::jsonb, best_grade = $5, util = $6::jsonb, updated_at = NOW()`,
-            [buyerId, itemId, level + 1, JSON.stringify(nextBonus), bestGrade, utilJson]
+            // The Master's Mark advances two levels instead of one, still bounded by MAX_FORGE_LEVEL.
+            [buyerId, itemId, Math.min(MAX_FORGE_LEVEL, level + (doubleLevel ? 2 : 1)), JSON.stringify(nextBonus), bestGrade, utilJson]
         )
         .catch(() => {});
     await db.query(`UPDATE mkt_buyer SET equipment_updated_at = NOW() WHERE id = $1`, [buyerId]).catch(() => {}); // nudge the hero-sprite redraw
