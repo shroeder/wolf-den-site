@@ -90,12 +90,15 @@ export default function SetsClient({ sets, exhibit = null, canLoan = false }) {
                         {inspect.signature ? <p style={{ margin: "6px 0 0", fontSize: "0.85rem", color: "#ffd75e" }}>★ {inspect.signature}</p> : null}
                         {inspect.flavor ? <p className="muted" style={{ margin: "8px 0 0", fontStyle: "italic", fontSize: "0.82rem" }}>“{inspect.flavor}”</p> : null}
                         <p className="muted" style={{ margin: "10px 0 0", fontSize: "0.8rem" }}>{inspect.equipped ? "✅ Equipped" : loan === inspect.id ? "On loan — counts as owned" : inspect.owned ? "In your bag" : "🔒 Not yet yours"}</p>
+                        {/* The borrow takes the gold, and Close steps down to a plain button when it is there.
+                            Shipped the other way round: the dismissal was the loudest thing on a card whose
+                            whole point was the one action underneath it. */}
                         {canLoan && !inspect.equipped && (loan === inspect.id || !inspect.owned) ? (
-                            <button type="button" className="button" style={{ marginTop: 10 }} disabled={busy} onClick={() => borrow(inspect.id)}>
+                            <button type="button" className="button gold" style={{ marginTop: 10 }} disabled={busy} onClick={() => borrow(inspect.id)}>
                                 {busy ? "…" : loan === inspect.id ? "Return it to the cabinet" : "Borrow this one"}
                             </button>
                         ) : null}
-                        <button type="button" className="button gold" style={{ marginTop: 12 }} onClick={() => setInspect(null)}>Close</button>
+                        <button type="button" className={`button${canLoan && !inspect.equipped && (loan === inspect.id || !inspect.owned) ? "" : " gold"}`} style={{ marginTop: 12 }} onClick={() => setInspect(null)}>Close</button>
                     </div>
                 </div>
             ), document.body) : null}

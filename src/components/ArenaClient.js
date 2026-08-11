@@ -1411,7 +1411,7 @@ export default function ArenaClient({ initial }) {
 // It lives in the Armoury tab because that is the one screen where a laurel is already a number you are
 // deciding what to do with. The doubloon side is deliberately shown at the same size: the whole point of the
 // power is that the two purses are one purse now.
-function PurserPanel({ st, busy, act }) {
+export function PurserPanel({ st, busy, act }) {
     const [from, setFrom] = useState("doubloons");
     const [amount, setAmount] = useState("");
     if (!st?.purser) return null;

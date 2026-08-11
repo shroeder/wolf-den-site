@@ -2186,7 +2186,9 @@ export default function TownClient({ initial }) {
     );
 }
 
-const TOWN_CSS = `
+// Exported ONLY so the powers lab can inject it — the stockade row lives in here, and a fixture without
+// these rules renders an unstyled stack that tells you nothing.
+export const TOWN_CSS = `
 .tw-scene { position: relative; width: 100%; height: min(66vh, 540px); border-radius: 18px; overflow: hidden; cursor: grab; touch-action: pan-y;
     box-shadow: inset 0 -30px 60px rgba(0,0,0,0.28), 0 10px 30px rgba(0,0,0,0.35); user-select: none; -webkit-user-select: none; background: #1a1330; }
 .tw-scene:active { cursor: grabbing; }
@@ -2597,6 +2599,9 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-stock-btn:disabled { opacity: 0.42; cursor: default; }
 .tw-stock-btn.is-shame { border-color: rgba(255,205,120,0.42); background: linear-gradient(180deg, rgba(74,58,30,0.96), rgba(44,34,18,0.96)); }
 .tw-stock-btn.is-fruit { border-color: rgba(255,120,110,0.45); background: linear-gradient(180deg, rgba(84,34,30,0.96), rgba(50,20,18,0.96)); }
+/* The key is the one button in this row that HELPS the occupant, so it is the one that is not red or amber —
+   without a colour of its own it fell back to the base grey and read as disabled next to its two neighbours. */
+.tw-stock-btn.is-key { border-color: rgba(140,200,255,0.42); background: linear-gradient(180deg, rgba(28,48,66,0.96), rgba(16,28,40,0.96)); }
 .tw-stock-ico { font-size: 22px; line-height: 1; grid-row: span 2; }
 .tw-stock-lbl { font-weight: 800; font-size: 0.98rem; letter-spacing: 0.1px; }
 .tw-stock-meta { grid-column: 2; font-size: 0.76rem; color: #c3b2a6; margin-top: 1px; }

@@ -16,9 +16,11 @@ import { useCallback, useEffect, useState } from "react";
 const IDLE_MS = 45000;
 const OPEN_MS = 4000;
 
-export default function MusterHorn() {
+// `defaultOpen` exists for the powers lab: the panel is the half worth looking at and it is only reachable
+// by tapping, which a screenshot cannot do.
+export default function MusterHorn({ defaultOpen = false }) {
     const [state, setState] = useState(null);
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(defaultOpen);
     const [busy, setBusy] = useState(null);
     const [flash, setFlash] = useState(null);
 
