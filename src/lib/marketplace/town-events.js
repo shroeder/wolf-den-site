@@ -232,10 +232,21 @@ async function computeRaidHit(buyerId) {
 const MIN_ACTIVE_MS = 150000;        // ~2.5 min for a real (pushed) event
 const MIN_ACTIVE_SILENT_MS = 45000;  // shorter for owner silent-tests so you're not stuck fighting for minutes
 
-// Resolve any active event whose timer has elapsed (lazy — runs on reads). Idempotent.
-async function resolveExpiredEvents() {
+// ── WHY THIS IS ALSO ON THE CRON NOW ─────────────────────────────────────────────────────────────────────────
+// This was lazy and ONLY lazy: it ran when somebody loaded the Town. A boss raid ends the instant its HP hits
+// zero, mid-fight, with people looking — so its "raid over" push always went out on time. A SKIRMISH raid never
+// ends on a clear; it runs to its timer and is resolved by whoever next opens the Town. If that is nobody, the
+// raid sits `active` forever, the completion rewards are never paid, and the push announcing the end never
+// fires at all. Which is exactly the report: the bandit and chieftain raids do not tell you when they finish.
+//
+// Exported and called from the 15-minute town cron as well, so a raid finishes when it FINISHES rather than
+// when somebody happens to look.
+export async function resolveExpiredEvents() {
     const rows = await db.query(`SELECT id FROM mkt_town_event WHERE status = 'active' AND ends_at < NOW()`).catch(() => []);
     for (const r of rows) await resolveTownEvent(r.id, "expired").catch(() => {});
+    // Counted rather than silent: the cron reports it, so "raids are not ending" is answerable from the job log
+    // instead of by noticing that nobody got paid.
+    return { resolved: rows.length, ids: rows.map((r) => Number(r.id)) };
 }
 
 // A raid runs for its FULL duration — clearing a wave NEVER ends it; reinforcements always arrive (refill hp +
@@ -613,10 +624,12 @@ async function resolveTownEvent(eventId, outcome) {
             await checkTownRaidBadges(h.buyer_id, { topDamagerOnKill: killed && h.buyer_id === topId }).catch(() => {});
             await maybeGrantRaidPet(h.buyer_id, { boss: true, killed }).catch(() => {});
         }
-        if (!ev.meta?.silent) {
-            // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
-            await broadcastWebPush({ kind: "raid", title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`, body: killed ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!` : "It slipped away, but everyone who fought earned a share.", url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
-        }
+        await announceRaidOver(ev, {
+            title: killed ? `🏆 ${ev.name} FELLED!` : `💨 ${ev.name} escaped`,
+            body: killed
+                ? `The pack brought it down — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils!`
+                : "It slipped away, but everyone who fought earned a share.",
+        });
         return;
     }
     // Skirmish raid over. Per-duel spoils were already paid as they fought; the COMPLETION bonus now scales with
@@ -650,13 +663,34 @@ async function resolveTownEvent(eventId, outcome) {
         // A Chieftain kill is the real achievement, so it carries the better pet odds.
         await maybeGrantRaidPet(h.buyer_id, { boss: chieftainDown, killed: chieftainDown }).catch(() => {});
     }
-    if (!ev.meta?.silent) {
-        // Awaited — see spawnTownEvent: an un-awaited push dies with the serverless instance.
-        const body = chieftainDown
+    await announceRaidOver(ev, {
+        title: chieftainDown ? `🏆 ${ev.name} broken!` : `✅ ${ev.name} over`,
+        body: chieftainDown
             ? `The Chieftain is down! ${n} ${n === 1 ? "wolf" : "wolves"} share the full purse.`
-            : `Pushed to wave ${waves} of ${CHIEFTAIN_WAVE} — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils.`;
-        await broadcastWebPush({ kind: "raid", title: chieftainDown ? `🏆 ${ev.name} broken!` : `✅ ${ev.name} over`, body, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => {});
-    }
+            : `Pushed to wave ${waves} of ${CHIEFTAIN_WAVE} — ${n} ${n === 1 ? "wolf" : "wolves"} share the spoils.`,
+    });
+}
+
+/**
+ * Tell everyone a raid is over — on BOTH channels, and record who was reached.
+ *
+ * The spawn announcement has always gone out on the browser AND the phone app. The end announcement went out on
+ * the browser only, on both raid paths, so the app told you a raid had started and then never mentioned it
+ * again. There was no way to notice either, because spawn stamps its reach onto the event row and the
+ * resolution stamped nothing — the admin Raids screen could show how many heard it begin and had no column at
+ * all for how many heard it end. Both fixed here, in one place, so the two announcements cannot drift again.
+ *
+ * Awaited, like the spawn push: on Vercel the handler's response freezes the instance and a fire-and-forget
+ * push is killed mid-flight.
+ */
+async function announceRaidOver(ev, { title, body }) {
+    if (ev?.meta?.silent) return;
+    const [web, app] = await Promise.all([
+        broadcastWebPush({ kind: "raid", title, body, url: "/marketplace/town", tag: "town-event", data: { type: "town_event_end" } }).catch(() => ({ sent: 0 })),
+        broadcastBuyerPushAll({ title, body, route: "town", data: { type: "town_event_end" } }).catch(() => ({ sent: 0 })),
+    ]);
+    await db.query(`UPDATE mkt_town_event SET meta = meta || $2::jsonb WHERE id = $1`,
+        [ev.id, JSON.stringify({ endPushWeb: Number(web?.sent) || 0, endPushApp: Number(app?.sent) || 0 })]).catch(() => {});
 }
 
 // ── PASSIVE DPS FOR BEING IN THE SQUARE ──────────────────────────────────────────────────────────────────────

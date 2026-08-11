@@ -16,7 +16,7 @@ const TARGET_MIN = 1;
 const TARGET_MAX = 3;
 
 export async function getTownTelemetry() {
-    const [summary, cadence, hours, participation, types, recent, top, live] = await Promise.all([
+    const [summary, cadence, hours, participation, types, recent, top, live, appTokenRow] = await Promise.all([
         db.queryOne(
             `SELECT COUNT(*)::int AS total,
                     COUNT(*) FILTER (WHERE ${REAL})::int AS real,
@@ -74,8 +74,12 @@ export async function getTownTelemetry() {
               GROUP BY e.kind ORDER BY n DESC`
         ).catch(() => []),
 
-        // Recent raids incl. how many devices the rally push actually reached (meta.pushWeb / meta.pushApp,
-        // stamped at spawn). NULL = spawned before we recorded it, 0 = genuinely nobody notified.
+        // Recent raids incl. how many devices each push actually reached. The RALLY push (meta.pushWeb /
+        // pushApp, stamped at spawn) and the OVER push (meta.endPushWeb / endPushApp, stamped at resolution)
+        // are separate numbers because they were separate bugs: the end announcement went out on the browser
+        // only, and a skirmish raid was not resolved at all until somebody loaded the Town. A raid with a
+        // healthy rally reach and a null end reach is the shape of that failure.
+        // NULL = the raid predates the stamp, 0 = genuinely nobody notified.
         db.query(
             `SELECT e.id::text AS id, e.kind, e.status, e.hp, e.hp_max,
                     TO_CHAR(e.started_at AT TIME ZONE 'America/Chicago','MM-DD HH24:MI') AS started_ct,
@@ -83,6 +87,8 @@ export async function getTownTelemetry() {
                     (e.meta->>'wave')::int AS wave,
                     (e.meta->>'pushWeb')::int AS push_web,
                     (e.meta->>'pushApp')::int AS push_app,
+                    (e.meta->>'endPushWeb')::int AS end_push_web,
+                    (e.meta->>'endPushApp')::int AS end_push_app,
                     COUNT(h.buyer_id)::int AS fighters,
                     COALESCE(SUM(h.damage), 0)::int AS damage
                FROM mkt_town_event e LEFT JOIN mkt_town_event_hit h ON h.event_id = e.id
@@ -106,9 +112,14 @@ export async function getTownTelemetry() {
                     GREATEST(0, EXTRACT(EPOCH FROM (ends_at - NOW()))::int) AS secs_left
                FROM mkt_town_event WHERE status = 'active' LIMIT 1`
         ).catch(() => null),
+
+        // How many phones could receive an app push AT ALL. A per-raid reach of 0 is ambiguous — it could be a
+        // broken send or an empty audience — and this is the number that tells the two apart.
+        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_push_token WHERE token IS NOT NULL AND token <> ''`).catch(() => null),
     ]);
 
     const p = participation || {};
+    const appTokens = Number(appTokenRow?.n) || 0;
     const emptyPct = p.events ? Math.round((p.empty_events / p.events) * 100) : 0;
     const todayN = summary?.today ?? 0;
 
@@ -132,6 +143,28 @@ export async function getTownTelemetry() {
         flags.push({ sev: "info", text: "No raid has recorded its push reach yet — the next spawn will." });
     }
 
+    // ── DID ANYONE HEAR IT END? ──────────────────────────────────────────────────────────────────────────
+    // A flag rather than a column, because the phone app renders flags already and this is the failure that
+    // was invisible for weeks: the rally push went out fine, so every number on this screen looked healthy,
+    // while the "raid over" announcement was browser-only AND a skirmish raid was not resolved at all until
+    // somebody happened to load the Town. Both are fixed; this is what would catch the next one.
+    const ended = (recent || []).filter((r) => !r.silent && r.status !== "active");
+    const stampedEnd = ended.filter((r) => r.end_push_web != null);
+    if (ended.length >= 2 && !stampedEnd.length) {
+        flags.push({ sev: "warn", text: `${ended.length} finished raids and not one recorded an end announcement — nobody is being told when a raid is over.` });
+    } else if (stampedEnd.length) {
+        const avgEnd = Math.round(stampedEnd.reduce((a, r) => a + (r.end_push_web || 0), 0) / stampedEnd.length);
+        const app = stampedEnd.reduce((a, r) => a + (r.end_push_app || 0), 0);
+        flags.push({ sev: avgEnd > 0 ? "good" : "warn", text: `"Raid over" reaching ~${avgEnd} browser${avgEnd === 1 ? "" : "s"}${app ? ` and ${app} phone${app === 1 ? "" : "s"}` : ""} per raid.` });
+    }
+
+    // The phone app has never registered a push token, so every app-channel broadcast in the game — rally,
+    // raid over, boss, sailing — has been sending to an empty list. Worth saying out loud on the screen whose
+    // whole job is "did anyone hear this", rather than leaving it to be inferred from a zero.
+    if (appTokens === 0) {
+        flags.push({ sev: "warn", text: "No phone has registered for app push (0 tokens), so every app notification reaches nobody. Browser push is unaffected." });
+    }
+
     if (summary?.silent) flags.push({ sev: "info", text: `${summary.silent} silent owner test spawn${summary.silent === 1 ? "" : "s"} excluded from these numbers.` });
 
     return {
@@ -145,6 +178,7 @@ export async function getTownTelemetry() {
             lastCt: summary?.last_ct || null,
             targetMin: TARGET_MIN,
             targetMax: TARGET_MAX,
+            appTokens,
         },
         live: live ? { id: live.id, kind: live.kind, hp: Number(live.hp), hpMax: Number(live.hp_max), secsLeft: Number(live.secs_left) } : null,
         participation: {
@@ -160,7 +194,9 @@ export async function getTownTelemetry() {
         recent: (recent || []).map((r) => ({
             id: r.id, kind: r.kind, status: r.status, startedCt: r.started_ct, silent: r.silent,
             hp: Number(r.hp), hpMax: Number(r.hp_max), wave: r.wave ?? 1,
-            pushWeb: r.push_web, pushApp: r.push_app, fighters: r.fighters, damage: r.damage,
+            pushWeb: r.push_web, pushApp: r.push_app,
+            endPushWeb: r.end_push_web, endPushApp: r.end_push_app,
+            fighters: r.fighters, damage: r.damage,
         })),
         top: (top || []).map((r) => ({ name: r.name, alias: r.alias, raids: r.raids, damage: r.damage, hits: r.hits })),
         flags,
