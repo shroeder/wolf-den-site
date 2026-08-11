@@ -6,11 +6,13 @@ import MusterHorn from "@/components/MusterHorn";
 import SetsClient from "@/components/SetsClient";
 import SpinWheel from "@/components/SpinWheel";
 import { PurserPanel } from "@/components/ArenaClient";
+import AvatarBuilder from "@/components/AvatarBuilder";
 import { TOWN_CSS } from "@/components/TownClient";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
-// DEV ONLY (the route 404s in production). Every control the 120 ascension powers added, at a real phone width
-// and at desktop, without needing the item that grants it.
+// DEV ONLY (the route 404s in production). Controls that are HARD TO REACH, at a real phone width and at
+// desktop — the ascension-power controls it was built for, plus anything else that needs a signed-in account
+// or a specific server state to lay eyes on.
 //
 // WHY IT HAS TO EXIST. Each of these is drawn ONLY for the member wearing one specific top-tier item — and not
 // one of those items is obtainable right now (every one is `source: "elite"`, which every drop pool excludes).
@@ -67,6 +69,8 @@ const SCENES = {
     "dealer-two": { label: "Dealer's Choice — both wedges", note: "Two tiles, no 'Deal again'." },
     purser: { label: "The Purser's Exchange", note: "Sits under the crates in the Armoury tab." },
     sets: { label: "The Loaned Exhibit", note: "Open a piece you do NOT own — the borrow button is in the modal." },
+    "lock-off": { label: "Hero lock — unlocked", note: "Sits beside the paid redraw; the two decide the same thing." },
+    "lock-on": { label: "Hero lock — locked", note: "Locked state must be certain at a glance, and it disables the redraw." },
     stockade: { label: "Warden's Key (markup fixture)", note: "A third button in a row built for two.", fixture: true },
     dock: { label: "Call for the merchant (markup fixture)", note: "A second CTA in a dock built for one.", fixture: true },
 };
@@ -118,6 +122,9 @@ function installStub(scene) {
         if (u.includes("/api/marketplace/spin")) return json(spin);
         if (u.includes("/api/marketplace/sets")) return json({ ok: true, exhibit: "piece_wheel_hub" });
         if (u.includes("/api/marketplace/arena")) return json({ ok: true, ...ARENA_BASE });
+        if (u.includes("/api/marketplace/avatar")) {
+            return json({ cost: 1000, gold: 4820, canAfford: true, firstIsFree: false, hasAvatar: true, locked: scene === "lock-on" });
+        }
         // Everything else the page happens to ask for while it is open.
         return json({});
     };
@@ -192,6 +199,7 @@ export default function PowersLab() {
             ) : null}
             {scene.startsWith("dealer") ? <SpinWheel key={scene} /> : null}
             {scene === "sets" ? <SetsClient sets={sets} exhibit={null} canLoan /> : null}
+            {scene.startsWith("lock") ? <AvatarBuilder key={scene} current={null} /> : null}
             {scene === "purser" ? (
                 <section className="card">
                     <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>

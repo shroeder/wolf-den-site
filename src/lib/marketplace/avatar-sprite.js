@@ -117,6 +117,10 @@ export function pendingSpriteIds(limit = null) {
             `SELECT id FROM mkt_buyer
               WHERE avatar_config IS NOT NULL
                 AND avatar_sprite_attempts < ${MAX_SPRITE_ATTEMPTS}
+                -- LOCKED: the member likes the hero they have and has said so. This is the only place the flag
+                -- is read, because this is the only query that decides who gets redrawn — a lock enforced
+                -- anywhere further down would be a second opinion about the same question.
+                AND avatar_sprite_locked = FALSE
                 -- NEVER draw for an untouched avatar. A member who has not opened the customiser is still on
                 -- the stock config, so a bespoke draw produces the stock character. That is precisely what the
                 -- shared default sprite exists for: they render it until they change something, which stamps
@@ -403,7 +407,8 @@ export const heroRedrawCost = (bought = 0) => HERO_REDRAW_BASE * Math.pow(2, Mat
 export async function heroRedrawQuote(buyerId) {
     if (!buyerId) return null;
     const r = await db.queryOne(
-        `SELECT COALESCE(hero_redraws, 0) AS bought, COALESCE(gold, 0) AS gold, avatar_sprite_url, avatar_config
+        `SELECT COALESCE(hero_redraws, 0) AS bought, COALESCE(gold, 0) AS gold, avatar_sprite_url, avatar_config,
+                avatar_sprite_locked
            FROM mkt_buyer WHERE id = $1`,
         [buyerId],
     ).catch(() => null);
@@ -416,7 +421,27 @@ export async function heroRedrawQuote(buyerId) {
         // No sprite yet means the free first draw is still owed — the cron will handle it.
         firstIsFree: !r.avatar_sprite_url,
         hasAvatar: Boolean(r.avatar_config),
+        locked: r.avatar_sprite_locked === true,
     };
+}
+
+/**
+ * Freeze the hero you have, or let it change again.
+ *
+ * A LOCK IS NOT A PAUSE ON THE CLOCK. `equipment_updated_at` and `avatar_updated_at` keep moving while locked,
+ * so unlocking makes the member immediately eligible again (subject to the usual 24h cooldown) and they get a
+ * draw that reflects everything they changed in the meantime. That is the behaviour people expect from a lock
+ * and it needs no bookkeeping to achieve — which is why the flag is read in the WHERE clause rather than used
+ * to suppress the timestamps.
+ */
+export async function setSpriteLock(buyerId, locked) {
+    if (!buyerId) return { ok: false, error: "unauthorized" };
+    const row = await db.queryOne(
+        `UPDATE mkt_buyer SET avatar_sprite_locked = $2 WHERE id = $1 RETURNING avatar_sprite_locked`,
+        [buyerId, Boolean(locked)],
+    ).catch(() => null);
+    if (!row) return { ok: false, error: "not_found" };
+    return { ok: true, locked: row.avatar_sprite_locked === true };
 }
 
 /** Spend gold and redraw this member's hero sprite now. */
@@ -426,6 +451,10 @@ export async function buyHeroRedraw(buyerId) {
     if (!quote) return { ok: false, error: "not_found" };
     if (!quote.hasAvatar) return { ok: false, error: "no_avatar" };
     if (quote.firstIsFree) return { ok: false, error: "first_is_free" };
+    // Refused rather than silently unlocking. A redraw is exactly the thing a lock exists to prevent, and
+    // spending gold to overwrite the hero you deliberately froze is the one outcome nobody wants — so the
+    // member unlocks first, on purpose, and the screen says so instead of the button just failing.
+    if (quote.locked) return { ok: false, error: "sprite_locked" };
 
     // Conditional spend: the WHERE clause IS the balance check, so a double-tap can't buy two on one balance.
     const paid = await db.queryOne(

@@ -15996,3 +15996,29 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cw-dealer-pick img { width: 46px; height: 46px; object-fit: contain; }
 .cw-dealer-again { align-self: center; padding: .5rem .8rem; border-radius: 999px; cursor: pointer;
     border: 1px dashed rgba(220,160,60,.5); background: none; color: #c9a24a; font-weight: 800; font-size: .78rem; }
+
+/* The hero lock. A ghost button's active state is otherwise only a brighter border, which reads as "maybe" —
+   and this one is a state you need to be certain of at a glance, because its whole job is to tell you nothing
+   is going to change your hero. Filled, with the text colour forced: the BASE .btn-ghost rule carries
+   `color: #ffd75e !important`, so no selected state can recolour its text without matching it. */
+.avatar-builder-actions .btn-ghost.is-active {
+    border-color: rgba(240,190,90,.95);
+    background: linear-gradient(180deg, #f2dfa8, #d8bd7c);
+    color: #2a2110 !important;
+    font-weight: 800;
+}
+
+/* A DISABLED GHOST BUTTON LOOKED EXACTLY LIKE AN ENABLED ONE. There was no :disabled rule at all, site-wide,
+   so every `disabled` ghost button — the hero redraw while locked, the exchange with nothing typed, a dozen
+   others — invited a tap that did nothing. Caught on the hero lock, fixed for all of them. */
+.btn-ghost:disabled,
+.btn-ghost[disabled] {
+    opacity: 0.45;
+    cursor: default;
+    filter: saturate(0.7);
+}
+.btn-ghost:disabled:hover,
+.btn-ghost[disabled]:hover {
+    background: transparent;
+    border-color: rgba(255, 215, 94, 0.4);
+}

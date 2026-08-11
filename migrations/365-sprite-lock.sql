@@ -1,0 +1,16 @@
+-- KEEP THE HERO YOU HAVE.
+--
+-- Asked for by @Jinxx on 2026-08-11: "Are you able to lock someone's Sprite? I like how mine looks currently
+-- and wouldn't care if it always looked like that no matter what gear I had on."
+--
+-- Her sprite really is changing under her. The avatar-sprites job runs every half hour and pendingSpriteIds
+-- treats `equipment_updated_at > avatar_sprite_at` as a reason to redraw, capped at once per member per 24
+-- hours — so equipping anything queues a fresh draw of the same character, and the roll of a generative model
+-- is never the same picture twice. Somebody who likes what they got has no way to stop it.
+--
+-- One boolean, read in exactly one place: the WHERE clause of pendingSpriteIds, which is the single query that
+-- decides who gets redrawn. Nothing else in the sprite pipeline needs to know.
+--
+-- DEFAULT FALSE, so nothing changes for anyone who does not go and ask for it. NOT NULL so the clause can be a
+-- plain comparison rather than a three-valued one.
+ALTER TABLE mkt_buyer ADD COLUMN IF NOT EXISTS avatar_sprite_locked BOOLEAN NOT NULL DEFAULT FALSE;

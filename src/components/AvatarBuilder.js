@@ -99,9 +99,31 @@ export default function AvatarBuilder({ current = null }) {
                 setQuote((q) => (q ? { ...q, cost: d.nextCost ?? q.cost, gold: d.gold ?? q.gold, canAfford: (d.gold ?? 0) >= (d.nextCost ?? 0) } : q));
                 try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
             } else {
-                setErr(d?.error === "not_enough_gold" ? "Not enough gold for a redraw." : "Couldn't redraw right now.");
+                setErr(d?.error === "sprite_locked" ? "Your hero is locked — unlock it first."
+                    : d?.error === "not_enough_gold" ? "Not enough gold for a redraw."
+                        : "Couldn't redraw right now.");
             }
         } catch { setErr("Couldn't redraw right now."); } finally { setBusy(false); }
+    };
+
+    // ── LOCK THE HERO ────────────────────────────────────────────────────────────────────────────────────
+    // Asked for by @Jinxx: she likes the sprite she has and does not want gear changing it. Equipping anything
+    // otherwise queues a fresh draw within the day, and a generative model never returns the same picture
+    // twice — so "I like this one" had no way to be said.
+    const toggleLock = async () => {
+        if (busy || !quote) return;
+        setBusy(true); setErr(null); setMsg(null);
+        try {
+            const r = await fetch("/api/marketplace/avatar", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "lock", locked: !quote.locked }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (d?.ok) {
+                setQuote((q) => (q ? { ...q, locked: d.locked } : q));
+                setMsg(d.locked ? "Hero locked — gear won't change it." : "Hero unlocked — gear can change it again.");
+            } else setErr("Couldn't change the lock right now.");
+        } catch { setErr("Couldn't change the lock right now."); } finally { setBusy(false); }
     };
 
     const [msg, setMsg] = useState("");
@@ -209,16 +231,34 @@ export default function AvatarBuilder({ current = null }) {
                         type="button"
                         className="btn-ghost"
                         onClick={redraw}
-                        disabled={busy || !quote.canAfford}
-                        title={quote.canAfford ? "Re-render your hero sprite from the current avatar" : "Not enough gold"}
+                        disabled={busy || !quote.canAfford || quote.locked}
+                        title={quote.locked ? "Your hero is locked — unlock it first" : quote.canAfford ? "Re-render your hero sprite from the current avatar" : "Not enough gold"}
                     >
                         {busy ? "Drawing…" : `🎨 Redraw hero · 🪙 ${quote.cost.toLocaleString()}`}
+                    </button>
+                ) : null}
+                {/* Offered only once there is a drawn hero to keep. Before that the lock would freeze a member
+                    on the shared stock sprite, which is not a thing anybody means to choose. */}
+                {quote && !quote.firstIsFree ? (
+                    <button
+                        type="button"
+                        className={`btn-ghost${quote.locked ? " is-active" : ""}`}
+                        onClick={toggleLock}
+                        disabled={busy}
+                        title={quote.locked ? "Your gear can change your hero again" : "Keep this hero exactly as it is, whatever you equip"}
+                    >
+                        {quote.locked ? "🔒 Hero locked" : "🔓 Lock this hero"}
                     </button>
                 ) : null}
             </div>
             {quote && !quote.firstIsFree && !quote.canAfford ? (
                 <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
                     You have 🪙 {quote.gold.toLocaleString()} — a redraw costs {quote.cost.toLocaleString()}.
+                </p>
+            ) : null}
+            {quote?.locked ? (
+                <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
+                    Your hero stays exactly as it is. Change gear all you like — it won&apos;t be redrawn until you unlock it.
                 </p>
             ) : null}
             {quote?.firstIsFree ? (
