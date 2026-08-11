@@ -51,7 +51,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
 | 11 | **Kind Neighbour** | Every farm you rate rates you back the same day. | B |
 | 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B |
-| 13 | **The Garden Path** | Decorations you place count twice toward your farm's rating. | A |
+| 13 | **The Garden Path** | Every decoration on your farm gives a buff, whatever its rarity — cosmetics included. | B |
 
 ## Fishing
 
@@ -436,6 +436,20 @@ The other twenty-two were failures of the rules already agreed:
 Four absolutes remain and all four are deliberate: **The Rain Barrel** ("never on cooldown" — the cooldown is
 the thing being bought), **The Head Chef** ("never the bottom rung" — a floor, not a jackpot), **The Standing
 Streak**, and **Merchant's Word**. None is a per-event faucet.
+
+## Eighth pass — decorations do not feed the rating
+
+**The Garden Path (13)** said decorations count twice toward your farm's rating. They do not count at all.
+
+A farm rating is a LIKE from another member — a positive-only three-tier vote (`like` 1 / `love` 2 / `admire`
+3) stored per rater in `mkt_farm_rating`, once a day each. Nothing about your own farm feeds it. What
+decorations actually do is grant passive farm buffs from `DECO_STATS` — growSpeed, seedLuck, harvestLuck,
+petXp, fertPower, goldHarvest — and only from EPIC upward. Rare pieces are "mostly cosmetic", and commons
+carry nothing at all: `buff` is simply null on them.
+
+So the power now uses the mechanic that exists: **every decoration on your farm gives a buff, whatever its
+rarity.** That turns roughly seventy cosmetic pieces into working ones without touching the placement cap,
+which is a performance limit and not a design one.
 
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
 state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
