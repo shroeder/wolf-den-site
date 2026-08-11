@@ -290,15 +290,25 @@ export function setsForWeakness(key) {
 // Count equipped pieces per set id. Accepts either an array of item ids OR the {slot → item_id} object
 // that getEquippedIds() returns (matching signatures.js's `ids()` normalizer) — passing the object bare
 // to `for…of` threw "not iterable", which broke setCombatMult/setCapstoneStrikeBonus in the attack path.
-function equippedCounts(equippedIds) {
+// `powers` is the wearer's ascension set. Two of them change how a set is COUNTED, which is upstream of every
+// bonus and capstone, so they belong here rather than at each reader:
+//   THE COMPLETIONIST'S LEDGER  one piece counts as two toward the tier bonuses
+//   THE SEAL OF OFFICE          a capstone fires one piece short of the full set
+// Both are conditional and neither writes anything: take the gear off and the set is counted normally again.
+function equippedCounts(equippedIds, powers = null) {
     const list = Array.isArray(equippedIds) ? equippedIds : Object.values(equippedIds || {});
+    const each = powers?.has?.("completionist_s_ledger") ? 2 : 1;
     const counts = new Map();
     for (const id of list) {
         const set = SET_BY_ITEM[id];
-        if (set) counts.set(set.id, (counts.get(set.id) || 0) + 1);
+        if (set) counts.set(set.id, (counts.get(set.id) || 0) + each);
     }
     return counts;
 }
+// How many pieces a capstone needs. The Seal of Office takes one off, never below two — a "full set" of one
+// piece is not a set, and the capstones are written as the payoff for finishing something.
+const capstoneNeed = (set, powers) =>
+    Math.max(2, set.items.length - (powers?.has?.("seal_of_office") ? 1 : 0));
 
 // Collection sets count OWNED pieces, so every reader of a collection bonus is handed the owned list instead
 // of the loadout. Duplicates cannot inflate a set — a piece you hold twice is still one slot ticked off.
@@ -317,8 +327,8 @@ export function collectedCounts(ownedIds) {
 export const COLLECTION_SETS = ITEM_SETS.filter((s) => s.collection);
 
 // Total extra stats from all ACTIVE set-bonus tiers for the equipped loadout.
-export function setBonusStats(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setBonusStats(equippedIds, powers = null) {
+    const counts = equippedCounts(equippedIds, powers);
     const total = {};
     for (const set of ITEM_SETS) {
         const n = counts.get(set.id) || 0;
@@ -459,8 +469,8 @@ export function activeSetBonuses(equippedIds) {
 }
 
 // Extra daily strikes from FULL-set capstones.
-export function setCapstoneStrikeBonus(equippedIds) {
-    const counts = equippedCounts(equippedIds);
+export function setCapstoneStrikeBonus(equippedIds, powers = null) {
+    const counts = equippedCounts(equippedIds, powers);
     let n = 0;
     for (const set of ITEM_SETS) if (set.capstone?.strikes && (counts.get(set.id) || 0) >= set.items.length) n += set.capstone.strikes;
     return n;
@@ -469,8 +479,8 @@ export function setCapstoneStrikeBonus(equippedIds) {
 // Per-hit damage multiplier from set CAPSTONES (full set) + WEAKNESS SYNERGY (affinity matches the boss's
 // weakness while the set is active). Bounded so it stacks reasonably with signatures/pets.
 export function setCombatMult(equippedIds, ctx = {}) {
-    const { crit = false, hitIndex = 0, bossHpFrac = 1, bossMaxHp = 0, hittersToday = 1, bossWeakness = null, rand = Math.random } = ctx;
-    const counts = equippedCounts(equippedIds);
+    const { crit = false, hitIndex = 0, bossHpFrac = 1, bossMaxHp = 0, hittersToday = 1, bossWeakness = null, rand = Math.random, powers = null } = ctx;
+    const counts = equippedCounts(equippedIds, powers);
     let mult = 1;
     const fired = [];
     for (const set of ITEM_SETS) {
@@ -479,7 +489,7 @@ export function setCombatMult(equippedIds, ctx = {}) {
         // Weakness synergy: the set is active (≥ its first tier) AND its affinity matches this week's boss.
         if (set.weakness && set.weakness === bossWeakness && n >= (set.bonuses[0]?.need || 2)) { mult *= 1.25; fired.push(`${set.name} SYNERGY`); }
         // Capstone (full set only).
-        if (n >= set.items.length && set.capstone) {
+        if (n >= capstoneNeed(set, powers) && set.capstone) {
             const c = set.capstone;
             if (c.crit_bonus && crit) { mult *= 1 + c.crit_bonus; fired.push(set.name); }
             if (c.erupt && rand() < c.erupt.chance) { mult *= c.erupt.mult; fired.push(`${set.name} ERUPTS`); }

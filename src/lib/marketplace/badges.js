@@ -433,11 +433,25 @@ export const BADGE_BONUSES = {
 async function sumBadgeDomain(buyerId, domain) {
     if (!buyerId) return {};
     const held = await heldSlugs(buyerId).catch(() => new Set());
-    const total = {};
+    // ── THE LONG SERVICE RECORD ──────────────────────────────────────────────────────────────────────────
+    // Your TEN BEST badges pay twice — not all of them. Measured: 131 badges carry a bonus and the full set is
+    // +356 Might, against +202 for a best-in-slot loadout, so doubling the lot would have been worth more than
+    // every piece of gear in the game put together. The ten best is a big number a completionist still feels.
+    const { hasPower } = await import("@/lib/marketplace/ascension-powers.js");
+    const doubleTop = await hasPower(buyerId, "long_service_record").catch(() => false);
+    const rows = [];
     for (const slug of held) {
         const d = BADGE_BONUSES[slug]?.[domain];
-        if (!d) continue;
-        for (const [k, v] of Object.entries(d)) total[k] = (total[k] || 0) + v;
+        if (d) rows.push(d);
+    }
+    // "Best" is the biggest total across the domain's own stats, so the ten it picks are the ten that matter
+    // to the system asking — a farm badge does not out-rank a combat one when the boss is the one asking.
+    const weight = (d) => Object.values(d).reduce((a, x) => a + x, 0);
+    const top = doubleTop ? new Set([...rows].sort((a, b) => weight(b) - weight(a)).slice(0, 10)) : null;
+    const total = {};
+    for (const d of rows) {
+        const mult = top?.has(d) ? 2 : 1;
+        for (const [k, v] of Object.entries(d)) total[k] = (total[k] || 0) + v * mult;
     }
     return total;
 }

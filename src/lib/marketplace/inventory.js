@@ -16,9 +16,11 @@ import { levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 
 // Equipped item stats merged with any active set-bonus stats (the single source combat + the UI read).
-function withSetBonuses(ids) {
+// `powers` reaches setBonusStats because The Completionist's Ledger changes how many pieces a set counts as
+// having, which is upstream of every tier bonus.
+function withSetBonuses(ids, powers = null) {
     const total = sumItemStats(ids);
-    for (const [k, v] of Object.entries(setBonusStats(ids))) total[k] = (total[k] || 0) + v;
+    for (const [k, v] of Object.entries(setBonusStats(ids, powers))) total[k] = (total[k] || 0) + v;
     return total;
 }
 
@@ -95,7 +97,7 @@ async function enhanceBonusFor(buyerId, itemIds) {
 export async function getEquippedStats(buyerId) {
     if (!buyerId) return {};
     const ids = Object.values(await getEquippedIds(buyerId));
-    const total = withSetBonuses(ids);
+    const total = withSetBonuses(ids, await equippedPowers(buyerId));
     for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids))) total[k] = (total[k] || 0) + v;
     // Lazily imported: jeweller.js is server-only and this module is imported widely.
     try {
@@ -157,7 +159,9 @@ export async function getEquippedStatsForMembers(buyerIds = []) {
     } catch { /* no bench, no gems */ }
 
     for (const [id, ids] of byBuyer) {
-        const total = withSetBonuses(ids);
+        // `id`, not `buyerId` — this loop runs over the WHOLE PACK, so each member's own powers decide how
+        // their own sets are counted. The first version reached for buyerId, which is not even in scope here.
+        const total = withSetBonuses(ids, await equippedPowers(id));
         const enh = enhByBuyer.get(id);
         if (enh) for (const [k, v] of Object.entries(enh)) total[k] = (total[k] || 0) + v;
         const gem = gemByBuyer.get(id);
@@ -420,7 +424,7 @@ export async function getInventory(buyerId) {
                 setName: set?.name || null, setId: set?.id || null, collectionPiece: true }; })
         .filter(Boolean)
         .sort((a, z) => String(a.setName || "").localeCompare(String(z.setName || "")) || a.name.localeCompare(z.name));
-    return { items, pieces, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
+    return { items, pieces, equipped: bySlot, slots: EQUIP_SLOTS, stats: withSetBonuses(equippedList, await equippedPowers(buyerId)), gold, shop, setBonuses: activeSetBonuses(equippedList), setsOverview: getSetsOverview(equippedList, [...ownedIds, ...ownedPieceIds]), coupon };
 }
 
 // Buy an xp_shop item with gold. Atomic deduction. Body validated in the route.
