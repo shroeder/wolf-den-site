@@ -692,6 +692,11 @@ export default function ArenaClient({ initial }) {
         if (l.blocked > 0) pops.push({ side: "left", n: l.blocked, kind: "block", at: 120 });
         if (l.healed > 0) pops.push({ side: "left", n: l.healed, kind: "heal" });
         if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
+        // ── WHAT YOU SENT BACK ── over THEM, because it is damage you dealt. A shield build's whole offence
+        // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
+        // said why. Staggered after the incoming hit so the two do not land on the same frame.
+        if (l.thorned > 0) pops.push({ side: "right", n: l.thorned, kind: "thorn", at: 200 });
+        if (l.riposted > 0) pops.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
         // Outlives the animation (2.1s, crit 2.4s) rather than cutting it off — unmounting at 1000ms is what
@@ -2312,6 +2317,7 @@ function Styles() {
                only then drifts off. Slower, not laggier: the beat behind it is unchanged. */
             /* The COLUMN is the positioned thing. column-reverse so the first number sits lowest and each
                extra one stacks above it — damage at the bottom, then what you blocked, healed and soaked. */
+            .ar-pop.is-thorn { color: #ff9f9f; text-shadow: 0 0 10px rgba(255,120,120,.65); }
             .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
                 align-items: center; gap: 6px; pointer-events: none; }
             .ar-pops.is-right { right: 18%; }

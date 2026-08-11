@@ -20,6 +20,8 @@ import { baseState, makeBout, SCENES, SCENE_KEYS } from "@/components/arena/aren
 //
 // ?scene=<key> selects a scene. ?chrome=0 hides the lab's own furniture so a screenshot is only the feature.
 
+import { pickIncoming } from "@/lib/marketplace/arena-ai.js";
+
 const NEXT_ON_WIN = 0;   // the sim never advances the ladder; a win just ends the bout
 
 // ── THE STUB SERVER ──────────────────────────────────────────────────────────────────────────────────────────
@@ -30,16 +32,9 @@ function makeServer(initial) {
     let st = JSON.parse(JSON.stringify(initial));
     const rnd = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
 
-    const pickIncoming = (b) => {
-        const ab = b.foe.abilities?.length && Math.random() < 0.45
-            ? b.foe.abilities[Math.floor(Math.random() * b.foe.abilities.length)] : null;
-        return {
-            name: ab?.name || "a heavy swing", kind: ab?.kind || "swing",
-            element: ab?.element || b.foe.element || null, sprite: ab?.sprite || null,
-            power: ab && ["strike", "spell", "execute"].includes(ab.kind) ? ab.power : 1,
-            isAbility: Boolean(ab),
-        };
-    };
+    // THE REAL POLICY, imported — not a copy. This was a copy, and it had already drifted: it was still the
+    // old uniformly-random picker, so the lab would have shown last week's defender while claiming to show
+    // this week's. A rig that lies about the thing it exists to display is worse than no rig.
 
     const cool = (b, n) => { for (const k of Object.keys(b.cd || {})) b.cd[k] = Math.max(0, (b.cd[k] || 0) - n); };
 
@@ -105,6 +100,14 @@ function makeServer(initial) {
             b.turn = "them";
         } else {
             const inc = b.incoming || pickIncoming(b);
+            // A BRACE IS NOT A SWING. The rig has to honour it or the one behaviour worth watching — a
+            // cornered defender covering up — would render here as an ordinary hit for zero.
+            if (inc.brace) {
+                b.foeBrace = 1;
+                b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0,
+                    text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });
+                b.turn = "you"; b.incoming = null; b.beat += 1; cool(b, 1);
+            } else {
             const raw = Math.max(1, Math.round(rnd(14, 22) * (inc.power || 1) / (b.clash?.mult || 1)));
             const blocked = Math.round(raw * 0.34);
             let through = Math.max(0, raw - blocked);
@@ -119,6 +122,7 @@ function makeServer(initial) {
                 ability: inc.isAbility ? inc.name : null,
             });
             b.turn = "you"; b.incoming = null; b.beat += 1; cool(b, 1);
+            }
         }
 
         if (b.turn === "them" && !b.incoming) b.incoming = pickIncoming(b);
