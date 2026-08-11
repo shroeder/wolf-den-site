@@ -74,7 +74,9 @@ function dayContext() {
 }
 
 // Daily deals never put too-powerful gear on sale — cap the rarity of gear that can appear.
-const DEAL_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as DEAL_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 const DEAL_RARITY_CAP = "epic"; // nothing above epic goes on sale
 
 // The full purchasable pool for daily deals (gear + consumables). Pets are intentionally EXCLUDED for now —

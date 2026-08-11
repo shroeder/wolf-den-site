@@ -17,7 +17,9 @@ import { itemById } from "@/lib/marketplace/items.js";
 // (overcharge, highroller, warbanner) are gated to the top 3 tiers. Per-hit output is bounded by SIG_MULT_CAP
 // (always-on procs) and BURST_CAP (overcharge/highroller), so a lucky spike is a moment, never a one-shot.
 
-const RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as RANK } from "@/lib/marketplace/rarity.js";
 const rankOf = (id) => RANK[itemById(id)?.rarity] ?? 3;
 const tierIdx = (id) => Math.max(0, Math.min(3, rankOf(id) - 3)); // 0=legendary … 3=eternal
 const isTop3 = (id) => rankOf(id) >= 4; // mythic+

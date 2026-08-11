@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { RARITIES } from "@/lib/marketplace/rarity.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { CONSUMABLES, grantConsumable } from "@/lib/marketplace/consumables.js";
@@ -241,7 +242,7 @@ export async function openChest(buyerId, tier) {
     const ownedRows = await db.query(`SELECT item_id FROM mkt_user_item WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const owned = new Set(ownedRows.map((r) => r.item_id));
     // A chest-luck companion can promote the roll one rarity band up — stated exactly on the pet card.
-    const RARITY_LADDER = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal"];
+    const RARITY_LADDER = RARITIES;   // shared ladder — it now runs two tiers past eternal
     let rarity = rollRarity(def.weights);
     try {
         const { getPetSystemPerk } = await import("@/lib/marketplace/pet-combat.js");

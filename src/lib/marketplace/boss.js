@@ -952,7 +952,9 @@ const PROC_BOSSES = [
 // Falls back to the theoretical projection (fresh install / no prior fight), and never lets the next boss
 // come out weaker than the last one. Returns a rounded HP.
 // Auto-pick N reward items for a procedurally-generated boss, capped so it never drops too-rare gear.
-const REWARD_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as REWARD_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 // A boss is a ten-day fight for the whole pack. Its drops had only a CAP, no floor, so the roll could hand out
 // three commons — a week and a half of everyone's effort paying out in grey. There is now a floor as well:
 // rare (blue) at minimum, epic at most. `floorRarity` is a parameter rather than a constant so raising the bar

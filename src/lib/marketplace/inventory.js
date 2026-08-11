@@ -302,7 +302,9 @@ function chargeState(ownedRow, item) {
 const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 2500, eternal: 6000, celestial: 12000, primordial: 20000 };
 // Power ordering for the shop so it reads as one clean worst→best ladder (the catalog itself is grouped
 // by when items were added, which otherwise makes the shop restart at "worst" every batch).
-const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
 export const sellValueOf = (item) => (item?.charged ? 0 : (SELL_VALUES[item?.rarity] || 25));
 
 // Full inventory view for the member's screen: owned items (+ charge state), the equipped loadout by slot,

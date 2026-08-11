@@ -1763,7 +1763,9 @@ const RAID_TARGET_COLS = `b.id, b.alias, b.display_name, b.avatar_sprite_url, b.
                 COALESCE(s.raid_level,0) AS raid_level,
                 COALESCE(s.gun_level,0) AS gun_level, COALESCE(s.gunnery_level,0) AS gunnery_level,
                 COALESCE(s.hull_level,0) AS hull_level, COALESCE(s.loadout,'round') AS loadout`;
-const RAID_RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as RAID_RARITY_RANK } from "@/lib/marketplace/rarity.js";
 
 // Fetch a SPECIFIC target the player chose (validated: a real, other member).
 async function raidTargetById(buyerId, targetId) {

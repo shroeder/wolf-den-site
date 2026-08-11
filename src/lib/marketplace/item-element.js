@@ -17,7 +17,7 @@ const grantBadge = (buyerId, slug) => import("@/lib/marketplace/badges.js").then
 
 export const DUAL_ELEMENT_CHANCE = 0.12; // small chance a reforge yields dual affinity instead of replacing
 // Gold cost by rarity (a solid sink — reforging is a meta reroll).
-const REFORGE_GOLD = { common: 400, rare: 900, epic: 1800, legendary: 3500, mythic: 6000, ascendant: 9000, eternal: 12000 };
+const REFORGE_GOLD = { common: 400, rare: 900, epic: 1800, legendary: 3500, mythic: 6000, ascendant: 9000, eternal: 12000, celestial: 18000, primordial: 26000 };
 export const reforgeCost = (rarity) => REFORGE_GOLD[rarity] || 1500;
 
 // A reforge yields at most 2 (dual); the Enchantment Scroll can push an item past that, so the STORAGE cap is

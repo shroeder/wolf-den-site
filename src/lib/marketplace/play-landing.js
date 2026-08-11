@@ -29,7 +29,9 @@ const SHOWCASE = [
 ];
 
 // Rarity order for the hero parade, so it reads as a treasure spill rather than a random dump.
-const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
+// The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
+// ranks below common in silence rather than throwing.
+import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
 
 export async function landingData() {
     const [art, counts, prizes] = await Promise.all([
