@@ -36,6 +36,10 @@
     ],
     "crons": [
         {
+            "path": "/api/jobs/sail-encounters",
+            "schedule": "*/5 * * * *"
+        },
+        {
             "path": "/api/jobs/town-hours",
             "schedule": "0,30 * * * *"
         },

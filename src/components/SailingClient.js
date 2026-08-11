@@ -1542,23 +1542,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             <em>{state.encounter.cls}</em>
                         </div>
                         <p className="sail-hail-blurb">{state.encounter.blurb}</p>
-                        {/* WHAT IS IN ITS HOLD. Sprites and counts, no sentence — the same list the payout
-                            walks, so what is promised here is what is handed over. */}
-                        <div className="sail-hail-loot">
-                            {(state.encounter.loot || []).map((l, i) => (
-                                <span key={i} className="sail-hail-drop" style={l.color ? { borderColor: l.color } : undefined}>
-                                    {/* Art, then the item's own emoji, then — only for an actual chest — the
-                                        chest icon. It used to fall straight through to ChestIcon, which drew a
-                                        wooden chest for a Pet Treat. */}
-                                    {l.art
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        ? <img src={l.art} alt={l.name || ""} title={l.name || undefined} />
-                                        : l.emoji ? <span className="sail-hail-emoji" title={l.name || undefined}>{l.emoji}</span>
-                                        : l.kind === "chest" ? <ChestIcon tier={l.tier || "wooden"} size={22} />
-                                        : <span className="sail-hail-emoji">🎁</span>}
-                                    <b>{l.n > 1 ? `×${l.n}` : ""}</b>
-                                </span>
-                            ))}
+                        {/* NO LOOT HERE. This used to list exactly what the thing was carrying, sprites and
+                            counts, BEFORE you had fought it — a reward handed over for having been
+                            interrupted. Luke: "shouldn't get a rewards before you fight the encounter lol."
+                            What it says instead is what you are about to face, which is the thing you
+                            actually need in order to decide how to open. The payout is on the recap, after. */}
+                        <div className="sail-hail-threat">
+                            <span className="sail-hail-tier">Tier {state.encounter.tier}</span>
+                            <span className="sail-hail-kind">
+                                {state.encounter.kind === "monster" ? "No rigging, no guns — it is all body" : "A crew, and they shoot back"}
+                            </span>
                         </div>
                         <button className="sail-cta sail-hail-go" disabled={busy}
                             onClick={() => setShipBattle(state.encounter.battle)}>

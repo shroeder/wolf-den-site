@@ -276,7 +276,17 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
 
     // Torn canvas, clipped to the real shape of the sails. The sprite cannot be repainted, but it can be
     // DARKENED exactly where the damage is — which is why the measured cells earn their keep twice.
-    const sailFrac = caps?.sails ? Math.max(0, Math.min(1, (sys?.sails ?? caps.sails) / caps.sails)) : 1;
+    // ── IS THIS A SHIP OR AN ANIMAL? ────────────────────────────────────────────────────────────────────
+    // initBattleState has marked living things `sys: false` since the day encounters shipped — a kraken has no
+    // rigging and no gun ports, and the ENGINE has always honoured that. The SCENE never asked, so it drew a
+    // sail chip and a cannon count over a squid and offered you its "sails" as a target. Luke: "the kraken
+    // fight had cannons and a sail, lol."
+    // `has` is the field battleView actually publishes (`has: st.foe.sys !== false`). I first wrote
+    // `sys?.sys === false`, which is a property that does not exist — it reads undefined, `=== false` is
+    // false, and every monster would have kept its cannons with nothing failing anywhere. A wrong property
+    // name is the one class of mistake lint:undef cannot see.
+    const alive = sys?.has === false;
+    const sailFrac = !alive && caps?.sails ? Math.max(0, Math.min(1, (sys?.sails ?? caps.sails) / caps.sails)) : 1;
     const torn = useMemo(
         () => (key && sailFrac < 1 ? zoneRects(key, "sails", { mirror }) : []),
         [key, mirror, sailFrac],
@@ -371,7 +381,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                 /* Clamped so a hull whose centre sits near the edge of its own box cannot
                                    push the row off the side of the stage. */
                                 style={{ left: `${Math.min(76, Math.max(24, hb.cx))}%`, top: `${hb.y + hb.h}%` }}>
-                                {caps?.sails ? (
+                                {!alive && caps?.sails ? (
                                     <PartChip zone="sails" left={sys?.sails ?? caps.sails} max={caps.sails} />
                                 ) : null}
                                 <PartChip zone="hull" left={hp} max={hpMax} />
@@ -379,7 +389,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                     damage in the fight — it is a shot she never fires again — and it was the
                                     one part with no number anywhere, readable only by noticing a cannon on
                                     the deck had gone dark. */}
-                                {gunHp.length ? (
+                                {!alive && gunHp.length ? (
                                     <PartChip zone="guns" left={gunHp.filter((h) => h > 0).length}
                                         max={gunHp.length} label="cannon" />
                                 ) : null}
@@ -646,7 +656,11 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
         // rectangle wider than the hull and, once the ships were scaled up, ran clean off the side of the
         // screen. Clamped to the timber underneath it, which is the shape a player reads as "her sails".
         const hullBox = zoneBox(key, "hull", { mirror });
-        for (const id of ["sails", "hull"]) {
+        // A LIVING THING IS ONE TARGET. No canvas to shred, no barrels to dismount — every ball goes into the
+        // animal, which is exactly what the engine has always done for `sys: false` foes. Offering "her sails"
+        // over a kraken was the scene inventing parts the server would never have honoured.
+        const living = foeSys?.has === false;
+        for (const id of (living ? ["hull"] : ["sails", "hull"])) {
             let box = zoneBox(key, id, { mirror });
             if (!box) continue;
             if (id === "sails" && hullBox) {
@@ -667,7 +681,8 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                 dmg: expectedDamage(att, def, ZONES[id], shot),
             });
         }
-        const ports = foe?.ports || [];
+        // ...and no gun ports on it either. A kraken has no barrels to knock out.
+        const ports = living ? [] : (foe?.ports || []);
         ports.forEach((p, i) => {
             const hp = foeSys?.guns?.[i] ?? caps?.gun ?? 4;
             // A DISMOUNTED GUN STAYS ON THE BOARD, crossed out. Removing it made the deck quietly change shape

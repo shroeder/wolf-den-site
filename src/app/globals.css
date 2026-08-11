@@ -15868,3 +15868,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     cursor: pointer; color: #120c1c; background: var(--stone); border: none; }
 .psts-buy:disabled { opacity: 0.45; cursor: default; }
 .psts-note { margin: 9px 0 0; font-size: 0.7rem; line-height: 1.4; color: rgba(255,255,255,0.45); }
+
+/* The hail card says what you are FACING, not what you will win — the payout belongs on the recap. */
+.sail-hail-threat { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 2px; }
+.sail-hail-tier { padding: 3px 10px; border-radius: 999px; font-size: .66rem; font-weight: 900; letter-spacing: .1em;
+    text-transform: uppercase; color: #0e0a14; background: #e0a552; }
+.sail-hail-kind { font-size: .74rem; color: rgba(255,255,255,.62); }

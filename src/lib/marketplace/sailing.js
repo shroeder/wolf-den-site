@@ -1158,8 +1158,37 @@ function pickEncounterFor(boatLevel = 1) {
 const encMarks = (row) => (Array.isArray(row?.encounter_marks) ? row.encounter_marks : []);
 
 /**
+ * Every boat at sea with an encounter due, opened and pushed — WITHOUT waiting for its owner to open the page.
+ *
+ * The per-member resolver below still runs on every read (it is the belt to this braces, and it covers the
+ * five-minute gap between ticks). But a lazy-only resolver meant the encounter BEGAN when you looked, so the
+ * push announcing it arrived at the same instant as the modal — which is a notification about something you
+ * are already staring at, and is exactly what Luke reported.
+ *
+ * Deliberately narrow: only rows that are mid-voyage, not digging, not already in a fight. Nothing else is
+ * touched, and each member is resolved independently so one failure cannot stop the sweep.
+ */
+export async function resolveDueEncountersForAll() {
+    const rows = await db.query(
+        `SELECT buyer_id FROM mkt_sailing
+          WHERE departed_at IS NOT NULL
+            AND encounter_active IS NULL AND encounter_paused_at IS NULL
+            AND battle_state IS NULL AND dig_state IS NULL
+          LIMIT 500`
+    ).catch(() => []);
+    let opened = 0;
+    for (const r of rows) {
+        const before = await readRow(r.buyer_id).catch(() => null);
+        await resolveDueEncounter(r.buyer_id).catch(() => {});
+        const after = await readRow(r.buyer_id).catch(() => null);
+        if (!before?.encounter_active && after?.encounter_active) opened += 1;
+    }
+    return { checked: rows.length, opened };
+}
+
+/**
  * Open the battle for the first mark that is due and unfought. A no-op unless one is actually waiting.
- * Called on every read of sailing state, like the old resolver was.
+ * Still called on every read of sailing state too — that covers the gap between cron ticks.
  */
 async function resolveDueEncounter(buyerId) {
     const row = await readRow(buyerId);
