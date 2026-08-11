@@ -11,17 +11,17 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 
 const OFFLINE_AFTER_MS = 5 * 60 * 1000; // treat as "offline" if not seen in the last 5 minutes
 
-async function displayName(userId) {
-    const row = await db
-        .queryOne(`SELECT first_name, last_name, alias, display_name FROM mkt_buyer WHERE id = $1`, [userId])
-        .catch(() => null);
-    if (!row) return "Someone";
-    const name = `${row.first_name || ""} ${row.last_name || ""}`.trim();
-    return name || row.alias || row.display_name || "Someone";
-}
-
-// PUBLIC label only — display name or @handle, NEVER a real first/last name. Used for browser (web)
-// push, which surfaces on a shared desktop, so it must not leak a member's real name.
+// PUBLIC label only — display name or @handle, NEVER a real first/last name.
+//
+// There used to be a second helper beside this one, `displayName()`, which built "first_name last_name" and
+// only fell back to the handle. The rule below was written for browser push, because that surfaces on a shared
+// desktop — but the EMAIL and the PHONE-APP push both used the real-name version. So a friend request, a friend
+// acceptance and a DM each put a member's legal name in another member's inbox, while the browser notification
+// for the very same event correctly showed their handle.
+//
+// The real-name helper is deleted rather than fixed. A member gives their first and last name for an ORDER,
+// not for a notification, and there is no member-facing message that should ever prefer it — leaving the
+// function in place was leaving the next call site a way to make the same mistake.
 async function publicLabel(userId) {
     const row = await db
         .queryOne(`SELECT alias, display_name FROM mkt_buyer WHERE id = $1`, [userId])
@@ -56,7 +56,7 @@ export async function markSeen(userId) {
 export async function notifyNewDm(recipientId, senderId, threadId, preview, { firstUnread = false } = {}) {
     try {
         if (!recipientId || recipientId === senderId) return;
-        const name = await displayName(senderId);
+        const name = await publicLabel(senderId);
         await sendBuyerPush(recipientId, {
             title: name,
             body: preview?.trim() ? preview.trim().slice(0, 140) : "Sent you a message",
@@ -88,7 +88,7 @@ export async function notifyNewDm(recipientId, senderId, threadId, preview, { fi
 export async function notifyFriendRequest(addresseeId, requesterId) {
     try {
         if (!addresseeId || addresseeId === requesterId) return;
-        const name = await displayName(requesterId);
+        const name = await publicLabel(requesterId);
         await sendBuyerPush(addresseeId, {
             title: "New friend request",
             body: `${name} wants to be friends`,
@@ -116,7 +116,7 @@ export async function notifyFriendRequest(addresseeId, requesterId) {
 export async function notifyFriendAccepted(requesterId, accepterId) {
     try {
         if (!requesterId || requesterId === accepterId) return;
-        const name = await displayName(accepterId);
+        const name = await publicLabel(accepterId);
         await sendBuyerPush(requesterId, {
             title: "Friend request accepted",
             body: `${name} accepted your friend request`,
