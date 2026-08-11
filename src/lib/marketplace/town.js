@@ -384,13 +384,19 @@ export async function getTownState(buyerId) {
     const fightingSet = new Set((event?.activeFighterIds || []).map(String));
     const raidLabel = event ? `⚔️ fighting the ${String(event.name || "raid").toLowerCase()}` : null;
 
+    // ONE query for everybody in the plaza rather than one per avatar — this renders every few seconds and a
+    // per-member round trip here is how a live scene turns into a load.
+    const { stoneMapForMembers } = await import("@/lib/marketplace/pet-ascension.js");
+    const petStones = await stoneMapForMembers([...recent.map((r) => r.id), buyerId].filter(Boolean)).catch(() => new Map());
+    const myStone = (petStones.get(buyerId) || {})[me?.featured_collectible] || null;
     const players = recent.map((r) => {
         const a = actBy[r.id];
         const mv = moverBy[r.id];
         const walking = Boolean(mv?.walking);
         const fighting = fightingSet.has(String(r.id));
         const slot = activitySlot(r.id, a?.event, a?.path);
-        const pet = petSpriteForLevel(r.featured_collectible, r.featured_pet_xp, petSprites, petSpriteLevels);
+        const pet = petSpriteForLevel(r.featured_collectible, r.featured_pet_xp, petSprites, petSpriteLevels,
+            (petStones.get(r.id) || {})[r.featured_collectible] || null);
         return {
             id: r.id,
             name: r.display_name || (r.alias ? `@${r.alias}` : "Wolf"),
@@ -431,8 +437,8 @@ export async function getTownState(buyerId) {
             x: myPos?.x ?? 50, y: myPos?.y ?? 80, facing: myPos?.facing ?? 1,
             chat: (buyerId ? chatBy[buyerId] : null) || null,
             inTown: true,
-            pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.url || null,
-            petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels)?.flip),
+            pet: petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone)?.url || null,
+            petFlip: Boolean(petSpriteForLevel(me?.featured_collectible, me?.featured_pet_xp, petSprites, petSpriteLevels, myStone)?.flip),
             gold: Number(me?.gold || 0),
         },
         players,

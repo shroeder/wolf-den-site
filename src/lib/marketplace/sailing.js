@@ -231,10 +231,13 @@ async function petArtByBuyer(pairs) {
         ).catch(() => []),
     ]);
     const xpFor = new Map((xpRows || []).map((r) => [`${r.buyer_id}|${r.pet_id}`, Number(r.xp) || 0]));
+    // Both captains' crews in one query — a battle draws two pets, not two hundred.
+    const { stoneMapForMembers } = await import("@/lib/marketplace/pet-ascension.js");
+    const crewStones = await stoneMapForMembers(wanted.map((w) => w.buyerId).filter(Boolean)).catch(() => new Map());
     const out = {};
     for (const w of wanted) {
         const lvl = petLevelForXp(xpFor.get(`${w.buyerId}|${w.petId}`) || 0, collectibleById(w.petId)?.rarity);
-        const art = pickPetSpriteForLevel(base[w.petId], levels[w.petId], lvl);
+        const art = pickPetSpriteForLevel(base[w.petId], levels[w.petId], lvl, (crewStones.get(w.buyerId) || {})[w.petId] || null);
         if (art?.url) out[w.buyerId] = { url: art.url, flip: art.flip === true };
     }
     return out;

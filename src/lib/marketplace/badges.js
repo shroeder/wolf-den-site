@@ -200,6 +200,12 @@ export async function getMemberMetrics(buyerId) {
     const petsMaxed = petLevelValues.filter((lv) => lv >= 5).length;
     const petLevelsTotal = petLevelValues.reduce((sum, lv) => sum + Math.max(0, lv - 1), 0);
     const maxedLegendaryPlus = (petLevelRows || []).some((r) => petLevelForXp(r.xp, collectibleById(r.pet_id)?.rarity) >= 5 && LEGENDARY_PLUS.has(collectibleById(r.pet_id)?.rarity));
+    // ENSHRINED PETS. `pets_maxed` above deliberately still tests >= 5 — that is what every existing maxed-pet
+    // reward has always meant and raising the ceiling must not take one back off anybody. This is the separate,
+    // harder thing: a pet taken to six AND paid for with a stone.
+    const enshrinedRows = await db.query(`SELECT stone FROM mkt_pet_enshrined WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const petsEnshrined = enshrinedRows.length;
+    const petBothStones = enshrinedRows.some((r) => r.stone === "light") && enshrinedRows.some((r) => r.stone === "dark") ? 1 : 0;
 
     return {
         xp,
@@ -243,6 +249,8 @@ export async function getMemberMetrics(buyerId) {
         petsOwned,
         maxPetLevel,
         petsMaxed,
+        petsEnshrined,
+        petBothStones,
         petLevelsTotal,
         maxedLegendaryPlus,
         eventDonated: Number(buyer?.event_gold_donated || 0),
@@ -553,6 +561,8 @@ export function progressForRule(rule, threshold, m) {
         case "pets_owned": return { current: m.petsOwned, target: t };
         case "pet_level_reached": return { current: m.maxPetLevel, target: t }; // highest level on any single pet
         case "pets_maxed": return { current: m.petsMaxed, target: t }; // # of pets at Lv5
+        case "pets_enshrined": return { current: m.petsEnshrined, target: t }; // # taken to Lv6 AND given a stone
+        case "pet_both_stones": return { current: m.petBothStones, target: t }; // used a Lightstone AND a Darkstone
         case "pet_levels_total": return { current: m.petLevelsTotal, target: t }; // total levels gained across pets
         case "event_donated": return { current: m.eventDonated, target: t }; // lifetime gold donated to Happy Hour / rally
         case "spin_count": return { current: m.spinCount, target: t }; // lifetime wheel spins

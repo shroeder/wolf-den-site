@@ -51,7 +51,11 @@ export default async function SailingPage() {
         ? await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyer.id, petId]).catch(() => null)
         : null;
     const petLvl = petId ? petLevelForXp(petXpRow?.xp || 0, collectibleById(petId)?.rarity) : 1;
-    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl) : null;
+    // The last surface. Your pet stands on your own deck, so it wears its enshrined form here too — the
+    // alternative is one screen in the game where a transfigured animal quietly reverts.
+    const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
+    const myStones = petId ? await stoneMapFor(buyer.id).catch(() => ({})) : {};
+    const petArt = petId ? pickPetSpriteForLevel(petBase[petId], petLevels[petId], petLvl, myStones[petId] || null) : null;
     const pet = petArt?.url ? { url: petArt.url, flip: petArt.flip || false } : null;
 
     return <SailingClient initial={state} hero={hero} pet={pet} captain={me?.display_name || me?.alias || "Captain"} />;

@@ -337,12 +337,16 @@ export async function getFarm(ownerId, viewerId) {
     if (!owner || !state) return null;
     const pettedToday = new Set(pettedRows.map((r) => r.pet_id));
     const mine = String(viewerId) === String(ownerId);
+    // Whose farm this is — a visitor sees the OWNER's enshrined forms, not their own.
+    const { stoneMapFor } = await import("@/lib/marketplace/pet-ascension.js");
+    const farmStones = await stoneMapFor(ownerId).catch(() => ({}));
     const pets = (state.ownedIds || [])
         .map((id) => {
             const def = collectibleById(id);
             const lvl = state.petLevels?.[id];
-            // Show the sprite for the pet's CURRENT level (evolved 2–5), like the boss scene — not the Lv1 base.
-            const sp = pickPetSpriteForLevel(sprites[id], levelSprites[id], lvl?.level || 1);
+            // Show the sprite for the pet's CURRENT level (evolved 2-6), like the boss scene — not the Lv1
+            // base — and its ENSHRINED form if it has one, which is the whole visible payoff of level six.
+            const sp = pickPetSpriteForLevel(sprites[id], levelSprites[id], lvl?.level || 1, farmStones[id] || null);
             return {
                 id,
                 name: def?.name || id,
