@@ -15,8 +15,8 @@ export const CHANGELOG = [
         key: "pet-ascension",
         date: "2026-08-10",
         tag: "new",
-        title: "Pets go to six, and can be enshrined",
-        blurb: "The sixth level ends the swapping. A pet's signature ability only ever worked while that pet was out, so the best play was to equip the farm pet to harvest, the fishing pet to cast, the boss pet to strike, and back again — an errand you ran four times a day because not running it was worse. Take ONE pet to level six and you can enshrine it with a Lightstone or a Darkstone, and its ability becomes permanent: it works whether the pet is equipped or not, forever. The Lightstone keeps the ability and makes your whole pack brighter; the Darkstone keeps it and raises it to 150%. That choice is permanent, and so is the new form the pet wears afterwards — every pet has two sixth-level forms, one per stone. Stones come out of a deep seam, a dig, a boss kill and the dungeons, or the Quartermaster (4,000 doubloons) and the Armoury (7,500 laurels) sell them dear — about three weeks of saving either way. Nothing you have already earned changes: every reward that counts a maxed pet still counts it.",
+        title: "Pets go to six",
+        blurb: "Five is no longer the end of the road. There is one more rung, it scales with rarity like every level before it, and only the pet you are carrying earns — so getting there means choosing one companion and sticking with it. A pet that reaches six can be ENSHRINED with a Lightstone or a Darkstone, and its signature ability becomes permanent: it keeps working whether that pet is equipped or not. The Lightstone keeps the ability and brightens your whole pack; the Darkstone sharpens it to 150% and gives nothing to anyone else. That choice is permanent — and so is the new form the pet wears afterwards, because every pet in the Den has two sixth-level forms, one per stone. Stones turn up in a deep seam, on a dig, off a boss kill and in the dungeons, or the Quartermaster (4,000 doubloons) and the Armoury (7,500 laurels) will part with one. Nothing you have already earned changes.",
         href: "/marketplace/pets",
     },
     {
