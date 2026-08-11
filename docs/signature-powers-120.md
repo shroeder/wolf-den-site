@@ -78,7 +78,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 27 | **Twice-Landed** | Every voyage makes landfall twice — two dig sites where there was one. | A |
 | 28 | **Deep Ballast** | Four more digs' worth of stamina on every voyage. | A |
 | 29 | **Diviner's Rod** | Every dig site is buried with the most fragments it can hold. | A |
-| 30 | **The Shipwright's Debt** | Boat upgrades cost half. | A |
+| 30 | **The Shipwright's Debt** | Every boat upgrade you buy refunds its cost as doubloons. | B |
 | 31 | **The Prize Court** | One encounter in three pays its doubloons twice. | B |
 | 32 | **The Quiet Passage** | One encounter in three lets you pass without a fight and keeps the spoils. | B |
 | 33 | **The Full Manifest** | One voyage in three returns with an item from the Quartermaster's locker. | B |
@@ -94,7 +94,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 |---|---|---|---|
 | 39 | **Shored Timbers** | The first collapse of each trip does nothing at all. | B |
 | 40 | **The Long Vein** | One seam in three pays out twice over. | B |
-| 41 | **The Assay Office** | Smelting costs half the ore. | A |
+| 41 | **The Assay Office** | One smelt in three costs no ore at all. | B |
 | 42 | **The Wide Seam** | One seam in three comes out a grade richer than it rolled. | B |
 | 43 | **The Deep Key** | You start every descent five floors down. | A |
 | 44 | **The Miner's Lamp** | Your trips start at the depth you reached last time, not at the top. | B |
@@ -136,7 +136,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 70 | **The Reforging Right** | Reforging an element costs half. | A |
 | 71 | **The Tempered Edge** | Your gear's enhancement bonuses count double. | A |
 | 72 | **The Whetstone** | One enhance a day is a guaranteed critical success. | B |
-| 73 | **The Deep Facet** | A gem set in any one piece gives its stat to every piece you are wearing. | B |
+| 73 | **The Deep Facet** | A gem set in one piece also gives its stat to the piece beside it. | B |
 
 ## The Town
 
@@ -160,7 +160,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 84 | **Twin Hinges** | One chest a day gives its rewards twice. | B |
 | 85 | **The Free Spin** | Your first three spins each day cost nothing. | A |
 | 86 | **Dealer's Choice** | Re-roll any wheel result once and keep whichever you prefer. | B |
-| 87 | **The Standing Streak** | Your check-in streak never breaks. | A |
+| 87 | **The Standing Streak** | Your check-in streak never breaks, and it counts double toward every streak reward. | A |
 | 88 | **Day's Double** | Your daily check-in pays out twice. | B |
 | 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B |
 | 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A |
@@ -181,14 +181,14 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 100 | **The Second Bowl** | Your equipped pet's passive counts twice toward the menagerie total. | A |
 | 101 | **The Shepherd's Crook** | An enshrined pet's passive counts twice as well. | A |
 | 102 | **The Long Table** | Your menagerie ceiling is half again as high. | A |
-| 103 | **The Whistle** | Your pet keeps earning for a full hour after you swap it out. | B |
+| 103 | **The Whistle** | Every pet you own earns the equipped pet's trickle while it sits in the box. | A |
 
 ## Market, Trade & Credit
 
 | # | Name | Effect | Class |
 |---|---|---|---|
-| 104 | **The Auctioneer's Seat** | You pay no listing fee at auction, at any price. | A |
-| 105 | **Merchant's Word** | Trades you offer never expire and never decay. | A |
+| 104 | **The Auctioneer's Seat** | An auction of yours that sells pays you the listing fee back, twice over. | B |
+| 105 | **Merchant's Word** | A trade you offer cannot be refused twice — the second offer to the same member is binding for a day. | B |
 | 106 | **The Standing Offer** | One item a day, the shop buys from you at the price it sells for. | B |
 | 107 | **The Purser's Exchange** | Doubloons and laurels convert freely into one another. Gold stays out of it. | B |
 | 108 | **The Bonded Warehouse** | Items you list at auction stay equipped and usable until they sell. | B |
@@ -202,10 +202,10 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 113 | **The Completionist's Ledger** | One piece of a set counts as two toward its tier bonuses. | A |
-| 114 | **Herald's Licence** | Your badges show on every screen in the game. | A |
+| 114 | **Herald's Licence** | Every badge you have not yet earned shows its progress, and one a month is granted outright. | B |
 | 115 | **The Loaned Exhibit** | One collection piece you do not own counts as owned. You choose which. | B |
-| 116 | **The Seal of Office** | Collection capstones fire one piece short of the full set. | A |
-| 117 | **The Long Service Record** | Every badge you hold pays its bonus twice. | A |
+| 116 | **The Seal of Office** | A collection you have completed keeps paying if you lend a piece away. | B |
+| 117 | **The Long Service Record** | Your ten best badges pay their bonus twice. | A |
 | 118 | **The Chronicle** | Anything you are first in the Den to do is written into the Live Feed under your name. | B |
 | 119 | **The Founder's Plate** | One collection piece a week is delivered to you, chosen from what you are missing. | B |
 | 120 | **The Standing Ovation** | A cheer pays you twice over — both times you cheer and when the hero lands their strike. | B |
@@ -524,5 +524,50 @@ A power survives contact when it **moves a number that already governs an outcom
 dies when it removes a friction I assumed was there. Every remaining entry has been checked against a named
 constant or a named function, not against a memory of how the feature probably works.
 
+## Thirteenth pass — will they work, are they cool, are they safe
+
+Three questions, three different kinds of answer.
+
+### Will they work
+
+Yes, with the caveat earned over twelve passes: every entry is now anchored to a named constant or a named
+function rather than to a memory of how a feature probably behaves. Twenty-six were killed across those passes
+for aiming at something that does not exist — no bag cap, no pantry cap, no location gate, no spoilage, no dish
+buffs, no persistent dungeon floors, no town-raid allowance, no wrecks, no visit limit, no locked buildings, no
+duplicate chest rewards, no sortie on an encounter, no growth stages, no sun, and pet swapping and pet feeding
+both already free.
+
+### Are they safe — MEASURED, not guessed
+
+Three were quietly enormous. Numbers first:
+
+| # | Power | The measurement | Fix |
+|---|---|---|---|
+| 117 | The Long Service Record — every badge pays twice | **131 badges carry a bonus. All of them together are +356 Might / +74 crit chance / +64 crit power.** Best-in-slot gear across all nine slots is +202 Might — the badge pool is already bigger than the best gear in the game, and this doubled it. | **Your ten best badges** pay twice |
+| 73 | The Deep Facet — one gem's stat on every piece | Gem tiers run 2 / 4 / 7 / 11 / **16**. Nine slots × a Flawless = **+144**, against +202 for an entire best-in-slot set — one gem worth three-quarters of a full kit. | The piece **beside** it, not all nine |
+| 113 + 116 | One piece counts as two, and capstones fire one short | Sets are 4–6 pieces. "One counts as two" fires a four-piece capstone at **two pieces** — and 116 was a weaker version of the same idea, so they were competing. | 113 stands; **116 repointed** at lending a piece away |
+
+For contrast, **The Jeweller's Eye (66)** measured fine and was left alone: one tier up on a Polished gem is
++4, which is a good item and not a second character.
+
+### Are they cool — the honest answer was no, for fourteen of them
+
+A discount is not a chase item. Seven entries were "this thing costs half", which is the least interesting
+shape a power can take and dies completely once you have bought the thing it discounts — The Shipwright's Debt
+was worthless the moment your boat was maxed. Another handful were invisible: a streak that never breaks, an
+hour of pet trickle, a trade that does not expire. Nobody chases a primordial for those.
+
+Rewritten to do something you can feel: boat upgrades now **refund** as doubloons, smelting has **one free in
+three**, the auction seat pays the fee **back double** on a sale, the streak **counts double**, every pet earns
+the trickle **from the box**, and Herald's Licence **grants you a badge a month**.
+
+### What I would still watch
+
+**The Long Day (93)** is one number against every daily allowance in the game and I have not measured what that
+totals. **Diviner's Rod (29)** takes buried fragments from three to twelve on a sixteen-tile board, which is a
+4x on the main sailing output. Both are defensible on an apex item; neither has been measured the way the badge
+pool just was.
+
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
-state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
+state that outlives the item, every one aimed at a mechanic that exists, 29 landing on a roll, and the three
+that measured as game-breaking cut down to size.
