@@ -13,7 +13,7 @@ import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { setDepthCapstones } from "@/lib/marketplace/sets.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
-import { hasPower, equippedPowers } from "@/lib/marketplace/ascension-powers.js";
+import { hasPower, equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 
 // ── MINING (owner-gated, phase 1) ────────────────────────────────────────────────────────────────────────────
 // You PROSPECT — one button surfaces a random live seam — then swing at it on
@@ -111,7 +111,10 @@ const COLLAPSE_SEAM_TIER = 1;
 // you had bought. Splitting the two means deep runs are something you can actually build toward — "start
 // later" AND "grow slower" — while the cap below still guarantees the gamble never becomes a formality.
 const COLLAPSE_FREE_DEPTH = 2;      // the first steps are safe, so there is always a reason to start
-export const safeDepthFor = (shoringLevel = 0) => COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3); // Shoring buys more
+// The Miner's Lamp buys five floors of safe roof — the same lever Shoring buys, which is what makes it
+// legible: a member who owns both can add the two numbers themselves.
+export const safeDepthFor = (shoringLevel = 0, lamp = false) =>
+    COLLAPSE_FREE_DEPTH + Math.floor(Math.max(0, shoringLevel) / 3) + (lamp ? 5 : 0);
 const COLLAPSE_PER_DEPTH = 0.075;   // and then it climbs, this much per step...
 const COLLAPSE_SLOW_PER = 0.05;     // ...less 5% of that per Buttress level...
 const COLLAPSE_SLOW_CAP = 0.50;     // ...to a floor of half the base rate.
@@ -120,8 +123,8 @@ export const perDepthFor = (braceLevel = 0) => COLLAPSE_PER_DEPTH * (1 - braceSl
 // A HARD CEILING regardless of either track. However well you have built the tunnel out, a deep enough step is
 // always a coin flip you can lose — otherwise the push-your-luck stops being a gamble at all.
 const COLLAPSE_CAP = 0.55;
-export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0) =>
-    Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel)) * perDepthFor(braceLevel));
+export const collapseChanceAt = (depth, shoringLevel = 0, braceLevel = 0, lamp = false) =>
+    Math.min(COLLAPSE_CAP, Math.max(0, depth - safeDepthFor(shoringLevel, lamp)) * perDepthFor(braceLevel));
 
 // ── DEPTHS AFFINITY ─────────────────────────────────────────────────────────────────────────────────────────
 // The mine shipped reading NOTHING off your loadout. You could be in full mythic with a legendary pet and the
@@ -245,7 +248,7 @@ const ENCOUNTERS = [
     { key: "vein", title: "The vein widens", body: "The rock ahead is threaded with colour.", effect: "seam" },
 ];
 
-function rollFind(card, depth, packBonus = 0) {
+function rollFind(card, depth, packBonus = 0, powers = null) {
     const tierCeil = Math.min(5, 1 + Math.floor(depth / 2));
     const pickTier = () => Math.max(1, Math.min(5, tierCeil - (Math.random() < 0.45 ? 1 : 0)));
     switch (card.key) {
@@ -254,9 +257,12 @@ function rollFind(card, depth, packBonus = 0) {
             // ("Silver Lode" as a thing you got) never made sense. So it does two honest things: it upgrades
             // the rock you'll work at the face, AND you chip some ore off it there and then, which is the
             // part that actually goes in the bag.
-            const t = pickTier();
+            // The Wide Seam lifts the rock a grade one time in three; The Long Vein pays the ore twice.
+            let t = pickTier();
+            if (powers?.has?.("wide_seam") && oneIn(3)) t = Math.min(5, t + 1);
             const o = oreTier(t);
-            const n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + packBonus)));
+            let n = Math.max(1, Math.round((2 + Math.floor(Math.random() * 3)) * (1 + packBonus)));
+            if (powers?.has?.("long_vein") && oneIn(3)) n *= 2;
             return { kind: "seam", tier: t, name: o.name, oreName: o.ore, n, color: o.color, art: oreArt(t) };
         }
         case "ore": {
@@ -296,7 +302,16 @@ export async function startTrip(buyerId) {
         [buyerId, allowed]
     ).catch(() => null);
     if (!spent) return { ok: false, error: "no_trips", ...(await getMiningState(buyerId)) };
-    const run = { depth: 0, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
+    // The Deep Key starts you five floors down; The Miner's Lamp starts you where you last reached. Both are a
+    // starting DEPTH, so they resolve here, once, rather than being re-asked every step. The deeper of the two
+    // wins when both are worn — they are the same promise at different strengths, not two that stack.
+    const startPowers = await equippedPowers(buyerId);
+    let startDepth = 0;
+    if (startPowers.has("deep_key")) startDepth = 5;
+    // (The Miner's Lamp is NOT here. It was written as "start where you reached last time" and mkt_mining has
+    // no column for that — nodes_mined and steps_taken are totals, not a deepest run. It buys safe depth
+    // instead; see collapseChanceAt.)
+    const run = { depth: startDepth, haul: [], seamTier: 1, over: false, collapsed: false, last: null };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb, current_node_id = NULL WHERE buyer_id = $1`, [buyerId, JSON.stringify(run)]).catch(() => {});
     await trackActivity(buyerId, "mine_trip", {}).catch(() => {});
     return { ok: true, ...(await getMiningState(buyerId)) };
@@ -347,7 +362,17 @@ export async function descend(buyerId) {
     // THE ROOF. Rolled before the card, so a collapse is the tunnel deciding rather than a reward being shown
     // to you and then snatched back.
     const eff = depthEffects(await equippedDepthAffinity(buyerId));
-    if (Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level) * (1 - eff.collapseCut)) {
+    // ── ASCENSION POWERS IN THE TUNNEL ───────────────────────────────────────────────────────────────────
+    // Shored Timbers eats the FIRST collapse of every trip outright — not the day's first, the trip's, which
+    // is a much stronger promise and the one on the card. Tracked on the run itself so it resets with the run.
+    const minePowers = await equippedPowers(buyerId);
+    let collapsing = Math.random() < collapseChanceAt(depth, row?.assay_level, row?.brace_level, minePowers.has("miner_s_lamp")) * (1 - eff.collapseCut);
+    if (collapsing && minePowers.has("shored_timbers") && !run.shored) {
+        await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify({ ...run, depth, shored: true, last: { kind: "shored" } })]).catch(() => {});
+        return { ok: true, depth, shored: true, ...(await getMiningState(buyerId)) };
+    }
+    if (collapsing) {
         // SECOND WIND (full Delver's Kit): the day's FIRST collapse still ends the run, but you keep the haul.
         // Guarded by a dated column so it is genuinely once a day and not once a page-load.
         const capstones = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
@@ -360,7 +385,7 @@ export async function descend(buyerId) {
         // payHaul returns what it ACTUALLY paid — gear and consumables are rolled at payout time, so the haul
         // entry says "gear" and only the paid record knows which piece. Without handing this back the wrap-up
         // had nothing to draw and Second Wind read as "you kept nothing" while quietly paying you everything.
-        const paid = saved ? await payHaul(buyerId, run.haul || []).catch(() => []) : [];
+        const paid = saved ? await payHaul(buyerId, run.haul || [], minePowers).catch(() => []) : [];
         await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
         // You crawl out with what you could reach on the way, which is the poorest rock in the mine. The vein
         // you'd actually found stays buried — `lostTier` is only for the wrap-up to show you what it cost.
@@ -374,7 +399,7 @@ export async function descend(buyerId) {
     }
 
     const card = drawCard(depth + Math.round(surveyValue("lantern", row?.lantern_level) * 10)); // Lantern reads the tunnel as deeper than it is
-    const found = rollFind(card, depth, surveyValue("pack", row?.face_level));
+    const found = rollFind(card, depth, surveyValue("pack", row?.face_level), minePowers);
     const haul = [...(run.haul || [])];
     let seamTier = Number(run.seamTier) || 1;
     if (found.kind === "seam") {
@@ -424,7 +449,12 @@ export async function descend(buyerId) {
 // Everything banked pays out. The haul was only ever a promise until something cashes it — climbing out with
 // it, or the Delver's Kit capstone deciding the roof does not get to keep it. Extracted so those two paths can
 // never drift: a reward added to one and not the other is the kind of bug nobody notices for months.
-async function payHaul(buyerId, haul = []) {
+async function payHaul(buyerId, haul = [], powers = null) {
+    // The Deep Cart doubles the ORE out of one trip in three. Ore only — doubling the gear and consumables
+    // rolled at payout time would be a different and much larger power than the card describes.
+    if (powers?.has?.("deep_cart") && oneIn(3)) {
+        haul = haul.flatMap((h) => (h?.kind === "seam" || h?.kind === "ore" ? [h, h] : [h]));
+    }
     const paid = [];
     for (const item of haul) {
         if (item.kind === "ore") {
@@ -501,7 +531,7 @@ export async function surfaceRun(buyerId) {
     const run = row?.run_json;
     if (!run || run.over) return { ok: false, error: "no_run" };
 
-    const paid = await payHaul(buyerId, run.haul || []);
+    const paid = await payHaul(buyerId, run.haul || [], await equippedPowers(buyerId));
     const next = { ...run, over: true, collapsed: false };
     await db.query(`UPDATE mkt_mining SET run_json = $2::jsonb WHERE buyer_id = $1`, [buyerId, JSON.stringify(next)]).catch(() => {});
     const seam = await cutSeam(buyerId, Number(run.seamTier) || 1);
@@ -727,7 +757,8 @@ export const smeltValue = (t, lvl) => Math.min(SMELT_TRACKS[t].cap, Math.max(0, 
 // Ore per part. The Crucible buys this down twice over its ten levels — a visible, discrete win rather than a
 // fraction that never quite changes the number on screen.
 export const SMELT_BASE_COST = 3;
-export const smeltCostFor = (crucibleLevel = 0) => Math.max(1, SMELT_BASE_COST - Math.floor(Math.max(0, crucibleLevel) / 4));
+export const smeltCostFor = (crucibleLevel = 0, free = false) =>
+    free ? 0 : Math.max(1, SMELT_BASE_COST - Math.floor(Math.max(0, crucibleLevel) / 4));
 
 // FURNACE FORMS — the smelting equivalent of the pickaxe ladder. Total smelting levels (0..30) decide which
 // furnace you're feeding, and it's the one you see in the smelt animation, so investment is visible at the
@@ -972,7 +1003,7 @@ export async function getMiningState(buyerId) {
         })() : null,
         ore: (ore || []).map((r) => {
             const o = oreTier(r.tier);
-            const cost = smeltCostFor(row?.crucible_level);
+            const cost = smeltCostFor(row?.crucible_level);   // display: the sticker price, before any power rolls
             const qty = Number(r.qty);
             return { tier: r.tier, name: o.ore, color: o.color, art: oreArt(r.tier), qty, partTier: o.part,
                 smeltCost: cost, canSmelt: Math.floor(qty / cost) };
@@ -981,7 +1012,7 @@ export async function getMiningState(buyerId) {
         // What you could smelt RIGHT NOW, in parts. The tab badge counted raw ore, so 2 Iron Ore — three short
         // of a single Iron Filing — lit a red "2" that promised something to do and then said "Not enough".
         partsReady: (ore || []).reduce((s, r) => {
-            const cost = smeltCostFor(row?.crucible_level);
+            const cost = smeltCostFor(row?.crucible_level);   // display: the sticker price, before any power rolls
             return s + Math.floor(Number(r.qty) / Math.max(1, cost));
         }, 0),
         gold: Number(goldRow?.gold) || 0,
@@ -1248,7 +1279,9 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     const t = Number(tier);
     if (!ORE_TIERS[t]) return { ok: false, error: "bad_tier" };
     const row = await minerRow(buyerId);
-    const cost = smeltCostFor(row?.crucible_level);
+    // The Assay Office: one smelt in three costs no ore at all. Rolled per POUR rather than per batch, so a
+    // ten-batch pour is one roll — otherwise the power would be worth ten times more to whoever stockpiled.
+    const cost = smeltCostFor(row?.crucible_level, await hasPower(buyerId, "assay_office") && oneIn(3));
 
     // ── ONE POUR, UP TO TEN BATCHES ──────────────────────────────────────────────────────────────────────────
     // A smelt is `cost` ore in, one part out, one hand of the minigame played — and that is right for the hand
