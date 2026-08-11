@@ -55,6 +55,17 @@ const KITS = [
 const ABILITY_EDGE = 1.25;
 const GUARD_SHARE = 0.33;
 const BLOCK = 0.34;
+// ── THE DEFENDER BRACES NOW ──────────────────────────────────────────────────────────────────────────────────
+// Below a third of its health an absent defender covers up instead of swinging: your next blow lands on a
+// raised guard (-40%) and it deals nothing that round. That cuts BOTH sides' damage, so it lengthens the tail
+// of a fight — which is exactly the thing the two-minute promise cares about, and it has to be in the model or
+// the model is measuring a game nobody plays.
+//
+// It only happens in the last third of the foe's health, and costs them a full attack, so it is folded in as a
+// modest haircut on each side rather than a phase: roughly a tenth of the fight spent bracing.
+const BRACE_SHARE = 0.10;
+const MY_BRACE_LOSS = 1 - BRACE_SHARE * 0.4;   // their raised guard eating part of my swings
+const THEIR_BRACE_LOSS = 1 - BRACE_SHARE;      // rounds they spend not swinging at all
 
 // THE PIT CLOSES from round 7: every blow compounds, both ways. So "how many rounds" is no longer
 // health/damage — it is how many rounds of a GROWING share of their health it takes, which is what actually
@@ -69,8 +80,8 @@ function roundsToKill(hp, perRound) {
 
 function bout(kit, foe) {
     const mine = swing(kit.might) * ABILITY_EDGE
-        * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1)) * (1 - foe.armour);
-    const theirs = foe.damage * (1 + foe.critChance * (foe.critMult - 1)) * (1 - GUARD_SHARE * BLOCK);
+        * (1 + critChance(kit.cc) * (critMult(kit.cp) - 1)) * (1 - foe.armour) * MY_BRACE_LOSS;
+    const theirs = foe.damage * (1 + foe.critChance * (foe.critMult - 1)) * (1 - GUARD_SHARE * BLOCK) * THEIR_BRACE_LOSS;
     const roundsIneed = roundsToKill(foe.health, Math.max(0.1, mine));
     const roundsTheyNeed = roundsToKill(health(kit.fero), Math.max(0.1, theirs));
     return { mine, theirs, roundsIneed, roundsTheyNeed, win: roundsIneed <= roundsTheyNeed };

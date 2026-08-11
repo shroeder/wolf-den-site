@@ -103,17 +103,77 @@ const AI_ABILITY_CHANCE = 0.75;
 // cause was structural — the opponent's move was rolled at the moment the beat RESOLVED, so there was nothing
 // to show you beforehand even in principle. It is now chosen the instant their turn begins, published to the
 // client, and consumed when the blow lands. Same randomness, but you get to see it first.
+// ── THE ABSENT DEFENDER PLAYS THEIR OWN BUILD ────────────────────────────────────────────────────────────────
+// It used to pick a UNIFORMLY RANDOM ability three rounds in four and never do anything else. It could not
+// guard, could not heal, and never respected a cooldown — so it could spam its best move forever while being
+// unable to defend itself once. And any DEFENSIVE ability it happened to roll (ward, riposte, drain) was
+// silently downgraded to a plain hit, because only strike/spell/execute were read for power.
+//
+// The result was that a member's loadout fought nothing like the member. Luke, who built a shield: "my dude is
+// a defensive machine, he should be able to defend himself using skills and the guard ability when he gets
+// low." His absent self did the exact opposite — it never guarded once.
+//
+// So the defender now plays a POLICY, in priority order, off the same kit the owner assembled:
+//
+//   FINISH    the challenger is under a third → an execute-type move, because that is what it is for
+//   SURVIVE   it is under a third itself → drain to heal, or BRACE (see below)
+//   SET UP    early, with a sunder or a surge available → spend the round making the next one hurt
+//   PRESS     otherwise the strongest thing off cooldown
+//
+// BRACING is the piece that was missing entirely, and it is what makes a defensive build defensive when its
+// owner is asleep. It costs the defender their attack — so it can never stall a fight, it trades damage out
+// for damage in, which is the same bargain the player's own Guard makes.
+const AI_BRACE_AT = 0.34;        // health fraction below which it starts protecting itself
+const AI_BRACE_GUARD = 0.4;      // how much of your next swing a brace turns aside
+const FINISH_AT = 0.34;          // your health fraction that makes an execute the obvious play
+
+function foeReady(b, ability) {
+    if (!ability) return false;
+    const until = (b.foeCd || {})[ability.id] || 0;
+    return b.beat >= until;
+}
+
 function pickIncoming(b) {
-    const ability = (b.foe.abilities || []).length && Math.random() < AI_ABILITY_CHANCE
-        ? b.foe.abilities[Math.floor(Math.random() * b.foe.abilities.length)]
-        : null;
+    const kit = (b.foe.abilities || []).filter((a) => foeReady(b, a));
+    const myFrac = b.maxHp ? b.hp / b.maxHp : 1;
+    const theirFrac = b.foeMaxHp ? b.foeHp / b.foeMaxHp : 1;
+    const of = (...kinds) => kit.find((a) => kinds.includes(a.kind)) || null;
+
+    let ability = null;
+    let brace = false;
+    if (theirFrac <= AI_BRACE_AT) {
+        // Cornered. Heal if it can, otherwise cover up — a build with no answer still stops standing still.
+        ability = of("drain") || of("ward");
+        if (!ability) brace = true;
+    }
+    if (!ability && !brace && myFrac <= FINISH_AT) ability = of("execute", "strike");
+    if (!ability && !brace && b.beat <= 2) ability = of("sunder", "surge");
+    if (!ability && !brace) {
+        // The strongest thing available, most of the time — with a little slack so it is not a metronome and
+        // a player cannot read the next four rounds off the first one.
+        const offensive = kit.filter((a) => !["ward"].includes(a.kind));
+        const pool = offensive.length ? offensive : kit;
+        if (pool.length && Math.random() < AI_ABILITY_CHANCE) {
+            ability = Math.random() < 0.75
+                ? pool.reduce((best, a) => ((a.power || 1) > (best?.power || 0) ? a : best), null)
+                : pool[Math.floor(Math.random() * pool.length)];
+        }
+    }
+    if (ability) {
+        if (!b.foeCd) b.foeCd = {};
+        b.foeCd[ability.id] = b.beat + Math.max(1, ability.cooldown || 2);
+    }
     return {
-        name: ability?.name || "a heavy swing",
-        kind: ability?.kind || "swing",
+        name: brace ? "a braced guard" : (ability?.name || "a heavy swing"),
+        kind: brace ? "brace" : (ability?.kind || "swing"),
         element: ability?.element || b.foe.element || null,
         sprite: ability?.sprite || null,
-        power: ability && ["strike", "spell", "execute"].includes(ability.kind) ? ability.power : 1,
-        isAbility: Boolean(ability),
+        // POWER IS READ FOR EVERY OFFENSIVE KIND NOW. It used to be honoured only for strike/spell/execute, so
+        // a foe that chose a flurry or a rend swung it at power 1 — its own ability, defanged.
+        power: brace ? 0 : (ability && !["ward", "drain"].includes(ability.kind) ? (ability.power || 1) : 1),
+        heal: ability?.kind === "drain" ? DRAIN_SHARE : 0,
+        brace,
+        isAbility: Boolean(ability) || brace,
     };
 }
 
@@ -917,7 +977,13 @@ export async function fightRound(buyerId, opts = {}) {
         const sundered = (b.sunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
         // Their armour: the number on their card, minus whatever a Sunder has stripped and whatever your
         // Pierce cuts through. No roll — the same swing into the same armour is the same number every time.
-        const guard = Math.max(0, Math.min(0.85, (Number(b.foe.armour) || 0) * pierce * sundered));
+        //
+        // A BRACE ADDS TO IT for exactly one of your swings. This is what a defensive loadout does while its
+        // owner is asleep, and it costs the defender their attack to do it — so it can never stall the fight,
+        // it trades their damage for yours. Sunder and Pierce cut through a brace exactly as they cut through
+        // armour, which keeps the counter-play the same one the player already knows.
+        const braced = (b.foeBrace || 0) > 0 ? AI_BRACE_GUARD : 0;
+        const guard = Math.max(0, Math.min(0.85, ((Number(b.foe.armour) || 0) + braced) * pierce * sundered));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -939,6 +1005,7 @@ export async function fightRound(buyerId, opts = {}) {
             dmg += Math.max(1, Math.round(raw - raw * guard));
         }
         b.foeHp = Math.max(0, b.foeHp - dmg);
+        if (b.foeBrace > 0) b.foeBrace -= 1;
 
         // What the move leaves behind.
         let healed = 0;
@@ -979,6 +1046,15 @@ export async function fightRound(buyerId, opts = {}) {
             ability: ability?.name || null });
         b.turn = "them";
     } else {
+        // ── A BRACED DEFENDER DOES NOT SWING ── it covers up, and your next blow lands on a raised guard.
+        // Handled at the top of their turn so it falls through to the SAME tail every other outcome uses
+        // (hand the turn back, tick cooldowns, check whether anybody has fallen). An early return here skipped
+        // all three, which is the sort of thing that only shows up as a bout that will not end.
+        if (b.incoming?.brace) {
+            b.foeBrace = 1;
+            b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
+                text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });
+        } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
         // Whatever was telegraphed is what lands. Rolling again here would make the warning a lie.
         const incoming = b.incoming || pickIncoming(b);
@@ -986,6 +1062,7 @@ export async function fightRound(buyerId, opts = {}) {
         const power = incoming.power || 1;
         // Their element against yours is the mirror of yours against theirs.
         const back = 1 / (b.clash?.mult || 1);
+        // A braced defender does not swing — it covers up, and your next blow lands on a raised guard.
         const foeCrit = Math.random() < foeCritChance;
         const raw = Math.max(1, Math.round(b.foe.damage * power * back * fever * (foeCrit ? foeCritMult : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
@@ -1043,6 +1120,7 @@ export async function fightRound(buyerId, opts = {}) {
         if ((P.regen || 0) > 0 && b.hp > 0 && b.hp < b.maxHp) {
             const back = Math.max(1, Math.round(b.maxHp * P.regen));
             b.hp = Math.min(b.maxHp, b.hp + back);
+        }
         }
         b.turn = "you";
         b.incoming = null;
@@ -1137,13 +1215,6 @@ async function finishBout(buyerId, row, b, won) {
     };
 
     // Recorded from BOTH sides. A defender was asleep; this is the only way they ever find out. An NPC has no
-    // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
-    await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
-        [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
-            JSON.stringify(feats.map((f) => f.id)), defencePaid]
-    ).catch(() => {});
 
     // ── THE DEFENDER'S CUT ───────────────────────────────────────────────────────────────────────────────
     // Paid HERE, at the moment the bout resolves, rather than when the away report is read. Paying on read
@@ -1166,6 +1237,14 @@ async function finishBout(buyerId, row, b, won) {
         ).catch(() => null);
         if (paid) defencePaid = cut;
     }
+
+    // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
+    await db.query(
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+        [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
+            JSON.stringify(feats.map((f) => f.id)), defencePaid]
+    ).catch(() => {});
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss",
         { foe: b.foe.id, vp, laurels, npcTier: npcTier || null, feats: feats.map((f) => f.id) }).catch(() => {});
