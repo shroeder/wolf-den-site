@@ -297,7 +297,9 @@ function chargeState(ownedRow, item) {
 
 // Gold a member gets for selling gear back, by rarity (mirrors the chest "dust" values). Charged perk
 // items hold real-world value, so they can't be sold for gold.
-const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 2500, eternal: 6000 };
+// Celestial and primordial were added when the top of the ladder was extended. Without them a sell-back
+// returned `undefined` gold, which is not a smaller number — it is a broken transaction.
+const SELL_VALUES = { common: 25, rare: 60, epic: 140, legendary: 350, mythic: 900, ascendant: 2500, eternal: 6000, celestial: 12000, primordial: 20000 };
 // Power ordering for the shop so it reads as one clean worst→best ladder (the catalog itself is grouped
 // by when items were added, which otherwise makes the shop restart at "worst" every batch).
 const RARITY_RANK = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4, ascendant: 5, eternal: 6 };
