@@ -271,6 +271,9 @@ function PartChip({ zone, left, max, label = null }) {
 function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys, caps, targets = null,
                 onPick = null, onUnpick = null, firing = false, hullRef = null }) {
     const ports = f?.ports || [];
+    // One entry per port: which mark this barrel is, and whether that sprite was drawn pointing the wrong way.
+    // Absent on a battle saved before the marks were wired, so the generic barrel stays the fallback.
+    const gunArts = f?.gunArts || [];
     const key = shipKey(f);
     const mirror = Boolean(f?.mirror);
     const gunHp = sys?.guns || [];
@@ -345,9 +348,22 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                 // the raw x, so on a flipped hull (a rival captain) every barrel sat on the
                                 // wrong end of the ship: guns at the stern, an empty bow, and the art facing
                                 // the other way to its own battery.
+                                // ── EACH BARREL DRAWS ITS OWN MARK ──────────────────────────────────
+                                // Every gun used to be the same generic deck-cannon.png, so pouring twelve
+                                // levels into one barrel changed nothing you could see mid-fight. `flip`
+                                // normalises the two stage sprites that were drawn facing left; the far
+                                // ship's whole gun is already mirrored by CSS, so the two compose.
                                 <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}${dead ? " is-dead" : ""}${hurtGun ? " is-damaged" : ""}`}
                                     style={{ left: `${(mirror ? 1 - g.x : g.x) * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 80}ms` }}>
-                                    <i className="sbt-gun-barrel" />
+                                    <i className="sbt-gun-barrel"
+                                        style={gunArts[i]?.url ? {
+                                            backgroundImage: `url("${gunArts[i].url}")`,
+                                            // A CUSTOM PROPERTY, NOT A TRANSFORM. The recoil is a keyframe on
+                                            // `transform`, and an animation beats an inline style — so setting
+                                            // the flip there would drop it the instant the gun fired. The
+                                            // keyframes multiply this in instead.
+                                            "--gflip": gunArts[i].flip ? -1 : 1,
+                                        } : undefined} />
                                     {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 80}ms` }} /> : null}
                                     {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 80}ms` }} /> : null}
                                 </span>

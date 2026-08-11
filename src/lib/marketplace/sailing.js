@@ -18,7 +18,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import { AMMO, AMMO_LIST, ammoById, COMBAT_TRACKS, shipProfile, foeProfile,
          gunsFor, accuracyFor, rakeFor, hullHitsFor, initBattleState, resolveVolley, sanitizeAims,
          SAILS_MAX, GUN_HP, matchupOdds, hullGrade, foeAims, BATTLE_STATE_V,
-         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage,
+         GUN_TRACKS, gunHpFor, gunDmgChance, gunAccBonus, gunUpgradeCost, resolveReckoning, gunArt, gunStage, gunArtFlip, gunStageFromLevel, GUN_ART_FACES_LEFT_STAGES,
          gunAmmoUnlocked, GUN_MARK_AMMO, GUN_ART_STAGES,
          RECKONING_AT, RECKONING_NAME } from "@/lib/marketplace/ship-battle.js";
 import { ZONE_LIST, zonesOn, zoneKeyFromArt } from "@/lib/marketplace/ship-zones.js";
@@ -2212,10 +2212,30 @@ const withGuns = (side, hulls) => {
     // Resolved here, at view time, for the same reason the guns are: `mirror` was written into the meta when
     // the battle opened, so a hull marked as flipped would not straighten up until every fight in progress
     // had ended. It is a property of the ART, and the art is read fresh on every round.
+    // ── EVERY BARREL DRAWS ITSELF ────────────────────────────────────────────────────────────────────────
+    // The battle drew one generic deck-cannon.png for every gun on every ship, so the four stage sprites — the
+    // whole point of pouring levels into ONE gun — only ever appeared on the gun-deck screen. Upgrade a barrel
+    // to Mark II and the fight showed you the same iron pipe as everybody else.
+    //
+    // Your own guns have real per-gun rows, so each one draws its own mark. A foe has no per-gun rows (fleet
+    // ships and encounters never did, and a rival's are not fetched into the meta), so their whole battery
+    // shows the mark their gun track has bought.
+    const stats = Array.isArray(side.gunStats) ? side.gunStats : null;
+    const ports = side.ports?.length ? side.ports : portsWithSaved(hulls?.ports || {}, art, deck, side.guns || 1);
+    // Your own battery has a row per gun, so every barrel draws the mark IT has earned. A foe has no per-gun
+    // rows — fleet ships and encounters never had any, and a rival's are not carried into the meta — so the
+    // whole battery shows the mark their gun track has bought.
+    const stageOf = (i) => (stats ? gunStage(stats[i] || {}) : gunStageFromLevel(side.gunLevel));
     return {
         ...side, deck,
         mirror: facing(hulls?.flip, art, side.mirror),
-        ports: side.ports?.length ? side.ports : portsWithSaved(hulls?.ports || {}, art, deck, side.guns || 1),
+        ports,
+        // Paired with `ports` by index. `flip` normalises a sprite that was drawn pointing left — ship-battle.js
+        // owns the fact that stages 2 and 3 face the other way to 1 and 4.
+        gunArts: ports.map((_, i) => {
+            const st = stageOf(i);
+            return { url: `/images/sailing/gun/cannon-${st}.png`, flip: GUN_ART_FACES_LEFT_STAGES.has(st) };
+        }),
     };
 };
 // EVERYTHING THE SCENE NEEDS TO LET YOU AIM. The client hit-tests taps against the same measured zone maps the
@@ -2252,14 +2272,16 @@ const buildBattleView = (st, meta, { row = null, hulls = null } = {}) => ({
         };
     })(),
     kind: meta.kind, rank: meta.rank ?? null, first: meta.first ?? false,
-    me: withGuns(meta.me, hulls),
+    // gunStats rides on meProfile rather than on `me`, and it is what decides which mark each barrel draws.
+    // Read from there instead of adding a field to `me`, so battles already in progress pick it up too.
+    me: withGuns({ ...meta.me, gunStats: meta.meProfile?.gunStats || null }, hulls),
     // Battles saved before the fleet had captains carry no rider in their meta, and they outlive a deploy — so
     // a fight resumed across it would come back to an empty enemy deck. Fill it from the rank rather than
     // migrating the jsonb: these rows are transient and a read is the cheaper place to be forgiving.
     foe: withGuns(
         meta.kind === "fleet" && meta.foe && !meta.foe.rider && meta.rank
-            ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false }
-            : meta.foe,
+            ? { ...meta.foe, rider: fleetCaptain(fleetShip(meta.rank)), riderFlip: false, gunLevel: meta.foeProfile?.gunLevel || 0 }
+            : { ...meta.foe, gunLevel: meta.foeProfile?.gunLevel || 0 },
         hulls,
     ),
     myHp: st.me.hp, foeHp: st.foe.hp, myMax: st.me.max, foeMax: st.foe.max,

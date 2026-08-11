@@ -291,6 +291,28 @@ export const gunStage = (lv) => {
 };
 export const gunArt = (lv) => `/images/sailing/gun/cannon-${gunStage(lv)}.png`;
 
+// ── WHICH WAY EACH BARREL WAS DRAWN ──────────────────────────────────────────────────────────────────────────
+// The four stage sprites do not agree with each other. Read off the art: cannon-1 and cannon-4 point RIGHT,
+// cannon-2 and cannon-3 point LEFT. Nothing enforced it at generation time and nothing noticed afterwards,
+// because the battle was drawing a single generic barrel for everybody and only the gun-deck screen ever showed
+// these — one at a time, where a muzzle facing the other way looks like a different pose rather than a bug.
+//
+// Everything downstream assumes a barrel points RIGHT: the CSS puts the muzzle flash at 88% and the smoke at
+// 96%, and mirrors the whole gun for the far ship. So this table is the single place that knows the truth, and
+// gunArtFlip normalises every stage to right-facing before any of that runs.
+//
+// A table rather than a scan: it is four values, it is checked by eye against four files, and a runtime image
+// scan to answer a question with four possible answers would be worse in every way. If a barrel is ever
+// redrawn, this is the line to change with it.
+export const GUN_ART_FACES_LEFT_STAGES = new Set([2, 3]);
+
+/** Does this gun's sprite need mirroring to point right, the way everything downstream assumes? */
+export const gunArtFlip = (lv) => GUN_ART_FACES_LEFT_STAGES.has(gunStage(lv));
+
+/** The stage a foe shows, derived from their gun track — rivals and fleet ships have no per-gun rows. */
+export const gunStageFromLevel = (gunLevel = 0) =>
+    Math.min(GUN_ART_STAGES, 1 + Math.floor(Math.max(0, Number(gunLevel) || 0) / 4));
+
 // ── WHAT A GUN IS LOADED WITH ────────────────────────────────────────────────────────────────────────────────
 // Ammunition used to be a SHOP and a QUANTITY: you bought chain with doubloons, it sat in a rack as a count,
 // you picked it per gun, and firing spent it. Three problems with that. It put a purchase in the middle of a
