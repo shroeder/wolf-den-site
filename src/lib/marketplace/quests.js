@@ -7,6 +7,7 @@ import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpFeatureDaily } from "@/lib/marketplace/feature-dailies.js";
+import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // Bonus XP for clearing all THREE daily quests in a day (on top of the bonus spin token).
 const ALL_QUESTS_XP = 300;
@@ -109,21 +110,24 @@ function eligibleTemplates(buyerId) {
 
 // The 3 templates assigned to this member today (stable for the whole day). `reset` salts the seed so a
 // paid re-roll produces a different set.
-function pickDaily(buyerId, day, reset = false) {
+function pickDaily(buyerId, day, reset = false, count = 3) {
     const salt = reset ? ":r" : "";
     return eligibleTemplates(buyerId)
         .map((t) => ({ t, h: hashStr(`${buyerId}:${day}${salt}:${t.key}`) }))
         .sort((a, b) => a.h - b.h)
-        .slice(0, 3)
+        .slice(0, count)
         .map((x) => x.t);
 }
 
-async function insertQuests(buyerId, day, templates) {
+// `headStart` is The Quartermaster's Round: every bounty is issued with one step already done. Written as
+// PROGRESS on the row rather than as a smaller target, so the card still reads "0 of 5" honestly — it reads
+// "1 of 5" the moment it appears, which is the whole point of the power.
+async function insertQuests(buyerId, day, templates, headStart = false) {
     for (const t of templates) {
         await db.query(
-            `INSERT INTO mkt_daily_quest (buyer_id, day, quest_key, target, reward_gold, reward_chest)
-             VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (buyer_id, day, quest_key) DO NOTHING`,
-            [buyerId, day, t.key, t.target, t.gold || 0, t.chest || null]
+            `INSERT INTO mkt_daily_quest (buyer_id, day, quest_key, target, reward_gold, reward_chest, progress)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (buyer_id, day, quest_key) DO NOTHING`,
+            [buyerId, day, t.key, t.target, t.gold || 0, t.chest || null, headStart ? 1 : 0]
         ).catch(() => {});
     }
 }
@@ -135,7 +139,10 @@ export async function ensureDailyQuests(buyerId) {
     const day = storeDay();
     const have = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => null);
     if ((have?.n || 0) >= 1) return day; // already assigned (or re-rolled) today
-    await insertQuests(buyerId, day, pickDaily(buyerId, day));
+    // Bounty Board Rights buys a fourth bounty; The Quartermaster's Round starts every one of them a step in.
+    const questPowers = await equippedPowers(buyerId);
+    await insertQuests(buyerId, day, pickDaily(buyerId, day, false, questPowers.has("bounty_board_rights") ? 4 : 3),
+        questPowers.has("quartermaster_s_round"));
     return day;
 }
 
@@ -159,7 +166,9 @@ export async function resetDailyQuests(buyerId) {
     await logCoin(buyerId, -QUEST_RESET_COST, "cooldown_skip", { meta: { kind: "quest_reroll" }, balanceAfter: paid.gold }).catch(() => {});
     await trackActivity(buyerId, "cooldown_skip", { kind: "quest_reroll", cost: QUEST_RESET_COST }).catch(() => {});
     await db.query(`DELETE FROM mkt_daily_quest WHERE buyer_id = $1 AND day = $2`, [buyerId, day]).catch(() => {});
-    await insertQuests(buyerId, day, pickDaily(buyerId, day, true));
+    const rerollPowers = await equippedPowers(buyerId);
+    await insertQuests(buyerId, day, pickDaily(buyerId, day, true, rerollPowers.has("bounty_board_rights") ? 4 : 3),
+        rerollPowers.has("quartermaster_s_round"));
     return { ok: true, gold: paid.gold, ...(await getDailyQuests(buyerId)) };
 }
 

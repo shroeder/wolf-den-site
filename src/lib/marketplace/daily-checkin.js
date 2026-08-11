@@ -14,6 +14,7 @@ import { rollLoginProcs, COUPON_PCT, COUPON_MAX } from "@/lib/marketplace/signat
 import { PUBLIC_COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
 // is consecutive days claimed; miss a day and it resets. Rewards escalate over a 7-day cycle, with a big
@@ -136,7 +137,12 @@ export async function claimDailyCheckin(buyerId) {
     const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const today = storeToday();
     if (asDay(row?.streak_claimed_day) === today) return { ok: false, error: "already_claimed", streak: row.streak };
-    const nextStreak = asDay(row?.streak_claimed_day) === storeYesterday() ? (row?.streak || 0) + 1 : 1;
+    // ── ASCENSION POWERS ON A CHECK-IN ───────────────────────────────────────────────────────────────────
+    // The Standing Streak never breaks — a missed day carries on rather than restarting at 1 — and it counts
+    // DOUBLE toward the reward ladder, so it climbs at twice the pace as well as never falling.
+    const dailyPowers = await equippedPowers(buyerId);
+    const kept = dailyPowers.has("standing_streak");
+    const nextStreak = (kept || asDay(row?.streak_claimed_day) === storeYesterday()) ? (row?.streak || 0) + (kept ? 2 : 1) : 1;
     // Atomic guard: only the first claim of the day wins (streak_claimed_day flips off today's value).
     const won = await db
         .queryOne(
@@ -148,7 +154,9 @@ export async function claimDailyCheckin(buyerId) {
     if (!won) return { ok: false, error: "already_claimed" };
 
     const reward = rewardForStreak(nextStreak);
-    if (reward.gold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, reward.gold]).catch(() => {});
+    // Day's Double pays the whole check-in twice.
+    const payMult = dailyPowers.has("day_s_double") ? 2 : 1;
+    if (reward.gold) await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, reward.gold * payMult]).catch(() => {});
     if (reward.gold) await logCoin(buyerId, reward.gold, "checkin", { meta: { streak: nextStreak } }).catch(() => {});
     if (reward.treat && CONSUMABLES[reward.treat]) await grantConsumable(buyerId, reward.treat, 1).catch(() => {});
     if (reward.chest && CHEST_TIERS[reward.chest]) await addChests(buyerId, { [reward.chest]: 1 }, { source: "daily_checkin", meta: { streak: nextStreak } }).catch(() => {});

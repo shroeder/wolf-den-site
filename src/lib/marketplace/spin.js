@@ -18,6 +18,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
+import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY SPIN — one free spin a day + a spin-token economy. Tokens come from quests, boss kills, streaks, or
 // gold. Your level unlocks better wheels. Gold prizes ride the Happy Hour multiplier. The wheel's prize list
@@ -439,11 +440,30 @@ export async function doSpin(buyerId) {
     const row = await db.queryOne(`SELECT COALESCE(xp,0) AS xp, COALESCE(spin_tokens,0) AS tokens, free_spin_day::text AS free_spin_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!row) return { ok: false, error: "not_signed_in" };
     const freeAvailable = asDay(row.free_spin_day) !== today();
+    let grantedFree = false;
+    // ── THE FREE SPIN ────────────────────────────────────────────────────────────────────────────────────
+    // Three free a day rather than one. free_spin_day is a single dated flag, so it cannot count to three on
+    // its own — the extra two are read off how many spins have already been taken today, which spin_count
+    // already tracks. A member with the power is free until they have spun three times.
+    const spinPowers = await equippedPowers(buyerId);
+    if (!freeAvailable && spinPowers.has("free_spin")) {
+        const today3 = await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_coin_event
+              WHERE buyer_id = $1 AND kind = 'spin'
+                AND (created_at AT TIME ZONE 'America/Chicago')::date = (NOW() AT TIME ZONE 'America/Chicago')::date`,
+            [buyerId]
+        ).catch(() => null);
+        if ((Number(today3?.n) || 0) < 3) grantedFree = true;
+    }
     // Consume a spin atomically (free first, else a token).
     let consumed = null;
     if (freeAvailable) {
         consumed = await db.queryOne(`UPDATE mkt_buyer SET free_spin_day = $2::date WHERE id = $1 AND (free_spin_day IS DISTINCT FROM $2::date) RETURNING id`, [buyerId, today()]).catch(() => null);
     }
+    // The dated flag can only ever be spent ONCE a day, so The Free Spin's second and third cannot go through
+    // it — they consume nothing at all. Kept separate from `freeAvailable` for exactly that reason: conflating
+    // them made the second free spin fail the guarded UPDATE and fall through to charging a token.
+    if (!consumed && grantedFree) consumed = { id: buyerId };
     if (!consumed) {
         consumed = await db.queryOne(`UPDATE mkt_buyer SET spin_tokens = spin_tokens - 1 WHERE id = $1 AND spin_tokens > 0 RETURNING id`, [buyerId]).catch(() => null);
         if (!consumed) return { ok: false, error: "no_spins" };
