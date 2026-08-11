@@ -49,7 +49,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 8 | **The Fallow Deed** | A plot left empty overnight yields double the next time you harvest it. | B |
 | 9 | **The Cold Frame** | One crop in three ignores its grow time entirely and is ready the moment it goes in. | B |
 | 10 | **The Long Furrow** | No crop of yours ever takes longer than eight hours. | A |
-| 11 | **The Open Gate** | Visiting another member's farm never spends one of your daily visits. | A |
+| 11 | **The Open Gate** | Petting and feeding on other people's farms never spends your daily budget. | B |
 | 12 | **The Seed Drill** | One harvest in four drops a second seed of what you planted. | B |
 | 13 | **The Garden Path** | Every decoration on your farm gives a buff, whatever its rarity — cosmetics included. | B |
 
@@ -143,7 +143,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | # | Name | Effect | Class |
 |---|---|---|---|
 | 74 | **Founder's Charter** | The travelling merchant sells to you at half price. | A |
-| 75 | **The Plaza Key** | Town buildings you have not unlocked are open to you anyway. | A |
+| 75 | **The Standing Order** | The travelling merchant's one-a-day chest limit becomes three of each. | A |
 | 76 | **Patron of Works** | Gold you give to a town project counts double toward it. | A |
 | 77 | **Market Day** | The travelling merchant restocks for you, on demand, once a day. | B |
 | 78 | **The Warden's Key** | You may release one person from the Stockade each week. | B |
@@ -165,7 +165,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 89 | **The Quartermaster's Round** | Every daily quest is issued one step already done. | B |
 | 90 | **Bounty Board Rights** | You may take a fourth daily quest. | A |
 | 91 | **The Master Key** | One chest in three also gives you the chest one tier below it, to open yourself. | B |
-| 92 | **The Sorting Table** | A chest reward you already own comes out one rarity up instead. | B |
+| 92 | **The Sorting Table** | A chest that would pay you dust widens to the rarity above instead. | B |
 | 93 | **The Long Day** | Every daily allowance in the game is one larger. Every single one. | A |
 
 ## Pets
@@ -195,7 +195,7 @@ Every entry below carries its class. If an entry cannot be given an A or a B, it
 | 109 | **The Merchant's Eye** | One daily deal each day is offered to you at half price. | A |
 | 110 | **No Reserve** | An auction that does not sell is relisted for you, free, until it does. | B |
 | 111 | **The Bulk Buyer** | One purchase in three from the gold shop comes in pairs. | B |
-| 112 | **The Merchant's Ledger** | The travelling merchant's stock is twice as large for you. | A |
+| 112 | **The Merchant's Ledger** | The travelling merchant stocks his whole catalogue for you, whatever your Trading Post level. | A |
 
 ## Collections & Standing
 
@@ -495,6 +495,34 @@ systems practically works."* Fair. Seven more, found by reading the modules rath
 Two nearby entries were checked and stand: **The Bonded Warehouse (108)** is real because listing genuinely
 removes the item from your bags, and **The Free Spin (85)** is real because the wheel gives exactly one free
 spin a day and everything else is a token.
+
+## Twelfth pass — the whole list, module by module
+
+Four more dead, and the misses have a single shape: I kept writing powers that REMOVE A FRICTION, and half the
+time the friction was not there.
+
+| # | Was | What the code says |
+|---|---|---|
+| 11 | The Open Gate — "never spends a daily visit" | **There is no visit limit.** What is metered is `pettingBudget()` — how much petting and feeding you may do in a day. Repointed at the budget that exists. |
+| 75 | The Plaza Key — "locked buildings are open to you" | **Nothing is locked.** "All nine are on by default… the Vault and Festival Stage used to be community-funded unlocks; they're now standing fixtures." Now **The Standing Order** — the merchant's one-chest-a-day limit becomes three. |
+| 92 | The Sorting Table — "a reward you already own" | Chests **never give a duplicate.** They widen to any un-owned item of that rarity and pay gold dust only if you own the lot. Repointed at the dust. |
+| 112 | The Merchant's Ledger — "stock twice as large" | Stock is `MERCHANT_STOCK` filtered by `minTier` against your Trading Post level. "Twice as large" is not a thing; ignoring the tier gate is. |
+
+### Verified and standing
+
+Checked against the module that owns them, and correct as written: boat upgrades (`upgradeCost = 100(n+1)²`),
+smelting ore cost (`smeltCostFor`), bought mine trips (`TRIP_RECHARGE_BASE = 500`, doubling, 3/day), the
+check-in streak ladder (`STREAK_REWARDS`), town projects (`TOWN_PROJECTS`, community-funded and still live),
+Stockade release (`releaseFromStockade`), selling to the shop (`sellItem` / `sellValueOf`), the auction listing
+fee (`LIST_FEE_PCT = 0.05`), trade expiry (`expires_at`, lazily reaped), the daily deal rotation (4 a day at
+midnight, capped at epic), the wheel's one free spin a day, and cooking's timing minigame.
+
+### The rule these misses point at
+
+A power survives contact when it **moves a number that already governs an outcome** — `FRAGMENTS_BURIED`,
+`RAIN_CUT`, `TREASURE_CHANCE`, `LIST_FEE_PCT`, `MAX_SOCKETS`, `SYSTEM_PASSIVE_CAP`, `TRIP_RECHARGE_BASE`. It
+dies when it removes a friction I assumed was there. Every remaining entry has been checked against a named
+constant or a named function, not against a memory of how the feature probably works.
 
 **The list is closed.** 120 entries, no duplicates, all bounded, all class A or B, none a tooltip, none minting
 state that outlives the item, every one aimed at a mechanic that exists, and 29 of them now land on a roll.
