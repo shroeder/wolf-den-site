@@ -90,6 +90,7 @@ async function petInPendingTrade(ownerId, petId) {
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as RARITY_RANK } from "@/lib/marketplace/rarity.js";
+import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 export async function listTradeableItems(viewerId, { q = "", rarity = null, limit = 160 } = {}) {
     if (!viewerId) return [];
     const rows = await db.query(
@@ -270,9 +271,14 @@ export async function proposeTrade(fromId, { toUserId, offeredItems, offeredGold
         await logCoin(fromId, -oGold, "trade_escrow", { balanceAfter: row.gold }).catch(() => {});
     }
     const offer = await db.queryOne(
-        `INSERT INTO mkt_trade_offer (from_buyer_id, to_buyer_id, offered_items, offered_gold, requested_items, requested_gold, offered_pets, requested_pets, note)
-         VALUES ($1, $2, $3::jsonb, $4, $5::jsonb, $6, $7::jsonb, $8::jsonb, $9) RETURNING id`,
-        [fromId, toId, JSON.stringify(oItems), oGold, JSON.stringify(rItems), rGold, JSON.stringify(oPets), JSON.stringify(rPets), note ? String(note).slice(0, 300) : null]
+        // Merchant's Word: the offer does not expire. The column is NOT NULL with a three-day default, so
+        // "never" is written as a date far enough out to be never rather than by making the column nullable —
+        // the lazy reaper compares against it on every read and a NULL there would have to be special-cased in
+        // three places.
+        `INSERT INTO mkt_trade_offer (from_buyer_id, to_buyer_id, offered_items, offered_gold, requested_items, requested_gold, offered_pets, requested_pets, note, expires_at)
+         VALUES ($1, $2, $3::jsonb, $4, $5::jsonb, $6, $7::jsonb, $8::jsonb, $9, NOW() + ($10 || ' days')::interval) RETURNING id`,
+        [fromId, toId, JSON.stringify(oItems), oGold, JSON.stringify(rItems), rGold, JSON.stringify(oPets), JSON.stringify(rPets), note ? String(note).slice(0, 300) : null,
+            (await hasPower(fromId, "merchant_s_word")) ? "36500" : "3"]
     ).catch(() => null);
     if (offer) {
         // Ping the recipient so the offer doesn't sit unseen.

@@ -77,6 +77,7 @@ function dayContext() {
 // The ladder lives in rarity.js — twelve copies of it stopped at eternal, and a missing rarity
 // ranks below common in silence rather than throwing.
 import { RARITY_RANK as DEAL_RARITY_RANK } from "@/lib/marketplace/rarity.js";
+import { equippedPowers } from "@/lib/marketplace/ascension-powers.js";
 const DEAL_RARITY_CAP = "epic"; // nothing above epic goes on sale
 
 // The full purchasable pool for daily deals (gear + consumables). Pets are intentionally EXCLUDED for now —
@@ -93,7 +94,7 @@ function dealPool() {
 
 // The deterministic list of today's deals (id + kind + discounted price). Same for everyone all day —
 // unless a member paid to re-roll, in which case seedExtra makes their set unique for the day.
-function todaysDeals(dayKey, seedExtra = "") {
+function todaysDeals(dayKey, seedExtra = "", powers = null) {
     const rng = mulberry32(hashSeed(`deals:${dayKey}${seedExtra}`));
     const pool = dealPool();
     // Guarantee at least one consumable (cheap + accessible) so there's always an easy grab.
@@ -103,7 +104,10 @@ function todaysDeals(dayKey, seedExtra = "") {
     const featuredIdx = Math.floor(rng() * picked.length);
     return picked.map((d, i) => {
         const discount = i === featuredIdx ? FEATURED_DISCOUNT : DISCOUNTS[Math.floor(rng() * DISCOUNTS.length)];
-        const price = Math.max(1, Math.round(d.basePrice * (1 - discount)));
+        // The Merchant's Eye halves ONE of the day's deals — the featured one, so which it is stays
+        // deterministic and the same for every viewer who has the power.
+        const eye = powers?.has?.("merchant_s_eye") && i === featuredIdx;
+        const price = Math.max(1, Math.round(d.basePrice * (1 - discount) * (eye ? 0.5 : 1)));
         return { ...d, discount, price, featured: i === featuredIdx };
     });
 }
@@ -131,7 +135,7 @@ export async function getDailyDeals(buyerId) {
     ]);
     const gold = goldRow?.gold || 0;
     const resetUsed = resetRow?.d === dayKey;
-    const deals = todaysDeals(dayKey, resetUsed ? `:${buyerId}:r` : "");
+    const deals = todaysDeals(dayKey, resetUsed ? `:${buyerId}:r` : "", await equippedPowers(buyerId));
     const claimed = new Set(claimedRows.map((r) => r.item_id));
     return {
         signedIn: true,
@@ -156,7 +160,7 @@ export async function buyDailyDeal(buyerId, dealId) {
     // Re-derive from the member's actual set (their re-rolled set if they paid to reset today).
     const resetRow = await db.queryOne(`SELECT deal_reset_day::text AS d FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const seedExtra = resetRow?.d === dayKey ? `:${buyerId}:r` : "";
-    const deal = todaysDeals(dayKey, seedExtra).find((d) => d.id === String(dealId));
+    const deal = todaysDeals(dayKey, seedExtra, await equippedPowers(buyerId)).find((d) => d.id === String(dealId));
     if (!deal) return { ok: false, error: "not_a_deal" };
 
     // One per deal per day — reserve the slot up front (unique PK) so a double-tap can't double-buy.
