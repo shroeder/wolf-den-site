@@ -1196,13 +1196,34 @@ async function readRow(buyerId) {
 // which point `returns_at` is pushed forward by exactly the time you took. A trip is not made longer by being
 // interrupted; it is made longer by you leaving the interruption sitting there, which is your business.
 
+// ── HOW OFTEN, NOT JUST HOW NEAR ─────────────────────────────────────────────────────────────────────────────
+// How likely each tier in the band is, relative to the one you are rated for. The band was always right; the
+// odds inside it were flat, and flat is what made sailing feel like a losing streak.
+//
+// A pool of "one tier either side" picked UNIFORMLY means the tier above you is a third of everything you
+// meet — so The Wolfpack, a tier 3, came for a level-8 boat exactly as often as a Reef Crawler did, and the
+// stretch fight stopped being an occasional bad afternoon and became the average one. Members read that as
+// "you lose at sea", which is the wrong lesson and also not the design.
+//
+// Above you is now one meeting in nine rather than one in three. It is still there — a voyage you might not
+// win is the reason an encounter is worth anything — it is just no longer the thing you expect.
+const ENC_TIER_WEIGHT = { "-1": 4, 0: 4, "1": 1 };
+
 /** Difficulty near your own boat level, so a fresh captain never opens with the Elder. */
 function pickEncounterFor(boatLevel = 1) {
     const want = Math.max(1, Math.min(5, 1 + Math.floor((Number(boatLevel) || 1) / 8)));
     // One tier either side, so there is variety without a cliff.
     const pool = ENCOUNTERS.filter((e) => Math.abs(e.tier - want) <= 1);
     const list = pool.length ? pool : ENCOUNTERS;
-    return list[randInt(list.length)].id;
+    // The TIER is drawn first and the foe uniformly within it, rather than weighting each row: the tiers hold
+    // four encounters apiece today, and weighting rows would silently re-tune every one of these odds the day
+    // somebody adds a fifth to one tier.
+    const tiers = [...new Set(list.map((e) => e.tier))];
+    const weightOf = (t) => ENC_TIER_WEIGHT[String(t - want)] ?? 1;
+    let r = Math.random() * tiers.reduce((s, t) => s + weightOf(t), 0);
+    const tier = tiers.find((t) => (r -= weightOf(t)) < 0) ?? tiers[tiers.length - 1];
+    const band = list.filter((e) => e.tier === tier);
+    return band[randInt(band.length)].id;
 }
 
 /** The marks on this voyage, as a live array. */
