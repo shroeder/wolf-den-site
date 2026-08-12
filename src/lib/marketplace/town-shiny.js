@@ -35,9 +35,25 @@ const SHINY_GOLD = 750;
 const SHINY_XP = 500;
 const SHINY_CHEST = "gold";
 
+// ── TUNED TO THE CRON THAT ACTUALLY RUNS ─────────────────────────────────────────────────────────────────────
+// In thirteen days this spawned nine times and was claimed ONCE — by the account that shipped it, forty-three
+// minutes after the first one appeared. Eight of nine faded untouched and no member has ever seen one. Three
+// reasons, and none of them was "nobody was paying attention":
+//
+//   THE ODDS WERE WRITTEN FOR A CRON THAT DOES NOT EXIST. 0.02 was "per 15-min tick (~1/day)", but
+//   `/api/jobs/town-hours` is scheduled `0,30 * * * *` — every THIRTY minutes, 48 ticks a day, so the real
+//   rate was 0.96/day against an intended ~2. Measured over the live table: 0.82/day. The constant now matches
+//   the schedule that exists rather than the one the comment imagined; if the cron cadence ever changes, this
+//   number has to change with it.
+//
+//   THE DAILY CAP COUNTED MORE THAN A DAY. See the window in maybeSpawnShiny.
+//
+//   THREE HOURS IS NOT LONG ENOUGH at one glint a day. It has to overlap with somebody actually standing in
+//   the plaza, and the plaza is not busy at 4am. Six hours roughly doubles the chance that the window and a
+//   member coincide without making the glint any easier to SEE, which is the part that should stay hard.
 const SHINY_MAX_PER_DAY = 2;
-const SHINY_TTL_HOURS = 3;           // an unclaimed glint fades after a few hours
-const SHINY_SPAWN_CHANCE = 0.02;     // per 15-min cron tick (~1/day avg, capped at 2)
+const SHINY_TTL_HOURS = 6;           // an unclaimed glint fades after a few hours
+const SHINY_SPAWN_CHANCE = 0.04;     // per 30-min cron tick (~2/day avg, capped at SHINY_MAX_PER_DAY)
 
 // The current live (unclaimed, unexpired) glint, or null. Shape is town-state friendly. x/y are % positions;
 // y is kept high so it hides among the rooftops/sky. No reward info leaks — that's rolled at claim time.
@@ -52,7 +68,15 @@ export async function getActiveShiny() {
 export async function maybeSpawnShiny() {
     const [live, todayRow] = await Promise.all([
         db.queryOne(`SELECT id FROM mkt_town_shiny WHERE claimed_by IS NULL AND expires_at > NOW() LIMIT 1`).catch(() => null),
-        db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_town_shiny WHERE spawned_at > (NOW() AT TIME ZONE 'America/Chicago')::date`).catch(() => ({ n: 0 })),
+        // "TODAY" IN CHICAGO, AS AN INSTANT. `spawned_at > (NOW() AT TIME ZONE 'America/Chicago')::date`
+        // compared a timestamptz against a bare date, so Postgres widened the date to midnight in the SERVER's
+        // zone — UTC — which is 7pm the previous evening in Chicago. The cap was counting a 29-hour window and
+        // suppressing the next day's first glints on the strength of last night's. Converting back through the
+        // zone gives the actual Chicago midnight.
+        db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_town_shiny
+              WHERE spawned_at >= ((NOW() AT TIME ZONE 'America/Chicago')::date::timestamp AT TIME ZONE 'America/Chicago')`
+        ).catch(() => ({ n: 0 })),
     ]);
     if (live) return { skipped: "already_live" };
     if ((todayRow?.n || 0) >= SHINY_MAX_PER_DAY) return { skipped: "daily_cap" };

@@ -180,20 +180,29 @@ if (want.includes("--facing")) {
 //   and is not. A vision model asked "which way is this facing?" flip-flops: on the fleet captains it flipped
 //   twelve, then re-read its own output and called ten of those left-facing again. Trusting it a second time
 //   is how a set ends up worse than it started. Read the sheet, then --flip the ones that are wrong by hand.
+// `--ingame` mirrors every cell, which is what ArenaClient does to a foe at render time ("a foe's rest pose is
+// scaleX(-1)", supplied by arBreatheFoe). Read THAT sheet for facing: the source art is not the picture the
+// player gets, and holding the mirror in your head across a hundred figures is how a wrong-facing fighter
+// survives an audit. In the --ingame sheet anything facing RIGHT is facing away from the hero.
 if (want.includes("--sheet")) {
+    const inGame = want.includes("--ingame");
     const nums = Object.keys(RUNGS).map(Number).filter((n) => fs.existsSync(path.join(OUT, `rung-${n}.webp`))).sort((a, b) => a - b);
     const cell = 260, cols = 10, rows = Math.ceil(nums.length / cols);
     const comp = [];
     for (let i = 0; i < nums.length; i += 1) {
+        const img = sharp(path.join(OUT, `rung-${nums[i]}.webp`))
+            .resize(cell - 12, cell - 12, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } });
         comp.push({
-            input: await sharp(path.join(OUT, `rung-${nums[i]}.webp`))
-                .resize(cell - 12, cell - 12, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
+            input: await (inGame ? img.flop() : img).png().toBuffer(),
             left: (i % cols) * cell + 6, top: Math.floor(i / cols) * cell + 6,
         });
     }
+    const out = inGame ? "road-sheet-ingame.png" : "road-sheet.png";
     await sharp({ create: { width: cols * cell, height: rows * cell, channels: 4, background: { r: 250, g: 250, b: 252, alpha: 1 } } })
-        .composite(comp).png().toFile("road-sheet.png");
-    console.log(`wrote road-sheet.png — ${nums.length} fighters, ${cols} across (row 1 = rungs 1-10, row 2 = 11-20, …)`);
+        .composite(comp).png().toFile(out);
+    console.log(`wrote ${out} — ${nums.length} fighters, ${cols} across (row 1 = rungs 1-10, row 2 = 11-20, …)`);
+    console.log(inGame ? "As the fight screen shows them. Anything facing RIGHT is facing away — --flip it."
+        : "Source art. Add --ingame for the picture the player actually gets.");
     process.exit(0);
 }
 
