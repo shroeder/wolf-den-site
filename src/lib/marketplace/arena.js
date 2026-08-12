@@ -12,9 +12,10 @@ import {
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { pickIncoming, AI_BRACE_GUARD, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
-import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
+import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderRungOf } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -427,6 +428,21 @@ export async function getArenaState(buyerId) {
         // The recipe shelf, priced in laurels. Same purchase the Quartermaster sells for doubloons — see
         // buyArmouryRecipe. Lazily imported for the usual reason: cooking.js reaches back into the game's
         // other modules and a static edge from here is the shape of cycle that has taken pages down before.
+        // ── THE LONG ROAD ── the whole hundred, with what is already down. Pure arithmetic plus one array
+        // off the row that was already loaded, so the screen costs nothing extra to render.
+        ladder: (() => {
+            const beaten = new Set((row?.ladder_beaten || []).map(Number));
+            return {
+                size: LADDER_SIZE,
+                beaten: beaten.size,
+                houses: LADDER_HOUSES,
+                foes: LADDER.map((f) => ({
+                    rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
+                    archetypeName: f.archetypeName, tell: f.tell, power: f.power, color: f.color,
+                    sprite: f.sprite, reward: f.reward, beaten: beaten.has(f.rung),
+                })),
+            };
+        })(),
         recipeShop: await (async () => {
             const { RECIPE_PRICE_LAURELS, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
             return { price: RECIPE_PRICE_LAURELS, knowsAll: !(await hasUnknownRecipe(buyerId)) };
@@ -691,9 +707,22 @@ export async function startBout(buyerId, targetId = null) {
         target = m.kind === "npc" ? `npc:${m.tier}` : m.id;
     }
     const npcTier = typeof target === "string" && target.startsWith("npc:") ? Number(target.slice(4)) : 0;
+    // ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────
+    // A rung resolves to exactly the same shape as a Gauntlet tier or a member, so everything below this
+    // point — the kit, the clash, the engine, the recap — needs no idea which it is holding. What is
+    // different is only that a rung can be fought ONCE, which is checked here and recorded on the win.
+    const rung = ladderRungOf(target);
     let foe = null;
     let foeKit = null;
-    if (npcTier > 0) {
+    if (rung > 0) {
+        if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+        const beaten = new Set(row?.ladder_beaten || []);
+        if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId)) };
+        const f = ladderFoe(rung);
+        foe = f;
+        const st = statsForPower(f.power, f.archetype, null, rung);
+        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, Math.round(rung * 0.9))) };
+    } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.
         const bestTier = Number(row?.npc_best) || 0;
@@ -1360,12 +1389,41 @@ async function finishBout(buyerId, row, b, won) {
     // Your VP after the fight, read BACK rather than assumed — the recap is the only thing telling somebody
     // what changed, so it has to report what actually happened. The two counting sub-selects that went with
     // it worked out your RUNG, which no longer exists.
+    // ── THE LONG ROAD ── a rung goes down ONCE, and the prize is paid the same time it is recorded. The
+    // array write is guarded by the ANY() check rather than read-then-write: two taps that both resolve a
+    // winning bout must not pay twice.
+    let ladderPrize = null;
+    const wonRung = b.foe?.ladder ? Number(b.foe.rung) || 0 : 0;
+    if (won && wonRung > 0) {
+        const marked = await db.queryOne(
+            `UPDATE mkt_arena
+                SET ladder_beaten = array_append(ladder_beaten, $2::int)
+              WHERE buyer_id = $1 AND NOT ($2::int = ANY(ladder_beaten))
+              RETURNING $2::int AS rung`,
+            [buyerId, wonRung]
+        ).catch(() => null);
+        if (marked) {
+            const prize = b.foe.reward || {};
+            if (prize.laurels > 0) {
+                await db.query(`UPDATE mkt_arena SET laurels = laurels + $2, laurels_earned = laurels_earned + $2 WHERE buyer_id = $1`,
+                    [buyerId, prize.laurels]).catch(() => {});
+            }
+            if (prize.chest) {
+                const { addChests } = await import("@/lib/marketplace/chests.js");
+                await addChests(buyerId, { [prize.chest]: 1 }, { source: "arena_ladder", meta: { rung: wonRung } }).catch(() => {});
+            }
+            await trackActivity(buyerId, "arena_ladder", { rung: wonRung, foe: b.foe.name }).catch(() => {});
+            ladderPrize = prize;
+        }
+    }
+
     const after = await db.queryOne(`SELECT vp FROM mkt_arena WHERE buyer_id = $1`, [buyerId]).catch(() => null);
 
     b.recap = {
         won, foe: b.foe, reward, feats,
         vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
         npcTier: npcTier || null,
+        ladder: wonRung ? { rung: wonRung, prize: ladderPrize } : null,
         npcUnlocked: won && npcTier > 0 && npcTier > (Number(row?.npc_best) || 0),
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
         rounds: b.beat || (b.log || []).length,

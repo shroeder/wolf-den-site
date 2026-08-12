@@ -65,6 +65,30 @@ export function itemsFor(foe) {
 export const POULTICE_HEAL = 0.25;
 const POULTICE_AT = 0.34;     // never above this — a heal that overflows is a wasted item
 
+/**
+ * Roughly what a given move would take off you, in the numbers the engine will actually use.
+ *
+ * Deliberately an ESTIMATE and deliberately optimistic about the crit: the point is to answer "is there a
+ * kill here", and a fighter who can see a lethal blow takes the swing rather than waiting for certainty.
+ * It reads the same terms resolveBeat multiplies — their damage, the move's power, the element clash, the
+ * block you always get — so it cannot drift far from the blow that follows.
+ */
+function estimateIncoming(b, ability) {
+    const power = ability && !["ward", "drain"].includes(ability.kind) ? (ability.power || 1) : 1;
+    const back = 1 / (b.clash?.mult || 1);
+    const crit = b.foe?.critChance ?? 0.25;
+    const critMult = b.foe?.critMult ?? 2.5;
+    // The average blow, plus the share of the time it crits. An execute against a hurt target is worth more,
+    // exactly as it is in the engine.
+    const executeBonus = ability?.kind === "execute" && b.hp <= b.maxHp * 0.35 ? 1.5 : 1;
+    const raw = (b.foe?.damage || 1) * power * back * executeBonus * (1 + crit * (critMult - 1));
+    // What you turn aside before anything reaches your health. BLOCK is the floor every fighter gets.
+    return Math.max(0, raw * (1 - 0.18));
+}
+
+/** Your effective health: what a blow actually has to chew through to end the bout. */
+const effectiveHp = (b) => Math.max(0, (b.hp || 0) + (b.shield || 0));
+
 export function pickIncoming(b) {
     const all = b.foe.abilities || [];
     const kit = all.filter((a) => foeReady(b, a));
@@ -73,9 +97,40 @@ export function pickIncoming(b) {
     const of = (...kinds) => kit.find((a) => kinds.includes(a.kind)) || null;
     const items = b.foeItems || itemsFor(b.foe);
 
-    // ── ITEMS FIRST, because an item is worth more than the swing it replaces only at specific moments, and
-    // those moments are the ones a real player watches for.
-    if (theirFrac <= POULTICE_AT && (items.poultice || 0) > 0) {
+    // ── IS THERE A KILL HERE? ────────────────────────────────────────────────────────────────────────────
+    // This question is asked FIRST, before anything about its own health, and that ordering is the whole of
+    // the fix. It used to heal the moment it dropped below a third — even with the bout already won on the
+    // next swing — so a cornered opponent would drink a poultice while you stood on nine health. It looks for
+    // the finish now and only tends to itself when there is not one.
+    //
+    // The comparison is against your effective health (health plus anything you have banked), so a shield you
+    // just put up genuinely deters it rather than being invisible.
+    const offensiveNow = kit.filter((a) => !["ward"].includes(a.kind));
+    const lethal = offensiveNow
+        .map((a) => ({ a, dmg: estimateIncoming(b, a) }))
+        .filter((x) => x.dmg >= effectiveHp(b))
+        .sort((x, y) => y.dmg - x.dmg)[0];
+    const plainKills = estimateIncoming(b, null) >= effectiveHp(b);
+    if (lethal || plainKills) {
+        const finisher = lethal?.a || null;
+        if (finisher) {
+            if (!b.foeCd) b.foeCd = {};
+            b.foeCd[finisher.id] = b.beat + Math.max(1, finisher.cooldown || 2);
+        }
+        return {
+            name: finisher?.name || "a heavy swing",
+            kind: finisher?.kind || "swing",
+            element: finisher?.element || b.foe.element || null,
+            sprite: finisher?.sprite || null,
+            power: finisher && !["ward", "drain"].includes(finisher.kind) ? (finisher.power || 1) : 1,
+            heal: 0, brace: false, isAbility: Boolean(finisher),
+        };
+    }
+
+    // ── ITEMS, because an item is worth more than the swing it replaces only at specific moments, and those
+    // moments are the ones a real player watches for. A heal is not one of them when you are nearly dead:
+    // pressing is. `myFrac` guards it so it will not spend a turn healing while it has you on the ropes.
+    if (theirFrac <= POULTICE_AT && (items.poultice || 0) > 0 && myFrac > FINISH_AT) {
         return { name: "a field poultice", kind: "item", item: "poultice", heal: POULTICE_HEAL,
             power: 0, brace: false, isAbility: true, element: null, sprite: null };
     }
@@ -87,12 +142,16 @@ export function pickIncoming(b) {
 
     let ability = null;
     let brace = false;
-    if (theirFrac <= AI_BRACE_AT) {
-        // Cornered. Heal if it can, otherwise cover up — a build with no answer still stops standing still.
+    // GOING FOR THE THROAT BEATS COVERING UP. The finish check moves above the cornered one: if you are the
+    // one nearly dead, a fighter presses even while hurt, because trading blows is winning the trade. It only
+    // protects itself when the race is not already in its favour.
+    if (myFrac <= FINISH_AT) ability = of("execute", "strike", "flurry", "spell");
+    if (!ability && theirFrac <= AI_BRACE_AT) {
+        // Cornered, and no finish available. Heal if it can, otherwise cover up — a build with no answer
+        // still stops standing still.
         ability = of("drain") || of("ward");
         if (!ability) brace = true;
     }
-    if (!ability && !brace && myFrac <= FINISH_AT) ability = of("execute", "strike");
     if (!ability && !brace && b.beat <= 2) ability = of("sunder", "surge");
     if (!ability && !brace) {
         // ── ALWAYS, IF IT HAS ONE ────────────────────────────────────────────────────────────────────────

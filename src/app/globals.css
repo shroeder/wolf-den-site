@@ -16159,3 +16159,85 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    Nine rows of text and a percentage on the screen that asks you to weigh twelve thousand laurels. */
 .ar-crate-row-art { width: 26px; height: 26px; object-fit: contain; flex: 0 0 auto;
     filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+
+/* ── THE COMPENDIUM ───────────────────────────────────────────────────────────────────────────────────────
+   A collection screen is mostly a wall of things you have NOT got, and that is the appeal — so a missing item
+   is its own silhouette (the real sprite, blacked out) rather than an empty box. You can see the shape of what
+   you are missing, which is what makes a collection pull. */
+.cmp-head-top { display: flex; align-items: flex-start; gap: 14px; justify-content: space-between; flex-wrap: wrap; }
+.cmp-head h1 { margin: 0 0 4px; }
+.cmp-score { display: flex; align-items: baseline; gap: 6px; font-family: var(--font-display); white-space: nowrap; }
+.cmp-score b { font-size: 1.8rem; color: #ffd75e; }
+.cmp-score span { color: #8b93a0; font-weight: 700; }
+.cmp-score em { font-style: normal; font-weight: 900; color: #8fd6a2; margin-left: 4px; }
+.cmp-bar { height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; margin: 10px 0 8px; }
+.cmp-bar i { display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #c8a24a, #ffd75e); box-shadow: 0 0 12px rgba(255,215,94,.5); }
+.cmp-next { margin: 0; font-size: 0.84rem; color: #cbd2da; }
+.cmp-next b { color: #ffd75e; }
+
+.cmp-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.cmp-sec-head b { font-family: var(--font-display); font-size: 1.05rem; }
+.cmp-sec-head em { font-style: normal; font-size: 0.76rem; color: #8b93a0; }
+.cmp-miles { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+.cmp-mile { display: grid; gap: 2px; padding: 9px 10px; border-radius: 12px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.10); opacity: .55; }
+.cmp-mile b { font-family: var(--font-display); font-size: 1.05rem; color: #8b93a0; }
+.cmp-mile span { font-size: 0.72rem; color: #a8b2bd; line-height: 1.3; }
+/* Reached ones light up in the gold the rest of the game uses for "earned". */
+.cmp-mile.is-on { opacity: 1; border-color: rgba(255,215,94,0.55); background: rgba(255,215,94,0.08); }
+.cmp-mile.is-on b { color: #ffd75e; }
+.cmp-mile.is-on span { color: #e8ddc8; }
+.cmp-bonus { margin: 10px 0 0; font-size: 0.82rem; color: #8fd6a2; }
+.cmp-bonus b { color: #b8f0c8; }
+
+.cmp-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cmp-pill { padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 0.74rem; font-weight: 800;
+    color: #b9c2cc; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.cmp-pill.is-slot { font-size: 0.7rem; }
+.cmp-pill:hover { border-color: rgba(255,215,94,0.5); }
+.cmp-pill.is-on { color: #2a1f08; background: linear-gradient(180deg, #ffe9a8, #f0c14b); border-color: rgba(255,215,94,0.8); }
+
+.cmp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 110px));
+    justify-content: start; gap: 8px; }
+.cmp-tile { display: grid; gap: 4px; justify-items: center; cursor: pointer; padding: 8px 6px;
+    border-radius: 13px; border: 1px solid color-mix(in srgb, var(--r) 34%, transparent);
+    background: radial-gradient(ellipse at 50% 18%, color-mix(in srgb, var(--r) 20%, transparent), transparent 66%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.22));
+    transition: transform .12s ease, border-color .12s ease; }
+.cmp-tile:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--r) 75%, transparent); }
+.cmp-tile-art { display: grid; place-items: center; width: 56px; height: 56px; }
+.cmp-tile-art img { width: 52px; height: 52px; object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+/* NOT YET FOUND: the real sprite, in shadow. The shape is the whole point — a grey box tells you nothing
+   about what you are chasing, and a blank slot tells you less. */
+.cmp-tile.is-missing { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+.cmp-tile.is-missing .cmp-tile-art img { filter: brightness(0) opacity(0.5); }
+.cmp-tile.is-missing .cmp-tile-name { color: #6a727d; }
+.cmp-tile-name { font-size: 0.64rem; font-weight: 800; text-align: center; line-height: 1.2;
+    color: color-mix(in srgb, var(--r) 78%, white); overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cmp-tile-none { width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.06); }
+
+.cmp-scrim { position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.82); padding: 18px; }
+.cmp-sheet { position: relative; width: 100%; max-width: 340px; text-align: center; padding: 20px 18px 18px;
+    border-radius: 18px; border: 2px solid color-mix(in srgb, var(--r) 65%, transparent);
+    background: linear-gradient(180deg, #1b1f25, #101317);
+    box-shadow: 0 24px 60px rgba(0,0,0,.7), 0 0 40px color-mix(in srgb, var(--r) 28%, transparent); }
+.cmp-x { position: absolute; top: 8px; right: 10px; background: none; border: none; color: #8b93a0;
+    font-size: 1rem; cursor: pointer; padding: 4px; }
+.cmp-sheet-art { display: grid; place-items: center; height: 132px; margin-bottom: 6px; }
+.cmp-sheet-art img { max-width: 122px; max-height: 122px; width: auto; height: auto; object-fit: contain;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,.7)) drop-shadow(0 0 22px color-mix(in srgb, var(--r) 45%, transparent)); }
+.cmp-sheet-art.is-missing img { filter: brightness(0) opacity(0.55); }
+.cmp-sheet-name { font-family: var(--font-display); font-size: 1.2rem; color: color-mix(in srgb, var(--r) 82%, white); }
+.cmp-sheet-meta { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 6px 0 10px; }
+.cmp-sheet-meta span { font-size: 0.68rem; font-weight: 800; text-transform: capitalize; letter-spacing: .03em;
+    padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,0.06); color: #b9c2cc; }
+.cmp-sheet-meta .cmp-rar { color: #12151a; background: var(--r); }
+.cmp-sheet-stats { margin: 0 0 6px; font-weight: 800; color: #e8eef5; }
+.cmp-sheet-sig { margin: 0 0 6px; font-size: 0.86rem; color: #ffd75e; }
+.cmp-sheet-flavor { margin: 0 0 10px; font-style: italic; font-size: 0.82rem; color: #8b93a0; }
+.cmp-sheet-state { margin: 0; font-size: 0.78rem; font-weight: 800; color: #6a727d; }
+.cmp-sheet-state.is-have { color: #8fd6a2; }

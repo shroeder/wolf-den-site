@@ -9,6 +9,7 @@ import { PurserPanel } from "@/components/ArenaClient";
 import AvatarBuilder from "@/components/AvatarBuilder";
 import JewellerClient from "@/components/JewellerClient";
 import EquipmentClient from "@/components/EquipmentClient";
+import CompendiumClient from "@/components/CompendiumClient";
 import { TOWN_CSS } from "@/components/TownClient";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
@@ -99,6 +100,26 @@ const BAG = {
     pieces: [], equipped: { helmet: "crown_of_kings", off_hand: "dragon_shield" }, gold: 3808, shop: [],
 };
 
+
+// A slice of the catalogue across every rarity, half of it collected — the shape that has to look right.
+const CI = (id, name, slot, rarity, stats, collected) => ({ id, name, slot, rarity, stats, collected, art: null, flavor: "A thing that exists.", reqLevel: 10 });
+const COMPENDIUM = (() => {
+    const rar = ["common", "rare", "epic", "legendary", "mythic", "ascendant", "eternal", "celestial", "primordial"];
+    const slots = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring"];
+    const items = [];
+    for (let i = 0; i < 54; i += 1) {
+        items.push(CI(`it_${i}`, ["Rusted Blade", "Oak Band", "Stormcloak", "Ember Treads", "Wolf's Tooth", "Scale Mail"][i % 6] + ` ${i}`,
+            slots[i % slots.length], rar[i % rar.length], { might: 3 + i }, i % 2 === 0));
+    }
+    const count = items.filter((i) => i.collected).length;
+    return {
+        signedIn: true, items, count, total: items.length,
+        bonus: { fortune: 2, might: 3 },
+        milestones: [10, 25, 50, 100, 250, 500, 1000].map((at) => ({ at, label: `+${at / 5 | 0} Might`, reached: count >= at })),
+        next: { at: 50, toGo: 50 - count, label: "+5 Might, +2 Crit chance" },
+    };
+})();
+
 const SCENES = {
     "horn-closed": { label: "Muster horn — closed pill", note: "Rides EVERY page. Bottom-left, because SocialHub owns bottom-right." },
     "horn-open": { label: "Muster horn — open, 5 foes", note: "The wave list scrolls inside itself at 46vh." },
@@ -107,6 +128,7 @@ const SCENES = {
     "dealer-two": { label: "Dealer's Choice — both wedges", note: "Two tiles, no 'Deal again'." },
     purser: { label: "The Purser's Exchange", note: "Sits under the crates in the Armoury tab." },
     recipe: { label: "Recipe shelf — Armoury", note: "A page from the book, for laurels. Twin of the Quartermaster's." },
+    compendium: { label: "The Compendium", note: "Every item, collected and not. Missing ones are silhouettes." },
     bag: { label: "Gear bag — sort + one-tap equip", note: "Kaishiern's ask: rarity then type, and Equip on the tile." },
     "jw-one": { label: "Jewelcutter — one gem", note: "The case that looked worst: a single stone in a full-width box." },
     "jw-many": { label: "Jewelcutter — a shelf", note: "Several stones, so the colours have to read apart at a glance." },
@@ -164,6 +186,7 @@ function installStub(scene) {
         if (u.includes("/api/marketplace/spin")) return json(spin);
         if (u.includes("/api/marketplace/sets")) return json({ ok: true, exhibit: "piece_wheel_hub" });
         if (u.includes("/api/marketplace/arena")) return json({ ok: true, ...ARENA_BASE });
+        if (u.includes("/api/marketplace/compendium")) return json(COMPENDIUM);
         if (u.includes("/api/marketplace/inventory")) return json(BAG);
         if (u.includes("/api/marketplace/avatar")) {
             return json({ cost: 1000, gold: 4820, canAfford: true, firstIsFree: false, hasAvatar: true, locked: scene === "lock-on" });
@@ -244,6 +267,7 @@ export default function PowersLab() {
             {scene === "sets" ? <SetsClient sets={sets} exhibit={null} canLoan /> : null}
             {scene.startsWith("lock") ? <AvatarBuilder key={scene} current={null} /> : null}
             {scene === "bag" ? <EquipmentClient key={scene} /> : null}
+            {scene === "compendium" ? <CompendiumClient key={scene} /> : null}
             {scene === "jw-one" ? <JewellerClient key={scene} initial={JW([GEM("topaz_t1", "Chipped Topaz", "#ffb648", { crit_chance: 2 }, 2, "/images/gems/topaz_t1.png")])} /> : null}
             {scene === "jw-many" ? <JewellerClient key={scene} initial={JW([
                 GEM("ruby_t1", "Chipped Ruby", "#ff5d6c", { might: 2 }, 3, "/images/gems/ruby_t1.png"),

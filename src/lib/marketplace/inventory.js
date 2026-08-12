@@ -103,6 +103,13 @@ export async function getEquippedStats(buyerId) {
     const ids = Object.values(await getEquippedIds(buyerId));
     const powers = await equippedPowers(buyerId);
     const total = withSetBonuses(ids, powers);
+    // THE COMPENDIUM'S MILESTONES. Permanent, owed to nothing but how many items you have ever held, and
+    // merged HERE — the one aggregate every fight, panel and card reads — so it cannot end up applying in the
+    // boss fight and not the arena, which is how half the effects in this game have historically failed.
+    try {
+        const { compendiumStats } = await import("@/lib/marketplace/compendium.js");
+        for (const [k, v] of Object.entries(await compendiumStats(buyerId))) total[k] = (total[k] || 0) + v;
+    } catch { /* no compendium, no bonus */ }
     for (const [k, v] of Object.entries(await enhanceBonusFor(buyerId, ids, powers))) total[k] = (total[k] || 0) + v;
     // Lazily imported: jeweller.js is server-only and this module is imported widely.
     try {
@@ -559,6 +566,14 @@ export async function grantItem(buyerId, itemId, via = "admin") {
         )
         .catch(() => []);
     const granted = rows.length > 0;
+    // ── THE COMPENDIUM ── recorded on EVERY grant, not only a new one: an item you are re-granted after
+    // selling it was still collected, and this is the single door every acquisition path already comes
+    // through, so a new drop source is counted by doing nothing. Lazily imported to keep this module's
+    // dependency list flat, and never allowed to fail the grant itself.
+    try {
+        const { markCollected } = await import("@/lib/marketplace/compendium.js");
+        await markCollected(buyerId, [itemId]);
+    } catch { /* bookkeeping never blocks a reward */ }
     // Getting a NEW top-rarity item unlocks its elite pet + re-checks the Ascendant/Eternal badges.
     if (granted && (item.rarity === "ascendant" || item.rarity === "eternal")) await onEliteItemGained(buyerId, item).catch(() => {});
     return { ok: true, granted };

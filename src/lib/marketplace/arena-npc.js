@@ -143,6 +143,28 @@ export function npcFor(tier) {
     };
 }
 
+/**
+ * A stat line for an opponent that is NOT on the tier ladder — the long PvE road (arena-ladder.js).
+ *
+ * It spends a power budget through the same archetype weights npcFor uses, so a Wall on the road and a Wall in
+ * the Gauntlet want the same answer out of you. Kept here rather than in arena-ladder.js so there is one place
+ * that knows how a budget becomes four numbers.
+ */
+export function statsForPower(power, archKey, element = null, seed = 0) {
+    const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
+    const budget = Math.max(1, Math.round(power));
+    return {
+        might: Math.round(budget * arch.w.might),
+        crit_chance: Math.round(budget * arch.w.crit_chance),
+        crit_power: Math.round(budget * arch.w.crit_power),
+        ferocity: Math.round(budget * arch.w.ferocity),
+        armour: arch.armour,
+        gearPower: budget,
+        element: element || ["fire", "water", "earth", "storm", "light", "shadow"][seed % 6],
+        speed: Math.round(10 + budget * 0.09),
+    };
+}
+
 // ── WHAT AN NPC FIGHTS WITH ──────────────────────────────────────────────────────────────────────────────────
 // Real named moves out of the same eleven kinds members use, not a bare swing. Two things matter here:
 //
