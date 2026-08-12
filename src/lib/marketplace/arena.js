@@ -1280,6 +1280,13 @@ export async function fightRound(buyerId, opts = {}) {
             b.foeShield -= theirSoak;
             dmg -= theirSoak;
         }
+        // ── A BRACE LASTS ONE BLOW ───────────────────────────────────────────────────────────────────────
+        // Whatever they braced and did not spend is gone now that the swing has landed. It used to bank until
+        // something ate it, which turned a stance into savings: guard twice against a foe hitting for less
+        // than the brace and you were simply carrying a second health bar. Dropped on THIS side too, and not
+        // only on yours — the AI guards, and a rule that expires the player's shield while letting the
+        // opponent hoard theirs is the same fight with the numbers pointed one way.
+        b.foeShield = 0;
         // ── THEIR LAST STAND ── the mirror of yours: once a bout, the blow that would end them leaves them
         // on 1. Checked BEFORE the subtraction, or there is nothing left to save.
         let theyStood = false;
@@ -1497,6 +1504,10 @@ export async function fightRound(buyerId, opts = {}) {
         }
         let soaked = 0;
         if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
+        // The brace is spent — they have had their swing at it. Cleared AFTER the soak above, so the blow it
+        // was set against is the blow it eats; clearing any earlier would make guarding do nothing at all.
+        // The mirror of the same line on their side, further up.
+        b.shield = 0;
         // ── IRON THORNS ── a share of the blow comes back off THE WHOLE SWING, not off what got past you.
         // Off `through` it would have punished the shield build for being good at its one job: the better you
         // blocked, the less you returned. This is the answer to "I am a shield class and I do no damage" —

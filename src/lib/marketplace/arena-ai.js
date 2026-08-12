@@ -3,8 +3,19 @@
 // server runs. It already kept its own copy of this, and that copy was the old uniformly-random picker: the
 // lab would have shown last week's AI while claiming to show this week's, which is worse than having no lab.
 //
-// DRAIN_SHARE is re-declared rather than imported from arena-kit.js only to keep this module dependency-free.
-const DRAIN_SHARE = 0.5;
+// "Dependency-free" was the rule here, and it cost us. GUARD_SOAK was copied in as a literal 0.30 and would
+// have kept that value through the rebalance below it, leaving the AI valuing a brace at twice what it now
+// buys — reaching for guard in the exact spot it should reach for the poultice, and looking like bad play
+// rather than a number whose dependants were not moved with it.
+//
+// A BALANCE NUMBER CANNOT BE DUPLICATED. It comes from where it is defined or the copy quietly becomes a
+// second, wrong game. DRAIN_SHARE was the same trap already sprung and merely not yet triggered: arena-kit
+// exports it, arena.js reads it from there, and this file kept its own 0.5 — equal today, and one rebalance
+// away from not being. Both are imported now.
+//
+// There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
+// already imports both modules side by side. The import costs nothing; the copies cost correctness.
+import { DRAIN_SHARE, GUARD_SOAK } from "@/lib/marketplace/arena-kit.js";
 const AI_ABILITY_CHANCE = 0.75;
 
 // ── THE ABSENT DEFENDER PLAYS THEIR OWN BUILD ────────────────────────────────────────────────────────────────
@@ -61,7 +72,10 @@ export function itemsFor(foe) {
     if (tier < 20) return { poultice: 1, draught: 0 };
     return { ...AI_ITEMS };
 }
-export const POULTICE_HEAL = 0.25;
+// The foe's copy of the poultice in BATTLE_ITEMS (arena-kit.js). Trimmed 10% with it — the AI drinks the same
+// item the player does, and a heal that is worth more in their hand than yours is the kind of asymmetry that
+// makes a fight feel rigged. If one moves, move both.
+export const POULTICE_HEAL = 0.225;
 const POULTICE_AT = 0.34;     // never above this — a heal that overflows is a wasted item
 
 /**
@@ -210,7 +224,11 @@ export function pickIncoming(b) {
     const doomed = theyFallIn <= 1 && youFallIn > 1;
     if (doomed) {
         const potHeal = (items.poultice || 0) > 0 ? Math.min(b.foeMaxHp - b.foeHp, b.foeMaxHp * POULTICE_HEAL) : 0;
-        const guardBank = b.foeMaxHp * (0.30 + (FP.guardSoak || 0));
+        // OFF THE CONSTANT, not a copy of its old value. This read `0.30` literally, so when GUARD_SOAK was
+        // halved the AI would have gone on valuing a brace at twice what it now buys — guarding in the exact
+        // spot where it should have reached for the poultice. The bug would have looked like the AI playing
+        // badly rather than like a number that moved without its dependants.
+        const guardBank = b.foeMaxHp * (GUARD_SOAK + (FP.guardSoak || 0));
         const drainMove = of("drain");
         if (potHeal > 0 && potHeal >= guardBank) return reachFor("poultice", { heal: POULTICE_HEAL });
         if (drainMove && theirFrac > 0.15) return swing(drainMove, null);

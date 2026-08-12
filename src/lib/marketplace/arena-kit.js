@@ -424,8 +424,11 @@ export const GUARD_COOL = 1;        // guarding also shaves a turn off everythin
 // an empty menu, and it avoids the trap where the correct play is burning a 6,500-gold potion on a ladder
 // scrap. Using one spends your turn, which is the whole decision — drink, or swing.
 export const BATTLE_ITEMS = [
+    // 0.25 → 0.225, a ten percent trim. The blurb no longer says "a quarter" because it is no longer a quarter,
+    // and a card that overstates what it does is worse than a weaker card. POULTICE_HEAL in arena-ai.js is the
+    // foe's copy of this number and moves with it — the AI drinks the same poultice you do.
     { id: "poultice", name: "Field Poultice", count: 2, sprite: "/images/arena/item-poultice.webp",
-        blurb: "Binds a wound. Restores a quarter of your health.", kind: "heal", amount: 0.25 },
+        blurb: "Binds a wound. Restores a little under a quarter of your health.", kind: "heal", amount: 0.225 },
     { id: "draught", name: "Quickening Draught", count: 1, sprite: "/images/arena/item-draught.webp",
         blurb: "Every skill you own comes off cooldown at once.", kind: "refresh" },
 ];
@@ -433,7 +436,16 @@ export const BATTLE_ITEMS = [
 // GUARD — no ring, no roll. You give up your swing and take a braced stance: it soaks a slice of the next blow
 // outright and settles you enough to gain Focus. It is the honest answer to a bout going badly, and the reason
 // the command menu is a decision rather than four ways to press attack.
-export const GUARD_SOAK = 0.30;     // of your max health, absorbed from what comes next
+//
+// 0.30 was twice what it should be, and the reason was that the shield also PERSISTED. Thirty percent of your
+// health that banks until something eats it means guarding twice puts most of a second health bar on the
+// board, and against a foe that swings for a fraction of that the brace was never spent at all — it just
+// accumulated to the cap. A brace is a stance you hold for one blow, not a wall you build.
+//
+// So the two changes go together: it is worth half as much, and it is gone once they have had their swing (see
+// the expiry after each side's attack resolves in arena.js). Fifteen percent of your health against ONE blow
+// is still the best answer to a big telegraphed hit, which is what the command is for.
+export const GUARD_SOAK = 0.15;     // of your max health, absorbed from the next blow — and only the next one
 
 // ── SPEED ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Who opens the bout was hard-coded to the challenger, which made Ferocity — a stat that until now only fed
