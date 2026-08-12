@@ -1247,12 +1247,16 @@ export default function FarmClient({ initial, viewingAlias }) {
                 {/* TODAY — the two things with a daily budget behind them. */}
                 {farm.mine && panel === "today" ? (
                     <>
+                        {/* BOUNTIES FIRST. The neighbour list is a full phone screen of other people's farms,
+                            so the five things you can actually claim today sat below a fold on the tab whose
+                            entire job is "what is there to do right now". Going to see somebody is the thing
+                            you do AFTER you have looked at your own list, not before. */}
+                        <FeatureDailies feature="farm" refreshKey={bountyTick} />
                         <NeighbourStrip
                             neighbours={farm.neighbours}
                             ratesLeft={farm.rating?.charge?.left ?? 0}
                             petsLeft={farm.petting?.others?.left ?? 0}
                         />
-                        <FeatureDailies feature="farm" refreshKey={bountyTick} />
                     </>
                 ) : null}
 

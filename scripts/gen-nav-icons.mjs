@@ -37,6 +37,10 @@ fs.mkdirSync(OUT, { recursive: true });
 const ICONS = {
     // The Compendium: a collector's ledger. Deliberately a BOOK rather than a bag — the screen is a record of
     // everything that exists and what you have found, not another inventory, and the menu should say which.
+    // Dungeons has been MAPPED to "delves" in GameNav's sprite table since that table was written, and the
+    // file was never drawn — so the one destination whose icon the code insists exists has always quietly
+    // fallen back to its emoji. The mirror image of the Compendium bug: a drawing with no mapping.
+    delves: "A dark stone stairway descending into the ground between two crumbling pillars, a single torch burning on the wall, deep shadow swallowing the bottom steps",
     compendium: "A thick leather-bound tome lying open, gilded page edges, a red ribbon bookmark, small glowing gemstones and a tiny sword pressed between its pages like specimens",
     town: "A tight cluster of three cosy medieval timber-framed cottages with steep shingled roofs, crooked chimneys and warm golden lit windows, grouped on a small grassy rise",
     boss: "Two heavy fantasy broadswords crossed in an X, ornate cross-guards, leather-wrapped grips, polished steel blades catching the light",

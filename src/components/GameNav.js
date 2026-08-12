@@ -39,6 +39,11 @@ const NAV_SPRITE = {
     "/marketplace/invite": "invite", "/marketplace/friends": "friends", "/marketplace/inbox": "inbox",
     "/marketplace/play": "home", "/marketplace/customize": "customize", "/marketplace/profile": "profile",
     "/marketplace/fishing": "fishing", "/marketplace/mining": "mining", "/marketplace/dungeons": "delves",
+    // compendium.png was GENERATED and then never mapped. This table is keyed by href and the menu entry
+    // carries `sprite: "compendium"`, which is only read for the Sets helmet — so the tile fell through to
+    // the emoji fallback, and the Compendium has no emoji. It rendered an empty gap, which is exactly what
+    // it looked like: the one tile in the grid with nothing above its label.
+    "/marketplace/compendium": "compendium",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -76,7 +81,7 @@ const LINKS = [
     { href: "/marketplace/inventory", emoji: "🛡️", label: "Gear" },
     { href: "/marketplace/store", emoji: "🛒", label: "Store" },
     { href: "/marketplace/sets", sprite: "helmet", label: "Sets" },
-    { href: "/marketplace/compendium", sprite: "compendium", label: "Compendium" },
+    { href: "/marketplace/compendium", label: "Compendium" },
     { href: "/marketplace/quests", emoji: "📜", label: "Quests" },
     { href: "/marketplace/track", emoji: "🏆", label: "Rewards" },
     { href: "/marketplace/badges", emoji: "🎖️", label: "Badges" },
@@ -399,7 +404,9 @@ export default function GameNav() {
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
             { href: "/marketplace/pets", emoji: "🐾", label: "Pets", sub: "Collect & equip" },
             { href: "/marketplace/sets", sprite: "helmet", label: "Sets", sub: "Set bonuses" },
-            { href: "/marketplace/compendium", sprite: "compendium", label: "Compendium", sub: "Every item, and what you have found" },
+            // Three lines of sub where every neighbour has one, which pushed the icon out of the tile and
+            // made the row ragged. Every other sub in this grid is two or three words; so is this one.
+            { href: "/marketplace/compendium", label: "Compendium", sub: "Every item there is" },
             { href: "/marketplace/blacksmith", emoji: "🔨", label: "The Forge", sub: "Salvage & enhance" },
             ...(jeweller ? [{ href: "/marketplace/jeweller", emoji: "💎", label: "Jewelcutter", sub: "Sockets & jewels" }] : []),
         ] },
