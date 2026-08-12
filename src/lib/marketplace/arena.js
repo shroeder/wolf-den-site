@@ -758,6 +758,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
         myPower, theirPower, npcTier, size,
+        // Built from the current kit. See the one-time refresh in resolveBeat, which this switches off for
+        // every bout made from here on.
+        kitv: 1,
         foe: {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
             npc: Boolean(npcTier), tier: npcTier || null,
@@ -1030,6 +1033,30 @@ export async function fightRound(buyerId, opts = {}) {
         if (fresh?.abilities?.length) {
             b.me.abilities = b.me.abilities.map((a) => fresh.abilities.find((f) => f.id === a.id) || a);
         }
+    }
+
+    // ── AND THE STATS THEMSELVES, ONCE ───────────────────────────────────────────────────────────────────
+    // A bout freezes your four numbers when it opens, so a fight already underway when kitFor started counting
+    // pets and badges kept swinging with the old ones — 17.8 damage against a card that now says 25, which
+    // reads as the fix not having worked. `kitv` stamps a bout as built from the current kit; bouts made after
+    // this arrive stamped, so this refresh fires once for the fights that were mid-flight and then never
+    // again.
+    //
+    // OFFENCE ONLY. Health is deliberately untouched: `maxHp` is the denominator of the bar you are already
+    // partway down, and moving it mid-fight either heals you for free or drops you below your own current hp.
+    //
+    // It does open a one-beat window where someone mid-bout could equip better gear and have it counted. That
+    // window closes as soon as the last pre-deploy bout ends, and paying it once beats leaving every fight in
+    // progress visibly wrong.
+    if (b.me && !b.kitv) {
+        const fresh = await kitFor(buyerId).catch(() => null);
+        if (fresh) {
+            b.me.damage = fresh.damage;
+            b.me.critChance = fresh.critChance;
+            b.me.critMult = fresh.critMult;
+            b.me.might = fresh.might;
+        }
+        b.kitv = 1;
     }
 
     // Same reasoning, for the town's edge. A raid bout is frozen at the moment it opens, so every fight that
