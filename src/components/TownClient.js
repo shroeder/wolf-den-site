@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Gi from "react-icons/gi";
 
+import ArenaClient from "@/components/ArenaClient";
 import TavernInterior from "@/components/TavernInterior";
 import SceneMusic from "@/components/SceneMusic";
 import CoinCta from "@/components/CoinCta";
@@ -731,6 +732,9 @@ export default function TownClient({ initial }) {
     const [raidProc, setRaidProc] = useState(null);     // weapon-skill callout {name,emoji,color,key}
     const [raidRecap, setRaidRecap] = useState(null);   // end-of-raid recap {gold,xp,kills,damage}
     const [duel, setDuel] = useState(null);             // active duel exchange { enemyId, foeArt, foeEmoji, name, win, events, reward }
+    // The arena state for a raid bout being fought RIGHT HERE, over the street. Null the rest of the time, and
+    // the mounted renderer draws nothing while it is.
+    const [fight, setFight] = useState(null);
     const [bossOpen, setBossOpen] = useState(false);    // boss-raid battle modal open
     const [bossReward, setBossReward] = useState(null); // boss KILL completion reward { gold, xp, chest }
     const bossCdRef = useRef(false);
@@ -763,7 +767,9 @@ export default function TownClient({ initial }) {
     }, []);
 
     // Lock the page scroll while any Town overlay is open, so the background can't scroll underneath it.
-    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal);
+    // `fight` counts as a modal: it is a full-screen layer, so the street beneath it must not scroll and the
+    // scene's pointer handlers must not fire — else a tap aimed at Attack also walks your hero.
+    const anyTownModal = roster || Boolean(menuFor) || boardOpen || merchantOpen || questOpen || smithOpen || stockOpen || Boolean(gambleReveal) || Boolean(fight);
     // …and stop the scene's own pointer handlers from firing while an overlay is up (else tapping a modal
     // button was walking the hero + scrolling the street behind the panel). Read via a ref so the [] -deps
     // pointer callbacks always see the live value.
@@ -803,7 +809,10 @@ export default function TownClient({ initial }) {
     // 6s while something is happening, 15s when the plaza is idle. Avatars interpolate and wander client-side
     // between updates, so a slower tick looks the same — and this is the single highest-volume request in the
     // app, so the interval is the biggest lever on compute there is.
-    const townPollMs = state?.event ? 6000 : 15000;
+    // Nothing is polled while you are in a fight. The street underneath cannot be seen or touched, and a
+    // reload landing mid-bout re-renders the whole scene behind the overlay for a picture nobody is looking
+    // at. The way out of the fight reloads once, which is the only refresh that matters.
+    const townPollMs = fight ? null : (state?.event ? 6000 : 15000);
     useVisiblePoll(load, townPollMs);
 
     // Ambient wander for idle players.
@@ -992,15 +1001,21 @@ export default function TownClient({ initial }) {
         // opens a REAL bout now, on the same engine and the same screen the Arena uses, because a second
         // combat system is how two parts of a game end up disagreeing about what Might does.
         //
-        // The fight is fought on /marketplace/arena rather than in a copy of that screen embedded here: the
-        // bout lives on the member's own row, so the Arena finds it already in progress and draws it with the
-        // renderer it already has. One bout UI, one place to fix it.
+        // ONE BOUT UI, MOUNTED HERE. That was always the right half of the idea; the other half — sending the
+        // player to /marketplace/arena to get it — was the mistake. A raid is a thing you do IN the plaza, and
+        // walking them out of it lost them the wave, lost them the way back, and had at least one member
+        // conclude a raid was a single fight because the Arena is where it left them.
+        //
+        // ArenaClient is mounted below in `boutOnly` mode: it is the same renderer, drawing the same bout off
+        // the same row, as a fixed full-screen layer over the street. Nothing is copied and nothing navigates.
         setSwing({ enemyId, foeArt: foeArt || null, label: foe?.label || null, hint: foe?.hint || null, tint: foe?.tint || null, opening: true });
         const r = await fetch("/api/marketplace/town", {
             method: "POST", headers: { "content-type": "application/json" },
             body: JSON.stringify({ action: "engage", eventId: ev.id, enemyId }),
         }).then((x) => x.json()).catch(() => null);
-        if (r?.ok) { window.location.href = "/marketplace/arena?from=town"; return; }
+        // `engage` hands back the whole arena state, which is what the fight renderer needs to draw YOUR
+        // fighter and not just the foe.
+        if (r?.ok) { setSwing(null); setFight(r); return; }
         setSwing(null);
         // Somebody else got to it first, or a bout of yours is already open. Say which.
         setRaidNote(r?.error === "bout_in_progress"
@@ -2088,6 +2103,21 @@ export default function TownClient({ initial }) {
                         </button>
                     </div>
                 </div>
+            ) : null}
+            {/* ── THE RAID FIGHT, FOUGHT HERE ──────────────────────────────────────────────────────────────
+                The Arena's own renderer, mounted over the street. Not a copy of it — the same component, the
+                same bout on the same row — so there is still exactly one fight UI to fix, which was the whole
+                point of the arrangement this replaces. What changes is only that the plaza keeps the player.
+
+                It draws nothing until `fight` is set, and it is `position: fixed; inset: 0` when it does, so
+                it needs nothing from the layout here. On the way out we reload the town: the wave has moved
+                while you were swinging at it, and possibly finished. */}
+            {fight ? (
+                // Keyed on the foe so a second raider mounts a FRESH fight. ArenaClient seeds its state from
+                // `initial` once, on mount — handing the same instance a new bout would leave the previous
+                // one on screen.
+                <ArenaClient key={fight.bout?.foe?.id || "raid"} initial={fight} boutOnly
+                    onLeave={() => { setFight(null); load(); }} />
             ) : null}
             {bossReward ? (
                 <div className="tw-duel" role="presentation" onClick={() => setBossReward(null)}>

@@ -852,7 +852,12 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
-    return { ok: true, bout: publicBout(b) };
+    // THE WHOLE STATE, not just the bout — which is what every other action in this file returns, and what the
+    // fight renderer actually needs. It draws your own fighter from `me` (sprite, element, the card), so a
+    // response carrying only `bout` could not mount it, and the town had to bounce the player to
+    // /marketplace/arena to get a page that had `me` on it. That bounce WAS the bug. The plaza mounts the same
+    // renderer over itself now and hands it this.
+    return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
 export async function startBout(buyerId, targetId = null) {

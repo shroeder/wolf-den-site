@@ -417,7 +417,23 @@ function Recap({ bout, busy, onClose }) {
     );
 }
 
-export default function ArenaClient({ initial }) {
+/**
+ * The Arena page — and, in `boutOnly` mode, the fight screen ON ITS OWN, mounted over another page.
+ *
+ * The plaza needs the fight, not the Arena. It used to get there by navigating to /marketplace/arena, on the
+ * reasoning that one bout UI is better than two — which was right about the UI and wrong about the address.
+ * A raid is a thing you do IN the town; sending someone to another page to do it lost them the plaza, lost
+ * them the wave, and left them somewhere with no way back.
+ *
+ * `boutOnly` renders nothing at all unless a bout is live, so the town can mount this permanently and have it
+ * appear only for the fight. The fight is already `position: fixed; inset: 0` (see .ar.ar-fight), so it
+ * covers whatever hosts it without that host having to arrange anything.
+ *
+ * `onLeave` replaces the walk back: the host closes the overlay and refreshes its own state. Without it this
+ * falls back to navigating, which still matters for a raid bout opened before any of this shipped and found
+ * in progress on the Arena page.
+ */
+export default function ArenaClient({ initial, boutOnly = false, onLeave = null }) {
     const [st, setSt] = useState(initial);
     const [busy, setBusy] = useState(false);
     // ── WHO TOOK IT, AND HOW HARD ── two different questions, and they used to share one number.
@@ -534,8 +550,12 @@ export default function ArenaClient({ initial }) {
     const leaveBout = useCallback(async () => {
         const toTown = Boolean(bout?.town || bout?.recap?.town);
         await act("dismiss");
-        if (toTown) window.location.href = "/marketplace/town";
-    }, [act, bout]);
+        if (!toTown) return;
+        // Hosted by the plaza: hand it back rather than going anywhere. Only a raid bout that somehow ends up
+        // on the Arena page — one opened before this shipped, and found in progress — still has to walk.
+        if (onLeave) onLeave();
+        else window.location.href = "/marketplace/town";
+    }, [act, bout, onLeave]);
 
     // Nothing underneath a full-screen fight should move when you swipe.
     useScrollLock(Boolean(bout));
@@ -822,6 +842,11 @@ export default function ArenaClient({ initial }) {
     // inside the panel: both fighters, both health bars, cooldowns, the last beat and the deck itself. It used to
     // be a picture on top with the controls stacked underneath it like a form, which is why it read as a page
     // rather than a fight.
+    // Hosted over another page: the fight, or nothing. Placed AFTER every hook above so the hook order is the
+    // same on both sides of this branch — returning early from among them is how a component that renders
+    // fine on its own page crashes the moment something else mounts it.
+    if (boutOnly && !bout) return null;
+
     if (bout && !stepped) {
         const yourTurn = !bout.over && bout.turn === "you";
         // A CRIT takes the whole pane for a moment. This used to test for grade "flawless"/"perfect" — timing
