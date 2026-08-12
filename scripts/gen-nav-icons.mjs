@@ -35,6 +35,9 @@ fs.mkdirSync(OUT, { recursive: true });
 // Subjects only — every word about STYLE comes from housePrompt. Each is a concrete object with a loud
 // silhouette, because at 18px a scene reads as mud.
 const ICONS = {
+    // The Compendium: a collector's ledger. Deliberately a BOOK rather than a bag — the screen is a record of
+    // everything that exists and what you have found, not another inventory, and the menu should say which.
+    compendium: "A thick leather-bound tome lying open, gilded page edges, a red ribbon bookmark, small glowing gemstones and a tiny sword pressed between its pages like specimens",
     town: "A tight cluster of three cosy medieval timber-framed cottages with steep shingled roofs, crooked chimneys and warm golden lit windows, grouped on a small grassy rise",
     boss: "Two heavy fantasy broadswords crossed in an X, ornate cross-guards, leather-wrapped grips, polished steel blades catching the light",
     sailing: "A small single-masted sailing boat with a billowing red-and-cream striped sail and a curved wooden hull, riding one stylised curl of blue water",

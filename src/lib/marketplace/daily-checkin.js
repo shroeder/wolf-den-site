@@ -48,6 +48,30 @@ function storeYesterday() { return dayStr(new Date(Date.now() - 86400000)); }
 // and compare strings — never build a JS Date from it. asDay just normalizes an already-"YYYY-MM-DD" value.
 const asDay = (v) => (v ? String(v).slice(0, 10) : null);
 
+/**
+ * What the streak becomes if they check in now.
+ *
+ * ── IT COUNTS DAYS YOU TURNED UP, NOT DAYS YOU PRESSED THE BUTTON ────────────────────────────────────────
+ * It used to key entirely off `streak_claimed_day`: miss the CLAIM and the streak reset, even if you had
+ * played all day. @Kaishiern reported this and was exactly right — fourteen consecutive days on the site,
+ * every one of them with real activity, and a streak of 3, while everybody who happens to tap the modal sat
+ * at 23. From the member's side "I haven't missed a day" was simply true and the game disagreed with them.
+ *
+ * So a day counts if you were HERE. `last_seen_at` is already maintained on every visit (the presence
+ * heartbeat), so the continuation test is: did you claim yesterday, OR were you seen yesterday. The reward is
+ * still once a day and still has to be claimed — this only decides whether the run is broken.
+ *
+ * `seenDay` is the store-local date of last_seen_at, resolved by the caller in SQL. Never build a JS Date from
+ * a Postgres DATE to compare it: read through JS it is a day behind on Vercel.
+ */
+function nextStreakFor(row, today, yesterday) {
+    const lastClaim = asDay(row?.streak_claimed_day);
+    if (lastClaim === today) return Number(row?.streak) || 0;   // already claimed; nothing moves
+    const seen = asDay(row?.seen_day);
+    const continued = lastClaim === yesterday || seen === yesterday || seen === today;
+    return continued ? (Number(row?.streak) || 0) + 1 : 1;
+}
+
 // A short "while you were away" summary — all truthful, computed live.
 async function awaySummary(buyerId) {
     const [boss, buyer, quests, chests, spin] = await Promise.all([
@@ -80,12 +104,14 @@ async function awaySummary(buyerId) {
 // GET — the member's check-in state: streak, today's claimable reward, and the away summary.
 export async function getDailyCheckin(buyerId) {
     if (!buyerId) return { signedIn: false, show: false };
-    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(
+        `SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day,
+                (last_seen_at AT TIME ZONE 'America/Chicago')::date::text AS seen_day
+           FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const today = storeToday();
     const lastDay = asDay(row?.streak_claimed_day);
     const claimedToday = lastDay === today;
-    // What the streak becomes if they claim now: +1 if they claimed yesterday, else it restarts at 1.
-    const nextStreak = claimedToday ? row.streak : lastDay === storeYesterday() ? (row?.streak || 0) + 1 : 1;
+    const nextStreak = nextStreakFor(row, today, storeYesterday());
     const reward = rewardForStreak(nextStreak);
     // Only run the (few) summary queries when the modal will actually show — most loads it's already claimed.
     return {
@@ -141,7 +167,10 @@ async function resolveLoginProcs(buyerId) {
 // POST — claim today's streak reward (advances/resets the streak, grants the reward). Idempotent per day.
 export async function claimDailyCheckin(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
-    const row = await db.queryOne(`SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const row = await db.queryOne(
+        `SELECT COALESCE(login_streak, 0) AS streak, streak_claimed_day::text AS streak_claimed_day,
+                (last_seen_at AT TIME ZONE 'America/Chicago')::date::text AS seen_day
+           FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const today = storeToday();
     if (asDay(row?.streak_claimed_day) === today) return { ok: false, error: "already_claimed", streak: row.streak };
     // ── ASCENSION POWERS ON A CHECK-IN ───────────────────────────────────────────────────────────────────
@@ -149,7 +178,10 @@ export async function claimDailyCheckin(buyerId) {
     // DOUBLE toward the reward ladder, so it climbs at twice the pace as well as never falling.
     const dailyPowers = await equippedPowers(buyerId);
     const kept = dailyPowers.has("standing_streak");
-    const nextStreak = (kept || asDay(row?.streak_claimed_day) === storeYesterday()) ? (row?.streak || 0) + (kept ? 2 : 1) : 1;
+    // The SAME rule the screen showed you a moment ago (nextStreakFor) — turning up is what continues a run,
+    // not tapping. The Standing Streak sits on top: it never breaks, and it counts double.
+    const base = nextStreakFor(row, today, storeYesterday());
+    const nextStreak = kept ? Math.max(base, (Number(row?.streak) || 0) + 1) + 1 : base;
     // Atomic guard: only the first claim of the day wins (streak_claimed_day flips off today's value).
     const won = await db
         .queryOne(
