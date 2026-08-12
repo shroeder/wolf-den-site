@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { checkTownQuestBadges } from "@/lib/marketplace/town-badges.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -166,7 +165,6 @@ export async function claimTownQuest(buyerId, key) {
     if (!claimed) return { ok: false, error: "not_ready" };
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, q.gold]).catch(() => null);
     await logCoin(buyerId, q.gold, "town_quest", { balanceAfter: paid?.gold, meta: { key } }).catch(() => {});
-    await rollWindfall(buyerId, "town_quest").catch(() => {});
     // The Pathfinder waits on this. Claiming a town quest had no activity event at all, so the guide step for it
     // was hung off `town_merchant` and `tavern_barkeep` — two names inherited from the old onboarding list that
     // NOTHING in the codebase has ever emitted — plus `buy_upgrade`, which is a sailing event.

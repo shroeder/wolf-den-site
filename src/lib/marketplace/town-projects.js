@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { checkWellBadges } from "@/lib/marketplace/town-badges.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
@@ -200,7 +199,6 @@ export async function claimWishingWell(buyerId) {
     const xp = Math.max(0, Number(bonuses.wellXp) || 0);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "wishing_well", { balanceAfter: paid?.gold }).catch(() => {});
-    await rollWindfall(buyerId, "wishing_well").catch(() => {});
     if (xp > 0) await awardXp(buyerId, "wishing_well", { points: xp, gold: 0 }).catch(() => {});
     checkWellBadges(buyerId).catch(() => {}); // Well Wisher / Fountain Faithful (daily claims)
     bumpTownQuest(buyerId, "well", 1).catch(() => {}); // "Make a Wish" town quest

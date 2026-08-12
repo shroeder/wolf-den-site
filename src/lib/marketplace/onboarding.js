@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 
 // ── "Getting started" — a first-week ramp through every system ─────────────────────────────────────────────
 // This used to be two entries: allow push, allow location. That is a permissions prompt with a gold reward, not
@@ -117,6 +116,5 @@ export async function claimOnboarding(buyerId, key) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET onboarding_done = $2::jsonb, gold = gold + $3 WHERE id = $1 RETURNING gold`, [buyerId, JSON.stringify([...done]), task.gold]).catch(() => null);
     if (!paid) return { ok: false, error: "db" };
     await logCoin(buyerId, task.gold, "onboarding", { balanceAfter: paid.gold, meta: { key } }).catch(() => {});
-    await rollWindfall(buyerId, "onboarding").catch(() => {});
     return { ok: true, gold: task.gold, ...(await getOnboarding(buyerId)) };
 }

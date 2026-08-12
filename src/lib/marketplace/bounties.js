@@ -8,7 +8,6 @@ import { grantBountyRewards } from "@/lib/marketplace/bounty-rewards.js";
 import { BOUNTY_TYPES, BOUNTY_TYPE_BY_ID as TYPE_BY_ID, MIN_BOUNTY, MAX_BOUNTY, BOUNTY_DAYS } from "@/lib/marketplace/bounty-types.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 
 // The Bounty Board. Members post a bounty (a request for real-world help) and reserve their OWN gold on it;
 // the gold is escrowed out of their balance until the bounty resolves. Others "take it on"; the creator
@@ -144,7 +143,6 @@ export async function completeBounty(bountyId, creatorId, winnerIds = []) {
         const share = shares[i];
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [wid, share]).catch(() => {});
         await logCoin(wid, share, "bounty_win", { meta: { bountyId } }).catch(() => {});
-        await rollWindfall(wid, "bounty_win").catch(() => {});
         await db.query(`UPDATE mkt_bounty_claim SET is_winner = TRUE, payout = $3 WHERE bounty_id = $1 AND buyer_id = $2`, [bountyId, wid, share]).catch(() => {});
         await awardXp(wid, "bounty_win", { dedupeKey: `bounty_win:${bountyId}:${wid}` }).catch(() => {});
         await syncEarnedBadges(wid).catch(() => {});

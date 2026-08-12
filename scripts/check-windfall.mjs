@@ -10,7 +10,7 @@ import fs from "node:fs";
 
 import { neon } from "@neondatabase/serverless";
 
-import { WINDFALL_DENY, WINDFALL_SOURCES, WINDFALL_TIERS, windfallWeight } from "../src/lib/marketplace/windfall-odds.js";
+import { WINDFALL_DENY, WINDFALL_NOT_LOOT, WINDFALL_SOURCES, WINDFALL_TIERS, windfallWeight } from "../src/lib/marketplace/windfall-odds.js";
 
 const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8");
 const sql = neon(env.match(/^DATABASE_URL=(.+)$/m)[1].trim());
@@ -27,6 +27,7 @@ let tickets = 0;
 let events = 0;
 let denied = 0;
 const unwired = [];
+let claims = 0;
 const bySystem = [];
 for (const r of rows) {
     const n = Number(r.earns);
@@ -34,7 +35,12 @@ for (const r of rows) {
     // Split the zero-weight reasons in two: the ones we DECIDED must never roll, and everything else, which
     // is just a reason nobody has wired. Collapsed together, a system that was meant to be a source and got
     // forgotten looks exactly like a spend — and reads as intentional in this output forever.
-    if (!w) { if (WINDFALL_DENY.has(r.reason)) denied += n; else if (n > 0) unwired.push(`${r.reason} (${n})`); continue; }
+    if (!w) {
+        if (WINDFALL_DENY.has(r.reason)) denied += n;
+        else if (WINDFALL_NOT_LOOT.has(r.reason)) claims += n;
+        else if (n > 0) unwired.push(`${r.reason} (${n})`);
+        continue;
+    }
     events += n;
     tickets += n * w;
     bySystem.push({ reason: r.reason, n, w, t: n * w });
@@ -44,7 +50,8 @@ const perYear = (365 / DAYS);
 console.log(`\n── ${DAYS} days of the live ledger ──`);
 console.log(`  ${active} members active in the window`);
 console.log(`  ${events.toLocaleString()} loot events roll  (+${denied.toLocaleString()} on the deny list: moved gold, idle income, admin)`);
-if (unwired.length) console.log(`  NOT WIRED — spends, or a source somebody forgot: ${unwired.join(", ")}`);
+console.log(`  ${claims.toLocaleString()} are CLAIMS — a daily, a badge, a quest. Deliberately do not roll.`);
+if (unwired.length) console.log(`  NOT WIRED and not explained — a source somebody forgot? ${unwired.join(", ")}`);
 console.log(`  ${tickets.toLocaleString()} weighted tickets → ${Math.round(tickets * perYear).toLocaleString()} a year across the Den`);
 
 console.log(`\n── what that pays, per year ──`);

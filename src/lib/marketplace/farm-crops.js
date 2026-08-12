@@ -197,10 +197,6 @@ async function rollHarvestReward(buyerId, rarity, luckyLevel = 0, bonusPromote =
             await grantSeed(buyerId, sid);
             label = `🌱 a ${SEEDS[sid].name} seed`;
         }
-        // AFTER the whole chain, not inside it: whatever the crop was hiding, finding it is one drop and it
-        // gets one roll. Slotted between the `if` and its first `else if` this was a syntax error, which is
-        // the one kind of mistake this file's lint gate cannot miss.
-        await rollWindfall(buyerId, "harvest_loot").catch(() => {});
     } catch { /* best-effort */ }
     return { label, tier, chest: pick.type === "chest" ? pick.chestTier : null };
 }

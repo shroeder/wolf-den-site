@@ -11,7 +11,6 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { allowsNotify } from "@/lib/marketplace/notify-prefs.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 
 // The admin app loads avatars over the network, so it needs an ABSOLUTE url (the built DiceBear avatar is
 // served relative). Prefer the built avatar (what the website shows), fall back to any uploaded one.
@@ -287,7 +286,6 @@ async function rewardBadgeEarned(buyerId, slug) {
     await awardXp(buyerId, "badge_earned", { points: BADGE_REWARD_XP, dedupeKey: `badge_reward:${slug}` }).catch(() => {});
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, BADGE_REWARD_GOLD]).catch(() => {});
     await logCoin(buyerId, BADGE_REWARD_GOLD, "badge_reward", { meta: { slug } }).catch(() => {});
-    await rollWindfall(buyerId, "badge_reward").catch(() => {});
 }
 
 // ── PER-BADGE BONUSES ── every badge grants a bonus, in the vocabulary of the SYSTEM it belongs to, scaled by
@@ -535,7 +533,6 @@ export async function claimBadgeMilestone(buyerId, count) {
         .catch(() => null);
     if (!upd) return { ok: false, error: "already_claimed" };
     await logCoin(buyerId, mst.gold, "badge_milestone", { balanceAfter: upd.gold, meta: { count: mst.count } }).catch(() => {});
-    await rollWindfall(buyerId, "badge_milestone").catch(() => {});
     // Grant the chest (best-effort; logged to the chest-grant ledger with its source).
     try {
         const { addChests } = await import("@/lib/marketplace/chests.js");

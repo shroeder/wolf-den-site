@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { GUIDE_CHAPTERS, DONE_CHAPTER, DONE_STEP, SEEDED, chapterById } from "@/lib/marketplace/guide-chapters.js";
@@ -127,7 +126,6 @@ export async function getGuide(buyerId) {
             if (res && gold > 0) {
                 paid = gold;
                 await logCoin(buyerId, gold, "guide_step", { balanceAfter: res.gold, meta: { steps: [...nowTrue] } }).catch(() => {});
-                await rollWindfall(buyerId, "guide_step").catch(() => {});
             }
         }
     } else if (!seeded) {
@@ -194,7 +192,6 @@ export async function claimGuideStep(buyerId, key) {
     ).catch(() => null);
     if (!paid) return { ok: false, error: "db" };
     await logCoin(buyerId, step.gold, "guide_step", { balanceAfter: paid.gold, meta: { key } }).catch(() => {});
-    await rollWindfall(buyerId, "guide_step").catch(() => {});
     return { ok: true, gold: step.gold, ...(await getGuide(buyerId)) };
 }
 
@@ -216,7 +213,6 @@ export async function claimGuideChapter(buyerId, id) {
     ).catch(() => null);
     if (!paid) return { ok: false, error: "claimed", ...(await getGuide(buyerId)) };
     await logCoin(buyerId, ch.reward.gold, "guide_chapter", { balanceAfter: paid.gold, meta: { chapter: id } }).catch(() => {});
-    await rollWindfall(buyerId, "guide_chapter").catch(() => {});
     if (ch.reward.chest) await addChests(buyerId, { [ch.reward.chest]: 1 }, { source: "guide" }).catch(() => {});
     return { ok: true, gold: ch.reward.gold, chest: ch.reward.chest, ...(await getGuide(buyerId)) };
 }

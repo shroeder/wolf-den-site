@@ -15,7 +15,6 @@ import { PUBLIC_COLLECTIBLES } from "@/lib/marketplace/collectibles.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantMissingBadge } from "@/lib/marketplace/badges.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { equippedPowers, claimPowerUsePeriod } from "@/lib/marketplace/ascension-powers.js";
 
 // DAILY CHECK-IN — a login-streak reward + a "while you were away" summary, shown once per day. The streak
@@ -135,7 +134,6 @@ async function resolveLoginProcs(buyerId) {
         if (p.kind === "gold") {
             await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, p.amount]).catch(() => {});
             await logCoin(buyerId, p.amount, "checkin", { meta: { proc: p.label } }).catch(() => {});
-            await rollWindfall(buyerId, "checkin").catch(() => {});
             out.push({ emoji: "🪙", text: `${p.label} found ${p.amount} gold!` });
         } else if (p.kind === "potion") {
             const pool = Object.entries(CONSUMABLES).filter(([, c]) => c.price != null);
