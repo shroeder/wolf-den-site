@@ -1280,6 +1280,24 @@ export default function ArenaClient({ initial }) {
                             );
                         })}
                     </div>
+                    {/* A PAGE FROM THE RECIPE BOOK, for laurels. The twin of the Quartermaster's, at the same
+                        odds and the matching price — so neither counter is the obviously correct one to walk
+                        up to, which is the whole point of selling it in both. What you get is a roll, weighted
+                        hard toward the everyday recipes, and it opens the ordinary recipe-found card. */}
+                    {st.recipeShop ? (
+                        <div className="ar-recipe">
+                            <b>A Recipe</b>
+                            <p className="ar-arm-sub">
+                                {st.recipeShop.knowsAll
+                                    ? "You already know every recipe in the book."
+                                    : "One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not."}
+                            </p>
+                            <button type="button" className="btn-gold" disabled={busy || st.recipeShop.knowsAll || (st.laurels || 0) < st.recipeShop.price}
+                                onClick={() => { Sfx.ui(); act("buy_recipe"); }}>
+                                {money(st.recipeShop.price)} laurels
+                            </button>
+                        </div>
+                    ) : null}
                     <PurserPanel st={st} busy={busy} act={act} />
                 </section>
             ) : null}

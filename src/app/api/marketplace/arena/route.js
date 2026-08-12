@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
-    buyArenaUpgrade, buyArmoury, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
+    buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
 } from "@/lib/marketplace/arena-progress.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -59,6 +59,8 @@ export async function POST(request) {
                     const r = await buyStone(buyer.id, String(b?.stone || ""), "laurels");
                     return noStore({ ...r, ...(await getArenaState(buyer.id)) });
                 }
+                case "buy_recipe":
+                    return noStore({ ...(await buyArmouryRecipe(buyer.id)), ...(await getArenaState(buyer.id)) });
                 case "buy_armoury":
                     return noStore({ ...(await buyArmoury(buyer.id, String(b?.id || ""))), ...(await getArenaState(buyer.id)) });
                 // The Purser's Exchange. purserExchange is the gate — it refuses anyone not wearing the

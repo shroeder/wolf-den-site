@@ -16033,3 +16033,8 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .sbt-foereck-pips { display: inline-flex; gap: 3px; align-items: center; font-style: normal; }
 .sbt-foereck-pips i { width: 6px; height: 6px; border-radius: 2px; background: rgba(255,255,255,0.18); }
 .sbt-foereck-pips i.is-on { background: var(--reck, #ffb45e); box-shadow: 0 0 4px var(--reck, #ffb45e); }
+
+/* The recipe shelf in the Armoury — one card, above the exchange, under the crates. */
+.ar-recipe { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid rgba(220,160,60,.22); }
+.ar-recipe > b { color: #f6dfae; font-size: .95rem; }
+.ar-recipe .btn-gold { margin-top: .5rem; }

@@ -55,7 +55,7 @@ const PieceArt = ({ piece, className }) => (
     ) : <Icon name={piece.icon} className={className} />
 );
 
-export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone }) {
+export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, onBuyPiece, onGamble, stoneShop, onBuyStone, recipe = null, onBuyRecipe }) {
     const [tab, setTab] = useState("locker");
     const [reveal, setReveal] = useState(null);   // the gamble's chest
     const [got, setGot] = useState(null);         // the piece a crate turned out to hold
@@ -122,6 +122,24 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                             </button>
                         </div>
                     ))}
+                    {/* A PAGE FROM THE BOOK. Which page is the quartermaster's business, not yours — the roll
+                        leans hard on the everyday recipes and only occasionally turns up something from the
+                        back. Sold beside the scrolls because it is the same kind of purchase: a permanent
+                        thing you cannot otherwise go and get on purpose. The card it opens is the ordinary
+                        recipe-found card; buying one is not a different celebration from finding one. */}
+                    {recipe ? (
+                        <div className="qm-card">
+                            <div className="qm-art"><Icon name="GiSpellBook" className="qm-art-ico" /></div>
+                            <b>A Recipe</b>
+                            <p>{recipe.knowsAll
+                                ? "You already know every recipe in the book."
+                                : "One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not."}</p>
+                            <button type="button" className="qm-buy" disabled={busy || recipe.knowsAll || purse < recipe.price}
+                                onClick={() => onBuyRecipe?.()}>
+                                <Dbl />{recipe.price}
+                            </button>
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
 

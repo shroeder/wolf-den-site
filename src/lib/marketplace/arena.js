@@ -413,6 +413,13 @@ export async function getArenaState(buyerId) {
         // the panel is not drawn at all rather than drawn disabled, because a shop you can never use is worse
         // than no shop. The doubloon purse is only read when the power is held; it lives in another table.
         purser: await purserBits(buyerId).catch(() => null),
+        // The recipe shelf, priced in laurels. Same purchase the Quartermaster sells for doubloons — see
+        // buyArmouryRecipe. Lazily imported for the usual reason: cooking.js reaches back into the game's
+        // other modules and a static edge from here is the shape of cycle that has taken pages down before.
+        recipeShop: await (async () => {
+            const { RECIPE_PRICE_LAURELS, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
+            return { price: RECIPE_PRICE_LAURELS, knowsAll: !(await hasUnknownRecipe(buyerId)) };
+        })().catch(() => null),
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,
             streak: Number(row?.streak) || 0, bestStreak: Number(row?.best_streak) || 0,

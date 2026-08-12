@@ -444,7 +444,18 @@ export const RECIPE_BANDS = {
     raid_win:     { min: 3, max: 4 },
     town_raid:    { min: 3, max: 4 },
     boss_kill:    { min: 4, max: 5 },   // weekly, shared, and the route to the top tiers
+    // BOUGHT, with doubloons at the Quartermaster or laurels at the Armoury. The whole book is in range on
+    // purpose — DROP_WEIGHT already leans hard on the bottom (46/32/20/9/3), so what you pay for is reliably a
+    // tier 1 or 2 and just occasionally something you would never otherwise see. Narrowing the band to the
+    // low tiers would have made every purchase identical and killed the only interesting thing about it.
+    shop:         { min: 1, max: 5 },
 };
+
+// What a random recipe costs. The two prices hold the same ratio the pet stones already set (4,000 doubloons
+// against 7,500 laurels), so neither counter is the obviously correct one to use — and the laurel price lands
+// exactly on the Armoury's middle crate, which is the tier a permanent unlock belongs beside.
+export const RECIPE_PRICE_DOUBLOONS = 400;
+export const RECIPE_PRICE_LAURELS = 750;
 
 /**
  * Teach a recipe from a source's band. Call this WHEN THE FEATURE'S OWN TABLE HAS ALREADY DECIDED to pay one
@@ -457,6 +468,32 @@ export async function grantRecipeReward(buyerId, band) {
     const def = RECIPE_BANDS[band];
     if (!buyerId || !def) return null;
     return learnRecipe(buyerId, null, { min: def.min, max: def.max });
+}
+
+/**
+ * Is there anything left to sell this member? Read BEFORE any currency is taken.
+ *
+ * A shop that charges for a book somebody has already finished is a shop that steals, and the alternative —
+ * charge, roll, refund — leaves a hole where a crash between the two halves keeps the money. neon() has no
+ * transactions (see the note in buyLocker), so the check has to come first and the grant has to be the very
+ * next thing.
+ */
+export async function hasUnknownRecipe(buyerId) {
+    if (!buyerId) return false;
+    const known = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    return known.length < RECIPES.length;
+}
+
+/**
+ * Hand over a bought recipe. Returns the recipe, or null if they somehow knew them all by the time it ran.
+ *
+ * The REVEAL is not this function's business and is deliberately not returned to the caller to display: a
+ * found recipe is pending state (see the note above pendingRecipeReveals), and the site-wide watcher pays it
+ * out wherever the member happens to be standing. Buying one at the Quartermaster therefore gets exactly the
+ * same card as finding one in a bottle, for free, and there is only ever one celebration to maintain.
+ */
+export async function grantBoughtRecipe(buyerId) {
+    return grantRecipeReward(buyerId, "shop");
 }
 
 /**

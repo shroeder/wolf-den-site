@@ -1002,7 +1002,7 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false) {
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1091,7 +1091,7 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             };
         })(),
         // SHIP BATTLES — the gun deck, the racks, the fleet and the purse.
-        combat: combatView(row, level, consumableArt, gunDeck, pieces, hulls),
+        combat: combatView(row, level, consumableArt, gunDeck, pieces, hulls, recipeShop),
         voyageMs: voyageDurationMs(speedLevel, level),
         // Digging upgrade system (separate from the boat).
         digUpgrades: digUpgradesView(row),
@@ -1516,7 +1516,16 @@ export async function getSailingState(buyerId, skyKey = null) {
     // `owner` carries exactly ONE thing now that ship battles are public: whether to draw the gun-placement
     // workshop door in the yard. That route is owner-only and 404s for everybody else, so a link every member
     // can see is a dead end with a nice icon on it.
-    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
+    // The recipe shelf. IMPORTED LAZILY, and it has to stay that way: cooking.js imports SEEDS and grantSeed
+    // from this file, so a static import back the other way is a cycle — and under ESM a cycle resolves to
+    // `undefined` at call time rather than failing the build, which is how the Kitchen page went down once
+    // already. Same rule as the pantry hook in farm-crops.js and fishing.js.
+    const recipeShop = await (async () => {
+        const { RECIPE_PRICE_DOUBLOONS, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
+        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: !(await hasUnknownRecipe(buyerId)) };
+    })().catch(() => null);
+    return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
+        recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
@@ -2083,7 +2092,7 @@ const ammoCount = (row, id) => (ammoById(id).basic ? Infinity : Number(ammoStock
 // Everything the ship-battle screens read: the gun deck, what is in the racks, the fleet and the purse. The
 // `ladder` flag that used to gate the fleet and the Cunning track went with the launch gate — a member sees
 // all of it now.
-function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = [], hulls = null) {
+function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceShop_ = [], hulls = null, recipeShop = null) {
     const gun = row?.gun_level || 0, gunnery = row?.gunnery_level || 0, hull = row?.hull_level || 0;
     const stock = ammoStock(row);
     const loaded = ammoById(row?.loadout || "round");
@@ -2151,6 +2160,9 @@ function combatView(row, boatLevel, consumableArt = {}, gunDeck = null, pieceSho
             // counter showed the same bottle of mystery liquid five times, priced from 75 to 12,000.
             art: (l.consumable && consumableArt[l.consumable]) || null,
         })),
+        // A page from the recipe book, for doubloons. `knowsAll` is resolved by the caller because combatView is
+        // synchronous and the answer is a query — the same reason marketDay is handed in rather than read here.
+        recipe: recipeShop,
         fleet: {
             depth, best: row?.fleet_best || 0, max: MAX_FLEET_RANK,
             wins: row?.fleet_wins || 0, losses: row?.fleet_losses || 0,
@@ -3001,6 +3013,39 @@ export async function buyLocker(buyerId, id) {
     ).catch(() => {});
     await trackActivity(buyerId, "buy_locker", { id: def.id, cost: def.price }).catch(() => {});
     return { ok: true, bought: def.name, ...(await getSailingState(buyerId)) };
+}
+
+/**
+ * A RECIPE OFF THE QUARTERMASTER, for doubloons. Same purchase the Armoury sells for laurels.
+ *
+ * Which one you get is a roll, weighted hard toward the bottom of the book — you are buying a page, not
+ * choosing one. What you see is the ordinary recipe-found card, because the grant goes through the same
+ * pending-reveal path everything else uses; nothing here has to know how to celebrate.
+ *
+ * CHECKED BEFORE CHARGED. A member who already knows every recipe is refused with their purse intact rather
+ * than paid back afterwards — neon() has no transactions, so a charge-then-refund has a window where a crash
+ * keeps the money.
+ */
+export async function buyRecipe(buyerId) {
+    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_DOUBLOONS } = await import("@/lib/marketplace/cooking.js");
+    if (!(await hasUnknownRecipe(buyerId))) {
+        return { ok: false, error: "knows_them_all", ...(await getSailingState(buyerId)) };
+    }
+    const paid = await db.queryOne(
+        `UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) - $2, updated_at = NOW()
+          WHERE buyer_id = $1 AND COALESCE(doubloons,0) >= $2 RETURNING doubloons`,
+        [buyerId, RECIPE_PRICE_DOUBLOONS]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_doubloons", ...(await getSailingState(buyerId)) };
+
+    const got = await grantBoughtRecipe(buyerId).catch(() => null);
+    if (!got) {
+        // The only way here is a race with another source teaching them the last one. Put it back.
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, RECIPE_PRICE_DOUBLOONS]).catch(() => {});
+        return { ok: false, error: "knows_them_all", ...(await getSailingState(buyerId)) };
+    }
+    await trackActivity(buyerId, "buy_recipe", { currency: "doubloons", cost: RECIPE_PRICE_DOUBLOONS, recipe: got.id }).catch(() => {});
+    return { ok: true, bought: got.name, ...(await getSailingState(buyerId)) };
 }
 
 // What is in the racks for the next battle. Loading a type you have none of is refused here rather than

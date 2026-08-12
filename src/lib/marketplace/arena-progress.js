@@ -330,3 +330,28 @@ export async function purserExchange(buyerId, from, amount) {
     await trackActivity(buyerId, "purser_exchange", { from: dir, n, paid }).catch(() => {});
     return { ok: true, from: dir, spent: n, gained: paid };
 }
+
+// ── A RECIPE OFF THE ARMOURY, for laurels ────────────────────────────────────────────────────────────────────
+// The doubloon twin of this lives on the Quartermaster (buyRecipe in sailing.js) and they share the roll, the
+// odds and the price ratio — so neither counter is the obviously correct one to walk up to. Laurels are
+// otherwise spent only on crates and stones, and a permanent unlock is a better sink than a fourth gamble.
+export async function buyArmouryRecipe(buyerId) {
+    if (!buyerId) return { ok: false, error: "not_signed_in" };
+    const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_LAURELS } = await import("@/lib/marketplace/cooking.js");
+    if (!(await hasUnknownRecipe(buyerId))) return { ok: false, error: "knows_them_all" };
+
+    const paid = await db.queryOne(
+        `UPDATE mkt_arena SET laurels = laurels - $2 WHERE buyer_id = $1 AND laurels >= $2 RETURNING laurels`,
+        [buyerId, RECIPE_PRICE_LAURELS]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_laurels", cost: RECIPE_PRICE_LAURELS };
+
+    const got = await grantBoughtRecipe(buyerId).catch(() => null);
+    if (!got) {
+        await db.query(`UPDATE mkt_arena SET laurels = laurels + $2 WHERE buyer_id = $1`, [buyerId, RECIPE_PRICE_LAURELS]).catch(() => {});
+        return { ok: false, error: "knows_them_all" };
+    }
+    await trackActivity(buyerId, "buy_recipe", { currency: "laurels", cost: RECIPE_PRICE_LAURELS, recipe: got.id }).catch(() => {});
+    // No reveal payload on purpose — the site-wide watcher shows the same card a found recipe gets.
+    return { ok: true, bought: got.name, laurels: Number(paid.laurels) || 0 };
+}

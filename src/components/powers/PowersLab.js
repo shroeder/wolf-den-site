@@ -59,6 +59,7 @@ const SPIN_BASE = {
 const ARENA_BASE = {
     laurels: 1240,
     purser: { doubloons: 386, rate: 1, max: 5000 },
+    recipeShop: { price: 750, knowsAll: false },
 };
 
 const SCENES = {
@@ -68,6 +69,7 @@ const SCENES = {
     "dealer-one": { label: "Dealer's Choice — before the re-roll", note: "One wedge held, plus 'Deal again'." },
     "dealer-two": { label: "Dealer's Choice — both wedges", note: "Two tiles, no 'Deal again'." },
     purser: { label: "The Purser's Exchange", note: "Sits under the crates in the Armoury tab." },
+    recipe: { label: "Recipe shelf — Armoury", note: "A page from the book, for laurels. Twin of the Quartermaster's." },
     sets: { label: "The Loaned Exhibit", note: "Open a piece you do NOT own — the borrow button is in the modal." },
     "lock-off": { label: "Hero lock — unlocked", note: "Sits beside the paid redraw; the two decide the same thing." },
     "lock-on": { label: "Hero lock — locked", note: "Locked state must be certain at a glance, and it disables the redraw." },
@@ -204,6 +206,16 @@ export default function PowersLab() {
                 <section className="card">
                     <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>
                     <PurserPanel st={ARENA_BASE} busy={purserBusy} act={async () => {}} />
+                </section>
+            ) : null}
+            {scene === "recipe" ? (
+                <section className="card">
+                    <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>
+                    <div className="ar-recipe">
+                        <b>A Recipe</b>
+                        <p className="ar-arm-sub">One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not.</p>
+                        <button type="button" className="btn-gold">750 laurels</button>
+                    </div>
                 </section>
             ) : null}
             <Ruler />

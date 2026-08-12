@@ -156,6 +156,8 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, 
                     purse={purse}
                     busy={busy}
                     onBuyLocker={(id) => onAct({ action: "buy_locker", id })}
+                    recipe={combat.recipe}
+                    onBuyRecipe={() => onAct({ action: "buy_recipe" })}
                     onBuyPiece={(piece) => onAct({ action: "buy_piece", piece })}
                     onGamble={() => onAct({ action: "gamble_chest" })}
                 />
