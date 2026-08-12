@@ -444,8 +444,9 @@ export async function getArenaState(buyerId) {
             };
         })(),
         recipeShop: await (async () => {
-            const { RECIPE_PRICE_LAURELS, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
-            return { price: RECIPE_PRICE_LAURELS, knowsAll: !(await hasUnknownRecipe(buyerId)) };
+            const { RECIPE_PRICE_LAURELS, recipeProgress } = await import("@/lib/marketplace/cooking.js");
+            const p = await recipeProgress(buyerId);
+            return { price: RECIPE_PRICE_LAURELS, knowsAll: p.known >= p.total, ...p };
         })().catch(() => null),
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,

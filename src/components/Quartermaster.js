@@ -128,17 +128,9 @@ export default function Quartermaster({ shop, locker, purse, busy, onBuyLocker, 
                         thing you cannot otherwise go and get on purpose. The card it opens is the ordinary
                         recipe-found card; buying one is not a different celebration from finding one. */}
                     {recipe ? (
-                        <div className="qm-card">
-                            <div className="qm-art"><Icon name="GiSpellBook" className="qm-art-ico" /></div>
-                            <b>A Recipe</b>
-                            <p>{recipe.knowsAll
-                                ? "You already know every recipe in the book."
-                                : "One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not."}</p>
-                            <button type="button" className="qm-buy" disabled={busy || recipe.knowsAll || purse < recipe.price}
-                                onClick={() => onBuyRecipe?.()}>
-                                <Dbl />{recipe.price}
-                            </button>
-                        </div>
+                        <RecipeShelf shop={recipe} busy={busy} canAfford={purse >= recipe.price}
+                            priceLabel={<><Dbl />{recipe.price}</>}
+                            onBuy={() => onBuyRecipe?.()} />
                     ) : null}
                 </div>
             ) : null}

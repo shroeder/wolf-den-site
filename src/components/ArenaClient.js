@@ -12,6 +12,7 @@ import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
 import ArenaFx from "@/components/arena/ArenaFx";
 import ArenaUpgrades from "@/components/arena/ArenaUpgrades";
+import RecipeShelf from "@/components/RecipeShelf";
 import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
@@ -1329,20 +1330,10 @@ export default function ArenaClient({ initial }) {
                         odds and the matching price — so neither counter is the obviously correct one to walk
                         up to, which is the whole point of selling it in both. What you get is a roll, weighted
                         hard toward the everyday recipes, and it opens the ordinary recipe-found card. */}
-                    {st.recipeShop ? (
-                        <div className="ar-recipe">
-                            <b>A Recipe</b>
-                            <p className="ar-arm-sub">
-                                {st.recipeShop.knowsAll
-                                    ? "You already know every recipe in the book."
-                                    : "One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not."}
-                            </p>
-                            <button type="button" className="btn-gold" disabled={busy || st.recipeShop.knowsAll || (st.laurels || 0) < st.recipeShop.price}
-                                onClick={() => { Sfx.ui(); act("buy_recipe"); }}>
-                                {money(st.recipeShop.price)} laurels
-                            </button>
-                        </div>
-                    ) : null}
+                    {st.recipeShop ? <RecipeShelf shop={st.recipeShop} busy={busy}
+                        canAfford={(st.laurels || 0) >= st.recipeShop.price}
+                        priceLabel={`${money(st.recipeShop.price)} laurels`}
+                        onBuy={() => { Sfx.ui(); act("buy_recipe"); }} /> : null}
                     <PurserPanel st={st} busy={busy} act={act} />
                 </section>
             ) : null}

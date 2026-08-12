@@ -11,6 +11,8 @@ import JewellerClient from "@/components/JewellerClient";
 import EquipmentClient from "@/components/EquipmentClient";
 import CompendiumClient from "@/components/CompendiumClient";
 import WindfallPop from "@/components/WindfallPop";
+import RecipeShelf from "@/components/RecipeShelf";
+import RecipeFoundWatcher from "@/components/RecipeFoundWatcher";
 import { TOWN_CSS } from "@/components/TownClient";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
@@ -121,6 +123,40 @@ const COMPENDIUM = (() => {
     };
 })();
 
+// Sixty-four pages across five tiers, holes weighted to the top — which is what a real member's book looks
+// like, and the case the tier pips exist to show.
+const RECIPE_TIERS = [
+    { tier: 1, name: "Simple", color: "#cfd8e3", total: 13, known: 13 },
+    { tier: 2, name: "Hearty", color: "#7ec8ff", total: 14, known: 11 },
+    { tier: 3, name: "Fine", color: "#c9a2ff", total: 15, known: 8 },
+    { tier: 4, name: "Exquisite", color: "#ffd75e", total: 12, known: 3 },
+    { tier: 5, name: "Legendary", color: "#ff9ec4", total: 10, known: 1 },
+];
+// One Simple page and one Legendary page, because the whole point of the reveal work is that those two must
+// not arrive on the same beat with only a different hex code between them.
+const REVEAL_FIXTURE = {
+    "reveal-simple": {
+        id: "r_broth", name: "Thin Broth", kind: "dish", tier: 1, tierName: "Simple", tierColor: "#cfd8e3",
+        flavor: "It is warm, and that is the whole of it.",
+        sprite: null, fallback: "/images/cooking/dish.webp",
+        needs: [{ ref: "veg_onion", qty: 2, name: "Onion", sprite: null, fallback: "/images/cooking/dish.webp" }],
+        makes: null, book: { total: 64, before: 35 },
+    },
+    "reveal-legendary": {
+        id: "r_feast", name: "The Wolf's Own Feast", kind: "dish", tier: 5, tierName: "Legendary", tierColor: "#ff9ec4",
+        flavor: "Served once, to nobody who would say what was in it.",
+        sprite: null, fallback: "/images/cooking/dish.webp",
+        needs: [
+            { ref: "fish_squid", qty: 3, name: "Squid", sprite: null, fallback: "/images/cooking/dish.webp" },
+            { ref: "p_dough", qty: 2, name: "Dough", sprite: null, fallback: "/images/cooking/dish.webp" },
+        ],
+        makes: null, book: { total: 64, before: 63 },
+    },
+};
+const RECIPE_BOOK = { price: 750, knowsAll: false, total: 64, known: 36, tiers: RECIPE_TIERS };
+const RECIPE_BOOK_FULL = { price: 750, knowsAll: true, total: 64, known: 64,
+    tiers: RECIPE_TIERS.map((t) => ({ ...t, known: t.total })) };
+
 const SCENES = {
     "horn-closed": { label: "Muster horn — closed pill", note: "Rides EVERY page. Bottom-left, because SocialHub owns bottom-right." },
     "horn-open": { label: "Muster horn — open, 5 foes", note: "The wave list scrolls inside itself at 46vh." },
@@ -129,6 +165,9 @@ const SCENES = {
     "dealer-two": { label: "Dealer's Choice — both wedges", note: "Two tiles, no 'Deal again'." },
     purser: { label: "The Purser's Exchange", note: "Sits under the crates in the Armoury tab." },
     recipe: { label: "Recipe shelf — Armoury", note: "A page from the book, for laurels. Twin of the Quartermaster's." },
+    "recipe-done": { label: "Recipe shelf — book finished", note: "Every page known: the buy has to be visibly spent." },
+    "reveal-simple": { label: "Recipe reveal — Simple", note: "The quiet end of the book. Book opens, page turns, card resolves." },
+    "reveal-legendary": { label: "Recipe reveal — Legendary", note: "The loud end, and it must not be the same half-second as Simple." },
     compendium: { label: "The Compendium", note: "Every item, collected and not. Missing ones are silhouettes." },
     bag: { label: "Gear bag — sort + one-tap equip", note: "Kaishiern's ask: rarity then type, and Equip on the tile." },
     "jw-one": { label: "Jewelcutter — one gem", note: "The case that looked worst: a single stone in a full-width box." },
@@ -190,6 +229,11 @@ function installStub(scene) {
         if (u.includes("/api/marketplace/sets")) return json({ ok: true, exhibit: "piece_wheel_hub" });
         if (u.includes("/api/marketplace/arena")) return json({ ok: true, ...ARENA_BASE });
         if (u.includes("/api/marketplace/compendium")) return json(COMPENDIUM);
+        // The reveal is driven entirely by this endpoint, so stubbing it runs the REAL watcher through its
+        // real three-beat sequence — the only way to see a moment that otherwise needs a lucky harvest.
+        if (u.includes("/api/marketplace/recipe-found")) {
+            return json({ pending: scene.startsWith("reveal") ? [REVEAL_FIXTURE[scene]] : [] });
+        }
         if (u.includes("/api/marketplace/inventory")) return json(BAG);
         if (u.includes("/api/marketplace/avatar")) {
             return json({ cost: 1000, gold: 4820, canAfford: true, firstIsFree: false, hasAvatar: true, locked: scene === "lock-on" });
@@ -290,16 +334,18 @@ export default function PowersLab() {
                     <PurserPanel st={ARENA_BASE} busy={purserBusy} act={async () => {}} />
                 </section>
             ) : null}
-            {scene === "recipe" ? (
+            {scene === "recipe" || scene === "recipe-done" ? (
                 <section className="card">
                     <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>
-                    <div className="ar-recipe">
-                        <b>A Recipe</b>
-                        <p className="ar-arm-sub">One page, drawn at random from everything you have not learned. Mostly everyday cooking — occasionally not.</p>
-                        <button type="button" className="btn-gold">750 laurels</button>
-                    </div>
+                    {/* The REAL shelf, not a copy of its markup — the whole reason the old fixture was worth
+                        replacing is that it could not have shown the collection it does not know about. */}
+                    <RecipeShelf key={scene} shop={scene === "recipe-done" ? RECIPE_BOOK_FULL : RECIPE_BOOK}
+                        busy={false} canAfford priceLabel="750 laurels" onBuy={() => {}} />
                 </section>
             ) : null}
+            {/* The watcher is mounted site-wide in the real app; here it is mounted only for its own scenes so
+                it does not sit invisibly over every other one. Keyed so re-picking a scene replays it. */}
+            {scene.startsWith("reveal") ? <RecipeFoundWatcher key={scene} /> : null}
             <Ruler />
             {scene === "stockade" ? <StockadeFixture /> : null}
             {scene === "dock" ? <DockFixture /> : null}

@@ -478,6 +478,32 @@ export async function grantRecipeReward(buyerId, band) {
  * transactions (see the note in buyLocker), so the check has to come first and the grant has to be the very
  * next thing.
  */
+/**
+ * How much of the book they have, by tier.
+ *
+ * The shelf used to sell "a recipe" against no context at all: a heading, a sentence and a price. Sixty-four
+ * pages exist and a member had no way to know that, no way to see how many they held, and therefore no reason
+ * to want another one — the purchase was a coin toss with a price on it rather than a gap being filled.
+ *
+ * One query, counted in JS against the authored list, so the tier split cannot drift from RECIPES.
+ */
+export async function recipeProgress(buyerId) {
+    const total = RECIPES.length;
+    const tiers = TIERS.map((t) => ({
+        tier: t.tier, name: t.name, color: t.color,
+        total: RECIPES.filter((r) => r.tier === t.tier).length, known: 0,
+    }));
+    if (!buyerId) return { known: 0, total, tiers };
+    const rows = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
+    const have = new Set(rows.map((r) => r.recipe_id));
+    for (const r of RECIPES) {
+        if (!have.has(r.id)) continue;
+        const t = tiers.find((x) => x.tier === r.tier);
+        if (t) t.known += 1;
+    }
+    return { known: tiers.reduce((n, t) => n + t.known, 0), total, tiers };
+}
+
 export async function hasUnknownRecipe(buyerId) {
     if (!buyerId) return false;
     const known = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
@@ -635,7 +661,14 @@ export async function pendingRecipeReveals(buyerId) {
     if (!rows.length) return [];
 
     const sprites = await cookingSprites().catch(() => ({}));
-    return rows.map((r) => {
+    // ── AND WHERE IT LEAVES THE BOOK ────────────────────────────────────────────────────────────────────
+    // The reveal used to be an island: a card with a dish on it, and nothing connecting it to the sixty-three
+    // other pages. The single best thing about finding one is watching the count move, so the card is handed
+    // the collection and counts UP to it on screen. `book.known` already includes everything in this batch —
+    // the rows exist the moment they were learned — so each card in a queue subtracts its own position to
+    // show the number as it stood when that page turned up.
+    const book = await recipeProgress(buyerId).catch(() => null);
+    return rows.map((r, i) => {
         const rec = recipeById(r.recipe_id);
         if (!rec) return null;
         const t = tierMeta(rec.tier);
@@ -647,6 +680,8 @@ export async function pendingRecipeReveals(buyerId) {
             tier: rec.tier,
             tierName: t.name,
             tierColor: t.color,
+            // "18 → 19 of 64", counted from where this specific page landed in the batch.
+            book: book ? { total: book.total, before: Math.max(0, book.known - (rows.length - i)) } : null,
             sprite: sprites[rec.id] || null,
             fallback: rec.kind === "prep" ? KIND_FALLBACK.prep : KIND_FALLBACK.dish,
             // What it asks for, so the modal answers "can I cook this now?" instead of only "you found a thing".

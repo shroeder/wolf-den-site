@@ -1521,8 +1521,11 @@ export async function getSailingState(buyerId, skyKey = null) {
     // `undefined` at call time rather than failing the build, which is how the Kitchen page went down once
     // already. Same rule as the pantry hook in farm-crops.js and fishing.js.
     const recipeShop = await (async () => {
-        const { RECIPE_PRICE_DOUBLOONS, hasUnknownRecipe } = await import("@/lib/marketplace/cooking.js");
-        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: !(await hasUnknownRecipe(buyerId)) };
+        const { RECIPE_PRICE_DOUBLOONS, recipeProgress } = await import("@/lib/marketplace/cooking.js");
+        // knowsAll is derived from the progress rather than asked for separately — two queries answering the
+        // same question is how two counters end up disagreeing on the same screen.
+        const p = await recipeProgress(buyerId);
+        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.known >= p.total, ...p };
     })().catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };

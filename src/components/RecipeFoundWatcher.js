@@ -20,6 +20,12 @@ export default function RecipeFoundWatcher() {
     const busyRef = useRef(false);
     const seenRef = useRef(new Set());
 
+    // 0 the book opens · 1 the page turns and the card resolves · 2 the details settle. Reset per card, so a
+    // queue of three plays the sequence three times rather than showing two of them already finished.
+    const [beat, setBeat] = useState(0);
+    // The page count climbs to its new value instead of appearing at it.
+    const [climb, setClimb] = useState(0);
+
     const check = useCallback(async () => {
         if (busyRef.current) return;
         busyRef.current = true;
@@ -40,6 +46,22 @@ export default function RecipeFoundWatcher() {
         } finally { busyRef.current = false; }
     }, []);
 
+    // Keyed on the CARD, not on the queue length: a queue of one that gets replaced by another single card
+    // has the same length throughout, and the sequence has to restart for the second one.
+    const cardId = queue[0]?.id || null;
+    useEffect(() => {
+        if (!cardId) return undefined;
+        setBeat(0);
+        const before = queue[0]?.book?.before ?? 0;
+        setClimb(before);
+        const a = setTimeout(() => setBeat(1), 520);
+        const b = setTimeout(() => setBeat(2), 1080);
+        // The tick lands after the card has settled, so the eye is already on the number when it moves.
+        const c = setTimeout(() => setClimb(before + 1), 1500);
+        return () => { clearTimeout(a); clearTimeout(b); clearTimeout(c); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cardId]);
+
     useEffect(() => {
         check();
         const onVisible = () => { if (document.visibilityState === "visible") check(); };
@@ -55,22 +77,36 @@ export default function RecipeFoundWatcher() {
     }, [check]);
 
     const current = queue[0];
-    if (!shown || !current) return null;
 
     const next = () => {
         setQueue((q) => q.slice(1));
         if (queue.length <= 1) setShown(false);
     };
 
-    const isPrep = current.kind === "prep";
+    const isPrep = current?.kind === "prep";
     const more = queue.length - 1;
+    // AFTER the hooks, never before. React counts hook calls per render, so an early return above them is the
+    // "rendered fewer hooks than expected" crash the moment the queue empties.
+    if (!shown || !current) return null;
 
     return (
-        <div className="rfw-scrim" role="dialog" aria-modal="true" aria-label="Recipe found" onClick={next}>
+        <div className={`rfw-scrim rfw-b${beat} rfw-t${current?.tier || 1}`} role="dialog" aria-modal="true"
+            aria-label="Recipe found" onClick={beat >= 1 ? next : undefined}>
+            {/* ── THE PAGE ARRIVES FIRST ───────────────────────────────────────────────────────────────
+                The card used to simply pop into existence, which made every recipe in the game — a Simple
+                broth and a Legendary feast — exactly the same half-second. It is a sequence now: the book
+                opens, the page turns out of it, and only then does the card resolve. The reveal is the beat
+                you WAIT through, which is the whole difference between a notification and a moment. */}
+            <div className="rfw-page" aria-hidden="true">
+                <i className="rfw-page-l" />
+                <i className="rfw-page-r" />
+            </div>
             <div className="rfw-card" style={{ "--tier": current.tierColor || "#ffd75e" }} onClick={(e) => e.stopPropagation()}>
                 <div className="rfw-rays" aria-hidden="true" />
                 <div className="rfw-confetti" aria-hidden="true">
-                    {Array.from({ length: 28 }).map((_, i) => (
+                    {/* A Legendary page throws more of everything. Five tiers that differed only by hex code
+                        was five names for one animation. */}
+                    {Array.from({ length: 14 + (current?.tier || 1) * 6 }).map((_, i) => (
                         <span key={i} style={{
                             left: `${(i * 37) % 100}%`,
                             animationDelay: `${(i % 9) * 0.07}s`,
@@ -112,6 +148,17 @@ export default function RecipeFoundWatcher() {
                     </p>
                 ) : null}
 
+                {/* ── AND THE BOOK IS ONE PAGE FULLER ──────────────────────────────────────────────────
+                    The best thing about finding one of sixty-four is watching the number move, and the card
+                    never mentioned that sixty-four existed. It counts up on screen, so the reveal ends on
+                    progress rather than on a dish you may not be able to cook yet. */}
+                {current.book ? (
+                    <p className="rfw-book">
+                        <b>{climb}</b>
+                        <span>of {current.book.total} pages</span>
+                    </p>
+                ) : null}
+
                 <div className="rfw-actions">
                     <Link href="/marketplace/cooking" className="rfw-go" onClick={next}>To the Kitchen</Link>
                     <button type="button" className="rfw-later" onClick={next}>
@@ -124,19 +171,59 @@ export default function RecipeFoundWatcher() {
 .rfw-scrim { position: fixed; inset: 0; z-index: 9000; display: grid; place-items: center; padding: 18px;
     background: rgba(6,4,3,0.78); backdrop-filter: blur(3px); animation: rfwIn .18s ease-out; }
 @keyframes rfwIn { from { opacity: 0; } to { opacity: 1; } }
+/* ── THE BOOK OPENS ── two leaves that swing apart, then get out of the way. Purely the half second before
+   the card, and the reason a Legendary page no longer arrives on the same beat as a Simple one. */
+.rfw-page { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; perspective: 900px; }
+.rfw-page i { position: absolute; width: 96px; height: 128px; border-radius: 4px;
+    background: linear-gradient(180deg, #f3e3c2, #cdb888);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.6); }
+.rfw-page-l { transform-origin: right center; animation: rfwLeafL .52s ease-in both; }
+.rfw-page-r { transform-origin: left center; animation: rfwLeafR .52s ease-in both; }
+@keyframes rfwLeafL {
+    0% { transform: rotateY(0deg) translateX(-48px); opacity: 0; }
+    28% { opacity: 1; }
+    100% { transform: rotateY(-84deg) translateX(-48px); opacity: 0; }
+}
+@keyframes rfwLeafR {
+    0% { transform: rotateY(0deg) translateX(48px); opacity: 0; }
+    28% { opacity: 1; }
+    100% { transform: rotateY(84deg) translateX(48px); opacity: 0; }
+}
+.rfw-b1 .rfw-page, .rfw-b2 .rfw-page { display: none; }
+
 .rfw-card { position: relative; overflow: hidden; width: min(380px, 100%); padding: 20px 18px 18px; border-radius: 20px;
     text-align: center; background: linear-gradient(180deg, #241a14, #14100d);
     border: 1px solid var(--tier); box-shadow: 0 0 44px -8px var(--tier), 0 18px 50px rgba(0,0,0,0.6);
-    animation: rfwPop .38s cubic-bezier(.2,1.5,.4,1); }
-@keyframes rfwPop { from { transform: scale(0.82) translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+    opacity: 0; }
+/* THE CARD RESOLVES OUT OF THE PAGE, so the two read as one movement rather than two things happening. */
+.rfw-b1 .rfw-card, .rfw-b2 .rfw-card { animation: rfwPop .46s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes rfwPop { from { transform: scale(0.62) rotateX(28deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* A LEGENDARY PAGE HITS HARDER. Five tiers that differed only by hex code were five names for one animation. */
+.rfw-t4 .rfw-card, .rfw-t5 .rfw-card { box-shadow: 0 0 70px -6px var(--tier), 0 18px 50px rgba(0,0,0,0.7); }
+.rfw-t5 .rfw-card { border-width: 2px; }
+/* Everything under the name cascades in on the third beat rather than arriving with the card. */
+.rfw-needs, .rfw-makes, .rfw-book, .rfw-actions { opacity: 0; }
+.rfw-b2 .rfw-needs { animation: rfwUp .4s ease .00s both; }
+.rfw-b2 .rfw-makes { animation: rfwUp .4s ease .07s both; }
+.rfw-b2 .rfw-book { animation: rfwUp .4s ease .14s both; }
+.rfw-b2 .rfw-actions { animation: rfwUp .4s ease .21s both; }
+@keyframes rfwUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ── ONE PAGE FULLER ── the count climbs after the card settles, so the eye is already on it when it moves. */
+.rfw-book { position: relative; display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    margin: 13px 0 0; padding-top: 11px; border-top: 1px solid rgba(255,255,255,0.1); }
+.rfw-book b { font-size: 1.5rem; font-weight: 900; color: var(--tier); line-height: 1;
+    font-variant-numeric: tabular-nums; animation: rfwTick .45s cubic-bezier(.2,1.7,.35,1); }
+@keyframes rfwTick { 0% { transform: scale(1); } 45% { transform: scale(1.45); } 100% { transform: scale(1); } }
+.rfw-book span { font-size: .78rem; font-weight: 800; color: #7a828c; }
 /* A slow sweep of light behind the card, so the moment has motion without anything jumping around. */
 .rfw-rays { position: absolute; inset: -60% -60% auto -60%; height: 220%; pointer-events: none; opacity: .32;
     background: conic-gradient(from 0deg, transparent 0 12deg, var(--tier) 13deg 15deg, transparent 16deg 30deg);
     animation: rfwSpin 14s linear infinite; }
 @keyframes rfwSpin { to { transform: rotate(360deg); } }
 .rfw-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.rfw-confetti span { position: absolute; top: -12px; width: 7px; height: 11px; border-radius: 2px; opacity: 0;
-    animation: rfwFall 1.5s ease-in forwards; }
+.rfw-confetti span { position: absolute; top: -12px; width: 7px; height: 11px; border-radius: 2px; opacity: 0; }
+.rfw-b1 .rfw-confetti span, .rfw-b2 .rfw-confetti span { animation: rfwFall 1.5s ease-in forwards; }
 @keyframes rfwFall { 0% { opacity: 0; transform: translateY(-10px) rotate(0deg); }
     12% { opacity: 1; } 100% { opacity: 0; transform: translateY(320px) rotate(520deg); } }
 .rfw-kicker { position: relative; margin: 0 0 10px; font-size: .68rem; font-weight: 900; letter-spacing: .18em;
