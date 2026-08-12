@@ -13,6 +13,7 @@ import DungeonLaunch from "@/components/DungeonLaunch";
 import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import BadgePop from "@/components/BadgePop";
+import WindfallPop from "@/components/WindfallPop";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
@@ -245,12 +246,26 @@ export default function GameNav() {
     const [sailAttn, setSailAttn] = useState(false);
     const [castsLeft, setCastsLeft] = useState(0); // unthrown fishing casts — nudges people back to the rail
     const [forgeReady, setForgeReady] = useState(0); // chests the shards in your hold can already forge
+    // ── THE WINDFALL ── one of the four rarest chests, dropped out of ordinary play. Rides on the chest poll
+    // below, so a member finds out on their very next screen without a second request existing anywhere.
+    const [windfall, setWindfall] = useState(null);
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
         let alive = true;
         const loadChests = () => {
-            fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0)); }).catch(() => {});
+            fetch("/api/marketplace/chests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+                if (!alive) return;
+                setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
+                // The endpoint CLEARS it as it hands it over, so this arrives exactly once. Nothing here may
+                // drop it on the floor — there is no second chance to show a thing that happens once a year.
+                if (d?.windfall?.tier) {
+                    // The tier was granted a moment ago, so it IS in this same payload — take its art from
+                    // there rather than asking for it again.
+                    const art = (d.chests || []).find((c) => c.tier === d.windfall.tier)?.image || null;
+                    setWindfall({ ...d.windfall, image: art });
+                }
+            }).catch(() => {});
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
@@ -418,6 +433,10 @@ export default function GameNav() {
             {/* A badge is earned while you are busy doing something else, so the card has to find you rather
                 than wait on the badge screen for you to come and count. */}
             {signedIn ? <BadgePop /> : null}
+            {/* ── THE SKY OPENED ── one of the four rarest chests, dropped out of ordinary play. Most members
+                will see this screen once; some never will. It is mounted here for the same reason the badge
+                card is: it lands while you are busy doing something else entirely. */}
+            {windfall ? <WindfallPop windfall={windfall} image={windfall.image} onClose={() => setWindfall(null)} /> : null}
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
             {signedIn ? <DungeonLaunch /> : null}

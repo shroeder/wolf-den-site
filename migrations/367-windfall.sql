@@ -1,0 +1,14 @@
+-- ── THE WINDFALL ────────────────────────────────────────────────────────────────────────────────────────────
+-- The four rarest chests — Ascendant, Eternal, Celestial, Primordial — had exactly one source in the whole
+-- game: a lottery riding on every tenth level from 20. In the sixteen days of grant history that has produced
+-- seven Ascendants and ZERO of the other three, which is not "rare", it is "does not happen".
+--
+-- They drop from ordinary play now, from every system that hands out loot, at odds set against the real
+-- measured volume of loot events (see windfall.js for the arithmetic). It is deliberately not a thing you can
+-- go and farm: a community of ninety should see roughly two Primordials a year between them.
+--
+-- WHY IT IS PENDING RATHER THAN JUST GRANTED. The chest is granted immediately — this column is only the
+-- "you have not been told yet" flag, so the celebration can fire the next time they have the game open rather
+-- than being missed because it happened on a background harvest. Same shape as spin_pending, and cleared with
+-- the same guarded UPDATE, because neon() over HTTP has no transactions.
+ALTER TABLE mkt_buyer ADD COLUMN IF NOT EXISTS windfall_pending JSONB;

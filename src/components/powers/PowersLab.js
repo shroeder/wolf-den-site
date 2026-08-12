@@ -10,6 +10,7 @@ import AvatarBuilder from "@/components/AvatarBuilder";
 import JewellerClient from "@/components/JewellerClient";
 import EquipmentClient from "@/components/EquipmentClient";
 import CompendiumClient from "@/components/CompendiumClient";
+import WindfallPop from "@/components/WindfallPop";
 import { TOWN_CSS } from "@/components/TownClient";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
@@ -135,6 +136,8 @@ const SCENES = {
     sets: { label: "The Loaned Exhibit", note: "Open a piece you do NOT own — the borrow button is in the modal." },
     "lock-off": { label: "Hero lock — unlocked", note: "Sits beside the paid redraw; the two decide the same thing." },
     "lock-on": { label: "Hero lock — locked", note: "Locked state must be certain at a glance, and it disables the redraw." },
+    "wf-ascendant": { label: "Windfall — Ascendant", note: "The quietest of the four. Beam, chest, words." },
+    "wf-primordial": { label: "Windfall — Primordial", note: "Twice a year, community-wide. It should take the screen." },
     stockade: { label: "Warden's Key (markup fixture)", note: "A third button in a row built for two.", fixture: true },
     dock: { label: "Call for the merchant (markup fixture)", note: "A second CTA in a dock built for one.", fixture: true },
 };
@@ -268,6 +271,12 @@ export default function PowersLab() {
             {scene.startsWith("lock") ? <AvatarBuilder key={scene} current={null} /> : null}
             {scene === "bag" ? <EquipmentClient key={scene} /> : null}
             {scene === "compendium" ? <CompendiumClient key={scene} /> : null}
+            {/* Keyed so switching between the two tiers replays the whole three-stage sequence rather than
+                swapping a colour on an animation that has already finished. */}
+            {scene.startsWith("wf-") ? (
+                <WindfallPop key={scene} windfall={{ tier: scene.slice(3), reason: scene === "wf-primordial" ? "boss_raid" : "fishing" }}
+                    image={null} onClose={() => {}} />
+            ) : null}
             {scene === "jw-one" ? <JewellerClient key={scene} initial={JW([GEM("topaz_t1", "Chipped Topaz", "#ffb648", { crit_chance: 2 }, 2, "/images/gems/topaz_t1.png")])} /> : null}
             {scene === "jw-many" ? <JewellerClient key={scene} initial={JW([
                 GEM("ruby_t1", "Chipped Ruby", "#ff5d6c", { might: 2 }, 3, "/images/gems/ruby_t1.png"),
