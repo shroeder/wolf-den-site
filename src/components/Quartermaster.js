@@ -1,6 +1,7 @@
 "use client";
 
 import PetStoneShelf from "@/components/PetStoneShelf";
+import RecipeShelf from "@/components/RecipeShelf";
 
 import { useState } from "react";
 import * as Gi from "react-icons/gi";

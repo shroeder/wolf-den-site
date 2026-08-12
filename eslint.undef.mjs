@@ -43,6 +43,13 @@ export default [
             // function mentioning a const declared below it does not run until the module is evaluated). This
             // one flags only a read with NO function boundary deferring it — the reads that always throw.
             "local/no-tdz": "error",
+            // ── AND THE JSX HALF OF THE SAME RULE ────────────────────────────────────────────────────────
+            // `no-undef` does NOT see component names in JSX — <RecipeShelf /> with no import is invisible to
+            // it. That gap took /marketplace/sailing down in production with "RecipeShelf is not defined"
+            // after a shelf was swapped into the Quartermaster and the import was not, and this gate ran
+            // green over it twice. It is precisely the defect the gate exists to catch, wearing angle
+            // brackets. `next build` compiles it without a word because it is valid syntax.
+            "react/jsx-no-undef": "error",
         },
     },
     {
