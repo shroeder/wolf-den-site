@@ -486,6 +486,62 @@ export function initBattleState(me, foe) {
 //
 // Same event shape as a normal volley so the scene animates it with the machinery it already has; the volley
 // event is flagged `reckoning` so the presentation can make an occasion of it.
+/**
+ * A Reckoning broadside — every live gun, unmissable, one free volley.
+ *
+ * SIDE-GENERIC, because both captains earn one. Every ball that goes wide winds the firer's meter (see the
+ * miss branch in resolveVolley, which has always been side-generic), so the enemy has been charging a
+ * Reckoning since the day it shipped and simply had no way to spend it. She spends it now.
+ *
+ * Mutates `st` and returns the events. The volley is flagged `reckoning` and carries its own `side`, which is
+ * all the scene needs — it already reads `ev.side` and plays the gold beat off the flag.
+ */
+function reckoningBroadside(att, st, who, rng) {
+    const mySide = who === "me" ? st.me : st.foe;
+    const theirSide = who === "me" ? st.foe : st.me;
+    const victim = who === "me" ? "foe" : "me";
+    const events = [];
+    const after = [];
+    const shots = [];
+    let total = 0;
+    const live = mySide.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
+
+    for (const gun of live) {
+        if (theirSide.hp <= 0) break;
+        const aim = reckoningTarget(theirSide, rng);
+        const shot = { gun, zone: aim.zone, target: aim.target, ammo: "round", hit: true, chance: 1, evasion: 0, rake: false, reckoning: true };
+
+        if (aim.zone === "hull") {
+            const bore = rng() < gunDmgChance(gunStat(att?.gunStats, gun).dmg);
+            const hits = 1 + (bore ? 1 : 0);
+            const landed = (theirSide.dmgTaken < 1 && rng() > theirSide.dmgTaken) ? Math.max(0, hits - 1) : hits;
+            theirSide.hp = Math.max(0, theirSide.hp - landed);
+            shot.dmg = landed; shot.hits = landed; shot.bore = bore;
+            total += landed;
+        } else if (aim.zone === "sails") {
+            shot.dmg = 0; shot.hits = 0;
+            if (theirSide.sails > 0) {
+                theirSide.sails = Math.max(0, theirSide.sails - 1);
+                shot.wrecked = "sails";
+                if (theirSide.sails === 0) after.push({ type: "wreck", victim, sys: "sails" });
+            }
+        } else {
+            shot.dmg = 0; shot.hits = 0;
+            const pick = aim.target;
+            if (pick != null && theirSide.guns[pick] > 0) {
+                theirSide.guns[pick] = Math.max(0, theirSide.guns[pick] - 1);
+                shot.wrecked = "guns"; shot.target = pick;
+                if (theirSide.guns[pick] === 0) after.push({ type: "wreck", victim, sys: "guns", index: pick });
+            }
+        }
+        shots.push(shot);
+    }
+
+    events.push({ type: "volley", side: who, shots, dmg: total, guns: shots.length, hp: hpPair(st), reckoning: true });
+    for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
+    return events;
+}
+
 export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
     const st = {
         v: BATTLE_STATE_V, round: state.round, gauge: state.gauge,
@@ -496,45 +552,7 @@ export function resolveReckoning(me, foe, state, { rng = Math.random } = {}) {
     st.me.reck = 0;
 
     const events = [];
-    const after = [];
-    const shots = [];
-    let total = 0;
-    const live = st.me.guns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0);
-
-    for (const gun of live) {
-        if (st.foe.hp <= 0) break;
-        const aim = reckoningTarget(st.foe, rng);
-        const zone = zoneById(aim.zone);
-        const shot = { gun, zone: aim.zone, target: aim.target, ammo: "round", hit: true, chance: 1, evasion: 0, rake: false, reckoning: true };
-
-        if (aim.zone === "hull") {
-            const bore = rng() < gunDmgChance(gunStat(me?.gunStats, gun).dmg);
-            const hits = 1 + (bore ? 1 : 0);
-            const landed = (st.foe.dmgTaken < 1 && rng() > st.foe.dmgTaken) ? Math.max(0, hits - 1) : hits;
-            st.foe.hp = Math.max(0, st.foe.hp - landed);
-            shot.dmg = landed; shot.hits = landed; shot.bore = bore;
-            total += landed;
-        } else if (aim.zone === "sails") {
-            shot.dmg = 0; shot.hits = 0;
-            if (st.foe.sails > 0) {
-                st.foe.sails = Math.max(0, st.foe.sails - 1);
-                shot.wrecked = "sails";
-                if (st.foe.sails === 0) after.push({ type: "wreck", victim: "foe", sys: "sails" });
-            }
-        } else {
-            shot.dmg = 0; shot.hits = 0;
-            const pick = aim.target;
-            if (pick != null && st.foe.guns[pick] > 0) {
-                st.foe.guns[pick] = Math.max(0, st.foe.guns[pick] - 1);
-                shot.wrecked = "guns"; shot.target = pick;
-                if (st.foe.guns[pick] === 0) after.push({ type: "wreck", victim: "foe", sys: "guns", index: pick });
-            }
-        }
-        shots.push(shot);
-    }
-
-    events.push({ type: "volley", side: "me", shots, dmg: total, guns: shots.length, hp: hpPair(st), reckoning: true });
-    for (const ev of after) events.push({ ...ev, hp: hpPair(st) });
+    for (const ev of reckoningBroadside(me, st, "me", rng)) events.push(ev);
 
     const sunk = st.foe.hp <= 0 ? "foe" : null;
     const over = Boolean(sunk);
@@ -769,7 +787,22 @@ export function resolveVolley(me, foe, state, aims, { rng = Math.random, foeOrde
     // "on the first round" are the same sentence when there is only ever one first round.
     const stunned = Boolean(me?.stun) && st.round === 1 && st.foe.hp > 0;
     if (stunned) events.push({ type: "stun", side: "foe", hp: hpPair(st) });
-    else fire("foe", theirs);
+    else {
+        // HER RECKONING. She has been winding one on every ball that went wide since the meter was built —
+        // the miss branch above is side-generic — and she had no way to spend it, so the enemy carried a full
+        // meter around doing nothing for the rest of the fight.
+        //
+        // Fired the instant it fills, BEFORE her ordinary broadside, and it does not cost her the round. That
+        // is exactly the deal the player gets (see shipBattleReckoning: "you took a free shot inside the
+        // round, you did not skip it"), so the mechanic reads the same from either deck — which is the point.
+        // She has no button to choose the moment with, and inventing hesitation for her would just be a
+        // hidden delay nobody could see.
+        if ((st.foe.reck || 0) >= RECKONING_AT && st.foe.hp > 0 && st.me.hp > 0) {
+            st.foe.reck = 0;
+            for (const ev of reckoningBroadside(foe, st, "foe", rng)) events.push(ev);
+        }
+        if (st.me.hp > 0 && st.foe.hp > 0) fire("foe", theirs);
+    }
 
     // IT ENDS WHEN A SHIP GOES DOWN. There used to be a fourteen-round limit and a winner decided on which
     // hull had the greater share of itself left, which is how a fight both captains were still fighting got

@@ -16022,3 +16022,14 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background: transparent;
     border-color: rgba(255, 215, 94, 0.4);
 }
+
+/* HER RECKONING, on the enemy card. Same four notches the player reads on their own meter, because it is the
+   same mechanic fired from the other deck — she winds one on every ball of hers that goes wide and spends it
+   the moment it fills, without it costing her the round. Shown only once she has at least one, so an empty
+   meter is never furniture on a card. */
+.sbt-syschip.is-foereck { --reck: #ffb45e; }
+.sbt-syschip.is-foereck.is-full { --reck: #ff7a4d; animation: sbtFoeReck 1.2s ease-in-out infinite; }
+@keyframes sbtFoeReck { 0%, 100% { filter: none; } 50% { filter: brightness(1.35) drop-shadow(0 0 6px rgba(255,122,77,.55)); } }
+.sbt-foereck-pips { display: inline-flex; gap: 3px; align-items: center; font-style: normal; }
+.sbt-foereck-pips i { width: 6px; height: 6px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+.sbt-foereck-pips i.is-on { background: var(--reck, #ffb45e); box-shadow: 0 0 4px var(--reck, #ffb45e); }

@@ -2384,6 +2384,10 @@ const buildBattleView = (st, meta, { row = null, hulls = null } = {}) => ({
     caps: { sails: SAILS_MAX, gun: GUN_HP },
     // THE RECKONING. How many of your balls have gone wide, and what it takes to spend it. See ship-battle.
     reck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.me.reck || 0)), name: RECKONING_NAME },
+    // HERS, because she fires one now. A free unanswered broadside that arrives with no warning is not
+    // difficulty, it is a surprise — and the whole design of this fight is that every number deciding it is on
+    // screen before you commit. Same shape as yours so the card can read it without a special case.
+    foeReck: { at: RECKONING_AT, n: Math.max(0, Math.min(RECKONING_AT, st.foe.reck || 0)), name: RECKONING_NAME },
     // Each gun's own ceiling — a barrel with Iron on it holds more hits than the one beside it, and the
     // scene has to read "1 of 3" against the right number.
     gunMax: { me: st.me.gunMax || null, foe: st.foe.gunMax || null },

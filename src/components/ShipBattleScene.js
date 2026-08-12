@@ -482,7 +482,7 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
 // ── THE PANELS ───────────────────────────────────────────────────────────────────────────────────────────────
 // Hull, canvas and guns per ship. The two systems are pips rather than numbers: the question they answer is
 // "has she anything left to shoot off", which is a shape.
-function Bar({ f, hp, max, side, sys, caps }) {
+function Bar({ f, hp, max, side, sys, caps, foeReck = null }) {
     // A creature keeps `sails` internally purely as its evasion (see initBattleState) — a serpent should be no
     // easier to hit than a sloop. That is correct, but the chip explaining it said "canvas keeps her dodging"
     // over an animal with no canvas, and once the sail pips were (rightly) hidden the player was left missing
@@ -531,6 +531,24 @@ function Bar({ f, hp, max, side, sys, caps }) {
                 {/* ARMOUR IS GONE. It was a percentage on a card that quietly turned aside balls you had
                     already earned — a hit that did nothing. A ball that lands is a plank now, so there is
                     nothing here to show. */}
+                {/* HER RECKONING, once she has wound one. She fires it the moment it fills and it does not
+                    cost her the round — so this is the warning, and it is the same four notches you read on
+                    your own. Hidden at zero: an empty meter on every card in every fight would be furniture. */}
+                {foeReck && foeReck.n > 0 ? (
+                    <span className={`sbt-syschip is-foereck${foeReck.n >= foeReck.at ? " is-full" : ""}`}
+                        title={foeReck.n >= foeReck.at
+                            ? `${foeReck.name} — her next broadside is free and cannot miss`
+                            : `${foeReck.name} — ${foeReck.at - foeReck.n} more of her shots must go wide`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/sailing/gun/reckoning.png" alt="" className="sbt-sysart" draggable="false" />
+                        <span className="sbt-syslabel">{foeReck.name}</span>
+                        <em className="sbt-foereck-pips" aria-hidden="true">
+                            {Array.from({ length: foeReck.at }).map((_, i) => (
+                                <i key={i} className={i < foeReck.n ? "is-on" : ""} />
+                            ))}
+                        </em>
+                    </span>
+                ) : null}
             </div>
         </div>
     );
@@ -1034,7 +1052,7 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                     {/* Nothing here any more: you fire first in every fight, including one already in
                         progress, so there is no order left to announce. */}
                 </div>
-                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps} />
+                <Bar f={foe} hp={foeHp} max={battle?.foeMax} side="foe" sys={foeSys} caps={caps} foeReck={battle?.foeReck} />
             </div>
 
             <div className={`sbt-chrome${logOpen ? " is-open" : ""}`}>
