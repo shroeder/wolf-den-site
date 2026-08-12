@@ -14,6 +14,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 //
 // Reveals QUEUE. A boss kill can teach you several at once, and they deserve one card each rather than a
 // summary line that reads like a receipt.
+// The seven places a page can turn up, in the member's own words. Keyed by the band the granting system
+// already passes — see RECIPE_BANDS in cooking.js.
+const FROM = {
+    spin: "Off the wheel",
+    fish: "In a bottle on the line",
+    seam: "Pressed in the rock", seam_deep: "Deep in the seam",
+    dig: "At the bottom of a dig", dig_deep: "Deep in a dig",
+    cook: "Worked out at the stove",
+    boss_kill: "Off the boss",
+    raid_win: "Out of the raid", town_raid: "Out of the raid",
+    chest_wooden: "Inside a chest", chest_iron: "Inside a chest",
+    chest_gold: "Inside a chest", chest_high: "Inside a chest",
+    shop: "Bought and read",
+};
+
 export default function RecipeFoundWatcher() {
     const [queue, setQueue] = useState([]);
     const [shown, setShown] = useState(false);
@@ -115,7 +130,14 @@ export default function RecipeFoundWatcher() {
                     ))}
                 </div>
 
-                <p className="rfw-kicker">Recipe found</p>
+                {/* ── WHERE THE PAGE CAME FROM ─────────────────────────────────────────────────────────────
+                    This card is mounted site-wide and fires off a poll, so it can land a beat after the thing
+                    that dropped it — and it said "Recipe found" and nothing else. A drop you cannot attribute
+                    is a drop that reads as random however deliberate its source was: "you spin the wheel and
+                    you get a pet treat and then all of a sudden you just randomly get a recipe 2 minutes later
+                    in a modal". Every one of the seven sources already names itself when it grants; the name
+                    was just being thrown away. */}
+                <p className="rfw-kicker">{FROM[current.source] || "Recipe found"}</p>
                 <div className="rfw-art">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={current.sprite || current.fallback} alt="" draggable="false" />

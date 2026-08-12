@@ -138,10 +138,15 @@ export function ladderFoe(rung) {
         name: house.who[within],
         blurb: house.blurb,
         color: house.tint,
-        // Champions wear their house's own portrait; the rest share the house plate. One image per house
-        // rather than a hundred, because a hundred sprites is a hundred generations and these are a ladder,
-        // not a collection.
-        sprite: `/images/arena/ladder/${house.key}${champion ? "-champion" : ""}.webp`,
+        // ── ONE FIGHTER PER RUNG ─────────────────────────────────────────────────────────────────────────
+        // This shared one plate across the nine non-champions of each house, which made ten hand-written
+        // names render as the same picture ten times — at exactly the moment somebody is choosing who to walk
+        // up to. Every rung has its own full-body combat sprite now (scripts/gen-ladder-rungs.mjs), drawn
+        // through the same pipeline as the Gauntlet tiers so a rung and a tier stand at the same scale in the
+        // same ring. The house plate stays as the fallback: a missing file is a grey box, and a grey box on
+        // the road is worse than a neighbour's face.
+        sprite: `/images/arena/ladder/rung-${n}.webp`,
+        spriteFallback: `/images/arena/ladder/${house.key}${champion ? "-champion" : ""}.webp`,
         archetype: arch.key,
         archetypeName: arch.name,
         tell: arch.tell,

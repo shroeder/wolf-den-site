@@ -1437,8 +1437,13 @@ export default function ArenaClient({ initial }) {
                         onClick={() => { Sfx.ui(); act("start", { target: next.id }); }}>
                         <span className="ar-next-tag">next on the road</span>
                         <span className="ar-next-body">
+                            {/* A missing rung sprite falls back to its house plate rather than to a gap —
+                                a hundred files is a hundred chances for one to be absent. */}
                             <img className="ar-next-art" src={next.sprite} alt="" draggable="false"
-                                onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                                onError={(e) => {
+                                    if (next.spriteFallback && e.currentTarget.src !== next.spriteFallback) e.currentTarget.src = next.spriteFallback;
+                                    else e.currentTarget.style.visibility = "hidden";
+                                }} />
                             <span className="ar-next-who">
                                 <b>{next.name}</b>
                                 <em>#{next.rung} · {next.archetypeName} · {next.power.toLocaleString()} power</em>
@@ -1468,7 +1473,10 @@ export default function ArenaClient({ initial }) {
                                 aria-expanded={open}>
                                 {champ?.sprite ? (
                                     <img className="ar-house-art" src={champ.sprite} alt="" draggable="false"
-                                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                        onError={(e) => {
+                                            if (champ.spriteFallback && e.currentTarget.src !== champ.spriteFallback) e.currentTarget.src = champ.spriteFallback;
+                                            else e.currentTarget.style.display = "none";
+                                        }} />
                                 ) : null}
                                 <span className="ar-house-who">
                                     <b>{h.name}</b>
@@ -1492,7 +1500,10 @@ export default function ArenaClient({ initial }) {
                                             title={f.beaten ? `${f.name} — already beaten` : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
                                             <span className="ar-rung-n">{f.rung}</span>
                                             <img className="ar-rung-art" src={f.sprite} alt="" draggable="false"
-                                                onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                                                onError={(e) => {
+                                                    if (f.spriteFallback && e.currentTarget.src !== f.spriteFallback) e.currentTarget.src = f.spriteFallback;
+                                                    else e.currentTarget.style.visibility = "hidden";
+                                                }} />
                                             <span className="ar-rung-who">
                                                 <b>{f.name}</b>
                                                 <em>{f.archetypeName} · {f.power.toLocaleString()}</em>

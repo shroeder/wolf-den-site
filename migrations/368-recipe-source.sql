@@ -1,0 +1,13 @@
+-- ── WHERE THE RECIPE CAME FROM ──────────────────────────────────────────────────────────────────────────────
+-- Recipes drop from seven real loot moments — a boss kill, a chest, a fish, a deep seam, a dig, the wheel, a
+-- town raid — so unlike the first cut of the windfall, the SOURCES were already the right shape. What was
+-- missing is that the card never said which one.
+--
+-- Luke: *"if you spin the wheel and you get a pet treat and then all of a sudden you just randomly get a
+-- recipe 2 minutes later in a modal that's not what we're looking for."* The reveal is site-wide and fires off
+-- a poll, so it can land a beat after the thing that caused it — and with nothing on the card naming the
+-- source, an explained drop is indistinguishable from a random one.
+--
+-- One column. The card says "Out of the wheel." / "In a bottle on the line." / "Off the boss." and the drop
+-- stops being a modal that appears for no reason.
+ALTER TABLE mkt_recipe_known ADD COLUMN IF NOT EXISTS source TEXT;

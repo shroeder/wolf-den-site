@@ -440,7 +440,7 @@ export async function getArenaState(buyerId) {
                 foes: LADDER.map((f) => ({
                     rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
                     archetypeName: f.archetypeName, tell: f.tell, power: f.power, color: f.color,
-                    sprite: f.sprite, reward: f.reward, beaten: beaten.has(f.rung),
+                    sprite: f.sprite, spriteFallback: f.spriteFallback, reward: f.reward, beaten: beaten.has(f.rung),
                 })),
             };
         })(),

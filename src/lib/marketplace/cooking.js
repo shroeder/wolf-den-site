@@ -468,7 +468,10 @@ export const RECIPE_PRICE_LAURELS = 750;
 export async function grantRecipeReward(buyerId, band) {
     const def = RECIPE_BANDS[band];
     if (!buyerId || !def) return null;
-    return learnRecipe(buyerId, null, { min: def.min, max: def.max });
+    // `band` IS the source — every caller already passes the name of the thing that dropped it (spin, fish,
+    // seam_deep, boss_kill, town_raid, a chest's tier). It was being used to pick the rarity and then thrown
+    // away, which is why the card could never say where the page came from.
+    return learnRecipe(buyerId, null, { min: def.min, max: def.max }, band);
 }
 
 /**
@@ -654,7 +657,7 @@ async function takeAnyFromPantry(buyerId, qty, skip = {}) {
 export async function pendingRecipeReveals(buyerId) {
     if (!buyerId) return [];
     const rows = await db.query(
-        `SELECT recipe_id FROM mkt_recipe_known
+        `SELECT recipe_id, source FROM mkt_recipe_known
           WHERE buyer_id = $1 AND celebrated_at IS NULL
           ORDER BY learned_at ASC LIMIT 5`,
         [buyerId]
@@ -683,6 +686,7 @@ export async function pendingRecipeReveals(buyerId) {
             tierColor: t.color,
             // "18 → 19 of 64", counted from where this specific page landed in the batch.
             book: book ? { total: book.total, before: Math.max(0, book.known - (rows.length - i)) } : null,
+            source: r.source || null,
             sprite: sprites[rec.id] || null,
             fallback: rec.kind === "prep" ? KIND_FALLBACK.prep : KIND_FALLBACK.dish,
             // What it asks for, so the modal answers "can I cook this now?" instead of only "you found a thing".
@@ -712,15 +716,19 @@ export async function ackRecipeReveals(buyerId, ids = []) {
 }
 
 /** Teach a recipe. Returns the recipe when it was NEW to them, else null — so callers can announce it. */
-export async function learnRecipe(buyerId, recipeId = null, band = undefined) {
+export async function learnRecipe(buyerId, recipeId = null, band = undefined, source = null) {
     if (!buyerId) return null;
     const knownRows = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
     const known = knownRows.map((r) => r.recipe_id);
     const rec = recipeId ? recipeById(recipeId) : rollRecipe(known, band);
     if (!rec || known.includes(rec.id)) return null;
+    // ── AND WHERE IT CAME FROM ───────────────────────────────────────────────────────────────────────────
+    // The reveal is site-wide and fires off a poll, so it can land a beat after the thing that dropped it —
+    // and with nothing on the card naming the source, an explained drop is indistinguishable from a random
+    // one. Recorded here so the card can say "Out of the wheel" rather than nothing at all.
     const ins = await db.queryOne(
-        `INSERT INTO mkt_recipe_known (buyer_id, recipe_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING recipe_id`,
-        [buyerId, rec.id]
+        `INSERT INTO mkt_recipe_known (buyer_id, recipe_id, source) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING recipe_id`,
+        [buyerId, rec.id, source || null]
     ).catch(() => null);
     if (!ins) return null;
     await trackActivity(buyerId, "recipe_learned", { recipe: rec.id, tier: rec.tier }).catch(() => {});
