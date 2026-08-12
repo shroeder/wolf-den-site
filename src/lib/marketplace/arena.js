@@ -16,7 +16,7 @@ import { pickIncoming, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-a
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
-import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderRungOf } from "@/lib/marketplace/arena-ladder.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -697,6 +697,21 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra 
         foe: {
             id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
             npc: Boolean(npcTier), tier: npcTier || null,
+            // ── WHO THEY ARE, NOT JUST WHAT THEY HIT FOR ─────────────────────────────────────────────────
+            // This object is an ALLOWLIST, and it is rebuilt from the resolved foe rather than spread from
+            // it — so anything not named here is dropped the moment the bout is written to bout_json, and
+            // every later read (the fight screen, finishBout) sees only what survived.
+            //
+            // The Long Road lost `ladder`, `rung` and `reward` exactly that way. finishBout gates the whole
+            // payout on `b.foe.ladder`, which was undefined for every rung ever fought — so a hundred named
+            // opponents each beatable once were beatable infinitely many times for nothing: no laurels, no
+            // chest, no rung marked down, the road stuck at 0/100 for everybody. The rung is ALSO carried as
+            // a top-level rider below (the town raid's pattern) because that is what the payout reads; these
+            // are what the screen reads, so the fighter you walk up to keeps their house and their face.
+            ladder: Boolean(foe.ladder), rung: foe.rung || null, champion: Boolean(foe.champion),
+            house: foe.house || null, houseName: foe.houseName || null,
+            blurb: foe.blurb || null, color: foe.color || null,
+            archetypeName: foe.archetypeName || null, spriteFallback: foe.spriteFallback || null,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed,
             // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
@@ -870,7 +885,16 @@ export async function startBout(buyerId, targetId = null) {
         foeKit = await kitFor(foe.id);
     }
 
-    const bout = buildBout(me, foe, foeKit, { npcTier, size: board.length, myPower });
+    // ── THE ROAD'S RIDER ─────────────────────────────────────────────────────────────────────────────────
+    // The rung travels as a top-level rider on the bout, the same way a town raid carries `town` — and for the
+    // same reason: it is what the PAYOUT reads, and a rider is not subject to the foe object's allowlist, so
+    // it cannot be dropped by someone adding a field to a fighter later. Only the rung number rides; what it
+    // is worth is recomputed from the current table at payout, so a bout left open across a rebalance pays
+    // today's prize rather than a number frozen into a JSON blob days ago.
+    const bout = buildBout(me, foe, foeKit, {
+        npcTier, size: board.length, myPower,
+        extra: rung > 0 ? { ladder: { rung } } : {},
+    });
     // A FOE WHO WINS INITIATIVE MUST STILL TELEGRAPH. `incoming` was only ever filled in at the end of a
     // resolved beat, so when their speed took the first one there was nothing to publish — the warning card
     // fell back to "a heavy swing" for a move that might have been a mythic spell, and the whole read-it-first
@@ -1595,8 +1619,13 @@ async function finishBout(buyerId, row, b, won) {
     // ── THE LONG ROAD ── a rung goes down ONCE, and the prize is paid the same time it is recorded. The
     // array write is guarded by the ANY() check rather than read-then-write: two taps that both resolve a
     // winning bout must not pay twice.
+    //
+    // READ OFF THE RIDER, not off the foe. `b.foe.ladder` was the only gate here and the foe object is an
+    // allowlist that never carried it (buildBout), so this branch has never once run: every rung ever beaten
+    // paid nothing and stayed standing. The rider is the primary source now; `b.foe` is the fallback so a
+    // bout already open when this deploys still pays out instead of being the last fight to lose its prize.
     let ladderPrize = null;
-    const wonRung = b.foe?.ladder ? Number(b.foe.rung) || 0 : 0;
+    const wonRung = Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0);
     if (won && wonRung > 0) {
         const marked = await db.queryOne(
             `UPDATE mkt_arena
@@ -1606,7 +1635,10 @@ async function finishBout(buyerId, row, b, won) {
             [buyerId, wonRung]
         ).catch(() => null);
         if (marked) {
-            const prize = b.foe.reward || {};
+            // Recomputed from the rung rather than read off the bout: `reward` is another field the allowlist
+            // drops, so `b.foe.reward` was `{}` — meaning even if the gate above had passed, the prize was an
+            // empty object and the payout would have been zero laurels and no chest.
+            const prize = ladderReward(wonRung);
             if (prize.laurels > 0) {
                 await db.query(`UPDATE mkt_arena SET laurels = laurels + $2, laurels_earned = laurels_earned + $2 WHERE buyer_id = $1`,
                     [buyerId, prize.laurels]).catch(() => {});

@@ -14,8 +14,12 @@
 // Usage:  node scripts/gen-ladder-rungs.mjs [rung ...]     (no args = every missing one)
 //         node scripts/gen-ladder-rungs.mjs --count        (price it before it runs)
 //         node scripts/gen-ladder-rungs.mjs --reframe      (re-frame what is on disk; free)
+//         node scripts/gen-ladder-rungs.mjs --sheet        (contact sheet of all 100; free)
+//         node scripts/gen-ladder-rungs.mjs --flip 37 52   (mirror by hand; free)
 import fs from "node:fs";
 import path from "node:path";
+
+import sharp from "sharp";
 
 import { facesLeft, fighterPrompt, frame, generate, inkMargins, shortSides } from "./lib/fighter-sprite.mjs";
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
@@ -143,6 +147,68 @@ const RUNGS = {
 };
 
 const want = process.argv.slice(2);
+
+// ── node scripts/gen-ladder-rungs.mjs --facing ── re-ask which way each sprite looks and mirror the ones
+// that came back facing left. The check runs once during generation, but one vision call per sprite gets a
+// handful wrong, and a sprite facing left is mirrored by the arena into facing AWAY from your hero — two
+// fighters standing back to back. Flipping is free and lossless, so this is worth a second pass over the set.
+if (want.includes("--facing")) {
+    const files = fs.readdirSync(OUT).filter((n) => n.startsWith("rung-") && n.endsWith(".webp"));
+    const flipped = [];
+    const queue = [...files];
+    await Promise.all(Array.from({ length: 6 }, async () => {
+        for (let f = queue.shift(); f; f = queue.shift()) {
+            const fp = path.join(OUT, f);
+            const buf = fs.readFileSync(fp);
+            if (!(await facesLeft(buf, KEY).catch(() => false))) continue;
+            fs.writeFileSync(fp, await frame(buf, { flip: true }));
+            flipped.push(f.replace("rung-", "").replace(".webp", ""));
+        }
+    }));
+    console.log(flipped.length ? `mirrored ${flipped.length}: ${flipped.sort((a, b) => a - b).join(", ")}` : "every sprite already faces right");
+    process.exit(0);
+}
+
+// ── THE ONLY AUDIT THAT WORKS ────────────────────────────────────────────────────────────────────────────────
+// A contact sheet, read by eye. Two defects in this set are invisible to every automatic check we have:
+//
+//   AMPUTATION — the model draws a figure whose legs stop flat at the shin. frame() trims to the content box
+//   and pads it, so an amputated fighter comes out neatly centred with a healthy border and passes the margin
+//   audit with full marks. A bounding box cannot tell a whole figure from half of one.
+//
+//   FACING — worth stating plainly because there is a --facing pass in this file that looks like the answer
+//   and is not. A vision model asked "which way is this facing?" flip-flops: on the fleet captains it flipped
+//   twelve, then re-read its own output and called ten of those left-facing again. Trusting it a second time
+//   is how a set ends up worse than it started. Read the sheet, then --flip the ones that are wrong by hand.
+if (want.includes("--sheet")) {
+    const nums = Object.keys(RUNGS).map(Number).filter((n) => fs.existsSync(path.join(OUT, `rung-${n}.webp`))).sort((a, b) => a - b);
+    const cell = 260, cols = 10, rows = Math.ceil(nums.length / cols);
+    const comp = [];
+    for (let i = 0; i < nums.length; i += 1) {
+        comp.push({
+            input: await sharp(path.join(OUT, `rung-${nums[i]}.webp`))
+                .resize(cell - 12, cell - 12, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer(),
+            left: (i % cols) * cell + 6, top: Math.floor(i / cols) * cell + 6,
+        });
+    }
+    await sharp({ create: { width: cols * cell, height: rows * cell, channels: 4, background: { r: 250, g: 250, b: 252, alpha: 1 } } })
+        .composite(comp).png().toFile("road-sheet.png");
+    console.log(`wrote road-sheet.png — ${nums.length} fighters, ${cols} across (row 1 = rungs 1-10, row 2 = 11-20, …)`);
+    process.exit(0);
+}
+
+// Mirror by hand, after reading the sheet. Lossless and free.
+if (want.includes("--flip")) {
+    const ns = want.filter((a) => /^\d+$/.test(a));
+    if (!ns.length) throw new Error("--flip needs at least one rung number");
+    for (const n of ns) {
+        const p = path.join(OUT, `rung-${n}.webp`);
+        if (!fs.existsSync(p)) { console.log("skip (missing):", n); continue; }
+        fs.writeFileSync(p, await sharp(fs.readFileSync(p)).flop().webp({ quality: 92 }).toBuffer());
+        console.log("flipped", n);
+    }
+    process.exit(0);
+}
 
 if (want.includes("--reframe")) {
     for (const f of fs.readdirSync(OUT).filter((n) => n.startsWith("rung-") && n.endsWith(".webp"))) {
