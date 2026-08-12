@@ -1721,6 +1721,92 @@ export async function fightRound(buyerId, opts = {}) {
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
+/**
+ * WHAT THE FIGHT WAS MADE OF, kept after the fight is gone.
+ *
+ * A bout row used to record who won and how long it took, and the bout itself — the only thing that could
+ * answer WHY — was wiped when the recap was dismissed. Every balance question then became inference from a
+ * screenshot. This is the evidence, computed once at the end, off the log the bout already has.
+ *
+ * Deliberately a summary and not the blow-by-blow. The log is tens of kilobytes and stops being interesting
+ * within minutes; what stays useful is the shape: what each side brought, what each side did with it, and
+ * where the health went. Everything here is answerable in one glance at one row:
+ *
+ *   "my damage does nothing"       → dealt.perSwing against their mitigation
+ *   "I get melted"                 → taken.perRound and blocked
+ *   "guard is useless now"         → shieldSpent, and how much of the guard went unused
+ *   "this matchup is unwinnable"   → clash, pierce, and both stat blocks side by side
+ *
+ * Nothing in here may throw: a telemetry bug must never cost somebody their bout payout, so every read is
+ * defensive and the whole call sits inside the same catch as the insert.
+ */
+function boutTelemetry(b, won) {
+    const log = Array.isArray(b?.log) ? b.log : [];
+    const sum = (rows, f) => rows.reduce((n, l) => n + (Number(f(l)) || 0), 0);
+    // THE TWO SIDES DO NOT USE THE SAME FIELD NAMES, and guessing that they did would have quietly recorded
+    // zeroes. Your line carries `turned` (what their guard stopped) and `theirSoak` (what their banked shield
+    // ate); theirs carries `blocked` and `soaked` for the mirror of each. Written out per side rather than
+    // parameterised, so the mapping is visible and a rename breaks loudly.
+    const shape = (rows, dmg, stopped, shielded, back) => {
+        const hits = rows.filter((l) => (l.damage || 0) > 0);
+        return {
+            dealt: dmg,
+            swings: hits.length,
+            perSwing: hits.length ? Math.round(dmg / hits.length) : 0,
+            crits: rows.filter((l) => l.crit).length,
+            turnedAside: stopped,     // stopped by the DEFENDER's guard/armour/block before anything landed
+            shieldEaten: shielded,    // absorbed by the defender's banked shield after that
+            healed: sum(rows, (l) => l.healed),
+            returned: back,           // thorns + riposte coming back off this swing
+            guards: rows.filter((l) => l.grade === "guard").length,
+            wards: rows.filter((l) => l.grade === "ward").length,
+            items: rows.filter((l) => l.grade === "item").length,
+            abilities: rows.filter((l) => l.grade === "skill").length,
+        };
+    };
+    const myRows = log.filter((l) => l.who === "you");
+    const theirRows = log.filter((l) => l.who !== "you");
+    const stat = (f) => (f ? {
+        damage: Math.round(f.damage || 0),
+        health: Math.round(f.health || 0),
+        critChance: Math.round((f.critChance || 0) * 100),
+        critMult: Number((f.critMult || 0).toFixed(2)),
+        // Both names for mitigation, because an NPC carries `armour` and a member carries `block` — printing
+        // one of them is how it took until today to notice a member had any at all.
+        armour: Math.round((f.armour || 0) * 100),
+        block: Math.round((f.block || 0) * 100),
+        gearPower: Math.round(f.gearPower || 0),
+        element: f.element || null,
+    } : null);
+    const rounds = b?.beat || log.length || 0;
+    const mine = shape(myRows, sum(myRows, (l) => l.damage), sum(myRows, (l) => l.turned),
+        sum(myRows, (l) => l.theirSoak), sum(myRows, (l) => (l.theirThorns || 0) + (l.takenBack || 0)));
+    const theirs = shape(theirRows, sum(theirRows, (l) => l.damage), sum(theirRows, (l) => l.blocked),
+        sum(theirRows, (l) => l.soaked), sum(theirRows, (l) => (l.thorned || 0) + (l.riposted || 0)));
+    return {
+        v: 1,
+        won: Boolean(won),
+        rounds,
+        // WHICH ROOM. A five-round loss to a member and a five-round loss to a rung are different problems.
+        kind: b?.town ? "town" : b?.ladder?.rung ? "ladder" : b?.npcTier ? "gauntlet" : "member",
+        rung: b?.ladder?.rung || null,
+        npcTier: b?.npcTier || null,
+        me: stat(b?.me),
+        foe: stat(b?.foe),
+        // The two multipliers that decide a matchup before anybody swings.
+        clash: b?.clash?.mult ?? null,
+        clashNote: b?.clash?.note || null,
+        underdog: b?.underdog ?? null,
+        dealt: mine,
+        taken: theirs,
+        // The two numbers a balance question almost always reduces to.
+        perRoundDealt: rounds ? Math.round(mine.dealt / rounds) : 0,
+        perRoundTaken: rounds ? Math.round(theirs.dealt / rounds) : 0,
+        hpLeft: Math.max(0, Math.round(b?.hp || 0)),
+        foeHpLeft: Math.max(0, Math.round(b?.foeHp || 0)),
+    };
+}
+
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
 
@@ -1895,10 +1981,10 @@ async function finishBout(buyerId, row, b, won) {
 
     // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
     await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)`,
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels, telemetry)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)`,
         [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
-            JSON.stringify(feats.map((f) => f.id)), defencePaid]
+            JSON.stringify(feats.map((f) => f.id)), defencePaid, JSON.stringify(boutTelemetry(b, won))]
     ).catch(() => {});
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss",
