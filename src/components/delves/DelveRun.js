@@ -350,11 +350,25 @@ export default function DelveRun({ run, busy, onAct }) {
                     animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrBreathe 2.6s ease-in-out .4s infinite alternate; }
                 .dlr-art.is-result { width: 40%; max-height: 52%; margin-bottom: 44px; animation: dlrPayoffIn .5s cubic-bezier(.2,1.5,.35,1) both; }
                 @keyframes dlrPayoffIn { from { opacity: 0; transform: scale(.55) rotate(-6deg); } to { opacity: 1; transform: none; } }
-                .dlr-art.is-rare { animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrRare 1.8s ease-in-out .4s infinite alternate; }
-                @keyframes dlrRare { from { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 10px rgba(255,215,94,.6)); }
-                    to { filter: drop-shadow(0 8px 20px rgba(0,0,0,.65)) drop-shadow(0 0 28px rgba(255,215,94,1)); } }
-                .dlr-rare-tag { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); z-index: 3;
-                    padding: 3px 11px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .12em;
+                /* A RARE FIND IS A FRAMED PLATE, NOT A DIE-CUT OBJECT.
+                   Every ordinary encounter sprite is a 256px cut-out on transparency, so contain plus a
+                   drop-shadow floats it on the backdrop exactly as intended. The rare arts are not: they are
+                   opaque 420px SCENES, and given the same treatment they landed as a hard-edged square
+                   photograph pasted onto another photograph, with a shadow tracing the rectangle. That is the
+                   whole of why it looked wrong — the sprite was fine, the treatment was for a different kind
+                   of picture.
+                   So it gets a frame on purpose: rounded, gilt-edged, lit from behind. A rare find is the
+                   thing you want to be looking at, so it also sits a little larger than an ordinary floor. */
+                .dlr-art.is-rare { width: 52%; max-height: 62%; border-radius: 14px;
+                    border: 2px solid rgba(255,215,94,.8); background: #0b0d10;
+                    animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrRare 1.8s ease-in-out .4s infinite alternate; }
+                @keyframes dlrRare {
+                    from { box-shadow: 0 10px 26px rgba(0,0,0,.7), 0 0 14px rgba(255,215,94,.5); filter: none; }
+                    to { box-shadow: 0 10px 26px rgba(0,0,0,.7), 0 0 34px rgba(255,215,94,.95); filter: none; } }
+                /* CLEAR OF THE PLATE. At 40px it sat ON the picture, cutting its top edge in half. It is a
+                   banner over the scene now, above the frame, where a label belongs. */
+                .dlr-rare-tag { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3;
+                    padding: 4px 13px; border-radius: 999px; font-size: 10px; font-weight: 900; letter-spacing: .12em;
                     color: #2a1c00; background: linear-gradient(180deg, #ffe9a8, #f0c14b); box-shadow: 0 0 22px rgba(255,200,70,.75); }
                 .dlr-art.is-foe { animation: dlrIn .4s cubic-bezier(.2,1.3,.4,1) both, dlrBreathe 2.6s ease-in-out 0.4s infinite alternate; }
                 @keyframes dlrIn { from { opacity: 0; transform: scale(.8) translateY(10px); } to { opacity: 1; transform: none; } }

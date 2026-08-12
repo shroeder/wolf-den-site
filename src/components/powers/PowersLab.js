@@ -7,6 +7,7 @@ import SetsClient from "@/components/SetsClient";
 import SpinWheel from "@/components/SpinWheel";
 import { PurserPanel } from "@/components/ArenaClient";
 import AvatarBuilder from "@/components/AvatarBuilder";
+import JewellerClient from "@/components/JewellerClient";
 import { TOWN_CSS } from "@/components/TownClient";
 
 // ── THE POWERS LAB ───────────────────────────────────────────────────────────────────────────────────────────
@@ -62,6 +63,21 @@ const ARENA_BASE = {
     recipeShop: { price: 750, knowsAll: false },
 };
 
+
+// The Jewelcutter's own state. `jw-one` is the shape from the screenshot — a single Chipped Topaz, which is
+// exactly the case the old grid stretched across the whole shelf.
+const GEM = (id, name, color, stats, count, art) => ({ id, name, color, stats, count, art, canFuse: count >= 3, fuseCount: 3,
+    fuseInto: { id: id + "_up", name: "Flawed " + name.split(" ").pop(), stats } });
+const JW = (gems) => ({
+    unlocked: true, gold: 3808, gems,
+    pieces: [
+        { id: "crown_of_kings", name: "Crown of Kings", slot: "helmet", rarity: "legendary", equipped: true,
+          statsText: "+12% Might · +18% Fortune", socket: null, socketCost: 12000, sockets: [] },
+        { id: "dragon_shield", name: "Dragon Shield", slot: "off_hand", rarity: "epic", equipped: true,
+          statsText: "+14% Ferocity", socket: null, socketCost: 9000, sockets: [] },
+    ],
+});
+
 const SCENES = {
     "horn-closed": { label: "Muster horn — closed pill", note: "Rides EVERY page. Bottom-left, because SocialHub owns bottom-right." },
     "horn-open": { label: "Muster horn — open, 5 foes", note: "The wave list scrolls inside itself at 46vh." },
@@ -70,6 +86,8 @@ const SCENES = {
     "dealer-two": { label: "Dealer's Choice — both wedges", note: "Two tiles, no 'Deal again'." },
     purser: { label: "The Purser's Exchange", note: "Sits under the crates in the Armoury tab." },
     recipe: { label: "Recipe shelf — Armoury", note: "A page from the book, for laurels. Twin of the Quartermaster's." },
+    "jw-one": { label: "Jewelcutter — one gem", note: "The case that looked worst: a single stone in a full-width box." },
+    "jw-many": { label: "Jewelcutter — a shelf", note: "Several stones, so the colours have to read apart at a glance." },
     sets: { label: "The Loaned Exhibit", note: "Open a piece you do NOT own — the borrow button is in the modal." },
     "lock-off": { label: "Hero lock — unlocked", note: "Sits beside the paid redraw; the two decide the same thing." },
     "lock-on": { label: "Hero lock — locked", note: "Locked state must be certain at a glance, and it disables the redraw." },
@@ -202,6 +220,13 @@ export default function PowersLab() {
             {scene.startsWith("dealer") ? <SpinWheel key={scene} /> : null}
             {scene === "sets" ? <SetsClient sets={sets} exhibit={null} canLoan /> : null}
             {scene.startsWith("lock") ? <AvatarBuilder key={scene} current={null} /> : null}
+            {scene === "jw-one" ? <JewellerClient key={scene} initial={JW([GEM("topaz_t1", "Chipped Topaz", "#ffb648", { crit_chance: 2 }, 2, "/images/gems/topaz_t1.png")])} /> : null}
+            {scene === "jw-many" ? <JewellerClient key={scene} initial={JW([
+                GEM("ruby_t1", "Chipped Ruby", "#ff5d6c", { might: 2 }, 3, "/images/gems/ruby_t1.png"),
+                GEM("sapphire_t2", "Flawed Sapphire", "#6bb8ff", { ferocity: 4 }, 1, "/images/gems/sapphire_t2.png"),
+                GEM("emerald_t1", "Chipped Emerald", "#5ddc9a", { fortune: 2 }, 5, "/images/gems/emerald_t1.png"),
+                GEM("topaz_t3", "Polished Topaz", "#ffb648", { crit_chance: 6 }, 1, "/images/gems/topaz_t3.png"),
+            ])} /> : null}
             {scene === "purser" ? (
                 <section className="card">
                     <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>

@@ -15522,17 +15522,33 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    inside <ItemArt> read like a styled-jsx problem when the file was not using styled-jsx at all. */
 .jw-head { position: relative; }
 .jw-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
-.jw-gold { position: absolute; top: 14px; right: 14px; font-family: var(--font-display);
-    font-weight: 900; color: #ffd75e; font-size: 0.9rem; }
+/* A struck plaque, not a figure floating in a corner — the same treatment the ship yard's purse got, for the
+   same reason: a bare number top-right reads as a debug read-out. */
+.jw-gold { position: absolute; top: 12px; right: 12px; font-family: var(--font-display);
+    font-weight: 900; color: #ffe6a6; font-size: 0.86rem; padding: 5px 11px; border-radius: 999px;
+    background: linear-gradient(180deg, rgba(60,44,16,0.95), rgba(34,25,10,0.95));
+    border: 1px solid rgba(255,215,94,0.45); box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
 /* ── THE WHEEL ── it turns slowly all the time, because a workshop with nothing moving in it
    is a diagram. When the bench is working it spins up and throws grit off the stone. */
-.jw-bench { position: relative; height: 76px; margin: 2px 0 10px; }
-.jw-wheel { position: absolute; left: 50%; top: 8px; width: 58px; height: 58px; margin-left: -29px;
-    border-radius: 50%; border: 3px solid #6a5c46;
-    background: radial-gradient(circle at 38% 34%, #4b4234, #2a241c 70%);
+/* IT HAS TO BE LIT AT REST. The wheel was #4b4234 into #2a241c behind a #6a5c46 rim, on a near-black card —
+   at idle it read as a broken image rather than a grindstone, and it only became visible while it was
+   working, which is the one time nobody is looking at it. It is a stone under a lamp now: a warm pool behind
+   it, a bright edge where the light falls, and spokes you can actually see turning. */
+.jw-bench { position: relative; height: 92px; margin: 4px 0 12px; }
+.jw-bench::before { content: ""; position: absolute; left: 50%; top: 2px; width: 150px; height: 78px;
+    margin-left: -75px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 45%, rgba(255,196,110,0.20), rgba(255,196,110,0) 68%); }
+.jw-wheel { position: absolute; left: 50%; top: 8px; width: 66px; height: 66px; margin-left: -33px;
+    border-radius: 50%; border: 3px solid #9a8153;
+    background:
+        radial-gradient(circle at 34% 30%, rgba(255,255,255,0.22), rgba(255,255,255,0) 42%),
+        radial-gradient(circle at 50% 50%, #6f6046, #3a3125 72%);
+    box-shadow: inset 0 0 0 6px rgba(0,0,0,0.22), inset 0 6px 12px rgba(255,225,170,0.10),
+        0 6px 16px rgba(0,0,0,0.55), 0 0 18px rgba(255,190,90,0.16);
     animation: jwSpin 5.5s linear infinite; }
-.jw-wheel i { position: absolute; left: 50%; top: 50%; width: 2px; height: 22px; margin: -11px 0 0 -1px;
-    background: rgba(255,255,255,0.09); transform-origin: 50% 50%; }
+.jw-wheel i { position: absolute; left: 50%; top: 50%; width: 2px; height: 26px; margin: -13px 0 0 -1px;
+    background: linear-gradient(180deg, rgba(255,232,190,0.34), rgba(255,232,190,0.06));
+    transform-origin: 50% 50%; }
 .jw-wheel i:nth-child(1) { transform: rotate(0deg) }
 .jw-wheel i:nth-child(2) { transform: rotate(30deg) }
 .jw-wheel i:nth-child(3) { transform: rotate(60deg) }
@@ -15541,8 +15557,10 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .jw-wheel i:nth-child(6) { transform: rotate(150deg) }
 .jw-head.is-working .jw-wheel { animation-duration: .32s; border-color: #b79a5e;
     box-shadow: 0 0 22px rgba(255,200,90,0.35); }
-.jw-anvil { position: absolute; left: 50%; top: 58px; width: 96px; height: 12px; margin-left: -48px;
-    border-radius: 4px 4px 8px 8px; background: linear-gradient(180deg, #55493a, #2c251d); }
+.jw-anvil { position: absolute; left: 50%; top: 68px; width: 112px; height: 14px; margin-left: -56px;
+    border-radius: 4px 4px 9px 9px;
+    background: linear-gradient(180deg, #7b6a52, #332b21);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,235,200,0.22); }
 .jw-sparks { position: absolute; left: 50%; top: 56px; }
 .jw-sparks b { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #ffd88a;
     box-shadow: 0 0 6px #ffb648;
@@ -15558,7 +15576,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .jw-sec-head b { font-family: var(--font-display); font-size: 1rem; color: #e8dcc6; }
 .jw-sec-head em { font-style: normal; font-size: 0.74rem; color: #8f98a3; margin-left: auto; }
 
-.jw-gems { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+/* CAPPED COLUMNS. minmax(150px, 1fr) meant a member holding ONE gem got a single card stretched across the
+   whole shelf — a small stone in the corner of a wide empty box with the count marooned at the far edge. A
+   jewel is a small precious thing, and the tile should be the size of one however many you happen to own. */
+.jw-gems { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 154px));
+    justify-content: start; gap: 10px; }
+/* THE CAP IS 154px, AND THAT NUMBER IS LOAD-BEARING. `auto-fill` counts how many tracks fit using the track's
+   MAX size whenever that max is a definite length — so minmax(132px, 176px) fit exactly one column into the
+   321px this grid gets on a 375px phone, and the shelf became a single narrow strip down the left. 154 is the
+   largest cap that still fits two: (321 + 10 gap) / (154 + 10) = 2. Raise it and the phone drops to one. */
+.jw-gemwrap > .jw-hint { display: block; margin-top: 2px; text-align: center; }
 .jw-gemwrap { display: flex; flex-direction: column; gap: 5px; }
 .jw-gemwrap .jw-gem { flex: 1; }
 /* Fusing sits under its own stack, in the gem's colour, and only appears when you are holding three. */
@@ -15569,20 +15596,41 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .jw-fuse i { display: block; font-style: normal; font-size: 0.68rem; opacity: .8; }
 .jw-fuse:disabled { cursor: default; filter: grayscale(.6) brightness(.7); }
 .jw-fuse-hint { padding: 0 2px; font-size: 0.66rem; line-height: 1.35; color: #7f8790; }
-.jw-gem { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-    padding: 10px; border-radius: 13px; cursor: pointer; text-align: left;
-    background: color-mix(in srgb, var(--c) 10%, rgba(255,255,255,0.03));
-    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); }
-.jw-gem.is-on { box-shadow: 0 0 0 2px var(--c), 0 6px 20px color-mix(in srgb, var(--c) 40%, transparent); }
-.jw-gem-face svg { width: 26px; height: 26px; color: var(--c); }
-/* The painted stone, bigger than the glyph was — it is the thing you are choosing between. */
-.jw-gem-face img { width: 42px; height: 42px; object-fit: contain;
-    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
+/* THE STONE IS THE CARD. It sat left-aligned beside its own label with the rest of the tile empty; it is
+   centred on a lit pad now, at the size of something you would actually pick up, with the name underneath.
+   The pad takes the gem's own colour, so a shelf of jewels reads as a set of different stones at a glance
+   rather than a column of identical boxes. */
+.jw-gem { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 14px 10px 11px; border-radius: 15px; cursor: pointer; text-align: center;
+    background:
+        radial-gradient(ellipse at 50% 22%, color-mix(in srgb, var(--c) 26%, transparent), transparent 62%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.22));
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 3px 12px rgba(0,0,0,0.4);
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
+.jw-gem:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--c) 70%, transparent); }
+.jw-gem.is-on { transform: translateY(-2px);
+    box-shadow: 0 0 0 2px var(--c), 0 10px 26px color-mix(in srgb, var(--c) 45%, transparent),
+        inset 0 1px 0 rgba(255,255,255,0.14); }
+/* The velvet the stone sits on — a pool of its own light, so the sprite has something to sit ON rather than
+   floating against a flat card. */
+.jw-gem-face { position: relative; display: grid; place-items: center; width: 72px; height: 72px; }
+.jw-gem-face::before { content: ""; position: absolute; inset: 6px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--c) 42%, transparent), transparent 70%);
+    filter: blur(2px); }
+.jw-gem-face svg { position: relative; width: 34px; height: 34px; color: var(--c); }
+.jw-gem-face img { position: relative; width: 58px; height: 58px; object-fit: contain;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,0.6)) drop-shadow(0 0 10px color-mix(in srgb, var(--c) 55%, transparent)); }
+.jw-gem.is-on .jw-gem-face img { animation: jwGemPop .28s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes jwGemPop { from { transform: scale(.86); } to { transform: none; } }
 .jwr-stage { position: relative; }
-.jw-gem b { font-family: var(--font-display); font-size: 0.84rem; color: var(--c); }
-.jw-gem em { font-style: normal; font-size: 0.72rem; color: #cbd2da; }
-.jw-gem-n { position: absolute; top: 8px; right: 10px; font-style: normal; font-weight: 900;
-    font-size: 0.78rem; color: #e8dcc6; }
+.jw-gem b { font-family: var(--font-display); font-size: 0.86rem; color: var(--c); line-height: 1.15; }
+.jw-gem em { font-style: normal; font-size: 0.74rem; color: #d7dee6; }
+/* A COUNT CHIP, not a number adrift in the corner of a wide box. */
+.jw-gem-n { position: absolute; top: 8px; right: 8px; font-style: normal; font-weight: 900;
+    font-size: 0.72rem; color: #1b1206; padding: 2px 7px; border-radius: 999px;
+    background: color-mix(in srgb, var(--c) 82%, white);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45); }
 /* The sixth one gets to look like it knows something. */
 .jw-gem.is-secret { background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(180,140,255,0.12)); }
 
@@ -16038,3 +16086,32 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-recipe { margin-top: 1rem; padding-top: .9rem; border-top: 1px solid rgba(220,160,60,.22); }
 .ar-recipe > b { color: #f6dfae; font-size: .95rem; }
 .ar-recipe .btn-gold { margin-top: .5rem; }
+
+/* ── THE TOP OF A LAPTOP SCREEN IS NOT FREE ───────────────────────────────────────────────────────────────
+   Three bars stack before any page content on the game screens — the site header, the gold/XP strip and the
+   game nav — and on a 1440x800 laptop that was 185px, of which the header's 97 is sticky and never comes back.
+   Measured, not guessed: the header was TWO rows, because .nav-inline wraps and ten links plus the brand do
+   not fit one line at 1440.
+
+   So the links get tighter until they fit on one line, and every bar in the stack gives back a few pixels.
+   Nothing is hidden and nothing moves — the same controls, in the same order, in about 60px less. Scoped to
+   pointer-capable widths so the phone layout, which stacks these deliberately, is untouched. */
+@media (min-width: 701px) {
+    .top-row { padding: 0.5rem 0; gap: 0.6rem; }
+    .nav-inline { margin-left: 0.75rem; gap: 0; }
+    .nav-inline .nav-link { padding: 0.35rem 0.5rem; font-size: 0.92rem; }
+    .brand-mark { height: 30px; }
+    /* The strip and the pills each lose their outer breathing room rather than their inner legibility. */
+    .reward-nudge { padding-top: 4px; padding-bottom: 4px; }
+    .game-nav { margin-bottom: 8px; }
+    .game-nav-scroll { padding-bottom: 2px; }
+}
+/* A SHORT viewport is the one that actually hurts — a 13" laptop is 800px tall or less, and that is where a
+   second row of navigation costs a tenth of everything you can see. Tighter again, and the brand wordmark
+   goes: the logo alone still says whose site this is. */
+@media (min-width: 701px) and (max-height: 860px) {
+    .top-row { padding: 0.35rem 0; }
+    .nav-inline .nav-link { padding: 0.3rem 0.44rem; font-size: 0.88rem; }
+    .brand span { display: none; }
+    .brand-mark { height: 28px; }
+}
