@@ -40,9 +40,23 @@ export const CHEST_TIERS = {
     mythic: { label: "Mythic Chest", emoji: "💎", color: "#5affaf", weights: { rare: 10, epic: 42, legendary: 34, mythic: 14 } },
     ascendant: { label: "Ascendant Chest", emoji: "🌟", color: "#ff7a3c", weights: { epic: 34, legendary: 36, mythic: 22, ascendant: 7, eternal: 1 } },
     eternal: { label: "Eternal Chest", emoji: "👑", color: "#ff5cc8", weights: { epic: 30, legendary: 34, mythic: 24, ascendant: 9, eternal: 3 } },
-    // The two rarest chests — a slightly richer tail (still bottom-anchored) + the best relic shot.
-    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff", weights: { epic: 24, legendary: 32, mythic: 28, ascendant: 12, eternal: 4 } },
-    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0", weights: { epic: 18, legendary: 30, mythic: 30, ascendant: 16, eternal: 6 } },
+    // ── THE TWO RAREST CHESTS ARE THE ONLY ROUTE TO THE TWO RAREST TIERS ─────────────────────────────────
+    // 55 items — every celestial and every primordial piece — could not be obtained by anything at all: no
+    // chest's table listed those rarities, so the top of the ladder was decoration. These are the numbers Luke
+    // set, and they are literal percentages: every weights map here sums to exactly 100, so a weight of 2 is
+    // 2% and the tables can be read straight off the page rather than worked out.
+    //
+    //   Celestial chest  -> 2% celestial, 0.3% primordial
+    //   Primordial chest -> 6% celestial, 1% primordial
+    //
+    // The other five rarities keep their existing SHAPE — the remainder is scaled down in proportion — so the
+    // only thing that has changed about these chests is that a sliver came off the ordinary end to pay for the
+    // new tail. Deliberately tiny: with a primordial chest itself meant to be a once-a-year object, a 1% tail
+    // on it is the rarest thing in the game by an order of magnitude, and that is the intent.
+    celestial: { label: "Celestial Chest", emoji: "🌌", color: "#7c5cff",
+        weights: { epic: 23.4, legendary: 31.3, mythic: 27.4, ascendant: 11.7, eternal: 3.9, celestial: 2, primordial: 0.3 } },
+    primordial: { label: "Primordial Chest", emoji: "☀️", color: "#ffe9b0",
+        weights: { epic: 16.7, legendary: 27.9, mythic: 27.9, ascendant: 14.9, eternal: 5.6, celestial: 6, primordial: 1 } },
 };
 export const CHEST_ORDER = ["wooden", "iron", "gold", "mythic", "ascendant", "eternal", "celestial", "primordial"];
 
@@ -266,7 +280,13 @@ export async function openChest(buyerId, tier) {
     // Pick the pool by the ROLLED rarity, not the chest tier: Ascendant/Eternal are elite (charged) gear;
     // everything common→mythic comes from the normal loot pool. This lets a chest's spread span both tiers
     // (e.g. an Ascendant chest that under-rolls to mythic still grants a real mythic item).
-    const isEliteRarity = rarity === "ascendant" || rarity === "eternal";
+    // ── READ THE SET, NOT TWO OF ITS FOUR MEMBERS ────────────────────────────────────────────────────────
+    // This was `rarity === "ascendant" || rarity === "eternal"` while ELITE_TIERS — which lists all four —
+    // sat above it declared and read by nothing. Harmless while no table could roll the top two; the moment
+    // the celestial and primordial chests could, a rolled celestial would have failed this test, fallen
+    // through to CHEST_POOL (which contains no celestial item), found no candidate at its own rarity, and
+    // quietly handed out a random ordinary piece instead. The rarest roll in the game paying out a common.
+    const isEliteRarity = ELITE_TIERS.has(rarity);
     // The four Corsair trophies come out of chests and used to be in CHEST_POOL because they were items. They
     // are their own table now, so a chest has to ask for them explicitly or the set becomes unobtainable.
     // Rolled at the same rarity, uncommonly, and never a duplicate.
