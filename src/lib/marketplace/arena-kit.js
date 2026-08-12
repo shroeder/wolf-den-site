@@ -371,23 +371,7 @@ export const SWING_BASE = 11;
 // The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
 // trap on its own — a Fortune kit critted constantly in here and never against the boss.
 export const CRIT_BASE = 0.25;
-// ── A CRITICAL THAT HAPPENS NINE TIMES IN TEN IS NOT A CRITICAL ──────────────────────────────────────────────
-// 0.9 was set when nobody could reach it. Everybody reaches it now: counting badges added crit_chance to every
-// member at once, and the first bout with telemetry has both fighters at 86% and 90%. At those odds crit stops
-// being variance and becomes a flat x3.1 on every blow — and a flurry rolls it per hit, so one action is
-// x3.1 x 3.7 hits = eleven times a fighter's damage number. That is how a 397hp Warden gets two-shot by a
-// 39-damage Reaver.
-//
-// 0.65 is chosen because it is the one lever that separates the two rooms. Members stack crit to the ceiling;
-// the early Road does not — rungs 1-10 run 47-56% and never touch this. So it cuts member burst by about a
-// fifth while leaving the Road exactly as tuned. Rungs 30+ were also sitting at the cap and come down, which
-// only makes a stretch of ladder nobody can beat slightly less impossible.
-//
-// This is a PARTIAL fix and worth saying so: it moves JT from killing in 1.4 actions to about 1.7, against
-// the 3.0 that was normal this morning. The rest of the gap is damage I added today — see SWING_BASE — and
-// the honest reason it is not also being changed in this pass is that changing two numbers at once is exactly
-// what produced the guard mistake a few hours ago. Telemetry is recording now; the next move gets measured.
-export const CRIT_CAP = 0.65;
+export const CRIT_CAP = 0.9;
 export const CRIT_MULT_BASE = 2.5;
 export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / 100 + bonus);
 export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;

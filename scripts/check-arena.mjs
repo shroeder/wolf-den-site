@@ -12,9 +12,7 @@
 const health = (fero) => Math.round(200 + fero * 2.5);
 const SWING_BASE = 8;
 const swing = (might) => SWING_BASE * (1 + might / 100);
-// Mirrors CRIT_CAP in arena-kit.js — 0.9 -> 0.65 when crit stopped being variance. This file is a
-// deliberate second opinion and keeps its own copy; if the cap moves again, move it here too.
-const critChance = (cc) => Math.min(0.65, 0.25 + cc / 100);
+const critChance = (cc) => Math.min(0.9, 0.25 + cc / 100);
 const critMult = (cp) => 2.5 + cp / 100;
 
 const npcPower = (t) => Math.round(34 * Math.pow(1.07, Math.max(1, t) - 1));
