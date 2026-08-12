@@ -2598,6 +2598,11 @@ export async function shipBattleReckoning(buyerId) {
 const TARGET_ODDS = 0.56;   // a shade in your favour
 const SHORTLIST = 7;        // how many of the closest matches go in the hat
 const RIVAL_WEIGHT = 1.5;   // a real ship is a better story than a designed one, when there is one your size
+// How often a sortie is against the FLEET rather than another captain. A guaranteed share rather than an
+// emergent one — see matchOpponent for why the old weighting could and did fall to zero. A third, because the
+// fleet is fifteen hand-designed ships with names and a ladder, and one in three keeps that content alive
+// without turning the sea into a single-player game.
+const FLEET_SHARE = 0.34;
 
 async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
     const rivals = await db.query(
@@ -2628,10 +2633,25 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
             d: dist(matchupOdds({ ...mine, guns, hull, acc: accuracyFor(r.gunnery_level || 0, level) })),
         });
     }
-    all.sort((a, z) => a.d - z.d);
-    const shortlist = all.slice(0, SHORTLIST).map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
-    let roll = Math.random() * shortlist.reduce((sum, p) => sum + p.w, 0);
-    return shortlist.find((p) => (roll -= p.w) <= 0) || shortlist[0];
+    // ── THE KIND IS DECIDED FIRST, AND THEN WHO ──────────────────────────────────────────────────────────
+    // Same failure as the arena's, from the same shape of code. One shortlist of the seven closest with real
+    // captains weighted RIVAL_WEIGHT above designed ships meant that on a Den with ninety captains, all seven
+    // seats went to people — so the fleet, which is the whole reason there are fifteen designed ships with
+    // names, effectively stopped appearing. Luke: "its always players make it so we fight npcs sometimes".
+    //
+    // FLEET_SHARE of sorties are against the fleet now, guaranteed, and the distance weighting is left to do
+    // the thing it is good at: choosing WHICH ship of that kind. If one kind is empty the other takes the roll.
+    const closest = (kind, n) => {
+        const pool = all.filter((c) => c.kind === kind).sort((a, z) => a.d - z.d).slice(0, n);
+        const weighted = pool.map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
+        let roll = Math.random() * weighted.reduce((sum, c) => sum + c.w, 0);
+        return weighted.find((c) => (roll -= c.w) <= 0) || weighted[0] || null;
+    };
+    const fleet = closest("fleet", 3);
+    const rival = closest("rival", SHORTLIST);
+    if (!rival) return fleet;
+    if (!fleet) return rival;
+    return Math.random() < FLEET_SHARE ? fleet : rival;
 }
 
 /** THE ONE WAY INTO A FIGHT. Matches you, then opens the battle — the two paths underneath (a designed fleet

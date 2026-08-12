@@ -755,6 +755,9 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
     }, [foe, battle, foeSys, caps, ammo]);
 
     const myGuns = battle?.sys?.me?.guns || [];
+    // The same per-barrel art the scene paints on your hull, so the rail below cannot show a different gun
+    // to the one that fires.
+    const myGunArts = battle?.me?.gunArts || [];
     const liveGuns = useMemo(() => myGuns.map((hp, i) => (hp > 0 ? i : -1)).filter((i) => i >= 0), [myGuns]);
     const nextGun = useMemo(() => liveGuns.find((g) => !aim.some((a) => a.gun === g)), [liveGuns, aim]);
     // The last order you gave is what the read-out talks about.
@@ -1207,8 +1210,20 @@ export default function ShipBattleScene({ battle, busy, onVolley, onReckoning, o
                                     className={`sbt-gunpip${a ? ` is-laid is-${a.ammo}` : ""}`}
                                     disabled={!a || phase !== "aim"} onClick={() => clearGun(g)}
                                     title={a ? `Gun ${g + 1} — ${at?.name || a.zone}` : `Gun ${g + 1} — not laid yet`}>
+                                    {/* ── EACH PIP IS ITS OWN GUN ─────────────────────────────────────────
+                                        This was one hardcoded deck-cannon.png for every barrel on the rail,
+                                        which made the rail lie twice over: a captain with four plain iron
+                                        guns and a captain with four masterworks saw the identical row, and
+                                        the sprite it happened to use is not the mark most guns actually
+                                        carry — Luke read the rail as "it is showing t2 cannons for every one
+                                        of the cannons, most of these are t1". Every barrel draws the mark it
+                                        has earned, off the exact same gunArts the ship on the water uses, so
+                                        the rail and the hull can never disagree. `flip` normalises the two
+                                        stage sprites that were drawn facing the other way. */}
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src="/images/sailing/deck-cannon.png" alt="" draggable="false" />
+                                    <img src={myGunArts[g]?.url || "/images/sailing/deck-cannon.png"} alt=""
+                                        draggable="false"
+                                        style={myGunArts[g]?.flip ? { transform: "scaleX(-1)" } : undefined} />
                                     {/* WHERE THIS BARREL IS POINTED. Splitting the broadside is the whole point
                                         of the feature and the rail was six identical icons — the assignment
                                         existed, on a `title` tooltip, which is nothing at all on a phone. The

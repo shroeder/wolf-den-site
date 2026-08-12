@@ -10,6 +10,10 @@
 //
 // In the Armoury it is the ONE fixed-price thing in a shop that is otherwise all crates, and that is the point:
 // a floor that is itself a gamble is not a floor.
+// The two currencies this shelf trades in, each with its own coin. Doubloons at the Quartermaster, laurels
+// in the Armoury — the shelf is shared, so the coin has to follow the shop rather than the component.
+const COIN = { doubloons: "/images/sailing/doubloon.png", laurels: "/images/arena/armoury/laurel.png" };
+
 export default function PetStoneShelf({ shop, currency, purse, busy, onBuy }) {
     if (!shop?.stones?.length) return null;
     const unit = currency === "laurels" ? "laurels" : "doubloons";
@@ -32,9 +36,20 @@ export default function PetStoneShelf({ shop, currency, purse, busy, onBuy }) {
                             <b className="psts-name">{s.name}</b>
                             <span className="psts-line">{s.line}</span>
                             {held ? <em className="psts-held">{held} in hand</em> : null}
+                            {/* ── THE PRICE IS THE PRICE, AFFORDABLE OR NOT ───────────────────────────────
+                                It read "Need 4,000" when short and "4,000 doubloons" when not, so the one
+                                number a member is trying to compare across a shelf changed its wording
+                                depending on their balance — and the shelf beside it (the Enchantment Scroll,
+                                the tracks) shows a coin and a number. The label is now the same in both
+                                states: the currency's own coin, then the cost. Disabled says "you cannot
+                                afford this" far better than the word need does, and the title carries the
+                                shortfall for anyone who wants the arithmetic. */}
                             <button type="button" className="psts-buy" disabled={busy || poor}
-                                onClick={() => onBuy?.(s.id)}>
-                                {poor ? `Need ${price.toLocaleString()}` : `${price.toLocaleString()} ${unit}`}
+                                onClick={() => onBuy?.(s.id)}
+                                title={poor ? `${(price - purse).toLocaleString()} more ${unit} needed` : `Costs ${price.toLocaleString()} ${unit}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img className="psts-buy-coin" src={COIN[unit]} alt={unit} draggable="false" />
+                                {price.toLocaleString()}
                             </button>
                         </div>
                     );

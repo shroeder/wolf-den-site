@@ -602,8 +602,14 @@ const TV_CSS = `
 .tv-foam { position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; border-radius: 50%; background: #ffe9b0; box-shadow: 0 0 6px rgba(255,233,176,0.9); transform: rotate(var(--a)) translateY(0); animation: tvFoam .9s ease-out forwards; }
 @keyframes tvFoam { 0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 0; } 20% { opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-52px) scale(.3); opacity: 0; } }
 /* In-scene order tray (replaces the emote bar while at the bar) */
-.tv-keeper-tray { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 12; box-sizing: border-box; width: calc(100% - 16px); max-width: 440px; display: flex; gap: 5px; align-items: stretch; background: rgba(20,10,4,0.72); border: 1px solid rgba(255,215,110,0.4); border-radius: 14px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: tvBubblePop .26s cubic-bezier(.2,1.2,.3,1) both; }
-.tv-order { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 11px; border: 1px solid rgba(255,215,110,0.35); background: linear-gradient(180deg, rgba(70,44,20,0.9), rgba(44,26,10,0.9)); color: #ffe9c4; cursor: pointer; font: inherit; }
+/* ── THE TRAY WRAPS WHEN YOU ARE SHORT ────────────────────────────────────────────────────────────────────
+   It was one flex row of flex:1-1-0 items, so the "323 short · Buy gold" pill appearing as a fifth child
+   took its share of the width out of the two buttons the tray exists for — the Pint and the Round collapsed
+   to icon-slivers with their labels clipped, at exactly the moment a member is being asked to spend money.
+   The tray wraps now and the coin pill takes its own full-width line underneath. */
+.tv-keeper-tray { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 12; box-sizing: border-box; width: calc(100% - 16px); max-width: 440px; display: flex; flex-wrap: wrap; gap: 5px; align-items: stretch; background: rgba(20,10,4,0.72); border: 1px solid rgba(255,215,110,0.4); border-radius: 14px; padding: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: tvBubblePop .26s cubic-bezier(.2,1.2,.3,1) both; }
+.tv-keeper-tray > .coin-cta { flex: 1 0 100%; justify-content: center; }
+.tv-order { flex: 1 1 0; min-width: 96px; display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: 11px; border: 1px solid rgba(255,215,110,0.35); background: linear-gradient(180deg, rgba(70,44,20,0.9), rgba(44,26,10,0.9)); color: #ffe9c4; cursor: pointer; font: inherit; }
 .tv-order:hover:not(:disabled) { border-color: rgba(255,215,110,0.7); }
 .tv-order:active:not(:disabled) { transform: translateY(1px); }
 .tv-order:disabled { opacity: .45; cursor: default; }

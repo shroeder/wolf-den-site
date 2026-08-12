@@ -93,7 +93,7 @@ export function Track({ t, purse, gold, busy, onBuy }) {
 // (matchOpponent in sailing.js), so there is nothing to compare and nothing to pick: this tab is one button
 // and your record.
 
-export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, stoneShop = null, owner = false }) {
+export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, stoneShop = null, owner = false, onUpgradeShip}) {
     const [ownTab, setOwnTab] = useState("battles");
     const [founderOpen, setFounderOpen] = useState(false);   // Teegs's tribute
     const active = tab || ownTab;
@@ -220,6 +220,25 @@ export default function ShipYard({ combat, raid, gold, busy, tab, onTab, onAct, 
                         You are matched on your <b>guns and hull</b>, so a fight is always close to fair — with the
                         occasional heavyweight to keep it honest. Losing costs the battle and nothing else.
                     </p>
+
+                    {/* ── UPGRADE THE SHIP, FROM WHERE YOU FOUND OUT YOU NEEDED TO ────────────────────────
+                        The whole reason to want a better hull is a fight you just lost, and the fight lives
+                        in this modal while every upgrade lives on the page behind it. So the moment the answer
+                        occurs to you, the way to act on it was: close this, find the station strip, pick the
+                        right one. It is one tap now, and it carries the purse — the number IS the argument. */}
+                    <button type="button" className="sby-upgrade" onClick={() => onUpgradeShip?.()}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="sby-upgrade-ico" src="/images/sailing/tracks/hull.png" alt="" draggable="false" />
+                        <span>
+                            <b>Upgrade your ship</b>
+                            <em>More guns, more oak, a truer crew</em>
+                        </span>
+                        <i className="sby-upgrade-purse">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/sailing/doubloon.png" alt="" draggable="false" />
+                            {(purse || 0).toLocaleString()}
+                        </i>
+                    </button>
 
                     {/* The gun placement tool. A WORKSHOP door, so it belongs at the bottom of the screen under
                         the thing you actually came here to press — and only for the owner, since the route

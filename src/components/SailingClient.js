@@ -1637,6 +1637,8 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             owner={state.owner === true}
                             tab={battleTab}
                             onTab={setBattleTab}
+                            purse={state.combat?.doubloons || 0}
+                            onUpgradeShip={() => { setYardOpen(false); setStation("guns"); }}
                             onAct={({ action, ...extra }) => act(action, extra)} />
                     </div>
                 </div>

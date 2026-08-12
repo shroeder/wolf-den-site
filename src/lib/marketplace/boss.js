@@ -639,7 +639,14 @@ export async function getBossRecap(bossId, buyerId = null) {
     let winner = null;
     if (boss.winner_buyer_id) {
         const w = await db.queryOne(`SELECT display_name, alias, avatar_url, avatar_config, avatar_cosmetics FROM mkt_buyer WHERE id = $1`, [boss.winner_buyer_id]).catch(() => null);
-        if (w) winner = { name: w.display_name || w.alias || "Member", avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL, tickets: boss.winner_tickets || 0, you: Boolean(buyerId && buyerId === boss.winner_buyer_id) };
+        // ── AND HOW BIG THE HAT WAS ─────────────────────────────────────────────────────────────────────
+        // The recap prints "dealt the most damage" directly above "Raffle winner", and when those are the
+        // same person — which they will be more often than chance, since damage BUYS tickets — the page reads
+        // as "top damage takes the prize". It is not: weightedDraw picks one ticket out of the pot. On the
+        // kill Luke asked about, Eric held 982 of roughly 7,000 and had an 86% chance of losing. Handing the
+        // card the pot lets it say the odds out loud, which is the only thing that settles it.
+        const pot = rows.reduce((n, r) => n + Math.floor(r.dmg / divisor), 0);
+        if (w) winner = { name: w.display_name || w.alias || "Member", avatarUrl: avatarImageUrl(w.avatar_config, w.avatar_cosmetics) || w.avatar_url || DEFAULT_AVATAR_URL, tickets: boss.winner_tickets || 0, pot, you: Boolean(buyerId && buyerId === boss.winner_buyer_id) };
     }
     let mine = null;
     if (buyerId) {

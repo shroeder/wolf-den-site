@@ -637,50 +637,48 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     for (let t = 1; t <= maxTier; t += 1) {
         const n = npcFor(t);
         if (!n) break;
-        npcs.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(n)) });
+        // ── ringStats(), AND THIS ONE LINE IS WHY THE GAUNTLET NEVER APPEARED ────────────────────────────
+        // npcFor() returns a tier's RAW stat line — might, crit_chance, crit_power, ferocity — and
+        // arenaRating() reads the RING stats: damage, critChance, critMult, health. Handed the raw object it
+        // found none of them, took every default, and returned 0. For every tier. So every tier's distance
+        // was a flat 0.95, nothing ever cleared the 0.5 fairness gate, `fairNpcs` was always empty, and the
+        // Gauntlet has never once been offered by matchmaking since this function was written. Every other
+        // arenaRating() call in this file wraps its argument in ringStats(); only this one did not.
+        npcs.push({ kind: "npc", tier: t, boost: 1, d: dist(arenaRating(ringStats(n))) });
     }
     if (!members.length && !npcs.length) return null;
     members.sort((a, z) => a.d - z.d);
     npcs.sort((a, z) => a.d - z.d);
 
-    // Seat the reserved places first, then fill what is left with whoever is closest overall.
-    // A RESERVED SEAT IS NOT A BLANK CHEQUE. A tier more than half a power-step away from you is not a fight,
-    // it is a formality — and forcing one in was what put Straw Dummies in front of a geared player. If no
-    // tier is close enough, the Gauntlet simply does not take its seats this time.
-    const FAIR = 0.5;
-    const fairNpcs = npcs.filter((n) => n.d <= FAIR);
-    const picked = [...fairNpcs.slice(0, RESERVE_NPC), ...members.slice(0, RESERVE_MEMBER)];
-    const rest = [...members.slice(RESERVE_MEMBER), ...npcs.filter((n) => !picked.includes(n))].sort((a, z) => a.d - z.d);
-    picked.push(...rest.slice(0, Math.max(0, SHORTLIST - picked.length)));
-
-    // ── WEIGHTED WITHIN ITS OWN KIND, THEN NORMALISED TO THE SPLIT ──────────────────────────────────────
-    // Rank each candidate against ITS OWN KIND, so the closest tier is always worth a full share however many
-    // people happen to be standing nearby. (Weighting by GLOBAL position was the first cut and it quietly
-    // undid the reservation: on a crowded board the two reserved tiers landed in seats six and seven, took
-    // 1/6 and 1/7, and the Gauntlet came out at 12%.)
+    // ── THE KIND IS DECIDED FIRST, AND THEN WHO ──────────────────────────────────────────────────────────
+    // This used to seat both kinds in one shortlist, weight every candidate by its distance, and then scale
+    // the blocks so the Gauntlet came out at GAUNTLET_SHARE. It reads well and it has one failure mode that
+    // is invisible from the code: the share is EMERGENT. It only holds while a tier survives the shortlist,
+    // and on a board with ninety members every one of the five unreserved seats goes to somebody closer than
+    // any tier — so the Gauntlet's share depended on a `fairNpcs` filter that quietly returns nothing the
+    // moment your power sits between rungs. Luke, who has fought a lot of these: "never getting random npcs
+    // when you select fight, its always players".
     //
-    // Then scale each block so the Gauntlet gets exactly GAUNTLET_SHARE of the roll. WITHIN a block the
-    // closest is still the likeliest — the normalising decides how often you face a monster, not which one.
-    const rank = { member: 0, npc: 0 };
-    const weighted = picked.map((c) => {
-        const i = rank[c.kind];
-        rank[c.kind] += 1;
-        return { ...c, w: c.boost / (1 + i) };
-    });
-    const sumOf = (kind) => weighted.filter((c) => c.kind === kind).reduce((n, c) => n + c.w, 0);
-    const npcSum = sumOf("npc");
-    const memSum = sumOf("member");
-    // Only one kind on the board? It takes the whole roll — there is nothing to split with.
-    const shortlist = (npcSum > 0 && memSum > 0)
-        ? weighted.map((c) => ({
-            ...c,
-            w: c.kind === "npc"
-                ? (c.w / npcSum) * GAUNTLET_SHARE
-                : (c.w / memSum) * (1 - GAUNTLET_SHARE),
-        }))
-        : weighted;
-    let roll = Math.random() * shortlist.reduce((sum, c) => sum + c.w, 0);
-    return shortlist.find((c) => (roll -= c.w) <= 0) || shortlist[0];
+    // So the coin is flipped BEFORE the shortlist. GAUNTLET_SHARE of the time you fight the Gauntlet, and
+    // then the question is only WHICH tier — which is what the distance weighting was always good at. A
+    // guaranteed share cannot drift to zero, and it cannot drift to one either: if a kind has nobody in it,
+    // the other kind takes the roll, and that is the only case where the split moves.
+    const pickWithin = (pool, reserve) => {
+        const seats = pool.slice(0, Math.max(1, reserve));
+        const weighted = seats.map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
+        let roll = Math.random() * weighted.reduce((sum, c) => sum + c.w, 0);
+        return weighted.find((c) => (roll -= c.w) <= 0) || weighted[0];
+    };
+    // A tier more than half a power-step away is not a fight, it is a formality — that is what put Straw
+    // Dummies in front of a geared player. If nothing is close enough the Gauntlet stands down for this roll
+    // rather than being forced in, and the members take it.
+    const fairNpcs = npcs.filter((n) => n.d <= 0.5);
+    const npcPool = fairNpcs.length ? fairNpcs : [];
+    if (!npcPool.length) return pickWithin(members, SHORTLIST);
+    if (!members.length) return pickWithin(npcPool, RESERVE_NPC + 1);
+    return Math.random() < GAUNTLET_SHARE
+        ? pickWithin(npcPool, RESERVE_NPC + 1)
+        : pickWithin(members, SHORTLIST - RESERVE_NPC);
 }
 
 /**

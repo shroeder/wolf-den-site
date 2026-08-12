@@ -456,10 +456,12 @@ export default function GameNav() {
                         const { badge, title } = badgeInfo(l.href);
                         const dot = dotFor(l.href);
                         return (
-                            <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${dot ? " has-dot" : ""}`}>
+                            <Link key={l.href} href={l.href} className={`game-nav-link${isOn(pathname, l.href) ? " is-active" : ""}${badge ? " has-badge" : ""}${!badge && dot ? " has-dot" : ""}`}>
                                 {renderIcon(l)} {l.label}
                                 {badge ? <span className="game-nav-badge" title={title}>{badge}</span> : null}
-                                {dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
+                                {/* Same rule as the grid: the count wins. Both marks on one link drew a dot
+                                    through the number. */}
+                                {!badge && dot ? <span className="game-nav-dot" title="Your boat has landed — time to dig!" aria-label="needs attention" /> : null}
                             </Link>
                         );
                     })}
@@ -488,7 +490,14 @@ export default function GameNav() {
                                                     <span className="gm-tile-sub">{it.sub}</span>
                                                     {it.owner ? <span className="gm-tile-owner">owner</span> : null}
                                                     {badge ? <span className="gm-tile-badge" title={title}>{badge}</span> : null}
-                                                    {dot ? <span className="gm-tile-dot" title="Needs attention" /> : null}
+                                                    {/* ── ONE MARK PER TILE ───────────────────────────────
+                                                        The badge sits at top/right 6px and the dot at 8px, so
+                                                        a destination with both drew them on top of each other
+                                                        — Sailing is the only tile that can have both and it
+                                                        rendered as a number with a bite out of it. The badge
+                                                        already means "something is waiting"; the dot is the
+                                                        version of that for when there is nothing to count. */}
+                                                    {!badge && dot ? <span className="gm-tile-dot" title="Needs attention" /> : null}
                                                 </Link>
                                             );
                                         })}

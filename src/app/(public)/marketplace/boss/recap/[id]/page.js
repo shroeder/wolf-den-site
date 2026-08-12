@@ -69,6 +69,18 @@ export default async function BossRecapPage({ params }) {
                         <div>
                             <div className="brw-name">{winner.you ? "🎉 You won!" : winner.name}</div>
                             <div className="muted">{winner.tickets.toLocaleString()} tickets{boss.prize ? ` · wins ${boss.prize.name}` : ""}</div>
+                            {/* ── IT WAS A DRAW, AND THE ODDS SAY SO ──────────────────────────────────────
+                                This card sits directly under "dealt the most damage", and when the same name
+                                is on both — likely, because damage is what buys tickets — the page reads as
+                                "top damage takes the prize". It never has: one ticket is pulled out of the
+                                pot. Printing the share is the only thing that settles it, and it does the
+                                second job too, which is telling everybody else they were genuinely in it. */}
+                            {winner.pot > 0 ? (
+                                <div className="brw-odds">
+                                    <b>{Math.round((winner.tickets / winner.pot) * 100)}%</b> of {winner.pot.toLocaleString()} tickets
+                                    <em> — drawn at random. Damage buys tickets; it does not buy the prize.</em>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
                     {winner.you && boss.prize ? <p className="boss-recap-claim">Come to The Wolf Den to claim your prize!</p> : null}

@@ -9802,6 +9802,10 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .brw-row { display: flex; align-items: center; gap: 12px; }
 .brw-av { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid #ffd75e; }
 .brw-name { font-weight: 900; font-size: 1.05rem; }
+/* The share, under the winner. Deliberately quiet — it is a correction to an impression, not a headline. */
+.brw-odds { margin-top: 4px; font-size: .74rem; color: #9aa2ae; line-height: 1.4; }
+.brw-odds b { color: #ffd75e; font-variant-numeric: tabular-nums; }
+.brw-odds em { font-style: normal; color: #6a727d; }
 .boss-recap-claim { color: #7ad07a; font-weight: 800; margin: 8px 0 0; }
 .boss-recap-mine { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.95rem; }
 .boss-recap-lb { display: flex; flex-direction: column; gap: 4px; }
@@ -14336,10 +14340,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 
 /* THE GUN RAIL. One pip per barrel, coloured by the round it carries — a split broadside has to be readable
    before it fires, and tapping a pip is the undo. */
-.sbt-gunrail { grid-area: rack; display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
-.sbt-gunpip { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; padding: 0;
+/* 28px was a row of smudges — "I cant see the cannons they are so tiny". A barrel drawn at 22px inside a
+   28px chip is smaller than the text beside it, and it is the one control that tells you where your whole
+   broadside is pointed. Half again as big, and the art fills it. */
+.sbt-gunrail { grid-area: rack; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.sbt-gunpip { width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; padding: 3px;
     background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #7f93a6;
     font-size: 0.9rem; }
+.sbt-gunpip > img:first-child { width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 .sbt-gunpip.is-laid { color: #23160a; background: var(--mtint, #ffd28a); border-color: rgba(0,0,0,0.4); }
 .sbt-gunpip.is-round { --mtint: #ffd28a; }
 .sbt-gunpip.is-chain { --mtint: #9fd0ff; }
@@ -15936,6 +15945,9 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .psts-held { font-style: normal; font-size: 0.66rem; font-weight: 800; color: var(--stone); }
 .psts-buy { margin-top: 6px; width: 100%; padding: 8px 10px; border-radius: 9px; font-size: 0.74rem; font-weight: 900;
     cursor: pointer; color: #120c1c; background: var(--stone); border: none; }
+/* The coin leads the price, matching the ship tracks and the Enchantment Scroll — the shelf used to be the
+   one place in either shop that printed a bare word instead of showing the currency. */
+.psts-buy-coin { width: 15px; height: 15px; object-fit: contain; vertical-align: -2px; margin-right: 5px; }
 .psts-buy:disabled { opacity: 0.45; cursor: default; }
 .psts-note { margin: 9px 0 0; font-size: 0.7rem; line-height: 1.4; color: rgba(255,255,255,0.45); }
 
