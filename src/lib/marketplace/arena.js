@@ -145,6 +145,40 @@ async function ladderFor(buyerId) {
         .sort((a, b) => a.power - b.power);
 }
 
+/**
+ * The FOUR things that pay for a swing, merged: gear (which already folds in the compendium), your PET and
+ * your BADGES.
+ *
+ * kitFor used to merge only gear, and the boss has always merged all four (boss.js) — so the same loadout hit
+ * for tens of thousands out there and eighteen in here, which read from outside as "what is wrong with the
+ * arena's damage". Nothing was: two of the four were not being asked.
+ *
+ * It lives out here as a function, and not inline in kitFor, because the CARD is drawn by arenaPower and the
+ * FIGHT by kitFor. Fixing only kitFor made your card say 18 while you swung for 25 — the exact failure the
+ * comment under this one warns about, committed while fixing something else. One helper, both callers, no way
+ * for the two to disagree again.
+ *
+ * Merged field-for-field rather than spread, so this and boss.js can be diffed by eye. A pet's FEROCITY feeds
+ * Might, not health — a companion hits alongside you, it does not lend you its constitution — and Beastbond
+ * multiplies the pet's share.
+ */
+async function combatStats(buyerId, gearStats, ids) {
+    const [petBonus, badgeStats, { beastbondMult }] = await Promise.all([
+        import("@/lib/marketplace/pet-combat.js").then((m) => m.getPetCombatBonus(buyerId)).catch(() => ({ stats: {} })),
+        import("@/lib/marketplace/badges.js").then((m) => m.getBadgePassives(buyerId)).catch(() => ({})),
+        import("@/lib/marketplace/signatures.js"),
+    ]);
+    const bb = beastbondMult(ids);
+    const ps = petBonus?.stats || {};
+    const bs = badgeStats || {};
+    return {
+        ...gearStats,
+        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (bs.might || 0),
+        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (bs.crit_chance || 0),
+        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (bs.crit_power || 0),
+    };
+}
+
 // The power figure the LADDER sorts on and the profile prints. Same source as the fight itself — a member
 // shown as weaker than they fight is a matchmaker aiming at the wrong number.
 export async function arenaPower(buyerId) {
@@ -160,7 +194,11 @@ export async function arenaPower(buyerId) {
         getEquippedIds(buyerId).catch(() => ({})),
     ]);
     const level = levelForXp(Number(me?.xp) || 0).level;
-    const stats = await getEquippedStats(buyerId).catch(() => ({}));
+    // The SAME four sources the fight is resolved from — see the note on that function. The card printed
+    // gear-only while kitFor had already started counting pets and badges, so it read 18 damage over a
+    // fighter swinging for 25, which is precisely the "shown as weaker than they fight" this comment warns of.
+    const ids = Object.values(bySlot || {}).filter(Boolean);
+    const stats = await combatStats(buyerId, await getEquippedStats(buyerId).catch(() => ({})), ids);
     const gearPower = Object.values(stats).reduce((n, v) => n + (Number(v) || 0), 0);
     return {
         level, gearPower, ...ringStats(stats), power: arenaRating(ringStats(stats)),
@@ -194,36 +232,8 @@ async function kitFor(buyerId) {
     // is the entire point of investing.
     const gearStats = await getEquippedStats(buyerId).catch(() => ({}));
 
-    // ── AND THE TWO SYSTEMS IT STILL COULD NOT SEE ───────────────────────────────────────────────────────
-    // The comment above fixed forge, sets and jewels and stopped one short: your PET and your BADGES were
-    // still worth nothing in the ring. The boss fight has always counted both (boss.js: gearStats.might +
-    // pet.might*beastbond + badgeStats.might, and the same for crit chance and crit power), so the same
-    // loadout hit for tens of thousands out there and eighteen in here — which is exactly what it looked
-    // like from the outside: "what's wrong with the arena's damage".
-    //
-    // Nothing was wrong with it. Two of the four things paying for that damage were not being asked.
-    //
-    // Merged the way boss.js merges them, deliberately field-for-field rather than a spread, so the two can
-    // be diffed. A pet's FEROCITY feeds Might there too — a companion hits alongside you, it does not lend
-    // you its health — and Beastbond multiplies the pet's share; both survive the move.
-    //
-    // Member-vs-member stays honest: both sides of a bout run through this same function, so an opponent's
-    // pet and badges count exactly as much as yours. What changes is the Gauntlet and the Road, whose tiers
-    // are fixed budgets — which is the point. Investment is supposed to tell against them.
-    const [petBonus, badgeStats, { beastbondMult }] = await Promise.all([
-        import("@/lib/marketplace/pet-combat.js").then((m) => m.getPetCombatBonus(buyerId)).catch(() => ({ stats: {} })),
-        import("@/lib/marketplace/badges.js").then((m) => m.getBadgePassives(buyerId)).catch(() => ({})),
-        import("@/lib/marketplace/signatures.js"),
-    ]);
-    const bb = beastbondMult(ids);
-    const ps = petBonus?.stats || {};
-    const bs = badgeStats || {};
-    const stats = {
-        ...gearStats,
-        might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (bs.might || 0),
-        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (bs.crit_chance || 0),
-        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (bs.crit_power || 0),
-    };
+    // See combatStats: gear alone is only half of what pays for a swing.
+    const stats = await combatStats(buyerId, gearStats, ids);
     const gearPower = Object.values(stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
     const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
     const flat = {};
