@@ -31,6 +31,38 @@ const SLOT_ICON = {
     main_hand: "⚔️", off_hand: "🛡️", helmet: "🪖", chest: "🥋", belt: "🎗️", boots: "🥾", amulet: "📿", ring1: "💍", ring2: "💍", back: "🧣",
 };
 
+// ── SORTING THE BAG ──────────────────────────────────────────────────────────────────────────────────────────
+// Asked for by @Kaishiern in global chat, in these words: "I'd like to arrange it by rarity and then type of
+// gear". That is the default, and it is first in the list.
+//
+// The bag arrives in whatever order the server read it — effectively acquisition order — which is the one
+// ordering that tells you nothing once you own forty pieces. RARITY DESCENDING is what people actually scan
+// for, and slot is the tie-break because the next question after "what is my best stuff" is always "what is
+// my best HELMET".
+const RARITY_ORDER = ["eternal", "ascendant", "mythic", "legendary", "epic", "rare", "common"];
+const SLOT_ORDER = ["main_hand", "off_hand", "helmet", "chest", "belt", "boots", "back", "amulet", "ring"];
+const rank = (list, v) => { const i = list.indexOf(v); return i < 0 ? list.length : i; };
+// Power is the plain sum of a piece's stats — the same one-number reading the delve uses, so "strongest" means
+// the same thing in both places.
+const powerOf = (i) => Object.values(i?.stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+
+const BAG_SORTS = {
+    rarity: {
+        label: "Rarity, then type",
+        cmp: (a, b) => rank(RARITY_ORDER, a.rarity) - rank(RARITY_ORDER, b.rarity)
+            || rank(SLOT_ORDER, a.slot) - rank(SLOT_ORDER, b.slot)
+            || a.name.localeCompare(b.name),
+    },
+    slot: {
+        label: "Type, then rarity",
+        cmp: (a, b) => rank(SLOT_ORDER, a.slot) - rank(SLOT_ORDER, b.slot)
+            || rank(RARITY_ORDER, a.rarity) - rank(RARITY_ORDER, b.rarity)
+            || a.name.localeCompare(b.name),
+    },
+    power: { label: "Strongest", cmp: (a, b) => powerOf(b) - powerOf(a) || a.name.localeCompare(b.name) },
+    name: { label: "Name", cmp: (a, b) => a.name.localeCompare(b.name) },
+};
+
 // Gold-shop categories, in display order — the shop groups its gear by slot into collapsible sections. Any
 // slot not listed here is appended under "Other" so nothing is ever dropped.
 const SHOP_SLOT_CATS = [
@@ -198,6 +230,16 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const [data, setData] = useState(null);
     const [loaded, setLoaded] = useState(false);
     const [slot, setSlot] = useState(null); // open picker for this slot
+    // The chosen order survives a reload, because re-picking it on every visit is the same chore as not
+    // having it. Read lazily so the server render and the first client render agree.
+    const [bagSort, setBagSort] = useState("rarity");
+    useEffect(() => {
+        try { const v = window.localStorage.getItem("wd-bag-sort"); if (v && BAG_SORTS[v]) setBagSort(v); } catch { /* private mode */ }
+    }, []);
+    const chooseSort = (k) => {
+        setBagSort(k);
+        try { window.localStorage.setItem("wd-bag-sort", k); } catch { /* private mode */ }
+    };
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
     const [detailItem, setDetailItem] = useState(null); // inventory item detail sheet (inspect → equip / sell)
@@ -366,7 +408,12 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
     const charged = (data.items || []).filter((i) => i.charge);
     // Trophies are not gear. They live in their own section below the bag: you cannot wear, sell, salvage or
     // trade one, so listing them among the things you can is the screen telling you something untrue.
-    const gearItems = (data.items || []).filter((i) => !i.collectionPiece);
+    // Equipped pieces float to the top whatever the order: the first thing anybody wants from a bag screen is
+    // "what am I wearing", and hunting a worn piece through forty tiles was half of why this screen felt like
+    // a mess. Everything below them is in the order you chose.
+    const gearItems = (data.items || []).filter((i) => !i.collectionPiece)
+        .slice()
+        .sort((a, b) => (b.equipped ? 1 : 0) - (a.equipped ? 1 : 0) || (BAG_SORTS[bagSort] || BAG_SORTS.rarity).cmp(a, b));
     // Trophies come down as their OWN list now that they are not items — filtering the bag for them returned
     // nothing the moment they moved out of it, which is what emptied everyone's collections on screen.
     const trophyItems = data.pieces || [];
@@ -516,11 +563,20 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                     <h3 style={{ margin: 0, flex: 1 }}>🎒 Inventory</h3>
                     <a href="/marketplace/trade" style={{ fontSize: "0.8rem", fontWeight: 700, color: "#8fd8ff", whiteSpace: "nowrap" }}>my trades →</a>
                 </div>
-                <p className="muted" style={{ marginTop: 4 }}>Tap a piece of gear to see what it does — then equip, sell, or trade it.</p>
+                <p className="muted" style={{ marginTop: 4 }}>Tap a piece to see what it does. Anything you can wear has an Equip button right on it.</p>
+                {/* The order, as a row of pills rather than a select: a native select on a phone is a
+                    full-screen wheel for four options (see the mobile conventions note in globals.css). */}
+                <div className="equip-sortbar">
+                    {Object.entries(BAG_SORTS).map(([k, v]) => (
+                        <button type="button" key={k} className={`equip-sort${bagSort === k ? " is-on" : ""}`}
+                            onClick={() => chooseSort(k)}>{v.label}</button>
+                    ))}
+                </div>
                 {gearItems.length ? (
                     <div className="equip-bag-grid">
                         {gearItems.map((i) => (
-                            <button type="button" key={i.id} className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
+                            <div key={i.id} className="equip-cardwrap">
+                            <button type="button" className={`equip-card rar-${i.rarity}${i.equipped ? " is-equipped" : ""}`} onClick={() => openDetail(i)} disabled={busy} title={`${i.slot ? i.slot.replace("_", " ") : "collection"} · ${describeStats(i.stats)}`} style={{ position: "relative" }}>
                                 {i.enhanceLevel > 0 ? <span style={{ position: "absolute", top: -4, right: -4, zIndex: 3 }}><ForgeRank level={i.enhanceLevel} size={22} /></span> : null}
                                 <ItemGlyph id={i.id} className="equip-card-glyph" elements={i.elements} />
                                 <span className="equip-card-name">{i.name}</span>
@@ -531,6 +587,18 @@ export default function EquipmentClient({ avatarUrl = null, spriteUrl = null, sp
                                 {i.farmText ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#8fe39a" }}>🌱 {i.farmText}</span> : null}
                                 {i.util ? <span style={{ fontSize: "0.62rem", fontWeight: 800, color: "#e0c8ff" }}>🔮 +{i.util.value}{i.util.unit} {i.util.label}{i.util.level > 1 ? ` Lv${i.util.level}` : ""}</span> : null}
                             </button>
+                            {/* ONE TAP TO WEAR IT. Equipping used to mean opening the piece, reading a sheet
+                                and finding the button on it — or leaving the bag entirely and hunting the slot
+                                on the paper-doll. The detail sheet is still there for everything else it does
+                                (sell, salvage, trade, compare); it is just no longer the only way in. */}
+                            {i.slot ? (
+                                i.equipped
+                                    ? <button type="button" className="equip-quick is-off" disabled={busy}
+                                        onClick={() => unequip(i.slot)}>Unequip</button>
+                                    : <button type="button" className="equip-quick" disabled={busy}
+                                        onClick={() => equip(i.slot, i.id)}>Equip</button>
+                            ) : null}
+                            </div>
                         ))}
                     </div>
                 ) : <p className="muted" style={{ margin: 0 }}>No items yet — level up, fight the boss, and check back.</p>}

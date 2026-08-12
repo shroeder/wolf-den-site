@@ -14,7 +14,7 @@ import {
 import { pickIncoming, AI_BRACE_GUARD, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
-import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
+import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -322,6 +322,17 @@ export async function getArenaState(buyerId) {
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
     const bout = staleBout(row?.bout_json) ? null : (row?.bout_json || null);
+    // The pictures for the crate tables. Both are database-backed and this file is otherwise pure, so they are
+    // read here and handed to rowArt rather than looked up inside it. Failures fall back to {} and the rows
+    // draw their text exactly as they did before.
+    const rowArtSources = await (async () => {
+        const [chests, consumables, parts] = await Promise.all([
+            import("@/lib/marketplace/chest-art.js").then((m) => m.getChestArt()).catch(() => ({})),
+            db.query(`SELECT consumable_id, url FROM mkt_consumable_sprite`).then((rows) => Object.fromEntries(rows.map((r) => [r.consumable_id, r.url]))).catch(() => ({})),
+            import("@/lib/marketplace/forge-parts.js").then((m) => Object.fromEntries((m.PART_TIERS || []).map((t) => [t.tier, t.sprite]))).catch(() => ({})),
+        ]);
+        return { chests, consumables, parts };
+    })().catch(() => ({ chests: {}, consumables: {}, parts: {} }));
 
     // ── HEAL A STALE BOUT ON READ ────────────────────────────────────────────────────────────────────────
     // A bout freezes its abilities into bout_json at the start, so a fight already running when the kit
@@ -434,8 +445,10 @@ export async function getArenaState(buyerId) {
             id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,
             // Every possible outcome, best first. A crate that will not say what is in it is a slot machine,
             // and this game does not have those.
+            // `art` rides along with each row. Resolved once, above, because chest and consumable pictures both
+            // live in the database and this map runs three times over ~30 rows.
             table: rollable(c)
-                .map((r) => ({ label: r.label, worth: r.worth, w: r.w }))
+                .map((r) => ({ label: r.label, worth: r.worth, w: r.w, art: rowArt(r, rowArtSources) }))
                 .sort((a, z) => z.worth - a.worth),
             ev: armouryEv(c),
         })),

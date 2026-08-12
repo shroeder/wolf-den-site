@@ -399,6 +399,8 @@ export default function ArenaClient({ initial }) {
     // What came out of the last crate, and which one is mid-open — the lid has to shake before it answers.
     const [opening, setOpening] = useState(null);
     const [opened, setOpened] = useState(null);
+    // False while the crate is still shaking, true once it has burst. Reset every time a new crate opens.
+    const [crateBurst, setCrateBurst] = useState(false);
     // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
     // walking away touches it, which is the whole reason this can exist at all.
     const [stepped, setStepped] = useState(false);
@@ -717,6 +719,15 @@ export default function ArenaClient({ initial }) {
         const t = setTimeout(() => setPop(null), 2500);
         return () => clearTimeout(t);
     }, [bout?.log?.length]);
+
+    // The shake runs for a beat and then bursts on its own; a tap skips it. Keyed on the crate so a second
+    // purchase replays it rather than showing the prize immediately.
+    useEffect(() => {
+        if (!opened) { setCrateBurst(false); return undefined; }
+        setCrateBurst(false);
+        const t = setTimeout(() => setCrateBurst(true), 1250);
+        return () => clearTimeout(t);
+    }, [opened]);
 
     if (!st?.unlocked) return null;
 
@@ -1266,6 +1277,10 @@ export default function ArenaClient({ initial }) {
                                         <ul>
                                             {(c.table || []).map((r) => (
                                                 <li key={r.label}>
+                                                    {r.art ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img className="ar-crate-row-art" src={r.art} alt="" draggable="false" />
+                                                    ) : null}
                                                     <i>{r.label}</i>
                                                     <em>{Math.round((r.w / total) * 100)}%</em>
                                                 </li>
@@ -1318,22 +1333,33 @@ export default function ArenaClient({ initial }) {
             ) : null}
 
             {/* What the crate held. Same shape as every other reveal in the game: the thing, named, at size. */}
+            {/* ── THE OPENING ─────────────────────────────────────────────────────────────────────────────
+                It used to cut straight to the answer: the prize card appeared the instant the request came
+                back, so a twelve-thousand-laurel press and a twelve-hundred one felt identical and neither
+                felt like anything. There is a beat now — the crate itself, shaking, for a moment — and THEN
+                it bursts. The wait is the whole product; the prize was already decided on the server before
+                the modal opened, so nothing here can change what you got.
+                Tapping skips it, because the second time you have seen it you want your prize. */}
             {opened ? (
-                <div className="ar-open-scrim" role="dialog" aria-modal="true" onClick={() => setOpened(null)}
+                <div className={`ar-open-scrim${crateBurst ? " is-burst" : ""}`} role="dialog" aria-modal="true"
+                    onClick={() => (crateBurst ? setOpened(null) : setCrateBurst(true))}
                     style={{ "--c": opened.color || "#ffd75e" }}>
                     <span className="ar-open-rays" aria-hidden="true" />
-                    <div className="ar-open-card" onClick={(e) => e.stopPropagation()}>
-                        <div className="ar-open-kick">{opened.crate?.name}</div>
-                        {opened.art ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="ar-open-art" src={opened.art} alt="" draggable="false" />
-                        ) : (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="ar-open-art" src={opened.crate?.art} alt="" draggable="false" />
-                        )}
-                        <b className="ar-open-name">{opened.label}</b>
-                        <button type="button" className="ar-btn ar-open-go" onClick={() => setOpened(null)}>Take it</button>
-                    </div>
+                    {crateBurst ? (
+                        <div className="ar-open-card" onClick={(e) => e.stopPropagation()}>
+                            <div className="ar-open-kick">{opened.crate?.name}</div>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="ar-open-art" src={opened.art || opened.crate?.art} alt="" draggable="false" />
+                            <b className="ar-open-name">{opened.label}</b>
+                            <button type="button" className="ar-btn ar-open-go" onClick={() => setOpened(null)}>Take it</button>
+                        </div>
+                    ) : (
+                        <div className="ar-crate-wait" onClick={(e) => e.stopPropagation()}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img className="ar-crate-shake" src={opened.crate?.art} alt="" draggable="false" />
+                            <span className="ar-crate-hint">opening…</span>
+                        </div>
+                    )}
                 </div>
             ) : null}
 

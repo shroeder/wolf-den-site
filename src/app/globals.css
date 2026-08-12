@@ -16115,3 +16115,47 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     .brand span { display: none; }
     .brand-mark { height: 28px; }
 }
+
+/* ── THE BAG: ORDER, AND ONE TAP TO WEAR ──────────────────────────────────────────────────────────────────
+   Pills rather than a native select — four options do not deserve a full-screen wheel on a phone. */
+.equip-sortbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; }
+.equip-sort { padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 0.74rem; font-weight: 800;
+    color: #b9c2cc; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.equip-sort:hover { border-color: rgba(255,215,94,0.5); }
+.equip-sort.is-on { color: #2a1f08; background: linear-gradient(180deg, #ffe9a8, #f0c14b); border-color: rgba(255,215,94,0.8); }
+/* The card and its action are one column now, so the button can sit under a tile that is itself a button. */
+.equip-cardwrap { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.equip-cardwrap .equip-card { flex: 1; }
+.equip-quick { padding: 7px 9px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 0.74rem;
+    color: #2a1f08; background: linear-gradient(180deg, #ffe9a8, #f0c14b);
+    border: 1px solid rgba(255,215,94,0.55); }
+.equip-quick:hover { filter: brightness(1.06); }
+.equip-quick:disabled { opacity: 0.45; cursor: default; filter: saturate(0.7); }
+/* Taking something off is not the loud action. */
+.equip-quick.is-off { color: #cbd2da; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.16); }
+
+/* ── OPENING A CRATE ──────────────────────────────────────────────────────────────────────────────────────
+   The prize used to appear the instant the request returned, so a 12,000-laurel press felt the same as a
+   1,200 one. The crate shakes first and then bursts. The outcome was decided on the server before this drew,
+   so the wait costs nothing and is the entire point. */
+.ar-crate-wait { display: grid; place-items: center; gap: 12px; }
+.ar-crate-shake { width: min(58vw, 260px); height: auto;
+    filter: drop-shadow(0 14px 30px rgba(0,0,0,.7)) drop-shadow(0 0 26px color-mix(in srgb, var(--c, #ffd75e) 55%, transparent));
+    animation: arCrateShake .42s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes arCrateShake {
+    0%, 100% { transform: rotate(-3deg) scale(1); }
+    25%      { transform: rotate(3.5deg) scale(1.03); }
+    50%      { transform: rotate(-2.5deg) scale(1.01); }
+    75%      { transform: rotate(3deg) scale(1.04); }
+}
+.ar-crate-hint { font-weight: 900; letter-spacing: .18em; text-transform: uppercase; font-size: .72rem;
+    color: color-mix(in srgb, var(--c, #ffd75e) 85%, white); opacity: .85; }
+/* The rays only spin up once it has actually opened. */
+.ar-open-scrim .ar-open-rays { opacity: .35; transition: opacity .35s ease; }
+.ar-open-scrim.is-burst .ar-open-rays { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .ar-crate-shake { animation: none; } }
+
+/* ── WHAT IS IN IT, WITH THE THING ITSELF ─────────────────────────────────────────────────────────────────
+   Nine rows of text and a percentage on the screen that asks you to weigh twelve thousand laurels. */
+.ar-crate-row-art { width: 26px; height: 26px; object-fit: contain; flex: 0 0 auto;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }

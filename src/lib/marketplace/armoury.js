@@ -117,6 +117,28 @@ export const crateById = (id) => CRATES.find((c) => c.id === String(id || "")) |
  * Expected laurel value of a crate, for the member the roll is FOR.
  *
  */
+/**
+ * The picture for a row of a crate table.
+ *
+ * Every one of these rewards already has art somewhere in the game — the chest tiers, the forge part tiers,
+ * the sailing fragments, the jewels, the consumables. The shelf was drawing none of it: nine lines of text and
+ * a percentage each, on the screen that asks you to weigh twelve thousand laurels.
+ *
+ * `chests` and `consumables` are passed in because both live in the database (mkt_town_art / a settings blob
+ * and mkt_consumable_sprite) and this file is pure. Anything without a picture falls back to null and the row
+ * draws its glyph, which is what it did before.
+ */
+export function rowArt(row, { chests = {}, consumables = {}, parts = {} } = {}) {
+    if (!row) return null;
+    if (row.kind === "chest") { const v = chests[row.tier]; return (typeof v === "string" ? v : v?.url) || null; }
+    if (row.kind === "consumable") return consumables[row.consumable] || null;
+    if (row.kind === "parts") return parts[row.partTier] || null;
+    if (row.kind === "fragment") return `/images/sailing/fragment-${row.tier}.png`;
+    if (row.kind === "gem") return `/images/gems/ruby_t${row.gemTier}.png`;
+    if (row.kind === "gold") return "/images/ui/coin.png";
+    return null;
+}
+
 export function armouryEv(crate) {
     const rows = rollable(crate);
     const total = rows.reduce((n, r) => n + r.w, 0);
