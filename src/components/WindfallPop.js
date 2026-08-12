@@ -25,14 +25,29 @@ const TIER = {
 // Where it came from, in the member's own words rather than the ledger's. A drop is far better when you can
 // point at the exact ordinary thing you were doing when it landed.
 const FROM = {
-    harvest: "out of a crop you pulled", harvest_loot: "out of a crop you pulled",
+    // ── TAPS ──
+    harvest: "out of a crop you pulled", harvest_loot: "buried under a crop you pulled",
     fishing: "on the end of a line", mining: "out of the rock", farm_encounter: "out on the farm",
     loot_pig: "from a very smug pig", wishing_well: "up out of the well",
+    chest_reward: "inside another chest, which is absurd",
+    // ── ACTIONS ──
     town_duel: "off something you put down in the plaza", arena_win: "off the arena floor",
     ship_battle: "out of the water beside your hull", delve: "from somewhere under the Den",
-    spin_prize: "off the wheel", checkin: "for simply turning up",
-    boss_raid: "off the boss", boss_reward: "off the boss", raid_complete: "out of the raid",
-    raid_defense: "out of the raid", town_event: "out of the town",
+    spin_prize: "off the wheel", tavern_gambit_win: "across the tavern table",
+    cooking: "out of a pot, somehow", sailing: "at the bottom of a dig",
+    merchant_minigame: "out of the merchant's cart",
+    // ── COMPLETIONS ──
+    checkin: "for simply turning up", quest_reward: "at the end of a quest",
+    town_quest: "from the Quartermaster", bounty_win: "on a bounty",
+    farm_daily: "off the day's farm work", sailing_daily: "off the day's sailing",
+    forge_daily: "off the day's work at the forge", cooking_daily: "off the day's cooking",
+    guide_step: "while you were still learning the ropes", guide_chapter: "while you were still learning the ropes",
+    badge_reward: "pinned to a badge", badge_milestone: "pinned to a badge",
+    onboarding: "on your very first day", giveaway: "out of a giveaway",
+    // ── THE BIG ONES ──
+    boss_raid: "off the boss", raid_complete: "out of the raid",
+    raid_defense: "out of a raid you did not ask for",
+    raid_defense: "out of a raid you did not ask for",
 };
 
 export default function WindfallPop({ windfall, image, onClose }) {

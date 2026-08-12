@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -431,6 +432,7 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     if (totalGold > 0) {
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, totalGold]).catch(() => null);
         await logCoin(buyerId, totalGold, "delve", { balanceAfter: g?.gold, meta: { dungeon: run.dungeonId, cleared } }).catch(() => {});
+        await rollWindfall(buyerId, "delve").catch(() => {});
     }
     // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the purse above IS the gold.
     if (totalXp > 0) await awardXp(buyerId, "delve_run", { points: totalXp, gold: 0 }).catch(() => {});

@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
@@ -632,6 +633,7 @@ async function resolveTownEvent(eventId, outcome) {
             if (gold > 0) {
                 const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, gold]).catch(() => null);
                 await logCoin(h.buyer_id, gold, "boss_raid", { balanceAfter: paid?.gold, ref: String(eventId), meta: { tier: tier.key } }).catch(() => {});
+                await rollWindfall(h.buyer_id, "boss_raid").catch(() => {});
             }
             // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and this runs per fighter.
             if (xp > 0) await awardXp(h.buyer_id, "boss_raid", { points: xp, gold: 0, dedupeKey: `boss_raid:${eventId}:${h.buyer_id}` }).catch(() => {});
@@ -675,6 +677,7 @@ async function resolveTownEvent(eventId, outcome) {
         if (compGold > 0) {
             const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [h.buyer_id, compGold]).catch(() => null);
             await logCoin(h.buyer_id, compGold, "raid_complete", { balanceAfter: paid?.gold, ref: String(eventId), meta: { waves, chieftainDown } }).catch(() => {});
+            await rollWindfall(h.buyer_id, "raid_complete").catch(() => {});
         }
         if (compXp > 0) await awardXp(h.buyer_id, "raid_complete", { points: compXp, gold: 0, dedupeKey: `raid_complete:${eventId}:${h.buyer_id}` }).catch(() => {});
         await db.query(
@@ -987,6 +990,7 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     if (coin > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, coin]).catch(() => null);
         await logCoin(buyerId, coin, "town_duel", { balanceAfter: paid?.gold, ref: String(eventId) }).catch(() => {});
+        await rollWindfall(buyerId, "town_duel").catch(() => {});
     }
     if (xp > 0) await awardXp(buyerId, "town_duel", { points: xp, gold: 0 }).catch(() => {});
 

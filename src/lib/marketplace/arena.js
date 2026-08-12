@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
@@ -1557,6 +1558,7 @@ async function finishBout(buyerId, row, b, won) {
         reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
+        await rollWindfall(buyerId, "arena_win").catch(() => {});
         // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the line above IS the gold.
         await awardXp(buyerId, "arena_win", { points: xp, gold: 0 }).catch(() => {});
     } else {

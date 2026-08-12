@@ -11,6 +11,7 @@ import { signatureFor } from "@/lib/marketplace/signatures.js";
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
 // Loot chests: opened for random gear. Every tier is a SPREAD that shifts its odds toward better gear as
@@ -337,5 +338,6 @@ export async function openChest(buyerId, tier) {
     if (twinHinges) gold *= 2;
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "chest_reward", { meta: { tier } }).catch(() => {});
+    await rollWindfall(buyerId, "chest_reward").catch(() => {});
     return { ok: true, remaining: dec.count, gold, rarity, doubled: twinHinges };
 }

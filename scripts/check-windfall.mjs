@@ -10,7 +10,7 @@ import fs from "node:fs";
 
 import { neon } from "@neondatabase/serverless";
 
-import { WINDFALL_TIERS, windfallWeight } from "../src/lib/marketplace/windfall-odds.js";
+import { WINDFALL_DENY, WINDFALL_SOURCES, WINDFALL_TIERS, windfallWeight } from "../src/lib/marketplace/windfall-odds.js";
 
 const env = fs.readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8");
 const sql = neon(env.match(/^DATABASE_URL=(.+)$/m)[1].trim());
@@ -26,11 +26,15 @@ const active = Number((await sql.query(
 let tickets = 0;
 let events = 0;
 let denied = 0;
+const unwired = [];
 const bySystem = [];
 for (const r of rows) {
     const n = Number(r.earns);
     const w = windfallWeight(r.reason);
-    if (!w) { denied += n; continue; }
+    // Split the zero-weight reasons in two: the ones we DECIDED must never roll, and everything else, which
+    // is just a reason nobody has wired. Collapsed together, a system that was meant to be a source and got
+    // forgotten looks exactly like a spend — and reads as intentional in this output forever.
+    if (!w) { if (WINDFALL_DENY.has(r.reason)) denied += n; else if (n > 0) unwired.push(`${r.reason} (${n})`); continue; }
     events += n;
     tickets += n * w;
     bySystem.push({ reason: r.reason, n, w, t: n * w });
@@ -39,7 +43,8 @@ for (const r of rows) {
 const perYear = (365 / DAYS);
 console.log(`\n── ${DAYS} days of the live ledger ──`);
 console.log(`  ${active} members active in the window`);
-console.log(`  ${events.toLocaleString()} loot events roll  (+${denied.toLocaleString()} denied: moved gold, idle income, admin)`);
+console.log(`  ${events.toLocaleString()} loot events roll  (+${denied.toLocaleString()} on the deny list: moved gold, idle income, admin)`);
+if (unwired.length) console.log(`  NOT WIRED — spends, or a source somebody forgot: ${unwired.join(", ")}`);
 console.log(`  ${tickets.toLocaleString()} weighted tickets → ${Math.round(tickets * perYear).toLocaleString()} a year across the Den`);
 
 console.log(`\n── what that pays, per year ──`);
@@ -59,6 +64,15 @@ for (const [w, label] of Object.entries(bands)) {
     const share = bySystem.filter((b) => b.w === Number(w)).reduce((s, b) => s + b.t, 0);
     console.log(`  ${label.padEnd(38)} ${((share / total) * 100).toFixed(1).padStart(5)}%`);
 }
+// ── AND WHAT THE LEDGER CANNOT SEE ──────────────────────────────────────────────────────────────────────────
+// A source only shows up above if the system that owns it also writes a coin event by that name. Sailing pays
+// in loot, so its digs are real rolls that this measurement is blind to. Printed rather than ignored: an
+// unmeasured source is fine, an unmeasured source nobody mentioned is how a total quietly stops being true.
+const seen = new Set(bySystem.map((b) => b.reason));
+const unmeasured = Object.keys(WINDFALL_SOURCES).filter((k) => !seen.has(k));
+if (unmeasured.length) console.log(`
+  unmeasured (no coin event by that name): ${unmeasured.join(", ")}`);
+
 const top = bySystem.sort((a, b) => b.t - a.t)[0];
 console.log(`\n  largest single source: ${top.reason} at ${((top.t / total) * 100).toFixed(1)}% of all tickets`);
 if (top.t / total > 0.3) console.log(`  ⚠ over 30% — one system is becoming the feature. Re-weight.`);

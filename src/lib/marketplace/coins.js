@@ -20,24 +20,6 @@ export async function logCoin(buyerId, delta, reason, { ref = null, meta = null,
     } catch {
         // swallow — ledger is observability, not correctness
     }
-
-    // ── AND EVERY DROP ROLLS FOR A WINDFALL ──────────────────────────────────────────────────────────────
-    // The four rarest chests drop out of ORDINARY PLAY, and this is the one seam every system that hands out
-    // loot already passes through — a harvest, a fish, a duel, a boss, a daily, a badge. Hooking it here
-    // rather than at twenty-odd call sites means "across pretty much every system" is true by construction
-    // instead of true until somebody adds a twenty-first and forgets.
-    //
-    // OUTSIDE the try above on purpose: a ledger insert failing is an observability problem, and it must not
-    // be allowed to quietly eat a member's once-a-year chest. windfall.js does its own catching, rolls in
-    // memory first, and touches the database only on a hit — which happens about four times a month — so the
-    // cost of this line on the other 29,000 calls is a single Math.random.
-    //
-    // Only EARNINGS roll. A spend is not a drop, and gold that merely moved between two members is not a drop
-    // either; see the DENY list in windfall.js for why that distinction is load-bearing.
-    if (delta > 0) {
-        const { rollWindfall } = await import("@/lib/marketplace/windfall.js");
-        await rollWindfall(buyerId, reason, ref ? { ref } : null).catch(() => {});
-    }
 }
 
 // A member's coin statement. All-time by default (row-limited, newest first). Computes a running balance

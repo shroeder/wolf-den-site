@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
@@ -207,6 +208,7 @@ export async function gambitResolve(buyerId) {
     if (payout > 0) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, payout]).catch(() => null);
         await logCoin(buyerId, payout, "tavern_gambit_win", { balanceAfter: paid?.gold, meta: { outcome, bet } }).catch(() => {});
+        await rollWindfall(buyerId, "tavern_gambit_win").catch(() => {});
         gold = Number(paid?.gold ?? 0);
     }
     if (outcome === "win") bumpTownQuest(buyerId, "patron", 1).catch(() => {});

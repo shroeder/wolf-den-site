@@ -10,6 +10,7 @@ import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
+import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { ITEMS, randomDropPool } from "@/lib/marketplace/items.js";
 import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
@@ -288,6 +289,7 @@ export async function claimPig(buyerId) {
     const gold = PIG_GOLD_MIN + randInt(PIG_GOLD_MAX - PIG_GOLD_MIN + 1);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "loot_pig", { balanceAfter: paid?.gold }).catch(() => {});
+    await rollWindfall(buyerId, "loot_pig").catch(() => {});
     let item = null;
     if (Math.random() < PIG_ITEM_CHANCE) {
         const rarity = weightedPick(PIG_RARITY_WEIGHTS);

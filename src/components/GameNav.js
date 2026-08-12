@@ -264,12 +264,9 @@ export default function GameNav() {
                 setChests((d?.chests || []).reduce((s, c) => s + (c.count || 0), 0));
                 // The endpoint CLEARS it as it hands it over, so this arrives exactly once. Nothing here may
                 // drop it on the floor — there is no second chance to show a thing that happens once a year.
-                if (d?.windfall?.tier) {
-                    // The tier was granted a moment ago, so it IS in this same payload — take its art from
-                    // there rather than asking for it again.
-                    const art = (d.chests || []).find((c) => c.tier === d.windfall.tier)?.image || null;
-                    setWindfall({ ...d.windfall, image: art });
-                }
+                // The art rides on the payload from the chest-art map itself, not from the owned-chest list —
+                // opening it before the card fires must not cost the card its picture.
+                if (d?.windfall?.tier) setWindfall(d.windfall);
             }).catch(() => {});
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});

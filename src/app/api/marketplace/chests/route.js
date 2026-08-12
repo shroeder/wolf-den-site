@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
-import { getChests, openChest } from "@/lib/marketplace/chests.js";
+import { CHEST_TIERS, getChests, openChest } from "@/lib/marketplace/chests.js";
+import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { db } from "@/lib/db";
@@ -43,10 +44,19 @@ export async function GET(request) {
                      SELECT (SELECT won FROM prev) AS won, (SELECT COUNT(*) FROM cleared) AS claimed`,
                     [buyer.id]).catch(() => null),
             ]);
-            return noStore({
-                chests, gold: goldRow?.gold || 0,
-                windfall: Number(windfall?.claimed) > 0 ? windfall.won : null,
-            });
+            // ── THE CELEBRATION GETS THE REAL CHEST, AUTHORITATIVELY ────────────────────────────────────
+            // It used to look the art up in `chests` above, which only lists tiers you currently OWN. Open the
+            // chest before the reveal fires — entirely possible, the grant lands the instant it drops and the
+            // card waits for your next screen — and the tier is gone from that list, so the rarest moment in
+            // the game rendered a generic outline glyph. Every tier has real art; it comes straight off the
+            // art map here, where ownership cannot affect it.
+            const won = Number(windfall?.claimed) > 0 ? windfall.won : null;
+            let wf = null;
+            if (won?.tier) {
+                const art = await getChestArt().catch(() => ({}));
+                wf = { ...won, image: art[won.tier] || null, label: CHEST_TIERS[won.tier]?.label || null };
+            }
+            return noStore({ chests, gold: goldRow?.gold || 0, windfall: wf });
         } catch (error) {
             return internalError(error, { event: "marketplace.chests.get.failure" });
         }

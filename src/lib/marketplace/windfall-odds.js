@@ -2,92 +2,120 @@
 // PURE. No DB, no server-only — deliberately, so scripts/check-windfall.mjs can measure what the SERVER will
 // actually pay rather than a second copy of these numbers that agrees with them today. A lottery whose odds
 // are only checkable by reading them is a lottery that drifts.
-// ── THE WINDFALL ─────────────────────────────────────────────────────────────────────────────────────────────
-// The four rarest chests drop from ORDINARY PLAY, out of every system in the game that hands out loot.
 //
-// Before this they had exactly one source between them: a lottery riding on every tenth level from 20. Sixteen
-// days of grant history had produced seven Ascendants and ZERO Eternals, Celestials or Primordials — which is
-// not "rare", it is "does not happen", and it is why the two chests whose whole purpose is to pay Celestial and
-// Primordial gear had never been held by anybody.
+// ── THE FOUR RAREST CHESTS ARE A DROP, NOT A LOTTERY ─────────────────────────────────────────────────────────
+// The first pass hung a roll on the gold ledger, so anything that paid a coin rolled for a chest. It worked,
+// and it was the wrong shape: it made the rarest object in the game a thing that happened NEXT TO what you
+// were doing rather than a thing that came OUT of it, and it tied the drop to gold — so a system that pays in
+// fish or ore or a floor cleared was worth nothing.
 //
-// Luke set the shape: *"we just have to decide how to add to each one of them the ability to get these rare
-// chests, but make it so that it's like a very very rare thing... I would rather they randomly get it maybe
-// once once a year. You know? Super, super rare."*
+// Luke: *"we have a bunch of systems — fishing farming Arena sailing digging etc etc — and all of these
+// systems have Rewards and so across all those different systems and all the rewards we can tie our new
+// chests in to those as long as they're super duper rare."*
 //
-// ── THE ODDS ARE SET AGAINST A MEASURED NUMBER, NOT A GUESS ──────────────────────────────────────────────────
-// "Once a year" means nothing until you know how many rolls a year is, so the rate was set against the real
-// ledger. Over the 30 days to 2026-08-12, across 89 members active in that window, the game wrote 29,030
-// positive coin events; stripping the ones that are not loot (see DENY below) leaves ~17,850 genuine drops —
-// about 200 per active member per month, so roughly 2,440 loot events per member per year.
+// So every source below is a REAL CALL in the system that owns it: fishing rolls when you land a fish, the
+// farm when you pull a crop, the arena when you win a bout, the boss when you strike it. Nothing rolls by
+// accident and nothing rolls because gold moved.
 //
-// Weighted (below), that is ~61,500 tickets a month, ~748,000 a year across the community. At the rates in
-// WINDFALL_TIERS that lands, community-wide and per year:
+// ── THE NAMES ARE THE LEDGER'S NAMES, ON PURPOSE ─────────────────────────────────────────────────────────────
+// Every source key is exactly the coin reason that system already writes. That is what lets check-windfall.mjs
+// measure the live volume of each source without a second lookup table sitting between the two — and a table
+// like that is precisely how the odds and the reality drift apart.
 //
-//     Ascendant    ~60     one every six days somewhere in the Den
-//     Eternal      ~30     one every two weeks
-//     Celestial    ~9      one every six weeks
-//     Primordial   ~2      twice a year, and it should stop the room
+// ── WHAT A TICKET IS WORTH ───────────────────────────────────────────────────────────────────────────────────
+// A flat rate per drop would make this a farming feature and nothing else: crops, fish and ore alone are 42% of
+// every reward event in the game. A drop is worth tickets in proportion to what it cost you.
 //
-// Per member that is about one rare chest a year each and a Primordial roughly once every forty years, which
-// is the "super, super rare" the brief asked for. Re-run scripts/check-windfall.mjs after touching any number
-// here; it re-reads the live ledger and prints this table, so it cannot quietly drift as the game grows.
+//   1   a tap on a timer — a crop, a fish, a seam, a dig. You will do thousands of these.
+//   4   a real action with a cooldown or a stake behind it — a duel, a bout, a voyage, a delve, a spin.
+//   5   something finished — a daily, a quest, a badge, a chapter of the guide.
+//  40   the big ones. A boss, a raid, a town event: the things a whole town turns up for.
+//
+// UNLISTED IS ZERO. There is no default: a source that is not in this table does not roll, and a typo in a
+// call site is a source that silently never pays rather than one that silently always does. Wiring a new
+// system is two lines — a key here, and the call in the system.
+export const WINDFALL_SOURCES = {
+    // ── TAPS ── the high-frequency ones. Thousands of these a month between everybody.
+    harvest: 1,          // a crop pulled
+    harvest_loot: 1,     // what the crop was hiding
+    fishing: 1,          // a fish landed
+    mining: 1,           // a node broken
+    farm_encounter: 1,   // whatever wandered onto the farm
+    loot_pig: 1,
+    wishing_well: 1,
+    chest_reward: 1,     // a chest opened. Bounded by chests owned, and a nice thing to find inside one.
+    // ── ACTIONS ── something with a cooldown, a stake or a real chance of losing.
+    town_duel: 4,        // a raider put down in the plaza
+    arena_win: 4,        // a bout won, ladder included
+    ship_battle: 4,
+    delve: 4,            // a floor of the dungeon
+    merchant_minigame: 4,
+    spin_prize: 4,
+    tavern_gambit_win: 4,
+    cooking: 4,          // a dish that came out right
+    sailing: 4,          // what a dig turned up. NOT a ledger reason — sailing pays in loot, so this one
+                         // source is invisible to check-windfall.mjs, which prints it as unmeasured.
+    // ── COMPLETIONS ── a thing you finished rather than a thing you did.
+    farm_daily: 5, sailing_daily: 5, forge_daily: 5, cooking_daily: 5,
+    checkin: 5, quest_reward: 5, town_quest: 5, bounty_win: 5,
+    guide_step: 5, guide_chapter: 5, badge_reward: 5, badge_milestone: 5,
+    onboarding: 5, giveaway: 5,
+    // ── THE BIG ONES ──
+    // raid_loss / town_event are ledger reasons written by awardXp rather than by a payout of their own, so
+    // there is no moment to hang a roll on and they are deliberately absent. boss_reward is the boss's gold
+    // line; the strike itself already rolls once as boss_raid, and rolling on both would pay a strike twice.
+    boss_raid: 40, raid_complete: 40,
+    raid_defense: 4,     // somebody raided YOU and you held. The one reward you never chose to go and get.
+};
+
+// ── WHAT DELIBERATELY DOES NOT ROLL ──────────────────────────────────────────────────────────────────────────
+// Kept even though the table above is now an allow-list, because this is the REASONING and the balance script
+// reads it to leave these out of the measured volume. Every one is a hole if it is ever added by mistake:
+//
+//   IDLE INCOME       xp_accrual, pet_income, checkin_interest. Earner pets ticking over while the app is shut
+//                     and interest on a balance are not drops. xp_accrual alone is 10,669 events a month, and
+//                     rewarding a bank statement with the rarest object in the game is the exact opposite of
+//                     "it drops out of what you were doing".
+//   GOLD THAT MOVED   trade, trade_escrow, trade_refund, auction_sale, auction_buy, sell_gear. Two accounts
+//                     passing one coin back and forth would otherwise be the best farm in the game, and it
+//                     costs nothing and leaves no trace.
+//   MONEY COMING BACK refund, bounty_refund, merchant_gamble_refund, arena_armoury, rate_doubling_backpay. A
+//                     refund is the reversal of a spend; pay a ticket for one and every cancelled trade is a
+//                     free roll.
+//   HANDED OVER       admin_grant, coin_grant, referral_bonus, referral_joined. A support correction must
+//                     never roll a lottery.
+export const WINDFALL_DENY = new Set([
+    "xp_accrual", "pet_income", "checkin_interest",
+    "trade", "trade_escrow", "trade_refund", "auction_sale", "auction_buy", "sell_gear",
+    "store_credit", "purchase", "gift", "transfer",
+    "refund", "bounty_refund", "merchant_gamble_refund", "arena_armoury", "rate_doubling_backpay",
+    "admin_grant", "coin_grant", "referral_bonus", "referral_joined",
+]);
+
+/** Tickets a drop from this source is worth. 0 means it never rolls — including anything unlisted. */
+export function windfallWeight(source) {
+    return WINDFALL_SOURCES[String(source || "")] || 0;
+}
+
+// ── THE ODDS ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Set against the real ledger rather than guessed. Over the 30 days to 2026-08-12, across 89 members active in
+// that window, the sources above fired 17,791 times — about 200 per active member per month, so roughly 2,400
+// drops a member a year. Weighted, 55,615 tickets a month and ~677,000 a year across the community, which at
+// these rates pays, per year (measured, not estimated — this is the script's own output):
+//
+//     Ascendant    54.1    one every 7 days somewhere in the Den      1 per member per 2 years
+//     Eternal      27.1    one every 13 days                          1 per 3 years
+//     Celestial     8.1    one every 45 days                          1 per 11 years
+//     Primordial    2.0    twice a year, and it should stop the room   1 per 44 years
+//
+// Ticket share lands at 16% taps / 22% actions / 52% completions / 10% bosses and raids, largest single source
+// badge_reward at 10.8% — so no one system is the feature, which is the thing a flat rate would have broken.
+//
+// Re-run scripts/check-windfall.mjs after touching any number here; it re-reads the live ledger and prints that
+// table off these exact constants, so it cannot quietly drift as the game grows.
 export const WINDFALL_TIERS = [
     { tier: "primordial", chance: 0.000003 },
     { tier: "celestial", chance: 0.000012 },
     { tier: "eternal", chance: 0.000040 },
     { tier: "ascendant", chance: 0.000080 },
 ];
-
-// ── WHAT A TICKET IS WORTH ───────────────────────────────────────────────────────────────────────────────────
-// A flat rate per loot event would have made this a farming feature and nothing else: harvesting, fishing and
-// mining alone are 42% of every drop in the game, so "across every system" would have meant "go and tend crops".
-// An event is therefore worth tickets in proportion to what it COST you, which keeps every system a real
-// source without making the cheapest one the only sensible one.
-//
-//   1   a tap on a timer — a crop, a fish, a seam. You will do thousands of these.
-//   4   a real action with a cooldown or a stake behind it — a duel, a bout, a voyage, a spin.
-//   5   something finished — a daily, a quest, a badge, a chapter of the guide.
-//  40   the big ones. A boss, a raid, a town event: the things a whole town turns up for.
-//
-// Anything NOT listed defaults to 1, on purpose: a system shipped next month should be a windfall source the
-// day it ships, not the day somebody remembers to add it here. The things that must never pay a ticket are
-// named in DENY instead, and they are all the same kind of thing — gold that moved rather than gold that was
-// found. Without that list, two accounts trading a single coin back and forth would be the best farm in the
-// game, and an admin correction would roll the lottery.
-const WEIGHTS = {
-    harvest: 1, harvest_loot: 1, fishing: 1, mining: 1, farm_encounter: 1, loot_pig: 1, wishing_well: 1,
-    town_duel: 4, arena_win: 4, ship_battle: 4, delve: 4, delve_merchant: 4, merchant_minigame: 4,
-    merchant_chest: 4, spin_prize: 4, tavern_gambit_win: 4, cooking: 4, sailing: 4,
-    farm_daily: 5, sailing_daily: 5, forge_daily: 5, cooking_daily: 5, checkin: 5, quest_reward: 5,
-    town_quest: 5, guide_step: 5, guide_chapter: 5, badge_reward: 5, badge_milestone: 5, onboarding: 5,
-    giveaway: 5, happy_hour: 5, town_project: 5,
-    boss_raid: 40, boss_reward: 40, raid_complete: 40, raid_defense: 40, raid_loss: 40, town_event: 40,
-    bounty_win: 5, chest_reward: 1, merchant_gamble: 4, mining_trip: 4,
-};
-
-// GOLD THAT MOVED, NOT GOLD THAT WAS FOUND — plus the one passive trickle. Every entry here is a hole if it is
-// left out: `xp_accrual` alone is 10,669 events a month of pure idle income and would have been the single
-// largest source in the game; `trade`, `auction_sale` and the refunds are two accounts handing each other the
-// same coin; `admin_grant` and `coin_grant` would make a support correction roll a lottery.
-const DENY = new Set([
-    // IDLE INCOME. Neither of these is a drop — one is earner pets ticking over while the app is closed and
-    // the other pays interest on a balance. Rewarding a bank statement with the rarest object in the game is
-    // the exact opposite of "drops from ordinary play", and xp_accrual alone is 10,669 events a month.
-    "xp_accrual", "pet_income", "checkin_interest",
-    // GOLD THAT MOVED BETWEEN TWO PEOPLE. Without these, two accounts passing the same coin back and forth
-    // is the best farm in the game, and it is a farm that costs nothing and leaves no trace.
-    "trade", "trade_escrow", "trade_refund", "auction_sale", "auction_buy", "sell_gear",
-    "store_credit", "purchase", "gift", "transfer",
-    // MONEY COMING BACK. A refund is the reversal of a spend, not a reward — pay a ticket for one and every
-    // cancelled trade or lost gamble becomes a free roll.
-    "refund", "bounty_refund", "merchant_gamble_refund", "arena_armoury", "rate_doubling_backpay",
-    // HANDED OVER BY A PERSON, not found. A support correction must never roll a lottery.
-    "admin_grant", "coin_grant", "referral_bonus", "referral_joined",
-]);
-
-/** Tickets an event of this kind is worth. 0 means it never rolls. */
-export function windfallWeight(reason) {
-    const r = String(reason || "");
-    if (!r || DENY.has(r)) return 0;
-    return WEIGHTS[r] ?? 1;
-}
