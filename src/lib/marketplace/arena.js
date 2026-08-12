@@ -689,7 +689,20 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
  * boss fight and the arena ended up disagreeing about what Might does. `extra` is spread last so a caller can
  * hang a rider on it (the raid does: see startTownBout) without this needing to know what a raid is.
  */
-function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra = {} } = {}) {
+// ── THE TOWN'S EDGE ──────────────────────────────────────────────────────────────────────────────────────────
+// A raider hits for twice what the same hero hits for in the Arena, and ONLY in the plaza.
+//
+// A town raid is not a duel you opted into with a build you tuned — it is the whole Den swinging at a shared
+// wave on a clock, in whatever gear they happened to be wearing when the horn went. Tuned against arena
+// numbers it stopped being a fight anybody could lose and became one nobody could win: the wave outlived the
+// event, the plaza sat stuck behind a foe with no answer, and the raid's own clock — the thing that makes it
+// an event rather than a grind — turned into the reason it failed.
+//
+// This is deliberately a flat number and not a curve. A curve here would be a difficulty system nobody asked
+// for, and the honest problem is that the baseline was set in the wrong room.
+const TOWN_EDGE = 2;
+
+function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {} } = {}) {
     const clash = elementClash(me.element, foeKit.element);
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
@@ -735,8 +748,12 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra 
         // fifteen that are not one of those four — thorns, regen, block, guardSoak, riposteShare, lastStand,
         // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
         // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
+        // `damage` is scaled HERE rather than multiplied into the swing at resolve time, so the number on the
+        // fighter card is the number you actually hit for. A hidden multiplier in the raw product is the exact
+        // shape of the "why do I do so little damage" complaint further down this file — the fix for that was
+        // to stop hiding terms, and a town buff nobody can see would be a new one.
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
-            health: me.health, damage: me.damage,
+            health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
@@ -819,7 +836,10 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     const foeKit = { ...foe, ...st, ...ringStats(st), abilities: npcAbilities(prof.kitTier) };
     const b = buildBout(me, foe, foeKit, {
         myPower: arenaRating(me),
-        extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) } },
+        myDamageMult: TOWN_EDGE,
+        // `townEdge` is stamped alongside the rider so a bout can say whether it has already been scaled —
+        // see the repair in resolveBeat, which is what rescues the fights that were open when this shipped.
+        extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
     return { ok: true, bout: publicBout(b) };
@@ -947,6 +967,17 @@ export async function fightRound(buyerId, opts = {}) {
         if (fresh?.abilities?.length) {
             b.me.abilities = b.me.abilities.map((a) => fresh.abilities.find((f) => f.id === a.id) || a);
         }
+    }
+
+    // Same reasoning, for the town's edge. A raid bout is frozen at the moment it opens, so every fight that
+    // was already underway when TOWN_EDGE shipped carries the old unscaled damage — and those are precisely
+    // the fights that were stuck against a wave nobody could kill. Scale them in place instead of making
+    // people forfeit and re-engage, which on a shared roster means losing the claim to somebody else.
+    // The stamp is what makes this idempotent: it runs once per bout, and a bout built after the deploy
+    // arrives already stamped, so it is skipped.
+    if (b.town && !b.townEdge && b.me?.damage != null) {
+        b.me.damage *= TOWN_EDGE;
+        b.townEdge = TOWN_EDGE;
     }
 
     const mine = b.turn === "you";
