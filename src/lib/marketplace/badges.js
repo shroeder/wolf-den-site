@@ -455,8 +455,54 @@ async function sumBadgeDomain(buyerId, domain) {
     }
     return total;
 }
+/**
+ * The same sum, for a whole list of members, in TWO queries total rather than two per member.
+ *
+ * Written for the Arena's standings board, which ranks every member with a bout to their name. The per-member
+ * version would have been eighty round trips to sort one list, and the honest reason the board went without
+ * badges was that nobody had written this — not that it could not be written. It follows the
+ * `getEquippedStatsForMembers` convention already used for gear a few lines above the caller.
+ *
+ * Returns Map<buyerId, statsObject>. Members with no badges are absent from the map; read it with `|| {}`.
+ */
+export async function getBadgeDomainForMembers(buyerIds, domain) {
+    const ids = [...new Set((buyerIds || []).filter(Boolean))];
+    if (!ids.length) return new Map();
+    const [badgeRows, equipRows] = await Promise.all([
+        db.query(`SELECT buyer_id, badge_slug FROM mkt_user_badge WHERE buyer_id = ANY($1::uuid[])`, [ids]).catch(() => []),
+        // Only to answer "who has Long Service Record", which doubles a member's ten best. One table, so it
+        // batches the same way; leaving it out would quietly under-rate exactly the members who invested in it.
+        db.query(`SELECT buyer_id, item_id FROM mkt_user_equipment WHERE buyer_id = ANY($1::uuid[]) AND item_id IS NOT NULL`, [ids]).catch(() => []),
+    ]);
+    const { ITEM_POWER } = await import("@/lib/marketplace/ascension-powers.js");
+    const doubles = new Set();
+    for (const r of equipRows) if (ITEM_POWER[r.item_id] === "long_service_record") doubles.add(r.buyer_id);
+
+    const held = new Map();
+    for (const r of badgeRows) {
+        const d = BADGE_BONUSES[r.badge_slug]?.[domain];
+        if (!d) continue;
+        if (!held.has(r.buyer_id)) held.set(r.buyer_id, []);
+        held.get(r.buyer_id).push(d);
+    }
+    // Identical arithmetic to sumBadgeDomain — same "ten best by total across the domain's own stats" rule.
+    const weight = (d) => Object.values(d).reduce((a, x) => a + x, 0);
+    const out = new Map();
+    for (const [buyerId, rows] of held) {
+        const top = doubles.has(buyerId) ? new Set([...rows].sort((a, b) => weight(b) - weight(a)).slice(0, 10)) : null;
+        const total = {};
+        for (const d of rows) {
+            const mult = top?.has(d) ? 2 : 1;
+            for (const [k, v] of Object.entries(d)) total[k] = (total[k] || 0) + v * mult;
+        }
+        out.set(buyerId, total);
+    }
+    return out;
+}
+
 // Domain-specific aggregators, each folded into that system's own bonus sum (mirrors gear/pets).
 export const getBadgePassives = (buyerId) => sumBadgeDomain(buyerId, "combat"); // → boss strike (unchanged callers)
+export const getBadgePassivesForMembers = (buyerIds) => getBadgeDomainForMembers(buyerIds, "combat");
 export const getBadgeSea = (buyerId) => sumBadgeDomain(buyerId, "sea");         // → equippedSeaAffinity (sailing)
 export const getBadgeFarm = (buyerId) => sumBadgeDomain(buyerId, "farm");       // → farmBonuses (farm)
 export const getBadgeForge = (buyerId) => sumBadgeDomain(buyerId, "forge");     // → forge smithing odds (crafting)

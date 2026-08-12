@@ -120,26 +120,43 @@ const AI_ABILITY_CHANCE = 0.75;
 // Computed LIVE from everyone's power rather than frozen, so it re-sorts as the pack gears up. One query for
 // the roster, one for everybody's equipped stats.
 async function ladderFor(buyerId) {
-    const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
+    const [{ getEquippedStatsForMembers }, { getBadgePassivesForMembers }] = await Promise.all([
+        import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/badges.js"),
+    ]);
     const rows = await db.query(
         `SELECT id, alias, display_name, COALESCE(xp,0) AS xp, avatar_sprite_url, avatar_sprite_flip
            FROM mkt_buyer WHERE COALESCE(xp,0) > 0 AND id <> $1`, [buyerId]
     ).catch(() => []);
     if (!rows.length) return [];
-    const stats = await getEquippedStatsForMembers(rows.map((r) => r.id)).catch(() => new Map());
+    const ids = rows.map((r) => r.id);
+    // Badges in bulk alongside the gear — this list is the one you PICK an opponent from, so a power figure
+    // that leaves out a third of what they hit with is the matchmaker aiming at the wrong number.
+    const [stats, badges] = await Promise.all([
+        getEquippedStatsForMembers(ids).catch(() => new Map()),
+        getBadgePassivesForMembers(ids).catch(() => new Map()),
+    ]);
     return rows
         .map((r) => {
             const level = levelForXp(Number(r.xp) || 0).level;
-            const s = stats.get(r.id) || {};
+            const g = stats.get(r.id) || {};
+            const bs = badges.get(r.id) || {};
+            const s = {
+                ...g,
+                might: (g.might || 0) + (bs.might || 0),
+                crit_chance: (g.crit_chance || 0) + (bs.crit_chance || 0),
+                crit_power: (g.crit_power || 0) + (bs.crit_power || 0),
+            };
             const gearPower = Object.values(s).reduce((n, v) => n + (Number(v) || 0), 0);
+            const ring = ringStats(s);
             return {
                 id: r.id,
                 name: r.display_name || r.alias || "A member",
                 sprite: r.avatar_sprite_url || null,
                 flip: Boolean(r.avatar_sprite_flip),
                 level, gearPower,
-                ...ringStats(s),
-                power: arenaRating(ringStats(s)),
+                ...ring,
+                power: arenaRating(ring),
             };
         })
         .sort((a, b) => a.power - b.power);
@@ -329,19 +346,44 @@ async function standings() {
           ORDER BY a.vp DESC, a.wins DESC, b.alias ASC`
     ).catch(() => []);
     if (!rows.length) return [];
-    const { getEquippedStatsForMembers } = await import("@/lib/marketplace/inventory.js");
-    const stats = await getEquippedStatsForMembers(rows.map((r) => r.buyer_id)).catch(() => new Map());
-    return rows.map((r, i) => {
+    const ids = rows.map((r) => r.buyer_id);
+    // ── THE BOARD RANKS ON WHAT PEOPLE ACTUALLY FIGHT WITH ───────────────────────────────────────────────
+    // Gear and badges, both in bulk — two queries for the badges rather than two per member, which is the
+    // only thing that was ever stopping the board from counting them.
+    //
+    // Pets are still absent here and that is a real gap, not a considered exclusion: getPetCombatBonus
+    // assembles a companion's contribution from five sources (owned collectibles, the equipped one, a per-pet
+    // XP map, enshrinements and ascension powers) and there is no bulk form of it yet. So the board still
+    // under-rates a member with a strong pet. Worth writing when the ranking matters enough.
+    const [{ getEquippedStatsForMembers }, { getBadgePassivesForMembers }] = await Promise.all([
+        import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/badges.js"),
+    ]);
+    const [stats, badges] = await Promise.all([
+        getEquippedStatsForMembers(ids).catch(() => new Map()),
+        getBadgePassivesForMembers(ids).catch(() => new Map()),
+    ]);
+    return rows.map((r) => {
         const level = levelForXp(Number(r.xp) || 0).level;
-        const gearPower = Object.values(stats.get(r.buyer_id) || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+        const g = stats.get(r.buyer_id) || {};
+        const bs = badges.get(r.buyer_id) || {};
+        // Same field-for-field merge combatStats does, minus the pet half it cannot batch yet.
+        const merged = {
+            ...g,
+            might: (g.might || 0) + (bs.might || 0),
+            crit_chance: (g.crit_chance || 0) + (bs.crit_chance || 0),
+            crit_power: (g.crit_power || 0) + (bs.crit_power || 0),
+        };
+        const gearPower = Object.values(merged).reduce((n, v) => n + (Number(v) || 0), 0);
+        const ring = ringStats(merged);
         return {
             id: r.buyer_id,
             vp: Number(r.vp) || 0,
             name: r.display_name || r.alias || "A member",
             sprite: r.avatar_sprite_url || null,
             level, gearPower, wins: r.wins, losses: r.losses,
-            ...ringStats(stats.get(r.buyer_id) || {}),
-            power: arenaRating(ringStats(stats.get(r.buyer_id) || {})),
+            ...ring,
+            power: arenaRating(ring),
         };
     });
 }
