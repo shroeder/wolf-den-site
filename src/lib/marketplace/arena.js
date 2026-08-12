@@ -575,6 +575,16 @@ function publicBout(b) {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
+        // THEIR WARD, ON THEIR BAR. `shield` was published and `foeShield` was not, so the blue slab that sits
+        // on your health bar when you brace had no counterpart when THEY braced — the enemy guarded, the next
+        // swing did far less than the numbers said it should, and nothing on screen accounted for it.
+        // FighterBar has taken a `shield` prop all along; the foe's copy was simply never given one.
+        //
+        // Only this one. The other seven foe-side fields the engine keeps (foeBleed, foeSunder, foeRiposte,
+        // foeSurge, foeCd, foeItems, foeStood) stay server-side: two of them are the opponent's options, which
+        // this function withholds on purpose, and the rest have nothing on screen that would read them —
+        // publishing a field nothing renders is how the last five bugs in this file started.
+        foeShield: b.foeShield || 0,
         // WHICH ROOM THIS FIGHT IS IN. Withheld until now, so the screen could not tell a plaza raider from a
         // ladder rung and offered "Back to the ladder" to somebody who had walked in from the town — which is
         // where they were then stranded. The rider itself stays server-side; only the fact of it is published.

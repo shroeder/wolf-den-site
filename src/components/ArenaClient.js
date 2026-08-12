@@ -1005,7 +1005,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
                         </span>
                         <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                            foe active={!yourTurn && !bout.over} />
+                            foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
                     </div>
 
                     <div className="ar-floor">
