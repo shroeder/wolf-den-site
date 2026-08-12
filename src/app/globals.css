@@ -16241,3 +16241,32 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cmp-sheet-flavor { margin: 0 0 10px; font-style: italic; font-size: 0.82rem; color: #8b93a0; }
 .cmp-sheet-state { margin: 0; font-size: 0.78rem; font-weight: 800; color: #6a727d; }
 .cmp-sheet-state.is-have { color: #8fd6a2; }
+
+/* ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────────
+   Grouped by house, because a hundred tiles in one run is a list and ten groups of ten is a road. */
+.ar-road-score { font-family: var(--font-display); font-weight: 900; color: #ffd75e; font-size: 1.1rem; }
+.ar-road-score em { font-style: normal; color: #8b93a0; font-size: .82rem; font-weight: 700; }
+.ar-house { margin-top: 14px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--h) 22%, transparent); }
+.ar-house-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ar-house-head b { font-family: var(--font-display); color: var(--h); font-size: 1rem; }
+.ar-house-head em { font-style: normal; font-size: .74rem; color: #8b93a0; flex: 1 1 auto; }
+.ar-house-head span { font-weight: 900; font-size: .76rem; color: #8b93a0; }
+.ar-house-head span.is-clear { color: #8fd6a2; }
+.ar-rungs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 168px));
+    justify-content: start; gap: 7px; }
+.ar-rung { position: relative; display: grid; gap: 2px; text-align: left; cursor: pointer;
+    padding: 8px 9px; border-radius: 11px;
+    border: 1px solid color-mix(in srgb, var(--h) 32%, transparent);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.24)); }
+.ar-rung:hover:not(:disabled) { border-color: color-mix(in srgb, var(--h) 80%, transparent); transform: translateY(-1px); }
+/* A champion wears the house colour outright — every tenth, and the one that pays a chest. */
+.ar-rung.is-champ { border-color: color-mix(in srgb, var(--h) 70%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--h) 16%, transparent), rgba(0,0,0,0.3)); }
+/* BEATEN IS DONE. Dimmed and unpressable, because the whole promise of the road is that it does not repeat. */
+.ar-rung.is-done { opacity: .42; cursor: default; border-style: dashed; }
+.ar-rung-n { position: absolute; top: 6px; right: 8px; font-size: .62rem; font-weight: 900; color: #6a727d; }
+.ar-rung-name { font-weight: 800; font-size: .78rem; color: color-mix(in srgb, var(--h) 80%, white);
+    padding-right: 18px; line-height: 1.15; }
+.ar-rung-meta { font-size: .64rem; color: #8b93a0; font-weight: 700; }
+.ar-rung-prize { font-size: .64rem; color: #ffd75e; font-weight: 800; }
+.ar-rung.is-done .ar-rung-prize { color: #6a727d; }

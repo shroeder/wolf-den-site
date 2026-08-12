@@ -1226,7 +1226,7 @@ export default function ArenaClient({ initial }) {
             {/* ── THREE JOBS, THREE TABS ── who to fight, how you fight, what you have trained. This screen
                 carried all of it in one scroll and it was already long before the tree existed. */}
             <div className="ar-tabs" role="tablist">
-                {[["fight", "Fight"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
+                {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}
                         className={`ar-tab${tab === k ? " is-on" : ""}${k === "tree" && st.progress?.points?.available ? " has-dot" : ""}`}
                         onClick={() => { Sfx.ui(); setTab(k); }}>{label}</button>
@@ -1367,6 +1367,48 @@ export default function ArenaClient({ initial }) {
                     )}
                 </div>
             ) : null}
+
+{tab === "road" ? (
+            <section className="card ar-road">
+                <div className="ar-arm-head">
+                    <b>The Long Road</b>
+                    <span className="ar-road-score">{st.ladder?.beaten || 0}<em>/{st.ladder?.size || 100}</em></span>
+                </div>
+                <p className="ar-arm-sub">
+                    A hundred fighters, each of them once. Walk up to any of them whenever you like — nothing
+                    here is locked, and nothing here comes back. A challenge spends one of your daily bouts.
+                </p>
+                {/* GROUPED BY HOUSE, because a hundred tiles in one run is a list and ten groups of ten is a
+                    road. The house you are on tells you roughly where you are without a number having to. */}
+                {(st.ladder?.houses || []).map((h) => {
+                    const foes = (st.ladder.foes || []).filter((f) => f.rung >= h.from && f.rung <= h.to);
+                    const done = foes.filter((f) => f.beaten).length;
+                    return (
+                        <div key={h.key} className="ar-house" style={{ "--h": h.tint }}>
+                            <div className="ar-house-head">
+                                <b>{h.name}</b>
+                                <em>{h.blurb}</em>
+                                <span className={done === foes.length ? "is-clear" : ""}>{done}/{foes.length}</span>
+                            </div>
+                            <div className="ar-rungs">
+                                {foes.map((f) => (
+                                    <button type="button" key={f.rung}
+                                        className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}`}
+                                        disabled={busy || f.beaten}
+                                        onClick={() => { Sfx.ui(); act("start", { target: f.id }); }}
+                                        title={f.beaten ? `${f.name} — already beaten` : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
+                                        <span className="ar-rung-n">{f.rung}</span>
+                                        <span className="ar-rung-name">{f.name}</span>
+                                        <span className="ar-rung-meta">{f.archetypeName} · {f.power.toLocaleString()}</span>
+                                        <span className="ar-rung-prize">{f.beaten ? "beaten" : f.reward?.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+            </section>
+        ) : null}
 
 {tab === "fight" ? (<>
             {/* ── ONE LINE FOR WHAT YOU FIGHT WITH ── the kit used to be four full cards at the top of this
