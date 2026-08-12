@@ -386,12 +386,9 @@ export async function getBossState(buyerId = null) {
     ]);
     // Pet battle sprites (shared per pet) so each member's active pet can fight beside them.
     // Base (Lv1) art + evolved (Lv2–5) art; each fighter shows the sprite for THEIR pet's level.
-    const [petSprites, petSpriteLevels, petStones, packPetBonuses] = await Promise.all([
+    const [petSprites, petSpriteLevels, packPetBonuses] = await Promise.all([
         getPetSpriteData().catch(() => ({})),
         getPetSpriteLevelData().catch(() => ({})),
-        // An enshrined pet wears its stone's form wherever it is drawn, and this is the wall where the Den
-        // actually looks at each other's heroes — so it is the one that matters most.
-        (async () => (await import("@/lib/marketplace/pet-ascension.js")).stoneMapForMembers(members.map((m) => m.id)))().catch(() => new Map()),
         getPackPetBonuses().catch(() => new Map()), // whole-pack fortune, so every roster card's ticket TOTAL is the same for all viewers
     ]);
 
@@ -428,6 +425,17 @@ export async function getBossState(buyerId = null) {
             [boss.id]
         )
         .catch(() => []);
+    // An enshrined pet wears its stone's form wherever it is drawn, and this is the wall where the Den actually
+    // looks at each other's heroes — so it is the one that matters most.
+    //
+    // RESOLVED HERE, not up in the Promise.all with the other pet art. It was an async IIFE inside that array,
+    // reading `members` — which is not declared until below it. The read sat after an `await import(...)`, so
+    // it landed in a later microtask and still found `members` in the temporal dead zone, and the `.catch()`
+    // turned the throw into an empty Map. Nothing failed, nothing logged: enshrined pets simply never wore
+    // their stone form on the boss wall, which is the one wall the whole Den looks at.
+    const petStones = await (async () => (await import("@/lib/marketplace/pet-ascension.js"))
+        .stoneMapForMembers(members.map((m) => m.id)))().catch(() => new Map());
+
     // Every fighter's full badge set in one query, so each hero card can show their showcased badges +
     // the "folder tab" featured badge exactly as it renders on their profile.
     const fighterBadges = new Map();

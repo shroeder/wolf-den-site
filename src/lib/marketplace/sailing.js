@@ -835,6 +835,13 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     const fragTiers = frag.map(() => artifactTier);
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
+    // Beachhead: a third of sites arrive half dug, so the shallow layers over the chest are already gone.
+    //
+    // MUST BE DECLARED ABOVE THE forEach BELOW. It was ten lines further down, and `forEach` runs its callback
+    // SYNCHRONOUSLY — so every dig hit the temporal dead zone, newBoard threw, begin_dig 500'd, and the "Dig
+    // for treasure" button did nothing for everybody. `lint:undef` cannot see this: the name IS declared in
+    // scope, so no-undef has nothing to say about it.
+    const halfDug = boardPowers?.has?.("beachhead") && Math.random() < 1 / 3;
     frag.forEach(([fr, fc], i) => { depth[fr][fc] = (perks.surface && i === 0) || halfDug ? 1 : (1 + randInt(cap)); });
     // Scatter real consumable ITEMS (1×1) on random non-chest tiles — bonus finds you dig up along the way.
     const chestSet = new Set(frag.map(([fr, fc]) => `${fr},${fc}`));
@@ -844,8 +851,6 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // Diviner's Rod fills the ground. `petFinds` is already the "more scattered finds" lever, so the power
     // rides the same number rather than inventing a parallel one.
     const finds = digItemCount(tier, petFinds) + (divinersRod ? digItemCount(tier, petFinds) : 0);
-    // Beachhead: a third of sites arrive half dug, so the shallow layers are already gone.
-    const halfDug = boardPowers?.has?.("beachhead") && Math.random() < 1 / 3;
     const items = free.slice(0, Math.min(free.length, finds)).map(([r, c]) => ({ r, c, id: DIG_ITEM_POOL[randInt(DIG_ITEM_POOL.length)] }));
     const dug = Array.from({ length: rows }, () => Array.from({ length: cols }, () => false));
     const sensed = Array.from({ length: rows }, () => Array.from({ length: cols }, () => -1)); // -1 = un-scanned; else the heat
