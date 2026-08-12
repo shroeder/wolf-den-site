@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
 import useScrollLock from "@/lib/useScrollLock";
+import { RARITIES, RARITY_META, rarityRank } from "@/lib/marketplace/rarity.js";
 
 // ── THE COMPENDIUM ───────────────────────────────────────────────────────────────────────────────────────────
 // Every piece of gear in the game, and whether you have ever held it.
@@ -16,18 +17,23 @@ import useScrollLock from "@/lib/useScrollLock";
 // Everything here reads off one fetch. The sort is fixed (rarity, then slot, then name) because a compendium
 // is a reference and a reference that reorders itself is a worse reference; the FILTERS are where the control
 // belongs.
-
-const RARITY_ORDER = ["eternal", "primordial", "celestial", "ascendant", "mythic", "legendary", "epic", "rare", "common"];
-const RARITY_TINT = {
-    common: "#9aa0a6", rare: "#4aa3ff", epic: "#b061ff", legendary: "#ffb020", mythic: "#33e0a1",
-    ascendant: "#ff7a3c", eternal: "#ff5cc8", celestial: "#5ad0ff", primordial: "#c9a24a",
-};
+//
+// ── THE LADDER COMES FROM rarity.js, AND USED NOT TO ─────────────────────────────────────────────────────────
+// This screen carried its own copy of the rarity order and its own colour table, and both had drifted from the
+// one in @/lib/marketplace/rarity.js — a file that exists, in its own words, because that map had been
+// copy-pasted into a dozen places and adding two tiers above eternal silently broke every copy. This was the
+// thirteenth. It ranked eternal ABOVE primordial and celestial (the real ladder puts those two on top), and it
+// had mythic and eternal wearing each other's colours — so the rarest gear in the game sorted into the wrong
+// place and the wall was tinted in colours that matched nothing else in the Den.
+//
+// Ordered COMMON FIRST now, and grouped under a heading per tier, so the wall reads as a ladder you climb
+// rather than one flat run of a hundred tiles.
 const SLOT_LABEL = {
     main_hand: "Weapon", off_hand: "Off-hand", helmet: "Helmet", chest: "Chest", belt: "Belt",
     boots: "Boots", back: "Back", amulet: "Amulet", ring: "Ring",
 };
 const STAT = { might: "Might", ferocity: "Ferocity", fortune: "Fortune", crit_chance: "Crit chance", crit_power: "Crit power", extra_strike: "Extra strike" };
-const rank = (v) => { const i = RARITY_ORDER.indexOf(v); return i < 0 ? RARITY_ORDER.length : i; };
+const tint = (r) => RARITY_META[r]?.color || "#9aa0a6";
 const describe = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT[k] || k}`).join(" · ");
 
 export default function CompendiumClient() {
@@ -46,16 +52,29 @@ export default function CompendiumClient() {
         return () => { alive = false; };
     }, []);
 
-    const shown = useMemo(() => {
+    // Grouped by tier, common first. The count on each heading is of the WHOLE tier, not of what the filters
+    // left standing — "3 of 14 Legendary" is the fact you came for, and it must not change meaning when you tap
+    // "Missing".
+    const groups = useMemo(() => {
         if (!data?.items) return [];
-        return data.items
+        const shown = data.items
             .filter((i) => (filter === "all" ? true : filter === "have" ? i.collected : !i.collected))
             .filter((i) => (slot === "all" ? true : i.slot === slot))
             .slice()
-            .sort((a, b) => rank(a.rarity) - rank(b.rarity)
+            .sort((a, b) => rarityRank(a.rarity) - rarityRank(b.rarity)
                 || String(a.slot).localeCompare(String(b.slot))
                 || a.name.localeCompare(b.name));
+        const whole = data.items.filter((i) => (slot === "all" ? true : i.slot === slot));
+        return RARITIES
+            .map((r) => {
+                const items = shown.filter((i) => i.rarity === r);
+                const all = whole.filter((i) => i.rarity === r);
+                return { rarity: r, items, have: all.filter((i) => i.collected).length, total: all.length };
+            })
+            .filter((g) => g.items.length);
     }, [data, filter, slot]);
+
+    const shownCount = groups.reduce((n, g) => n + g.items.length, 0);
 
     if (!data) return <section className="card"><p className="muted" style={{ margin: 0 }}>Opening the compendium…</p></section>;
 
@@ -106,45 +125,63 @@ export default function CompendiumClient() {
 
             {/* ── THE WALL ── */}
             <section className="card">
-                <div className="cmp-filters">
-                    {[["all", `All ${data.total}`], ["have", `Collected ${data.count}`], ["missing", `Missing ${data.total - data.count}`]].map(([k, label]) => (
-                        <button type="button" key={k} className={`cmp-pill${filter === k ? " is-on" : ""}`} onClick={() => setFilter(k)}>{label}</button>
-                    ))}
+                {/* Two rows of identical gold pills, unlabelled, was most of what read as jank: twelve controls
+                    with no indication that they were two independent axes. They are named now, and the slot
+                    row is visibly the quieter of the two. */}
+                <div className="cmp-filter-row">
+                    <span className="cmp-filter-lab">Show</span>
+                    <div className="cmp-filters">
+                        {[["all", `All ${data.total}`], ["have", `Collected ${data.count}`], ["missing", `Missing ${data.total - data.count}`]].map(([k, label]) => (
+                            <button type="button" key={k} className={`cmp-pill${filter === k ? " is-on" : ""}`} onClick={() => setFilter(k)}>{label}</button>
+                        ))}
+                    </div>
                 </div>
-                <div className="cmp-filters">
-                    {slots.map((sk) => (
-                        <button type="button" key={sk} className={`cmp-pill is-slot${slot === sk ? " is-on" : ""}`} onClick={() => setSlot(sk)}>
-                            {sk === "all" ? "Every slot" : SLOT_LABEL[sk]}
-                        </button>
-                    ))}
-                </div>
-
-                {shown.length ? (
-                    <div className="cmp-grid">
-                        {shown.map((i) => (
-                            <button type="button" key={i.id}
-                                className={`cmp-tile${i.collected ? " is-have" : " is-missing"}`}
-                                style={{ "--r": RARITY_TINT[i.rarity] || "#9aa0a6" }}
-                                onClick={() => setInspect(i)}
-                                title={i.collected ? i.name : "Not yet collected"}>
-                                <span className="cmp-tile-art">
-                                    {i.art ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={i.art} alt="" draggable="false" />
-                                    ) : <span className="cmp-tile-none" aria-hidden="true" />}
-                                </span>
-                                <span className="cmp-tile-name">{i.collected ? i.name : "???"}</span>
+                <div className="cmp-filter-row">
+                    <span className="cmp-filter-lab">Slot</span>
+                    <div className="cmp-filters">
+                        {slots.map((sk) => (
+                            <button type="button" key={sk} className={`cmp-pill is-slot${slot === sk ? " is-on" : ""}`} onClick={() => setSlot(sk)}>
+                                {sk === "all" ? "Every slot" : SLOT_LABEL[sk]}
                             </button>
                         ))}
                     </div>
-                ) : <p className="muted" style={{ margin: 0 }}>Nothing matches those filters.</p>}
+                </div>
+
+                {shownCount ? groups.map((g) => (
+                    <div key={g.rarity} className="cmp-tier" style={{ "--r": tint(g.rarity) }}>
+                        {/* The tier's own progress, on the tier. A single bar over a hundred items cannot tell
+                            you that you have every Common and no Mythic, which is the actual state of play. */}
+                        <div className="cmp-tier-head">
+                            <b>{RARITY_META[g.rarity]?.label || g.rarity}</b>
+                            <span className="cmp-tier-count">{g.have}<i>/{g.total}</i></span>
+                            <span className="cmp-tier-bar"><i style={{ width: `${g.total ? (g.have / g.total) * 100 : 0}%` }} /></span>
+                        </div>
+                        <div className="cmp-grid">
+                            {g.items.map((i) => (
+                                <button type="button" key={i.id}
+                                    className={`cmp-tile${i.collected ? " is-have" : " is-missing"}`}
+                                    style={{ "--r": tint(i.rarity) }}
+                                    onClick={() => setInspect(i)}
+                                    title={i.collected ? i.name : "Not yet collected"}>
+                                    <span className="cmp-tile-art">
+                                        {i.art ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={i.art} alt="" draggable="false" />
+                                        ) : <span className="cmp-tile-none" aria-hidden="true" />}
+                                    </span>
+                                    <span className="cmp-tile-name">{i.collected ? i.name : "???"}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )) : <p className="muted" style={{ margin: 0 }}>Nothing matches those filters.</p>}
             </section>
 
             {/* ── ONE ITEM, PROPERLY ── the sprite at size, every number on it, and how you get it. A missing
                 item still shows all of it: knowing exactly what you are chasing is the point of the screen. */}
             {inspect && typeof document !== "undefined" ? createPortal((
                 <div className="cmp-scrim" role="dialog" aria-modal="true" onClick={() => setInspect(null)}
-                    style={{ "--r": RARITY_TINT[inspect.rarity] || "#9aa0a6" }}>
+                    style={{ "--r": tint(inspect.rarity) }}>
                     <div className="cmp-sheet" onClick={(e) => e.stopPropagation()}>
                         <button type="button" className="cmp-x" onClick={() => setInspect(null)} aria-label="Close">✕</button>
                         <div className={`cmp-sheet-art${inspect.collected ? "" : " is-missing"}`}>

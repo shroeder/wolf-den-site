@@ -77,6 +77,24 @@ export default function CookingClient({ initial }) {
     // breadcrumb back, so chasing a chain three deep doesn't strand you.
     const [trail, setTrail] = useState([]);
     const [tab, setTab] = useState("all");
+    // ── HIDING WHAT YOU HAVE NOT FOUND ───────────────────────────────────────────────────────────────────
+    // Undiscovered recipes are shown by default, and that is deliberate — a locked row is tappable and lists
+    // what it wants, which is how you learn a recipe exists at all. But once you know the book, seventy rows
+    // of "Not found" are in the way of the six you can actually cook.
+    //
+    // Read from localStorage in an effect rather than in the initial state: touching localStorage during the
+    // first render makes the server and client disagree and React throws the whole tree away.
+    const [hideLocked, setHideLocked] = useState(false);
+    useEffect(() => {
+        try { setHideLocked(window.localStorage.getItem("ck-hide-locked") === "1"); } catch { /* private mode */ }
+    }, []);
+    const toggleHideLocked = () => {
+        setHideLocked((v) => {
+            const next = !v;
+            try { window.localStorage.setItem("ck-hide-locked", next ? "1" : "0"); } catch { /* private mode */ }
+            return next;
+        });
+    };
     // The kettle gives itself a shake every few seconds. Randomised so it never falls into a metronome — a
     // predictable twitch reads as a broken loop, an unpredictable one reads as something alive.
     const [shaking, setShaking] = useState(false);
@@ -177,12 +195,17 @@ export default function CookingClient({ initial }) {
     };
 
     const shown = useMemo(() => {
-        const all = s.recipes || [];
+        // Independent of the tabs: "Ready" already implies known, but Prep, Dishes and All do not.
+        const all = (s.recipes || []).filter((r) => (hideLocked ? r.known : true));
         if (tab === "ready") return all.filter((r) => r.canCook);
         if (tab === "prep") return all.filter((r) => r.kind === "prep");
         if (tab === "dish") return all.filter((r) => r.kind === "dish");
         return all;
-    }, [s.recipes, tab]);
+    }, [s.recipes, tab, hideLocked]);
+    const hiddenCount = useMemo(
+        () => (hideLocked ? (s.recipes || []).filter((r) => !r.known).length : 0),
+        [s.recipes, hideLocked],
+    );
 
     return (
         <div className="stack reveal ck">
@@ -297,8 +320,22 @@ export default function CookingClient({ initial }) {
                         <button key={k} type="button" className={`ck-tab${tab === k ? " is-on" : ""}`} onClick={() => setTab(k)}>{label}</button>
                     ))}
                 </div>
+                {/* Its own control, not a fifth tab: found/not-found is a different axis from prep/dish, and
+                    folding it into the tabs would mean you could not ask for "dishes I can actually read". */}
+                <button type="button" className={`ck-onlyknown${hideLocked ? " is-on" : ""}`}
+                    onClick={toggleHideLocked} aria-pressed={hideLocked}>
+                    {hideLocked
+                        ? `Showing found only${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`
+                        : "Hide the ones I haven't found"}
+                </button>
                 <div className="ck-recipes">
-                    {shown.length === 0 ? <p className="muted ck-empty">Nothing here yet.</p> : null}
+                    {shown.length === 0 ? (
+                        <p className="muted ck-empty">
+                            {hideLocked && hiddenCount
+                                ? "Nothing found in here yet — tap above to show the undiscovered ones."
+                                : "Nothing here yet."}
+                        </p>
+                    ) : null}
                     {shown.map((r) => {
                         const isOpen = open === r.id;
                         return (
@@ -634,6 +671,13 @@ const CK_CSS = `
 @media (max-width: 420px) { .ck-kpis { grid-template-columns: repeat(3, 1fr); } }
 .ck-flash { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: rgba(224,91,106,0.14); border: 1px solid rgba(224,91,106,0.4); color: #ffb4bc; font-size: 0.84rem; font-weight: 700; }
 .ck-sec { font-weight: 800; font-size: 0.98rem; margin-bottom: 10px; }
+/* Subordinate to the tabs above it — a full-width quiet bar, not a fifth tab competing with them. */
+.ck-onlyknown { display: block; width: 100%; margin: -4px 0 11px; padding: 6px 10px; border-radius: 9px;
+    cursor: pointer; font: inherit; font-size: 0.74rem; font-weight: 800; text-align: left;
+    color: #8b93a0; background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.14); }
+.ck-onlyknown:hover { color: #cbd2da; border-color: rgba(255,255,255,0.26); }
+.ck-onlyknown.is-on { color: #ffd75e; background: rgba(255,215,110,0.10);
+    border-style: solid; border-color: rgba(255,215,110,0.42); }
 .ck-empty { margin: 0; font-size: 0.85rem; }
     background: none; border: none; cursor: pointer; font: inherit; font-weight: 800; font-size: 0.9rem; color: #c9a2ff; }
 
