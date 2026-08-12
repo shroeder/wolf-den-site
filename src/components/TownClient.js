@@ -981,11 +981,32 @@ export default function TownClient({ initial }) {
     // Tapping a foe opens the TIMING swing; the duel only resolves once they've taken their shot, so a kill is
     // skill rather than a stat roll. Same bands as the Forge anvil and the golem, so the feel carries across.
     const [swing, setSwing] = useState(null); // { enemyId, foeArt } while the bar is up
-    const startDuel = useCallback((enemyId, foeArt) => {
+    const [raidNote, setRaidNote] = useState(null);   // why a tap did nothing — said out loud, never swallowed
+    const startDuel = useCallback(async (enemyId, foeArt) => {
         const ev = state?.event; if (!ev || raidCdRef.current || duel || swing) return;
         // Carry the archetype through so the swing screen can say what you've picked a fight with.
         const foe = (ev.swarm?.enemies || []).find((e) => String(e.id) === String(enemyId)) || null;
-        setSwing({ enemyId, foeArt: foeArt || null, label: foe?.label || null, hint: foe?.hint || null, tint: foe?.tint || null });
+        // ── THE TIMING BAR IS GONE ───────────────────────────────────────────────────────────────────────
+        // Tapping a raider used to open a one-swing accuracy game, graded on how close to the centre you
+        // tapped — your class, your tree and your skills had nothing to do with it. It claims the foe and
+        // opens a REAL bout now, on the same engine and the same screen the Arena uses, because a second
+        // combat system is how two parts of a game end up disagreeing about what Might does.
+        //
+        // The fight is fought on /marketplace/arena rather than in a copy of that screen embedded here: the
+        // bout lives on the member's own row, so the Arena finds it already in progress and draws it with the
+        // renderer it already has. One bout UI, one place to fix it.
+        setSwing({ enemyId, foeArt: foeArt || null, label: foe?.label || null, hint: foe?.hint || null, tint: foe?.tint || null, opening: true });
+        const r = await fetch("/api/marketplace/town", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "engage", eventId: ev.id, enemyId }),
+        }).then((x) => x.json()).catch(() => null);
+        if (r?.ok) { window.location.href = "/marketplace/arena?from=town"; return; }
+        setSwing(null);
+        // Somebody else got to it first, or a bout of yours is already open. Say which.
+        setRaidNote(r?.error === "bout_in_progress"
+            ? "Finish the fight you are already in first."
+            : r?.who ? `${r.who} is already on that one.` : "That one is already taken.");
+        setTimeout(() => setRaidNote(null), 2600);
     }, [state?.event, duel, swing]);
 
     // Resolve the duel with the swing's distance-from-centre; the server grades and clamps it.
@@ -1969,7 +1990,16 @@ export default function TownClient({ initial }) {
             {gambleReveal ? <GambleReveal reveal={gambleReveal} diceUrl={art.dice?.url} onClose={() => setGambleReveal(null)} /> : null}
 
             {/* Raid victory recap */}
-            {swing ? <SwingBar foe={swing} onSwing={(d) => resolveSwing(swing.enemyId, swing.foeArt, d)} onCancel={() => setSwing(null)} /> : null}
+            {/* The swing bar is only ever the "opening…" beat now — the fight itself happens on the arena
+                screen. Kept as a component rather than deleted because a queued tap from an old tab can still
+                resolve the old way (see the `duel` branch in the route). */}
+            {swing?.opening ? (
+                <div className="tw-raid-opening" role="status">
+                    <b>{swing.label || "A raider"}</b>
+                    <span>squaring up…</span>
+                </div>
+            ) : swing ? <SwingBar foe={swing} onSwing={(d) => resolveSwing(swing.enemyId, swing.foeArt, d)} onCancel={() => setSwing(null)} /> : null}
+            {raidNote ? <div className="tw-raid-note" role="status">{raidNote}</div> : null}
             {duel ? <DuelModal duel={duel} youSprite={you?.sprite} youFlip={you?.flip} onClose={closeDuel} /> : null}
 
             {bossOpen && state?.event?.boss ? <BossRaidModal ev={state.event} bossArt={art[EVENT_ART[state.event.kind]]?.url} you={you} onStrike={bossStrike} onClose={() => setBossOpen(false)} /> : null}

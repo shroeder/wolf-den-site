@@ -40,6 +40,29 @@ export const TOWN_EVENT_TYPES = {
         name: "Goblin Swarm", emoji: "👺", hp: 2000, enemies: 8, rewardGold: 1800, durationMin: 12, duelPower: 13,
         pushTitle: "👺 A goblin swarm hit the Town!", pushBody: "Pile into the plaza and drive them out — loot for everyone who fights!",
     },
+    // ── THREE MORE, AND EACH ONE WANTS A DIFFERENT ANSWER ────────────────────────────────────────────────
+    // Bandits and goblins are the same fight with different portraits: a line of brawlers you work through.
+    // Now that a raider is fought on the arena engine, a faction can have a SHAPE — its roster leans on one
+    // archetype, so the kit that walked through the goblins is the wrong kit here.
+    //
+    //   FROST PACK    fast and fragile. Duelists and berserkers, almost no armour, and a LOT of them. If you
+    //                 built to out-last things you will be bled to death by something you could one-shot.
+    //   DROWNED CREW  the sea's leftovers. Walls and brutes, heavy and slow. Nothing you swing lands for much
+    //                 — the answer is sunder, pierce, or patience you have not got, because the raid has a clock.
+    //   HOLLOW COURT  spellcasters. Balanced bodies with real abilities and the longest health pools, which
+    //                 makes it the one raid where YOUR cooldowns and element matter more than your Might.
+    frost_pack: {
+        name: "Frost Pack", emoji: "🐺", hp: 2200, enemies: 10, rewardGold: 2200, durationMin: 12, duelPower: 12,
+        pushTitle: "🐺 A frost pack came down on the Den!", pushBody: "They are fast and there are a lot of them — get to the plaza before they scatter.",
+    },
+    drowned_crew: {
+        name: "The Drowned Crew", emoji: "🌊", hp: 2900, enemies: 6, rewardGold: 2900, durationMin: 15, duelPower: 19,
+        pushTitle: "🌊 Something came up the beach and into the plaza.", pushBody: "Heavy, slow and hard to hurt. Bring something that cuts armour.",
+    },
+    hollow_court: {
+        name: "The Hollow Court", emoji: "🕯️", hp: 3200, enemies: 7, rewardGold: 3400, durationMin: 16, duelPower: 21,
+        pushTitle: "🕯️ The Hollow Court is holding session in the plaza.", pushBody: "They are casting. Your element and your cooldowns decide this one.",
+    },
     // The golem is a BOSS RAID (not a skirmish): ONE huge shared boss everyone strikes together, its HP bar drains
     // for the whole pack, and killing it ENDS the raid. No per-hit rewards — only a rich completion reward.
     // Two damage sources, both requiring you to be IN THE SQUARE (see accrueSquarePassive + bossRaidStrike):
@@ -832,7 +855,18 @@ function simulateDuel({ myPower, foePower, myCrit = 0, myCritPow = 30 }) {
 // Your FIRST duel of a raid always drops a low-tier chest (thanks for coming down to play). Wins drain the wave
 // (which just refills — the raid runs its full timer).
 // enemyId targets a specific foe on the shared roster; the duel claims it, then drops it on a win.
-export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = null) {
+/**
+ * Resolve one encounter in a town raid — the spoils, the shared roster, the wave, the quests, the badges.
+ *
+ * `decided` is how a RAID BOUT gets paid. The fight itself no longer has to happen in here: a goblin is fought
+ * on the arena engine now, with your class and your skills (see startTownBout), and when that bout ends the
+ * winner is already known. Rather than a second copy of every payout — chests, scrap, the wave advance, the
+ * chieftain, the raid-won celebration — the bout hands the result to this, which has always owned all of it.
+ *
+ * Passing `decided` also skips the timing grade and the duel simulation, which is the entire point: there is
+ * no timing bar in a raid any more.
+ */
+export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = null, { decided = null } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     // started_at is needed by the XP budget below — XP events carry no raid ref, so "this raid" means "since it
     // started". Without it the window falls back to an hour and bleeds a previous raid's XP into this one's cap.
@@ -861,7 +895,11 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
     const timingMult = dist == null ? 1 : 0.5 + (grade.mult / STRIKE_GRADES[0].mult) * 1.5; // glancing 0.65x → pixel 2.0x
     myPower *= timingMult;
     const type = TOWN_EVENT_TYPES[ev.kind] || {};
-    const sim = simulateDuel({ myPower, foePower: type.duelPower || 16, myCrit: critC, myCritPow: critP });
+    // A BOUT ALREADY FOUGHT IS NOT SIMULATED AGAIN. `decided` carries the outcome of a real arena-engine fight
+    // and the foe's remaining health, so everything below reads it exactly as it read the old simulation.
+    const sim = decided
+        ? { win: Boolean(decided.win), foeHp: decided.win ? 0 : Math.max(0, Math.min(100, Number(decided.foeHpPct) ?? 100)), events: [] }
+        : simulateDuel({ myPower, foePower: type.duelPower || 16, myCrit: critC, myCritPow: critP });
     // Record participation (damage this exchange = foe HP removed; hits = duels won — powers the leaderboard).
     const dealt = Math.round(100 - sim.foeHp);
     const mine = await db.queryOne(

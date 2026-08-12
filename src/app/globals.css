@@ -16270,3 +16270,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-rung-meta { font-size: .64rem; color: #8b93a0; font-weight: 700; }
 .ar-rung-prize { font-size: .64rem; color: #ffd75e; font-weight: 800; }
 .ar-rung.is-done .ar-rung-prize { color: #6a727d; }
+
+/* The beat between tapping a raider and the fight opening. Short on purpose — it is a claim on the shared
+   roster and a page change, not a loading screen. */
+.tw-raid-opening, .tw-raid-note {
+    position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); z-index: 1200;
+    display: grid; justify-items: center; gap: 2px; padding: 10px 18px; border-radius: 14px;
+    background: rgba(12,14,18,.94); border: 1px solid rgba(255,215,94,.45);
+    box-shadow: 0 12px 34px rgba(0,0,0,.6); text-align: center;
+}
+.tw-raid-opening b { color: #f6dfae; font-size: .92rem; }
+.tw-raid-opening span { color: #b9a382; font-size: .74rem; }
+.tw-raid-note { color: #e8c9a0; font-size: .82rem; font-weight: 700; }

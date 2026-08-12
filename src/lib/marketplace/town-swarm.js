@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { ARCHETYPES } from "@/lib/marketplace/arena-npc.js";
 
 // ── THE SHARED SWARM ─────────────────────────────────────────────────────────────────────────────────────────
 // A skirmish raid is now a real, finite, SHARED roster of foes: 5 waves, then a chieftain, then it's over.
@@ -78,6 +79,36 @@ const FACTIONS = {
             chieftain: { label: "Bandit King", emoji: "💀", hint: "The Bandit King. Drop him and the raid is won." },
         },
     },
+    frost_pack: {
+        art: "frost",
+        names: {
+            scrapper: { label: "Frost Whelp", emoji: "🐺", hint: "Quick and thin. It dies fast and so might you." },
+            archer: { label: "Ice-Spitter", emoji: "❄️", hint: "Hits from range and does not stand still." },
+            shieldbearer: { label: "Rimehide", emoji: "🧊", hint: "The only thing here wearing armour." },
+            elite: { label: "Pack Alpha", emoji: "🌨️", hint: "It leads them, and it is faster than all of them." },
+            chieftain: { label: "The Winter Wolf", emoji: "💠", hint: "Put it down and the pack breaks." },
+        },
+    },
+    drowned_crew: {
+        art: "drowned",
+        names: {
+            scrapper: { label: "Drowned Deckhand", emoji: "🌊", hint: "Slow, waterlogged, and it does not stop." },
+            archer: { label: "Harpooner", emoji: "🔱", hint: "Reaches further than it looks like it should." },
+            shieldbearer: { label: "Barnacled Hull", emoji: "🐚", hint: "Nothing you swing gets through this." },
+            elite: { label: "The Bosun", emoji: "⚓", hint: "It still thinks it is running a deck." },
+            chieftain: { label: "Captain Grine", emoji: "☠️", hint: "Whatever went down with the ship came back up." },
+        },
+    },
+    hollow_court: {
+        art: "hollow",
+        names: {
+            scrapper: { label: "Candle-Bearer", emoji: "🕯️", hint: "A servant of the court. Barely there." },
+            archer: { label: "The Whisperer", emoji: "🌫️", hint: "It casts from the back and it does not miss much." },
+            shieldbearer: { label: "The Sealed Knight", emoji: "⚔️", hint: "Empty armour, and it holds the line." },
+            elite: { label: "Court Magister", emoji: "🔮", hint: "Real spells, and it knows your element." },
+            chieftain: { label: "The Hollow Regent", emoji: "👑", hint: "It has been holding court a very long time." },
+        },
+    },
 };
 export const factionOf = (eventKind) => FACTIONS[eventKind] || FACTIONS.goblin_swarm;
 
@@ -91,6 +122,65 @@ export const enemyKind = (k, eventKind = null) => {
     const named = factionOf(eventKind).names[k in KINDS ? k : "scrapper"];
     return named ? { ...base, ...named, art: factionOf(eventKind).art } : base;
 };
+
+// ── A RAIDER AS AN ARENA OPPONENT ────────────────────────────────────────────────────────────────────────────
+// A town foe is fought on the arena engine now — your class, your skills, their archetype — so it needs the
+// same shape any other opponent has. The MECHANICS above (hp, bite, timing) described a tap-to-hit duel and do
+// not translate directly, so each kind is mapped to an arena archetype that fights the way it looks:
+//
+//   scrapper      BRUTE      races you. Nothing clever, and it does not need to be.
+//   archer        DUELIST    swingy and sharp. Squishy, but a crit takes a third of you.
+//   shieldbearer  WALL       nothing lands for much. Bring a sunder or bring patience.
+//   elite         BERSERKER  a Warchanter hits far harder than it can survive.
+//   chieftain     BALANCED   no weakness and no lever. The raid's boss is meant to take a real kit.
+//
+// `power` is a budget, not a stat line — statsForPower spends it through the archetype's weights, exactly as a
+// Gauntlet tier or a Long Road rung does. Scaled off the kind's old HP so a shield-bearer is still the tanky
+// one and a chieftain is still ten times a scrapper.
+const ARENA_SHAPE = {
+    scrapper: { archetype: "brute", power: 320, kitTier: 4 },
+    archer: { archetype: "duelist", power: 300, kitTier: 5 },
+    shieldbearer: { archetype: "wall", power: 480, kitTier: 6 },
+    elite: { archetype: "berserker", power: 760, kitTier: 9 },
+    chieftain: { archetype: "balanced", power: 1900, kitTier: 14 },
+};
+
+// ── AND A FACTION HAS A SHAPE ────────────────────────────────────────────────────────────────────────────────
+// Without this every raid is the same fight with different portraits, which is what bandits and goblins have
+// always been. A faction re-points its roster at a different archetype, so the kit that walked through the
+// goblins is the wrong kit against the Court — and the raid announcement can honestly tell you what to bring.
+//
+// Only the ROLE moves; the power budget still comes off the kind, so a shield-bearer is the tanky one whoever
+// is wearing it. Anything not listed keeps the default shape.
+const FACTION_SHAPE = {
+    // Fast and fragile, and there are ten of them. Duelists all the way up.
+    frost_pack: { scrapper: "duelist", archer: "duelist", shieldbearer: "brute", elite: "berserker", chieftain: "berserker" },
+    // Heavy, slow, and nothing you swing lands for much.
+    drowned_crew: { scrapper: "wall", archer: "brute", shieldbearer: "wall", elite: "wall", chieftain: "wall" },
+    // Bodies are ordinary; what hurts is what they cast.
+    hollow_court: { scrapper: "balanced", archer: "duelist", shieldbearer: "wall", elite: "balanced", chieftain: "balanced" },
+};
+
+/** Everything the arena needs to fight one of these, resolved from the kind and the faction it belongs to. */
+export function enemyProfile(kind, eventKind = null) {
+    const k = kind in ARENA_SHAPE ? kind : "scrapper";
+    const def = enemyKind(k, eventKind);
+    const shape = { ...ARENA_SHAPE[k], archetype: FACTION_SHAPE[eventKind]?.[k] || ARENA_SHAPE[k].archetype };
+    const arch = ARCHETYPES.find((a) => a.key === shape.archetype) || ARCHETYPES[0];
+    return {
+        archetypeName: arch.name,
+        tell: arch.tell,
+        name: def.label,
+        blurb: def.hint,
+        // The KEY, not a path. Foe art lives in mkt_town_art (foe_<faction>_<kind>), the same table the plaza
+        // buildings use — there are no files on disk for these, and inventing a path was how this would have
+        // shipped a fight with no portrait on it.
+        artKey: def.art ? `foe_${def.art}_${k}` : null,
+        tint: def.tint || "#c9a24a",
+        element: ["fire", "earth", "storm", "shadow", "water"][Object.keys(ARENA_SHAPE).indexOf(k) % 5],
+        ...shape,
+    };
+}
 
 const rand = (a, b) => a + Math.random() * (b - a);
 function pickKind(wave) {

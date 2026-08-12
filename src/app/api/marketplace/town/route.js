@@ -44,6 +44,14 @@ export async function POST(request) {
             else if (body?.action === "typing") res = await setTownTyping(buyer.id);
             else if (body?.action === "project_contribute") res = await contributeTownProject(buyer.id, body?.projectId, body?.amount);
             else if (body?.action === "attack") res = await attackTownEvent(buyer.id, body?.eventId, body?.move);
+            // A RAID FIGHT IS A BOUT NOW. The timing bar is gone: tapping a foe opens a real fight on the
+            // arena engine, with your class and your skills, and the raid is paid when that bout ends.
+            // `duel` stays wired for anything still posting it (an old tab, a queued tap) and resolves the
+            // old way rather than 400ing at somebody mid-raid.
+            else if (body?.action === "engage") {
+                const { startTownBout } = await import("@/lib/marketplace/arena.js");
+                res = await startTownBout(buyer.id, body?.eventId, body?.enemyId);
+            }
             else if (body?.action === "duel") res = await duelRaidEnemy(buyer.id, body?.eventId, body?.enemyId, body?.dist);
             // `dist` is the swing's distance from the timing bar's centre (0 = dead centre). Graded server-side.
             else if (body?.action === "boss_strike") res = await bossRaidStrike(buyer.id, body?.eventId, body?.dist);

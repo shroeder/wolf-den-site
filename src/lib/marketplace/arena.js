@@ -681,6 +681,120 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     return shortlist.find((c) => (roll -= c.w) <= 0) || shortlist[0];
 }
 
+/**
+ * Build a fresh bout object.
+ *
+ * EXTRACTED so a town raider and an arena challenger are the same fight. It was written inline in startBout,
+ * which meant a second entry point could only be a second copy — and two copies of a combat state is how the
+ * boss fight and the arena ended up disagreeing about what Might does. `extra` is spread last so a caller can
+ * hang a rider on it (the raid does: see startTownBout) without this needing to know what a raid is.
+ */
+function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra = {} } = {}) {
+    const clash = elementClash(me.element, foeKit.element);
+    const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
+    const bout = {
+        myPower, theirPower, npcTier, size,
+        foe: {
+            id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
+            npc: Boolean(npcTier), tier: npcTier || null,
+            element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
+            speed: foeKit.speed,
+            // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
+            // disagree — the card reads the same fields resolveBeat multiplies.
+            health: foeKit.health, damage: foeKit.damage,
+            critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
+            // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
+            // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
+            // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
+            // thorns, block, lastStand, regen, pierce, openMult, lowHpDmg, spellPower, elementEdge and the
+            // rest — were computed for the defender and then dropped on the floor, because only `me` carried
+            // `perks` onto the bout. So a member who spent twelve points on Iron Thorns returned nothing
+            // while defending, and the build they chose was invisible in half the fights it appeared in.
+            perks: foeKit.perks || {},
+        },
+        // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
+        // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
+        // "anything >= 0" and it fired on EVERY win — including beating a Straw Dummy.
+        // `perks` RIDES ALONG NOW, and that is the whole fix for a shield build that did nothing. The tree's
+        // stat nodes were merged into health/might/speed/fortune at kit time and then thrown away, so the
+        // fifteen that are not one of those four — thorns, regen, block, guardSoak, riposteShare, lastStand,
+        // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
+        // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
+        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
+            health: me.health, damage: me.damage,
+            critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
+            gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
+        clash,                                   // your affinity against theirs, decided before a blow lands
+        underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
+        hp: me.health, maxHp: me.health,
+        foeHp: foeKit.health, foeMaxHp: foeKit.health,
+        cd: {},                                  // abilityId -> turns before it can be used again
+        // The defender's satchel. Seeded here so a bout saved before items existed still gets them on its
+        // next beat (the picker falls back to a fresh set if this is missing) rather than fighting empty.
+        foeItems: itemsFor(foeKit),
+        items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
+        // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
+        // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
+        turn: me.speed >= foeKit.speed ? "you" : "them",
+        opener: me.speed >= foeKit.speed ? "you" : "them",
+        beat: 1, log: [], over: false, won: false,
+        shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
+        bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back
+    };
+    Object.assign(bout, extra);
+    return bout;
+}
+
+/**
+ * FIGHT A TOWN RAIDER ON THE ARENA ENGINE.
+ *
+ * Tapping a goblin used to open a timing bar: one swing, graded on how close to the centre you tapped, and
+ * your class and your skills had nothing to do with it. It opens a real bout now — your kit, your tree, their
+ * archetype — on exactly the machinery the Arena uses, because a second combat engine is how two systems end
+ * up disagreeing about what Might does.
+ *
+ * WHAT IS DIFFERENT FROM AN ARENA CHALLENGE, and all of it deliberate:
+ *   · it does NOT spend one of your daily arena bouts — a raid is the town's clock, not the Arena's
+ *   · it pays no VP and no laurels; the spoils are the raid's own (see duelRaidEnemy)
+ *   · the foe is claimed on the shared roster FIRST, so two members cannot fight the same goblin
+ *
+ * The bout carries a `town` rider, which is the only thing telling finishBout to pay it as a raid.
+ */
+export async function startTownBout(buyerId, eventId, enemyId) {
+    const row = await arenaRow(buyerId);
+    if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
+        return { ok: false, error: "bout_in_progress" };
+    }
+    const { engageEnemy, enemyProfile } = await import("@/lib/marketplace/town-swarm.js");
+    // The faction decides the archetype (see FACTION_SHAPE), so the event's kind has to come along or every
+    // raid fights as the default and the three new ones are three new portraits on one fight.
+    const ev = await db.queryOne(`SELECT kind FROM mkt_town_event WHERE id = $1 AND status = 'active'`, [eventId]).catch(() => null);
+    if (!ev) return { ok: false, error: "no_event" };
+    // CLAIMED BEFORE ANYTHING IS BUILT. The roster is shared and the claim is the thing that stops two people
+    // opening a bout against the same goblin; losing that race has to cost nothing.
+    const claim = await engageEnemy(buyerId, enemyId).catch(() => null);
+    if (!claim?.ok) return { ok: false, error: claim?.error || "taken", who: claim?.who || null };
+
+    const me = await kitFor(buyerId);
+    const prof = enemyProfile(claim.kind, ev.kind);
+    const st = statsForPower(prof.power, prof.archetype, prof.element, Number(enemyId) || 0);
+    const art = prof.artKey
+        ? await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = $1`, [prof.artKey]).catch(() => null)
+        : null;
+    const foe = {
+        id: `town:${enemyId}`, name: prof.name, sprite: art?.url || null, npc: true, town: true,
+        blurb: prof.blurb, color: prof.tint, archetype: prof.archetype, archetypeName: prof.archetypeName,
+        tell: prof.tell, level: null,
+    };
+    const foeKit = { ...foe, ...st, ...ringStats(st), abilities: npcAbilities(prof.kitTier) };
+    const b = buildBout(me, foe, foeKit, {
+        myPower: arenaRating(me),
+        extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) } },
+    });
+    await saveBout(buyerId, b);
+    return { ok: true, bout: publicBout(b) };
+}
+
 export async function startBout(buyerId, targetId = null) {
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
@@ -741,57 +855,7 @@ export async function startBout(buyerId, targetId = null) {
         foeKit = await kitFor(foe.id);
     }
 
-    const clash = elementClash(me.element, foeKit.element);
-    const theirPower = npcTier > 0 ? foe.gearPower : foe.power;
-    const bout = {
-        myPower, theirPower, npcTier, size: board.length,
-        foe: {
-            id: foe.id, name: foe.name, sprite: foe.sprite, level: foe.level || null,
-            npc: Boolean(npcTier), tier: npcTier || null,
-            element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
-            speed: foeKit.speed,
-            // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
-            // disagree — the card reads the same fields resolveBeat multiplies.
-            health: foeKit.health, damage: foeKit.damage,
-            critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
-            // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
-            // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
-            // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
-            // thorns, block, lastStand, regen, pierce, openMult, lowHpDmg, spellPower, elementEdge and the
-            // rest — were computed for the defender and then dropped on the floor, because only `me` carried
-            // `perks` onto the bout. So a member who spent twelve points on Iron Thorns returned nothing
-            // while defending, and the build they chose was invisible in half the fights it appeared in.
-            perks: foeKit.perks || {},
-        },
-        // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
-        // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
-        // "anything >= 0" and it fired on EVERY win — including beating a Straw Dummy.
-        // `perks` RIDES ALONG NOW, and that is the whole fix for a shield build that did nothing. The tree's
-        // stat nodes were merged into health/might/speed/fortune at kit time and then thrown away, so the
-        // fifteen that are not one of those four — thorns, regen, block, guardSoak, riposteShare, lastStand,
-        // shieldCap, wardSoak, critMult, openMult, lowHpDmg, pierce, spellPower, elementEdge, rendTick — were
-        // read by nothing at all. Iron Thorns returned nothing. Fortress soaked nothing. Overkill did nothing.
-        me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
-            health: me.health, damage: me.damage,
-            critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
-            gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
-        clash,                                   // your affinity against theirs, decided before a blow lands
-        underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
-        hp: me.health, maxHp: me.health,
-        foeHp: foeKit.health, foeMaxHp: foeKit.health,
-        cd: {},                                  // abilityId -> turns before it can be used again
-        // The defender's satchel. Seeded here so a bout saved before items existed still gets them on its
-        // next beat (the picker falls back to a fresh set if this is missing) rather than fighting empty.
-        foeItems: itemsFor(foeKit),
-        items: Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count])),
-        // SPEED takes the first beat. A tie keeps it with the challenger, so bringing the fight still counts
-        // for something. Opening a ten-beat exchange is a real edge, which is what makes Ferocity worth wearing.
-        turn: me.speed >= foeKit.speed ? "you" : "them",
-        opener: me.speed >= foeKit.speed ? "you" : "them",
-        beat: 1, log: [], over: false, won: false,
-        shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
-        bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back
-    };
+    const bout = buildBout(me, foe, foeKit, { npcTier, size: board.length, myPower });
     // A FOE WHO WINS INITIATIVE MUST STILL TELEGRAPH. `incoming` was only ever filled in at the end of a
     // resolved beat, so when their speed took the first one there was nothing to publish — the warning card
     // fell back to "a heavy swing" for a move that might have been a mythic spell, and the whole read-it-first
@@ -803,7 +867,7 @@ export async function startBout(buyerId, targetId = null) {
           WHERE buyer_id = $1`,
         [buyerId, JSON.stringify(bout)]
     ).catch(() => {});
-    await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower }).catch(() => {});
+    await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower: bout.theirPower }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
@@ -1324,6 +1388,29 @@ export async function fightRound(buyerId, opts = {}) {
 
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
+
+    // ── A RAID BOUT IS PAID BY THE RAID ──────────────────────────────────────────────────────────────────
+    // Everything below this point is the Arena's economy — VP, laurels, the ladder, the streak, the feats —
+    // and none of it belongs to a goblin in the plaza. A town fight hands its result to duelRaidEnemy, which
+    // has always owned the spoils, the shared roster, the wave, the chieftain and the raid-won celebration,
+    // and returns here with nothing else touched. Recorded on the bout first so a reload cannot re-pay it.
+    if (b.town && !b.townPaid) {
+        b.townPaid = true;
+        await saveBout(buyerId, b).catch(() => {});
+        const { duelRaidEnemy } = await import("@/lib/marketplace/town-events.js");
+        const res = await duelRaidEnemy(buyerId, b.town.eventId, b.town.enemyId, null, {
+            decided: { win: won, foeHpPct: b.foeMaxHp ? Math.round((b.foeHp / b.foeMaxHp) * 100) : 100 },
+        }).catch(() => null);
+        b.recap = {
+            won, foe: b.foe, town: true,
+            raid: res && res.ok ? { reward: res.reward, cleared: res.cleared, wave: res.wave, loot: res.loot } : null,
+            rounds: b.beat || (b.log || []).length,
+        };
+        await db.query(`UPDATE mkt_arena SET bout_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify(b)]).catch(() => {});
+        return { ok: true, ...(await getArenaState(buyerId)) };
+    }
+
 
     // ── WHAT THE BOUT PAID ───────────────────────────────────────────────────────────────────────────────
     // No position swap. Standing is an accrued TOTAL now, so winning adds and losing subtracts nothing —
