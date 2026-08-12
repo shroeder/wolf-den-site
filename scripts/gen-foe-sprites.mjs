@@ -8,11 +8,14 @@
 // Written into mkt_town_art under `foe_<faction>_<archetype>`, which is where the Town already reads its art
 // from, so no new plumbing.
 //
-// Usage:  node scripts/gen-foe-sprites.mjs [key ...]     (no args = every missing one)
+// Usage:  node scripts/gen-foe-sprites.mjs [key ...]              (no args = every missing one)
+//         node scripts/gen-foe-sprites.mjs --sheet                (contact sheet of all 25; free)
+//         node scripts/gen-foe-sprites.mjs --flip drowned_scrapper (mirror by hand; free)
 import fs from "node:fs";
 
 import { put } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
+import sharp from "sharp";
 
 import { housePrompt } from "../src/lib/marketplace/art-style.js";
 import "./lib/ai-trace.mjs"; // every OpenAI call in this script lands in the AI Costs history
@@ -26,8 +29,18 @@ const DB = pick(env, "DATABASE_URL");
 if (!OPENAI || !BLOB || !DB) throw new Error(`missing key(s): openai=${!!OPENAI} blob=${!!BLOB} db=${!!DB}`);
 const sql = neon(DB);
 
-// Full body, facing LEFT — they're charging the player's side of the plaza.
-const POSE = "Full body, standing in a menacing ready stance, facing and looking toward the LEFT of the image.";
+// ── FACING RIGHT, AND IT HAS TO BE ───────────────────────────────────────────────────────────────────────────
+// This said LEFT for its whole life, on the reasoning that these foes charge the player's side of the plaza.
+// That reasoning skipped the screen they are actually FOUGHT on. A town skirmish is an arena bout — it resolves
+// through startBout with a `town` rider — so a foe is drawn by ArenaClient, and ArenaClient MIRRORS every foe:
+// "a foe's rest pose is scaleX(-1)", supplied by arBreatheFoe, because arena fighters are drawn facing right and
+// have to turn to meet a hero standing on the left. A sprite authored facing left therefore renders facing RIGHT
+// — back to back with your hero for the whole fight, which is exactly how it looked in the plaza's skirmishes.
+//
+// So: right, like every other fighter in this game. The plaza is unaffected — a roaming enemy there is flipped
+// per-enemy anyway (`scaleX(en.flip ? -1 : 1)`), so it was never relying on a fixed direction.
+// Verify with `--sheet --ingame`, which applies the same mirror and shows you what the player gets.
+const POSE = "Full body, standing in a menacing ready stance, facing and looking toward the RIGHT of the image.";
 
 const FOES = {
     // ── GOBLINS ──
@@ -87,6 +100,69 @@ async function generate(prompt) {
 }
 
 const want = process.argv.slice(2);
+
+/** Every foe sprite currently live, in roster order, as { key, url }. */
+async function roster() {
+    const rows = await sql.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'foe_%'`);
+    const byKey = new Map(rows.map((r) => [r.art_key, r.url]));
+    return Object.keys(FOES).map((k) => ({ key: k, url: byKey.get(`foe_${k}`) || null })).filter((f) => f.url);
+}
+
+// ── THE ONLY AUDIT THAT WORKS ────────────────────────────────────────────────────────────────────────────────
+// A contact sheet, read by eye — the same pass gen-ladder-rungs.mjs has, and here for the same reason. These
+// foes are drawn facing LEFT because they stand on the right of the plaza and charge the player, and the model
+// gets that wrong often enough to matter: a foe drawn facing right stands back-to-back with your hero for the
+// whole fight. Nothing automatic catches it. A vision model asked "which way is this facing?" flip-flops — on
+// the fleet captains it flipped twelve, then re-read its own output and called ten of those left-facing again.
+// So: read the sheet, then --flip the wrong ones by hand. Labelled, because a fix needs a name to act on.
+// `--ingame` is the one worth reading. The fight screen MIRRORS every foe — "a foe's rest pose is scaleX(-1)",
+// supplied by arBreatheFoe in ArenaClient — because arena fighters are drawn facing right and have to turn to
+// meet a hero who stands on the left. So the sprite on the blob is NOT what the player sees, and auditing the
+// source art means holding the mirror in your head for twenty-five figures. Don't: pass --ingame and read the
+// picture the player actually gets. Anything facing RIGHT there is facing away from the hero, and is a bug.
+if (want.includes("--sheet")) {
+    const inGame = want.includes("--ingame");
+    const foes = await roster();
+    const cell = 300, pad = 22, cols = 5, rows = Math.ceil(foes.length / cols);
+    const comp = [];
+    for (let i = 0; i < foes.length; i += 1) {
+        const buf = Buffer.from(await (await fetch(foes[i].url)).arrayBuffer());
+        const left = (i % cols) * cell, top = Math.floor(i / cols) * (cell + pad);
+        const img = sharp(buf).resize(cell - 12, cell - 12, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } });
+        comp.push({ input: await (inGame ? img.flop() : img).png().toBuffer(), left: left + 6, top: top + 6 });
+        // The hero stands on the LEFT of the ring, so a correct foe looks back down this arrow.
+        comp.push({
+            input: Buffer.from(`<svg width="${cell}" height="${pad}"><text x="${cell / 2}" y="15" font-family="monospace"
+                font-size="13" fill="#333" text-anchor="middle">← ${foes[i].key}</text></svg>`),
+            left, top: top + cell,
+        });
+    }
+    const out = inGame ? "foe-sheet-ingame.png" : "foe-sheet.png";
+    await sharp({ create: { width: cols * cell, height: rows * (cell + pad), channels: 4, background: { r: 250, g: 250, b: 252, alpha: 1 } } })
+        .composite(comp).png().toFile(out);
+    console.log(`wrote ${out} — ${foes.length} foes, ${cols} across.`);
+    console.log(inGame ? "This is what the fight screen shows. Each should face LEFT, into the arrow." : "Source art, unmirrored. Add --ingame to see what the player gets.");
+    process.exit(0);
+}
+
+// Mirror by hand, after reading the sheet. Lossless, free, and it re-uploads rather than editing in place so a
+// cached <img> cannot keep serving the old orientation.
+if (want.includes("--flip")) {
+    const keys = want.filter((a) => !a.startsWith("--"));
+    if (!keys.length) throw new Error("--flip needs at least one foe key, e.g. drowned_scrapper");
+    for (const k of keys) {
+        if (!FOES[k]) { console.log(`skip (not a foe): ${k}`); continue; }
+        const row = await sql.query(`SELECT url FROM mkt_town_art WHERE art_key = $1`, [`foe_${k}`]);
+        if (!row[0]?.url) { console.log(`skip (never generated): ${k}`); continue; }
+        const src = Buffer.from(await (await fetch(row[0].url)).arrayBuffer());
+        const blob = await put(`marketplace/foes/${k}-${Date.now()}.png`, await sharp(src).flop().png().toBuffer(),
+            { access: "public", contentType: "image/png", token: BLOB });
+        await sql.query(`UPDATE mkt_town_art SET url = $2, updated_at = NOW() WHERE art_key = $1`, [`foe_${k}`, blob.url]);
+        console.log(`flipped ${k}`);
+    }
+    process.exit(0);
+}
+
 const existing = new Set((await sql.query(`SELECT art_key FROM mkt_town_art WHERE art_key LIKE 'foe_%'`)).map((r) => r.art_key));
 const todo = Object.keys(FOES).filter((k) => (want.length ? want.includes(k) : !existing.has(`foe_${k}`)));
 if (!todo.length) { console.log("nothing to do"); process.exit(0); }
