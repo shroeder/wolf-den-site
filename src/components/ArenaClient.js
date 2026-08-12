@@ -66,7 +66,11 @@ const TELEGRAPH_MS = 850;
 
 // How long a cast holds the screen before the blow lands. The declaration, the spotlight and the effect all
 // play inside this window.
-const CAST_MS = 1250;
+//
+// 1250 -> 700. A cinematic you have seen four hundred times is not a cinematic, it is a wait, and a skill is
+// pressed several times a bout. The declaration and the spotlight both still play — they were never 1250ms of
+// content, they were ~400ms of content in a 1250ms hold.
+const CAST_MS = 700;
 
 // ── ANTICIPATION ─────────────────────────────────────────────────────────────────────────────────────────────
 // Every command now has a WIND-UP: the fighter commits, draws back, and only then does the server resolve it.
@@ -75,7 +79,14 @@ const CAST_MS = 1250;
 //
 // Anticipation is not decoration. It is the half of a hit that tells you a hit is coming, and without it the
 // impact has nothing to land against. Lengths are per command: a swing is quick, a skill earns its cinematic.
-const WINDUP = { attack: 420, skill: CAST_MS, guard: 300, item: 420 };
+//
+// HALVED, because anticipation stops being anticipation once you know exactly what is coming. 420ms is a
+// generous draw-back the first ten times and a toll every time after; 220 still reads as a swing — the arWind
+// keyframe plays over whatever it is given — and it is now short enough that the server's reply almost always
+// lands inside it, which is what makes the whole exchange feel immediate rather than merely faster.
+//
+// Guard drops least: it is the one command with no follow-through to watch, so it was already near the floor.
+const WINDUP = { attack: 220, skill: CAST_MS, guard: 180, item: 220 };
 
 // How long a resolved beat owns the screen before anything else is allowed to start. This is what stops your
 // own result and their incoming telegraph from being on screen at the same time — which they were, in the same

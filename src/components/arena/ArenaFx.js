@@ -157,7 +157,7 @@ class Fx {
     ring(at, col, opts = {}) {
         this.rings.push({
             x: at.x, y: at.y, r: opts.from ?? 12, to: opts.to ?? 240,
-            life: 0, max: opts.max ?? 0.5, col, w: opts.w ?? 5, back: Boolean(opts.back),
+            life: 0, max: opts.max ?? 0.5, col, w: opts.w ?? 5,
         });
     }
 
@@ -216,7 +216,7 @@ class Fx {
                 this.elemental(at, element, p * big);
                 break;
             case "execute":
-                this.ring(at, PALETTE.shadow, { from: 320, to: 20, max: 0.34, w: 8, back: true });
+                this.ring(at, PALETTE.shadow, { to: 300, max: 0.34, w: 8 });
                 this.burst(at, PALETTE.shadow, Math.round(70 * big), 420);
                 this.hit(0.8 * big, "#b061ff");
                 break;
@@ -232,7 +232,7 @@ class Fx {
                 break;
             case "ward":
             case "guard":
-                this.ring(at, PALETTE.water, { from: 200, to: 70, max: 0.55, w: 7, back: true });
+                this.ring(at, PALETTE.water, { to: 200, max: 0.55, w: 7 });
                 this.burst(at, PALETTE.water, 34, 160, { grav: -40, lift: 90 });
                 break;
             case "surge":
@@ -241,14 +241,13 @@ class Fx {
                 break;
             case "riposte":
                 this.ring(at, PALETTE.water, { to: 240, max: 0.32, w: 5 });
-                this.ring(at, PALETTE.water, { from: 240, to: 30, max: 0.42, w: 4, back: true });
                 break;
             case "gamble":
                 this.burst(at, PALETTE.light, 60, 360, { grav: 900, lift: 320 });
                 break;
             case "heal":
                 this.column(at, PALETTE.light, 60, 70);
-                this.ring(at, ["#8bf0b4", "#dfffe8"], { from: 160, to: 40, max: 0.6, w: 4, back: true });
+                this.ring(at, ["#8bf0b4", "#dfffe8"], { to: 170, max: 0.6, w: 4 });
                 break;
             default:
                 // A plain blow. Small, sharp, and it shakes.
@@ -286,7 +285,7 @@ class Fx {
                 this.hit(1 * p, "#ffffff");
                 break;
             case "shadow":
-                this.ring(at, PALETTE.shadow, { from: 300, to: 24, max: 0.42, w: 10, back: true });
+                this.ring(at, PALETTE.shadow, { to: 280, max: 0.42, w: 10 });
                 this.burst(at, PALETTE.shadow, Math.round(70 * p), 260, { grav: -80 });
                 this.hit(0.7 * p, "#8a3cff");
                 break;
@@ -338,7 +337,7 @@ class Fx {
             if (r.life < 0) continue;
             if (r.life >= r.max) { this.rings.splice(i, 1); continue; }
             const t = r.life / r.max;
-            const rad = r.back ? r.r + (r.to - r.r) * t : r.r + (r.to - r.r) * t;
+            const rad = r.r + (r.to - r.r) * t;
             ctx.globalAlpha = Math.max(0, 1 - t);
             ctx.strokeStyle = Array.isArray(r.col) ? r.col[0] : r.col;
             ctx.lineWidth = r.w * (1 - t * 0.5);
