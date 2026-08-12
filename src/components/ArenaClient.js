@@ -286,7 +286,14 @@ function Recap({ bout, busy, onClose }) {
     })();
 
     const feats = Array.isArray(r?.feats) ? r.feats : [];
-    const reward = r?.reward || bout?.reward || null;
+    // ── A RAID IS PAID BY THE RAID, AND MUST BE REPORTED BY IT TOO ───────────────────────────────────────
+    // A town bout earns no VP, no laurels, no streak and no feats — its spoils are xp/coin/loot from
+    // duelRaidEnemy, hung on `recap.raid`. This screen only ever knew how to read the Arena's economy, so it
+    // rendered "+0 Victory Points", an empty reward list and "Streak 0" over a fight that had in fact just
+    // paid out. Members read that, correctly, as having been given nothing.
+    const raid = r?.town ? (r.raid || null) : null;
+    const reward = raid ? raid.reward : (r?.reward || bout?.reward || null);
+    const loot = raid ? (raid.loot || []) : [];
 
     return (
         <Portal>
@@ -301,7 +308,7 @@ function Recap({ bout, busy, onClose }) {
             }}
             onClick={() => { if (!busy) onClose(); }}>
             <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
-                aria-label="Back to the ladder">Close</button>
+                aria-label={raid ? "Back to the plaza" : "Back to the ladder"}>Close</button>
             <div className="ar-recap-card" onClick={(e) => e.stopPropagation()}>
                 <div className="ar-rays" aria-hidden="true">
                     {Array.from({ length: won ? 24 : 12 }).map((_, i) => (
@@ -314,16 +321,51 @@ function Recap({ bout, busy, onClose }) {
                     {won ? `You beat ${bout?.foe?.name || "them"}` : `${bout?.foe?.name || "They"} put you down`}
                 </b>
                 <p className="ar-recap-sub">
-                    {r?.rounds || bout?.beat || 0} round{(r?.rounds || 0) === 1 ? "" : "s"} in the ring
+                    {r?.rounds || bout?.beat || 0} round{(r?.rounds || 0) === 1 ? "" : "s"}
+                    {raid ? " in the plaza" : " in the ring"}
                     {r?.npcTier ? ` · Gauntlet tier ${r.npcTier}` : ""}
+                    {raid?.gradeLabel ? ` · ${raid.gradeLabel}` : ""}
                 </p>
 
-                {/* THE POINTS. */}
-                <div className="ar-vp">
-                    <span className="ar-vp-num">+{money(shown)}</span>
-                    <span className="ar-vp-lab">Victory Points</span>
+                {/* THE SPOILS — a raid's headline is what it dropped, not a standing it does not move. */}
+                {raid ? (
+                    <div className="ar-vp">
+                        <span className="ar-vp-num">{reward?.coin ? `+${money(reward.coin)}` : "—"}</span>
+                        <span className="ar-vp-lab">{reward?.coin ? "Gold" : "No spoils this time"}</span>
+                    </div>
+                ) : (
+                    /* THE POINTS. */
+                    <div className="ar-vp">
+                        <span className="ar-vp-num">+{money(shown)}</span>
+                        <span className="ar-vp-lab">Victory Points</span>
 
-                </div>
+                    </div>
+                )}
+
+                {/* Where the wave stands, because "is this thing nearly dead" is the question you tap for, and
+                    because more than one member did not realise a raid HAS more than one fight in it. */}
+                {raid?.cleared ? (
+                    <div className="ar-unlock">The wave is cleared — the plaza is yours</div>
+                ) : raid?.wave ? (
+                    <div className="ar-unlock">Wave {raid.wave} still standing</div>
+                ) : null}
+
+                {loot.length ? (
+                    <div className="ar-feats">
+                        {loot.map((l, i) => (
+                            <span key={`${l.kind}-${l.itemId || l.tier || i}`} className="ar-feat" style={{ "--el": "#8fd6a2" }}>
+                                <b>{l.label || l.kind}</b>
+                                <em>{l.kind === "chest" ? "off the raid" : l.rarity || "salvage"}</em>
+                            </span>
+                        ))}
+                    </div>
+                ) : null}
+
+                {/* Paid nothing BECAUSE YOU ARE CAPPED is a different sentence from paid nothing, and only one
+                    of them is a bug. Saying so is the whole reason duelRaidEnemy returns the flag. */}
+                {raid?.capped ? (
+                    <p className="ar-recap-sub">The raid&apos;s spoils are done for today — the fight still counts.</p>
+                ) : null}
 
                 {r?.npcUnlocked ? (
                     <div className="ar-unlock">Tier {r.npcTier + 1} unlocked</div>
@@ -355,13 +397,18 @@ function Recap({ bout, busy, onClose }) {
                 <div className="ar-recap-rows">
                     {reward?.laurels ? <span><i>Laurels</i><b>+{money(reward.laurels)}</b></span> : null}
                     {reward?.gold ? <span><i>Gold</i><b>+{money(reward.gold)}</b></span> : null}
+                    {reward?.coin ? <span><i>Gold</i><b>+{money(reward.coin)}</b></span> : null}
                     {reward?.xp ? <span><i>XP</i><b>+{money(reward.xp)}</b></span> : null}
-                    <span><i>Streak</i><b>{r?.streak || 0}{(r?.streak || 0) > 0 && r.streak >= (r.bestStreak || 0) ? " · best" : ""}</b></span>
+                    {/* No streak line on a raid: the Arena's streak is not touched by a plaza fight, so printing
+                        "Streak 0" under one was the screen reporting a number that does not apply as a loss. */}
+                    {raid ? null : (
+                        <span><i>Streak</i><b>{r?.streak || 0}{(r?.streak || 0) > 0 && r.streak >= (r.bestStreak || 0) ? " · best" : ""}</b></span>
+                    )}
                 </div>
 
                 <div className="ar-recap-foot">
                     <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
-                        {won ? "Next fight" : "Back to the ladder"}
+                        {raid ? "Back to the plaza" : won ? "Next fight" : "Back to the ladder"}
                     </button>
                 </div>
             </div>
@@ -475,6 +522,21 @@ export default function ArenaClient({ initial }) {
     }, [busy]);
 
     const bout = st?.bout || null;
+
+    // ── LEAVING A FINISHED FIGHT, FROM WHEREVER YOU CAME IN ──────────────────────────────────────────────
+    // One handler because there are TWO ways off this screen — the recap's button and the bare verdict
+    // fallback that exists for when the recap does not render — and a raid fight has to return to the plaza
+    // from both. Fixing only the pretty one leaves the stranding in place for exactly the case the fallback
+    // was built for.
+    //
+    // Dismissed first and awaited: navigating straight off the tap unloads the page with the dismiss in
+    // flight, and the finished bout stays in the row for the next visit to open on.
+    const leaveBout = useCallback(async () => {
+        const toTown = Boolean(bout?.town || bout?.recap?.town);
+        await act("dismiss");
+        if (toTown) window.location.href = "/marketplace/town";
+    }, [act, bout]);
+
     // Nothing underneath a full-screen fight should move when you swipe.
     useScrollLock(Boolean(bout));
 
@@ -1057,9 +1119,10 @@ export default function ArenaClient({ initial }) {
                             <b>{bout.won ? "Victory" : "You fall"}</b>
                             {bout.won && bout.foe?.name ? <em className="ar-verdict-sub">{bout.foe.name} is down</em> : null}
                             {/* Present whether or not the recap modal renders. A finished fight must always
-                                have a visible way back to the ladder somewhere on the screen. */}
+                                have a visible way out somewhere on the screen — and it has to lead back to the
+                                room you came from, which for a raider is the plaza. */}
                             <button type="button" className="ar-btn is-sm" disabled={busy}
-                                onClick={() => act("dismiss")}>Back to the ladder</button>
+                                onClick={leaveBout}>{bout.town ? "Back to the plaza" : "Back to the ladder"}</button>
                         </div>
                     ) : null}
 
@@ -1182,7 +1245,17 @@ export default function ArenaClient({ initial }) {
                     it: the component still existed, the dismiss action still existed, clearBout still existed —
                     only the one line that mounts it was gone. So every bout since then ended on a dead screen
                     with no button, and the only escape was reloading the page. */}
-                {bout.over && recapReady ? <Recap bout={bout} busy={busy} onClose={() => act("dismiss")} /> : null}
+                {/* ── AND THE WAY BACK ─────────────────────────────────────────────────────────────────────
+                    A raid fight is fought HERE — the town sends you to /marketplace/arena?from=town rather
+                    than embedding a second copy of this screen — but nothing ever read that `from`, so the
+                    fight ended and left you standing in the Arena with the plaza still under attack and no
+                    route back to it. Several members reported exactly that, and one of them concluded a raid
+                    was a single fight because the Arena is where it dropped them.
+
+                    Off the bout's own `town` flag rather than the query string: the flag is true for the
+                    fight that IS a raid, which survives a reload, a re-entry and a link with no `?from` on
+                    it. A hard nav, because the town page loads its own state and must not inherit this one's. */}
+                {bout.over && recapReady ? <Recap bout={bout} busy={busy} onClose={leaveBout} /> : null}
 
                 {err ? <p className="ar-err">{err}</p> : null}
                 {/* THE LOG IS A DRAWER. It was 150px of grey text under the fight, which on a phone is 150px

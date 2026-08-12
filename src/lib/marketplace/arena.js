@@ -575,6 +575,10 @@ function publicBout(b) {
         foe: b.foe, beat: b.beat, turn: b.turn, hp: b.hp, foeHp: b.foeHp, maxHp: b.maxHp, foeMaxHp: b.foeMaxHp,
         cd: b.cd || {}, clash: b.clash, opener: b.opener || "you", fever: pitFever(b.beat || 1),
         me: b.me, shield: b.shield, surge: b.surge, underdog: b.underdog || 1, items: b.items || {},
+        // WHICH ROOM THIS FIGHT IS IN. Withheld until now, so the screen could not tell a plaza raider from a
+        // ladder rung and offered "Back to the ladder" to somebody who had walked in from the town — which is
+        // where they were then stranded. The rider itself stays server-side; only the fact of it is published.
+        town: Boolean(b.town),
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
@@ -1586,7 +1590,16 @@ async function finishBout(buyerId, row, b, won) {
         }).catch(() => null);
         b.recap = {
             won, foe: b.foe, town: true,
-            raid: res && res.ok ? { reward: res.reward, cleared: res.cleared, wave: res.wave, loot: res.loot } : null,
+            // `loot` reads off res.reward, which is where duelRaidEnemy puts it — `res.loot` does not exist and
+            // this asked for it, so the recap has been carrying an undefined the screen could never show.
+            // `capped` and the grade come along too: "the spoils are done" is the difference between a raid
+            // that paid nothing because you were unlucky and one that paid nothing because you are capped, and
+            // a player who cannot tell those apart reports the second as a bug. It was reported as one.
+            raid: res && res.ok ? {
+                reward: res.reward || null, loot: res.reward?.loot || [],
+                cleared: res.cleared || null, wave: res.wave ?? null,
+                capped: Boolean(res.capped), gradeLabel: res.gradeLabel || null,
+            } : null,
             rounds: b.beat || (b.log || []).length,
         };
         await db.query(`UPDATE mkt_arena SET bout_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
