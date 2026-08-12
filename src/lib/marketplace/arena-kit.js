@@ -358,7 +358,15 @@ export const healthFrom = (ferocity = 0) => Math.round(HEALTH_BASE + (Number(fer
 
 // One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
 // to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.
-export const SWING_BASE = 8;
+// 8 -> 11. This is the one knob for bout LENGTH, and both fighters read it, so raising it shortens the fight
+// without moving who wins it: every round-count in the Road drops by about a quarter and the win/loss line
+// stays exactly where it was. A ten-beat design target was running thirteen-to-nineteen against the Road's
+// wall archetypes, which is where "these fights are too slow" comes from — the walls carry 0.60 ferocity and
+// 26% armour, so they were absorbing two fights' worth of swings.
+//
+// Deliberately not a hero-only buff. Making one side hit harder makes the Road easier, which is a different
+// change from making it shorter, and only one of those was asked for.
+export const SWING_BASE = 11;
 
 // The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
 // trap on its own — a Fortune kit critted constantly in here and never against the boss.

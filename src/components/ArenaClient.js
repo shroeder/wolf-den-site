@@ -57,7 +57,12 @@ const REFUSALS = {
 };
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
-const TELEGRAPH_MS = 1100;
+// 1100 -> 850. This and RESULT_MS are the two fixed waits in every single exchange, and at 1100 + 1500 they
+// were 2.6 seconds of enforced holding per beat — over a ten-beat bout, twenty-six seconds in which the fight
+// is showing you things you have already read. Trimmed rather than removed: the reason they exist (one thing
+// said at a time, a move you can actually name before you answer it) is still right, and cutting them to
+// nothing brings back the overlap they were introduced to fix.
+const TELEGRAPH_MS = 850;
 
 // How long a cast holds the screen before the blow lands. The declaration, the spotlight and the effect all
 // play inside this window.
@@ -79,7 +84,10 @@ const WINDUP = { attack: 420, skill: CAST_MS, guard: 300, item: 420 };
 // 900 -> 1500. The window has to outlast the thing it is protecting, and it did not: the damage number now
 // holds for about a second before it drifts, so at 900 their telegraph arrived while your own hit was still
 // mid-air. A beat you cannot read is not faster, it is just gone.
-const RESULT_MS = 1500;
+// 1500 -> 1050. Still comfortably longer than the ~900 that was measured as too short (their telegraph used
+// to arrive while your own hit was still mid-air), and it is now the hit-stop and the damage float that carry
+// the moment rather than a hold.
+const RESULT_MS = 1050;
 
 // The freeze on contact. Every fighting game made since Street Fighter II holds both fighters still for a few
 // frames at the moment of impact; it is most of why a hit reads as a hit rather than a position change.
@@ -511,6 +519,35 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     useEffect(() => { setMuteOn(isMuted()); }, []);
 
 
+    // ── A BEAT, SPLIT IN TWO ─────────────────────────────────────────────────────────────────────────────
+    // `act` fetches and applies in one breath, which is right for every action EXCEPT the one you press
+    // hundreds of times. A beat needs the two halves apart so the fetch can overlap the wind-up animation
+    // instead of queueing behind it (see the wind-up effect). `busy` is still raised for the whole flight, so
+    // the buttons lock exactly as before and a double-tap cannot send two beats.
+    // The in-flight guard is a REF, not the `busy` state, and both callbacks take no dependencies. If they
+    // depended on `busy` their identity would change the moment a beat set it — and they are in the wind-up
+    // effect's dependency list, so that change would tear the effect down and run it again mid-swing, firing
+    // a SECOND beat for one tap. The ref guards re-entrancy; the state still drives the disabled buttons.
+    const beatFlight = useRef(false);
+    const sendBeat = useCallback(async (extra) => {
+        if (beatFlight.current) return null;
+        beatFlight.current = true;
+        setBusy(true); setErr(null);
+        return fetch("/api/marketplace/arena", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "beat", ...extra }),
+        }).then((x) => x.json()).catch(() => null);
+    }, []);
+
+    const applyBeat = useCallback((r) => {
+        beatFlight.current = false;
+        setBusy(false);
+        if (!r) return;                     // a torn-down swing: nothing to apply, and busy is already clear
+        if (r?.unlocked) { setSt(r); return; }
+        setErr(REFUSALS[r?.error]
+            || (r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again."));
+    }, []);
+
     // Every action goes through here, and it now says so when one fails. A tap that silently does nothing is
     // the worst outcome available: somebody sat on a finished bout tapping "Back to the ladder" with no
     // message, no spinner and no way out.
@@ -713,13 +750,28 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         } else if (p2.command === "attack") Sfx.whoosh();
         Haptic.cast();
 
-        const t = setTimeout(() => {
+        // ── THE REQUEST RIDES ALONG WITH THE WIND-UP, IT DOES NOT QUEUE BEHIND IT ────────────────────────
+        // This used to wait out the animation and only THEN touch the network, so every beat cost the
+        // wind-up PLUS the round trip end to end, and the wait landed at the worst possible moment: after the
+        // swing had visibly started, with the screen holding still. That is the whole of "the arena is
+        // server-bound and janky" — not slow rendering, just latency nobody thought to overlap.
+        //
+        // The blow is decided on the server either way, and nothing here guesses at the outcome; the request
+        // simply leaves at the same instant the sword does. Whichever finishes last decides when the result
+        // shows, so on a normal connection the round trip is free — it fits inside 420ms of wind-up — and on
+        // a bad one the fight degrades to exactly the behaviour it had before.
+        let dead = false;
+        const flight = sendBeat({ command: p2.command, ability: p2.ability || null, item: p2.item || null });
+        const wound = new Promise((r) => { setTimeout(r, ms); });
+        Promise.all([flight, wound]).then(([r]) => {
+            // Torn down mid-swing: still release the flight, or `busy` latches on and the deck stays dead.
+            if (dead) { applyBeat(null); return; }
             setCastDone(true);
             setPending(null); setMenu(null);
-            act("beat", { command: p2.command, ability: p2.ability || null, item: p2.item || null });
-        }, ms);
-        return () => clearTimeout(t);
-    }, [pending, bout?.turn, bout?.beat, bout?.over]);
+            applyBeat(r);
+        });
+        return () => { dead = true; };
+    }, [pending, bout?.turn, bout?.beat, bout?.over, sendBeat, applyBeat]);
 
     // ── THEIR BEAT, IN THREE PARTS ───────────────────────────────────────────────────────────────────────
     // result → telegraph → blow. The middle step used to begin the instant your own swing resolved, so their
