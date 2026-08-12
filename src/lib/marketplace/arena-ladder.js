@@ -166,3 +166,25 @@ export const LADDER_HOUSES = HOUSES.map((h, i) => ({
 /** Parse a `ladder:<n>` target back to a rung, or 0 if it is not one. */
 export const ladderRungOf = (target) =>
     (typeof target === "string" && target.startsWith("ladder:") ? Number(target.slice(7)) || 0 : 0);
+
+/**
+ * The ONE rung you may fight next: the lowest you have not put down. 0 once the whole road is behind you.
+ *
+ * It is a road, so you walk it. Skipping was possible for as long as the road existed — you could open the
+ * hundredth fight on your first day — and while that was never the intent, it read as intentional because
+ * nothing said otherwise and beaten rungs never greyed out (see the payout fix: `ladder_beaten` was empty for
+ * everybody, so the screen had nothing to grey).
+ *
+ * DERIVED, never stored. A `next_rung` column would be a second copy of a fact `ladder_beaten` already holds,
+ * and the two would disagree the first time a rung was awarded by any path but a win — the backfill did
+ * exactly that for seven chests.
+ *
+ * Gaps are respected rather than punished. Members who skipped ahead while it was allowed KEEP those rungs:
+ * the frontier steps over anything already beaten, so someone holding 1, 2, 4, 10 is sent to 3, and then
+ * straight to 5 because 4 is already down. Nobody re-fights a rung they have beaten, and nobody loses one.
+ */
+export function nextRung(beaten) {
+    const done = beaten instanceof Set ? beaten : new Set((beaten || []).map(Number));
+    for (let n = 1; n <= LADDER_SIZE; n += 1) if (!done.has(n)) return n;
+    return 0;
+}

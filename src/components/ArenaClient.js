@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiCrossedSwords, GiExitDoor, GiKnapsack, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiCrossedSwords, GiExitDoor, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -47,6 +47,14 @@ function Portal({ children }) {
 // looked like a number the screen was telling you rather than a thing you hold.
 const LAUREL = "/images/arena/armoury/laurel.png";
 const money = (n) => Number(n || 0).toLocaleString();
+
+// The server's deliberate NOs, said in words. Anything not in here is an actual fault and keeps the generic
+// "try again" — the distinction matters, because a rule and a bug want opposite things from the player.
+const REFUSALS = {
+    locked: "The Road is walked in order — beat the rung you are standing on first.",
+    already_beaten: "You have already put that one down. A rung only pays once.",
+    bout_in_progress: "You are already in a fight. Finish it, then pick the next one.",
+};
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
 const TELEGRAPH_MS = 1100;
@@ -454,7 +462,11 @@ export default function ArenaClient({ initial }) {
                 // the result screen. Drop it locally and let the next read reconcile.
                 setSt((prev) => (prev ? { ...prev, bout: null } : prev));
             } else {
-                setErr(r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again.");
+                // A REFUSAL IS NOT A FAILURE. "Try again" is the wrong thing to say to somebody the server
+                // deliberately turned away — the road being walked in order is a rule, not a glitch, and
+                // telling them to retry sends them tapping at a button that will never open.
+                setErr(REFUSALS[r?.error]
+                    || (r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again."));
             }
             // The rank-up used to be its own overlay on a timer, stacked behind the result card. It lives
             // INSIDE the recap now — one modal, not two in sequence — so all that is left is the sting.
@@ -1382,7 +1394,9 @@ export default function ArenaClient({ initial }) {
             // everything you have put down). Nothing is locked — it never was — this only says where you are.
             const foesAll = st.ladder?.foes || [];
             const houses = st.ladder?.houses || [];
-            const next = foesAll.find((f) => !f.beaten) || null;
+            // Off the SERVER's `next`, not recomputed here. It is the rung the server will actually accept, and
+            // the screen having its own opinion about which one that is would be the same rule written twice.
+            const next = foesAll.find((f) => f.rung === st.ladder?.next) || null;
             const beaten = st.ladder?.beaten || 0;
             const size = st.ladder?.size || 100;
             const pct = size ? Math.round((beaten / size) * 100) : 0;
@@ -1494,10 +1508,12 @@ export default function ArenaClient({ initial }) {
                                 <div className="ar-rungs">
                                     {foes.map((f) => (
                                         <button type="button" key={f.rung}
-                                            className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}${next?.rung === f.rung ? " is-next" : ""}`}
-                                            disabled={busy || f.beaten}
+                                            className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}${next?.rung === f.rung ? " is-next" : ""}${f.locked ? " is-locked" : ""}`}
+                                            disabled={busy || f.beaten || f.locked}
                                             onClick={() => { Sfx.ui(); act("start", { target: f.id }); }}
-                                            title={f.beaten ? `${f.name} — already beaten` : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
+                                            title={f.beaten ? `${f.name} — already beaten`
+                                                : f.locked ? `${f.name} — locked. The Road is walked in order; rung ${st.ladder?.next} is next.`
+                                                : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
                                             <span className="ar-rung-n">{f.rung}</span>
                                             <img className="ar-rung-art" src={f.sprite} alt="" draggable="false"
                                                 onError={(e) => {
@@ -1513,6 +1529,9 @@ export default function ArenaClient({ initial }) {
                                             </span>
                                             {f.reward?.chest && !f.beaten
                                                 ? <span className="ar-rung-chest">{f.reward.chest} chest</span> : null}
+                                            {/* The prize stays legible on a locked rung — what is up the road is the
+                                                reason to walk it. Only the way in is closed. */}
+                                            {f.locked ? <span className="ar-rung-lock" aria-hidden="true"><GiPadlock /></span> : null}
                                         </button>
                                     ))}
                                 </div>

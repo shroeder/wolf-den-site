@@ -16403,6 +16403,16 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-rung.is-done .ar-rung-art { filter: grayscale(1) brightness(.65); }
 .ar-rung.is-done::before { content: "✓"; position: absolute; right: 7px; bottom: 4px; font-size: .9rem;
     font-weight: 900; color: #8fd6a2; }
+/* LOCKED IS NOT BEATEN, AND MUST NOT LOOK LIKE IT. `is-done` is dimmed to .4 and dashed to read as spent; a
+   locked rung is the opposite — it is still ahead of you, and the prize on it is the reason to keep walking.
+   So it stays solid and legible, only muted, with the portrait greyed to say "not yet" and the padlock sitting
+   where the ✓ sits on a beaten one. The two states occupy the same corner deliberately: one badge, one
+   meaning, and never both on the same rung. */
+.ar-rung.is-locked { opacity: .72; cursor: default; border-style: solid;
+    border-color: color-mix(in srgb, var(--h) 25%, transparent); }
+.ar-rung.is-locked .ar-rung-art { filter: grayscale(.85) brightness(.72); }
+.ar-rung.is-locked .ar-rung-who b { color: #8b93a0; }
+.ar-rung-lock { position: absolute; right: 6px; bottom: 3px; display: flex; font-size: .82rem; color: #6a727d; }
 .ar-rung-n { position: absolute; top: 3px; right: 7px; font-family: var(--font-display); font-size: .72rem;
     font-weight: 900; color: color-mix(in srgb, var(--h) 45%, transparent); font-variant-numeric: tabular-nums; }
 .ar-rung-art { flex: 0 0 auto; width: 36px; height: 36px; object-fit: contain;

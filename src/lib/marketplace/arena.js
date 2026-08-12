@@ -16,7 +16,7 @@ import { pickIncoming, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-a
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
-import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf } from "@/lib/marketplace/arena-ladder.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf, nextRung } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -433,14 +433,20 @@ export async function getArenaState(buyerId) {
         // off the row that was already loaded, so the screen costs nothing extra to render.
         ladder: (() => {
             const beaten = new Set((row?.ladder_beaten || []).map(Number));
+            // The road is walked in order, and `next` is the only rung that can be fought. Published so the
+            // screen can lock the rest off the SAME rule the server refuses them by — a screen that computed
+            // its own idea of "next" would be a second copy of the rule, and the copies would drift.
+            const next = nextRung(beaten);
             return {
                 size: LADDER_SIZE,
                 beaten: beaten.size,
+                next,
                 houses: LADDER_HOUSES,
                 foes: LADDER.map((f) => ({
                     rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
                     archetypeName: f.archetypeName, tell: f.tell, power: f.power, color: f.color,
                     sprite: f.sprite, spriteFallback: f.spriteFallback, reward: f.reward, beaten: beaten.has(f.rung),
+                    locked: !beaten.has(f.rung) && f.rung !== next,
                 })),
             };
         })(),
@@ -882,6 +888,13 @@ export async function startBout(buyerId, targetId = null) {
         if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
         const beaten = new Set(row?.ladder_beaten || []);
         if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId)) };
+        // ── IN ORDER, AND ENFORCED HERE ──────────────────────────────────────────────────────────────────
+        // Refused on the SERVER, not merely greyed out on the screen: the target is a string in a POST body,
+        // and `ladder:100` is as easy to send as `ladder:3`. The screen locks the same rungs (see the
+        // `locked` flag in getArenaState) off this identical rule, so the two cannot drift.
+        if (rung !== nextRung(beaten)) {
+            return { ok: false, error: "locked", ...(await getArenaState(buyerId)) };
+        }
         const f = ladderFoe(rung);
         foe = f;
         const st = statsForPower(f.power, f.archetype, null, rung);
