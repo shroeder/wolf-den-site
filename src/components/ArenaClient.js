@@ -201,7 +201,16 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 <i title="Chance to crit, and what a crit multiplies by">
                     <b>{Math.round((f?.critChance || 0) * 100)}%</b> crit &times;{(f?.critMult || 2.5).toFixed(1)}
                 </i>
-                {f?.armour > 0 ? <i title="Damage this fighter turns aside"><b>{Math.round(f.armour * 100)}%</b> armour</i> : null}
+                {/* BOTH sides, or the promise above is only half kept. An NPC's mitigation is `armour`, a
+                    member's is `block` — two names for the same thing, and only theirs was ever printed. That
+                    is the whole reason armour reads as a stat the enemy gets and you do not: a member turns
+                    aside 34% before Footwork, usually MORE than the 6-26% an NPC carries, and nothing on your
+                    half of the screen has ever said so. Summed, because a member defender has both. */}
+                {(f?.armour || 0) + (f?.block || 0) > 0 ? (
+                    <i title="Share of every incoming blow this fighter turns aside">
+                        <b>{Math.round(((f.armour || 0) + (f.block || 0)) * 100)}%</b> turned aside
+                    </i>
+                ) : null}
             </span>
         </div>
     );

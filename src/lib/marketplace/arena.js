@@ -8,7 +8,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
-    BATTLE_ITEMS, GUARD_SOAK, GUARD_COOL, speedOf,
+    BATTLE_ITEMS, BLOCK, BLOCK_CAP, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -274,7 +274,14 @@ async function kitFor(buyerId) {
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
         // Your armour is what you CHOOSE, not what you accumulated: a guard you play, not a stat you carry.
         // The Den has no defence stat, so inventing one here would be the same mistake as health was.
+        // Nothing grants `perks.armour` — no gear rolls it, no node gives it — so for a member this is always
+        // 0. It stays because an NPC's kit runs through the same shape.
         armour: Math.min(0.6, perks.armour || 0),
+        // WHAT YOU ACTUALLY TURN ASIDE, and the reason the above being 0 does not mean you are unprotected:
+        // every member blocks a flat BLOCK before Footwork adds to it. resolveBeat has always applied this;
+        // it was simply never a number anyone could see, while the foe's armour was printed on their card —
+        // which is what makes armour look like a stat only they get to have.
+        block: Math.min(BLOCK_CAP, BLOCK + (perks.block || 0)),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         element: kit.element, abilities,
     };
@@ -785,6 +792,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // disagree — the card reads the same fields resolveBeat multiplies.
             health: foeKit.health, damage: foeKit.damage,
             critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
+            // A MEMBER defender blocks too. An NPC has no tree, so this is 0 for them and their armour is the
+            // whole of their mitigation — but against a member, armour alone understated what they turn aside.
+            block: foeKit.block || 0,
             // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
             // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
             // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
@@ -809,6 +819,8 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
             health: me.health, damage: me.damage * myDamageMult,
             critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
+            // Carried so the card can print what you turn aside, the way theirs prints their armour.
+            block: me.block || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
@@ -1084,7 +1096,7 @@ export async function fightRound(buyerId, opts = {}) {
     // Was 1.15, chosen to average out the +-18% swing wobble that has been removed. A plain attack is now
     // plainly your damage number; only an ABILITY moves it, which is the only multiplier you actually choose.
     const ATTACK = 1;
-    const BLOCK = 0.34;    // was BLOCK, which averaged ~0.34
+    // BLOCK moved to arena-kit.js — the fighter card reads it now, so it cannot stay a local const in here.
 
     // ── CRITS ────────────────────────────────────────────────────────────────────────────────────────────
     // Removing the timing ring took the last source of variance a player could feel. Every blow became the
@@ -1544,7 +1556,7 @@ export async function fightRound(buyerId, opts = {}) {
         // Your stance is a BLOCK, cut by their Pierce and by whatever a Sunder of theirs has already stripped
         // off it — the mirror of what your own Sunder does to their armour.
         const mySundered = (b.foeSunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
-        const myBlock = Math.min(0.7, BLOCK + (P.block || 0)) * foePierce * mySundered;
+        const myBlock = Math.min(BLOCK_CAP, BLOCK + (P.block || 0)) * foePierce * mySundered;
         // EVERY blow of a flurry rolls its own crit, on their side of the ring too.
         let raw = 0;
         let blocked = 0;

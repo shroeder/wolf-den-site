@@ -447,6 +447,19 @@ export const BATTLE_ITEMS = [
 // is still the best answer to a big telegraphed hit, which is what the command is for.
 export const GUARD_SOAK = 0.15;     // of your max health, absorbed from the next blow — and only the next one
 
+// ── WHAT A MEMBER TURNS ASIDE ────────────────────────────────────────────────────────────────────────────────
+// The counterpart to an NPC's `armour`, and the answer to "is armour just an NPC stat". It is — no gear rolls
+// it and no tree node grants it, so a member's armour is always 0 — but a member is not going without: this
+// flat 34% is what YOU turn aside from every blow, before Footwork adds up to another 10 on top. Most NPCs
+// carry 6-26%, so a member's mitigation is usually the HIGHER of the two. It only ever looked one-sided
+// because their number is printed on their card and yours was printed nowhere.
+//
+// Lives here rather than inside resolveBeat, where it was a local const, because it is a balance number with
+// dependants — the fighter card now reads it, and scripts/sim-arena.mjs and scripts/check-arena.mjs each keep
+// their own deliberate copy for a second opinion. Move this and move those.
+export const BLOCK = 0.34;          // of every incoming blow, before Footwork
+export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
+
 // ── SPEED ────────────────────────────────────────────────────────────────────────────────────────────────────
 // Who opens the bout was hard-coded to the challenger, which made Ferocity — a stat that until now only fed
 // 24/7 passive boss damage — worth nothing in here. It decides initiative now: the faster fighter takes the
