@@ -396,14 +396,17 @@ export async function runAvatarSpriteJob({ batch = 8 } = {}) {
 }
 
 
-// ── PAY TO REDRAW ────────────────────────────────────────────────────────────────────────────────────────────
-// Your first hero is free; redrawing it costs gold. The price climbs with how many you've bought, so the first
-// couple feel free and someone re-rolling their look daily pays for it. Cheap in gold terms on purpose — this
-// is a brake, not a paywall.
-export const HERO_REDRAW_BASE = 500;
-export const heroRedrawCost = (bought = 0) => HERO_REDRAW_BASE * Math.pow(2, Math.min(4, Math.max(0, bought)));
-
-/** What a redraw would cost this member right now, and whether they can afford it. */
+// ── NOBODY PAYS TO REDRAW ────────────────────────────────────────────────────────────────────────────────────
+// There WAS a paid re-roll here — first one free, price doubling after that. It is gone, button, endpoint and
+// price ladder, at Luke's call on 2026-08-11. The hero redraws itself when your look or your gear changes
+// (pendingSpriteIds), so gold was being charged for something the cron did for free a day later anyway.
+/**
+ * What the customiser needs to know about this member's hero.
+ *
+ * It is still called `heroRedrawQuote` and still returns a `cost`, but nothing charges it any more: the paid
+ * re-roll was removed on 2026-08-11. What the screen actually reads is `firstIsFree` (is there a hero yet, so
+ * is the lock worth offering) and `locked`.
+ */
 export async function heroRedrawQuote(buyerId) {
     if (!buyerId) return null;
     const r = await db.queryOne(
@@ -413,11 +416,8 @@ export async function heroRedrawQuote(buyerId) {
         [buyerId],
     ).catch(() => null);
     if (!r) return null;
-    const cost = heroRedrawCost(Number(r.bought) || 0);
     return {
-        cost,
         gold: Number(r.gold) || 0,
-        canAfford: (Number(r.gold) || 0) >= cost,
         // No sprite yet means the free first draw is still owed — the cron will handle it.
         firstIsFree: !r.avatar_sprite_url,
         hasAvatar: Boolean(r.avatar_config),
@@ -444,36 +444,3 @@ export async function setSpriteLock(buyerId, locked) {
     return { ok: true, locked: row.avatar_sprite_locked === true };
 }
 
-/** Spend gold and redraw this member's hero sprite now. */
-export async function buyHeroRedraw(buyerId) {
-    if (!buyerId) return { ok: false, error: "unauthorized" };
-    const quote = await heroRedrawQuote(buyerId);
-    if (!quote) return { ok: false, error: "not_found" };
-    if (!quote.hasAvatar) return { ok: false, error: "no_avatar" };
-    if (quote.firstIsFree) return { ok: false, error: "first_is_free" };
-    // Refused rather than silently unlocking. A redraw is exactly the thing a lock exists to prevent, and
-    // spending gold to overwrite the hero you deliberately froze is the one outcome nobody wants — so the
-    // member unlocks first, on purpose, and the screen says so instead of the button just failing.
-    if (quote.locked) return { ok: false, error: "sprite_locked" };
-
-    // Conditional spend: the WHERE clause IS the balance check, so a double-tap can't buy two on one balance.
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2, hero_redraws = COALESCE(hero_redraws, 0) + 1
-          WHERE id = $1 AND COALESCE(gold, 0) >= $2 RETURNING gold, hero_redraws`,
-        [buyerId, quote.cost],
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_gold", cost: quote.cost };
-
-    try {
-        const url = await generateBuyerSprite(buyerId);
-        await logCoin(buyerId, -quote.cost, "hero_redraw", { meta: { redraws: paid.hero_redraws } }).catch(() => {});
-        return { ok: true, spriteUrl: url, spent: quote.cost, gold: paid.gold, nextCost: heroRedrawCost(paid.hero_redraws) };
-    } catch (e) {
-        // Refund on a failed draw — they must never pay for art they didn't get.
-        await db.query(
-            `UPDATE mkt_buyer SET gold = gold + $2, hero_redraws = GREATEST(0, COALESCE(hero_redraws, 0) - 1) WHERE id = $1`,
-            [buyerId, quote.cost],
-        ).catch(() => {});
-        return { ok: false, error: "draw_failed", detail: String(e?.message || e) };
-    }
-}

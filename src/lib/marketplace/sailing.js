@@ -1902,6 +1902,11 @@ export async function doRaid(buyerId, targetId = null) {
                 raid_day = (NOW() AT TIME ZONE 'America/Chicago')::date, updated_at = NOW()
           WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     await bumpQuestProgress(buyerId, "raid_do", 1).catch(() => {});
+    // AND `ship_battle`, because the player did not choose this. There is ONE button — the opponent list was
+    // deliberately removed and matchOpponent decides between a fleet ship and a rival captain — so a bounty
+    // that ticked only on the fleet half was completable by luck and by nothing else. That is exactly why
+    // nobody could work out how to finish "Fight the fleet": there was nothing to work out.
+    await bumpQuestProgress(buyerId, "ship_battle", 1).catch(() => {});
 
     const crew = await petArtByBuyer([
         { buyerId, petId: me?.featured_collectible },

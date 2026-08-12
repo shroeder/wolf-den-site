@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 
 import { AVATAR_FIELDS, sanitizeAvatarConfig } from "@/lib/marketplace/avatar-options.js";
 import { generateAvatarSvg, renderAvatarPng } from "@/lib/marketplace/avatar-render.js";
-import { generateBuyerSprite, buyHeroRedraw, heroRedrawQuote, setSpriteLock } from "@/lib/marketplace/avatar-sprite.js";
+import { generateBuyerSprite, heroRedrawQuote, setSpriteLock } from "@/lib/marketplace/avatar-sprite.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { setAvatarConfig } from "@/lib/marketplace/profile.js";
 import { withRequestLogging } from "@/lib/server-logger";
@@ -52,7 +52,8 @@ export async function POST(request) {
             // Redrawing an EXISTING hero costs gold. The first sprite is still free and still drawn by the
             // cron — charging for that would be charging to have a face. What's paid for is re-rolling the
             // look, which used to happen automatically on any gear change, once a day, forever.
-            if (body?.action === "redraw") return noStore(await buyHeroRedraw(buyer.id));
+            // No "redraw" action. The paid re-roll was removed from the UI, and leaving the endpoint up
+            // would leave a gold-spending action reachable by anyone willing to post JSON at it.
             if (body?.action === "redrawQuote") return noStore(await heroRedrawQuote(buyer.id));
             // Freeze the hero you have, or let gear change it again. Asked for by @Jinxx.
             if (body?.action === "lock") return noStore(await setSpriteLock(buyer.id, Boolean(body?.locked)));

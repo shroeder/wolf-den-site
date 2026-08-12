@@ -35,8 +35,12 @@ export const FEATURE_DAILIES = {
     sailing: [
         { key: "sail_voyage1", label: "Set sail on a voyage", metric: "voyage_start", need: 1, reward: { gold: 120 }, rewardLabel: "+120 gold" },
         { key: "sail_dig1", label: "Dig up buried treasure", metric: "dig_done", need: 1, reward: { gold: 140 }, rewardLabel: "+140 gold" },
-        { key: "sail_raid1", label: "Raid a passing ship", metric: "raid_do", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
-        { key: "sail_fleet1", label: "Fight the fleet", metric: "ship_battle", need: 1, reward: { gold: 160 }, rewardLabel: "+160 gold" },
+        // ONE BOUNTY FOR ONE BUTTON. These were two — "Raid a passing ship" (raid_do) and "Fight the fleet"
+        // (ship_battle) — from the days when the yard listed opponents and you picked one. It does not any
+        // more: there is a single Battle button and matchOpponent decides whether you meet a fleet ship or a
+        // rival captain. So one of the two ticked and the other did not, at random, and neither told you why.
+        // `ship_battle` is bumped by BOTH paths now, and `sail_raid1` keeps its key so today's rows survive.
+        { key: "sail_raid1", label: "Win a ship battle", metric: "ship_battle", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
         // the one task you can finish without waiting on a four-hour timer.
         { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },

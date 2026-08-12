@@ -65,8 +65,10 @@ function presetLook(kind) {
 
 // Build your "vanilla" avatar (base identity — skin, hair, face, basic clothes). Live preview renders via
 // our own /api/marketplace/avatar route. Save stores the config (the build-your-own avatar is the only path).
-// The illustrated hero SPRITE is drawn free the first time and costs gold to redraw after that — see
-// buyHeroRedraw. Saving the avatar itself is always free.
+// The illustrated hero SPRITE is drawn free the first time, and after that it is redrawn on its own when your
+// look or your gear changes — unless you LOCK it. There is no redraw button: paying gold to re-roll the art
+// was removed at Luke's call on 2026-08-11. The quote is still fetched because the lock needs to know whether
+// a hero exists yet (`firstIsFree`) and whether it is currently locked.
 export default function AvatarBuilder({ current = null }) {
     const router = useRouter();
     const [config, setConfig] = useState(() => ({ ...DEFAULT_AVATAR, ...(current || {}) }));
@@ -84,27 +86,6 @@ export default function AvatarBuilder({ current = null }) {
             .catch(() => { /* the button just stays hidden */ });
         return () => { alive = false; };
     }, []);
-
-    const redraw = async () => {
-        if (busy) return;
-        setBusy(true); setErr(null); setMsg(null);
-        try {
-            const r = await fetch("/api/marketplace/avatar", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "redraw" }),
-            });
-            const d = await r.json().catch(() => ({}));
-            if (d?.ok) {
-                setMsg("Hero redrawn.");
-                setQuote((q) => (q ? { ...q, cost: d.nextCost ?? q.cost, gold: d.gold ?? q.gold, canAfford: (d.gold ?? 0) >= (d.nextCost ?? 0) } : q));
-                try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ }
-            } else {
-                setErr(d?.error === "sprite_locked" ? "Your hero is locked — unlock it first."
-                    : d?.error === "not_enough_gold" ? "Not enough gold for a redraw."
-                        : "Couldn't redraw right now.");
-            }
-        } catch { setErr("Couldn't redraw right now."); } finally { setBusy(false); }
-    };
 
     // ── LOCK THE HERO ────────────────────────────────────────────────────────────────────────────────────
     // Asked for by @Jinxx: she likes the sprite she has and does not want gear changing it. Equipping anything
@@ -226,17 +207,6 @@ export default function AvatarBuilder({ current = null }) {
                 {/* Redrawing the hero SPRITE is a separate, paid action. Saving the avatar is free and always
                     was; what costs gold is having the illustrated hero re-rendered from it. That used to happen
                     on its own after any gear change, once a day, with nobody deciding it was worth doing. */}
-                {quote && !quote.firstIsFree ? (
-                    <button
-                        type="button"
-                        className="btn-ghost"
-                        onClick={redraw}
-                        disabled={busy || !quote.canAfford || quote.locked}
-                        title={quote.locked ? "Your hero is locked — unlock it first" : quote.canAfford ? "Re-render your hero sprite from the current avatar" : "Not enough gold"}
-                    >
-                        {busy ? "Drawing…" : `🎨 Redraw hero · 🪙 ${quote.cost.toLocaleString()}`}
-                    </button>
-                ) : null}
                 {/* Offered only once there is a drawn hero to keep. Before that the lock would freeze a member
                     on the shared stock sprite, which is not a thing anybody means to choose. */}
                 {quote && !quote.firstIsFree ? (
@@ -251,11 +221,6 @@ export default function AvatarBuilder({ current = null }) {
                     </button>
                 ) : null}
             </div>
-            {quote && !quote.firstIsFree && !quote.canAfford ? (
-                <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
-                    You have 🪙 {quote.gold.toLocaleString()} — a redraw costs {quote.cost.toLocaleString()}.
-                </p>
-            ) : null}
             {quote?.locked ? (
                 <p className="muted" style={{ marginTop: 6, fontSize: "0.8rem" }}>
                     Your hero stays exactly as it is. Change gear all you like — it won&apos;t be redrawn until you unlock it.
