@@ -453,7 +453,16 @@ export const BATTLE_ITEMS = [
 // So the two changes go together: it is worth half as much, and it is gone once they have had their swing (see
 // the expiry after each side's attack resolves in arena.js). Fifteen percent of your health against ONE blow
 // is still the best answer to a big telegraphed hit, which is what the command is for.
-export const GUARD_SOAK = 0.15;     // of your max health, absorbed from the next blow — and only the next one
+// 0.15 -> 0.21, and the reason is arithmetic rather than a change of mind. "Halve it" was the instruction and
+// halving the NUMBER did not halve the VALUE: SWING_BASE went 8 -> 11 in the same pass, so a guard now absorbs
+// 0.15*maxHp against blows 37.5% bigger. Measured against what it used to stop, that is 36% of its old value,
+// not 50%. 0.21 is what actually lands on half in the new damage economy.
+//
+// This is what a Warden felt as being clapped: guard halved, guard stopped banking, and everything hitting
+// them got a third harder — four defensive nerfs at once against a build whose entire win condition is
+// outlasting. Attrition fights went from thirty rounds to five. The expiry stays (that was the point, and a
+// brace should not be savings); only the compounding is undone.
+export const GUARD_SOAK = 0.21;     // of your max health, absorbed from the next blow — and only the next one
 
 // ── WHAT A MEMBER TURNS ASIDE ────────────────────────────────────────────────────────────────────────────────
 // The counterpart to an NPC's `armour`, and the answer to "is armour just an NPC stat". It is — no gear rolls
