@@ -103,7 +103,7 @@ function makeServer(initial) {
             // A BRACE IS NOT A SWING. The rig has to honour it or the one behaviour worth watching — a
             // cornered defender covering up — would render here as an ordinary hit for zero.
             if (inc.brace) {
-                b.foeBrace = 1;
+                b.foeShield = Math.round(b.foeMaxHp * 0.3);
                 b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0,
                     text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });
                 b.turn = "you"; b.incoming = null; b.beat += 1; cool(b, 1);

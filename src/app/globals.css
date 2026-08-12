@@ -16243,41 +16243,176 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .cmp-sheet-state.is-have { color: #8fd6a2; }
 
 /* ── THE LONG ROAD ────────────────────────────────────────────────────────────────────────────────────────
-   Grouped by house, because a hundred tiles in one run is a list and ten groups of ten is a road. */
-.ar-road-score { font-family: var(--font-display); font-weight: 900; color: #ffd75e; font-size: 1.1rem; }
-.ar-road-score em { font-style: normal; color: #8b93a0; font-size: .82rem; font-weight: 700; }
-.ar-house { margin-top: 14px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--h) 22%, transparent); }
-.ar-house-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.ar-house-head b { font-family: var(--font-display); color: var(--h); font-size: 1rem; }
-.ar-house-head em { font-style: normal; font-size: .74rem; color: #8b93a0; flex: 1 1 auto; }
-.ar-house-head span { font-weight: 900; font-size: .76rem; color: #8b93a0; }
-.ar-house-head span.is-clear { color: #8fd6a2; }
+   It shipped as a hundred grey text tiles under ten text headings and read as homework. Everything below is
+   in service of three things the old version had none of: FACES, one NEXT FIGHT louder than anything else on
+   the page, and progress you can watch move. --h is the house tint, set per house on the element. */
+.ar-road { display: grid; gap: 12px; }
+
+/* ── THE BANNER ── one number, the ten houses as pips, and what you are climbing toward. */
+.ar-road-hero { position: relative; overflow: hidden; padding: 13px 14px 12px; border-radius: 14px;
+    border: 1px solid rgba(255,215,94,0.28);
+    background:
+        radial-gradient(120% 140% at 8% -20%, rgba(255,215,94,0.16), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.34)); }
+.ar-road-hero-top { display: flex; align-items: flex-start; gap: 10px; justify-content: space-between; }
+.ar-road-hero-top b { display: block; font-family: var(--font-display); font-size: 1.18rem; color: #ffd75e;
+    line-height: 1.05; }
+.ar-road-hero-top em { display: block; margin-top: 3px; font-style: normal; font-size: .74rem; color: #9aa2ae;
+    max-width: 34ch; line-height: 1.3; }
+.ar-road-score { flex: 0 0 auto; font-family: var(--font-display); font-weight: 900; color: #fff;
+    font-size: 1.65rem; line-height: 1; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 18px rgba(255,215,94,0.45); }
+.ar-road-score i { font-style: normal; color: #6a727d; font-size: .86rem; font-weight: 800; }
+
+/* THE METER. A sheen crawls across the filled part — the one piece of motion on the screen that says the
+   number is a thing you are moving rather than a thing you are being told. */
+.ar-road-meter { position: relative; height: 7px; margin: 11px 0 9px; border-radius: 99px; overflow: hidden;
+    background: rgba(0,0,0,0.45); box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+.ar-road-meter > span { position: relative; display: block; height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, #b8862b, #ffd75e 70%, #fff3c4);
+    box-shadow: 0 0 12px rgba(255,215,94,0.55); transition: width .5s cubic-bezier(.2,.8,.2,1); }
+.ar-road-meter > span::after { content: ""; position: absolute; inset: 0; border-radius: 99px;
+    background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.65) 50%, transparent 70%);
+    background-size: 220% 100%; animation: ar-road-sheen 2.6s linear infinite; }
+@keyframes ar-road-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* TEN PIPS, ONE PER HOUSE — a map of the whole road in 24 pixels of height, and each one is a jump link. */
+.ar-road-pips { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.ar-pip { position: relative; height: 22px; padding: 0; border-radius: 5px; cursor: pointer; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--h) 34%, transparent);
+    background: rgba(0,0,0,0.35); transition: transform .12s ease, border-color .12s ease; }
+.ar-pip > i { position: absolute; left: 0; right: 0; bottom: 0; display: block;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--h) 85%, white), var(--h));
+    transition: height .45s cubic-bezier(.2,.8,.2,1); }
+.ar-pip:hover { transform: translateY(-2px); border-color: var(--h); }
+.ar-pip.is-open { border-color: #ffd75e; box-shadow: 0 0 0 1px rgba(255,215,94,0.35); }
+.ar-pip.is-clear { box-shadow: 0 0 10px color-mix(in srgb, var(--h) 45%, transparent); }
+.ar-road-goal { margin-top: 9px; font-size: .74rem; color: #9aa2ae; line-height: 1.35; }
+.ar-road-goal b { color: #ffd75e; text-transform: capitalize; }
+
+/* ── THE NEXT ONE STILL STANDING ─────────────────────────────────────────────────────────────────────────
+   The whole job of this page is to get one more fight started, so exactly one control is allowed to shout.
+   It breathes: a slow ring pulse that stops the moment you hover, so it draws the eye and then gets out of
+   the way. Deliberately ignores prefers-reduced-motion, like the rest of the Den's celebration work. */
+.ar-next { position: relative; overflow: hidden; display: grid; gap: 8px; text-align: left; cursor: pointer;
+    padding: 12px 13px; border-radius: 15px;
+    border: 1px solid color-mix(in srgb, var(--h) 62%, transparent);
+    background:
+        radial-gradient(90% 130% at 100% 0%, color-mix(in srgb, var(--h) 26%, transparent), transparent 62%),
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.4));
+    animation: ar-next-breathe 2.8s ease-in-out infinite; }
+@keyframes ar-next-breathe {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--h) 40%, transparent); }
+    50% { box-shadow: 0 0 22px 2px color-mix(in srgb, var(--h) 42%, transparent); }
+}
+.ar-next:hover:not(:disabled) { animation: none; box-shadow: 0 0 26px 3px color-mix(in srgb, var(--h) 50%, transparent);
+    transform: translateY(-1px); }
+.ar-next:disabled { opacity: .55; cursor: default; animation: none; }
+.ar-next.is-done { animation: none; text-align: center; color: #9aa2ae; font-size: .82rem; --h: #8fd6a2; }
+.ar-next.is-done b { display: block; font-family: var(--font-display); color: #8fd6a2; font-size: 1rem; }
+.ar-next-tag { font-size: .6rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--h) 70%, white); }
+.ar-next-body { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.ar-next-art { flex: 0 0 auto; width: 58px; height: 58px; object-fit: contain; border-radius: 12px;
+    background: radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--h) 30%, transparent), transparent 70%);
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,0.55)); }
+.ar-next-who { display: grid; gap: 1px; min-width: 0; }
+.ar-next-who b { font-family: var(--font-display); font-size: 1.05rem; color: #fff; line-height: 1.1; }
+.ar-next-who em { font-style: normal; font-size: .68rem; font-weight: 800; color: color-mix(in srgb, var(--h) 60%, white);
+    font-variant-numeric: tabular-nums; }
+.ar-next-who i { font-style: italic; font-size: .7rem; color: #9aa2ae; line-height: 1.25; }
+.ar-next-prize { font-size: .74rem; font-weight: 800; color: #ffd75e; }
+.ar-next-go { justify-self: stretch; text-align: center; padding: 9px 0; border-radius: 11px;
+    font-family: var(--font-display); font-size: .95rem; letter-spacing: .04em; color: #1a1408;
+    background: linear-gradient(180deg, #ffe89a, #ffc93c);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.6); }
+
+/* ── TEN HOUSES, ONE OPEN ────────────────────────────────────────────────────────────────────────────────
+   A hundred tiles at once is the laptop scroll that got called out. Folded, the whole road fits on a screen. */
+.ar-house { border-radius: 14px; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--h) 26%, transparent);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.22)); }
+.ar-house.is-open { border-color: color-mix(in srgb, var(--h) 55%, transparent); }
+.ar-house.is-clear { border-style: dashed; }
+.ar-house-head { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+    padding: 9px 11px; background: none; border: 0; }
+.ar-house-head:hover { background: color-mix(in srgb, var(--h) 9%, transparent); }
+.ar-house-art { flex: 0 0 auto; width: 42px; height: 42px; object-fit: contain; border-radius: 10px;
+    background: radial-gradient(60% 60% at 50% 40%, color-mix(in srgb, var(--h) 26%, transparent), transparent 70%); }
+.ar-house.is-clear .ar-house-art { filter: grayscale(1) brightness(.7); }
+.ar-house-who { display: grid; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.ar-house-who b { font-family: var(--font-display); color: var(--h); font-size: 1rem; line-height: 1.1; }
+.ar-house-who em { font-style: normal; font-size: .7rem; color: #8b93a0; line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-house-bar { display: block; height: 4px; margin-top: 3px; border-radius: 99px; background: rgba(0,0,0,0.45); }
+.ar-house-bar > i { display: block; height: 100%; border-radius: 99px; background: var(--h);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--h) 60%, transparent);
+    transition: width .45s cubic-bezier(.2,.8,.2,1); }
+.ar-house-count { flex: 0 0 auto; display: grid; justify-items: end; gap: 1px;
+    font-weight: 900; font-size: .84rem; color: #cfd4da; font-variant-numeric: tabular-nums; }
+.ar-house-count i { font-style: normal; color: #6a727d; font-size: .72rem; }
+.ar-house-count em { font-style: normal; font-size: .6rem; font-weight: 800; color: #6a727d; letter-spacing: .04em; }
+.ar-house-clear { font-family: var(--font-display); font-size: .74rem; letter-spacing: .1em;
+    text-transform: uppercase; color: #8fd6a2; }
+
 /* A FLEXIBLE MAX, NOT A FIXED ONE, and that is the whole trick.
    `auto-fill` counts how many tracks fit using the track's MAX when that max is a definite length — so
    minmax(140px, 168px) fitted exactly ONE column here and produced a hundred rungs in a single strip on a
    page 8,776px tall. I capped it at 152 to fix that, measured, and it was STILL one column, because this grid
    is 272px wide and not the 321 I had assumed from the jewel shelf.
-   With `1fr` as the max the count is taken from the MIN instead, so it fits as many 130px tracks as the
-   container can take and stretches them to fill — correct at 272, at 321 and at any desktop width, with no
-   number to re-derive if a container ever changes. The jewel shelf keeps its fixed cap for the opposite
-   reason: one jewel must NOT stretch across the shelf, and a rung always has nine siblings. */
-.ar-rungs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 7px; }
-.ar-rung { position: relative; display: grid; gap: 2px; text-align: left; cursor: pointer;
-    padding: 8px 9px; border-radius: 11px;
-    border: 1px solid color-mix(in srgb, var(--h) 32%, transparent);
-    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.24)); }
-.ar-rung:hover:not(:disabled) { border-color: color-mix(in srgb, var(--h) 80%, transparent); transform: translateY(-1px); }
-/* A champion wears the house colour outright — every tenth, and the one that pays a chest. */
-.ar-rung.is-champ { border-color: color-mix(in srgb, var(--h) 70%, transparent);
-    background: linear-gradient(180deg, color-mix(in srgb, var(--h) 16%, transparent), rgba(0,0,0,0.3)); }
-/* BEATEN IS DONE. Dimmed and unpressable, because the whole promise of the road is that it does not repeat. */
-.ar-rung.is-done { opacity: .42; cursor: default; border-style: dashed; }
-.ar-rung-n { position: absolute; top: 6px; right: 8px; font-size: .62rem; font-weight: 900; color: #6a727d; }
-.ar-rung-name { font-weight: 800; font-size: .78rem; color: color-mix(in srgb, var(--h) 80%, white);
-    padding-right: 18px; line-height: 1.15; }
-.ar-rung-meta { font-size: .64rem; color: #8b93a0; font-weight: 700; }
-.ar-rung-prize { font-size: .64rem; color: #ffd75e; font-weight: 800; }
+   With `1fr` as the max the count is taken from the MIN instead, so it fits as many tracks as the container
+   can take and stretches them to fill — correct at 272, at 321 and at any desktop width, with no number to
+   re-derive if a container ever changes. */
+.ar-rungs { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 7px;
+    padding: 0 9px 10px; }
+.ar-rung { position: relative; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer;
+    padding: 7px 8px; border-radius: 11px; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--h) 30%, transparent);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.24));
+    transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.ar-rung:hover:not(:disabled) { border-color: color-mix(in srgb, var(--h) 85%, transparent);
+    transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
+.ar-rung:active:not(:disabled) { transform: translateY(0); }
+/* A champion wears the house colour outright — every tenth, and the one that pays a chest. A slow shine
+   crosses it so the ten that matter are the ten that catch your eye on the way past. */
+.ar-rung.is-champ { grid-column: 1 / -1; padding: 9px 10px;
+    border-color: color-mix(in srgb, var(--h) 70%, transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--h) 20%, transparent), rgba(0,0,0,0.32)); }
+.ar-rung.is-champ::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.16) 50%, transparent 62%);
+    background-size: 260% 100%; animation: ar-road-sheen 4.5s linear infinite; }
+.ar-rung.is-champ .ar-rung-art { width: 46px; height: 46px; }
+.ar-rung.is-champ .ar-rung-who b { font-size: .92rem; }
+/* THE ONE YOU ARE ON. Ringed in gold wherever it sits, so opening a house tells you where you stopped. */
+.ar-rung.is-next { border-color: #ffd75e; box-shadow: 0 0 0 1px rgba(255,215,94,0.4), 0 0 18px rgba(255,215,94,0.22); }
+/* BEATEN IS DONE. Dimmed, desaturated and unpressable, because the whole promise of the road is that it does
+   not repeat — and stamped, because a thing you have put down should look like a thing you have put down. */
+.ar-rung.is-done { opacity: .4; cursor: default; border-style: dashed; }
+.ar-rung.is-done .ar-rung-art { filter: grayscale(1) brightness(.65); }
+.ar-rung.is-done::before { content: "✓"; position: absolute; right: 7px; bottom: 4px; font-size: .9rem;
+    font-weight: 900; color: #8fd6a2; }
+.ar-rung-n { position: absolute; top: 3px; right: 7px; font-family: var(--font-display); font-size: .72rem;
+    font-weight: 900; color: color-mix(in srgb, var(--h) 45%, transparent); font-variant-numeric: tabular-nums; }
+.ar-rung-art { flex: 0 0 auto; width: 36px; height: 36px; object-fit: contain;
+    filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+.ar-rung-who { display: grid; gap: 1px; min-width: 0; flex: 1 1 auto; }
+/* NAMES WRAP, THEY DO NOT GET CUT. On a phone a champion tile is one column wide like every other tile, so
+   "COMMANDER ROOK" needed 157px and had 121 — it rendered as "COMMANDE…". These are the half of the road that
+   is authored rather than derived; a name is the whole reason a rung is a person, and an ellipsis takes it. */
+.ar-rung-who b { font-weight: 800; font-size: .76rem; line-height: 1.15; padding-right: 16px;
+    color: color-mix(in srgb, var(--h) 65%, white);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ar-rung-who em { font-style: normal; font-size: .62rem; color: #8b93a0; font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+.ar-rung-prize { flex: 0 0 auto; align-self: flex-end; font-size: .68rem; color: #ffd75e; font-weight: 900;
+    font-variant-numeric: tabular-nums; }
+.ar-rung-prize i { font-style: normal; font-size: .56rem; font-weight: 700; color: #8b7a3d; }
 .ar-rung.is-done .ar-rung-prize { color: #6a727d; }
+/* THE CHEST IS THE POINT OF A CHAMPION, so it gets its own chip rather than a longer sentence. */
+.ar-rung-chest { position: absolute; left: 8px; bottom: 4px; font-size: .55rem; font-weight: 900;
+    letter-spacing: .1em; text-transform: uppercase; color: #1a1408; padding: 1px 6px; border-radius: 99px;
+    background: linear-gradient(180deg, #ffe89a, #ffc93c); }
+.ar-rung.is-champ { padding-bottom: 18px; }
 
 /* The beat between tapping a raider and the fight opening. Short on purpose — it is a claim on the shared
    roster and a page change, not a loading screen. */

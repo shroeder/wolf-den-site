@@ -387,6 +387,11 @@ export default function ArenaClient({ initial }) {
     // The ladder screen carries three jobs now — who to fight, how you fight, and what you have trained. One
     // scroll for all three was already long before the tree existed.
     const [tab, setTab] = useState("fight");
+    // Which stretch of the Road is unfolded. NULL rather than a key, deliberately: the ladder arrives with the
+    // state, so seeding a house here would seed it from data that has not landed yet and leave the wrong one
+    // open forever (a `defaultOpen` prop only ever seeds useState once, on mount). Null means "wherever I am",
+    // resolved at render off the live data; the empty string means "I folded them all up".
+    const [openHouse, setOpenHouse] = useState(null);
     const [boardAll, setBoardAll] = useState(false);
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
@@ -702,11 +707,8 @@ export default function ArenaClient({ initial }) {
         if (l.blocked > 0) pops.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
         if (l.healed > 0) pops.push({ side: ownSide, n: l.healed, kind: "heal" });
         if (l.soaked > 0) pops.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
-        // A BRACE IS NOT A SHIELD, and that is why nothing was shown for it. The opponent has no shield pool —
-        // bracing raises a damage-reduction guard for one blow (see AI_BRACE_GUARD) — so there was no number
-        // to float and the move read as having done nothing at all. It shows what it actually is now: the
-        // percentage your next blow has to get through, over the fighter who raised it.
-        if (l.bracedPct > 0) pops.push({ side: ownSide, n: l.bracedPct, kind: "brace", at: 60 });
+        // A BRACE IS A SHIELD NOW, on both sides of the ring, so it floats the same green number your own
+        // Guard does — `soaked`, handled one line up. `bracedPct` is gone with the flat reduction it named.
         // A DEFENDER'S THORNS COME OFF YOU. It is their number, but it lands on your health, so it floats over
         // you — the same rule as any other blow: the pop goes where the damage went.
         if (l.theirThorns > 0) pops.push({ side: "left", n: l.theirThorns, kind: "thorn", at: 220 });
@@ -716,6 +718,9 @@ export default function ArenaClient({ initial }) {
         // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
         // said why. Staggered after the incoming hit so the two do not land on the same frame.
         if (l.thorned > 0) pops.push({ side: "right", n: l.thorned, kind: "thorn", at: 200 });
+        // ── AND WHAT THEY SENT BACK ── their riposte lands on YOU, so it floats over you. Same rule again:
+        // the pop goes where the damage went, not to whoever owns the move.
+        if (l.takenBack > 0) pops.push({ side: "left", n: l.takenBack, kind: "thorn", at: 280 });
         if (l.riposted > 0) pops.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
@@ -1373,47 +1378,149 @@ export default function ArenaClient({ initial }) {
                 </div>
             ) : null}
 
-{tab === "road" ? (
+{tab === "road" ? (() => {
+            // ── THE ROAD IS A ROAD NOW, NOT A LIST ────────────────────────────────────────────────────────
+            // It shipped as a hundred identical grey text tiles under ten text headings, and every fight
+            // underneath it is different: ten places, ten looks, a champion every tenth, a chest on every one
+            // of those, and a curve that runs from a tavern brawler to something that is not sport. None of
+            // that reached the eye, so the screen read as homework.
+            //
+            // Three things carry it: the FACES (a house plate on every rung, a champion portrait on the
+            // tenth), the NEXT FIGHT (the lowest one still standing, pulled out and made the loudest thing on
+            // the screen), and PROGRESS THAT MOVES (a house meter, ten pips across the top, and a stamp on
+            // everything you have put down). Nothing is locked — it never was — this only says where you are.
+            const foesAll = st.ladder?.foes || [];
+            const houses = st.ladder?.houses || [];
+            const next = foesAll.find((f) => !f.beaten) || null;
+            const beaten = st.ladder?.beaten || 0;
+            const size = st.ladder?.size || 100;
+            const pct = size ? Math.round((beaten / size) * 100) : 0;
+            // The next unbeaten CHEST, because "what am I working toward" is the question a ladder has to
+            // answer at a glance and a laurel count does not answer it.
+            const nextChest = foesAll.find((f) => !f.beaten && f.reward?.chest) || null;
+            // Which house is open. `openHouse` is null until you tap one, so the screen opens on the house
+            // you are actually standing in and a cleared house stays folded away.
+            const openKey = openHouse ?? next?.house ?? houses[0]?.key;
+            return (
             <section className="card ar-road">
-                <div className="ar-arm-head">
-                    <b>The Long Road</b>
-                    <span className="ar-road-score">{st.ladder?.beaten || 0}<em>/{st.ladder?.size || 100}</em></span>
+                {/* ── THE BANNER ── one number, the ten houses as pips, and the thing you are climbing for. */}
+                <div className="ar-road-hero">
+                    <div className="ar-road-hero-top">
+                        <div>
+                            <b>The Long Road</b>
+                            <em>A hundred fighters, each of them once. Nothing here comes back.</em>
+                        </div>
+                        <span className="ar-road-score">{beaten}<i>/{size}</i></span>
+                    </div>
+                    <div className="ar-road-meter" role="img" aria-label={`${beaten} of ${size} beaten`}>
+                        <span style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="ar-road-pips">
+                        {houses.map((h) => {
+                            const hf = foesAll.filter((f) => f.rung >= h.from && f.rung <= h.to);
+                            const d = hf.filter((f) => f.beaten).length;
+                            return (
+                                <button type="button" key={h.key} style={{ "--h": h.tint }}
+                                    className={`ar-pip${d === hf.length && hf.length ? " is-clear" : ""}${d ? " is-part" : ""}${openKey === h.key ? " is-open" : ""}`}
+                                    onClick={() => { Sfx.ui(); setOpenHouse(h.key); }}
+                                    title={`${h.name} — ${d}/${hf.length}`}>
+                                    <i style={{ height: `${hf.length ? (d / hf.length) * 100 : 0}%` }} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {nextChest ? (
+                        <div className="ar-road-goal">
+                            Next chest at <b>#{nextChest.rung}</b> — {nextChest.name},
+                            {" "}{"aeiou".includes(nextChest.reward.chest[0]) ? "an" : "a"}
+                            {" "}<b>{nextChest.reward.chest}</b> chest.
+                        </div>
+                    ) : null}
                 </div>
-                <p className="ar-arm-sub">
-                    A hundred fighters, each of them once. Walk up to any of them whenever you like — nothing
-                    here is locked, and nothing here comes back. A challenge spends one of your daily bouts.
-                </p>
-                {/* GROUPED BY HOUSE, because a hundred tiles in one run is a list and ten groups of ten is a
-                    road. The house you are on tells you roughly where you are without a number having to. */}
-                {(st.ladder?.houses || []).map((h) => {
-                    const foes = (st.ladder.foes || []).filter((f) => f.rung >= h.from && f.rung <= h.to);
+
+                {/* ── THE NEXT ONE STILL STANDING ── the single loudest thing on the screen, because the whole
+                    job of this page is to get one more fight started. */}
+                {next ? (
+                    <button type="button" className="ar-next" style={{ "--h": next.color }}
+                        disabled={busy}
+                        onClick={() => { Sfx.ui(); act("start", { target: next.id }); }}>
+                        <span className="ar-next-tag">next on the road</span>
+                        <span className="ar-next-body">
+                            <img className="ar-next-art" src={next.sprite} alt="" draggable="false"
+                                onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                            <span className="ar-next-who">
+                                <b>{next.name}</b>
+                                <em>#{next.rung} · {next.archetypeName} · {next.power.toLocaleString()} power</em>
+                                <i>{next.tell}</i>
+                            </span>
+                        </span>
+                        <span className="ar-next-prize">{next.reward?.label}</span>
+                        <span className="ar-next-go">Fight</span>
+                    </button>
+                ) : (
+                    <div className="ar-next is-done"><b>The road is walked.</b> All hundred, every one of them once.</div>
+                )}
+
+                {/* ── TEN HOUSES, ONE OPEN ── a hundred tiles at once is the scroll Luke called out on the
+                    laptop. Folded, the whole road fits on one screen and you open the stretch you are on. */}
+                {houses.map((h) => {
+                    const foes = foesAll.filter((f) => f.rung >= h.from && f.rung <= h.to);
                     const done = foes.filter((f) => f.beaten).length;
+                    const clear = done === foes.length && foes.length > 0;
+                    const open = openKey === h.key;
+                    const champ = foes.find((f) => f.champion);
                     return (
-                        <div key={h.key} className="ar-house" style={{ "--h": h.tint }}>
-                            <div className="ar-house-head">
-                                <b>{h.name}</b>
-                                <em>{h.blurb}</em>
-                                <span className={done === foes.length ? "is-clear" : ""}>{done}/{foes.length}</span>
-                            </div>
-                            <div className="ar-rungs">
-                                {foes.map((f) => (
-                                    <button type="button" key={f.rung}
-                                        className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}`}
-                                        disabled={busy || f.beaten}
-                                        onClick={() => { Sfx.ui(); act("start", { target: f.id }); }}
-                                        title={f.beaten ? `${f.name} — already beaten` : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
-                                        <span className="ar-rung-n">{f.rung}</span>
-                                        <span className="ar-rung-name">{f.name}</span>
-                                        <span className="ar-rung-meta">{f.archetypeName} · {f.power.toLocaleString()}</span>
-                                        <span className="ar-rung-prize">{f.beaten ? "beaten" : f.reward?.label}</span>
-                                    </button>
-                                ))}
-                            </div>
+                        <div key={h.key} className={`ar-house${clear ? " is-clear" : ""}${open ? " is-open" : ""}`}
+                            style={{ "--h": h.tint }}>
+                            <button type="button" className="ar-house-head"
+                                onClick={() => { Sfx.ui(); setOpenHouse(open ? "" : h.key); }}
+                                aria-expanded={open}>
+                                {champ?.sprite ? (
+                                    <img className="ar-house-art" src={champ.sprite} alt="" draggable="false"
+                                        onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                                ) : null}
+                                <span className="ar-house-who">
+                                    <b>{h.name}</b>
+                                    <em>{h.blurb}</em>
+                                    <span className="ar-house-bar"><i style={{ width: `${(done / (foes.length || 1)) * 100}%` }} /></span>
+                                </span>
+                                <span className="ar-house-count">
+                                    {/* ONE grid cell, not two. A bare text node beside the <i> made them two
+                                        items in the grid, so "5" and "/10" stacked on separate lines. */}
+                                    <span>{clear ? <b className="ar-house-clear">cleared</b> : <>{done}<i>/{foes.length}</i></>}</span>
+                                    <em>{h.from}–{h.to}</em>
+                                </span>
+                            </button>
+                            {open ? (
+                                <div className="ar-rungs">
+                                    {foes.map((f) => (
+                                        <button type="button" key={f.rung}
+                                            className={`ar-rung${f.beaten ? " is-done" : ""}${f.champion ? " is-champ" : ""}${next?.rung === f.rung ? " is-next" : ""}`}
+                                            disabled={busy || f.beaten}
+                                            onClick={() => { Sfx.ui(); act("start", { target: f.id }); }}
+                                            title={f.beaten ? `${f.name} — already beaten` : `${f.name} · ${f.archetypeName} — ${f.tell}`}>
+                                            <span className="ar-rung-n">{f.rung}</span>
+                                            <img className="ar-rung-art" src={f.sprite} alt="" draggable="false"
+                                                onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                                            <span className="ar-rung-who">
+                                                <b>{f.name}</b>
+                                                <em>{f.archetypeName} · {f.power.toLocaleString()}</em>
+                                            </span>
+                                            <span className="ar-rung-prize">
+                                                {f.beaten ? "beaten" : <>{f.reward.laurels.toLocaleString()}<i> laurels</i></>}
+                                            </span>
+                                            {f.reward?.chest && !f.beaten
+                                                ? <span className="ar-rung-chest">{f.reward.chest} chest</span> : null}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : null}
                         </div>
                     );
                 })}
             </section>
-        ) : null}
+            );
+        })() : null}
 
 {tab === "fight" ? (<>
             {/* ── ONE LINE FOR WHAT YOU FIGHT WITH ── the kit used to be four full cards at the top of this

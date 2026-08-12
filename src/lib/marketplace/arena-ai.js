@@ -28,7 +28,6 @@ const AI_ABILITY_CHANCE = 0.75;
 // owner is asleep. It costs the defender their attack — so it can never stall a fight, it trades damage out
 // for damage in, which is the same bargain the player's own Guard makes.
 export const AI_BRACE_AT = 0.34;        // health fraction below which it starts protecting itself
-export const AI_BRACE_GUARD = 0.4;      // how much of your next swing a brace turns aside
 export const FINISH_AT = 0.34;          // your health fraction that makes an execute the obvious play
 
 export function foeReady(b, ability) {
@@ -89,105 +88,246 @@ function estimateIncoming(b, ability) {
 /** Your effective health: what a blow actually has to chew through to end the bout. */
 const effectiveHp = (b) => Math.max(0, (b.hp || 0) + (b.shield || 0));
 
+/** Their effective health: what YOUR blow has to chew through. The mirror of effectiveHp. */
+const foeEffectiveHp = (b) => Math.max(0, (b.foeHp || 0) + (b.foeShield || 0));
+
+/** How many beats until YOU fall, at the rate they have been hitting you. */
+function beatsUntilYouFall(b) {
+    const dmg = estimateIncoming(b, null);
+    return dmg > 0 ? Math.ceil(effectiveHp(b) / dmg) : 99;
+}
+
+/**
+ * How many beats until THEY fall, at the rate you have been hitting them.
+ *
+ * Read off what you have actually been doing rather than off your card, because the AI cannot see your gear
+ * and should not be allowed to. Averaged over your last three landed blows, which is exactly the read a person
+ * makes across a bout: they do not know your stats, they know how much the last few hurt.
+ */
+function beatsUntilTheyFall(b) {
+    const mine = (b.log || []).filter((l) => l.who === "you" && l.grade !== "burn" && l.damage > 0).slice(-3);
+    if (!mine.length) return 99;
+    const avg = mine.reduce((t, l) => t + l.damage, 0) / mine.length;
+    return avg > 0 ? Math.ceil(foeEffectiveHp(b) / avg) : 99;
+}
+
+const READY = (b, kit, ...kinds) => kit.find((a) => kinds.includes(a.kind)) || null;
+
+/**
+ * ── HOW AN ABSENT DEFENDER DECIDES ──────────────────────────────────────────────────────────────────────────
+ *
+ * The old policy was four rules deep — finish, survive, open with a set-up, otherwise hit the hardest thing —
+ * and every one of them looked at exactly one number. It could not tell a fight it was winning from a fight it
+ * was losing, so it played a race it had already lost the same way it played one it had already won, and it
+ * spent its rarest moves on beats where they paid nothing: a rend on a target that was already burning, a
+ * sunder on a guard that was already stripped, a surge on a bout with one beat left in it.
+ *
+ * It answers two questions first now, and every rule below is written in terms of them:
+ *
+ *     MINE   how many beats until I fall, at the rate you have actually been hitting me
+ *     YOURS  how many beats until YOU fall, at the rate I have been hitting you
+ *
+ * That single comparison is what separates a player from a script. Ahead in the race, it presses and spends
+ * its beats on things that compound. Behind, it stops setting up a future it is not going to reach — it takes
+ * the variance, it drinks, it covers, it gambles. Level, it spends the free stances, because a ward and a
+ * riposte cost it nothing and it has a beat to spare.
+ *
+ * ── AND IT PLAYS THE WHOLE KIT ──────────────────────────────────────────────────────────────────────────────
+ * A ward, a riposte, a surge, a sunder, a rend and a gamble in a defender's bag used to be nine names for one
+ * move, because the engine collapsed them all to a number. arena.js resolves each of them properly on their
+ * side now, so this is the half that decides WHEN each one is the right answer — with a reason for every one:
+ *
+ *     WARD/RIPOSTE  free. They do not cost the beat, so the only question is whether they are worth setting,
+ *                   and the answer is yes whenever there is room in the shield or a blow of yours coming.
+ *     SUNDER        only if you are not already sundered AND the fight is running long enough to bank it.
+ *     REND          only if you are not already burning — a second rend on a lit target is a wasted beat.
+ *     SURGE         only with two or more beats of its own left to spend the charges on.
+ *     GAMBLE        when it is BEHIND. Variance is what you take when the average is losing.
+ *     FLURRY        into a low guard, where several small blows beat one big one.
+ *     DRAIN         when hurt, because it is the only heal that is also an attack.
+ *     EXECUTE       when you are low, which is what it is for.
+ */
 export function pickIncoming(b) {
     const all = b.foe.abilities || [];
     const kit = all.filter((a) => foeReady(b, a));
     const myFrac = b.maxHp ? b.hp / b.maxHp : 1;
     const theirFrac = b.foeMaxHp ? b.foeHp / b.foeMaxHp : 1;
-    const of = (...kinds) => kit.find((a) => kinds.includes(a.kind)) || null;
+    const of = (...kinds) => READY(b, kit, ...kinds);
     const items = b.foeItems || itemsFor(b.foe);
+    const FP = b.foe?.perks || {};
+    const youFallIn = beatsUntilYouFall(b);
+    const theyFallIn = beatsUntilTheyFall(b);
+    const winning = youFallIn < theyFallIn;         // it puts you down before you put it down
+    const losing = theyFallIn < youFallIn;
+    // How long anything it sets up this beat has to pay itself off. A burn needs ticks, a sunder needs a swing
+    // to land in it and a surge needs charges spent — all three are worthless if EITHER fighter falls first.
+    const runway = Math.min(youFallIn, theyFallIn);
 
-    // ── IS THERE A KILL HERE? ────────────────────────────────────────────────────────────────────────────
-    // This question is asked FIRST, before anything about its own health, and that ordering is the whole of
-    // the fix. It used to heal the moment it dropped below a third — even with the bout already won on the
-    // next swing — so a cornered opponent would drink a poultice while you stood on nine health. It looks for
-    // the finish now and only tends to itself when there is not one.
-    //
-    // The comparison is against your effective health (health plus anything you have banked), so a shield you
-    // just put up genuinely deters it rather than being invisible.
-    const offensiveNow = kit.filter((a) => !["ward"].includes(a.kind));
-    const lethal = offensiveNow
+    // The cooldown it will pay for a move, shortened by its own Quickening nodes exactly as yours are.
+    const cdFor = (a) => Math.max(1, Math.round((a.cooldown || 2) - (FP.cdCut || 0)));
+    const spend = (a) => { if (a) { if (!b.foeCd) b.foeCd = {}; b.foeCd[a.id] = b.beat + cdFor(a); } };
+
+    const swing = (ability, free) => {
+        spend(ability);
+        if (free) spend(free);
+        const k = ability?.kind;
+        return {
+            name: free ? `${free.name}, then ${ability?.name || "a swing"}` : (ability?.name || "a heavy swing"),
+            kind: k || "swing",
+            element: ability?.element || b.foe.element || null,
+            sprite: ability?.sprite || free?.sprite || null,
+            power: ability && !["ward", "drain"].includes(k) ? (ability.power || 1) : 1,
+            hits: k === "flurry" ? Math.max(1, ability.hits || 3) : 1,
+            heal: k === "drain" ? DRAIN_SHARE : 0,
+            free: free ? free.kind : null,
+            freeName: free?.name || null,
+            brace: false,
+            isAbility: Boolean(ability),
+        };
+    };
+    const reachFor = (item, extra) => ({ name: item === "poultice" ? "a field poultice" : "a quickening draught",
+        kind: "item", item, power: 0, brace: false, isAbility: true, element: null, sprite: null, ...extra });
+    const guard = () => ({ name: "a raised guard", kind: "brace", power: 0, brace: true, isAbility: true,
+        element: null, sprite: null, heal: 0 });
+
+    // ── 1. IS THERE A KILL HERE? ─────────────────────────────────────────────────────────────────────────
+    // Asked FIRST, before anything about its own health. It used to heal the moment it dropped below a third
+    // even with the bout already won on the next swing, so a cornered opponent would drink a poultice while
+    // you stood on nine health. Measured against your EFFECTIVE health, so a shield you just raised genuinely
+    // deters it rather than being invisible.
+    const offensive = kit.filter((a) => !["ward", "riposte", "surge"].includes(a.kind));
+    const lethal = offensive
         .map((a) => ({ a, dmg: estimateIncoming(b, a) }))
         .filter((x) => x.dmg >= effectiveHp(b))
         .sort((x, y) => y.dmg - x.dmg)[0];
-    const plainKills = estimateIncoming(b, null) >= effectiveHp(b);
-    if (lethal || plainKills) {
-        const finisher = lethal?.a || null;
-        if (finisher) {
-            if (!b.foeCd) b.foeCd = {};
-            b.foeCd[finisher.id] = b.beat + Math.max(1, finisher.cooldown || 2);
-        }
-        return {
-            name: finisher?.name || "a heavy swing",
-            kind: finisher?.kind || "swing",
-            element: finisher?.element || b.foe.element || null,
-            sprite: finisher?.sprite || null,
-            power: finisher && !["ward", "drain"].includes(finisher.kind) ? (finisher.power || 1) : 1,
-            heal: 0, brace: false, isAbility: Boolean(finisher),
-        };
+    if (lethal) return swing(lethal.a, null);
+    if (estimateIncoming(b, null) >= effectiveHp(b)) return swing(null, null);
+
+    // ── 2. AM I ABOUT TO DIE? ────────────────────────────────────────────────────────────────────────────
+    // One beat left and no kill available is the only genuine emergency in the fight, and it has exactly three
+    // answers: drink, drain, or cover. It takes whichever is BIGGEST rather than the first that matches —
+    // a poultice that returns less than a guard banks is the wrong item to burn.
+    const doomed = theyFallIn <= 1 && youFallIn > 1;
+    if (doomed) {
+        const potHeal = (items.poultice || 0) > 0 ? Math.min(b.foeMaxHp - b.foeHp, b.foeMaxHp * POULTICE_HEAL) : 0;
+        const guardBank = b.foeMaxHp * (0.30 + (FP.guardSoak || 0));
+        const drainMove = of("drain");
+        if (potHeal > 0 && potHeal >= guardBank) return reachFor("poultice", { heal: POULTICE_HEAL });
+        if (drainMove && theirFrac > 0.15) return swing(drainMove, null);
+        if (potHeal > 0) return reachFor("poultice", { heal: POULTICE_HEAL });
+        return guard();
     }
 
-    // ── ITEMS, because an item is worth more than the swing it replaces only at specific moments, and those
-    // moments are the ones a real player watches for. A heal is not one of them when you are nearly dead:
-    // pressing is. `myFrac` guards it so it will not spend a turn healing while it has you on the ropes.
-    if (theirFrac <= POULTICE_AT && (items.poultice || 0) > 0 && myFrac > FINISH_AT) {
-        return { name: "a field poultice", kind: "item", item: "poultice", heal: POULTICE_HEAL,
-            power: 0, brace: false, isAbility: true, element: null, sprite: null };
+    // ── 3. THE SATCHEL ───────────────────────────────────────────────────────────────────────────────────
+    // A poultice at full health pours a quarter of itself on the floor, and a poultice while it has YOU on the
+    // ropes is a beat it did not spend winning. Both guarded. A draught is only worth a beat when the kit is
+    // genuinely locked up — spending it to refresh one ability is how a player wastes theirs.
+    if (theirFrac <= POULTICE_AT && (items.poultice || 0) > 0 && !winning) {
+        return reachFor("poultice", { heal: POULTICE_HEAL });
     }
     const cooling = all.length - kit.length;
-    if ((items.draught || 0) > 0 && cooling >= 2 && !of("execute", "strike", "spell", "flurry", "gamble", "rend", "sunder", "drain")) {
-        return { name: "a quickening draught", kind: "item", item: "draught", refresh: true,
-            power: 0, brace: false, isAbility: true, element: null, sprite: null };
+    if ((items.draught || 0) > 0 && cooling >= 2 && !offensive.length) {
+        return reachFor("draught", { refresh: true });
     }
 
-    let ability = null;
-    let brace = false;
-    // GOING FOR THE THROAT BEATS COVERING UP. The finish check moves above the cornered one: if you are the
-    // one nearly dead, a fighter presses even while hurt, because trading blows is winning the trade. It only
-    // protects itself when the race is not already in its favour.
-    if (myFrac <= FINISH_AT) ability = of("execute", "strike", "flurry", "spell");
-    if (!ability && theirFrac <= AI_BRACE_AT) {
-        // Cornered, and no finish available. Heal if it can, otherwise cover up — a build with no answer
-        // still stops standing still.
-        ability = of("drain") || of("ward");
-        if (!ability) brace = true;
+    // ── 4. A FREE STANCE IS FREE ─────────────────────────────────────────────────────────────────────────
+    // Ward and riposte do not spend the beat, so there is no cost to weigh — only whether the stance will do
+    // anything. A ward with the shield already at cap does nothing; a riposte with one already set does
+    // nothing; and neither is worth setting on a bout that ends before you get to swing again.
+    let free = null;
+    if (runway > 1) {
+        const rip = of("riposte");
+        const ward = of("ward");
+        // A riposte pays off the blow you are about to land, so it wants you healthy enough to throw one.
+        if (rip && !(b.foeRiposte > 0) && myFrac > 0.2) free = rip;
+        else if (ward && (b.foeShield || 0) < b.foeMaxHp * 0.35) free = ward;
     }
-    if (!ability && !brace && b.beat <= 2) ability = of("sunder", "surge");
-    if (!ability && !brace) {
-        // ── ALWAYS, IF IT HAS ONE ────────────────────────────────────────────────────────────────────────
-        // This used to fire three times in four, so one round in four a defender with a full kit threw a
-        // plain swing for no reason. A person does not do that: if a skill is off cooldown, a person uses it.
-        // The variety now comes from WHICH — a quarter of the time it takes something other than its best,
-        // which keeps it unreadable without ever making it play badly.
-        const offensive = kit.filter((a) => !["ward"].includes(a.kind));
-        const pool = offensive.length ? offensive : kit;
-        if (pool.length) {
-            ability = Math.random() < 0.75
-                ? pool.reduce((best, a) => ((a.power || 1) > (best?.power || 0) ? a : best), null)
-                : pool[Math.floor(Math.random() * pool.length)];
-        } else if (theirFrac <= 0.6 && all.length >= 2) {
-            // Nothing off cooldown and taking damage: covering up beats a bare swing. THIS is what "guard
-            // optimally" means for a side that cannot see your next move — brace on the rounds where it has
-            // nothing better, not only when it is nearly dead. Gated on owning at least TWO abilities: a foe
-            // with a single skill has it on cooldown half the time, and letting that brace every other round
-            // turned the bottom of the ladder into a wall for the people least able to push through it.
-            brace = true;
-        }
+
+    // ── 5. FINISH, IF YOU ARE THE ONE ON THE ROPES ───────────────────────────────────────────────────────
+    // A fighter presses while hurt, because trading blows is winning the trade. This sits above the cornered
+    // branch on purpose: covering up while you are nearly dead is how a bout gets thrown away.
+    if (myFrac <= FINISH_AT) {
+        const finisher = of("execute") || of("flurry", "strike", "spell", "gamble");
+        if (finisher) return swing(finisher, free);
     }
-    if (ability) {
-        if (!b.foeCd) b.foeCd = {};
-        b.foeCd[ability.id] = b.beat + Math.max(1, ability.cooldown || 2);
+
+    // ── 6. CORNERED, AND NO FINISH ───────────────────────────────────────────────────────────────────────
+    if (theirFrac <= AI_BRACE_AT && !winning) {
+        const dr = of("drain");
+        if (dr) return swing(dr, free);
+        if (!free) return guard();      // nothing to answer with: cover up rather than trade
     }
-    return {
-        name: brace ? "a braced guard" : (ability?.name || "a heavy swing"),
-        kind: brace ? "brace" : (ability?.kind || "swing"),
-        element: ability?.element || b.foe.element || null,
-        sprite: ability?.sprite || null,
-        // POWER IS READ FOR EVERY OFFENSIVE KIND NOW. It used to be honoured only for strike/spell/execute, so
-        // a foe that chose a flurry or a rend swung it at power 1 — its own ability, defanged.
-        power: brace ? 0 : (ability && !["ward", "drain"].includes(ability.kind) ? (ability.power || 1) : 1),
-        heal: ability?.kind === "drain" ? DRAIN_SHARE : 0,
-        brace,
-        isAbility: Boolean(ability) || brace,
-    };
+
+    // ── 7. THINGS THAT ONLY PAY IF THE FIGHT LASTS ───────────────────────────────────────────────────────
+    // Every rule here is gated on beats remaining, which is the piece that was missing entirely. A surge with
+    // one beat left is three charges it will never spend; a sunder on a bout ending this beat strips a guard
+    // nobody will swing into; a rend needs its ticks. It plays them when they have time to be worth something
+    // and skips them when they do not, which is the difference between a script and an opponent.
+    if (runway >= 2) {
+        // A rend on a target that is already burning refreshes three ticks for the price of a beat. Only
+        // re-applied when the burn is nearly out, or when its own Kindling makes another stack worth having.
+        const rendMove = of("rend");
+        const burning = (b.foeBleed?.turns || 0) > 1;
+        const canStack = (b.foeBleed?.stacks || 0) < 3 + Math.round(FP.rendStacks || 0);
+        if (rendMove && (!burning || canStack)) return swing(rendMove, free);
+        // A sunder is worth a beat only if it is not already stripped and there are beats left to swing into it.
+        const sunderMove = of("sunder");
+        if (sunderMove && !(b.foeSunder > 0) && runway >= 3) return swing(sunderMove, free);
+        // A surge wants beats to spend its charges on and is pointless while one is already running.
+        const surgeMove = of("surge");
+        if (surgeMove && !(b.foeSurge > 0) && runway >= 3) return swing(surgeMove, free);
+    }
+
+    // ── 8. VARIANCE IS WHAT YOU TAKE WHEN THE AVERAGE IS LOSING ──────────────────────────────────────────
+    // A gamble is a coin: double or nothing. Playing it while ahead throws away a race it is winning; playing
+    // it while behind is the only line that has a chance in it. This is the rule that most makes it read as a
+    // person — it starts taking swings when it can feel the fight getting away from it.
+    if (losing) {
+        const g = of("gamble");
+        if (g) return swing(g, free);
+    }
+
+    // ── 8b. WHEN YOU ARE SIMPLY OUT-TRADING IT, IT STOPS TRADING ─────────────────────────────────────────
+    // A guard banks 30% of its health now, which makes covering up a genuine line rather than the thing it
+    // does when it has nothing. Losing the race by two clear beats with an empty shield is exactly when a
+    // person stops swinging into you and buys a beat back — and because a guard costs its attack, it can
+    // never stall: it is trading its damage for yours, at a price it only pays when the trade is good.
+    if (losing && theyFallIn + 2 <= youFallIn && !(b.foeShield > 0) && theirFrac < 0.6 && !free) {
+        return guard();
+    }
+
+    // ── 9. EXECUTE WHAT IS ALREADY DYING ─────────────────────────────────────────────────────────────────
+    if (myFrac <= 0.45) {
+        const ex = of("execute");
+        if (ex) return swing(ex, free);
+    }
+
+    // ── 10. OTHERWISE, THE BEST THING IT HAS ─────────────────────────────────────────────────────────────
+    // If a skill is off cooldown, a person uses it — this used to fire only three rounds in four, so one round
+    // in four a defender with a full kit threw a bare punch for no reason. The variety comes from WHICH: a
+    // quarter of the time it takes something other than its best, which keeps it unreadable without ever
+    // making it play badly. A drain gets a thumb on the scale while hurt, since it is a heal and an attack at
+    // the same time, and a flurry gets one against a low guard where small blows land more of themselves.
+    const pool = offensive.length ? offensive : kit.filter((a) => a.kind !== "ward" && a.kind !== "riposte");
+    if (pool.length) {
+        const score = (a) => {
+            let v = a.power || 1;
+            if (a.kind === "drain" && theirFrac < 0.7) v *= 1.35;
+            if (a.kind === "flurry" && (b.me?.armour || 0) < 0.2) v *= 1.2;
+            if (a.kind === "execute") v *= myFrac <= 0.45 ? 1.5 : 0.75;
+            return v;
+        };
+        const best = Math.random() < 0.78
+            ? pool.reduce((top, a) => (score(a) > score(top) ? a : top), pool[0])
+            : pool[Math.floor(Math.random() * pool.length)];
+        return swing(best, free);
+    }
+    if (free) return swing(null, free);
+
+    // ── 11. NOTHING READY ────────────────────────────────────────────────────────────────────────────────
+    // Covering up beats a bare swing on a beat where it has nothing better — but only if it owns at least two
+    // abilities. A foe with a single skill has it cooling half the time, and letting that guard every other
+    // round turned the bottom of the ladder into a wall for the people least able to push through it.
+    if (theirFrac <= 0.6 && all.length >= 2 && !winning) return guard();
+    return swing(null, null);
 }

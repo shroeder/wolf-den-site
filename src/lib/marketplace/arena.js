@@ -11,7 +11,7 @@ import {
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
-import { pickIncoming, AI_BRACE_GUARD, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
+import { pickIncoming, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
@@ -725,7 +725,14 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra 
             critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
-        underdog: underdogEdge(me.gearPower, foeKit.gearPower),   // 1 unless they badly outgear you
+        // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
+        // This only ever multiplied the CHALLENGER's damage. The same two loadouts therefore fought two
+        // different fights depending on who happened to open: challenge someone far above you and you came in
+        // with up to +90% damage, and that identical mismatch defending paid them nothing. It is the exact
+        // "we debuff them because they're on defence" asymmetry — a catch-up rule only one side of the ring
+        // could ever collect. Both sides are measured now, and only the side actually behind on gear collects.
+        underdog: underdogEdge(me.gearPower, foeKit.gearPower),
+        foeUnderdog: underdogEdge(foeKit.gearPower, me.gearPower),
         hp: me.health, maxHp: me.health,
         foeHp: foeKit.health, foeMaxHp: foeKit.health,
         cd: {},                                  // abilityId -> turns before it can be used again
@@ -740,6 +747,14 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, extra 
         beat: 1, log: [], over: false, won: false,
         shield: 0, surge: 0,                     // ward soaks the next blow; surge sharpens your next swing
         bleed: null, sunder: 0, riposte: 0,      // rend burns, sunder strips guard, riposte answers back
+        // ── AND THE SAME SIX ON THEIR SIDE OF THE RING ────────────────────────────────────────────────────
+        // Every one of these was a thing only an attacker could own. A defender could swing, brace, drain or
+        // reach for an item, and that was the entire game they were allowed to play — so a rend in their kit
+        // landed as a plain hit, a sunder did nothing, a surge did nothing, a ward did nothing, and a riposte
+        // did nothing. Five of the tree's nodes (rendTick, rendStacks, burnOnCrit, riposteShare, cdCut) were
+        // therefore unreachable while defending no matter how many points their owner had spent on them.
+        foeShield: 0, foeSurge: 0,
+        foeBleed: null, foeSunder: 0, foeRiposte: 0,
     };
     Object.assign(bout, extra);
     return bout;
@@ -1143,14 +1158,13 @@ export async function fightRound(buyerId, opts = {}) {
         // Their armour: the number on their card, minus whatever a Sunder has stripped and whatever your
         // Pierce cuts through. No roll — the same swing into the same armour is the same number every time.
         //
-        // A BRACE ADDS TO IT for exactly one of your swings. This is what a defensive loadout does while its
-        // owner is asleep, and it costs the defender their attack to do it — so it can never stall the fight,
-        // it trades their damage for yours. Sunder and Pierce cut through a brace exactly as they cut through
-        // armour, which keeps the counter-play the same one the player already knows.
-        const braced = (b.foeBrace || 0) > 0 ? AI_BRACE_GUARD : 0;
+        // A BRACE NO LONGER ADDS TO IT. It used to add a flat 40% on top, which was the defender's ONLY
+        // reward for guarding; now that a guard banks a real shield exactly as yours does (see their turn),
+        // keeping the reduction as well would have made the same command strictly better in their hands than
+        // in yours. Their shield eats the blow further down, which is where yours eats one too.
         // Their Footwork rides with their armour: the same node that lets YOU turn a blow aside lets them.
         const guard = Math.max(0, Math.min(0.85,
-            ((Number(b.foe.armour) || 0) + braced + (FP.block || 0)) * pierce * sundered));
+            ((Number(b.foe.armour) || 0) + (FP.block || 0)) * pierce * sundered));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -1194,7 +1208,14 @@ export async function fightRound(buyerId, opts = {}) {
             theirThorns = Math.max(1, Math.round((dmg / Math.max(0.15, 1 - guard)) * FP.thorns));
             b.hp = Math.max(0, b.hp - theirThorns);
         }
-        if (b.foeBrace > 0) b.foeBrace -= 1;
+        // ── THEIR RIPOSTE ── set on a beat they spent standing ready, spent on the first blow that lands.
+        // The mirror of yours: off what actually got through their guard, and reading their Vengeance node.
+        let theirRiposte = 0;
+        if ((b.foeRiposte || 0) > 0 && dmg > 0) {
+            theirRiposte = Math.max(1, Math.round(dmg * (b.foeRiposte + (FP.riposteShare || 0))));
+            b.hp = Math.max(0, b.hp - theirRiposte);
+            b.foeRiposte = 0;
+        }
 
         // What the move leaves behind.
         let healed = 0;
@@ -1237,8 +1258,23 @@ export async function fightRound(buyerId, opts = {}) {
                 : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`}`
                 + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
                 + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
-                + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`,
+                + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`
+                + `${theirRiposte ? ` ${b.foe.name} answers for ${theirRiposte}.` : ""}`,
+            takenBack: theirRiposte,
             ability: ability?.name || null });
+
+        // ── THEIR BURN ── ticks at the end of YOUR beat, the same place yours ticks at the end of theirs.
+        if (b.foeBleed?.turns > 0) {
+            const tick = Math.min(b.hp, b.foeBleed.dmg);
+            b.hp = Math.max(0, b.hp - tick);
+            b.foeBleed.turns -= 1;
+            if (tick > 0) {
+                b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend",
+                    text: `You are still burning — another ${tick}.`, ability: null });
+            }
+            if (b.foeBleed.turns <= 0) b.foeBleed = null;
+        }
+        if (b.foeSunder > 0) b.foeSunder -= 1;
         b.turn = "them";
     } else {
         // ── A BRACED DEFENDER DOES NOT SWING ── it covers up, and your next blow lands on a raised guard.
@@ -1264,52 +1300,104 @@ export async function fightRound(buyerId, opts = {}) {
                 }
             }
         } else if (b.incoming?.brace) {
-            b.foeBrace = 1;
-            // ── AND IT FILLS A SHIELD, IF THEY BUILT ONE ──────────────────────────────────────────────────
-            // Fortress, Deep Guard and Unyielding are four of the Warden's twelve nodes and every one of them
-            // sizes a SHIELD POOL — which the defender did not have, so those points did nothing the moment
-            // their owner was the one being attacked. A brace now banks real hit points for anyone who bought
-            // the nodes, capped by their own Unyielding exactly as yours is capped by yours.
+            // ── A GUARD IS A GUARD, WHOEVER RAISES IT ───────────────────────────────────────
+            // Your Guard banks a shield worth 30% of your health, capped by your own Unyielding. Theirs banked
+            // NOTHING unless they had bought Warden nodes — it was a flat 40% off one blow and nothing else.
+            // So the identical command was two different commands depending on which side of the ring you
+            // happened to be standing on, and that is the plainest form of the debuff-on-defence problem: a
+            // member's shield build could not raise the shield they built.
             //
-            // Nobody without the nodes gains anything: with no guardSoak and no wardSoak this is zero and the
-            // brace stays the plain damage-reduction it always was, which is what every NPC still gets.
-            const soakRate = (FP.guardSoak || 0) + (FP.wardSoak || 0);
-            let foeSoak = 0;
-            if (soakRate > 0) {
-                const cap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
-                foeSoak = Math.min(Math.round(b.foeMaxHp * soakRate), Math.max(0, cap - (b.foeShield || 0)));
-                b.foeShield = (b.foeShield || 0) + foeSoak;
-            }
-            b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
-                bracedPct: Math.round(AI_BRACE_GUARD * 100), soaked: foeSoak || undefined,
-                text: `${b.foe.name} braces — your next blow lands on a raised guard.${foeSoak ? ` They bank ${foeSoak}.` : ""}`,
-                ability: "Brace" });
+            // It is the same move now, off the same constants, with the same per-node bonuses and the same
+            // cap. The flat 40% is gone with it — keeping BOTH would have made defending strictly better than
+            // attacking, which is the same failure pointed the other way.
+            const cap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
+            const foeSoak = Math.min(Math.round(b.foeMaxHp * (GUARD_SOAK + (FP.guardSoak || 0))),
+                Math.max(0, cap - (b.foeShield || 0)));
+            b.foeShield = (b.foeShield || 0) + foeSoak;
+            b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false, soaked: foeSoak,
+                text: `${b.foe.name} raises a guard — ${foeSoak} banked against what comes next.`,
+                ability: "Guard" });
         } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
         // Whatever was telegraphed is what lands. Rolling again here would make the warning a lie.
         const incoming = b.incoming || pickIncoming(b);
+        // ── A FREE STANCE COSTS THEM NOTHING EITHER ────────────────────────────────────────────
+        // FREE_KINDS is your rule: a ward or a riposte does not spend your beat — you set it, and you still
+        // swing. The defender was never given it, so the picker's own ward branch fell through and resolved
+        // as a plain punch. A Warden's signature move, downgraded to a punch, every time its owner was away.
+        if (incoming.free) {
+            if (incoming.free === "riposte") {
+                b.foeRiposte = RIPOSTE_SHARE;
+                b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: true,
+                    text: `${b.foe.name} sets to answer — their beat is still theirs.`,
+                    ability: incoming.freeName || "Riposte" });
+            } else {
+                const wcap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
+                const wsoak = Math.min(Math.round(b.foeMaxHp * (WARD_SOAK + (FP.wardSoak || 0))),
+                    Math.max(0, wcap - (b.foeShield || 0)));
+                b.foeShield = (b.foeShield || 0) + wsoak;
+                b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: true, soaked: wsoak,
+                    text: `${b.foe.name} throws up a ward — ${wsoak} banked. Their beat is still theirs.`,
+                    ability: incoming.freeName || "Ward" });
+            }
+        }
         const theirAbility = incoming.isAbility ? incoming : null;
-        const power = incoming.power || 1;
+        let power = incoming.power || 1;
+        let foeHits = 1;
+        let foeDrain = incoming.heal || 0;
+        let rendNow = false;
+        let sunderNow = false;
+        let foeJustSurged = false;
+        // How much of YOUR block their swing cuts through. Their Pierce, and a spell cuts guard on its own.
+        let foePierce = Math.max(0.25, 1 - (FP.pierce || 0));
         // Their element against yours is the mirror of yours against theirs — including their Wheelwise, which
         // sharpens their advantage and softens their disadvantage exactly as yours does.
         let back = 1 / (b.clash?.mult || 1);
         if (FP.elementEdge) back = back >= 1 ? back * (1 + FP.elementEdge) : back + (1 - back) * FP.elementEdge;
-        // A braced defender does not swing — it covers up, and your next blow lands on a raised guard.
-        const foeCrit = Math.random() < foeCritChance;
-        // Their First Blood, their Bloodlust, and their spell power — read off their tree exactly as yours are
-        // read off yours. A defender who built an opener now actually opens with it.
+        // ── THE SAME NINE KINDS, DOING THE SAME NINE THINGS ──────────────────────────────────
+        // Read off the same list your own swing is read off. Every one of these used to collapse into a bare
+        // `power` multiplier, so their surge, their sunder, their rend, their gamble and their flurry were all
+        // literally the same move with a different name printed over it. The kit a member assembled was
+        // therefore visible only when they happened to be the one holding the controls.
+        if (theirAbility) {
+            const k = theirAbility.kind;
+            if (k === "surge") { b.foeSurge = SURGE_SWINGS; power = 0; foeJustSurged = true; }
+            if (k === "execute" && b.hp <= b.maxHp * 0.35) power *= 1.5;
+            if (k === "gamble") power = Math.random() < 0.5 ? power * 2 : 0;
+            if (k === "spell") {
+                power *= 0.88 * (1 + (FP.spellPower || 0));
+                foePierce = Math.max(0.2, 0.6 - (FP.pierce || 0));
+            }
+            if (k === "flurry") foeHits = Math.max(1, theirAbility.hits || 3);
+            if (k === "drain") { foeDrain = DRAIN_SHARE; power = 1; }
+            if (k === "rend") rendNow = true;
+            if (k === "sunder") sunderNow = true;
+        }
+        // Their surge spends itself on the swings AFTER the one that set it, exactly as yours does.
+        const foeSurgeMult = (b.foeSurge > 0 && !foeJustSurged) ? 1.5 : 1;
+        if (b.foeSurge > 0 && !foeJustSurged) b.foeSurge -= 1;
+        // Their First Blood, their Bloodlust — read off their tree exactly as yours are read off yours.
         const foeOpen = b.beat <= 1 ? 1 + (FP.openMult || 0) : 1;
         const foeLow = b.foeHp <= b.foeMaxHp / 3 ? 1 + (FP.lowHpDmg || 0) : 1;
-        const foeSpell = theirAbility?.kind === "spell" ? 1 + (FP.spellPower || 0) : 1;
-        const raw = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow * foeSpell
-            * (foeCrit ? foeCritMult : 1)));
-        // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
-        // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
-        // Their Sunder Guard cuts what YOUR block is worth, which is the same thing your pierce does to their
-        // guard. Floored so a blow can never become completely unblockable.
-        const foePierce = Math.max(0.25, 1 - (FP.pierce || 0));
-        const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)) * foePierce);
-        let through = Math.max(0, raw - blocked);
+        // Your stance is a BLOCK, cut by their Pierce and by whatever a Sunder of theirs has already stripped
+        // off it — the mirror of what your own Sunder does to their armour.
+        const mySundered = (b.foeSunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
+        const myBlock = Math.min(0.7, BLOCK + (P.block || 0)) * foePierce * mySundered;
+        // EVERY blow of a flurry rolls its own crit, on their side of the ring too.
+        let raw = 0;
+        let blocked = 0;
+        let through = 0;
+        let foeCrit = false;
+        for (let i = 0; i < foeHits && power > 0; i += 1) {
+            const c = Math.random() < foeCritChance;
+            if (c) foeCrit = true;
+            const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow
+                * (b.foeUnderdog || 1) * foeSurgeMult * (c ? foeCritMult : 1)));
+            const off = Math.round(one * myBlock);
+            raw += one;
+            blocked += off;
+            through += Math.max(0, one - off);
+        }
         let soaked = 0;
         if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
         // ── IRON THORNS ── a share of the blow comes back off THE WHOLE SWING, not off what got past you.
@@ -1325,6 +1413,22 @@ export async function fightRound(buyerId, opts = {}) {
         let stood = false;
         if (through >= b.hp && (P.lastStand || 0) > 0 && !b.stood) { through = Math.max(0, b.hp - 1); b.stood = true; stood = true; }
         b.hp = Math.max(0, b.hp - through);
+        // ── WHAT THEIR MOVE LEAVES BEHIND ── their drain feeding them, their burn on you, their sunder on
+        // your block. All three were computed on their card and then dropped: `heal` in particular was set by
+        // the picker on every drain and read by nothing at all, so a life-steal kit healed for zero on defence.
+        let foeHealed = 0;
+        if (foeDrain > 0 && through > 0) {
+            foeHealed = Math.min(b.foeMaxHp - b.foeHp, Math.round(through * foeDrain));
+            b.foeHp += foeHealed;
+        }
+        if (foeCrit && (FP.burnOnCrit || 0) > 0 && through > 0) rendNow = true;
+        if (rendNow && through > 0) {
+            const per = Math.max(1, Math.round(b.maxHp * (REND_PER_TURN + (FP.rendTick || 0))));
+            const cap = REND_MAX_STACKS + Math.round(FP.rendStacks || 0);
+            const stacks = Math.min(cap, (b.foeBleed?.stacks || 0) + 1);
+            b.foeBleed = { turns: REND_TURNS, stacks, dmg: per * stacks };
+        }
+        if (sunderNow) b.foeSunder = SUNDER_TURNS;
         // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
         // which meant the entire payoff of guarding and warding was a line of grey text under the buttons.
         // ── RIPOSTE ── their blow comes back at them. Resolved off what actually LANDED, so bracing first and
@@ -1336,6 +1440,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.riposte = 0;
         }
         b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
+            healed: foeHealed, hits: foeHits,
             // SENT SEPARATELY. These were added together into one `riposted` field that no component ever
             // read — so a shield build's entire damage output came off the enemy's health bar with no number,
             // no pop and no colour, mentioned only inside a sentence at the end of THEIR log line. It works,
@@ -1343,7 +1448,7 @@ export async function fightRound(buyerId, opts = {}) {
             riposted: sent, thorned,
             text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
             ability: theirAbility?.name || null });
 
         // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of
