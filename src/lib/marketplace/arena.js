@@ -1367,7 +1367,17 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "spell") {
                 power *= 0.88 * (1 + (FP.spellPower || 0));
                 foePierce = Math.max(0.2, 0.6 - (FP.pierce || 0));
+                // ── A SPELL BRINGS ITS OWN ELEMENT, ON THEIR SIDE TOO ────────────────────────────────────
+                // Yours reads the affinity of the SPECIFIC piece you attuned at the Forge rather than the
+                // bout-wide clash; theirs was still using the bout-wide number, so the one decision the Forge
+                // asks you to make about a weapon was worth nothing on the half of your fights you defend.
+                const c = elementClash(theirAbility.element, b.me.element);
+                back = c.mult * (FP.elementEdge ? (c.mult >= 1 ? 1 + FP.elementEdge : 1) : 1);
             }
+            // ── AND THE STRIKE AMPLIFIER ── a strike is the high-variance kind: yours swings at 1.45 where
+            // everything else swings at 1. Theirs swung at 1, so a strike kit was a strictly worse kit to be
+            // caught defending with. Same number, same kind, both sides.
+            if (k === "strike") power *= 1.45;
             if (k === "flurry") foeHits = Math.max(1, theirAbility.hits || 3);
             if (k === "drain") { foeDrain = DRAIN_SHARE; power = 1; }
             if (k === "rend") rendNow = true;
