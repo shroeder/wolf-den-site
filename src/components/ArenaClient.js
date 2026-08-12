@@ -707,6 +707,11 @@ export default function ArenaClient({ initial }) {
         // to float and the move read as having done nothing at all. It shows what it actually is now: the
         // percentage your next blow has to get through, over the fighter who raised it.
         if (l.bracedPct > 0) pops.push({ side: ownSide, n: l.bracedPct, kind: "brace", at: 60 });
+        // A DEFENDER'S THORNS COME OFF YOU. It is their number, but it lands on your health, so it floats over
+        // you — the same rule as any other blow: the pop goes where the damage went.
+        if (l.theirThorns > 0) pops.push({ side: "left", n: l.theirThorns, kind: "thorn", at: 220 });
+        // What their banked guard ate — over THEM, because it is their shield doing it.
+        if (l.theirSoak > 0) pops.push({ side: "right", n: l.theirSoak, kind: "ward", at: 40 });
         // ── WHAT YOU SENT BACK ── over THEM, because it is damage you dealt. A shield build's whole offence
         // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
         // said why. Staggered after the incoming hit so the two do not land on the same frame.

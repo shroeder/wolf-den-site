@@ -725,6 +725,14 @@ export async function startBout(buyerId, targetId = null) {
             // disagree — the card reads the same fields resolveBeat multiplies.
             health: foeKit.health, damage: foeKit.damage,
             critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
+            // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
+            // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
+            // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
+            // thorns, block, lastStand, regen, pierce, openMult, lowHpDmg, spellPower, elementEdge and the
+            // rest — were computed for the defender and then dropped on the floor, because only `me` carried
+            // `perks` onto the bout. So a member who spent twelve points on Iron Thorns returned nothing
+            // while defending, and the build they chose was invisible in half the fights it appeared in.
+            perks: foeKit.perks || {},
         },
         // gearPower is load-bearing and was MISSING: the Giant-Killer feat tests
         // foe.gearPower >= me.gearPower * 1.25, so with me.gearPower undefined the comparison was
@@ -847,6 +855,21 @@ export async function fightRound(buyerId, opts = {}) {
     const P = b.me?.perks || {};
     const critChance = b.me?.critChance ?? 0.25;
     const myCritMult = b.me?.critMult ?? 2.5;
+    // ── THE DEFENDER'S TREE, READ THE WAY YOURS IS ───────────────────────────────────────────────────────
+    // Every passive a fully-invested tree can produce now lands when its owner is the one being attacked,
+    // except five — and those five are not oversights, they are perks whose MECHANIC the defending side never
+    // performs:
+    //
+    //   riposteShare  the AI never sets a riposte; it braces or it swings
+    //   rendTick / rendStacks / burnOnCrit   all leave a burn behind, which only an attacker applies
+    //   cdCut         shortens cooldowns, and the incoming move is chosen fresh each beat rather than cooled
+    //
+    // Wiring any of those means giving the defending AI a new behaviour, not reading a number, so they stay
+    // out until it has one. Everything else — block, thorns, regen, lastStand, guardSoak, wardSoak,
+    // shieldCap, pierce, openMult, lowHpDmg, spellPower, elementEdge — is live.
+    //
+    // THEIRS, read exactly the way P is read for you. A defender is a real build now, not four numbers.
+    const FP = b.foe?.perks || {};
     const foeCritChance = b.foe?.critChance ?? 0.25;
     const foeCritMult = b.foe?.critMult ?? 2.5;
     if (!b.items) b.items = Object.fromEntries(BATTLE_ITEMS.map((i) => [i.id, i.count]));
@@ -1032,7 +1055,9 @@ export async function fightRound(buyerId, opts = {}) {
         // it trades their damage for yours. Sunder and Pierce cut through a brace exactly as they cut through
         // armour, which keeps the counter-play the same one the player already knows.
         const braced = (b.foeBrace || 0) > 0 ? AI_BRACE_GUARD : 0;
-        const guard = Math.max(0, Math.min(0.85, ((Number(b.foe.armour) || 0) + braced) * pierce * sundered));
+        // Their Footwork rides with their armour: the same node that lets YOU turn a blow aside lets them.
+        const guard = Math.max(0, Math.min(0.85,
+            ((Number(b.foe.armour) || 0) + braced + (FP.block || 0)) * pierce * sundered));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -1053,7 +1078,29 @@ export async function fightRound(buyerId, opts = {}) {
             turned += Math.round(raw * guard);
             dmg += Math.max(1, Math.round(raw - raw * guard));
         }
+        // Their banked shield eats first, exactly as yours does on the way in — so the points they spent on
+        // it are the reason your blow did less, and the recap can say so.
+        let theirSoak = 0;
+        if ((b.foeShield || 0) > 0 && dmg > 0) {
+            theirSoak = Math.min(b.foeShield, dmg);
+            b.foeShield -= theirSoak;
+            dmg -= theirSoak;
+        }
+        // ── THEIR LAST STAND ── the mirror of yours: once a bout, the blow that would end them leaves them
+        // on 1. Checked BEFORE the subtraction, or there is nothing left to save.
+        let theyStood = false;
+        if (dmg >= b.foeHp && (FP.lastStand || 0) > 0 && !b.foeStood) {
+            dmg = Math.max(0, b.foeHp - 1); b.foeStood = true; theyStood = true;
+        }
         b.foeHp = Math.max(0, b.foeHp - dmg);
+        // ── THEIR IRON THORNS ── off your WHOLE swing, the same way yours works, so a defender who built for
+        // it punishes a big hit hardest. It can finish you: a shield build defending is supposed to be able
+        // to win a fight it never swings in.
+        let theirThorns = 0;
+        if ((FP.thorns || 0) > 0 && dmg > 0) {
+            theirThorns = Math.max(1, Math.round((dmg / Math.max(0.15, 1 - guard)) * FP.thorns));
+            b.hp = Math.max(0, b.hp - theirThorns);
+        }
         if (b.foeBrace > 0) b.foeBrace -= 1;
 
         // What the move leaves behind.
@@ -1087,11 +1134,17 @@ export async function fightRound(buyerId, opts = {}) {
             sunder ? `guard stripped` : null,
             hits > 1 ? `${hits} hits` : null,
         ].filter(Boolean).join(", ");
+        // `theirThorns` and `theyStood` ride along so the ring can SHOW them. A defender's thorns taking a
+        // bite out of you with no number and no line is precisely the invisible-effect bug this file keeps
+        // being fixed for — and it is worse coming from the other side, because you cannot see their tree.
         b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg, crit,
-            hits, healed, turned, kind: ability?.kind || "hit",
-            text: dmg > 0
+            hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
+            text: `${dmg > 0
                 ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"} — ${dmg}${extra ? ` (${extra})` : ""}.`
-                : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`,
+                : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`}`
+                + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
+                + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
+                + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`,
             ability: ability?.name || null });
         b.turn = "them";
     } else {
@@ -1119,25 +1172,50 @@ export async function fightRound(buyerId, opts = {}) {
             }
         } else if (b.incoming?.brace) {
             b.foeBrace = 1;
-            // `bracedPct` so the ring can SHOW it. A brace was the one move in the fight that put nothing on
-            // screen: no number, no marker, on either side — so it read as the opponent's turn doing nothing.
+            // ── AND IT FILLS A SHIELD, IF THEY BUILT ONE ──────────────────────────────────────────────────
+            // Fortress, Deep Guard and Unyielding are four of the Warden's twelve nodes and every one of them
+            // sizes a SHIELD POOL — which the defender did not have, so those points did nothing the moment
+            // their owner was the one being attacked. A brace now banks real hit points for anyone who bought
+            // the nodes, capped by their own Unyielding exactly as yours is capped by yours.
+            //
+            // Nobody without the nodes gains anything: with no guardSoak and no wardSoak this is zero and the
+            // brace stays the plain damage-reduction it always was, which is what every NPC still gets.
+            const soakRate = (FP.guardSoak || 0) + (FP.wardSoak || 0);
+            let foeSoak = 0;
+            if (soakRate > 0) {
+                const cap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
+                foeSoak = Math.min(Math.round(b.foeMaxHp * soakRate), Math.max(0, cap - (b.foeShield || 0)));
+                b.foeShield = (b.foeShield || 0) + foeSoak;
+            }
             b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
-                bracedPct: Math.round(AI_BRACE_GUARD * 100),
-                text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });
+                bracedPct: Math.round(AI_BRACE_GUARD * 100), soaked: foeSoak || undefined,
+                text: `${b.foe.name} braces — your next blow lands on a raised guard.${foeSoak ? ` They bank ${foeSoak}.` : ""}`,
+                ability: "Brace" });
         } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.
         // Whatever was telegraphed is what lands. Rolling again here would make the warning a lie.
         const incoming = b.incoming || pickIncoming(b);
         const theirAbility = incoming.isAbility ? incoming : null;
         const power = incoming.power || 1;
-        // Their element against yours is the mirror of yours against theirs.
-        const back = 1 / (b.clash?.mult || 1);
+        // Their element against yours is the mirror of yours against theirs — including their Wheelwise, which
+        // sharpens their advantage and softens their disadvantage exactly as yours does.
+        let back = 1 / (b.clash?.mult || 1);
+        if (FP.elementEdge) back = back >= 1 ? back * (1 + FP.elementEdge) : back + (1 - back) * FP.elementEdge;
         // A braced defender does not swing — it covers up, and your next blow lands on a raised guard.
         const foeCrit = Math.random() < foeCritChance;
-        const raw = Math.max(1, Math.round(b.foe.damage * power * back * fever * (foeCrit ? foeCritMult : 1)));
+        // Their First Blood, their Bloodlust, and their spell power — read off their tree exactly as yours are
+        // read off yours. A defender who built an opener now actually opens with it.
+        const foeOpen = b.beat <= 1 ? 1 + (FP.openMult || 0) : 1;
+        const foeLow = b.foeHp <= b.foeMaxHp / 3 ? 1 + (FP.lowHpDmg || 0) : 1;
+        const foeSpell = theirAbility?.kind === "spell" ? 1 + (FP.spellPower || 0) : 1;
+        const raw = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow * foeSpell
+            * (foeCrit ? foeCritMult : 1)));
         // Your stance is a BLOCK: BLOCK is how much of it you turned aside. A guard soaks what's left.
         // Footwork adds to it — a Warden who bought five ranks turns aside 44% rather than 34%.
-        const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)));
+        // Their Sunder Guard cuts what YOUR block is worth, which is the same thing your pierce does to their
+        // guard. Floored so a blow can never become completely unblockable.
+        const foePierce = Math.max(0.25, 1 - (FP.pierce || 0));
+        const blocked = Math.round(raw * Math.min(0.7, BLOCK + (P.block || 0)) * foePierce);
         let through = Math.max(0, raw - blocked);
         let soaked = 0;
         if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
@@ -1194,6 +1272,11 @@ export async function fightRound(buyerId, opts = {}) {
         if ((P.regen || 0) > 0 && b.hp > 0 && b.hp < b.maxHp) {
             const back = Math.max(1, Math.round(b.maxHp * P.regen));
             b.hp = Math.min(b.maxHp, b.hp + back);
+        }
+        // And theirs, on the same beat and by the same rule.
+        if ((FP.regen || 0) > 0 && b.foeHp > 0 && b.foeHp < b.foeMaxHp) {
+            const back = Math.max(1, Math.round(b.foeMaxHp * FP.regen));
+            b.foeHp = Math.min(b.foeMaxHp, b.foeHp + back);
         }
         }
         b.turn = "you";
