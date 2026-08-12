@@ -566,8 +566,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         else window.location.href = "/marketplace/town";
     }, [act, bout, onLeave]);
 
-    // Nothing underneath a full-screen fight should move when you swipe.
-    useScrollLock(Boolean(bout));
+    // Nothing underneath a full-screen fight should move when you swipe — but ONLY while that fight is on
+    // screen. The condition has to match the one that renders it (`bout && !stepped`, further down) or you get
+    // the state this was in: step out of a bout to look at your card or spend a skill point, and the fight
+    // unmounts while the lock stays on, leaving the whole Arena page frozen with no way to scroll it. The bout
+    // is still open in that state by design — that is what the "Back to the fight" banner is for — so `bout`
+    // alone was never the right test.
+    useScrollLock(Boolean(bout) && !stepped);
 
     // Fall (.6s), then the flourish, then the card at 1.9s. Long enough to watch them go down and hear it
     // land; short enough that nobody taps the screen wondering whether it is stuck.
@@ -854,7 +859,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Hosted over another page: the fight, or nothing. Placed AFTER every hook above so the hook order is the
     // same on both sides of this branch — returning early from among them is how a component that renders
     // fine on its own page crashes the moment something else mounts it.
-    if (boutOnly && !bout) return null;
+    // `|| stepped` is the belt to the exit door's braces: hosted mode has no Arena page to fall through to, so
+    // any state that is not "a live fight" must render nothing rather than dropping the whole Arena over the
+    // street.
+    if (boutOnly && (!bout || stepped)) return null;
 
     if (bout && !stepped) {
         const yourTurn = !bout.over && bout.turn === "you";
@@ -957,8 +965,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {/* ── LEAVE ── the bout is a row in the database, not a thing held open by this
                                 screen, so stepping out costs nothing: no forfeit, no round conceded, the
                                 opponent is not waiting. Same deal a ship battle already offers. */}
+                            {/* Hosted over the plaza there is no Arena page to step out ONTO — stepping out
+                                hands the screen back to the street instead, with the bout left open exactly as
+                                it is. Tapping any raider re-enters it (see TownClient's engage). Without this
+                                the fight unmounted and the whole Arena page rendered over the town. */}
                             <button type="button" className="ar-mute ar-leave" aria-label="Step out of the fight"
-                                onClick={() => { Sfx.ui(); setStepped(true); }}>
+                                onClick={() => {
+                                    Sfx.ui();
+                                    if (boutOnly) { if (onLeave) onLeave(); return; }
+                                    setStepped(true);
+                                }}>
                                 <GiExitDoor aria-hidden="true" />
                             </button>
                             <button type="button" className={`ar-mute ar-logbtn${logOpen ? "" : " is-off"}`}

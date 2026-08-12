@@ -1017,6 +1017,15 @@ export default function TownClient({ initial }) {
         // fighter and not just the foe.
         if (r?.ok) { setSwing(null); setFight(r); return; }
         setSwing(null);
+        // ── WALKING BACK INTO A FIGHT YOU STEPPED OUT OF ─────────────────────────────────────────────────
+        // The fight screen has an exit door, and out here it hands the street back with the bout still open
+        // on your row. Tapping a raider then answers `bout_in_progress`, which used to be a dead end: the
+        // message told you to finish a fight you had no way to reach. Fetch the live arena state and re-mount
+        // it instead — it is the same bout, so this resumes rather than starting anything.
+        if (r?.error === "bout_in_progress") {
+            const st = await fetch("/api/marketplace/arena", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+            if (st?.bout && !st.bout.over) { setFight(st); return; }
+        }
         // Somebody else got to it first, or a bout of yours is already open. Say which.
         setRaidNote(r?.error === "bout_in_progress"
             ? "Finish the fight you are already in first."
