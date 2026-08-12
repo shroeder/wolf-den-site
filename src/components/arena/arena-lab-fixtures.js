@@ -1,6 +1,7 @@
 "use client";
 
 import { npcOffer } from "@/lib/marketplace/arena-npc.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE } from "@/lib/marketplace/arena-ladder.js";
 import { arenaLevelFor, CLASSES, classById, pointsSpent, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE, treeAbilities, treeState } from "@/lib/marketplace/arena-classes.js";
 import { upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 
@@ -9,7 +10,10 @@ const TREE_CLASS = "reaver";
 const TREE_TAKEN = { rv_might: 3, rv_crit: 2, rv_strike: 1, rv_flurry: 1 };
 const TREE_XP = 2400;
 import { vpPreview, boutLaurels } from "@/lib/marketplace/arena-rewards.js";
-import { CRATES, armouryEv, rollable } from "@/lib/marketplace/armoury.js";
+import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
+// The part sprites are static Blob URLs, so the lab can show them; chest and consumable art live in
+// the database and stay blank here — in production rowArt resolves all three.
+import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 
 // ── THE ARENA LAB: FIXTURES ──────────────────────────────────────────────────────────────────────────────────
 // DEV ONLY. Handcrafted arena state in exactly the shape `getArenaState` / `publicBout` hand to the client, so
@@ -237,10 +241,23 @@ export function baseState(extra = {}) {
         // The real crates, through the real tables, so the shelf can be looked at without a login.
         armoury: CRATES.map((c) => ({
             id: c.id, name: c.name, cost: c.cost, art: c.art, blurb: c.blurb,
-            table: rollable(c, { jewels: true }).map((r) => ({ label: r.label, worth: r.worth, w: r.w }))
+            table: rollable(c, { jewels: true }).map((r) => ({ label: r.label, worth: r.worth, w: r.w, art: rowArt(r, { parts: Object.fromEntries(PART_TIERS.map((t) => [t.tier, t.sprite])) }) }))
                 .sort((a, z) => z.worth - a.worth),
             ev: armouryEv(c, { jewels: true }),
         })),
+        // THE LONG ROAD, through the real catalogue — a hundred rungs, ten houses, with the first fifteen put
+        // down so the lab shows both states of a rung and both states of a house header.
+        ladder: (() => {
+            const beaten = new Set(Array.from({ length: 15 }, (_, i) => i + 1));
+            return {
+                size: LADDER_SIZE, beaten: beaten.size, houses: LADDER_HOUSES,
+                foes: LADDER.map((f) => ({
+                    rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
+                    archetypeName: f.archetypeName, tell: f.tell, power: f.power, color: f.color,
+                    sprite: f.sprite, reward: f.reward, beaten: beaten.has(f.rung),
+                })),
+            };
+        })(),
         band: RANK_HUNTER,
         fightsLeft: 7, fightsPerDay: 10,
         stats: { wins: 34, losses: 19, streak: 3, bestStreak: 5, bestVp: 1040, npcBest: 11 },

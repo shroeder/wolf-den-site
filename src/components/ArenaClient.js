@@ -1280,8 +1280,13 @@ export default function ArenaClient({ initial }) {
                                     <details className="ar-crate-odds">
                                         <summary>What is in it</summary>
                                         <ul>
-                                            {(c.table || []).map((r) => (
-                                                <li key={r.label}>
+                                            {/* KEYED ON THE INDEX, not the label. The War Chest lists "A Polished
+                                                Jewel" TWICE at different odds (a jewel row and its rarer
+                                                sibling), so keying on the label gave React two children with
+                                                the same key — which it is free to duplicate or drop. It was
+                                                warning about exactly this in the console. */}
+                                            {(c.table || []).map((r, ri) => (
+                                                <li key={`${c.id}-${ri}-${r.label}`}>
                                                     {r.art ? (
                                                         // eslint-disable-next-line @next/next/no-img-element
                                                         <img className="ar-crate-row-art" src={r.art} alt="" draggable="false" />
