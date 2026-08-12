@@ -1106,7 +1106,10 @@ export async function fightRound(buyerId, opts = {}) {
             }
         } else if (b.incoming?.brace) {
             b.foeBrace = 1;
+            // `bracedPct` so the ring can SHOW it. A brace was the one move in the fight that put nothing on
+            // screen: no number, no marker, on either side — so it read as the opponent's turn doing nothing.
             b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
+                bracedPct: Math.round(AI_BRACE_GUARD * 100),
                 text: `${b.foe.name} braces — your next blow lands on a raised guard.`, ability: "Brace" });
         } else {
         // ── THEIR SWING ── the ring closed over you, and you were bracing.

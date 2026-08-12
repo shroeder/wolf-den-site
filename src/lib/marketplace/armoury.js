@@ -21,6 +21,18 @@
 //   Strongbox   750 laurels -> EV ~862  (1.15x)
 //   War Chest 2,000 laurels -> EV ~2,304 (1.15x)
 //
+// ⚠️ PRICES WERE RAISED ON 2026-08-11 (Luke: 1.2k / 5k / 12k) AND THE TABLES HAVE NOT MOVED YET, so those
+// three lines describe the OLD prices and the invariants below are currently BROKEN:
+//
+//   Footlocker  1,200 -> EV ~289   (0.24x)   worst row 130   (0.11x)
+//   Strongbox   5,000 -> EV ~890   (0.18x)   worst row 420   (0.08x)
+//   War Chest  12,000 -> EV ~2,369 (0.20x)   worst row 1,100 (0.09x)
+//
+// Scaling the CONTENTS to restore 1.15x means roughly five times the payout per crate — five Mythic Chests
+// out of a War Chest — which is a far bigger change to the wider economy than a price edit, so it is a
+// decision rather than arithmetic and it is Luke's to make. Until it is made, these are a bad buy and the
+// rule below is not true.
+//
 // A 15% premium over the old fixed prices is deliberate: you are giving up the ability to choose, and a
 // gamble that pays exactly its price is strictly worse than the shop it replaced. It stays a sink either way —
 // the alternative to spending is holding laurels, which do nothing.
@@ -44,7 +56,7 @@ export const CRATES = [
     {
         id: "crate_1",
         name: "Footlocker",
-        cost: 250,
+        cost: 1200,
         art: "/images/arena/armoury/crate_1.png",
         blurb: "Somebody's kit, broken open. Small things mostly — but nothing in here is a wasted press.",
         table: [
@@ -63,7 +75,7 @@ export const CRATES = [
     {
         id: "crate_2",
         name: "Strongbox",
-        cost: 750,
+        cost: 5000,
         art: "/images/arena/armoury/crate_2.png",
         blurb: "Iron-bound and heavy. The middle of everything the ladder pays, with a real edge on top.",
         table: [
@@ -82,7 +94,7 @@ export const CRATES = [
     {
         id: "crate_3",
         name: "War Chest",
-        cost: 2000,
+        cost: 12000,
         art: "/images/arena/armoury/crate_3.png",
         blurb: "The best the ladder will hand over. Nothing in here is small, and one thing in here is a story.",
         table: [

@@ -20,6 +20,12 @@ export const GAME_EXTRA_PATHS = [
     "/marketplace/trade", "/marketplace/friends", "/marketplace/inbox", "/marketplace/dm",
     "/marketplace/town", "/marketplace/auction", "/marketplace/cooking", "/marketplace/mining",
     "/marketplace/dungeons", "/marketplace/arena", "/marketplace/blacksmith", "/marketplace/events", "/marketplace/notifications",
+    // The Jewelcutter was missing from BOTH lists, so the bench lost the game nav and the Pathfinder strip
+    // together — you could walk in and have no way back out except the browser button. It is the exact
+    // "abandons you in certain places" failure this file was written to prevent, on a page that shipped after
+    // the file did. The other unlisted /marketplace/* dirs are checkout, auth, vendor and admin surfaces,
+    // which are correctly not part of the game shell.
+    "/marketplace/jeweller",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

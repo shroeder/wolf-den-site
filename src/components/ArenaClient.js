@@ -689,9 +689,22 @@ export default function ArenaClient({ initial }) {
             // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
             pops.push({ side: l.who === "you" ? "right" : "left", n: l.damage, kind: l.crit ? "crit" : "dmg" });
         }
-        if (l.blocked > 0) pops.push({ side: "left", n: l.blocked, kind: "block", at: 120 });
-        if (l.healed > 0) pops.push({ side: "left", n: l.healed, kind: "heal" });
-        if (l.soaked > 0) pops.push({ side: "left", n: l.soaked, kind: "ward", at: 60 });
+        // ── AND THEY BELONG TO WHOEVER EARNED THEM ──────────────────────────────────────────────────────
+        // All three of these were pinned to "left", which is YOU. Damage was already handled correctly, so a
+        // blow you took floated over you and a blow you landed floated over them — but a heal, a block and a
+        // ward always floated over you no matter who did it. So the opponent drinking a poultice put a big
+        // green +N over YOUR hero, and the opponent bracing looked like you had been handed a shield. The
+        // engine was right about all of it; only the side was wrong.
+        const mine = l.who === "you";
+        const ownSide = mine ? "left" : "right";
+        if (l.blocked > 0) pops.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
+        if (l.healed > 0) pops.push({ side: ownSide, n: l.healed, kind: "heal" });
+        if (l.soaked > 0) pops.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
+        // A BRACE IS NOT A SHIELD, and that is why nothing was shown for it. The opponent has no shield pool —
+        // bracing raises a damage-reduction guard for one blow (see AI_BRACE_GUARD) — so there was no number
+        // to float and the move read as having done nothing at all. It shows what it actually is now: the
+        // percentage your next blow has to get through, over the fighter who raised it.
+        if (l.bracedPct > 0) pops.push({ side: ownSide, n: l.bracedPct, kind: "brace", at: 60 });
         // ── WHAT YOU SENT BACK ── over THEM, because it is damage you dealt. A shield build's whole offence
         // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
         // said why. Staggered after the incoming hit so the two do not land on the same frame.
@@ -921,9 +934,11 @@ export default function ArenaClient({ initial }) {
                                         <span key={`${it.kind}-${i}`}
                                             className={`ar-pop is-${it.side} is-${it.kind}`}
                                             style={it.at ? { animationDelay: `${it.at}ms` } : undefined}>
-                                            {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" ? "" : "−"}
-                                            {it.n}
-                                            {it.kind === "block" ? <u>blocked</u> : it.kind === "ward" ? <u>soaked</u> : null}
+                                            {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" || it.kind === "brace" ? "" : "−"}
+                                            {it.n}{it.kind === "brace" ? "%" : ""}
+                                            {it.kind === "block" ? <u>blocked</u>
+                                                : it.kind === "ward" ? <u>soaked</u>
+                                                    : it.kind === "brace" ? <u>braced</u> : null}
                                         </span>
                                     ))}
                                 </span>
