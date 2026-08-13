@@ -13648,7 +13648,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
    be seen at all — the deck looked gunless while the HUD said "1 guns". A gun sits at the rail and the crew
    works it from behind anyway, so this is also the truer order. */
 .sbt-guns { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.sbt-gun { position: absolute; width: var(--gw, 13%); aspect-ratio: 128 / 82; transform: translate(-50%, -70%); }
+/* ── SIZED TO THE SPRITE THAT IS ACTUALLY IN IT ──────────────────────────────────────────────────────────
+   The barrels looked tiny and it was two shrinks compounding. The four stage sprites are drawn on a SQUARE
+   256x256 canvas, and this box was 128/82 — an aspect of 1.56 — so `contain` fitted the square by its
+   HEIGHT and the gun rendered at 64% of the box width before it started. Inside that, the ink itself only
+   fills about 84%. Net: a 13% box drew a 7% cannon.
+   The box is square now, matching the art, and 16% wide — so the visible barrel roughly doubles. The old
+   ratio belonged to deck-cannon.png, which is now only the fallback for a battle saved before the marks
+   were wired. */
+.sbt-gun { position: absolute; width: var(--gw, 16%); aspect-ratio: 1 / 1; transform: translate(-50%, -70%); }
 /* The enemy's guns point at YOU, so the whole battery mirrors with the ship it belongs to. */
 .sbt-ship-foe .sbt-gun { transform: translate(-50%, -70%) scaleX(-1); }
 /* The generic barrel is the FALLBACK only — a battle saved before the marks were wired, or a foe with no gun

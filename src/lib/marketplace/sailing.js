@@ -1334,7 +1334,13 @@ async function openEncounterBattle(buyerId, enc, row) {
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
         foeProfile: { ...enc, fleet: true, hits: enc.hits, art: encounterArt(enc.id) },
-        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
+        // ── THE GUNS' OWN DATA, ON THE SIDE THAT DRAWS THEM ──────────────────────────────────────────
+        // decorate() reads gunStats/gunLevel off THIS object to pick each barrel's stage sprite, and
+        // they only ever existed on meProfile — so `stats` was null and gunStageFromLevel(undefined)
+        // returned stage 1 for every gun on both ships, every fight. Twelve levels into a barrel and
+        // the fight drew the same iron pipe as a fresh one.
+        me: { gunStats: mine.gunStats || null, gunLevel: row?.gun_level || 0,
+            name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
             deck: boatDeck(myTier),
             ports: portsWithSaved(savedPorts, `boat:${myTier}`, boatDeck(myTier), mine.guns),
             rider: me?.avatar_sprite_url || null,
@@ -1348,7 +1354,8 @@ async function openEncounterBattle(buyerId, enc, row) {
         // Limb markers are arranged rather than measured (see monster-parts.js) because a creature's arms are
         // wherever the artist put them on thirty-odd different sprites, and a hand-placed table would rot the
         // first time one was redrawn.
-        foe: { name: enc.name, cls: enc.cls, art: encounterArt(enc.id), guns: enc.guns, hp: enc.hits,
+        foe: { gunLevel: Math.max(0, (enc.tier || 1) * 3 - 2),   // no gun rows on an encounter — its tier implies the mark
+            name: enc.name, cls: enc.cls, art: encounterArt(enc.id), guns: enc.guns, hp: enc.hits,
             ammo: enc.ammo, boss: enc.tier >= 5, flavor: enc.blurb, mirror: false,
             deck: 42, rider: null, riderFlip: false, pet: null,
             ports: enc.kind === "monster" ? limbPoints(enc.guns) : [],
@@ -1976,13 +1983,20 @@ export async function doRaid(buyerId, targetId = null) {
         // at all and stood both crews at the fallback deck height rather than on their own hull — the fleet
         // path got both when the guns were added and this one was simply missed. Two members fighting each
         // other is the MORE common battle, so the version with no guns on it was the one most people saw.
-        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel,
+        // ── THE GUNS' OWN DATA, ON THE SIDE THAT DRAWS THEM ──────────────────────────────────────────
+        // decorate() reads gunStats/gunLevel off THIS object to pick each barrel's stage sprite, and
+        // they only ever existed on meProfile — so `stats` was null and gunStageFromLevel(undefined)
+        // returned stage 1 for every gun on both ships, every fight. Twelve levels into a barrel and
+        // the fight drew the same iron pipe as a fresh one.
+        me: { gunStats: mine.gunStats || null, gunLevel: row?.gun_level || 0,
+            name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: myLevel,
             deck: boatDeck(boatTier(myLevel)),
             ports: portsWithSaved(savedPorts, `boat:${boatTier(myLevel)}`, boatDeck(boatTier(myLevel)), mine.guns),
             rider: me?.avatar_sprite_url || null,
             riderFlip: me?.avatar_sprite_flip === true,
             pet: crew[buyerId] || null },
-        foe: { name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns, hp: theirs.hp,
+        foe: { gunLevel: target?.gun_level || 0,   // a rival has a real gun track; draw what they bought
+            name: theirs.name, cls: `boat level ${foeLevel}`, art: theirs.art, guns: theirs.guns, hp: theirs.hp,
             ammo: theirs.ammo.id, boss: false, mirror: true, flavor: "A passing ship, and everything they are carrying.",
             deck: boatDeck(boatTier(foeLevel)),
             ports: portsWithSaved(savedPorts, `boat:${boatTier(foeLevel)}`, boatDeck(boatTier(foeLevel)), theirs.guns),
@@ -2762,7 +2776,13 @@ export async function doFleetBattle(buyerId, rank = null) {
             gunneryLevel: row?.gunnery_level || 0, hullLevel: row?.hull_level || 0, ammo: fired, art: mine.art,
             sea: await equippedSeaAffinity(buyerId).catch(() => ({})), gunStats: mine.gunStats || null },
         foeProfile: { ...ship, fleet: true },
-        me: { name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
+        // ── THE GUNS' OWN DATA, ON THE SIDE THAT DRAWS THEM ──────────────────────────────────────────
+        // decorate() reads gunStats/gunLevel off THIS object to pick each barrel's stage sprite, and
+        // they only ever existed on meProfile — so `stats` was null and gunStageFromLevel(undefined)
+        // returned stage 1 for every gun on both ships, every fight. Twelve levels into a barrel and
+        // the fight drew the same iron pipe as a fresh one.
+        me: { gunStats: mine.gunStats || null, gunLevel: row?.gun_level || 0,
+            name: mine.name, art: mine.art, guns: mine.guns, hp: mine.hp, ammo: mine.ammo.id, level: mine.boatLevel,
             // Your own hull's deck line, so your hero stands on the boat rather than hovering over it, and the
             // battery it carries — one drawn cannon per gun you actually own.
             deck: boatDeck(myTier),
@@ -2770,7 +2790,8 @@ export async function doFleetBattle(buyerId, rank = null) {
             rider: me?.avatar_sprite_url || null,
             riderFlip: me?.avatar_sprite_flip === true,
             pet: crew[buyerId] || null },
-        foe: { name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id,
+        foe: { gunLevel: Math.max(0, (ship?.rank || 1) * 2),   // fleet ships have no rows either; rank implies it
+            name: foe.name, cls: ship.cls, art: fleetArt(ship), guns: foe.guns, hp: foe.hp, ammo: foe.ammo.id,
             boss: Boolean(ship.boss), flavor: ship.flavor, mirror: false, deck: fleetDeckOf(ship),
             ports: portsWithSaved(savedPorts, ship.art, fleetDeckOf(ship), foe.guns),
             // Their captain on deck, mirrored by the scene so they face your ship.
