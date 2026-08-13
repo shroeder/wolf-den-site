@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import ArenaClient from "@/components/ArenaClient";
 import FxPreview from "@/components/arena/FxPreview";
-import { BATTLE_ITEMS, elementClash } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
 import { npcAbilities, npcFor } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, featsFor, vpFor } from "@/lib/marketplace/arena-rewards.js";
 import { baseState, makeBout, SCENES, SCENE_KEYS } from "@/components/arena/arena-lab-fixtures.js";
@@ -180,7 +180,6 @@ function makeServer(initial) {
                 foe,
                 // Computed, not hard-coded: the fixture used to announce "Their Water smothers your Fire"
                 // over an Earth opponent, which makes the affinity system impossible to verify in here.
-                clash: elementClash(st.me.element, foe.element),
                 myPower: st.me.power, theirPower, npcTier: tier,
             });
             st.bout.incoming = null;
