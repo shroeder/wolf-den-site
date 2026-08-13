@@ -424,6 +424,35 @@ export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP *
 // fight braces four times) and it is a hard ceiling on how long anybody can refuse to play.
 export const BRACE_LIMIT = 6;
 
+// ── WHAT A WIN IS WORTH, AND WHY IT STOPPED BEING LINEAR ─────────────────────────────────────────────────────
+// A win paid `40 + theirPower * 0.9` gold and `18 + theirPower * 0.4` XP, and the shape was the whole problem.
+// Linear and unbounded in the opponent's power rating makes the Arena a SPIRAL: gold buys gear, gear raises
+// everybody's power rating, a higher rating pays more gold. It compounds with nothing pushing back.
+//
+// Measured before it was touched (three days, the whole Den):
+//   · 680,745 gold out of 1,286,853 minted — the Arena alone was 53% of every coin made in the game
+//   · median win 895, top win 3,501 — which at 200 coins to the dollar is $17.50 for one fight
+//   · the heaviest player took 32 wins in a day: 34,809 gold, $174
+//
+// SQUARE ROOT, so a stronger opponent still pays more but the curve flattens instead of running away. The
+// shape matters more than the coefficients: it cuts almost nothing off a beginner's first win and roughly
+// seven-eighths off the top, which is exactly where the inflation was.
+//
+//   power    25:   63 →  55 gold      (a first win, essentially untouched)
+//   power   774:  737 → 215 gold      (the fight that prompted this: $3.69 → $1.08)
+//   power  3846: 3501 → 454 gold      ($17.50 → $2.27)
+//
+// Both numbers live here, together, because they are the same decision made twice — see the memory note on
+// balance constants never being copied. If you retune one, look at the other.
+export const ARENA_GOLD_BASE = 20;
+export const ARENA_GOLD_PER_ROOT = 7;
+export const ARENA_XP_BASE = 10;
+export const ARENA_XP_PER_ROOT = 3;
+export const arenaWinGold = (power = 0) =>
+    Math.round(ARENA_GOLD_BASE + ARENA_GOLD_PER_ROOT * Math.sqrt(Math.max(0, Number(power) || 0)));
+export const arenaWinXp = (power = 0) =>
+    Math.round(ARENA_XP_BASE + ARENA_XP_PER_ROOT * Math.sqrt(Math.max(0, Number(power) || 0)));
+
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
 

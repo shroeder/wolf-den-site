@@ -7,6 +7,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
+    arenaWinGold, arenaWinXp,
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
@@ -2156,11 +2157,11 @@ async function finishBout(buyerId, row, b, won) {
     const renown = 1 + (Number(upgradeEffects(row?.upgrades || {}).laurels) || 0);
     const laurels = Math.round((baseLaurels + featLaurels) * renown);
 
-    // Gold and XP still pay on a win, unchanged — this sits on top rather than replacing them.
+    // Gold and XP still pay on a win — this sits on top rather than replacing them.
     let reward = null;
     if (won) {
-        const gold = Math.round(40 + theirPower * 0.9);
-        const xp = Math.round(18 + theirPower * 0.4);
+        const gold = arenaWinGold(theirPower);
+        const xp = arenaWinXp(theirPower);
         reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});
