@@ -20,6 +20,24 @@ const rows = await sql.query(
     `SELECT reason, COUNT(*) FILTER (WHERE delta > 0) AS earns
        FROM mkt_coin_event WHERE created_at > NOW() - ($1 || ' days')::interval
       GROUP BY reason ORDER BY 2 DESC`, [String(DAYS)]);
+// ── THE SOURCES THE LEDGER CANNOT SEE ────────────────────────────────────────────────────────────────────────
+// This whole script rests on one assumption, stated at the top of windfall-odds.js: "every source key is
+// exactly the coin reason that system already writes". For the boss that is FALSE, and it is the
+// heaviest-weighted source in the table.
+//
+// A boss strike rolls on EVERY manual hit — boss.js calls rollWindfall outside the gold guard, deliberately,
+// because "a strike is a strike whether or not this particular hit happened to pay coin". But a strike only
+// writes a coin row when the Prospector signature pays, and that row is named `boss_reward`. So the ledger
+// showed 72 boss_raid earns in thirty days when the real number was 1,789: a 25x undercount, and the reason
+// this script reported one celestial every 42 days while the Den saw one in 28.
+//
+// Counted from the table that actually records the event instead. Any future source whose roll is not
+// one-to-one with a coin row belongs here too.
+const directCounts = {
+    boss_raid: Number((await sql.query(
+        `SELECT COUNT(*) AS n FROM boss_hit WHERE kind = 'manual' AND created_at > NOW() - ($1 || ' days')::interval`,
+        [String(DAYS)]))[0].n),
+};
 const active = Number((await sql.query(
     `SELECT COUNT(*) AS n FROM mkt_buyer WHERE last_seen_at > NOW() - ($1 || ' days')::interval`, [String(DAYS)]))[0].n);
 
@@ -30,7 +48,8 @@ const unwired = [];
 let claims = 0;
 const bySystem = [];
 for (const r of rows) {
-    const n = Number(r.earns);
+    // A source measured DIRECTLY overrides whatever the ledger thinks it saw — see directCounts.
+    const n = directCounts[r.reason] ?? Number(r.earns);
     const w = windfallWeight(r.reason);
     // Split the zero-weight reasons in two: the ones we DECIDED must never roll, and everything else, which
     // is just a reason nobody has wired. Collapsed together, a system that was meant to be a source and got

@@ -68,7 +68,20 @@ export const WINDFALL_SOURCES = {
     sailing: 4,          // what a dig turned up. NOT a ledger reason — sailing pays in loot, so this one
                          // source is invisible to check-windfall.mjs, which prints it as unmeasured.
     // ── THE BIG ONES ──
-    boss_raid: 40, raid_complete: 40,
+    // ── A STRIKE IS AN ACTION, NOT "THE BIG ONE" ─────────────────────────────────────────────────────────
+    // boss_raid was 40 — the band reserved for "a boss, a raid: the things a whole town turns up for". That
+    // is the right weight for a boss KILL and the wrong one for what the call site actually does: boss.js
+    // rolls on every MANUAL STRIKE, of which the Den throws about sixty a day.
+    //
+    // The error hid because check-windfall could not see it. A strike only writes a coin row when the
+    // Prospector signature pays, so the ledger showed 2.4 boss rolls a day against a real 59.6, and the
+    // script happily reported one celestial per 42 days while boss strikes alone were paying one per 17.
+    // Measured properly, boss_raid was 72.8% of every ticket in the game and all four tiers were landing at
+    // roughly 3.3x their intended rate — one ascendant every two days, one celestial every thirteen.
+    //
+    // 4 is the band a strike belongs in: "a fight or a dig — something with a stake behind it". raid_complete
+    // keeps its 40, because a town raid IS the whole-town event that band was written for.
+    boss_raid: 4, raid_complete: 40,
 };
 
 
