@@ -45,11 +45,17 @@ export async function postDmMessage(threadId, senderId, body, catalogProductId =
         .queryOne(`SELECT user_a, user_b, last_message_at, a_last_read_at, b_last_read_at FROM mkt_dm_thread WHERE id = $1`, [threadId])
         .catch(() => null);
     if (!t || (t.user_a !== senderId && t.user_b !== senderId)) return { error: "forbidden" };
+    // ── A BLOCK IS ENFORCED HERE, ON THE SERVER, IN BOTH DIRECTIONS ──────────────────────────────────────
+    // Hiding the composer in the client is a courtesy; this is the rule. Symmetric on purpose: if only the
+    // blocker were stopped, the blocked party could go on writing into a thread the blocker can no longer
+    // answer, which is worse than having no block at all.
+    const otherId = t.user_a === senderId ? t.user_b : t.user_a;
+    if (await isBlockedBetween(senderId, otherId)) return { error: "blocked" };
     const text = String(body || "").trim().slice(0, 4000);
     if (!text && !catalogProductId) return { error: "empty" };
 
     // Was the recipient caught up BEFORE this message? If so, this is their first unread → email-worthy.
-    const recipientId = t.user_a === senderId ? t.user_b : t.user_a;
+    const recipientId = otherId;
     const recipientRead = t.user_a === recipientId ? t.a_last_read_at : t.b_last_read_at;
     const firstUnread = !t.last_message_at || (recipientRead != null && new Date(recipientRead) >= new Date(t.last_message_at));
 
@@ -226,4 +232,102 @@ export async function unreadDmCount(userId) {
         )
         .catch(() => null);
     return row?.n || 0;
+}
+
+// ── BLOCK, AND REPORT ────────────────────────────────────────────────────────────────────────────────────────
+// DMs shipped with no way out of a conversation. The shared profanity filter (text-filter.js) guards
+// member-authored PUBLIC text — town chat, farm names, bounty titles — and a DM is none of those, so a direct
+// message is the one place in the Den where a member can write anything to another member with nothing in
+// between. Their only options were to ignore it or to tell Luke, and "tell Luke" does not scale past the
+// number of people he already knows by name.
+//
+// Two controls, deliberately small:
+//
+//   BLOCK is the one that matters, because it needs nobody's permission and it works instantly. Stored
+//   directionally (who blocked whom, so the person who set it is the person who can lift it) and enforced
+//   SYMMETRICALLY: a block in either direction stops the thread both ways. Enforcing it one-way would let the
+//   blocked party keep writing into a thread the blocker can no longer answer, which is worse than nothing.
+//
+//   REPORT is for when blocking is not the whole answer. It names a MESSAGE where it can, because "this one,
+//   here" is what makes a report reviewable a fortnight later, and a message body is immutable so the evidence
+//   cannot be edited out from underneath it. Reporting blocks as well, by default — nobody wants to file a
+//   report and then keep receiving messages while it is looked at.
+export const REPORT_REASONS = ["harassment", "sexual", "scam", "spam", "other"];
+
+/** Either direction. One query, because a block is symmetric at enforcement time. */
+export async function isBlockedBetween(a, b) {
+    if (!a || !b) return false;
+    const row = await db.queryOne(
+        `SELECT 1 FROM mkt_dm_block WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1) LIMIT 1`,
+        [a, b]
+    ).catch(() => null);
+    return Boolean(row);
+}
+
+/** Everyone this member has blocked — for the thread list, so a blocked thread can say so. */
+export async function blockedIds(userId) {
+    if (!userId) return new Set();
+    const rows = await db.query(`SELECT blocked_id FROM mkt_dm_block WHERE blocker_id = $1`, [userId]).catch(() => []);
+    return new Set(rows.map((r) => r.blocked_id));
+}
+
+export async function blockMember(userId, otherId) {
+    if (!userId || !otherId || userId === otherId) return { error: "invalid" };
+    await db.query(
+        `INSERT INTO mkt_dm_block (blocker_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [userId, otherId]
+    ).catch(() => {});
+    return { ok: true, blocked: true };
+}
+
+/** Only your OWN block comes off — which is the whole reason the row is stored directionally. */
+export async function unblockMember(userId, otherId) {
+    if (!userId || !otherId) return { error: "invalid" };
+    await db.query(`DELETE FROM mkt_dm_block WHERE blocker_id = $1 AND blocked_id = $2`, [userId, otherId]).catch(() => {});
+    return { ok: true, blocked: false };
+}
+
+/**
+ * File a report, and block by default.
+ *
+ * `messageId` is verified to belong to the thread and to the person being reported, so a report cannot be
+ * used to attach somebody else's words to a member — the one way a reporting tool becomes a weapon.
+ */
+export async function reportMember(userId, { threadId = null, messageId = null, reason = "other", note = "" } = {}) {
+    if (!userId) return { error: "invalid" };
+    const t = threadId
+        ? await db.queryOne(`SELECT id, user_a, user_b FROM mkt_dm_thread WHERE id = $1`, [threadId]).catch(() => null)
+        : null;
+    if (!t || (t.user_a !== userId && t.user_b !== userId)) return { error: "forbidden" };
+    const otherId = t.user_a === userId ? t.user_b : t.user_a;
+
+    let msgId = null;
+    if (messageId) {
+        const m = await db.queryOne(
+            `SELECT id FROM mkt_dm_message WHERE id = $1 AND thread_id = $2 AND sender_id = $3`,
+            [messageId, threadId, otherId]
+        ).catch(() => null);
+        msgId = m?.id || null;
+    }
+    const why = REPORT_REASONS.includes(reason) ? reason : "other";
+    await db.query(
+        `INSERT INTO mkt_dm_report (reporter_id, reported_id, thread_id, message_id, reason, note)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userId, otherId, threadId, msgId, why, String(note || "").trim().slice(0, 1000)]
+    ).catch(() => {});
+    // Reporting blocks too. Filing one and then continuing to receive messages while it is looked at is the
+    // shape of a tool nobody uses twice.
+    await blockMember(userId, otherId);
+    // Straight to the owner's phone. A report sitting in a table nobody opens is the same as no report — and
+    // this is the one notification in the Den where the delay matters more than the batching.
+    try {
+        const { sendAdminPush } = await import("@/lib/push/send.js");
+        const who = await db.queryOne(
+            `SELECT COALESCE(NULLIF(display_name,''), alias, 'A member') AS a,
+                    (SELECT COALESCE(NULLIF(display_name,''), alias, 'a member') FROM mkt_buyer WHERE id = $2) AS b
+               FROM mkt_buyer WHERE id = $1`, [userId, otherId]).catch(() => null);
+        await sendAdminPush({ title: "A message was reported",
+            body: `${who?.a || "A member"} reported ${who?.b || "a member"} — ${why}.`, route: "messages" });
+    } catch { /* the report is filed either way; the ping is best-effort */ }
+    return { ok: true, blocked: true, reported: true };
 }

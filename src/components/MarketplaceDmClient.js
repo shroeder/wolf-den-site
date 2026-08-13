@@ -37,6 +37,26 @@ export default function MarketplaceDmClient({ threadId }) {
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [pickerFor, setPickerFor] = useState(null);
+    // ── THE WAY OUT ──────────────────────────────────────────────────────────────────────────────────────
+    // Until now a member's only options in a conversation they did not want were to ignore it or to tell
+    // Luke, and "tell Luke" stops working the moment the Den is bigger than the people he knows by name.
+    // Block is instant and needs nobody's permission; Report is for when blocking is not the whole answer,
+    // and it blocks as well, because filing one and then continuing to receive messages is a tool nobody
+    // uses twice. Tucked behind the peer's name rather than sat beside Send — a safety control that is easy
+    // to hit by accident is its own problem.
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [modBusy, setModBusy] = useState(false);
+    const [blocked, setBlocked] = useState(false);
+    const moderate = useCallback(async (action, extra = {}) => {
+        setModBusy(true);
+        try {
+            const r = await fetch(`/api/marketplace/dm/${threadId}/moderate`, {
+                method: "POST", headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action, ...extra }),
+            }).then((x) => x.json()).catch(() => null);
+            if (r && !r.error) setBlocked(Boolean(r.blocked));
+        } finally { setModBusy(false); setMenuOpen(false); }
+    }, [threadId]);
     const endRef = useRef(null);
     const messagesRef = useRef(null);
     const lastTypingRef = useRef(0);
@@ -142,7 +162,36 @@ export default function MarketplaceDmClient({ threadId }) {
                         </span>
                     </Link>
                 ) : null}
+                {/* A shop is a business with a support channel; blocking one is a different feature. */}
+                {c && !c.isShop ? (
+                    <div className="dm-mod">
+                        <button type="button" className="dm-mod-btn" aria-label="Conversation options"
+                            aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}>⋯</button>
+                        {menuOpen ? (
+                            <div className="dm-mod-menu" role="menu">
+                                <button type="button" disabled={modBusy}
+                                    onClick={() => moderate(blocked ? "unblock" : "block")}>
+                                    {blocked ? "Unblock" : "Block"} {c.displayLabel}
+                                </button>
+                                <button type="button" disabled={modBusy} className="is-report"
+                                    onClick={() => {
+                                        const why = window.prompt("Report this conversation — what is wrong?\n\nharassment · sexual · scam · spam · other", "harassment");
+                                        if (!why) return;
+                                        const note = window.prompt("Anything to add? (optional)", "") || "";
+                                        moderate("report", { reason: String(why).toLowerCase().trim(), note });
+                                    }}>
+                                    Report and block
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
             </section>
+            {blocked ? (
+                <p className="dm-blocked-note">
+                    You have blocked {c?.displayLabel || "this member"}. Neither of you can send messages here.
+                </p>
+            ) : null}
 
             <section className="card dm-thread">
                 <div className="dm-messages" ref={messagesRef} onClick={() => setPickerFor(null)}>

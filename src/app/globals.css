@@ -6582,6 +6582,24 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 
 /* ===== First-class DM conversation ===== */
 .dm-topbar { display: flex; align-items: center; gap: 8px; }
+/* ── THE CONVERSATION MENU ── block and report, behind a dot-menu at the end of the top bar. Deliberately
+   NOT next to Send: a safety control you can hit by accident becomes its own support problem. */
+.dm-mod { position: relative; margin-left: auto; flex: 0 0 auto; }
+.dm-mod-btn { width: 34px; height: 34px; border-radius: 10px; font-size: 18px; line-height: 1;
+    color: #b6bec7; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+    cursor: pointer; }
+.dm-mod-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
+.dm-mod-menu { position: absolute; right: 0; top: 40px; z-index: 30; display: grid; min-width: 210px;
+    padding: 6px; border-radius: 12px; background: #14121a;
+    border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 14px 34px rgba(0,0,0,0.55); }
+.dm-mod-menu button { padding: 9px 11px; border-radius: 8px; text-align: left; font-size: 13px;
+    font-weight: 700; color: #e8edf2; background: transparent; border: 0; cursor: pointer; }
+.dm-mod-menu button:hover { background: rgba(255,255,255,0.09); }
+.dm-mod-menu button.is-report { color: #ff8ba0; }
+.dm-mod-menu button:disabled { opacity: .5; cursor: default; }
+.dm-blocked-note { margin: 8px 0 0; padding: 9px 12px; border-radius: 10px; text-align: center;
+    font-size: 12.5px; font-weight: 700; color: #ff8ba0;
+    background: rgba(255,90,120,0.10); border: 1px solid rgba(255,90,120,0.30); }
 .dm-back { font-size: 1.7rem; line-height: 1; text-decoration: none; color: var(--ink); padding-right: 4px; }
 .dm-peer { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; min-width: 0; }
 .dm-peer-av { position: relative; width: 42px; height: 42px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #2a2340, #1c1830); color: #ffd75e; font-weight: 800; flex: 0 0 auto; }

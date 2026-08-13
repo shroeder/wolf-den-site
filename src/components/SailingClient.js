@@ -1024,10 +1024,13 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 <button className="sail-act is-raid" disabled={busy || raidResetTooPoor}
                                     onClick={buyRaidReset}>
                                     <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
+                                    {/* Priced the way the Tailwind recharge beside it is priced: the coin and
+                                        the number, nothing else. "300 gold · doubles each time" was true and
+                                        it ran off the edge of the card — and the two buttons sit side by side,
+                                        so the odd one out reads as a different kind of thing. That it doubles
+                                        is something you learn the second time you press it, not label text. */}
                                     <b>Buy a battle</b>
-                                    <em>{raidResetTooPoor
-                                        ? `${resetCost.toLocaleString()} gold — short`
-                                        : `${resetCost.toLocaleString()} gold · doubles each time`}</em>
+                                    <em>{busy ? "buying…" : `🪙 ${resetCost.toLocaleString()}`}</em>
                                 </button>
                             )
                         ) : null}
