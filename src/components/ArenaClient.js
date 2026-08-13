@@ -851,13 +851,32 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // Scale the spectacle by how much of the target's bar it actually took, so a graze and a
         // fight-ender are not the same picture.
         const pool = target === "you" ? bout.maxHp : bout.foeMaxHp;
-        const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
-        fxRef.current?.play({
-            kind,
-            element: mineNow ? bout.me?.element : bout.foe?.element,
-            side: target, power, crit: Boolean(l.crit),
-        });
-        return undefined;
+        const element = mineNow ? bout.me?.element : bout.foe?.element;
+
+        // ── A FLURRY FIRES THREE TIMES ───────────────────────────────────────────────────────────────────
+        // The effect used to play once per ACTION, so Rampage — three blows, the entire identity of the move
+        // — produced one burst scaled by the combined damage, which is indistinguishable from a single big
+        // hit. The particle system was built precisely so a skill could feel like what it is; playing it once
+        // threw that away for the one skill that needed it most.
+        //
+        // Each landed blow gets its own burst, staggered to match the damage numbers so the sound, the float
+        // and the flash are one event repeated rather than three things happening at slightly wrong times.
+        // A missed blow gets nothing — the absence IS the feedback.
+        const each = Array.isArray(l.each) ? l.each : null;
+        const timers = [];
+        if (each && each.length > 1) {
+            each.forEach((n, i) => {
+                if (!(n > 0)) return;
+                const p = 0.5 + Math.min(1.2, n / Math.max(1, pool * 0.2));
+                timers.push(setTimeout(() => {
+                    fxRef.current?.play({ kind, element, side: target, power: p, crit: Boolean(l.crit) });
+                }, i * 170));
+            });
+        } else {
+            const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
+            fxRef.current?.play({ kind, element, side: target, power, crit: Boolean(l.crit) });
+        }
+        return () => timers.forEach(clearTimeout);
     }, [bout?.log?.length]);
 
     // ── THE NUMBERS ── off the blow that actually landed, on the fighter that took it. A blocked or healed

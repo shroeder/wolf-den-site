@@ -25,6 +25,14 @@ export const ARENA_UPGRADES = [
         unit: (v) => `+${v.toFixed(1)} might`,
     },
     {
+        // The counterpart to the Reaver's Killer's Eye node, for the two classes that have no accuracy node
+        // at all. Gold-bought and class-agnostic, so a Warden who wants their Rampage-equivalent to land can
+        // pay for it the slow way — which is what these tracks are for.
+        id: "aim", name: "Steady Hand", icon: "/images/arena/track/instinct.webp", max: 12, base: 300, stat: "accuracy", per: 0.004,
+        desc: "A blade that goes where you send it. Fewer swings miss outright.",
+        unit: (v) => `+${(v * 100).toFixed(1)}% accuracy`,
+    },
+    {
         id: "instinct", name: "Instinct", icon: "/images/arena/track/instinct.webp", max: 15, base: 340, stat: "crit", per: 0.006,
         desc: "Finding the seam. Raises the chance a blow lands critical.",
         unit: (v) => `+${(v * 100).toFixed(1)}% crit`,

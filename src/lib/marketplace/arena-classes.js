@@ -74,7 +74,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/reaver.webp",
         health: 0,
         dr: 0.16,
-        accuracy: 0.94,
+        accuracy: 0.92,
     },
     {
         id: "warden",
@@ -85,7 +85,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/warden.webp",
         health: 70,
         dr: 0.34,
-        accuracy: 0.97,
+        accuracy: 0.95,
     },
     {
         id: "runecaller",
@@ -96,7 +96,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/runecaller.webp",
         health: 30,
         dr: 0.24,
-        accuracy: 0.95,
+        accuracy: 0.93,
     },
 ];
 
@@ -127,7 +127,10 @@ export const DEFAULT_DR = 0.20;
 export const DEFAULT_ACCURACY = 0.95;
 // Nobody dodges forever and nobody hits forever: a ceiling on each so investment cannot end the interaction.
 export const DR_CAP = 0.60;
-export const ACCURACY_CAP = 1.0;
+// 0.98 rather than 1.0, deliberately: a plain swing must ALWAYS be able to miss. At a cap of 1 a
+// well-invested fighter reaches "never misses", and the moment that happens every skill's accuracy cost
+// stops being a trade-off and becomes a rounding error — which is the whole mechanic gone.
+export const ACCURACY_CAP = 0.98;
 export const ACCURACY_FLOOR = 0.35;
 
 export const classById = (id) => CLASSES.find((c) => c.id === id) || null;
