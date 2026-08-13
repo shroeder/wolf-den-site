@@ -51,6 +51,12 @@ export async function GET(request) {
             if (view === "thread") {
                 const id = searchParams.get("id");
                 if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
+                // Thread ids are uuids. Without this check a client that sends anything else — the admin app
+                // sent "0" for every row while it parsed the id as a Long — reaches Postgres, fails the uuid
+                // compare, and surfaces as a 500 that reads like the server is broken rather than the call.
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+                    return NextResponse.json({ error: "bad_id" }, { status: 400 });
+                }
                 const rows = await db.query(
                     `SELECT m.id, m.body, m.created_at, m.sender_id, ${NAME} AS sender
                        FROM mkt_dm_message m JOIN mkt_buyer b ON b.id = m.sender_id
