@@ -152,7 +152,7 @@ export const TREES = {
             desc: "+2 Might per rank.", sprite: "/images/arena/node/rv_might.webp" }),
         N({ id: "rv_crit", tier: 0, name: "Killer Instinct", ranks: 5, stat: "crit", per: 0.02,
             desc: "+2% critical chance per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
-        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 2.3, cd: 3,
+        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 2.0, cd: 3,
             desc: "A committed blow. One big hit.", sprite: "/images/arena/node/rv_strike.webp" }),
 
         N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.12, needs: 3,
@@ -163,8 +163,8 @@ export const TREES = {
         //
         // 0.50 x 3 = 150% and every blow can miss. That is the trade an all-out attack should be: more total
         // damage than a single committed swing only if it lands, and three chances for it not to.
-        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.50, hits: 3, acc: -0.18, cd: 3, needs: 3,
-            desc: "Three wild blows at 50% each — every one can miss, every one can crit.", sprite: "/images/arena/node/rv_flurry.webp" }),
+        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.72, hits: 3, acc: -0.10, cd: 3, needs: 3,
+            desc: "Three wild blows — each can miss, each can crit.", sprite: "/images/arena/node/rv_flurry.webp" }),
         N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "speed", per: 3, needs: 3,
             desc: "+3 Speed per rank — decides who opens.", sprite: "/images/arena/node/rv_speed.webp" }),
         // The answer to Rampage's penalty: a Reaver who wants the wild swing can pay for it to land.
@@ -178,7 +178,7 @@ export const TREES = {
         N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 2.4, cd: 4, needs: 7,
             desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
 
-        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 3, cd: 5, needs: 12,
+        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 2.7, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
         N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.1, needs: 12,
             desc: "+10% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
@@ -228,7 +228,7 @@ export const TREES = {
         N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 2.3, cd: 4,
             desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
 
-        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.5, cd: 3, needs: 3,
+        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.85, cd: 3, needs: 3,
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
         N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTick", per: 0.008, needs: 3,
             desc: "Burns tick 0.8% harder per rank.", sprite: "/images/arena/node/rc_burn.webp" }),
@@ -242,7 +242,7 @@ export const TREES = {
         N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.05, needs: 7,
             desc: "Cut 5% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 
-        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 3.2, cd: 6, needs: 12,
+        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 3.0, cd: 6, needs: 12,
             desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
         N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
             desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),

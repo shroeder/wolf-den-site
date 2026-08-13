@@ -89,13 +89,29 @@ const HOUSES = [
 ];
 
 // ── THE CURVE ────────────────────────────────────────────────────────────────────────────────────────────────
-// Rung 1 sits under a fresh member and rung 100 sits well past the best gear in the game. Exponential rather
-// than linear, so the early climb is quick and the top is genuinely a wall.
-const FLOOR = 140;
-const CEILING = 26000;
+// Written as a FLOOR and a per-rung GROWTH rather than a floor and a ceiling, because those are the two things
+// the design actually cares about — how easy the first fight is, and how fast it gets hard — and the ceiling
+// is just whatever falls out at rung 100. Expressed the other way round, tuning either one silently moved the
+// other.
+//
+// FLOOR 140 -> 25. Rung 1 was pitched at roughly Gauntlet tier 12: measured against a member with starter
+// gear it was not an opening fight, it was a wall with a "1" on it. It is an opening fight now.
+//
+// GROWTH 5.4% -> 15% a rung. This is the number that decides how far apart two members end up, and it was set
+// so shallow that the gap between the newest fighter and the best-geared one spanned twenty-five rungs — one
+// stalled at 3 while the other was still winning at 28. At 15% the whole Den lands in the second stretch:
+//
+//     newest member  ~13     mid-tier  ~18     best-geared today  ~23
+//
+// WHAT THIS COSTS, stated plainly because it is a real trade. A steep curve compresses everyone together and
+// makes the rest of the ladder distant: tripling your power now buys about eight rungs, where at 5.4% it
+// bought twenty-one. Rungs 30+ are future content rather than this season's content. That is the deliberate
+// choice — the alternative is the spread, where a new member is walled at rung 3 and nobody meets anybody.
+const FLOOR = 25;
+const GROWTH = 1.15;
 export const LADDER_SIZE = 100;
 
-const powerAt = (rung) => Math.round(FLOOR * Math.pow(CEILING / FLOOR, (rung - 1) / (LADDER_SIZE - 1)));
+const powerAt = (rung) => Math.round(FLOOR * Math.pow(GROWTH, rung - 1));
 
 // A champion (every tenth) is a step above its own rung — the house's name is on it.
 const isChampion = (rung) => rung % 10 === 0;
