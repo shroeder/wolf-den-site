@@ -83,9 +83,18 @@ export const CLASSES = [
         blurb: "Wards, ripostes and sustain. A Warden wins by still being standing, and makes swinging at them a mistake.",
         color: "#6fd0ff",
         emblem: "/images/arena/class/warden.webp",
-        health: 70,
-        dr: 0.34,
+        health: 110,
+        dr: 0.40,
         accuracy: 0.95,
+        // ── THE WARDEN DRINKS ────────────────────────────────────────────────────────────────────────────
+        // A share of everything they put on the other fighter comes back as health — INCLUDING thorns and
+        // ripostes, which is where 84% of a Warden's damage actually comes from. So the class heals by being
+        // hit and answering, which is the fantasy the rest of the tree already describes and nothing
+        // delivered: the sheet had nine defensive passives, no damage passives, and one weak active.
+        //
+        // Inherent rather than a node, because it is what the class IS. You do not spend a point to be a
+        // Warden.
+        lifesteal: 0.15,
     },
     {
         id: "runecaller",
@@ -119,7 +128,12 @@ export const CLASSES = [
 // real accuracy decisions live on the skills.
 export const classBase = (id) => {
     const c = classById(id);
-    return { health: c?.health || 0, dr: c?.dr ?? DEFAULT_DR, accuracy: c?.accuracy ?? DEFAULT_ACCURACY };
+    return {
+        health: c?.health || 0,
+        dr: c?.dr ?? DEFAULT_DR,
+        accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
+        lifesteal: c?.lifesteal || 0,
+    };
 };
 
 // What someone with no class at all fights with — a member who has not picked yet, and the shape NPCs use.
@@ -155,10 +169,10 @@ export const TREES = {
             desc: "+2 Might per rank.", sprite: "/images/arena/node/rv_might.webp" }),
         N({ id: "rv_crit", tier: 0, name: "Killer Instinct", ranks: 5, stat: "crit", per: 0.02,
             desc: "+2% critical chance per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
-        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 2.0, cd: 3,
+        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 1.45, cd: 3,
             desc: "A committed blow. One big hit.", sprite: "/images/arena/node/rv_strike.webp" }),
 
-        N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.12, needs: 3,
+        N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.08, needs: 3,
             desc: "Criticals hit +12% harder per rank.", sprite: "/images/arena/node/rv_critdmg.webp" }),
         // ── RAMPAGE, RETUNED ────────────────────────────────────────────────────────────────────────────
         // 0.95 x 3 = 285% on a three-turn cooldown, against Cleave's 230% on the SAME cooldown — more damage,
@@ -166,7 +180,7 @@ export const TREES = {
         //
         // 0.50 x 3 = 150% and every blow can miss. That is the trade an all-out attack should be: more total
         // damage than a single committed swing only if it lands, and three chances for it not to.
-        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.72, hits: 3, acc: -0.10, cd: 3, needs: 3,
+        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.52, hits: 3, acc: -0.10, cd: 3, needs: 3,
             desc: "Three wild blows — each can miss, each can crit.", sprite: "/images/arena/node/rv_flurry.webp" }),
         N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "speed", per: 3, needs: 3,
             desc: "+3 Speed per rank — decides who opens.", sprite: "/images/arena/node/rv_speed.webp" }),
@@ -178,14 +192,14 @@ export const TREES = {
             desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
         N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.06, needs: 7,
             desc: "Cut 6% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
-        N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 2.4, cd: 4, needs: 7,
+        N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, cd: 4, needs: 7,
             desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
 
-        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 2.7, cd: 5, needs: 12,
+        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
-        N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.1, needs: 12,
+        N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.06, needs: 12,
             desc: "+10% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
-        N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.25, needs: 12,
+        N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.18, needs: 12,
             desc: "+25% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
     ],
 
@@ -204,10 +218,10 @@ export const TREES = {
             desc: "Wards soak 2% more of your health per rank.", sprite: "/images/arena/node/wd_soak.webp" }),
         N({ id: "wd_riposte", tier: 1, kind: "active", ability: "riposte", name: "Answer", cd: 5, needs: 3,
             desc: "Their next blow comes back at them — and you still act.", sprite: "/images/arena/node/wd_riposte.webp" }),
-        N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.05, needs: 3,
-            desc: "Return 5% of every blow you take, per rank.", sprite: "/images/arena/node/wd_thorns.webp" }),
+        N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.07, needs: 3,
+            desc: "Return 7% of every blow you take, per rank.", sprite: "/images/arena/node/wd_thorns.webp" }),
 
-        N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.9, cd: 3, needs: 7,
+        N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.55, cd: 3, needs: 7,
             desc: "You keep half of what it takes off them.", sprite: "/images/arena/node/wd_drain.webp" }),
         N({ id: "wd_regen", tier: 2, name: "Second Wind", ranks: 4, stat: "regen", per: 0.015, needs: 7,
             desc: "Recover 1.5% of your health each round, per rank.", sprite: "/images/arena/node/wd_regen.webp" }),
@@ -224,28 +238,28 @@ export const TREES = {
 
     // ── RUNECALLER ── affinity, burns, broken armour.
     runecaller: [
-        N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.05,
+        N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.035,
             desc: "+5% spell damage per rank.", sprite: "/images/arena/node/rc_power.webp" }),
         N({ id: "rc_edge", tier: 0, name: "Wheelwise", ranks: 4, stat: "elementEdge", per: 0.03,
             desc: "Your affinity is worth 3% more per rank, either way.", sprite: "/images/arena/node/rc_edge.webp" }),
-        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 2.3, cd: 4,
+        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, cd: 4,
             desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
 
-        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.85, cd: 3, needs: 3,
+        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
         N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTick", per: 0.008, needs: 3,
             desc: "Burns tick 0.8% harder per rank.", sprite: "/images/arena/node/rc_burn.webp" }),
         N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendStacks", per: 1, needs: 3,
             desc: "+1 burn stack per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
 
-        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 2.05, cd: 3, needs: 7,
+        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 1.50, cd: 3, needs: 7,
             desc: "Strips their guard for what comes next.", sprite: "/images/arena/node/rc_sunder.webp" }),
         N({ id: "rc_cd", tier: 2, name: "Quickening", ranks: 3, stat: "cdCut", per: 1, needs: 7,
             desc: "Every third rank shaves a turn off one cooldown.", sprite: "/images/arena/node/rc_cd.webp" }),
         N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.05, needs: 7,
             desc: "Cut 5% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 
-        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 3.0, cd: 6, needs: 12,
+        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 2.15, cd: 6, needs: 12,
             desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
         N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
             desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),

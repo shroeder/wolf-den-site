@@ -148,6 +148,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                 <i><b>{c.health > 0 ? `+${c.health}` : "—"}</b>health</i>
                                 <i><b>{Math.round((c.dr || 0) * 100)}%</b>reduction</i>
                                 <i><b>{Math.round((c.accuracy || 0) * 100)}%</b>accuracy</i>
+                                <i><b>{c.lifesteal ? `${Math.round(c.lifesteal * 100)}%` : "—"}</b>lifesteal</i>
                             </span>
                             <p>{c.blurb}</p>
                         </button>
@@ -321,7 +322,7 @@ function Styles() {
             /* ── CLASS PICKER ── */
             /* Three columns so the classes can be COMPARED, which is the only way a stat line helps: the
                numbers line up across the three buttons and the trade is visible without reading. */
-            .skt-class-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%;
+            .skt-class-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; width: 100%;
                 margin: 6px 0 2px; }
             .skt-class-stats i { display: grid; gap: 1px; font-style: normal; text-align: center;
                 font-size: 0.58rem; text-transform: uppercase; letter-spacing: .05em; color: #8b93a0;

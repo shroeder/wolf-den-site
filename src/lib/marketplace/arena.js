@@ -318,6 +318,8 @@ async function kitFor(buyerId) {
         // It is a CLASS trait now: the class base is the identity (Warden 34, Runecaller 24, Reaver 16) and
         // Footwork adds on top from both the tree and the upgrade track, whose ranks carry over untouched.
         dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
+        // A share of everything you deal comes back as health. Class-inherent; see classBase.
+        lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
@@ -862,6 +864,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // One number for mitigation on both sides of the ring now, and one for landing a blow.
             dr: foeKit.dr ?? DEFAULT_DR,
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
+            lifesteal: foeKit.lifesteal || 0,
             // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
             // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
             // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
@@ -888,6 +891,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             critChance: me.critChance, critMult: me.critMult,
             dr: me.dr ?? DEFAULT_DR,
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
+            lifesteal: me.lifesteal || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
@@ -1477,6 +1481,14 @@ export async function fightRound(buyerId, opts = {}) {
             healed = Math.min(b.maxHp - b.hp, Math.round(dmg * drain));
             b.hp += healed;
         }
+        // ── LIFESTEAL ── on top of a drain ability, not instead of it: the ability is a choice you spend a
+        // turn on, this is what the class does for free.
+        const steal = Number(b.me.lifesteal) || 0;
+        if (steal > 0 && dmg > 0) {
+            const back = Math.min(b.maxHp - b.hp, Math.round(dmg * steal));
+            b.hp += back;
+            healed += back;
+        }
         // CONFLAGRATION. One rank, tier 3, twelve points deep: "your criticals leave a burn behind" — and
         // nothing read it, so the deepest node in the Runecaller tree was a sprite and a sentence. A crit now
         // applies the same burn a rend would, which is exactly what the card says and nothing more.
@@ -1685,6 +1697,16 @@ export async function fightRound(buyerId, opts = {}) {
             thorned = Math.max(1, Math.round(raw * P.thorns));
             b.foeHp = Math.max(0, b.foeHp - thorned);
         }
+        // Lifesteal on what THORNS took off them. This is the half that matters: 84% of a Warden's damage
+        // output comes back off the enemy's swing rather than out of their own, so a lifesteal that only read
+        // your attacks would have skipped almost all of it and the class would heal least while doing what it
+        // is for. Riposte is added below, once `sent` is known.
+        const mySteal = Number(b.me.lifesteal) || 0;
+        let stolen = 0;
+        if (mySteal > 0 && thorned > 0) {
+            stolen = Math.min(b.maxHp - b.hp, Math.round(thorned * mySteal));
+            b.hp += stolen;
+        }
         // ── LAST STAND ── once a bout, the blow that would end you leaves you on 1 instead.
         let stood = false;
         if (through >= b.hp && (P.lastStand || 0) > 0 && !b.stood) { through = Math.max(0, b.hp - 1); b.stood = true; stood = true; }
@@ -1714,6 +1736,12 @@ export async function fightRound(buyerId, opts = {}) {
             sent = Math.max(1, Math.round(through * (b.riposte + (P.riposteShare || 0))));
             b.foeHp = Math.max(0, b.foeHp - sent);
             b.riposte = 0;
+            // The other half of the Warden's output feeds lifesteal too.
+            if (mySteal > 0) {
+                const back = Math.min(b.maxHp - b.hp, Math.round(sent * mySteal));
+                b.hp += back;
+                stolen += back;
+            }
         }
         b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
             healed: foeHealed, hits: foeHits,
@@ -1721,10 +1749,10 @@ export async function fightRound(buyerId, opts = {}) {
             // read — so a shield build's entire damage output came off the enemy's health bar with no number,
             // no pop and no colour, mentioned only inside a sentence at the end of THEIR log line. It works,
             // and it has always looked exactly like it does not, which is the same thing to a player.
-            riposted: sent, thorned,
+            riposted: sent, thorned, stolen,
             text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
             ability: theirAbility?.name || null });
 
         // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of

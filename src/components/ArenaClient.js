@@ -919,6 +919,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const ownSide = mine ? "left" : "right";
         if (l.blocked > 0) pops.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
         if (l.healed > 0) pops.push({ side: ownSide, n: l.healed, kind: "heal" });
+        // Lifesteal off thorns and ripostes lands on THEIR log line (it happens during their swing), so it
+        // floats over whoever drank it rather than over the fighter whose line it is written on.
+        if (l.stolen > 0) pops.push({ side: l.who === "you" ? "left" : "right", n: l.stolen, kind: "heal", at: 240 });
         if (l.soaked > 0) pops.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
         // A BRACE IS A SHIELD NOW, on both sides of the ring, so it floats the same green number your own
         // Guard does — `soaked`, handled one line up. `bracedPct` is gone with the flat reduction it named.
