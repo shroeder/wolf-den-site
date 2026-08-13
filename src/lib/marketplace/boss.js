@@ -113,6 +113,64 @@ function manualHit(level, stats = {}, { forceCrit = false } = {}) {
 const BOSS_TARGET_DAYS = 10;
 // A little headroom so the next boss isn't undersized by the pack leveling/growing between fights.
 const BOSS_PACK_GROWTH = 1.1;
+// ── THE PACK DOES NOT STAND STILL, AND THAT IS THE WHOLE BUG ─────────────────────────────────────────────────
+// Sizing was `perDay × targetDays` — the arithmetic of a pack whose damage is the same on day ten as on day
+// one. It never has been. Measured across every boss the Den has fought:
+//
+//     day  0    202,286/day        day 15    4,204,107/day
+//     day  4.5  886,155/day        day 21    7,538,812/day
+//     day  9.8  1,902,845/day      day 25   13,688,541/day
+//
+// That is a clean exponential: +16.7% a day, a DOUBLING every four and a half days. So a ten-day boss sized
+// at ten times today's rate is really a four-to-six-day boss, every single time — which is exactly what
+// happened: 3.8, 5.0, 5.6, 5.5 and 6.1 days against a ten-day target, and the gap widens as the pack
+// accelerates. The +10% headroom above was aimed at this and is roughly seventeen times too small.
+//
+// The fix is to size against what a GROWING pack deals over the window — the geometric sum, not the flat
+// product. At 16.7%/day that is 2.2x the naive number, and it self-corrects: when growth flattens (and it
+// must, once gear and membership stop compounding) the fit follows it down and the multiplier returns to ~1.
+const GROWTH_MIN = 1.0;    // never SHRINK a boss for a pack that got weaker; the observed floor handles that
+const GROWTH_MAX = 1.20;   // a bad fit must not be able to size a boss nobody can kill
+const GROWTH_SAMPLES = 6;  // how many recent fights the trend is read from
+const GROWTH_HP_CAP = 3;   // and the total can never exceed this multiple of the flat estimate, whatever the fit says
+
+/**
+ * How fast the pack's daily damage is compounding, as a per-day factor, fitted from recent fights.
+ *
+ * Least squares on ln(rate) against time, which is the right shape for something growing by a percentage:
+ * a straight line in log space IS exponential growth, and the slope is the rate. Needs three fights to say
+ * anything; below that it returns 1 and the sizer falls back to the flat product it always used.
+ */
+async function packGrowthPerDay() {
+    const rows = await db.query(
+        `SELECT started_at, COALESCE(defeated_at, NOW()) AS ended,
+                EXTRACT(EPOCH FROM (COALESCE(defeated_at, NOW()) - started_at))/86400.0 AS days,
+                (SELECT COALESCE(SUM(damage), 0) FROM boss_hit WHERE boss_id = be.id) AS dmg
+           FROM boss_event be WHERE started_at IS NOT NULL
+          ORDER BY started_at DESC LIMIT $1`, [GROWTH_SAMPLES]
+    ).catch(() => []);
+    // A fight shorter than a third of a day is a rounding error on the rate, not a data point.
+    const pts = rows
+        .map((r) => ({ days: Number(r.days) || 0, dmg: Number(r.dmg) || 0,
+            mid: (new Date(r.started_at).getTime() + new Date(r.ended).getTime()) / 2 }))
+        .filter((p) => p.days >= 0.3 && p.dmg > 0)
+        .map((p) => ({ x: p.mid / 86400000, y: Math.log(p.dmg / p.days) }));
+    if (pts.length < 3) return 1;
+    const n = pts.length;
+    const mx = pts.reduce((s, p) => s + p.x, 0) / n;
+    const my = pts.reduce((s, p) => s + p.y, 0) / n;
+    const varX = pts.reduce((s, p) => s + (p.x - mx) ** 2, 0);
+    if (varX <= 0) return 1;
+    const slope = pts.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0) / varX;
+    const g = Math.exp(slope);
+    return Number.isFinite(g) ? Math.min(GROWTH_MAX, Math.max(GROWTH_MIN, g)) : 1;
+}
+
+/** What a pack growing at `g` a day deals over `days` — the geometric sum, not the flat product. */
+function damageOverWindow(perDay, days, g) {
+    if (!(g > 1.0000001)) return perDay * days;
+    return perDay * (Math.pow(g, days) - 1) / (g - 1);
+}
 // How many "typical members" the single strongest account is allowed to count as when projecting pack power.
 // High enough that a genuinely well-geared veteran still counts for more than average, low enough that one
 // runaway account can't size the boss on its own.
@@ -217,11 +275,23 @@ export async function projectBossHp({ targetDays = BOSS_TARGET_DAYS } = {}) {
     // projection — so a buffed-up pack can't one-shot the boss, but a first-ever boss still gets a real size.
     const observed = await observedDailyDamage();
     const perDay = Math.max(daily, (observed || 0) * BOSS_PACK_GROWTH);
-    const raw = Math.max(8000, Math.round(perDay * Math.max(1, targetDays)));
+    const days = Math.max(1, targetDays);
+    // ── AND NOW AGAINST A PACK THAT IS STILL GROWING ─────────────────────────────────────────────────────
+    // `perDay * days` is the arithmetic of a pack that is the same on the last day as the first. See
+    // packGrowthPerDay: measured, this one doubles every four and a half days, which is why every boss has
+    // died in four to six against a ten-day target. The cap is the safety rail — a bad fit must never be
+    // able to size a boss nobody can kill, which is the failure mode the OUTLIER_CAP note above describes.
+    const growth = await packGrowthPerDay().catch(() => 1);
+    const flat = perDay * days;
+    const raw = Math.max(8000, Math.round(Math.min(damageOverWindow(perDay, days, growth), flat * GROWTH_HP_CAP)));
     const hp = Math.round(raw / 500) * 500;
     return {
         hp, members: members.length, targetDays,
         packDaily: Math.round(daily), observedDaily: observed ? Math.round(observed) : null, perDay: Math.round(perDay),
+        // Surfaced so the admin screen shows the maths rather than a number out of nowhere: what the pack does
+        // now, how fast that is compounding, and what the growth actually cost in HP.
+        growthPerDay: Math.round((growth - 1) * 1000) / 10,
+        flatHp: Math.round(flat), growthMult: Math.round((raw / Math.max(1, flat)) * 100) / 100,
         basis: observed && observed * BOSS_PACK_GROWTH > daily ? "observed" : "projected",
     };
 }
