@@ -44,7 +44,8 @@ if (arg("--bout")) {
     const line = (label, s, f) => console.log(`  ${label.padEnd(9)} ${f.damage} dmg · ${f.critChance}% crit x${f.critMult} · ${f.health} hp · ${f.dr}% reduction · ${f.accuracy}% accuracy · ${f.element}
              dealt ${s.dealt} over ${s.swings} swings (${s.perSwing}/swing, ${s.crits} crits)
              ${s.turnedAside} turned aside · ${s.shieldEaten} eaten by shield · ${s.returned} came back
-             ${s.guards} guards · ${s.wards} wards · ${s.abilities} skills (${s.blows ?? "?"} blows) · ${s.items} items · healed ${s.healed}`);
+             ${s.guards} guards · ${s.wards} wards · ${s.abilities} skills (${s.blows ?? "?"} blows${
+        s.missed ? `, ${s.missed} missed` : ""}) · ${s.items} items · healed ${s.healed}`);
     console.log();
     line("CHALLENGER", t.dealt, t.me || {});
     line("OPPONENT", t.taken, t.foe || {});

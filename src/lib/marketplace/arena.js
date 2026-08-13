@@ -1449,7 +1449,9 @@ export async function fightRound(buyerId, opts = {}) {
             dmg += landed;
         }
         // Every blow missed. Not the same event as a blow that was fully absorbed, and it must not read as one.
-        const whiffed = hits > 0 && hitsLanded === 0;
+        // `power > 0` for the same reason as on their side: surge throws no blows, and without this term
+        // sharpening your blade announced itself as a swing and a miss.
+        const whiffed = hits > 0 && power > 0 && hitsLanded === 0;
         // Their banked shield eats first, exactly as yours does on the way in — so the points they spent on
         // it are the reason your blow did less, and the recap can say so.
         let theirSoak = 0;
@@ -1680,12 +1682,28 @@ export async function fightRound(buyerId, opts = {}) {
         const mySundered = (b.foeSunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
         // Your damage reduction, the mirror of theirs — class base plus Footwork, already merged in kitFor.
         const myBlock = Math.min(DR_CAP, Number(b.me.dr) || 0) * foePierce * mySundered;
+        // ── ACCURACY, AND NOW IT IS THE WHOLE OF HIT-OR-MISS ─────────────────────────────────────────
+        // Their accuracy was computed in kitFor, carried onto the bout, printed on their card — and read by
+        // NOTHING. Every blow an opponent threw landed, always, in every bout the arena has ever run. So the
+        // stat was a decoration on one side of the ring and a real cost on the other: a Reaver picking
+        // Rampage paid -0.10 accuracy attacking and got it back for free the moment the same kit was the one
+        // defending, and every point anyone spent on Steady Hand bought half of what it said.
+        //
+        // Rolled per blow off THEIR accuracy and their skill's own penalty, the same two terms as mine, in
+        // the same place in the loop. Nothing else anywhere decides whether a blow connects — not damage
+        // reduction, which only ever changes how much lands, and not a brace, which eats what did.
+        const foeAcc = Math.max(ACCURACY_FLOOR, Math.min(ACCURACY_CAP,
+            (Number(b.foe.accuracy) || DEFAULT_ACCURACY) + (theirAbility?.acc || 0)));
         // EVERY blow of a flurry rolls its own crit, on their side of the ring too.
         let raw = 0;
         let blocked = 0;
         let through = 0;
         let foeCrit = false;
+        const foeEach = [];
+        let foeLanded = 0;
         for (let i = 0; i < foeHits && power > 0; i += 1) {
+            if (Math.random() >= foeAcc) { foeEach.push(0); continue; }
+            foeLanded += 1;
             const c = Math.random() < foeCritChance;
             if (c) foeCrit = true;
             const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow
@@ -1694,7 +1712,11 @@ export async function fightRound(buyerId, opts = {}) {
             raw += one;
             blocked += off;
             through += Math.max(0, one - off);
+            foeEach.push(Math.max(0, one - off));
         }
+        // Every blow of theirs missed. `power > 0` is load-bearing: a surge cast throws no blows at all, and
+        // without it a sharpen would report itself as a whiff.
+        const foeWhiffed = foeHits > 0 && power > 0 && foeLanded === 0;
         let soaked = 0;
         if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
         // The brace is spent — they have had their swing at it. Cleared AFTER the soak above, so the blow it
@@ -1756,14 +1778,20 @@ export async function fightRound(buyerId, opts = {}) {
                 stolen += back;
             }
         }
-        b.log.push({ beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked, crit: foeCrit,
+        b.log.push({ beat: b.beat, who: "them", grade: foeWhiffed ? "miss" : "hit", damage: through, blocked, soaked, crit: foeCrit,
             healed: foeHealed, hits: foeHits,
+            // The same three fields my own swing publishes. The screen's pop builder is already written
+            // side-agnostically — it reads `each` and grade "miss" off whichever fighter's line it is on —
+            // so their flurry now pops three numbers over you with MISS in the gaps, exactly as mine does.
+            each: foeEach, hitsLanded: foeLanded, missed: foeHits - foeLanded, acc: Math.round(foeAcc * 100),
             // SENT SEPARATELY. These were added together into one `riposted` field that no component ever
             // read — so a shield build's entire damage output came off the enemy's health bar with no number,
             // no pop and no colour, mentioned only inside a sentence at the end of THEIR log line. It works,
             // and it has always looked exactly like it does not, which is the same thing to a player.
             riposted: sent, thorned, stolen,
-            text: `${foeCrit ? "CRITICAL — " : ""}${theirAbility
+            text: `${foeCrit ? "CRITICAL — " : ""}${foeWhiffed
+                ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
+                : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
                 : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
             ability: theirAbility?.name || null });
@@ -1855,6 +1883,10 @@ function boutTelemetry(b, won) {
             abilities: rows.filter((l) => l.ability).length,
             // Total blows, so a multi-hit action cannot hide inside a single log line.
             blows: rows.reduce((n, l) => n + (Number(l.hits) || (l.damage > 0 ? 1 : 0)), 0),
+            // Blows that missed. Only ever recorded for the member before, because only the member could
+            // miss — so the one number that would have shown accuracy was doing nothing on defence was the
+            // number the defender never produced.
+            missed: rows.reduce((n, l) => n + (Number(l.missed) || 0), 0),
         };
     };
     const myRows = log.filter((l) => l.who === "you");
