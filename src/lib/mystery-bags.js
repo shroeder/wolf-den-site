@@ -1,6 +1,6 @@
 import "server-only";
 
-import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareCustomerById, getSquareOrder } from "@/lib/consignment/square";
+import { deleteSquareCatalogObject, getSquareCatalogObjectById, getMysteryBagPriceInfoFromSquare, getSquareCustomerById, getSquareOrder, getSquarePaymentById } from "@/lib/consignment/square";
 import { db } from "@/lib/db";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { resolveBuyerId } from "@/lib/marketplace/xp.js";
@@ -13,15 +13,30 @@ const BIG_HIT_DOLLARS = 100;
 // customer we can match to a mkt_buyer, credit one bag bought and, when the pulled card clears the big-hit
 // threshold, flag mystery_big_hit — then re-sync their badges. Walk-in sales with no Square customer can't
 // be attributed (returns quietly). Never throws — attribution must never break sale processing.
-async function attributeMysteryPull({ order, cardId }) {
+async function attributeMysteryPull({ order, cardId, squarePaymentId = null }) {
     try {
-        // 169 mystery-bag sales went through this and attributed exactly ZERO of them, because it only
-        // looked at order.customer_id. When a cashier attaches a customer at the terminal, Square hangs them
-        // off the TENDER (and the payment) — which is why the ordinary purchase-XP path, which reads
-        // payment.customer_id, has credited 45 members from the same orders while this credited nobody.
-        const customerId = order?.customer_id
+        // ── WHERE SQUARE ACTUALLY PUTS THE CUSTOMER ──────────────────────────────────────────────────────
+        // On the PAYMENT. Not the order, not the tender.
+        //
+        // This has now failed twice in the same place. The first version read only order.customer_id and
+        // attributed zero of 169 sales; the fix added the tender and attributed zero of the next batch too,
+        // because the note it was written from said "the tender (and the payment)" and the tender was the
+        // half that is empty. Checked against three live sales on 2026-08-12:
+        //
+        //     order.customer_id  —        tenders[].customer_id  —        payment.customer_id  624CRMB1...
+        //
+        // The comment sitting right here even said the ordinary purchase-XP path reads payment.customer_id
+        // and credits members off the very same orders. It was the answer, written down, next to the bug.
+        //
+        // All three are still checked, cheapest first: the payment costs an API call, so it is the fallback
+        // rather than the first thing tried, and a cash walk-in with no payment record still exits quietly.
+        let customerId = order?.customer_id
             || (order?.tenders || []).map((t) => t?.customer_id).find(Boolean)
             || null;
+        if (!customerId && squarePaymentId) {
+            const payment = await getSquarePaymentById(squarePaymentId).catch(() => null);
+            customerId = payment?.customer_id || null;
+        }
         if (!customerId) return; // genuinely anonymous walk-in — nothing to attribute to
         const customer = await getSquareCustomerById(customerId).catch(() => null);
         const buyerId = await resolveBuyerId({
@@ -1284,7 +1299,7 @@ export async function processQueuedMysteryWebhookEvent(eventId) {
         assignedCount++;
 
         // Auto-attribute the pull to a member (credits bag + flags a big hit if the card clears $100).
-        await attributeMysteryPull({ order, cardId: card.id });
+        await attributeMysteryPull({ order, cardId: card.id, squarePaymentId });
 
         // Delete the packed Square variation now that the card is sold.
         // The scanned variationId IS the packed variation, so prefer the stored
