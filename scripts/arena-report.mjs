@@ -41,10 +41,10 @@ if (arg("--bout")) {
     console.log(`\nbout ${id} · ${r.created_at.toISOString()} · ${r.rounds} rounds`);
     console.log(`${r.challenger} ${r.challenger_won ? "BEAT" : "LOST TO"} ${r.defender || (t?.rung ? `rung ${t.rung}` : `tier ${r.npc_tier}`)}`);
     if (!t) { console.log("\n(no telemetry — bout predates mig 369)"); process.exit(0); }
-    const line = (label, s, f) => console.log(`  ${label.padEnd(9)} ${f.damage} dmg · ${f.critChance}% crit x${f.critMult} · ${f.health} hp · turns aside ${(f.armour || 0) + (f.block || 0)}% · ${f.element}
+    const line = (label, s, f) => console.log(`  ${label.padEnd(9)} ${f.damage} dmg · ${f.critChance}% crit x${f.critMult} · ${f.health} hp · ${f.dr}% reduction · ${f.accuracy}% accuracy · ${f.element}
              dealt ${s.dealt} over ${s.swings} swings (${s.perSwing}/swing, ${s.crits} crits)
              ${s.turnedAside} turned aside · ${s.shieldEaten} eaten by shield · ${s.returned} came back
-             ${s.guards} guards · ${s.wards} wards · ${s.abilities} skills · ${s.items} items · healed ${s.healed}`);
+             ${s.guards} guards · ${s.wards} wards · ${s.abilities} skills (${s.blows ?? "?"} blows) · ${s.items} items · healed ${s.healed}`);
     console.log();
     line("CHALLENGER", t.dealt, t.me || {});
     line("OPPONENT", t.taken, t.foe || {});

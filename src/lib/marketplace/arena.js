@@ -1807,7 +1807,13 @@ function boutTelemetry(b, won) {
             guards: rows.filter((l) => l.grade === "guard").length,
             wards: rows.filter((l) => l.grade === "ward").length,
             items: rows.filter((l) => l.grade === "item").length,
-            abilities: rows.filter((l) => l.grade === "skill").length,
+            // Counted off `ability`, not off grade "skill". The DEFENDER's log rows are always written with
+            // grade "hit" whatever they threw, so a grade test reported 0 abilities for every opponent in
+            // every bout — which made a Reaver spamming Rampage look like someone taking plain swings, and
+            // sent the first diagnosis off this data looking for a multiplier that was just an ability.
+            abilities: rows.filter((l) => l.ability).length,
+            // Total blows, so a multi-hit action cannot hide inside a single log line.
+            blows: rows.reduce((n, l) => n + (Number(l.hits) || (l.damage > 0 ? 1 : 0)), 0),
         };
     };
     const myRows = log.filter((l) => l.who === "you");
