@@ -249,7 +249,17 @@ await Promise.all(Array.from({ length: 4 }, async () => {
             let short = [];
             // Three rolls at most: the framing is a prompt instruction, and prompts are advice, not a contract.
             for (let roll = 1; roll <= 3; roll += 1) {
-                const candidate = await generate(fighterPrompt(RUNGS[n]), KEY);
+                // A RE-ROLL ALONE DOES NOT FIX A SLICED HEAD. Rungs 9 and 19 each burned all three rolls
+                // coming back at top 0.0%: the model composes a character to FILL its canvas, so asking
+                // again asks for the same composition. What moves it is telling the later rolls to pull the
+                // camera back, which costs nothing downstream because frame() rescales the ink to one
+                // standard size however it arrives. And a slice cannot be repaired after the fact — frame()
+                // trims to ink and never crops, so a cut crown just gets a tidy margin drawn around it.
+                const zoomOut = roll === 1 ? "" : " CRITICAL FRAMING: zoom the camera OUT and draw the character"
+                    + " SMALL in the frame, filling only the central 65% of the image height. There must be a"
+                    + " large band of empty transparent space above the top of the head and below the feet."
+                    + " The head must be nowhere near the top edge.";
+                const candidate = await generate(fighterPrompt(RUNGS[n]) + zoomOut, KEY);
                 short = shortSides(await inkMargins(candidate));
                 buf = candidate;                 // keep the last one so a stubborn subject still ships
                 if (!short.length) break;
