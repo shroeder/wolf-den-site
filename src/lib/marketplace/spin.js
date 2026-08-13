@@ -72,6 +72,9 @@ function prizeDesc(p) {
         case "fragment": return `${p.n || 1} ${fragName(p.tierId || FRAGMENT_PRIZE_TIER)} chest fragments — collect enough of a kind to forge that chest at the docks.`;
         case "chest": return `A ${cap(p.tierId)} loot chest — open it for gear, gold and more.`;
         case "recipe": return "A page for the Kitchen's book — something new you can cook.";
+        case "gem": return "A cut gem — take it to the Jeweller and set it into a socket on gear you mean to keep.";
+        case "doubloons": return "Sailing coin. Spend it with the Quartermaster on crates, ammo and evolve stones.";
+        case "stone": return "A Lightstone or a Darkstone — makes a level-six pet's ability permanent, and changes the animal.";
         case "parts": return "A haul of Forge salvage \— Iron Filings through Emberheart Shard \— to spend enhancing your gear at the Forge.";
         case "mini_wheel": return "Spin a bonus Mini Wheel for a second prize on top.";
         case "respin": return "A free bonus spin — spin again on the house.";
@@ -84,7 +87,7 @@ function prizeDesc(p) {
 // Progressive jackpot tuning (shared community pot).
 const JACKPOT_BASE = 5000;      // pot reseeds to this when won
 const JACKPOT_CONTRIB = 15;     // every spin adds this to the pot
-const MINI_JACKPOT_AMT = 1500;  // the fixed MINI JACKPOT wedge
+const MINI_JACKPOT_AMT = 2200;  // the fixed MINI JACKPOT wedge — must stay above the 1,000 rare wedge
 
 // TWENTY wedges — one prize each, shown on the wheel with real sprites. Regular prizes + four special wedges
 // (MINI/MAJOR jackpot, MINI WHEEL bonus round, BONUS GAME gear pick).
@@ -107,7 +110,12 @@ const WHEELS = [
             { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
             { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
             { label: "5 Fertilizer", sprite: "fertilizer", weight: 7, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
-            { label: `4 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 8, kind: "fragment", n: 4, tierId: FRAGMENT_PRIZE_TIER },
+            // ── A CUT GEM, WHERE THE WOODEN SHARDS USED TO BE ────────────────────────────────────────
+            // Four wooden fragments is a quarter of the cheapest chest in the game — a wedge you were glad to
+            // stop watching. The Jeweller shipped three days before this and NINE members in the whole Den
+            // hold a single gem, because gems drop from the mine and the arena only: the two hardest-gated
+            // systems there are. A low tier off the wheel is how somebody meets a socket for the first time.
+            { label: "Cut Gem", sprite: "/images/gems/emerald_t2.png", weight: 8, kind: "gem" },
             { label: "MINI WHEEL", sprite: "mini-wheel", weight: 6, tier: "bonus", kind: "mini_wheel" },
             // The Forge and the Depths were the two newest systems in the game and the wheel had never heard of
             // either. Salvage parts are the thing every enhancer is short of, so this is the wedge that makes a
@@ -115,14 +123,27 @@ const WHEELS = [
             { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 7, kind: "parts" },
             { label: "500 XP", sprite: "xp-orb", weight: 7, kind: "xp", amount: 500 },
             { label: "Adrenaline Vial", sprite: "potion-red", weight: 6, kind: "consumable", consumable: "pot_adrenaline", n: 1 },
-            { label: "BONUS SPIN", sprite: "bonus-spin", weight: 8, tier: "bonus", kind: "respin" },
+            // ── AND THE FREE SPIN IS GONE ────────────────────────────────────────────────────────────
+            // "The free spin is pointless" — it is, and it is worse than pointless: it is the one wedge that
+            // resolves to "you have not won anything yet, try again", on the wheel where every other wedge
+            // ends the moment. Doubloons take the slot because sailing is the one big system the wheel had
+            // never heard of (the same argument that put Forge Parts on here), and because doubloons are what
+            // buys an evolve stone at the Quartermaster — so the wheel now points AT the chase rather than
+            // handing it over.
+            { label: "Doubloons", sprite: "/images/sailing/doubloon.png", weight: 8, kind: "doubloons", min: 40, max: 90 },
             { label: "Wooden Chest", sprite: "chest-wood", weight: 9, rare: true, tier: "rare", kind: "chest", tierId: "wooden" },
             // A WEDGE, not a hidden roll. The wheel used to grant recipes at a flat 2.5% AFTER it had already
             // landed on something else - 401 spins a week made it one of the top three sources in the game, and
             // none of it was on the wheel you were watching. Now you can see it and land on it.
             { label: "New Recipe", sprite: "recipe-scroll", weight: 3, rare: true, tier: "rare", kind: "recipe" },
             { label: "BONUS GAME", sprite: "mystery-box", weight: 5, tier: "bonus", kind: "bonus_game" },
-            { label: "1,600 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1600 },
+            // ── THE GOLD LADDER, IN ORDER ────────────────────────────────────────────────────────────
+            // This wedge paid 1,600 and the MINI JACKPOT below paid 1,500 — so the thing announced as a
+            // jackpot was WORSE than an ordinary rare wedge, and rarer (weight 3 against 6). Landing the
+            // jackpot was a downgrade you were supposed to cheer for. The rungs now climb: 250, 600, 1,000,
+            // and the MINI JACKPOT genuinely on top at 2,200. Net effect on what the wheel mints is slightly
+            // NEGATIVE, which is the direction it needed to go anyway.
+            { label: "1,000 gold", sprite: "coins-big", weight: 6, rare: true, tier: "rare", kind: "gold", amount: 1000 },
             { label: "Berserker's Brew", sprite: "potion-brew", weight: 3, rare: true, tier: "rare", kind: "consumable", consumable: "pot_berserker", n: 1 },
             { label: "Gold Chest", sprite: "chest-gold", weight: 4, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
             { label: "MINI JACKPOT", sprite: "coin-burst", weight: 3, rare: true, mini: true, tier: "mini", kind: "gold", amount: MINI_JACKPOT_AMT },
@@ -160,11 +181,27 @@ for (const w of WHEELS) {
 // the treat is the 150-pet-XP one rather than the 25, and the top wedge is a Gold Chest.
 const MINI_WHEEL_PRIZES = [
     { label: "400 gold", sprite: "coins-big", weight: 17, kind: "gold", amount: 400 },
-    { label: "225 XP", sprite: "xp-orb", weight: 13, kind: "xp", amount: 225 },
+    // ── THE EVOLVE STONE, AND WHY IT IS HERE AND NOT ON THE BIG WHEEL ────────────────────────────────────
+    // Luke asked for "an evolve stone with super rare chance on the wheel". It cannot go on the main wheel.
+    // That wheel is spun 2.4 times a day by the average member and SIXTEEN times a day by the heaviest, so
+    // even the smallest wedge possible there — weight 1 of 134 — hands a dedicated player about 1.3 stones a
+    // month. Every existing source in the game combined pays 0.55, and pet-stones.js is explicit that
+    // over-supply is the failure mode to avoid: a stone is only usable on a level-6 pet, and those take two
+    // to three months each.
+    //
+    // The bonus round is the answer. You reach it on ~4% of spins, so a weight-2 wedge here is roughly one
+    // spin in a thousand — a real chase, painted on a disc where you can see it, and it moves the monthly
+    // rate by a fraction instead of breaking it. check-stones.mjs measures that ratio, and it is the reason
+    // this number is 2 rather than a guess.
+    { label: "EVOLVE STONE", sprite: "/images/pets/stone-light.png", weight: 1, rare: true, tier: "jackpot", kind: "stone" },
     { label: "Chew Toy", sprite: "pet-treat", weight: 11, kind: "consumable", consumable: "treat_toy", n: 1 },
-    { label: `8 ${fragName(FRAGMENT_PRIZE_TIER)} Fragments`, sprite: fragSprite(FRAGMENT_PRIZE_TIER), weight: 12, kind: "fragment", n: 8, tierId: FRAGMENT_PRIZE_TIER },
+    // ── THE BONUS ROUND EARNS ITS NAME ───────────────────────────────────────────────────────────────────
+    // "The mini wheel should have cooler prizes." It carried eight wooden shards and a wooden chest — two of
+    // the weakest things in the game — on a round you only reach on about 4% of spins. A round that rare
+    // should never be able to pay you something you would rather have skipped.
+    { label: "Cut Gem", sprite: "/images/gems/sapphire_t3.png", weight: 12, kind: "gem", minTier: 2, maxTier: 3 },
     { label: "700 gold", sprite: "coins-big", weight: 11, kind: "gold", amount: 700 },
-    { label: "Wooden Chest", sprite: "chest-wood", weight: 11, kind: "chest", tierId: "wooden" },
+    { label: "Iron Chest", sprite: "chest-wood", weight: 11, kind: "chest", tierId: "iron" },
     { label: "Forge Parts", sprite: PARTS_WEDGE_SPRITE, weight: 10, kind: "parts" },
     { label: "Second Wind", sprite: "potion-red", weight: 9, kind: "consumable", consumable: "pot_secondwind", n: 1 },
     { label: "Gold Chest", sprite: "chest-gold", weight: 6, rare: true, tier: "rare", kind: "chest", tierId: "gold" },
@@ -338,6 +375,47 @@ async function grantPrize(buyerId, prize, opts = {}) {
         return { sprite: partSprite(roll.tier) || sprite, text: `${roll.n}× ${partName(roll.tier)}` };
     }
     if (prize.kind === "respin") { await grantSpinTokens(buyerId, 1); return { sprite, text: "Spin again — on the house!" }; }
+    // ── A CUT GEM ────────────────────────────────────────────────────────────────────────────────────────
+    // One of the five kinds at a low tier, so it is a stat you chose to socket rather than a stat you were
+    // handed. The Wolf's Eye is excluded on purpose: gems.js is explicit that the sixth kind only ever comes
+    // out of the deep dark of the mine and that nothing should advertise it.
+    if (prize.kind === "gem") {
+        const { GEM_KINDS, gemId, gemById } = await import("@/lib/marketplace/gems.js");
+        const { grantGem } = await import("@/lib/marketplace/jeweller.js");
+        const kind = GEM_KINDS[Math.floor(Math.random() * GEM_KINDS.length)];
+        const lo = prize.minTier || 1, hi = prize.maxTier || 2;
+        const tier = lo + Math.floor(Math.random() * (hi - lo + 1));
+        const id = gemId(kind.id, tier);
+        await grantGem(buyerId, id, 1, "spin").catch(() => {});
+        const g = gemById(id);
+        return { sprite: `/images/gems/${id}.png`, text: g ? `${g.name}!` : "A cut gem!" };
+    }
+    // ── DOUBLOONS ────────────────────────────────────────────────────────────────────────────────────────
+    // Sailing's currency, and the wheel had never paid it. Sized against what the sea actually pays — a
+    // maxed captain earns ~180 a day — so this is a few hours of voyaging, not a shortcut past the 4,000 a
+    // stone costs at the Quartermaster.
+    if (prize.kind === "doubloons") {
+        const n = (prize.min || 40) + Math.floor(Math.random() * ((prize.max || 90) - (prize.min || 40) + 1));
+        // Upserted rather than updated: a member who has never put to sea has no mkt_sailing row, and a bare
+        // UPDATE against one would touch nothing and silently pay them nothing. Same shape sailing.js uses.
+        await db.query(
+            `INSERT INTO mkt_sailing (buyer_id, doubloons) VALUES ($1, $2)
+             ON CONFLICT (buyer_id) DO UPDATE SET doubloons = COALESCE(mkt_sailing.doubloons,0) + $2, updated_at = NOW()`,
+            [buyerId, n]
+        ).catch(() => {});
+        return { sprite, text: `${n} doubloons` };
+    }
+    // ── AN EVOLVE STONE ──────────────────────────────────────────────────────────────────────────────────
+    // The bonus round's crown. Which of the two you get is a coin flip, because the choice between them is
+    // meant to be made against a PET (see pet-stones.js — the effects are authored per animal), and handing
+    // somebody the one they wanted would make that choice for them.
+    if (prize.kind === "stone") {
+        const { STONE_IDS } = await import("@/lib/marketplace/pet-stones.js");
+        const id = STONE_IDS[Math.floor(Math.random() * STONE_IDS.length)];
+        const { grantStone } = await import("@/lib/marketplace/pet-ascension.js");
+        await grantStone(buyerId, id, 1, "spin_wheel").catch(() => {});
+        return { sprite: `/images/pets/stone-${id}.png`, text: `${id === "light" ? "A Lightstone" : "A Darkstone"} — evolve a level-six pet!` };
+    }
     if (prize.kind === "chest") { await addChests(buyerId, { [prize.tierId]: 1 }, { source: "daily_spin" }).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "recipe") {
         const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");

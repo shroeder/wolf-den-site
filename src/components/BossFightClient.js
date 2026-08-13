@@ -333,6 +333,23 @@ export default function BossFightClient() {
                                 {you.fortuneTickets > 0 ? <span className="boss2-fortune" title="Bonus raffle tickets from your fortune (pets/gear) — banked each day the boss is alive, on top of your damage tickets">🍀 +{you.fortuneTickets} from fortune</span> : null}
                                 {xpFlash ? <span className="boss2-xp"> +10 XP!</span> : null}
                             </div>
+                            {/* ── WHY YOUR TICKETS MIGHT NOT BE IN THE HAT ────────────────────────────────────
+                                Said out loud, on the same line as the ticket count, because the only evidence
+                                of either rule is a name that never gets drawn — and from the outside that is
+                                indistinguishable from the draw being rigged. Both leave every in-game reward
+                                untouched, which is the part worth stating in the same breath. */}
+                            {you.raffleHouse ? (
+                                <div className="boss2-raffle-out">
+                                    🏠 The house does not enter — staff and the owner are out of the real-world
+                                    draw. Everything else the kill pays is still yours.
+                                </div>
+                            ) : you.raffleCooldown > 0 ? (
+                                <div className="boss2-raffle-out">
+                                    🎟️ You won a prize recently — sitting out the real-world draw for{" "}
+                                    <strong>{you.raffleCooldown}</strong> more boss{you.raffleCooldown === 1 ? "" : "es"}.
+                                    Your tickets still count for everything else.
+                                </div>
+                            ) : null}
                             {you.autoPerHour ? (
                                 <div className="boss2-auto" title="Your passive auto-damage — dealt to the boss 24/7 from your gear + pet (+ element match). Upgrade gear/pets to raise it.">
                                     ⚔️ Your DPS: <strong>{you.autoPerHour.toLocaleString()}/hr</strong> · <strong>{(you.autoPerHour * 24).toLocaleString()}/day</strong> <span className="muted">passive, gear + pet</span>

@@ -20,9 +20,13 @@ const petThresholds = (r) => PET_BASE_THRESHOLDS.map((t) => Math.round(t * (RARI
 
 // How often each source is actually REACHED, per day, by two kinds of member. These are activity rates, not
 // drop rates — the whole point is that a rate is meaningless without knowing how often the door opens.
+// `spin_bonus` is spins per day, and it is MEASURED rather than estimated — 740 spins by 44 members over the
+// seven days to 2026-08-13 is 2.4 a day each, the heaviest two were on 16, and the dedicated tier below sits
+// where Hudson and GrayKitsune actually are. The frequency is the whole reason the wheel's stone wedge is the
+// smallest chance in the table: a wheel is spun an order of magnitude more often than a mine is entered.
 const PLAYERS = {
-    dedicated: { mine_seam: 3, sail_dig: 2, boss_kill: 0.12, delve_boss: 3, petXpPerDay: 710 },
-    casual: { mine_seam: 0.6, sail_dig: 0.4, boss_kill: 0.02, delve_boss: 0.7, petXpPerDay: 180 },
+    dedicated: { mine_seam: 3, sail_dig: 2, boss_kill: 0.12, delve_boss: 3, spin_bonus: 6, petXpPerDay: 710 },
+    casual: { mine_seam: 0.6, sail_dig: 0.4, boss_kill: 0.02, delve_boss: 0.7, spin_bonus: 1.5, petXpPerDay: 180 },
 };
 
 console.log("Stones a month, by where they come from:\n");

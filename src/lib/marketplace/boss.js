@@ -12,7 +12,7 @@ import { weaknessInfo, elementMult, pickWeakness } from "@/lib/marketplace/boss-
 import { getElementOverrides, getElementOverridesForMembers } from "@/lib/marketplace/item-element.js";
 import { TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks.js";
 import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
-import { isOwner } from "@/lib/marketplace/owner.js";
+import { isHouse, isOwner } from "@/lib/marketplace/owner.js";
 import { setCapstoneStrikeBonus, setCombatMult } from "@/lib/marketplace/sets.js";
 import { getEquippedStats, getEquippedStatsForMembers, getEquippedIdsForMembers, getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
@@ -641,7 +641,13 @@ export async function getBossState(buyerId = null) {
         // number you see for yourself is the same number everyone else sees for you — no more mismatches.
         const myDmgTickets = mine?.dmgTickets ?? Math.floor(dmg / divisor);
         const myFortuneTickets = mine?.fortuneTickets ?? fortuneTickets(myPet?.stats?.fortune || 0, boss);
-        you = { attacksLeft: Math.max(0, dailyCap - used), strikeCap: dailyCap, strikeSources: strikeSources(capArgs), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay };
+        you = { attacksLeft: Math.max(0, dailyCap - used), strikeCap: dailyCap, strikeSources: strikeSources(capArgs), dmg, tickets: myDmgTickets + myFortuneTickets, dmgTickets: myDmgTickets, fortuneTickets: myFortuneTickets, gold: goldRow?.gold || 0, boosts, element: { matches: em.matches, bonusPct: em.bonusPct }, autoPerHour: myAutoPerHour, cheersLeft: cheerStatus.left, cheersPerDay: cheerStatus.perDay,
+            // ── WHY YOUR TICKETS MIGHT NOT BE IN THE HAT ─────────────────────────────────────────────
+            // Two ways to be out of the real-world draw, and both are stated rather than discovered.
+            // `raffleHouse` is staff and the owner — permanent, and the reason is that the shop cannot
+            // hand its own prize to itself. `raffleCooldown` is how many more bosses a recent winner
+            // sits out. An unexplained rule looks exactly like a rigged draw from the outside.
+            raffleHouse: isHouse(buyerId), raffleCooldown: await raffleCooldownFor(buyerId, boss.id).catch(() => 0) };
     }
 
     // Continuously-accruing passive damage so the bar is always creeping, not frozen between hourly ticks.
@@ -846,6 +852,44 @@ async function markDefeatIfDead(bossId, hp, defeatedBy = null) {
     return true;
 }
 
+// ── WHO IS SITTING THIS ONE OUT ──────────────────────────────────────────────────────────────────────────────
+// Whoever won the real-world prize on any of the last three bosses. Derived from boss_event rather than stored
+// on the member, so it needs no column and no cleanup: the cooldown expires simply by three more bosses being
+// killed, and it can never disagree with the history it is read from.
+//
+// Counted over bosses that ACTUALLY DREW — `winner_buyer_id IS NOT NULL` — so a boss with no prize attached is
+// not one of the three. A prize-less week should not serve part of somebody's suspension.
+export const RAFFLE_COOLDOWN_BOSSES = 3;
+async function raffleLockedIds(currentBossId) {
+    const rows = await db.query(
+        `SELECT winner_buyer_id FROM boss_event
+          WHERE winner_buyer_id IS NOT NULL AND id <> $1 AND defeated_at IS NOT NULL
+          ORDER BY defeated_at DESC LIMIT $2`,
+        [currentBossId, RAFFLE_COOLDOWN_BOSSES]
+    ).catch(() => []);
+    return new Set(rows.map((r) => r.winner_buyer_id));
+}
+
+/**
+ * How many more bosses this member has to sit out, 0 if they are eligible.
+ *
+ * The boss screen shows it. A rule the player cannot see is indistinguishable from the draw being rigged
+ * against them — and this one is invisible by construction, because the only evidence of it is a name that
+ * does not come out of a hat.
+ */
+export async function raffleCooldownFor(buyerId, currentBossId = null) {
+    if (!buyerId) return 0;
+    const rows = await db.query(
+        `SELECT winner_buyer_id FROM boss_event
+          WHERE winner_buyer_id IS NOT NULL AND defeated_at IS NOT NULL AND ($1::uuid IS NULL OR id <> $1)
+          ORDER BY defeated_at DESC LIMIT $2`,
+        [currentBossId, RAFFLE_COOLDOWN_BOSSES]
+    ).catch(() => []);
+    const idx = rows.findIndex((r) => String(r.winner_buyer_id) === String(buyerId));
+    // Won the most recent draw → three to sit out. Won three ago → this is the last one.
+    return idx < 0 ? 0 : RAFFLE_COOLDOWN_BOSSES - idx;
+}
+
 // Weighted random pick from a pool. weightFn returns each entry's weight; returns null if all weights ≤ 0.
 function weightedDraw(pool, weightFn) {
     const weights = pool.map(weightFn);
@@ -897,12 +941,30 @@ async function finalizeBossKill(bossId) {
     // The raffle pool alone is widened. `pool` still means "everyone who fought" and keeps driving participation
     // XP, spin tokens, badges, seeds and reward items — none of which are free, and none of which should go to
     // someone who never turned up.
-    const rafflePool = pool.filter((p) => !isOwner(p.id));
+    // ── AND WINNING SITS YOU OUT FOR THREE ───────────────────────────────────────────────────────────────
+    // The raffle prize is a REAL object off the shelf in Montgomery, and a ticket-weighted draw has no memory:
+    // the same person can take three in a row and nothing in the maths finds that odd. With a few dozen
+    // regulars that is not a hypothetical, and the people it discourages are exactly the ones who turned up,
+    // swung, and watched the same name come out of the hat again.
+    //
+    // So a winner is ineligible for the next three bosses. Not a nerf to them — they keep every in-game reward
+    // this function hands out, the pet rolls, the chests, the XP, the spin token. They are out of the hat for
+    // the physical prize only, and only for three, which at the current cadence is about a month.
+    const lockedOut = await raffleLockedIds(bossId).catch(() => new Set());
+    const rafflePool = pool.filter((p) => !isHouse(p.id) && !lockedOut.has(p.id));
     const inRaffle = new Set(rafflePool.map((p) => p.id));
     for (const [buyerId, bonus] of petBonuses) {
-        if (inRaffle.has(buyerId) || isOwner(buyerId)) continue;
+        if (inRaffle.has(buyerId) || isHouse(buyerId) || lockedOut.has(buyerId)) continue;
         const tickets = fortuneTickets(bonus?.stats?.fortune || 0, boss);
         if (tickets > 0) rafflePool.push({ id: buyerId, dmg: 0, tickets });
+    }
+    // ── AND IF THE COOLDOWN EMPTIES THE HAT, THE HAT WINS ────────────────────────────────────────────────
+    // On a quiet week the three suspended winners could be most of the people who turned up. A prize that
+    // goes to nobody is worse for everyone than a prize that goes to a repeat winner, so the suspension is
+    // dropped rather than the draw — the house exclusion is NOT, because that one is a promise, not a
+    // fairness dial.
+    if (!rafflePool.length && boss.prize_name) {
+        for (const p of pool) if (!isHouse(p.id)) rafflePool.push(p);
     }
     if (rafflePool.length && boss.prize_name) {
         const totalTickets = rafflePool.reduce((s, p) => s + p.tickets, 0);

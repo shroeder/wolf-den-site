@@ -83,6 +83,16 @@ export const STONE_SOURCES = {
     boss_kill: { label: "a boss kill", chance: 0.02 },
     // The Depths' dungeons: the floor-ten boss, one run per dungeon per day.
     delve_boss: { label: "a dungeon boss", chance: 0.003 },
+    // ── AND THE WHEEL'S BONUS ROUND ──────────────────────────────────────────────────────────────────────────
+    // A WEDGE, not a roll — it is painted on the mini wheel's disc and you land on it. The chance here is that
+    // wedge's real odds so this table stays the one place the supply is measured: reaching the bonus round is
+    // about 4.5% of a spin (weight 6 of 134 on the main wheel) and the stone is weight 1 of 88 on the round
+    // itself, which is 0.045 * 0.011 ≈ 0.0005.
+    //
+    // It is deliberately the SMALLEST source in the table despite sitting on the most-used screen in the game,
+    // because the wheel is spun 2.4 times a day by the average member and sixteen by the heaviest — frequency
+    // is exactly what makes a wheel wedge dangerous for a chase item. See check-stones.mjs for the ratio.
+    spin_bonus: { label: "the wheel's bonus round", chance: 0.0005 },
 };
 
 // ── AND THE SHOPS ────────────────────────────────────────────────────────────────────────────────────────────
