@@ -352,7 +352,13 @@ export default function MiningMinigame({ node, pick, onSwing, onDone }) {
                                 ) : (
                                     <>
                                         <Img src={cracked.bonus.art || KIND_ART[cracked.bonus.kind] || KIND_ART.gold} className="mmg-bonus-art" fallback="" />
-                                        <em>{cracked.bonus.kind === "ore" ? `${cracked.bonus.n} more ${cracked.bonus.name}` : cracked.bonus.name}</em>
+                                        {/* `label()` was written for exactly this line and then never called
+                                            — so a gold bonus rendered whatever `.name` happened to be rather
+                                            than "250 gold", and a chest showed a raw name instead of "Iron
+                                            chest". Ore keeps its own phrasing, which label() does not cover. */}
+                                        <em>{cracked.bonus.kind === "ore"
+                                            ? `${cracked.bonus.n} more ${cracked.bonus.name}`
+                                            : label(cracked.bonus.kind, cracked.bonus)}</em>
                                     </>
                                 )}
                             </div>

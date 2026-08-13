@@ -2,6 +2,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 
 import { GLOBALS } from "./eslint.config.mjs";
 import noTdz from "./eslint-local/no-tdz.mjs";
+import noDeadHandler from "./eslint-local/no-dead-handler.mjs";
 
 // ── THE FAST GATE ────────────────────────────────────────────────────────────────────────────────────────────
 // `npm run lint` also reports ~100 pre-existing react-hooks findings, so its exit code stopped meaning anything
@@ -25,7 +26,7 @@ export default [
     ...silenced,
     {
         languageOptions: { ecmaVersion: 2023, sourceType: "module", globals: GLOBALS },
-        plugins: { local: { rules: { "no-tdz": noTdz } } },
+        plugins: { local: { rules: { "no-tdz": noTdz, "no-dead-handler": noDeadHandler } } },
         linterOptions: { reportUnusedDisableDirectives: false },
         rules: {
             "no-undef": "error",
@@ -50,6 +51,13 @@ export default [
             // green over it twice. It is precisely the defect the gate exists to catch, wearing angle
             // brackets. `next build` compiles it without a word because it is valid syntax.
             "react/jsx-no-undef": "error",
+            // ── AND THE HANDLER NOTHING CALLS ────────────────────────────────────────────────────────────
+            // Three of these shipped in one day: the sailing raid buy-back, its two derived price values, and
+            // the arena's refusal messages. Every one was written, wired to a working server route, and
+            // rendered by nothing — so the feature existed and was unreachable. There is no crash and no
+            // warning; `next build` compiles it happily. See eslint-local/no-dead-handler.mjs for why this is
+            // a targeted rule rather than `no-unused-vars`, which reports 802 findings here.
+            "local/no-dead-handler": "error",
         },
     },
     {
