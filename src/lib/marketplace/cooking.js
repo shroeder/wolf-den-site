@@ -147,7 +147,7 @@ export const TIERS = [
             { kind: "recipe", band: "cook" },
             { kind: "consumable", id: "treat_toy" },
             { kind: "consumable", id: "farm_harvest_charm" },
-            { kind: "spin", n: 2 },
+            { kind: "spin", n: 1 },
             { kind: "chest", chestTier: "gold" },
         ],
     },
@@ -163,7 +163,7 @@ export const TIERS = [
             { kind: "consumable", id: "treat_feast" },
             { kind: "consumable", id: "farm_fertilizer_crate" },
             { kind: "consumable", id: "sail_treasure_map" },
-            { kind: "spin", n: 5 },
+            { kind: "spin", n: 2 },
             { kind: "chest", chestTier: "mythic" },
         ],
     },
@@ -175,7 +175,7 @@ export const TIERS = [
             { kind: "parts", partTier: 5, min: 2, max: 4 },
             { kind: "consumable", id: "farm_fertilizer_haul" },
             { kind: "consumable", id: "treat_golden" },
-            { kind: "spin", n: 8 },
+            { kind: "spin", n: 3 },
             { kind: "chest", chestTier: "mythic" },
             { kind: "creation", n: 1 },
             { kind: "chest", chestTier: "ascendant" },
@@ -238,7 +238,10 @@ export function rewardLabel(r, art = {}) {
             return { name: `Seeds ×${r.min}–${r.max}`, desc: `Farm seeds: ${r.pool.map((x) => SEEDS[x]?.name || x).join(", ")}.`, rarity: SEEDS[first]?.rarity || "common", sprite: crops[`crop:${first}`] || null, fallback: KIND_FALLBACK.seed };
         }
         case "spin":
-            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 5 ? "epic" : "rare", fallback: KIND_FALLBACK.spin };
+            // Threshold moved with the counts. The top spin rung is 3 now, not 8, so `>= 5` would have made
+            // every spin reward on every ladder read as "rare" and the epic colour unreachable — a card that
+            // can never show one of its states is the same defect as a number nothing reads.
+            return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 3 ? "epic" : "rare", fallback: KIND_FALLBACK.spin };
         case "recipe":
             return { name: "A new recipe", desc: "A page for the book — something new you can cook.", rarity: "epic", fallback: KIND_FALLBACK.dish };
         case "creation":
@@ -1114,11 +1117,24 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 goldPaid += bonusN;
                 break;
             }
-            // `portions` is the Seasoning track's second helping. It used to be applied ONLY to gold, so
-            // "the same dish, twice" quietly meant "the same dish once" for six of the seven reward kinds —
-            // the track read as broken to anyone who bought it and then won a chest.
+            // ── WHAT A SECOND HELPING IS, AND WHAT IT IS NOT ─────────────────────────────────────────
+            // `portions` is the Seasoning track's second helping, and it was applied to EVERY reward kind.
+            // That is right for what a bigger pot can sensibly hold more of — gold, forge parts, seeds,
+            // consumables — and wrong for the three rungs that are not food at all:
+            //
+            //   SPIN      a wheel token is currency; the wheel pays about 1,000 gold a pull. Tier 5's spin
+            //             rung was EIGHT of them and then multiplied by portions, so one cook handed over 24
+            //             spins — about 24,000 gold, which is $120 of store credit.
+            //   CHEST     multiplying a mythic chest by pot size is a windfall multiplier, and chest volume
+            //             is the thing we just spent a week halving.
+            //   CREATION  a Creation token is bought with REAL MONEY. A second helping of one is the game
+            //             minting dollars. Exactly one has ever dropped from a cook and it was not doubled,
+            //             so this closes an exposure rather than a leak.
+            //
+            // The track still lands on five of the eight rungs in most tiers, which is where a second helping
+            // reads as a second helping instead of as a jackpot multiplier.
             case "parts": await addParts(buyerId, rw.partTier, serve(rint(rw.min, rw.max))).catch(() => {}); break;
-            case "chest": await addChests(buyerId, { [rw.chestTier]: serve(1) }, { source: "cooking", meta: { recipe: forRecipe.id } }).catch(() => {}); break;
+            case "chest": await addChests(buyerId, { [rw.chestTier]: 1 }, { source: "cooking", meta: { recipe: forRecipe.id } }).catch(() => {}); break;
             case "seed": {
                 const id = rw.pool[Math.floor(Math.random() * rw.pool.length)];
                 for (let i = 0, n = serve(rint(rw.min, rw.max)); i < n; i += 1) await grantSeed(buyerId, id).catch(() => {});
@@ -1136,8 +1152,8 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 }
                 break;
             }
-            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, serve(rw.n)]).catch(() => {}); break;
-            case "creation": await grantCustomCredit(buyerId, serve(rw.n), { source: "cooking", meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {}); break;
+            case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, rw.n]).catch(() => {}); break;
+            case "creation": await grantCustomCredit(buyerId, rw.n, { source: "cooking", meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {}); break;
             case "consumable": await grantConsumable(buyerId, rw.id, serve(1)).catch(() => {}); break;
             default: break;
         }
