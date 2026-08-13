@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { clearBout, fightRound, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
+import { clearBout, fightRound, forfeitBout, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
     buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
 } from "@/lib/marketplace/arena-progress.js";
@@ -42,6 +42,8 @@ export async function POST(request) {
                     itemId: b?.item ? String(b.item) : null,
                 }));
                 case "dismiss": return noStore(await clearBout(buyer.id));
+                // Leaving a fight that is still running. It resolves as a loss — see forfeitBout.
+                case "forfeit": return noStore(await forfeitBout(buyer.id));
                 // ── PROGRESSION ── each returns the whole state so the screen never has to guess what
                 // changed; a skill point is worth gold, so every one of these re-validates server-side.
                 case "pick_class":

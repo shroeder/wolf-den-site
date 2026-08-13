@@ -58,6 +58,11 @@ const REFUSALS = {
     no_event: "That fight is over — the plaza has moved on.",
     already_beaten: "You have already put that one down. A rung only pays once.",
     bout_in_progress: "You are already in a fight. Finish it, then pick the next one.",
+    // The two halves of the brace budget. The button is disabled and titled before you can reach either of
+    // these, so they are the belt to that brace — but a refusal with no words on it is what turns a rule
+    // into a bug report, and that is precisely how the stall was reported.
+    brace_cooling: "You braced last beat. Not twice in a row — swing, drink, or cast.",
+    no_braces: "You are out of braces for this bout. Six is all anybody gets.",
 };
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
@@ -515,6 +520,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
     // walking away touches it, which is the whole reason this can exist at all.
     const [stepped, setStepped] = useState(false);
+    // Two-tap confirm on the forfeit. It costs a loss, so it must not be reachable by a mis-tap.
+    const [giveUp, setGiveUp] = useState(false);
     // ── THE END OF A FIGHT NEEDS A BEAT ──────────────────────────────────────────────────────────────────
     // The recap was rendered on `bout.over` directly, which meant it covered the screen on the same frame the
     // last blow landed. Everything built for that moment played underneath it and was never seen: the loser's
@@ -623,7 +630,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         if (!toTown) return;
         // Hosted by the plaza: hand it back rather than going anywhere. Only a raid bout that somehow ends up
         // on the Arena page — one opened before this shipped, and found in progress — still has to walk.
-        if (onLeave) onLeave();
+        // Hand the finished bout back with it. The plaza needs the recap to know what that fight paid and
+        // how many foes this member has now felled — it has no other way to find out, since the kill is
+        // booked inside the arena engine.
+        if (onLeave) onLeave(bout);
         else window.location.href = "/marketplace/town";
     }, [act, bout, onLeave, setTab]);
 
@@ -1020,6 +1030,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // gets — it is your class base scaled by your Fortune — so "Guard" alone stopped being enough to
         // decide with. The number is the one the engine banks; see guardSoakFrom.
         const braceFor = Math.round((bout.maxHp || 0) * (bout.me?.guard || 0));
+        // Older bouts, opened before the budget shipped, publish neither field. They get the full allowance
+        // rather than a disabled button — a rule cannot be applied retroactively to a fight already running.
+        const bracesLeft = bout.braces == null ? 6 : Number(bout.braces) || 0;
+        const canBrace = bracesLeft > 0 && bout.braceReady !== false;
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar ar-fight">
@@ -1407,10 +1421,21 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         onClick={() => { unlock(); Sfx.ui(); setMenu("skill"); }}>
                                         <GiSpellBook aria-hidden="true" /><span>Skill</span>
                                     </button>
-                                    <button type="button" className="ar-cmd is-guard" disabled={busy}
+                                    {/* ── THE BRACE IS RATIONED NOW ───────────────────────────────────────────
+                                        Six a bout and never twice running (see BRACE_LIMIT). Both halves are
+                                        on the button rather than discovered by pressing it: the count under
+                                        the shield is what the brace banks, and the pip beside the label is
+                                        how many you have left. Greyed with a title when it is unavailable,
+                                        because a button that silently refuses is the bug report. */}
+                                    <button type="button" className="ar-cmd is-guard"
+                                        disabled={busy || !canBrace}
+                                        title={bracesLeft <= 0 ? "No braces left this bout"
+                                            : !bout.braceReady ? "You braced last beat — not twice in a row"
+                                            : `Brace for ${braceFor} · ${bracesLeft} left`}
                                         onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
                                         <GiShield aria-hidden="true" /><span>Guard</span>
                                         {braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
+                                        {bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
                                     </button>
                                     <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
                                         onClick={() => { unlock(); Sfx.ui(); setMenu("item"); }}>
@@ -1845,6 +1870,22 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <b>Back to the fight</b>
                         <em>{bout.foe?.name || "Your opponent"} is still standing — round {bout.beat}</em>
                     </span>
+                </button>
+            ) : null}
+            {/* ── AND THE DOOR, IF THE FIGHT WILL NOT END ─────────────────────────────────────────────────
+                Deliberately small, deliberately under the resume button, and deliberately two taps. An open
+                bout blocks every other fight you might start, so before this existed a bout that could not
+                be finished cost you the Arena AND the plaza raid for as long as it lasted — which for one
+                member was a full day. It takes the loss, because a free exit from a bad matchup is a re-roll.
+                The stalls it was built for are fixed; this is for the next one nobody has found yet. */}
+            {bout && !bout.over ? (
+                <button type="button" className="ar-forfeit" disabled={busy}
+                    onClick={() => {
+                        Sfx.ui();
+                        if (!giveUp) { setGiveUp(true); setTimeout(() => setGiveUp(false), 4000); return; }
+                        setGiveUp(false); setStepped(false); act("forfeit");
+                    }}>
+                    {giveUp ? "Tap again to take the loss" : "Give up this fight"}
                 </button>
             ) : null}
 
@@ -2727,7 +2768,7 @@ function Styles() {
                 background: linear-gradient(180deg, transparent, rgba(6,4,8,0.82) 38%, rgba(6,4,8,0.95));
                 border-top: 1px solid rgba(255,190,110,0.16); }
             .ar-cmds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-            .ar-cmd { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+            .ar-cmd { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
                 padding: 9px 4px; border-radius: 11px; cursor: pointer; font-size: 11px; font-weight: 900;
                 letter-spacing: .04em; color: #f3e8d6; background: rgba(255,255,255,0.06);
                 border: 1px solid rgba(255,255,255,0.16); transition: transform .1s ease, background .1s ease; }
@@ -2748,6 +2789,11 @@ function Styles() {
                tallest, so this line does not make the deck ragged. */
             .ar-cmd-sub { font-style: normal; font-size: 9.5px; font-weight: 900; letter-spacing: .06em;
                 color: var(--cmd, #6fd0ff); opacity: .9; }
+            /* How many braces are left, as a corner pip rather than a second line — the deck is four buttons
+               on a phone and none of them has room for another row of text. */
+            .ar-cmd-pips { position: absolute; top: 3px; right: 5px; font-style: normal; font-size: 9px;
+                font-weight: 900; line-height: 1; padding: 2px 4px; border-radius: 999px;
+                color: #06121a; background: var(--cmd, #6fd0ff); opacity: .85; }
 
             /* A submenu replaces the deck in place — you are still looking at the fight, not a new screen. */
             .ar-sub { display: grid; gap: 5px; max-height: min(46vh, 300px); overflow-y: auto; }
@@ -3113,6 +3159,12 @@ function Styles() {
                 background: linear-gradient(180deg, #f6c34a, #d99a1e 52%, #a86f10);
                 box-shadow: 0 6px 20px rgba(180,120,20,0.38); }
             .ar-find:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); box-shadow: none; }
+            .ar-forfeit { display: block; margin: 6px auto 0; padding: 5px 12px; border-radius: 999px;
+                font-size: 11px; font-weight: 800; letter-spacing: .04em; cursor: pointer;
+                color: rgba(255,190,190,0.75); background: rgba(255,90,90,0.09);
+                border: 1px solid rgba(255,90,90,0.28); }
+            .ar-forfeit:disabled { opacity: .4; cursor: default; }
+
             /* The way back into a fight you stepped out of — cooler than "find a fight" so the two never read
                as the same button, and it sits above it. */
             .ar-find.is-resume { color: #f4ecff;

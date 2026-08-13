@@ -15,7 +15,7 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS } from "@/lib/marketplace/arena-kit.js";
+import { BRACE_LIMIT, DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS } from "@/lib/marketplace/arena-kit.js";
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 
@@ -202,8 +202,44 @@ export function pickIncoming(b) {
     };
     const reachFor = (item, extra) => ({ name: item === "poultice" ? "a field poultice" : "a quickening draught",
         kind: "item", item, power: 0, brace: false, isAbility: true, element: null, sprite: null, ...extra });
-    const guard = () => ({ name: "a raised guard", kind: "brace", power: 0, brace: true, isAbility: true,
-        element: null, sprite: null, heal: 0 });
+
+    // ── A BRACE CANNOT FOLLOW A BRACE ────────────────────────────────────────────────────────────────────
+    // THE STALL. A guard banks a shield worth a share of the fighter's max health and eats the next blow
+    // whole. So a foe whose brace is bigger than your per-swing damage takes ZERO from you, and its state at
+    // the end of the beat is identical to its state at the start — which means the same rule fires again, and
+    // again. Nine of the nine open bouts on the night this was found were in that loop; one had run 130 beats
+    // and another had its foe sitting on 9 health it could not be finished from. Members could not leave, so
+    // it cost them the Arena and the raid as well.
+    //
+    // Three separate rules select a brace — cornered (§2), no finish (§6) and nothing ready (§11) — and all
+    // three are RIGHT to want it. The defect was never which branch chose it; it was that choosing it changed
+    // nothing, so whatever chose it once chose it forever. Every stall in the game had that shape, and it
+    // used to be hidden by damage that ramped with the round count: the ramp eventually out-grew any brace.
+    // That ramp was removed deliberately (fights that punish you for taking your time are not fun), and this
+    // is the hole it left.
+    //
+    // So: a fighter that braced last beat must do something else this beat — swing, drink, anything. It still
+    // gets to brace as often as every other beat, which is all any of those three rules actually wants, and
+    // your blow always lands on the beat in between. The same rule binds the player (see arena.js), because a
+    // brace that only one side can spam is the same stall pointed the other way.
+    // Two limits, and the second is the one that cannot be argued with: not on consecutive beats, and never
+    // more than BRACE_LIMIT times in the whole bout — the same budget the player is held to.
+    const bracedLastBeat = (b.foeBraceBeat || 0) >= b.beat - 1 && (b.foeBraceBeat || 0) > 0;
+    const bracesSpent = (b.foeBraces || 0) >= BRACE_LIMIT;
+    const guard = () => {
+        b.foeBraceBeat = b.beat;
+        b.foeBraces = (b.foeBraces || 0) + 1;
+        return { name: "a raised guard", kind: "brace", power: 0, brace: true, isAbility: true,
+            element: null, sprite: null, heal: 0 };
+    };
+    // What it does instead when the brace is unavailable: the hardest thing it can still throw, or a bare
+    // swing. Never nothing — a beat where the foe does nothing at all is the stall wearing a different hat.
+    const insteadOfGuard = (free) => {
+        const pool = kit.filter((a) => !["ward", "riposte"].includes(a.kind));
+        const best = pool.length ? pool.reduce((top, a) => ((a.power || 1) > (top.power || 1) ? a : top), pool[0]) : null;
+        return swing(best, free || null);
+    };
+    const brace = (free) => (bracedLastBeat || bracesSpent ? insteadOfGuard(free) : guard());
 
     // ── 1. IS THERE A KILL HERE? ─────────────────────────────────────────────────────────────────────────
     // Asked FIRST, before anything about its own health. It used to heal the moment it dropped below a third
@@ -237,7 +273,7 @@ export function pickIncoming(b) {
         if (potHeal > 0 && potHeal >= guardBank) return reachFor("poultice", { heal: POULTICE_HEAL });
         if (drainMove && theirFrac > 0.15) return swing(drainMove, null);
         if (potHeal > 0) return reachFor("poultice", { heal: POULTICE_HEAL });
-        return guard();
+        return brace(null);
     }
 
     // ── 3. THE SATCHEL ───────────────────────────────────────────────────────────────────────────────────
@@ -277,7 +313,7 @@ export function pickIncoming(b) {
     if (theirFrac <= AI_BRACE_AT && !winning) {
         const dr = of("drain");
         if (dr) return swing(dr, free);
-        if (!free) return guard();      // nothing to answer with: cover up rather than trade
+        if (!free) return brace(null);  // nothing to answer with: cover up rather than trade
     }
 
     // ── 6b. THE MOVES YOU CANNOT LEARN ───────────────────────────────────────────────────────────────────
@@ -354,7 +390,7 @@ export function pickIncoming(b) {
     // person stops swinging into you and buys a beat back — and because a guard costs its attack, it can
     // never stall: it is trading its damage for yours, at a price it only pays when the trade is good.
     if (losing && theyFallIn + 2 <= youFallIn && !(b.foeShield > 0) && theirFrac < 0.6 && !free) {
-        return guard();
+        return brace(null);
     }
 
     // ── 9. EXECUTE WHAT IS ALREADY DYING ─────────────────────────────────────────────────────────────────
@@ -389,6 +425,6 @@ export function pickIncoming(b) {
     // Covering up beats a bare swing on a beat where it has nothing better — but only if it owns at least two
     // abilities. A foe with a single skill has it cooling half the time, and letting that guard every other
     // round turned the bottom of the ladder into a wall for the people least able to push through it.
-    if (theirFrac <= 0.6 && all.length >= 2 && !winning) return guard();
+    if (theirFrac <= 0.6 && all.length >= 2 && !winning) return brace(null);
     return swing(null, null);
 }

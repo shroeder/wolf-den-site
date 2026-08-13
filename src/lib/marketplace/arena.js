@@ -7,7 +7,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
-    BATTLE_ITEMS, BLOCK, BLOCK_CAP, guardSoakFrom, GUARD_COOL, speedOf,
+    BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
@@ -705,6 +705,12 @@ function publicBout(b) {
         // this function withholds on purpose, and the rest have nothing on screen that would read them —
         // publishing a field nothing renders is how the last five bugs in this file started.
         foeShield: b.foeShield || 0,
+        // ── WHAT IS LEFT OF YOUR BRACE BUDGET ────────────────────────────────────────────────────────────
+        // Published because the button reads it. A limit the player cannot see is a button that stops
+        // working for no stated reason, which is how a rule becomes a bug report. `braceReady` is the
+        // alternating half of the same rule, resolved here so the screen never has to know the arithmetic.
+        braces: Math.max(0, BRACE_LIMIT - (b.braces || 0)),
+        braceReady: !((b.braceBeat || 0) > 0 && (b.braceBeat || 0) >= (b.beat || 0) - 1),
         // WHICH ROOM THIS FIGHT IS IN. Withheld until now, so the screen could not tell a plaza raider from a
         // ladder rung and offered "Back to the ladder" to somebody who had walked in from the town — which is
         // where they were then stranded. The rider itself stays server-side; only the fact of it is published.
@@ -1291,6 +1297,23 @@ export async function fightRound(buyerId, opts = {}) {
     if (mine && (command === "guard" || command === "item")) {
         // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.
         if (command === "guard") {
+            // ── AND NOT TWICE IN A ROW ───────────────────────────────────────────────────────────────
+            // The mirror of the rule that binds the defender (arena-ai.js). A brace eats the next blow
+            // whole, so a fighter whose brace is bigger than the incoming blow takes nothing, gives
+            // nothing, and ends the beat in the state it started it — the loop that ran nine live bouts
+            // to a standstill, one of them for 130 beats. Refused rather than silently downgraded: a
+            // command that quietly does something else is worse than one that says no.
+            if ((b.braceBeat || 0) > 0 && (b.braceBeat || 0) >= b.beat - 1) {
+                return { ok: false, error: "brace_cooling", ...(await getArenaState(buyerId)) };
+            }
+            // ── AND ONLY SO MANY, FULL STOP ──────────────────────────────────────────────────────────
+            // The budget (BRACE_LIMIT) is the ceiling the alternating rule above cannot give you: six a
+            // bout, the same six the defender gets. Refused rather than downgraded, for the same reason.
+            if ((b.braces || 0) >= BRACE_LIMIT) {
+                return { ok: false, error: "no_braces", ...(await getArenaState(buyerId)) };
+            }
+            b.braceBeat = b.beat;
+            b.braces = (b.braces || 0) + 1;
             // Fortress soaks more on a plain guard, which is the command a shield build spends turns on.
             // `b.me.guard` already has the class base, Fortune and Fortress folded in at kit time. The
             // fallback is for bouts written before guard was a built number — they carry no `me.guard`, and
@@ -1947,6 +1970,29 @@ export async function fightRound(buyerId, opts = {}) {
     if (b.turn === "them" && !b.incoming) b.incoming = pickIncoming(b);
 
     if (b.foeHp <= 0 || b.hp <= 0) return finishBout(buyerId, row, b, b.foeHp <= 0 && b.hp > 0);
+
+    // ── AND A BOUT ENDS, WHATEVER ELSE HAPPENS ───────────────────────────────────────────────────────────
+    // The brace rules above close the stall that was actually found. This is the backstop for the one that
+    // has not been found yet: any pair of fighters who cannot finish each other now runs out of ring rather
+    // than out of patience. A member asked for exactly this — "a timer on each battle where it ends in a
+    // draw if the battle goes past a certain number of rounds" — after 70 beats against a foe that would not
+    // swing.
+    //
+    // Decided on REMAINING HEALTH FRACTION rather than called a draw, because a draw pays nobody and most of
+    // these are a fight somebody was plainly winning. The challenger has to be genuinely ahead to take it: a
+    // dead-level ring goes to the defender, which is the same convention the rest of the game uses for a tie.
+    // Fifty beats is roughly three times the longest honest bout in the telemetry, so nothing that is
+    // actually progressing can reach it.
+    if (b.beat >= BOUT_BEAT_CAP) {
+        const myFrac = b.maxHp ? b.hp / b.maxHp : 0;
+        const theirFrac = b.foeMaxHp ? b.foeHp / b.foeMaxHp : 0;
+        b.calledAt = b.beat;
+        b.log.push({ beat: b.beat, who: "you", grade: "call", damage: 0,
+            text: myFrac > theirFrac
+                ? `The ring is called at ${b.beat} beats. You are the one still standing straighter — it goes to you.`
+                : `The ring is called at ${b.beat} beats. Neither of you could finish it, and it does not go to you.` });
+        return finishBout(buyerId, row, b, myFrac > theirFrac);
+    }
     await saveBout(buyerId, b);
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
@@ -2072,6 +2118,14 @@ async function finishBout(buyerId, row, b, won) {
                 reward: res.reward || null, loot: res.reward?.loot || [],
                 cleared: res.cleared || null, wave: res.wave ?? null,
                 capped: Boolean(res.capped), gradeLabel: res.gradeLabel || null,
+                // ── THE COUNT THE PLAZA IS WAITING FOR ───────────────────────────────────────────────
+                // duelRaidEnemy has always returned `wins` — this member's running total of foes felled
+                // in this raid, straight off mkt_town_event_hit — and it stopped here, because the recap
+                // was written when the town still counted its own kills client-side. It does not any
+                // more: the tap that used to resolve a kill now opens a bout, so the plaza's counter was
+                // never incremented again and every raid ended on "0 foes bested" no matter what you did.
+                // Eric felled about twenty and was told zero.
+                wins: Number.isFinite(Number(res.wins)) ? Number(res.wins) : null,
             } : null,
             rounds: b.beat || (b.log || []).length,
         };
@@ -2236,6 +2290,35 @@ async function finishBout(buyerId, row, b, won) {
 }
 
 /** Clear a finished bout so the arena screen comes back. */
+/**
+ * ── THE DOOR ─────────────────────────────────────────────────────────────────────────────────────────────────
+ * Walk out of a fight that is still running, and take the loss for it.
+ *
+ * There was no way out. `dismiss` clears a bout, but the button that calls it only renders once the bout is
+ * OVER — so a fight that would not end was a fight you could not leave, and because one open bout blocks the
+ * next one, it took the whole Arena and the plaza raid with it. Members sat in the same bout for a day:
+ * "I can't even help with the raid because of being stuck in that above mentioned battle", "it won't let me
+ * leave the fight/surrender."
+ *
+ * The stalls that caused that are fixed above (BRACE_LIMIT, the alternating rule, the pit, the beat cap). This
+ * exists because the next unforeseen way to get stuck should cost somebody one bout instead of their evening.
+ *
+ * IT IS A LOSS, resolved through the same finishBout every other ending uses. Not a free exit: bailing out of
+ * a bad matchup at no cost is a re-roll, and a re-roll makes the Road a slot machine. A raid foe goes back on
+ * the shared roster the same way it does when you are killed, because duelRaidEnemy is what books that and it
+ * is booked from finishBout.
+ */
+export async function forfeitBout(buyerId) {
+    const row = await arenaRow(buyerId);
+    const b = row?.bout_json;
+    if (!b || b.over) return { ok: false, error: "no_bout", ...(await getArenaState(buyerId)) };
+    b.forfeit = true;
+    b.log = b.log || [];
+    b.log.push({ beat: b.beat, who: "you", grade: "call", damage: 0,
+        text: `You step out of the ring. ${b.foe?.name || "Your opponent"} is left standing.` });
+    return finishBout(buyerId, row, b, false);
+}
+
 export async function clearBout(buyerId) {
     await saveBout(buyerId, null);
     return { ok: true, ...(await getArenaState(buyerId)) };

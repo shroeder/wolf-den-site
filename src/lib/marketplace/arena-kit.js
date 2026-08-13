@@ -396,18 +396,33 @@ export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Numb
 //
 // A round cap with a points decision was the alternative, and it is worse: ship battles had one, and the thing
 // it produced was "broke off and ran after 14 rounds" while both decks still had guns.
-export const PIT_CLOSES_AT = 7;
-export const PIT_STEP = 0.35;
-// ── THE SAND NO LONGER RUNS OUT ──────────────────────────────────────────────────────────────────────────────
-// Removed on request. From round seven both fighters' damage climbed 35% a beat, which did end long bouts —
-// that was the point — but it ended them by taking the fight off the player: past round ten the numbers were
-// so far above what either card said that nothing you had built mattered any more. It also punished the
-// Warden hardest, whose whole win condition is outlasting, which is the opposite of what a stalling rule
-// should do.
+// ── THE SAND RUNS OUT AGAIN, SLOWLY ──────────────────────────────────────────────────────────────────────────
+// This mechanic has now been in the game twice and out of it once, and both moves were right.
 //
-// Kept as a neutral function rather than deleted so every call site keeps compiling and no caller has to know
-// the mechanic went away — the same treatment elementClash got. The two constants stay for the same reason.
-export const pitFever = () => 1;
+// AT 35% A BEAT FROM ROUND SEVEN it ended long bouts by taking the fight off the player: by round ten the
+// numbers were so far above what either card said that nothing you had built mattered, and it punished the
+// Warden hardest — a class whose entire win condition is outlasting. So it was removed.
+//
+// What removing it exposed is that it had been holding a door shut. It was the only thing in the engine that
+// guaranteed a bout ENDS: any two fighters who cannot finish each other were, without it, in a loop with no
+// exit. Nine live bouts were sitting in exactly that loop the night this came back — one at 130 beats, one
+// with the foe on 9 health — and members could not leave them, so it cost them the Arena and the raid too.
+//
+// So it returns at a SEVENTH of the old slope and three rounds later: nothing for the first ten beats, then
+// 5% a beat. A normal bout finishes inside twenty and never sees more than +50%, which is pressure rather
+// than a takeover; a bout that reaches thirty is at double, and one that somehow reaches the beat cap is at
+// triple and is going to end regardless. The Warden still gets to outlast — it just cannot outlast forever.
+export const PIT_CLOSES_AT = 10;
+export const PIT_STEP = 0.05;
+export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP * (beat - PIT_CLOSES_AT + 1));
+
+// ── AND YOU ONLY GET SO MANY BRACES ──────────────────────────────────────────────────────────────────────────
+// A budget for the whole bout, per fighter, and the same number for everybody — a player, an absent member's
+// loadout, a ladder NPC and a plaza raider all get six. A brace eats the next blow whole, so a fighter whose
+// brace exceeds the incoming swing takes nothing and gives nothing; unlimited, that is not a stance, it is an
+// off switch for the fight. Six is more than any honest bout has ever wanted (the telemetry's longest real
+// fight braces four times) and it is a hard ceiling on how long anybody can refuse to play.
+export const BRACE_LIMIT = 6;
 
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
@@ -451,6 +466,13 @@ export function underdogEdge(myGearPower = 0, foeGearPower = 0) {
 // balance pass assumed: an ability with cooldown C is usable once every C+1 turns, so a four-piece kit at
 // C=3 has something ready on 1 - (3/4)^4 = 68% of turns. The tuning assumed skills on ~70% of beats.
 export const GUARD_COOL = 1;        // guarding also shaves a turn off everything cooling
+
+// ── HOW LONG A RING CAN LAST ─────────────────────────────────────────────────────────────────────────────────
+// The backstop, not the balance. Every bout the telemetry has ever recorded finishes well inside twenty beats;
+// this is three times that, so it can only ever be reached by two fighters who cannot hurt each other. Lives
+// here with the other balance numbers rather than as a literal in the engine, because the next person to tune
+// bout length will look here and nowhere else.
+export const BOUT_BEAT_CAP = 50;
 
 // ── THE FIELD KIT ────────────────────────────────────────────────────────────────────────────────────────────
 // Both fighters get the same small kit every bout. It is deliberately NOT the consumable economy: these cost

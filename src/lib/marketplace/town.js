@@ -25,6 +25,7 @@ import { checkTownContribBadges, checkMerchantBadges } from "@/lib/marketplace/t
 import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
+import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -652,6 +653,13 @@ export async function getGlobalChat(buyerId = null, limit = 40) {
         sprite: r.avatar_sprite_url || null,
         flip: r.avatar_sprite_url ? r.avatar_sprite_flip === true : false,
         mine: buyerId ? String(r.buyer_id) === String(buyerId) : false,
+        // ── AN ANNOUNCEMENT, FLAGGED AS ONE ──────────────────────────────────────────────────────────────
+        // The Arbiter's posts are patch notes, and the chat log renders a message as one span of text — so
+        // they arrive as an unbroken wall between the emotes and push the actual conversation off the screen.
+        // Flagged here rather than sniffed in the client, and matched on the ALIAS rather than an id in an
+        // env var: the Arbiter is a mkt_buyer row, not code, and its row is the thing that identifies it.
+        // See notice-format.js for what the client does with this.
+        notice: r.alias === NOTICE_ALIAS,
     }));
 }
 
