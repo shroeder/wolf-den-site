@@ -1005,10 +1005,31 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             </button>
                         )}
                         {liveStatus === "sailing" && state.combat?.fleet ? (
-                            <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
-                                <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
-                                <b>Raid</b><em>{Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left</em>
-                            </button>
+                            (state.raid?.cap ?? 0) - (state.raid?.used ?? 0) > 0 ? (
+                                <button className="sail-act is-raid" disabled={busy} onClick={openRaid}>
+                                    <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
+                                    <b>Raid</b><em>{Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} battles left</em>
+                                </button>
+                            ) : (
+                                /* ── BUY ANOTHER, FROM THE SCREEN YOU ARE ACTUALLY ON ────────────────────
+                                   `buyRaidReset`, `resetCost` and `raidResetTooPoor` were all declared in
+                                   this component and rendered NOWHERE: the handler existed, the escalating
+                                   price was recomputed every render, and no button in the file ever called
+                                   it. The feature shipped, worked, and was unreachable from the main sailing
+                                   screen — which is the screen everyone looks at. Same class as the arena's
+                                   refusal banner: written, wired, never mounted.
+
+                                   It takes the Raid slot the moment that slot would otherwise read "0 left",
+                                   because the offer belongs exactly where the need turns up. */
+                                <button className="sail-act is-raid" disabled={busy || raidResetTooPoor}
+                                    onClick={buyRaidReset}>
+                                    <span className="sail-act-ico" aria-hidden="true">🏴‍☠️</span>
+                                    <b>Buy a battle</b>
+                                    <em>{raidResetTooPoor
+                                        ? `${resetCost.toLocaleString()} gold — short`
+                                        : `${resetCost.toLocaleString()} gold · doubles each time`}</em>
+                                </button>
+                            )
                         ) : null}
                     </div>
                 )}
