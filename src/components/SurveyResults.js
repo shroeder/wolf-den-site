@@ -14,8 +14,11 @@ const fmtDate = (d) => {
     } catch { return ""; }
 };
 
-export default function SurveyResults({ data }) {
+export default function SurveyResults({ data, round = 1, rounds = 1 }) {
     const { responses = 0, systems = [], wishes = [], responsesList = [] } = data || {};
+    // Round 1's answers are kept so the rounds can be read against each other; without a way to switch, that
+    // is a promise the screen does not deliver on.
+    const roundLinks = rounds > 1 ? Array.from({ length: rounds }, (_, i) => i + 1) : [];
     // System key → its display label, so the per-person table reads "The Kitchen" rather than "kitchen".
     const labelOf = Object.fromEntries(systems.map((s2) => [s2.key, s2.label]));
     // Both halves scale off the single largest count on either side, so the two wings stay comparable.
@@ -33,6 +36,17 @@ export default function SurveyResults({ data }) {
                 </p>
             </section>
 
+            {roundLinks.length ? (
+                <p className="muted" style={{ margin: "0 0 10px", fontSize: "0.78rem" }}>
+                    {roundLinks.map((r) => (
+                        <a key={r} href={`?round=${r}`}
+                            style={{ marginRight: 10, fontWeight: r === round ? 900 : 600,
+                                textDecoration: r === round ? "none" : "underline" }}>
+                            Round {r}{r === rounds ? " (current)" : ""}
+                        </a>
+                    ))}
+                </p>
+            ) : null}
             {responses > 0 ? (
                 <section className="card">
                     <div className="svr-legend">

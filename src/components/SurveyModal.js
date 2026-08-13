@@ -16,9 +16,21 @@ import useScrollLock from "@/lib/useScrollLock";
 //
 // Deliberately steps rather than one long form. A single screen with twelve radio buttons twice over reads as
 // homework; one question at a time with a progress line reads as thirty seconds.
-const SNOOZE_KEY = "wolfden-survey-snooze-v1";
+// Bumped with the round. "Not right now" was an answer to being asked in AUGUST about round 1 — it must not
+// silence a member for every survey the Den ever runs. A new round is a new ask, including for the people who
+// waved the last one away.
+const SNOOZE_KEY = "wolfden-survey-snooze-v2";
 // Launch announcements that must be seen and dismissed before the survey may appear.
-const LAUNCH_KEYS = ["wolfden-mining-announce-v2"];
+// EVERY launch card currently mounted in GameNav, not just the newest — the rule is "never stack on top of an
+// announcement", and a member who has seen the dungeon card but not the mining one still has a modal waiting.
+// If a launch component is retired from the nav its key must come OUT of this list, or the survey waits
+// forever on a card that can no longer be shown.
+const LAUNCH_KEYS = [
+    "wolfden-mining-announce-v2",
+    "wolfden-dungeons-announce-v1",
+    "wolfden-fishing-announce-v1",
+    "wolfden-forge-announce-v1",
+];
 
 function Portal({ children }) {
     const [el] = useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
