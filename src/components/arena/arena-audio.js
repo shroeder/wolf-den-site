@@ -392,35 +392,49 @@ export const Sfx = {
 };
 
 // ── THE MUSIC ────────────────────────────────────────────────────────────────────────────────────────────────
-// "THE PIT" — a war-drum processional, scheduled a beat ahead so it stays locked regardless of what React is
-// doing. Layers come and go with INTENSITY, which the fight drives, so the music tells you you are losing
-// before the number does.
+// "THE GALLOP" — scheduled a beat ahead against the audio clock, so it stays locked regardless of what React
+// is doing, and the layers come and go with INTENSITY, which the fight drives.
 //
-// ── WHAT WAS WRONG WITH THE LAST ONE ─────────────────────────────────────────────────────────────────────────
-// It was a sawtooth bass and a triangle pluck in A Phrygian dominant at 138bpm, over a four-bar loop that came
-// round every seven seconds. Three separate problems, and they compounded:
+// ── WHY THIS IS THE SECOND REWRITE ───────────────────────────────────────────────────────────────────────────
+// The first pass replaced a seven-second chiptune loop with a war-drum processional: 100bpm, 4/4, D natural
+// minor, eight bars. It fixed the loop length and it fixed the voices, and it was still wrong in three ways
+// that only show up once you have sat through fifty bouts rather than five.
 //
-//   1. SEVEN SECONDS. A bout runs a minute or two. You heard that phrase twenty times, and by the fifth you
-//      were not hearing music any more, you were hearing a rhythm you had already learned.
-//   2. THE MODE. Phrygian dominant is the harmonic-minor-with-a-flat-second sound every game reaches for when
-//      it wants "gladiator", and reaching for it is exactly why it no longer says anything.
-//   3. THE VOICES. A saw bass and a triangle pluck is a chiptune. It sounds like a menu, not like two people
-//      trying to put each other on the floor.
+//   1. IT MARCHED. 4/4 at 100 with the weight on the downbeat is a PROCESSION — music for entering an arena,
+//      not for being in one. A fight lurches; the track sat still while the screen was frantic.
+//   2. THE MODE WAS INERT. D natural minor with a bVI-bVII-V turnaround is the same harmonic furniture as the
+//      Phrygian dominant it replaced: correct, expected, and saying nothing.
+//   3. NINETEEN SECONDS IS STILL A LOOP. Tripling the phrase moved the moment you notice from the fifth pass
+//      to the tenth. It did not remove it, because the phrase came round IDENTICAL every time.
 //
-// So: 100bpm, an EIGHT-bar phrase (~19 seconds, nearly three times the old loop), D natural minor, and the
-// voices are struck and blown rather than plucked — taiko, low brass, an anvil on the backbeat, a choir pad,
-// and a melody that only arrives once the fight is actually going. i–i–bVI–bVII–i–bIII–bVII–V: the cadence
-// stays in the minor and the V at the end is what makes bar eight feel like a door rather than a splice.
+// All three are attacked directly:
+//
+//   6/8, NOT 4/4. A gallop — two pulses a bar, each split in three. It is the meter of something running, it
+//   never sits square on the grid, and almost nothing in this genre uses it, which is most of why the old one
+//   sounded like every other arena.
+//
+//   D DORIAN, NOT AEOLIAN. One note different from natural minor — the sixth is natural, so the IV chord is
+//   MAJOR over a minor tonic. That one chord is the whole colour: minor enough to be dangerous, bright enough
+//   not to be a funeral. Bars 4, 11 and 14 are where you hear it.
+//
+//   SIXTEEN BARS THAT DO NOT REPEAT IDENTICALLY. An A section that states it and a B section that lifts out
+//   of it, ~21 seconds — then the whole thing runs again with its ornaments moved (see `pass`), so the real
+//   form is 42 seconds and no two passes match. A bout ends before the track has repeated itself once.
+//
+//   AND THERE IS A CROWD. New, and the one that makes it a PLACE: a breathing noise bed that swells into every
+//   fourth bar and roars on the turnaround when the fight is nearly over. An arena with no crowd in it is a
+//   rehearsal room, and no amount of drums fixes that.
 const ROOT = 73.42;                                 // D2
-const SCALE = [0, 2, 3, 5, 7, 8, 10];               // D natural minor (Aeolian)
+const SCALE = [0, 2, 3, 5, 7, 9, 10];               // D DORIAN — the natural 6 is the point
 const step = (deg, oct = 0) => ROOT * Math.pow(2, (SCALE[((deg % 7) + 7) % 7] + 12 * (oct + Math.floor(deg / 7))) / 12);
 const semi = (n) => ROOT * Math.pow(2, n / 12);
 
-const BPM = 100;
-const SPB = 60 / BPM;
-const STEPS = 16;                                   // sixteenth notes per bar
-const BARS = 8;                                     // ...and a phrase is EIGHT of them
-const SPS = SPB / 4;
+// The felt pulse is the DOTTED quarter — two a bar — so a "step" is a sixteenth and a bar is twelve of them.
+const PULSE = 92;
+const SPB = 60 / PULSE;                             // one dotted-quarter
+const SPS = SPB / 6;                                // ...split into six sixteenths
+const STEPS = 12;                                   // twelve to the bar: 6/8
+const BARS = 16;                                    // A (1-8) then B (9-16)
 
 let musicTimer = null;
 let nextStepTime = 0;
@@ -428,36 +442,53 @@ let stepIndex = 0;
 let intensity = 0.35;
 let musicOn = false;
 
-// Roots are semitone offsets from D. `third` is minor (3) or major (4) — the bVI, bVII and V are all major
-// triads over a minor tonic, which is where the lift in the second half comes from.
+// Semitone offsets from D. Every `third: 4` over a minor tonic is borrowed brightness; the IV (root 5) is the
+// Dorian one, and it is deliberately the chord the melody peaks over.
 const CHORDS = [
-    { root: 0, third: 3 },   // i    Dm
-    { root: 0, third: 3 },   // i    Dm
-    { root: 8, third: 4 },   // bVI  Bb
-    { root: 10, third: 4 },  // bVII C
-    { root: 0, third: 3 },   // i    Dm
-    { root: 3, third: 4 },   // bIII F
-    { root: 10, third: 4 },  // bVII C
-    { root: 7, third: 4 },   // V    A  — the turnaround
+    { root: 0, third: 3 },   // 1  i    Dm
+    { root: 0, third: 3 },   // 2  i    Dm
+    { root: 10, third: 4 },  // 3  bVII C
+    { root: 5, third: 4 },   // 4  IV   G   <- Dorian
+    { root: 0, third: 3 },   // 5  i    Dm
+    { root: 3, third: 4 },   // 6  bIII F
+    { root: 10, third: 4 },  // 7  bVII C
+    { root: 0, third: 3 },   // 8  i    Dm
+    { root: 3, third: 4 },   // 9  bIII F   -- B: it lifts
+    { root: 10, third: 4 },  // 10 bVII C
+    { root: 5, third: 4 },   // 11 IV   G   <- Dorian, and the melody's peak
+    { root: 7, third: 3 },   // 12 v    Am
+    { root: 3, third: 4 },   // 13 bIII F
+    { root: 5, third: 4 },   // 14 IV   G   <- Dorian
+    { root: 0, third: 3 },   // 15 i    Dm
+    { root: 10, third: 4 },  // 16 bVII C  — the door back to the top
 ];
 
-// ── THE DRUMS ── a war rhythm, not a backbeat. Hits on 0-3-6-8-11-14 land ahead of where a kick drum would,
-// which is what makes it read as something being STRUCK by a person rather than a machine keeping time.
-const TAIKO = [0, 3, 6, 8, 11, 14];
-const TAIKO_HARD = [4, 12];                         // added once it is going badly
+// ── THE GALLOP ── 6/8 is two groups of three, so the big drum lands on 0 and 6 and the hand fills 2/4/8/10.
+// The missing odd sixteenths are what stop it being a machine: a rider does not hit every subdivision.
+const HAND = [0, 2, 4, 6, 8, 10];
+const PULSES = [0, 6];
+const HARD = [9];                                   // the extra kick, once it is going badly
 
-// ── THE MELODY ── [step, degree, lengthInSteps] per bar, sparse on purpose: it enters in bar two, says one
-// thing per bar, and leaves a hole in bars 4 and 8 for the drums to answer it. Degrees are scale steps from D;
-// 7 is the octave. This is the part you should be able to hum after two bouts.
+// ── THE MELODY ── [step, degree, lengthInSteps] per bar. Degrees are Dorian steps from D; 7 is the octave.
+// It enters in bar 3, holds its peak over the IV and the v in bars 11-12, and walks home in bar 16. Bars 1, 2
+// and 8 are deliberately empty — the holes are where the drums answer, and a line with no holes is a drone.
 const MELODY = [
-    [],                                             // 1 — drums and brass alone; let the phrase start
-    [[0, 7, 6], [8, 6, 3], [12, 5, 3]],             // 2 — D, C, Bb: down out of the octave
-    [[0, 5, 8], [10, 4, 5]],                        // 3 — over the Bb: Bb held, then A
-    [[0, 3, 6], [8, 4, 3], [12, 5, 3]],             // 4 — over the C: G, A, Bb climbing back
-    [[0, 7, 10]],                                   // 5 — the octave again, held. The arrival.
-    [[0, 9, 6], [8, 8, 3], [12, 7, 3]],             // 6 — over the F: F, E, D above
-    [[0, 6, 8], [10, 5, 5]],                        // 7 — over the C: C, then Bb
-    [[0, 4, 6], [8, 4, 2], [11, 3, 2], [14, 2, 2]], // 8 — over the A: the turnaround walks down to the tonic
+    [],                                             // 1  let the gallop establish
+    [],                                             // 2
+    [[0, 7, 4], [6, 6, 4]],                         // 3  D' then C over the bVII
+    [[0, 5, 6], [8, 4, 4]],                         // 4  B over the major IV — the colour, stated plainly
+    [[0, 4, 6]],                                    // 5  A, held
+    [[0, 3, 4], [6, 4, 4]],                         // 6  G, A
+    [[0, 6, 6], [8, 5, 4]],                         // 7  C, B
+    [],                                             // 8  the answer
+    [[0, 7, 6], [8, 8, 4]],                         // 9  up into the B section
+    [[0, 6, 8]],                                    // 10 C, held
+    [[0, 5, 4], [4, 6, 4], [8, 7, 4]],              // 11 B-C-D' climbing over the IV
+    [[0, 4, 10]],                                   // 12 A over the v — the top of the arc
+    [[0, 8, 4], [6, 7, 4]],                         // 13 E'-D' coming down
+    [[0, 6, 6], [8, 5, 4]],                         // 14 C-B over the IV again
+    [[0, 4, 6], [8, 3, 4]],                         // 15 A-G
+    [[0, 2, 3], [4, 1, 3], [8, 0, 4]],              // 16 F-E-D: home, and round again
 ];
 
 /** A struck drum: a pitched body that drops fast, plus a noise transient so it has a stick on it. */
@@ -483,35 +514,75 @@ function drum(t, { freq = 92, drop = 52, gain = 0.4, dur = 0.34, tone: toneQ = 3
     n.start(t); n.stop(t + 0.09);
 }
 
+/** Filtered noise with an envelope. The crowd, the anvil's crack, the shaker and the riser are all this. */
+function air(t, { from = 600, to = 600, peak = 0.04, attack = 0.2, hold = 0.2, release = 0.4, q = 1, type = "bandpass" }) {
+    const n = ctx.createBufferSource();
+    n.buffer = noiseBuf; n.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = type; f.Q.value = q;
+    f.frequency.setValueAtTime(from, t);
+    if (to !== from) f.frequency.exponentialRampToValueAtTime(to, t + attack + hold);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + attack);
+    g.gain.setValueAtTime(peak, t + attack + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + release);
+    n.connect(f); f.connect(g); g.connect(musicBus);
+    n.start(t); n.stop(t + attack + hold + release + 0.05);
+}
+
 function scheduleStep(i, t) {
     if (!ctx || !musicBus) return;
     const beat = i % STEPS;
     const bar = Math.floor(i / STEPS) % BARS;
+    // Which time through the sixteen this is. Every ornament keys off it, so the form is 32 bars even though
+    // the harmony is 16 — the cheapest possible way to stop a loop announcing itself.
+    const pass = Math.floor(i / (STEPS * BARS)) % 2;
     const chord = CHORDS[bar];
-    const last = bar === BARS - 1;                  // the turnaround
+    const last = bar === BARS - 1;
     const lv = intensity;
     const tr = Math.pow(2, chord.root / 12);        // one ratio, so every voice moves together
 
-    // ── TAIKO ── the spine. Always there, because the drums ARE the arena; everything else is decoration on
-    // top of two people and a crowd. Downbeats hit harder and lower.
-    if (TAIKO.includes(beat) || (lv > 0.6 && TAIKO_HARD.includes(beat))) {
-        const down = beat === 0 || beat === 8;
-        drum(t, { freq: down ? 104 : 88, drop: down ? 46 : 56, gain: down ? 0.44 : 0.26, dur: down ? 0.4 : 0.26 });
-    }
-
-    // ── THE ANSWER ── a second, higher drum filling the hole the melody leaves in bars 4 and 8. A call and a
-    // response is the cheapest way to make eight bars feel composed rather than looped.
-    if ((bar === 3 || last) && beat >= 12 && beat % 2 === 0 && lv > 0.3) {
-        drum(t, { freq: 170 + (beat - 12) * 26, drop: 96, gain: 0.2, dur: 0.16, tone: 900 });
-    }
-
-    // ── LOW BRASS ── the identity of the whole thing. Three detuned saws through a lowpass with a real attack,
-    // holding the chord for most of the bar. Slow attack is the entire difference between a horn section and a
-    // synth patch: a horn takes time to speak.
+    // ── THE CROWD ── a breath across four bars, swelling into every fourth. Always on, even at zero intensity:
+    // the room is full before the fight starts. One noise source a bar for the whole difference between an
+    // arena and a rehearsal space.
     if (beat === 0) {
-        const notes = [semi(chord.root) / 2, semi(chord.root + 7) / 2, semi(chord.root + 12) / 2];
-        notes.forEach((fr, k) => {
-            for (const det of [-6, 6]) {
+        const swell = bar % 4 === 3;                // the bar BEFORE a section point: anticipation, not applause
+        air(t, {
+            from: 420, to: swell ? 1500 : 700, q: 0.9,
+            peak: (swell ? 0.055 : 0.03) * (0.5 + lv * 0.7),
+            attack: SPB * (swell ? 1.4 : 0.9), hold: SPB * 0.2, release: SPB * 0.9,
+        });
+    }
+    // A real roar, on the turnaround only and only when it is nearly over, so it means something when it comes.
+    if (last && beat === 6 && lv > 0.72) {
+        air(t, { from: 700, to: 2400, q: 0.7, peak: 0.075, attack: SPB * 0.9, hold: SPB * 0.3, release: SPB * 1.1 });
+    }
+
+    // ── THE GALLOP ── the spine. Big drum on the two pulses, hand drum filling the triplet underneath, so the
+    // bar breathes in three rather than sitting flat.
+    if (PULSES.includes(beat)) {
+        const down = beat === 0;
+        drum(t, { freq: down ? 108 : 96, drop: down ? 44 : 54, gain: down ? 0.42 : 0.3, dur: down ? 0.36 : 0.28 });
+    } else if (HAND.includes(beat) && lv > 0.12) {
+        drum(t, { freq: 190, drop: 120, gain: 0.1 + lv * 0.05, dur: 0.1, tone: 1200 });
+    }
+    if (lv > 0.62 && HARD.includes(beat)) {
+        drum(t, { freq: 84, drop: 48, gain: 0.24, dur: 0.22 });
+    }
+
+    // ── THE ANSWER ── drums filling the holes the melody leaves in bars 2 and 8, and MOVED by `pass`, so the
+    // second time through the sixteen the fill lands elsewhere and the phrase does not read as a tape.
+    if ((bar === 1 || bar === 7) && lv > 0.3 && beat >= (pass ? 6 : 8) && beat % 2 === 0) {
+        drum(t, { freq: 168 + beat * 9, drop: 100, gain: 0.17, dur: 0.14, tone: 950 });
+    }
+
+    // ── THE BOWED DRONE ── the bass, and it never stops. Two saws a fifth apart under a slow lowpass, bowed in
+    // over a third of a bar rather than plucked: an arco string speaks LATE, and that lateness is the whole
+    // difference between a string section and a synth bass on a grid.
+    if (beat === 0) {
+        [semi(chord.root) / 2, semi(chord.root + 7) / 2].forEach((fr, k) => {
+            for (const det of [-7, 7]) {
                 const o = ctx.createOscillator();
                 const f = ctx.createBiquadFilter();
                 const g = ctx.createGain();
@@ -519,84 +590,98 @@ function scheduleStep(i, t) {
                 o.frequency.value = fr;
                 o.detune.value = det;
                 f.type = "lowpass";
-                f.frequency.setValueAtTime(300, t);
-                f.frequency.linearRampToValueAtTime(900 + lv * 1500, t + 0.22);
-                f.frequency.linearRampToValueAtTime(600, t + SPB * 3);
+                f.frequency.setValueAtTime(260, t);
+                f.frequency.linearRampToValueAtTime(780 + lv * 1200, t + SPB * 0.5);
+                f.frequency.linearRampToValueAtTime(520, t + SPB * 1.8);
                 g.gain.setValueAtTime(0.0001, t);
-                g.gain.linearRampToValueAtTime((k === 0 ? 0.075 : 0.042) * (0.55 + lv * 0.45), t + 0.13);
-                g.gain.setValueAtTime((k === 0 ? 0.075 : 0.042) * (0.55 + lv * 0.45), t + SPB * 2.6);
-                g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 3.6);
+                g.gain.linearRampToValueAtTime((k === 0 ? 0.07 : 0.038) * (0.6 + lv * 0.4), t + SPB * 0.35);
+                g.gain.setValueAtTime((k === 0 ? 0.07 : 0.038) * (0.6 + lv * 0.4), t + SPB * 1.5);
+                g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 2);
                 o.connect(f); f.connect(g); g.connect(musicBus);
-                o.start(t); o.stop(t + SPB * 3.7);
+                o.start(t); o.stop(t + SPB * 2.05);
             }
         });
     }
 
-    // ── CHOIR ── detuned triangles with a slow vibrato, sitting an octave up under everything. Quiet enough
-    // that you would not name it if asked, loud enough that taking it out makes the track sound like a demo.
-    if (beat === 0) {
+    // ── THE HORNS ── not a pad. They ANSWER the gallop on the second pulse of alternate bars, short and
+    // stopped, the way a hunting horn is played. Held chords are what made the last version a procession.
+    if (beat === 6 && bar % 2 === (pass ? 0 : 1) && lv > 0.25) {
+        [0, chord.third, 7].forEach((iv, k) => {
+            const o = ctx.createOscillator();
+            const f = ctx.createBiquadFilter();
+            const g = ctx.createGain();
+            o.type = "sawtooth";
+            o.frequency.value = semi(chord.root + iv);
+            f.type = "lowpass";
+            f.frequency.setValueAtTime(420, t);
+            f.frequency.linearRampToValueAtTime(1600 + lv * 900, t + 0.08);
+            f.frequency.linearRampToValueAtTime(700, t + SPB * 0.7);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime((k === 0 ? 0.05 : 0.03) * (0.5 + lv * 0.5), t + 0.06);
+            g.gain.setValueAtTime((k === 0 ? 0.05 : 0.03) * (0.5 + lv * 0.5), t + SPB * 0.45);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 0.8);
+            o.connect(f); f.connect(g); g.connect(musicBus);
+            o.start(t); o.stop(t + SPB * 0.85);
+        });
+    }
+
+    // ── CHOIR ── detuned triangles an octave up, and ONLY in the B section. Keeping them out of A is what
+    // makes the lift at bar 9 land: you cannot raise something that was already there.
+    if (beat === 0 && bar >= 8 && lv > 0.3) {
         [semi(chord.root), semi(chord.root + chord.third), semi(chord.root + 7)].forEach((fr) => {
             const o = ctx.createOscillator();
             const g = ctx.createGain();
             const lfo = ctx.createOscillator();
             const lg = ctx.createGain();
             o.type = "triangle"; o.frequency.value = fr * 2;
-            lfo.type = "sine"; lfo.frequency.value = 5.2;
-            lg.gain.value = 1.6;                    // cents of vibrato, via detune
+            lfo.type = "sine"; lfo.frequency.value = 5.4;
+            lg.gain.value = 1.8;                    // cents of vibrato, via detune
             g.gain.setValueAtTime(0.0001, t);
-            g.gain.linearRampToValueAtTime(0.016 + lv * 0.018, t + SPB * 0.8);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 3.9);
+            g.gain.linearRampToValueAtTime(0.014 + lv * 0.02, t + SPB * 0.7);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 1.9);
             lfo.connect(lg); lg.connect(o.detune);
             o.connect(g); g.connect(musicBus);
             o.start(t); lfo.start(t);
-            o.stop(t + SPB * 4); lfo.stop(t + SPB * 4);
+            o.stop(t + SPB * 2); lfo.stop(t + SPB * 2);
         });
     }
 
-    // ── THE ANVIL ── a hammer on iron, on the backbeat, once the fight is worth watching. Two inharmonic
+    // ── THE ANVIL ── a hammer on iron, on the second pulse, once the fight is worth watching. Two inharmonic
     // partials plus a bandpassed crack: a bell rings, an anvil CLANGS, and the difference is that the partials
     // are not whole-number multiples of anything.
-    if (lv > 0.5 && beat === 8) {
+    if (lv > 0.5 && beat === 6 && bar % 2 === 0) {
         [1834, 2731].forEach((fr, k) => {
             const o = ctx.createOscillator();
             const g = ctx.createGain();
             o.type = "square"; o.frequency.value = fr;
             g.gain.setValueAtTime(0.0001, t);
-            g.gain.exponentialRampToValueAtTime(0.028 * (k ? 0.6 : 1) * lv, t + 0.004);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-            o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.52);
+            g.gain.exponentialRampToValueAtTime(0.026 * (k ? 0.6 : 1) * lv, t + 0.004);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+            o.connect(g); g.connect(musicBus); o.start(t); o.stop(t + 0.47);
         });
-        const n = ctx.createBufferSource();
-        n.buffer = noiseBuf; n.loop = true;
-        const f = ctx.createBiquadFilter();
-        f.type = "bandpass"; f.frequency.value = 3200; f.Q.value = 1.4;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.05 * lv, t);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-        n.connect(f); f.connect(g); g.connect(musicBus);
-        n.start(t); n.stop(t + 0.11);
+        air(t, { from: 3200, to: 3200, q: 1.4, peak: 0.045 * lv, attack: 0.002, hold: 0.01, release: 0.08 });
     }
 
-    // ── THE MELODY ── enters once the fight has shape. A filtered square with a per-note envelope, doubled a
-    // twelfth up very quietly so it reads as an instrument with a body rather than a bleep.
+    // ── THE MELODY ── a struck string rather than a bleep: a filtered square with a fast body plus a quiet
+    // twelfth above it, so it reads as something with a soundboard. Enters once the fight has a shape.
     if (lv > 0.4) {
         for (const [at, deg, len] of MELODY[bar]) {
             if (at !== beat) continue;
             const fr = step(deg, 1) * tr;
             const hold = SPS * len;
-            for (const [mult, vol, wave] of [[1, 0.062, "square"], [3, 0.012, "sine"]]) {
+            for (const [mult, vol, wave] of [[1, 0.058, "square"], [3, 0.011, "sine"]]) {
                 const o = ctx.createOscillator();
                 const f = ctx.createBiquadFilter();
                 const g = ctx.createGain();
                 o.type = wave;
                 o.frequency.value = fr * mult;
                 f.type = "lowpass";
-                f.frequency.setValueAtTime(1200, t);
-                f.frequency.linearRampToValueAtTime(2600 + lv * 1800, t + 0.05);
-                f.frequency.linearRampToValueAtTime(1400, t + hold);
+                f.frequency.setValueAtTime(1400, t);
+                f.frequency.linearRampToValueAtTime(2800 + lv * 1800, t + 0.04);
+                f.frequency.linearRampToValueAtTime(1300, t + hold);
                 g.gain.setValueAtTime(0.0001, t);
-                g.gain.linearRampToValueAtTime(vol * (0.6 + lv * 0.4), t + 0.03);
-                g.gain.setValueAtTime(vol * (0.6 + lv * 0.4), t + hold * 0.72);
+                g.gain.linearRampToValueAtTime(vol * (0.6 + lv * 0.4), t + 0.02);
+                g.gain.setValueAtTime(vol * (0.6 + lv * 0.4), t + hold * 0.7);
                 g.gain.exponentialRampToValueAtTime(0.0001, t + hold);
                 o.connect(f); f.connect(g); g.connect(musicBus);
                 o.start(t); o.stop(t + hold + 0.02);
@@ -604,35 +689,17 @@ function scheduleStep(i, t) {
         }
     }
 
-    // ── SHAKER ── the only fast layer, and it is deliberately the LAST thing to arrive. Eighths, then
-    // sixteenths when it is nearly over, so the track speeds up without the tempo ever changing.
-    if (lv > 0.62 && (lv > 0.85 || beat % 2 === 0)) {
-        const n = ctx.createBufferSource();
-        n.buffer = noiseBuf; n.loop = true;
-        const f = ctx.createBiquadFilter();
-        f.type = "highpass"; f.frequency.value = 8200;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime((beat % 4 === 0 ? 0.03 : 0.017) * lv, t);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
-        n.connect(f); f.connect(g); g.connect(musicBus);
-        n.start(t); n.stop(t + 0.055);
+    // ── THE SHAKER ── the last layer to arrive and the only fast one. On the triplet at first, then every
+    // sixteenth when it is nearly over, so the track accelerates without the tempo moving at all.
+    if (lv > 0.66 && (lv > 0.88 || beat % 2 === 0)) {
+        air(t, { from: 8600, to: 8600, type: "highpass", peak: (beat % 6 === 0 ? 0.026 : 0.014) * lv,
+            attack: 0.002, hold: 0.005, release: 0.04 });
     }
 
-    // ── THE RISER ── the back half of bar eight, sweeping up into the downbeat. It is the thing that makes
-    // nineteen seconds feel like a phrase that came round rather than a file that started again.
-    if (last && beat === 8 && lv > 0.35) {
-        const n = ctx.createBufferSource();
-        n.buffer = noiseBuf; n.loop = true;
-        const f = ctx.createBiquadFilter();
-        f.type = "bandpass"; f.Q.value = 2.2;
-        f.frequency.setValueAtTime(500, t);
-        f.frequency.exponentialRampToValueAtTime(5200, t + SPS * 8);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.linearRampToValueAtTime(0.05 * lv, t + SPS * 7);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + SPS * 8.4);
-        n.connect(f); f.connect(g); g.connect(musicBus);
-        n.start(t); n.stop(t + SPS * 8.5);
+    // ── THE RISER ── the back half of the last bar, sweeping into the downbeat. It is what makes the form come
+    // ROUND rather than start again.
+    if (last && beat === 6 && lv > 0.35) {
+        air(t, { from: 480, to: 5400, q: 2.2, peak: 0.05 * lv, attack: SPS * 5, hold: 0, release: SPS * 1.5 });
     }
 }
 
