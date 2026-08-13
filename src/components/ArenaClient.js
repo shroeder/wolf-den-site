@@ -225,10 +225,13 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                     is the whole reason armour reads as a stat the enemy gets and you do not: a member turns
                     aside 34% before Footwork, usually MORE than the 6-26% an NPC carries, and nothing on your
                     half of the screen has ever said so. Summed, because a member defender has both. */}
-                {(f?.armour || 0) + (f?.block || 0) > 0 ? (
-                    <i title="Share of every incoming blow this fighter turns aside">
-                        <b>{Math.round(((f.armour || 0) + (f.block || 0)) * 100)}%</b> turned aside
-                    </i>
+                {/* One name, both sides. NPCs read 0 here — their toughness is health now, which the bar
+                    already tells you about. */}
+                {(f?.dr || 0) > 0 ? (
+                    <i title="Share of every incoming blow that never lands"><b>{Math.round(f.dr * 100)}%</b> reduction</i>
+                ) : null}
+                {(f?.accuracy ?? 1) < 1 ? (
+                    <i title="Chance a plain swing connects"><b>{Math.round((f.accuracy ?? 1) * 100)}%</b> acc</i>
                 ) : null}
             </span>
         </div>
@@ -864,9 +867,28 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
         if (!l) return undefined;
         const pops = [];
-        if (l.damage > 0) {
+        const target = l.who === "you" ? "right" : "left";
+        // ── ONE NUMBER PER BLOW ──────────────────────────────────────────────────────────────────────────
+        // A three-hit flurry used to arrive as a single accumulated number, so the one thing that makes it a
+        // flurry — that it is THREE — was invisible, and Rampage looked exactly like a big swing with a
+        // different sprite. `each` is the per-blow breakdown from the engine; every entry gets its own float,
+        // staggered so they read as a sequence rather than a pile, and a missed blow says MISS in its place.
+        const each = Array.isArray(l.each) ? l.each : null;
+        if (each && each.length > 1) {
+            each.forEach((n, i) => {
+                pops.push({
+                    side: target,
+                    n: n > 0 ? n : null,
+                    text: n > 0 ? null : "MISS",
+                    kind: n > 0 ? (l.crit ? "crit" : "dmg") : "miss",
+                    at: i * 170,
+                });
+            });
+        } else if (l.damage > 0) {
             // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
-            pops.push({ side: l.who === "you" ? "right" : "left", n: l.damage, kind: l.crit ? "crit" : "dmg" });
+            pops.push({ side: target, n: l.damage, kind: l.crit ? "crit" : "dmg" });
+        } else if (l.grade === "miss") {
+            pops.push({ side: target, n: null, text: "MISS", kind: "miss" });
         }
         // ── AND THEY BELONG TO WHOEVER EARNED THEM ──────────────────────────────────────────────────────
         // All three of these were pinned to "left", which is YOU. Damage was already handled correctly, so a
@@ -1143,8 +1165,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         <span key={`${it.kind}-${i}`}
                                             className={`ar-pop is-${it.side} is-${it.kind}`}
                                             style={it.at ? { animationDelay: `${it.at}ms` } : undefined}>
-                                            {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" || it.kind === "brace" ? "" : "−"}
-                                            {it.n}{it.kind === "brace" ? "%" : ""}
+                                            {it.text
+                                                ? it.text
+                                                : <>
+                                                    {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" || it.kind === "brace" ? "" : "−"}
+                                                    {it.n}{it.kind === "brace" ? "%" : ""}
+                                                </>}
                                             {it.kind === "block" ? <u>blocked</u>
                                                 : it.kind === "ward" ? <u>soaked</u>
                                                     : it.kind === "brace" ? <u>braced</u> : null}
@@ -2790,6 +2816,11 @@ function Styles() {
                 font-variant-numeric: tabular-nums;
                 animation: arPop 2.1s cubic-bezier(.2,1,.3,1) both; }
             .ar-pop.is-dmg { color: #ffd75e; }
+            /* A miss is a real outcome and has to read as one — small, grey and unmistakably not a number,
+               so a flurry that lands two of three shows two golds and a grey MISS rather than one figure
+               that quietly happens to be smaller. */
+            .ar-pop.is-miss { font-size: 1.15rem; color: #9aa0a6; letter-spacing: .06em;
+                text-shadow: 0 2px 8px #000; }
             .ar-pop.is-left.is-dmg { color: #ff8f9a; }
             /* A crit is the biggest number in the game and it should look like it. */
             .ar-pop.is-crit { font-size: 2.9rem; color: #fff6cc;

@@ -1,3 +1,4 @@
+import { DEFAULT_ACCURACY } from "@/lib/marketplace/arena-classes.js";
 import { swingFrom, healthFrom, critChanceFrom, critMultFrom } from "@/lib/marketplace/arena-kit.js";
 
 // ── THE GAUNTLET: ENDLESS NPC CHALLENGERS ────────────────────────────────────────────────────────────────────
@@ -72,7 +73,15 @@ export function npcPower(tier) {
 // and the archetypes cycle, so tier N and tier N+1 want different answers out of you:
 //
 //   BRUTE      pours it into Might. Races you. Kill it or be killed inside ten rounds.
-//   WALL       pours it into Ferocity and armour. Nothing you do lands for much; bring Sunder or Pierce.
+//   WALL       pours it into Ferocity and sheer bulk. It takes a long time to put down.
+//
+// ── NO ARMOUR ON AN NPC ──────────────────────────────────────────────────────────────────────────────────────
+// Archetypes used to carry a hidden damage-reduction percentage, and it was the single most confusing thing in
+// a fight: your damage number said one thing, the bar moved by another, and nothing on screen accounted for
+// the difference. Damage reduction is a CLASS idea now — something a member builds and can read off their own
+// card — and an NPC's toughness is health, which is the one number a health bar already tells you the truth
+// about. `tough` is the old armour expressed as the health multiplier that keeps each archetype exactly as
+// hard to kill: a wall's 26% reduction is 1/(1-0.26) = 1.35x the health.
 //   DUELIST    pours it into crit. Swingy — it can take a third of you in one beat or whiff for three.
 //   BERSERKER  everything into offence, almost nothing into staying alive. A glass cannon: guard the opening
 //              and it falls over, trade blindly and it wins.
@@ -86,15 +95,15 @@ export const ARCHETYPES = [
     // a Wall took twenty. Compressed to 0.22-0.60. Each archetype still plainly IS itself; none of them is a
     // different game.
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
-      w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, armour: 0.10 },
+      w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, tough: 1.11 },
     { key: "brute", name: "Brute", tell: "Hits like a falling wall. End it early.",
-      w: { might: 0.44, crit_chance: 0.08, crit_power: 0.12, ferocity: 0.36 }, armour: 0.10 },
+      w: { might: 0.44, crit_chance: 0.08, crit_power: 0.12, ferocity: 0.36 }, tough: 1.11 },
     { key: "wall", name: "Wall", tell: "Soaks everything. Strip its guard or you are here all day.",
-      w: { might: 0.20, crit_chance: 0.10, crit_power: 0.10, ferocity: 0.60 }, armour: 0.26 },
+      w: { might: 0.20, crit_chance: 0.10, crit_power: 0.10, ferocity: 0.60 }, tough: 1.35 },
     { key: "duelist", name: "Duelist", tell: "Fishing for criticals. It only needs to land one.",
-      w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, armour: 0.12 },
+      w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, tough: 1.14 },
     { key: "berserker", name: "Berserker", tell: "All edge, no armour. Survive the opening and it folds.",
-      w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, armour: 0.06 },
+      w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, tough: 1.06 },
 ];
 // The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
 // harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
@@ -132,9 +141,12 @@ export function npcFor(tier) {
         crit_chance: Math.round(budget * arch.w.crit_chance),
         crit_power: Math.round(budget * arch.w.crit_power),
         ferocity: Math.round(budget * arch.w.ferocity),
-        // Armour is the one thing a member does not carry: it is what an absent opponent has instead of the
-        // guard a present one chooses to play. A stated number, never a roll.
-        armour: arch.armour,
+        // Toughness rides on the health the budget already bought, so an archetype is exactly as hard to kill
+        // as it was when the same figure was a hidden percentage — the difference is you can now see it.
+        tough: arch.tough || 1,
+        // NPCs have no damage reduction at all, and no tree, so they hit at the neutral base.
+        dr: 0,
+        accuracy: DEFAULT_ACCURACY,
         gearPower: power,
         // Element cycles so consecutive tiers are not all answerable with one affinity — the wheel stays a
         // reason to re-attune rather than something you solve once.
@@ -158,7 +170,9 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
         crit_chance: Math.round(budget * arch.w.crit_chance),
         crit_power: Math.round(budget * arch.w.crit_power),
         ferocity: Math.round(budget * arch.w.ferocity),
-        armour: arch.armour,
+        tough: arch.tough || 1,
+        dr: 0,
+        accuracy: DEFAULT_ACCURACY,
         gearPower: budget,
         element: element || ["fire", "water", "earth", "storm", "light", "shadow"][seed % 6],
         speed: Math.round(10 + budget * 0.09),
@@ -240,7 +254,7 @@ export function tierForRating(rating) {
     if (!(rating > 0)) return 1;
     // SEARCHED, NOT SOLVED WITH A MAGIC NUMBER. The first cut multiplied npcPower by a constant I guessed at
     // (4.2) and put a rating of 400 at tier 17 — wildly wrong, and wrong in the direction that would have
-    // handed a beginner the Nightmare band. Rating is health x damage x crit x armour and none of that
+    // handed a beginner the Nightmare band. Rating is health x damage x crit and none of that
     // collapses to one coefficient, so this walks the ladder and takes the closest tier. It is thirty
     // comparisons of arithmetic, once per matchmake.
     let best = 1;
@@ -256,7 +270,7 @@ export function tierForRating(rating) {
         const cc = critChanceFrom(n.crit_chance);
         const cm = critMultFrom(n.crit_power);
         const perSwing = damage * (1 + cc * (cm - 1));
-        const r = Math.round((perSwing * (hp / Math.max(0.1, 1 - (n.armour || 0)))) / 10);
+        const r = Math.round((perSwing * hp) / 10);
         const gap = Math.abs(r - rating);
         if (gap < bestGap) { bestGap = gap; best = t; }
         if (r > rating * 1.5) break;   // past it — the curve only climbs

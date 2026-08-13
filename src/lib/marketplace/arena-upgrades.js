@@ -13,9 +13,11 @@ export const ARENA_UPGRADES = [
         unit: (v) => `+${Math.round(v)} health`,
     },
     {
-        id: "footwork", name: "Footwork", icon: "/images/arena/track/footwork.webp", max: 20, base: 260, stat: "block", per: 0.006,
-        desc: "Reading a swing early. You turn aside more of every blow that lands.",
-        unit: (v) => `+${(v * 100).toFixed(1)}% turned aside`,
+        // stat renamed block -> dr alongside the tree node of the same name. Purchased ranks are stored by
+        // TRACK ID, not by stat, so every level anyone has bought carries over untouched.
+        id: "footwork", name: "Footwork", icon: "/images/arena/track/footwork.webp", max: 20, base: 260, stat: "dr", per: 0.006,
+        desc: "Reading a swing early. Less of every blow gets through.",
+        unit: (v) => `+${(v * 100).toFixed(1)}% damage reduction`,
     },
     {
         id: "edge", name: "Whetstone", icon: "/images/arena/track/edge.webp", max: 20, base: 280, stat: "might", per: 0.8,

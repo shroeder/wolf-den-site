@@ -139,6 +139,16 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                             <img src={c.emblem} alt="" draggable="false" />
                             <b>{c.name}</b>
                             <em>{c.tag}</em>
+                            {/* ── WHAT YOU ARE ACTUALLY PICKING ────────────────────────────────────────
+                                A class used to be three lines of prose over an identical stat block: a fresh
+                                Warden and a fresh Reaver fought exactly the same until they spent a point.
+                                These three numbers ARE the choice, so they belong on the button that makes
+                                it — not on a card you find later. */}
+                            <span className="skt-class-stats">
+                                <i><b>{c.health > 0 ? `+${c.health}` : "—"}</b>health</i>
+                                <i><b>{Math.round((c.dr || 0) * 100)}%</b>reduction</i>
+                                <i><b>{Math.round((c.accuracy || 0) * 100)}%</b>accuracy</i>
+                            </span>
                             <p>{c.blurb}</p>
                         </button>
                     ))}
@@ -309,6 +319,14 @@ function Styles() {
             .skt-points.is-live em { color: color-mix(in srgb, var(--c) 60%, white); }
 
             /* ── CLASS PICKER ── */
+            /* Three columns so the classes can be COMPARED, which is the only way a stat line helps: the
+               numbers line up across the three buttons and the trade is visible without reading. */
+            .skt-class-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 100%;
+                margin: 6px 0 2px; }
+            .skt-class-stats i { display: grid; gap: 1px; font-style: normal; text-align: center;
+                font-size: 0.58rem; text-transform: uppercase; letter-spacing: .05em; color: #8b93a0;
+                padding: 4px 2px; border-radius: 7px; background: rgba(255,255,255,0.05); }
+            .skt-class-stats i b { font-size: 0.86rem; color: var(--c); letter-spacing: 0; }
             .skt-classes { display: grid; gap: 10px; }
             @media (min-width: 640px) { .skt-classes { grid-template-columns: repeat(3, 1fr); } }
             .skt-class { display: grid; justify-items: center; gap: 4px; text-align: center; cursor: pointer;

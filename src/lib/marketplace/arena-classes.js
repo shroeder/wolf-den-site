@@ -72,6 +72,9 @@ export const CLASSES = [
         blurb: "Damage and criticals. A Reaver wants the bout over in six rounds and builds every point toward that.",
         color: "#ff6f7d",
         emblem: "/images/arena/class/reaver.webp",
+        health: 0,
+        dr: 0.16,
+        accuracy: 0.94,
     },
     {
         id: "warden",
@@ -80,6 +83,9 @@ export const CLASSES = [
         blurb: "Wards, ripostes and sustain. A Warden wins by still being standing, and makes swinging at them a mistake.",
         color: "#6fd0ff",
         emblem: "/images/arena/class/warden.webp",
+        health: 70,
+        dr: 0.34,
+        accuracy: 0.97,
     },
     {
         id: "runecaller",
@@ -88,8 +94,41 @@ export const CLASSES = [
         blurb: "Affinity, burns and broken guard. A Runecaller wins the rounds after the one they are in.",
         color: "#b061ff",
         emblem: "/images/arena/class/runecaller.webp",
+        health: 30,
+        dr: 0.24,
+        accuracy: 0.95,
     },
 ];
+
+// ── WHAT A CLASS IS, BEFORE YOU SPEND A POINT ────────────────────────────────────────────────────────────────
+// Three numbers every class now carries in its own right, because a class that is only a list of nodes is a
+// menu rather than an identity: a fresh Warden and a fresh Reaver used to be mechanically IDENTICAL, and the
+// only thing separating them was which grid their future points would land in.
+//
+//   health    flat bonus on top of what Ferocity buys — the tank is bigger before they spend anything
+//   dr        damage reduction, the share of every incoming blow that never lands
+//   accuracy  the base chance a swing connects, before a skill's own penalty
+//
+// DR REPLACES "TURN ASIDE". Same mechanic, one name, and it is a class trait rather than a flat 34% everybody
+// shared. Footwork's ranks carry straight over — the node's stat is `dr` now and adds to the class base, so a
+// member who spent five points on it keeps exactly what they paid for.
+//
+// The spread is the identity. A Reaver is soft on purpose: 16% against a Warden's 34% is the difference
+// between a fight you have to end quickly and one you can afford to lose rounds in. Accuracy runs the other
+// way and deliberately narrowly — 94 to 97 — because it is a tiebreaker, not a second damage stat, and the
+// real accuracy decisions live on the skills.
+export const classBase = (id) => {
+    const c = classById(id);
+    return { health: c?.health || 0, dr: c?.dr ?? DEFAULT_DR, accuracy: c?.accuracy ?? DEFAULT_ACCURACY };
+};
+
+// What someone with no class at all fights with — a member who has not picked yet, and the shape NPCs use.
+export const DEFAULT_DR = 0.20;
+export const DEFAULT_ACCURACY = 0.95;
+// Nobody dodges forever and nobody hits forever: a ceiling on each so investment cannot end the interaction.
+export const DR_CAP = 0.60;
+export const ACCURACY_CAP = 1.0;
+export const ACCURACY_FLOOR = 0.35;
 
 export const classById = (id) => CLASSES.find((c) => c.id === id) || null;
 
@@ -118,10 +157,19 @@ export const TREES = {
 
         N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.12, needs: 3,
             desc: "Criticals hit +12% harder per rank.", sprite: "/images/arena/node/rv_critdmg.webp" }),
-        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.95, hits: 3, cd: 3, needs: 3,
-            desc: "Three blows, each rolling its own critical.", sprite: "/images/arena/node/rv_flurry.webp" }),
+        // ── RAMPAGE, RETUNED ────────────────────────────────────────────────────────────────────────────
+        // 0.95 x 3 = 285% on a three-turn cooldown, against Cleave's 230% on the SAME cooldown — more damage,
+        // and three separate crit rolls, from the same class. There was no reason to ever take Cleave.
+        //
+        // 0.50 x 3 = 150% and every blow can miss. That is the trade an all-out attack should be: more total
+        // damage than a single committed swing only if it lands, and three chances for it not to.
+        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.50, hits: 3, acc: -0.18, cd: 3, needs: 3,
+            desc: "Three wild blows at 50% each — every one can miss, every one can crit.", sprite: "/images/arena/node/rv_flurry.webp" }),
         N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "speed", per: 3, needs: 3,
             desc: "+3 Speed per rank — decides who opens.", sprite: "/images/arena/node/rv_speed.webp" }),
+        // The answer to Rampage's penalty: a Reaver who wants the wild swing can pay for it to land.
+        N({ id: "rv_aim", tier: 1, name: "Killer's Eye", ranks: 4, stat: "accuracy", per: 0.02, needs: 3,
+            desc: "+2% accuracy per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
 
         N({ id: "rv_surge", tier: 2, kind: "active", ability: "surge", name: "Warcry", cd: 3, needs: 7,
             desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
@@ -142,8 +190,10 @@ export const TREES = {
     warden: [
         N({ id: "wd_vigour", tier: 0, name: "Conditioning", ranks: 5, stat: "health", per: 12,
             desc: "+12 max Health per rank.", sprite: "/images/arena/node/wd_vigour.webp" }),
-        N({ id: "wd_block", tier: 0, name: "Footwork", ranks: 5, stat: "block", per: 0.02,
-            desc: "Turn aside 2% more per rank.", sprite: "/images/arena/node/wd_block.webp" }),
+        // `stat` renamed block -> dr with the node id, rank count and value untouched, so five points spent
+        // on Footwork are still five points of the same thing. Only the word changed.
+        N({ id: "wd_block", tier: 0, name: "Footwork", ranks: 5, stat: "dr", per: 0.02,
+            desc: "+2% damage reduction per rank.", sprite: "/images/arena/node/wd_block.webp" }),
         N({ id: "wd_ward", tier: 0, kind: "active", ability: "ward", name: "Bulwark", cd: 4,
             desc: "Brace against the next blow — on either beat, and it never costs you a swing.", sprite: "/images/arena/node/wd_ward.webp" }),
 

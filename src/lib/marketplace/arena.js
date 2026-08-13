@@ -7,7 +7,7 @@ import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
-    buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
+    accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, GUARD_SOAK, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
@@ -20,7 +20,9 @@ import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRung
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
-    arenaLevelFor, arenaXpFor, CLASSES, classById, FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
+    ACCURACY_CAP, ACCURACY_FLOOR, arenaLevelFor, arenaXpFor, classBase, CLASSES, classById,
+    DEFAULT_ACCURACY, DEFAULT_DR, DR_CAP,
+    FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState,
 } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
@@ -57,22 +59,25 @@ export const arenaHealth = (ferocity = 0) => healthFrom(ferocity);
  */
 export function ringStats(stats = {}) {
     return {
-        health: healthFrom(Number(stats.ferocity) || 0),
+        // `tough` is an NPC archetype's bulk — the old hidden armour percentage, expressed as health so the
+        // bar tells the truth. A member has no tough and reads as 1.
+        health: Math.round(healthFrom(Number(stats.ferocity) || 0) * (Number(stats.tough) || 1)),
         damage: swingFrom(Number(stats.might) || 0),
         critChance: critChanceFrom(Number(stats.crit_chance) || 0),
         critMult: critMultFrom(Number(stats.crit_power) || 0),
-        // A member carries no armour — theirs is the guard they choose to play. An absent fighter carries a
-        // stated one instead, which is what they have in place of a decision.
-        armour: Math.min(0.6, Number(stats.armour) || 0),
+        // Damage reduction is a class trait and NPCs have no class, so theirs is 0 and their toughness is in
+        // the health above. See arena-npc.js.
+        dr: Math.min(DR_CAP, Number(stats.dr) || 0),
+        accuracy: Number(stats.accuracy) || DEFAULT_ACCURACY,
         might: Number(stats.might) || 0,
     };
 }
 
 // A kit's RATING, used for matchmaking and for the ladder. Damage a round times how many rounds you last, which
 // is the only honest one-number summary of a fight — and it is computable by the player from the two cards.
-export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, armour = 0, health = 200 }) {
+export function arenaRating({ damage = 0, critChance = 0, critMult = 2.5, health = 200 }) {
     const perSwing = damage * (1 + critChance * (critMult - 1));
-    return Math.round(perSwing * (health / Math.max(0.1, 1 - armour)) / 10);
+    return Math.round((perSwing * health) / 10);
 }
 
 // THE RUNG LADDER IS GONE. There used to be a `position` column, seven named bands (Stray, Cub ... Alpha) cut
@@ -266,6 +271,8 @@ async function kitFor(buyerId) {
     const classId = prog?.arena_class || null;
     const taken = prog?.skill_tree || {};
     const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
+    // A member with no class yet still has to fight, so this falls back to the neutral defaults.
+    const base = classBase(classId);
     let abilities = treeAbilities(classId, taken, kit.element);
     // Nobody fights empty-handed. Before a class is picked — or with every point refunded — you still get one
     // honest move, exactly as the gear path used to guarantee.
@@ -295,20 +302,28 @@ async function kitFor(buyerId) {
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
         // land in `perks` and are added on top, so the engine reads one set of numbers and does not care
         // which system paid for them.
-        health: healthFrom((Number(stats.ferocity) || 0) + (perks.ferocity || 0)) + Math.round(perks.health || 0),
+        health: healthFrom((Number(stats.ferocity) || 0) + (perks.ferocity || 0))
+            + Math.round(perks.health || 0) + base.health,
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0)),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
-        // Your armour is what you CHOOSE, not what you accumulated: a guard you play, not a stat you carry.
-        // The Den has no defence stat, so inventing one here would be the same mistake as health was.
-        // Nothing grants `perks.armour` — no gear rolls it, no node gives it — so for a member this is always
-        // 0. It stays because an NPC's kit runs through the same shape.
-        armour: Math.min(0.6, perks.armour || 0),
-        // WHAT YOU ACTUALLY TURN ASIDE, and the reason the above being 0 does not mean you are unprotected:
-        // every member blocks a flat BLOCK before Footwork adds to it. resolveBeat has always applied this;
-        // it was simply never a number anyone could see, while the foe's armour was printed on their card —
-        // which is what makes armour look like a stat only they get to have.
-        block: Math.min(BLOCK_CAP, BLOCK + (perks.block || 0)),
+        // `armour` is gone as a member concept and gone from NPCs too — see arena-npc.js. One name for one
+        // mechanic; see DAMAGE REDUCTION below.
+        //
+        // ── DAMAGE REDUCTION ─────────────────────────────────────────────────────────────────────────────
+        // The share of every incoming blow that never lands. It was a flat 34% everybody shared plus a
+        // Footwork bonus, under two different names depending on which side of the ring you stood — the
+        // member's was called block and never printed, the NPC's was called armour and always was.
+        //
+        // It is a CLASS trait now: the class base is the identity (Warden 34, Runecaller 24, Reaver 16) and
+        // Footwork adds on top from both the tree and the upgrade track, whose ranks carry over untouched.
+        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
+        // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
+        // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
+        // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
+        // swinging is also a body that lands them — and raised by the tree.
+        accuracy: Math.min(ACCURACY_CAP, Math.max(ACCURACY_FLOOR,
+            base.accuracy + accuracyFromFerocity((Number(stats.ferocity) || 0) + (perks.ferocity || 0)) + (perks.accuracy || 0))),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         element: kit.element, abilities,
     };
@@ -843,10 +858,10 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
             // disagree — the card reads the same fields resolveBeat multiplies.
             health: foeKit.health, damage: foeKit.damage,
-            critChance: foeKit.critChance, critMult: foeKit.critMult, armour: foeKit.armour || 0,
-            // A MEMBER defender blocks too. An NPC has no tree, so this is 0 for them and their armour is the
-            // whole of their mitigation — but against a member, armour alone understated what they turn aside.
-            block: foeKit.block || 0,
+            critChance: foeKit.critChance, critMult: foeKit.critMult,
+            // One number for mitigation on both sides of the ring now, and one for landing a blow.
+            dr: foeKit.dr ?? DEFAULT_DR,
+            accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
             // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
             // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
@@ -870,9 +885,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
         // to stop hiding terms, and a town buff nobody can see would be a new one.
         me: { element: me.element, abilities: me.abilities, might: me.might, speed: me.speed,
             health: me.health, damage: me.damage * myDamageMult,
-            critChance: me.critChance, critMult: me.critMult, armour: me.armour || 0,
-            // Carried so the card can print what you turn aside, the way theirs prints their armour.
-            block: me.block || 0,
+            critChance: me.critChance, critMult: me.critMult,
+            dr: me.dr ?? DEFAULT_DR,
+            accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         clash,                                   // your affinity against theirs, decided before a blow lands
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
@@ -1364,16 +1379,19 @@ export async function fightRound(buyerId, opts = {}) {
         // means nothing — 100% win rates at every level of play, in 4,000 simulated bouts a cell.
         // Their guard, minus whatever a Sunder has already stripped off it.
         const sundered = (b.sunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
-        // Their armour: the number on their card, minus whatever a Sunder has stripped and whatever your
-        // Pierce cuts through. No roll — the same swing into the same armour is the same number every time.
+        // Their DAMAGE REDUCTION: one number, printed on their card, minus whatever a Sunder has stripped and
+        // whatever your Pierce cuts through. No roll — the same swing into the same reduction is the same
+        // number every time.
+        //
+        // This was two mechanics called two things: `armour` for an NPC, `block` for a member, neither of them
+        // the other's equal. It is one stat now, and NPCs simply have none of it — their bulk is health, which
+        // a health bar can actually tell you about.
         //
         // A BRACE NO LONGER ADDS TO IT. It used to add a flat 40% on top, which was the defender's ONLY
         // reward for guarding; now that a guard banks a real shield exactly as yours does (see their turn),
         // keeping the reduction as well would have made the same command strictly better in their hands than
         // in yours. Their shield eats the blow further down, which is where yours eats one too.
-        // Their Footwork rides with their armour: the same node that lets YOU turn a blow aside lets them.
-        const guard = Math.max(0, Math.min(0.85,
-            ((Number(b.foe.armour) || 0) + (FP.block || 0)) * pierce * sundered));
+        const guard = Math.max(0, Math.min(DR_CAP, (Number(b.foe.dr) || 0) * pierce * sundered));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -1386,14 +1404,34 @@ export async function fightRound(buyerId, opts = {}) {
         // own damage jump between 14 and 35 with the same gear against the same opponent has no way to learn
         // that it is one hidden roll, and concludes their gear does nothing.
         let turned = 0;
+        // ── ACCURACY, ROLLED PER BLOW ────────────────────────────────────────────────────────────────────
+        // Your class base, plus Ferocity and the tree, minus whatever the skill itself costs you. An all-out
+        // attack is supposed to be a gamble: Rampage throws three blows at half damage each and every one of
+        // them can miss, which is what makes it a decision against Cleave's one committed swing instead of
+        // strictly better than it.
+        //
+        // Rolled INSIDE the loop, not once for the action, or a flurry would be all-or-nothing and the whole
+        // point of "three chances" would be a single coin flip wearing a disguise.
+        //
+        // `hitsLanded` is kept so the log can say "2 of 3" and the screen can pop a number per blow.
+        const acc = Math.max(ACCURACY_FLOOR, Math.min(ACCURACY_CAP,
+            (Number(b.me.accuracy) || DEFAULT_ACCURACY) + (ability?.acc || 0)));
+        const each = [];
+        let hitsLanded = 0;
         for (let i = 0; i < hits && power > 0; i += 1) {
+            if (Math.random() >= acc) { each.push(0); continue; }
+            hitsLanded += 1;
             const c = Math.random() < critChance;
             if (c) crit = true;
             const raw = b.me.damage * gradeAtk * power * surge * clashMult * (b.underdog || 1)
                 * openMult * lowHpMult * fever * (c ? myCritMult : 1);
             turned += Math.round(raw * guard);
-            dmg += Math.max(1, Math.round(raw - raw * guard));
+            const landed = Math.max(1, Math.round(raw - raw * guard));
+            each.push(landed);
+            dmg += landed;
         }
+        // Every blow missed. Not the same event as a blow that was fully absorbed, and it must not read as one.
+        const whiffed = hits > 0 && hitsLanded === 0;
         // Their banked shield eats first, exactly as yours does on the way in — so the points they spent on
         // it are the reason your blow did less, and the recap can say so.
         let theirSoak = 0;
@@ -1467,11 +1505,18 @@ export async function fightRound(buyerId, opts = {}) {
         // `theirThorns` and `theyStood` ride along so the ring can SHOW them. A defender's thorns taking a
         // bite out of you with no number and no line is precisely the invisible-effect bug this file keeps
         // being fixed for — and it is worse coming from the other side, because you cannot see their tree.
-        b.log.push({ beat: b.beat, who: "you", grade: ability ? "skill" : "hit", damage: dmg, crit,
+        b.log.push({ beat: b.beat, who: "you", grade: whiffed ? "miss" : (ability ? "skill" : "hit"), damage: dmg, crit,
+            // `each` is the per-blow breakdown and it is the whole reason a flurry can be FELT. Three blows
+            // used to arrive as one accumulated number, so the difference between Rampage and one big swing
+            // was a sprite. The screen pops one number per entry now, misses included.
+            each, hitsLanded, missed: hits - hitsLanded, acc: Math.round(acc * 100),
             hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
-            text: `${dmg > 0
-                ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"} — ${dmg}${extra ? ` (${extra})` : ""}.`
-                : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`}`
+            text: `${whiffed
+                ? `${ability ? ability.name : "You swing"} — ${hits > 1 ? "all " + hits + " blows miss" : "and miss"}.`
+                : dmg > 0
+                    ? `${crit ? "CRITICAL — " : ""}${ability ? ability.name : "You strike"} — ${dmg}`
+                        + `${hits > 1 ? ` (${hitsLanded} of ${hits} land)` : ""}${extra ? ` (${extra})` : ""}.`
+                    : `${ability ? ability.name : "You strike"}${note.replace(` · ${ability?.name}`, "")}.`}`
                 + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
                 + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
                 + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`
@@ -1608,7 +1653,8 @@ export async function fightRound(buyerId, opts = {}) {
         // Your stance is a BLOCK, cut by their Pierce and by whatever a Sunder of theirs has already stripped
         // off it — the mirror of what your own Sunder does to their armour.
         const mySundered = (b.foeSunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
-        const myBlock = Math.min(BLOCK_CAP, BLOCK + (P.block || 0)) * foePierce * mySundered;
+        // Your damage reduction, the mirror of theirs — class base plus Footwork, already merged in kitFor.
+        const myBlock = Math.min(DR_CAP, Number(b.me.dr) || 0) * foePierce * mySundered;
         // EVERY blow of a flurry rolls its own crit, on their side of the ring too.
         let raw = 0;
         let blocked = 0;
@@ -1771,10 +1817,9 @@ function boutTelemetry(b, won) {
         health: Math.round(f.health || 0),
         critChance: Math.round((f.critChance || 0) * 100),
         critMult: Number((f.critMult || 0).toFixed(2)),
-        // Both names for mitigation, because an NPC carries `armour` and a member carries `block` — printing
-        // one of them is how it took until today to notice a member had any at all.
-        armour: Math.round((f.armour || 0) * 100),
-        block: Math.round((f.block || 0) * 100),
+        // One name for mitigation now, on both sides — see the DAMAGE REDUCTION note in kitFor.
+        dr: Math.round((f.dr || 0) * 100),
+        accuracy: Math.round((f.accuracy ?? 1) * 100),
         gearPower: Math.round(f.gearPower || 0),
         element: f.element || null,
     } : null);

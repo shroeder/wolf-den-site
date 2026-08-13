@@ -395,6 +395,15 @@ export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP *
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
 
+// ── FEROCITY BUYS A LITTLE ACCURACY ──────────────────────────────────────────────────────────────────────────
+// Deliberately small and hard-capped: accuracy is a tiebreaker between builds, not a second damage stat, and a
+// stat that can be stacked to "never miss" turns every skill's accuracy cost into a rounding error. 200
+// Ferocity — a very heavy investment — buys four points of it.
+export const ACCURACY_PER_FEROCITY = 0.0002;
+export const ACCURACY_FROM_FEROCITY_CAP = 0.06;
+export const accuracyFromFerocity = (fero = 0) =>
+    Math.min(ACCURACY_FROM_FEROCITY_CAP, Math.max(0, Number(fero) || 0) * ACCURACY_PER_FEROCITY);
+
 // ── THE UNDERDOG CLAUSE ──────────────────────────────────────────────────────────────────────────────────────
 // Without this a big enough gear gap is a WALL: simulated at the top of the ladder, a player did not win a
 // single bout in 4,000, because health scales with gear about five times faster than might does. A first place
