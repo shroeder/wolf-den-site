@@ -52,6 +52,10 @@ const money = (n) => Number(n || 0).toLocaleString();
 // "try again" — the distinction matters, because a rule and a bug want opposite things from the player.
 const REFUSALS = {
     locked: "The Road is walked in order — beat the rung you are standing on first.",
+    no_fights: "You are out of arena fights for today. They come back at 5am — the Road does not use them.",
+    no_target: "Nobody your size is free right now. Try the Road, or pick someone from the standings.",
+    cooling: "That one needs a moment before it can be used again.",
+    no_event: "That fight is over — the plaza has moved on.",
     already_beaten: "You have already put that one down. A rung only pays once.",
     bout_in_progress: "You are already in a fight. Finish it, then pick the next one.",
 };
@@ -1434,8 +1438,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <i><b>{Math.round((st.me?.critChance || 0) * 100)}%</b> crit &times;{(st.me?.critMult || 2.5).toFixed(1)}</i>
                         <i><b>{Math.round(st.me?.health || 0)}</b> health</i>
                     </span>
+                    {/* Says WHAT the allowance covers, because it no longer covers everything: the Road is
+                        free, and a bare "0 of 12 left today" sitting directly above a Road tab reads as the
+                        whole screen being shut for the night. */}
                     <span className="ar-tonext-label">
-                        {st.fightsLeft} of {st.fightsPerDay} challenges left today
+                        {st.fightsLeft} of {st.fightsPerDay} arena challenges left today
+                        {st.fightsLeft <= 0 ? " — the Road is still open" : ""}
                     </span>
                     {/* Two numbers with no explanation anywhere is how you get asked "what are laurels".
                         One line each, on the screen that shows them. */}
@@ -1455,6 +1463,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 
             {/* ── THREE JOBS, THREE TABS ── who to fight, how you fight, what you have trained. This screen
                 carried all of it in one scroll and it was already long before the tree existed. */}
+            {/* ── A REFUSAL HAS TO LAND SOMEWHERE ──────────────────────────────────────────────────────
+                This banner existed, and it was rendered ONLY inside the in-bout branch — which returns
+                early, so it was unreachable from the three screens that actually ask the server for
+                something. Every deliberate NO on the Road tab therefore set an error message into state and
+                painted it nowhere: you tapped Fight, the server said "no fights left", and the button did
+                nothing at all. The three carefully-worded REFUSALS above had never once been seen.
+                Above the tabs, so it sits with the thing you just pressed rather than at the end of a
+                hundred-rung list. */}
+            {err ? <p className="ar-err">{err}</p> : null}
+
             <div className="ar-tabs" role="tablist">
                 {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
                     <button key={k} type="button" role="tab" aria-selected={tab === k}

@@ -1009,7 +1009,18 @@ export async function startBout(buyerId, targetId = null) {
     // STAMINA was bought and then ignored HERE: getArenaState added the track to the allowance it displays,
     // and this gate compared against the bare constant — so the counter said you had another challenge and
     // the server refused it. One expression, in both places.
-    if (fightsUsed(row) >= dailyFightsFor(row)) return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
+    // ── THE ROAD IS NOT THE ARENA'S ALLOWANCE ────────────────────────────────────────────────────────────
+    // A rung is a hundred fixed fights, each payable ONCE — it has its own hard ceiling built in, and it is
+    // the single-player track people walk through in the evening. Charging it against the same ten-a-day
+    // allowance the ladder uses meant an hour of Road spent the whole arena, and then the Fight button on
+    // the Road card simply stopped working with nothing on screen to say why.
+    //
+    // Read off the RAW target rather than the resolved one, because the resolve is below and matchmaking
+    // ("auto") can only ever return a member or a Gauntlet tier — never a rung.
+    const roadRung = ladderRungOf(targetId);
+    if (roadRung <= 0 && fightsUsed(row) >= dailyFightsFor(row)) {
+        return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
+    }
 
     const board = await standings();
     const me = await kitFor(buyerId);
@@ -1083,11 +1094,17 @@ export async function startBout(buyerId, targetId = null) {
     // fell back to "a heavy swing" for a move that might have been a mythic spell, and the whole read-it-first
     // contract was broken on the one beat you had no information at all.
     if (bout.turn === "them") bout.incoming = pickIncoming(bout);
+    // The counter moves for an arena fight and stands still for a rung — the other half of the rule above.
+    // Both columns are left completely alone on a Road bout: bumping `fights_day` while holding the count
+    // would silently reset somebody's allowance the first time they walked the Road on a new day.
     await db.query(
-        `UPDATE mkt_arena SET bout_json = $2::jsonb, fights_day = ${DAY},
-            fights_today = CASE WHEN fights_day = ${DAY} THEN fights_today + 1 ELSE 1 END, updated_at = NOW()
+        `UPDATE mkt_arena SET bout_json = $2::jsonb,
+            fights_day = CASE WHEN $3 THEN fights_day ELSE ${DAY} END,
+            fights_today = CASE WHEN $3 THEN fights_today
+                                WHEN fights_day = ${DAY} THEN fights_today + 1 ELSE 1 END,
+            updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, JSON.stringify(bout)]
+        [buyerId, JSON.stringify(bout), rung > 0]
     ).catch(() => {});
     await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower: bout.theirPower }).catch(() => {});
     return { ok: true, ...(await getArenaState(buyerId)) };
