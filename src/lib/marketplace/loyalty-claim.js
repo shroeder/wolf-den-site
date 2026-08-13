@@ -129,7 +129,7 @@ export async function redeemLoyaltyClaim(token, buyerId) {
             `UPDATE mkt_loyalty_claim
                 SET redeemed_at = NOW(), redeemed_buyer_id = $2
               WHERE token = $1 AND redeemed_at IS NULL AND expires_at > NOW()
-              RETURNING award_order_id, amount_cents`,
+              RETURNING award_order_id, amount_cents, square_payment_id`,
             [token, buyerId]
         )
         .catch(() => []);
@@ -148,6 +148,57 @@ export async function redeemLoyaltyClaim(token, buyerId) {
     await awardPurchaseXp({ buyerId, amountCents: won[0].amount_cents, orderId: won[0].award_order_id });
     const after = await db.queryOne(`SELECT xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
 
+    // ── THE SCAN IS THE ATTRIBUTION ──────────────────────────────────────────────────────────────────────
+    // A mystery bag sale tried to find its buyer on the Square payment, at the moment the webhook fired —
+    // which is BEFORE the member has done the one thing that actually identifies them, scanning this QR.
+    // Six sales in 186 carried a customer Square could match. Thirty-two have a claim behind them, because
+    // claiming is the deliberate act and the terminal record is an accident of how the cashier rang it up.
+    //
+    // So the claim credits the bag. Same payment id on both sides, and it is the same member either way —
+    // this simply asks the question at the point in time where the answer exists.
+    await creditMysteryBagsForPayment(won[0].square_payment_id, buyerId).catch(() => {});
+
     const points = Math.max(0, (after?.xp || 0) - (before?.xp || 0));
     return { ok: true, points, level: levelForXp(after?.xp || 0) };
+}
+
+/**
+ * Credit any mystery bags sold on this payment to the member who just claimed it.
+ *
+ * Counted from mystery_sold_events rather than incremented blindly, and written as a FLOOR, so a re-scan, a
+ * webhook retry or the backfill running again cannot inflate anybody. Never throws: a badge is not worth
+ * failing a member's XP claim over.
+ */
+async function creditMysteryBagsForPayment(squarePaymentId, buyerId) {
+    if (!squarePaymentId || !buyerId) return;
+    const rows = await db.query(
+        `SELECT e.id, c.market_value
+           FROM mystery_sold_events e
+           LEFT JOIN mystery_sold_assignments a ON a.sold_event_id = e.id
+           LEFT JOIN mystery_bag_cards c ON c.id = a.mystery_card_id
+          WHERE e.square_payment_id = $1`,
+        [squarePaymentId]
+    ).catch(() => []);
+    if (!rows.length) return;
+
+    // Everything this member has ever been credited for, so the floor is over their whole history rather
+    // than this payment alone — otherwise a second claim would write a 1 over an existing 4.
+    const total = await db.queryOne(
+        `SELECT COUNT(*)::int AS n
+           FROM mystery_sold_events e
+           JOIN mkt_loyalty_claim c ON c.square_payment_id = e.square_payment_id
+          WHERE c.redeemed_buyer_id = $1`,
+        [buyerId]
+    ).catch(() => null);
+
+    await db.query(
+        `UPDATE mkt_buyer SET mystery_bags_bought = GREATEST(COALESCE(mystery_bags_bought, 0), $2) WHERE id = $1`,
+        [buyerId, Math.max(rows.length, Number(total?.n) || 0)]
+    ).catch(() => {});
+
+    if (rows.some((r) => Number(r.market_value) >= 100)) {
+        await db.query(`UPDATE mkt_buyer SET mystery_big_hit = TRUE WHERE id = $1`, [buyerId]).catch(() => {});
+    }
+    const { syncEarnedBadges } = await import("@/lib/marketplace/badges.js");
+    await syncEarnedBadges(buyerId).catch(() => {});
 }
