@@ -1,4 +1,5 @@
 import MarketplaceProfileClient from "@/components/MarketplaceProfileClient";
+import ViewPing from "@/components/ViewPing";
 import CreationTokensClient from "@/components/CreationTokensClient";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -32,6 +33,7 @@ export default async function CreationTokensPage() {
 
     return (
         <div className="stack reveal">
+            <ViewPing event="view_creations" />
             <CreationTokensClient
                 paymentsEnabled={paymentsEnabled}
                 squareApplicationId={process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID || ""}

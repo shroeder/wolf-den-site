@@ -5,6 +5,7 @@ import { hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { db } from "@/lib/db";
 import SetsClient from "@/components/SetsClient";
+import ViewPing from "@/components/ViewPing";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Gear Sets · The Wolf Den" };
@@ -36,6 +37,7 @@ export default async function SetsPage() {
 
     return (
         <div className="stack reveal">
+            <ViewPing event="view_sets" />
             <SetsClient sets={sets} exhibit={exhibit} canLoan={canLoan} />
         </div>
     );

@@ -102,6 +102,20 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 450, chest: "iron" },
     },
     {
+        // THE TWO SCREENS THAT FILL THEMSELVES. Nothing here is an action — the compendium is written by
+        // grantItem on every acquisition you already made, and collection pieces bank the moment they land.
+        // Which is exactly why it needs a chapter: a member can be carrying a stat bonus for weeks without
+        // knowing the screen that shows it exists, and the owned-vs-worn rule below is the single least
+        // guessable thing in the game.
+        id: "shelf", name: "The Shelf", minLevel: 6, tint: "#a8c4ff", icon: "/images/guide/ch-shelf.webp",
+        blurb: "The things you own quietly pay you for owning them.",
+        steps: [
+            { key: "shelf_compendium", label: "Open the compendium", why: "Every item you have ever held is recorded here permanently — including the ones you sold, salvaged or traded away. Cross ten and it starts paying real stats into every fight you take, and it keeps paying at twenty-five, fifty and a hundred.", href: "/marketplace/compendium", cta: "See the compendium", gold: 200, events: ["view_compendium"] },
+            { key: "shelf_sets", label: "Find a set you're close to", why: "Gear sets pay when you WEAR the pieces together. Collections are the opposite — trophies pay for being owned and you never equip them at all, so a collection you finished two months ago is still working right now.", href: "/marketplace/sets", cta: "Check my sets", gold: 250, events: ["view_sets"] },
+        ],
+        reward: { gold: 450, chest: "iron" },
+    },
+    {
         id: "forge", name: "The Forge", minLevel: 8, tint: "#ff9a3c", icon: "/images/guide/ch-forge.webp",
         blurb: "Where spare gear becomes better gear.",
         steps: [
@@ -115,6 +129,12 @@ export const GUIDE_CHAPTERS = [
         blurb: "The farm is also a place you decorate.",
         steps: [
             { key: "deco_place", label: "Place a decoration", why: "A hundred of them, and the good ones carry real buffs. Where you put things is up to you — people come and look.", href: "/marketplace/farm", cta: "Decorate", gold: 200, events: ["place_deco", "arrange_deco"] },
+            // CREATIONS GETS A STEP, NOT A CHAPTER, and the step is LOOKING rather than buying. The bench sells
+            // tokens for real money and does nothing else, so a Creations chapter would be a chapter that
+            // cannot be finished without paying — the exact paywall the store chapter below refuses, except
+            // worse, because an unfinishable chapter sits on the guide forever. Here it lands in front of
+            // somebody who is already decorating, which is the only moment the price means anything.
+            { key: "deco_creation", label: "See what a Creation is", why: "Custom art, drawn to your description, yours permanently and nobody else's. It costs real money and you never have to buy one — but it is worth knowing what the option is before you decide you don't want it.", href: "/marketplace/creations", cta: "Have a look", gold: 200, events: ["view_creations"] },
         ],
         reward: { gold: 350, chest: "iron" },
     },
@@ -143,6 +163,18 @@ export const GUIDE_CHAPTERS = [
             { key: "arena_class", label: "Pick a class", why: "Reaver, Warden or Runecaller. It is the one choice here you cannot drift into — each starts with different health, damage reduction and accuracy, and the tree you spend points in follows from it. Changing your mind later costs gold, not progress.", href: "/marketplace/arena", cta: "Choose", gold: 250, events: ["arena_class"] },
             { key: "arena_win", label: "Win a bout", why: "The ring reads the same four stat sources the boss does — your gear, your compendium, your companion and your badges all swing. Nothing here is a separate grind; it is the scoreboard for everything else you own.", href: "/marketplace/arena", cta: "Find a fight", gold: 350, events: ["arena_win"] },
             { key: "arena_ladder", label: "Take a rung of the Long Road", why: "A hundred named fighters, each beatable exactly once, walked in order. They do not spend your daily arena challenges, so the Road is always open — and from the thirteenth rung they start bringing moves no member can learn.", href: "/marketplace/arena", cta: "Walk the Road", gold: 400, events: ["arena_ladder"] },
+        ],
+        reward: { gold: 700, chest: "gold" },
+    },
+    {
+        // TWO STEPS, NOT THREE. Fusing is the third thing the bench does and it is deliberately not a step:
+        // it takes three gems of one kind, and gems drop only from the mine and the arena — nine members in
+        // the whole Den hold any at all. A step most people cannot finish stops a chapter dead.
+        id: "jeweller", name: "The Jeweller", minLevel: 12, tint: "#4fd18b", icon: "/images/guide/ch-jeweller.webp",
+        blurb: "A reason to keep the piece you already like.",
+        steps: [
+            { key: "jewel_socket", label: "Cut a socket", why: "One socket per item, permanent, and priced off the item's rarity — 1,500 gold into a common is a cheap experiment, 20,000 into a mythic is a commitment. Cut it into something you actually intend to keep wearing.", href: "/marketplace/jeweller", cta: "Open the bench", gold: 250, events: ["socket_cut"] },
+            { key: "jewel_set", label: "Set a gem in it", why: "Five kinds, one per combat stat, five tiers each. The gem is separate from the item, so a lucky drop is useful the moment it lands instead of only if it happens to beat what you are already wearing.", href: "/marketplace/jeweller", cta: "Set a stone", gold: 350, events: ["gem_set"] },
         ],
         reward: { gold: 700, chest: "gold" },
     },

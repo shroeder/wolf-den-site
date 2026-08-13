@@ -12,6 +12,12 @@ export const CLIENT_EVENTS = new Set([
     // hits from one member alone — which made the Pathfinder's last step uncompletable for everybody.
     "view_boss", "view_leaderboard", "browse_shop", "view_shop", "view_vendor", "view_inventory",
     "share_location", "view_bounties",
+    // THE THREE PASSIVE SCREENS. Sets, the compendium and the creations bench have no member action to log —
+    // sets and the compendium fill themselves from acquisitions you made elsewhere, and the bench only takes
+    // money. Looking IS the action there, and without these three the Pathfinder could never teach them: rule
+    // 3 of the guide is "verified, never claimed", so a step with no event behind it is a step that can only
+    // sit unfinished forever.
+    "view_sets", "view_compendium", "view_creations",
 ]);
 
 // Pull the eight scalar context columns + a JSONB blob for the rest out of a device/geo context object.

@@ -39,6 +39,10 @@ const ART = {
     // The ring, not a weapon: every other combat chapter is already an axe or a pick, and the Arena is the
     // one place the fight is against a PERSON. A raised gauntlet over a laurel reads as a duel won.
     "ch-arena": E("a raised armoured gauntlet clenched in victory over a crossed gladius and a bronze laurel wreath"),
+    "ch-jeweller": E("a faceted emerald-green gemstone seated in a gold socket, with a jeweller's loupe and a pair of fine tongs crossed behind it"),
+    // A SHELF, not a trophy: the chapter is about the things you already own sitting there working for
+    // you, which a single cup would read as a prize you have to go and win.
+    "ch-shelf": E("a small wooden display shelf holding a row of medals, a ribboned badge and a glass dome over a tiny relic"),
     "ch-trade": E("two open hands exchanging a gold coin above a small balance scale"),
     "ch-store": E("a paper shopping bag with a trading card and a gold coin peeking out of the top"),
 };
