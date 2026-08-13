@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
@@ -471,7 +470,6 @@ async function payHaul(buyerId, haul = [], powers = null) {
         } else if (item.kind === "gold") {
             const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, item.n]).catch(() => null);
             await logCoin(buyerId, item.n, "mining", { balanceAfter: g?.gold, meta: { kind: "descent" } }).catch(() => {});
-            await rollWindfall(buyerId, "mining").catch(() => {});
             paid.push(item);
         } else if (item.kind === "chest") {
             await addChests(buyerId, { [item.tier]: 1 }, { source: "mining" }).catch(() => {});
@@ -1197,7 +1195,6 @@ async function claimNode(buyerId, node, row, run = {}) {
     const gold = Math.round(o.gold * (1 + pct) * (1 + haulBonus));
     const goldRow = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "mining", { balanceAfter: goldRow?.gold, meta: { kind: "seam", tier: node.tier } }).catch(() => {});
-    await rollWindfall(buyerId, "mining").catch(() => {});
 
     // THE BONUS. One roll, one thing. Your rank is most of it; clean swings nudge it (the same tickets as
     // before, worth a little luck each instead of being a currency you spend on pulls).

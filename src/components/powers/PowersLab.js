@@ -10,7 +10,6 @@ import AvatarBuilder from "@/components/AvatarBuilder";
 import JewellerClient from "@/components/JewellerClient";
 import EquipmentClient from "@/components/EquipmentClient";
 import CompendiumClient from "@/components/CompendiumClient";
-import WindfallPop from "@/components/WindfallPop";
 import RecipeShelf from "@/components/RecipeShelf";
 import RecipeFoundWatcher from "@/components/RecipeFoundWatcher";
 import { TOWN_CSS } from "@/components/TownClient";
@@ -175,8 +174,6 @@ const SCENES = {
     sets: { label: "The Loaned Exhibit", note: "Open a piece you do NOT own — the borrow button is in the modal." },
     "lock-off": { label: "Hero lock — unlocked", note: "Sits beside the paid redraw; the two decide the same thing." },
     "lock-on": { label: "Hero lock — locked", note: "Locked state must be certain at a glance, and it disables the redraw." },
-    "wf-ascendant": { label: "Windfall — Ascendant", note: "The quietest of the four. Beam, chest, words." },
-    "wf-primordial": { label: "Windfall — Primordial", note: "Twice a year, community-wide. It should take the screen." },
     stockade: { label: "Warden's Key (markup fixture)", note: "A third button in a row built for two.", fixture: true },
     dock: { label: "Call for the merchant (markup fixture)", note: "A second CTA in a dock built for one.", fixture: true },
 };
@@ -319,14 +316,6 @@ export default function PowersLab() {
             {scene === "compendium" ? <CompendiumClient key={scene} /> : null}
             {/* Keyed so switching between the two tiers replays the whole three-stage sequence rather than
                 swapping a colour on an animation that has already finished. */}
-            {scene.startsWith("wf-") ? (
-                // ?art=<url> paints the REAL chest sprite. The chest art lives in Blob and is keyed off a DB
-                // setting, so the lab has nothing to load it from — and shipping the fallback glyph as the
-                // thing I had "verified" is exactly how the rarest screen in the game got signed off showing
-                // a generic outline. Pass the tier's live URL and what you look at is what a member sees.
-                <WindfallPop key={scene} windfall={{ tier: scene.slice(3), reason: scene === "wf-primordial" ? "boss_raid" : "fishing" }}
-                    image={art || null} onClose={() => {}} />
-            ) : null}
             {scene === "jw-one" ? <JewellerClient key={scene} initial={JW([GEM("topaz_t1", "Chipped Topaz", "#ffb648", { crit_chance: 2 }, 2, "/images/gems/topaz_t1.png")])} /> : null}
             {scene === "jw-many" ? <JewellerClient key={scene} initial={JW([
                 GEM("ruby_t1", "Chipped Ruby", "#ff5d6c", { might: 2 }, 3, "/images/gems/ruby_t1.png"),

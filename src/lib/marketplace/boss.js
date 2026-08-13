@@ -32,7 +32,6 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { getPetCombatBonus, getPackPetBonuses, manualStatMultiplier, procMultiplier } from "@/lib/marketplace/pet-combat.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 
 // The shared, persistent weekly boss. HP lives in the DB and is shared across everyone.
 // Combat: ONE big manual "ability" swing per member per day (level-scaled, splashy) + passive AUTO-attacks
@@ -1281,7 +1280,6 @@ export async function attackBoss(buyerId) {
     // Striking the boss is the single biggest thing anybody does in a day, so it carries the heaviest
     // ticket in the table. Outside the gold guard on purpose: a strike is a strike whether or not this
     // particular hit happened to pay coin.
-    await rollWindfall(buyerId, "boss_raid").catch(() => {});
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});

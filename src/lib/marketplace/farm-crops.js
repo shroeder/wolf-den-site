@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -431,7 +430,6 @@ export async function harvestPlot(buyerId, slot) {
     }
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
     await logCoin(buyerId, gold, "harvest", { balanceAfter: paid?.gold, meta: { seedId: claimed.seed_id } }).catch(() => {});
-    await rollWindfall(buyerId, "harvest").catch(() => {});
     // YOU ALSO KEEP THE CROP. The gold above still reads as selling the surplus and the farm economy is
     // balanced on it — but the produce itself now goes to the pantry, where the Kitchen can cook with it. A
     // doubled harvest doubles the produce too, since it doubled everything else.

@@ -2,7 +2,6 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { addChests, CHEST_TIERS } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { grantSeed, SEEDS } from "@/lib/marketplace/farm-crops.js";
@@ -63,7 +62,6 @@ async function grantEncounterReward(buyerId, key, xp, gold, loot) {
     const g = Math.max(0, Number(gold) || 0);
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
     await logCoin(buyerId, g, "farm_encounter", { balanceAfter: paid?.gold, meta: { creature: key } }).catch(() => {});
-    await rollWindfall(buyerId, "farm_encounter").catch(() => {});
     if ((Number(xp) || 0) > 0) await awardXp(buyerId, "farm_encounter", { points: Math.max(0, Number(xp) || 0), gold: 0 }).catch(() => {});
     if (loot?.type === "seed" && loot.seed) await grantSeed(buyerId, loot.seed).catch(() => {});
     else if (loot?.type === "chest" && loot.chestTier) await addChests(buyerId, { [loot.chestTier]: 1 }, { source: "farm_encounter" }).catch(() => {});

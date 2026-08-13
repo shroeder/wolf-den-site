@@ -13,7 +13,6 @@ import DungeonLaunch from "@/components/DungeonLaunch";
 import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import BadgePop from "@/components/BadgePop";
-import WindfallPop from "@/components/WindfallPop";
 import ForgeAnnounce from "@/components/ForgeAnnounce";
 import { useItemSprite } from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
@@ -253,7 +252,6 @@ export default function GameNav() {
     const [forgeReady, setForgeReady] = useState(0); // chests the shards in your hold can already forge
     // ── THE WINDFALL ── one of the four rarest chests, dropped out of ordinary play. Rides on the chest poll
     // below, so a member finds out on their very next screen without a second request existing anywhere.
-    const [windfall, setWindfall] = useState(null);
     const [featureClaims, setFeatureClaims] = useState({}); // claimable per-feature daily quests {farm,sailing,forge}
     useEffect(() => {
         if (!inGame) return undefined;
@@ -266,7 +264,6 @@ export default function GameNav() {
                 // drop it on the floor — there is no second chance to show a thing that happens once a year.
                 // The art rides on the payload from the chest-art map itself, not from the owned-chest list —
                 // opening it before the card fires must not cost the card its picture.
-                if (d?.windfall?.tier) setWindfall(d.windfall);
             }).catch(() => {});
             fetch("/api/marketplace/spin", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSignedIn(Boolean(d?.signedIn)); if (d?.signedIn) setSpins((d.freeAvailable ? 1 : 0) + (d.tokens || 0)); }).catch(() => {});
             fetch("/api/marketplace/boss/strikes", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setBossStrikes(d?.attacksLeft || 0); }).catch(() => {});
@@ -440,7 +437,6 @@ export default function GameNav() {
             {/* ── THE SKY OPENED ── one of the four rarest chests, dropped out of ordinary play. Most members
                 will see this screen once; some never will. It is mounted here for the same reason the badge
                 card is: it lands while you are busy doing something else entirely. */}
-            {windfall ? <WindfallPop windfall={windfall} image={windfall.image} onClose={() => setWindfall(null)} /> : null}
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
             {signedIn ? <DungeonLaunch /> : null}

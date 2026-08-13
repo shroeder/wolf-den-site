@@ -38,7 +38,6 @@ import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { maybeGrantSeaFightPet } from "@/lib/marketplace/pet-drops.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
 // via a dynamic import for grantFragment, so this static import can't cycle.
@@ -2024,7 +2023,6 @@ async function finishRaidBattle(buyerId, meta, res) {
         spoils.push(...paid);
 
         const wonRow = await db.queryOne(`UPDATE mkt_sailing SET raids_won = COALESCE(raids_won, 0) + 1 WHERE buyer_id = $1 RETURNING raids_won`, [buyerId]).catch(() => null);
-        await rollWindfall(buyerId, "raid_complete").catch(() => {});
         const wins = wonRow?.raids_won || 0;
         if (wins >= BADGE_RAID_MARAUDER) await grantEventBadge(buyerId, "raid_marauder").catch(() => {});
         if (wins >= BADGE_RAID_SCOURGE) await grantEventBadge(buyerId, "raid_scourge").catch(() => {});
@@ -2049,7 +2047,6 @@ async function finishRaidBattle(buyerId, meta, res) {
         // The defender gets a roll too. It is the only reward in the game you never chose to take —
         // somebody else's raid happening to you — and leaving it out would have made the one system where
         // you can be on the receiving end the one system that never pays a windfall.
-        await rollWindfall(meta.targetId, "raid_defense").catch(() => {});
         const defRow = await db.queryOne(
             `INSERT INTO mkt_sailing (buyer_id, raids_defended) VALUES ($1, 1)
              ON CONFLICT (buyer_id) DO UPDATE SET raids_defended = COALESCE(mkt_sailing.raids_defended, 0) + 1 RETURNING raids_defended`,
@@ -2279,7 +2276,6 @@ async function payFleetReward(buyerId, reward) {
     if (reward.gold) {
         const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, reward.gold]).catch(() => null);
         await logCoin(buyerId, reward.gold, "ship_battle", { balanceAfter: paid?.gold }).catch(() => {});
-        await rollWindfall(buyerId, "ship_battle").catch(() => {});
         out.push({ kind: "gold", n: reward.gold });
     }
     // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the gold is paid above.
@@ -3281,7 +3277,6 @@ export async function merchantMinigame(buyerId, collected, perfectFlag) {
     if (!won) return { ok: false, error: "already_played", ...(await getSailingState(buyerId)) };
     await db.query(`UPDATE mkt_buyer SET gold = gold + $2, updated_at = NOW() WHERE id = $1`, [buyerId, gold]).catch(() => {});
     await logCoin(buyerId, gold, "merchant_minigame", { meta: { perfect } }).catch(() => {});
-    await rollWindfall(buyerId, "merchant_minigame").catch(() => {});
     if (perfect) await grantEventBadge(buyerId, "merchant_perfect").catch(() => {}); // "Coin Virtuoso"
     await trackActivity(buyerId, "sail_merchant", { gold, perfect }).catch(() => {});
     return { ok: true, goldWon: gold, perfect, ...(await getSailingState(buyerId)) };
@@ -3612,7 +3607,6 @@ async function finishDig(buyerId, board) {
     // ── AND THE FOUR RAREST CHESTS ── on the DIG, for the same reason the stone is: a dig is the part you
     // actually play. Sailing was one of the systems named by name, and it pays in loot rather than in coin,
     // so there is no ledger line for the sweep to have sat beside — it had to be placed here by hand.
-    await rollWindfall(buyerId, "sailing").catch(() => {});
     const row = await readRow(buyerId);
     const level = decorate(row).level;
     const quality = row?.voyage_quality || "standard";

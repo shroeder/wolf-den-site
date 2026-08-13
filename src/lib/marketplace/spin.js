@@ -15,7 +15,6 @@ import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { activeXpMultiplier } from "@/lib/marketplace/happy-hour-core.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { partName, partSprite } from "@/lib/marketplace/forge-parts.js";
@@ -301,7 +300,6 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const won = await winJackpotPot(buyerId);
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, won]).catch(() => {});
         await logCoin(buyerId, won, "spin_prize", { meta: { prize: "MAJOR JACKPOT" } }).catch(() => {});
-        await rollWindfall(buyerId, "spin_prize").catch(() => {});
         await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
         return { sprite, text: `MAJOR JACKPOT — ${won.toLocaleString()} gold!`, amount: won };
     }
@@ -309,7 +307,6 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const amt = Math.round(prize.amount * hh * goldMult);
         await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, amt]).catch(() => {});
         await logCoin(buyerId, amt, "spin_prize", { meta: { prize: prize.label } }).catch(() => {});
-        await rollWindfall(buyerId, "spin_prize").catch(() => {});
         if (prize.mini) await db.query(`INSERT INTO mkt_user_badge (buyer_id, badge_slug) VALUES ($1, 'jackpot') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
         return { sprite, text: `${amt.toLocaleString()} gold${prize.mini ? " — MINI JACKPOT!" : ""}` };
     }

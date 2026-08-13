@@ -17,7 +17,6 @@ import { addParts } from "@/lib/marketplace/crafting.js";
 import { grantSeed } from "@/lib/marketplace/farm-crops.js";
 import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
 
@@ -1112,7 +1111,6 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 const bonusN = serve(rint(rw.min, rw.max));
                 const p2 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, bonusN]).catch(() => null);
                 await logCoin(buyerId, bonusN, "cooking", { balanceAfter: p2?.gold, meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {});
-                await rollWindfall(buyerId, "cooking").catch(() => {});
                 goldPaid += bonusN;
                 break;
             }
@@ -1134,7 +1132,6 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                     const g = 240 + tierN * 60;
                     const p3 = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, g]).catch(() => null);
                     await logCoin(buyerId, g, "cooking", { balanceAfter: p3?.gold, meta: { recipe: forRecipe.id, fallback: true } }).catch(() => {});
-                    await rollWindfall(buyerId, "cooking").catch(() => {});
                     goldPaid += g;
                 }
                 break;

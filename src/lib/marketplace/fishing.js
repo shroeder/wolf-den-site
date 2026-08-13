@@ -3,7 +3,6 @@ import "server-only";
 import { db } from "@/lib/db";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
-import { rollWindfall } from "@/lib/marketplace/windfall.js";
 import { addChests } from "@/lib/marketplace/chests.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -877,7 +876,6 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
     await awardXp(buyerId, "sail_fish", { points: xp, gold }).catch(() => {});
     await logCoin(buyerId, gold, "fishing", { meta: { species: species.id, cm, quality: q } }).catch(() => {});
-    await rollWindfall(buyerId, "fishing").catch(() => {});
 
     // ── THE HAUL ─────────────────────────────────────────────────────────────────────────────────────────────
     const extras = [];
@@ -916,7 +914,6 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
         await addToPantry(buyerId, "fish", sp.id, 1).catch(() => {});
         await awardXp(buyerId, "sail_fish", { points: Math.max(1, Math.round(sp.xp * 0.7)), gold: bonusGold }).catch(() => {});
         await logCoin(buyerId, bonusGold, "fishing", { meta: { species: sp.id, bonus: true } }).catch(() => {});
-        await rollWindfall(buyerId, "fishing").catch(() => {});
         extras.push({ kind: "fish", label: `${sp.name} — ${size}cm`, gold: bonusGold });
     }
     if (bonusFish.length) await checkFishingBadges(buyerId).catch(() => {});
