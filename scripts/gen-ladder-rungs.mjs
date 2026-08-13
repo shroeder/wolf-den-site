@@ -44,7 +44,7 @@ const RUNGS = {
     7: "A lithe acrobat balanced on the balls of his feet, rope coiled round one forearm, ready to tumble.",
     8: "A burly fishmonger woman in a rubber apron, filleting knife in one hand, a huge fish held like a club in the other.",
     9: "A stocky boxer woman with taped fists in a tight classic guard, braided hair, chin tucked.",
-    10: "A hulking yard king in a scavenged leather harness, a barrel stave studded with nails hoisted overhead, roaring.",
+    10: "A hulking yard king in a scavenged leather harness, roaring, a nail-studded barrel stave gripped low across his body at waist height. His arms stay DOWN and the weapon stays BELOW his shoulders — nothing raised above his head.",   // pose authored to FIT: hoisted overhead, the stave left the frame on every roll
     // ── 11–20 THE WATCH ── municipal, disciplined, blue and steel.
     11: "A very young city watch recruit in an oversized blue tabard and a helmet slightly too big, gripping a spear too tightly.",
     12: "A watchman lamplighter in a blue cloak, a shuttered brass lantern raised in one hand, a baton in the other.",

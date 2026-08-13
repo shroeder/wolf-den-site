@@ -612,13 +612,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // flight, and the finished bout stays in the row for the next visit to open on.
     const leaveBout = useCallback(async () => {
         const toTown = Boolean(bout?.town || bout?.recap?.town);
+        // ── LEAVE A FIGHT WHERE YOU STARTED IT ───────────────────────────────────────────────────────────
+        // A raid already hands you back to the plaza; a rung dropped you on the Fight tab, which is not
+        // where you were. Walking the Road is a sequence — beat one, look at the next — and the tab you
+        // wanted is always the one you came from, so finishing a rung meant a tap back to The Road every
+        // single time. Read off the foe rather than a flag we would have to remember to set.
+        const toRoad = Boolean(bout?.foe?.ladder);
         await act("dismiss");
+        if (toRoad) setTab("road");
         if (!toTown) return;
         // Hosted by the plaza: hand it back rather than going anywhere. Only a raid bout that somehow ends up
         // on the Arena page — one opened before this shipped, and found in progress — still has to walk.
         if (onLeave) onLeave();
         else window.location.href = "/marketplace/town";
-    }, [act, bout, onLeave]);
+    }, [act, bout, onLeave, setTab]);
 
     // Nothing underneath a full-screen fight should move when you swipe — but ONLY while that fight is on
     // screen. The condition has to match the one that renders it (`bout && !stepped`, further down) or you get
@@ -850,7 +857,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // Who it HAPPENED TO. A ward, a surge and a drink are things you do to yourself; a blow and the burn
         // it left behind land on the other one.
         const onSelf = ["ward", "heal", "surge", "guard"].includes(kind);
-        const target = onSelf ? "you" : (mineNow || l.grade === "burn") ? "them" : "you";
+        // ── AND IT HAPPENS TO WHOEVER DID IT ─────────────────────────────────────────────────────────────
+        // `onSelf` pinned the effect to "you" — YOUR side of the sand — whoever had acted. So the opponent
+        // drinking a potion put the green bloom over your hero, and so did their ward, their surge and their
+        // guard. The self-actions are exactly the ones where the actor IS the target, which is the one case
+        // the old expression got backwards.
+        //
+        // The burn clause was wrong the same way. A burn logs `who` as the fighter who APPLIED it, so
+        // `|| l.grade === "burn"` forced every tick onto the foe — including the burn ticking on YOU, whose
+        // flames played over the enemy who lit them. With `who` meaning the actor in both cases, burns need
+        // no special case at all: they land on the other one, like any other blow.
+        const target = onSelf ? (mineNow ? "you" : "them") : (mineNow ? "them" : "you");
         // Scale the spectacle by how much of the target's bar it actually took, so a graze and a
         // fight-ender are not the same picture.
         const pool = target === "you" ? bout.maxHp : bout.foeMaxHp;
@@ -924,7 +941,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         if (l.healed > 0) pops.push({ side: ownSide, n: l.healed, kind: "heal" });
         // Lifesteal off thorns and ripostes lands on THEIR log line (it happens during their swing), so it
         // floats over whoever drank it rather than over the fighter whose line it is written on.
-        if (l.stolen > 0) pops.push({ side: l.who === "you" ? "left" : "right", n: l.stolen, kind: "heal", at: 240 });
+        // ALWAYS YOURS. `stolen` is only ever written on the opponent's swing line (it is your lifesteal off
+        // thorns and ripostes, which happen during their beat), so keying it to whose line it is put your own
+        // drink over THEIR head every single time — the exact mistake the comment above it warns against.
+        if (l.stolen > 0) pops.push({ side: "left", n: l.stolen, kind: "heal", at: 240 });
         if (l.soaked > 0) pops.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
         // A BRACE IS A SHIELD NOW, on both sides of the ring, so it floats the same green number your own
         // Guard does — `soaked`, handled one line up. `bracedPct` is gone with the flat reduction it named.
