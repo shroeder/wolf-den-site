@@ -38,6 +38,36 @@ export async function getCrownConfig() {
 // own bag — unlimited; feeding a friend's pet grants the feeder a small generosity bonus. (mkt_pet_level.buyer_id
 // is TEXT → ::text.)
 const DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, matches the rest of the game
+
+// ── WHEN THE PIG COMES ROUND ─────────────────────────────────────────────────────────────────────────────────
+// The pig used to be available from midnight, which in practice meant it charged through on the FIRST time you
+// opened your farm that day, every day, for everybody. Once you have seen that twice it is not a rampaging
+// animal any more, it is a login bonus with hooves — the surprise was spent on the most predictable moment in
+// the day.
+//
+// So each member gets their own arrival TIME, different every day and unknowable in advance: visit before it
+// and the field is empty, visit after and he may be waiting. The point is that "is he there today?" stops
+// having an answer you can be sure of before you look.
+//
+// Derived from a hash of (member, date) rather than stored, so there is no column, no cron, no row to go
+// stale — and it is stable within the day, so two page loads a minute apart cannot roll different answers and
+// make him flicker in and out.
+const PIG_FROM = 6;    // earliest arrival, store-local hour
+const PIG_UNTIL = 18;  // and the latest, so an evening visit always catches a pig you have not claimed
+function pigHourFor(buyerId, ymd) {
+    let h = 2166136261;
+    for (const ch of `${buyerId}:${ymd}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    // ── AND THEN MIX IT PROPERLY ─────────────────────────────────────────────────────────────────────────
+    // FNV alone is not enough here. Consecutive dates differ by one character, and the raw hash walks in
+    // step with them: the first cut gave one member 10:01, 13:00, 15:59, 06:58 — exactly three hours later
+    // every day, which is a schedule anybody would spot inside a week and the opposite of the point. This is
+    // the standard 32-bit avalanche finaliser; after it, one character of input changes half the output bits.
+    h ^= h >>> 16; h = Math.imul(h, 2246822507);
+    h ^= h >>> 13; h = Math.imul(h, 3266489909);
+    h ^= h >>> 16;
+    // >>> 0 first: Math.imul returns a SIGNED int, and a negative modulo would put the pig before dawn.
+    return PIG_FROM + ((h >>> 0) % ((PIG_UNTIL - PIG_FROM) * 60)) / 60;
+}
 export const PET_PET_XP = 30; // pet XP the fed pet gains per petting
 const PET_PET_GOLD = 12; // gold YOU earn per petting (petting is rewarding, not just chores)
 const PET_PET_PLAYER_XP = 5; // player XP you earn per petting
@@ -249,7 +279,16 @@ function flatBudget(b, own) {
 async function farmMineBits(buyerId, mine = true) {
     const [cons, wallet, rawBudget] = await Promise.all([
         listConsumables(buyerId).catch(() => ({ stash: [], shop: [] })),
-        db.queryOne(`SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc, (pig_day IS DISTINCT FROM ${DAY}) AS pig_available FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        // `pig_hour` is the store-local time NOW, so the arrival check below can be made in JS against the
+        // member's own hash-derived hour without a second round trip or a clock that disagrees with the DAY.
+        db.queryOne(
+            `SELECT COALESCE(gold, 0) AS gold, COALESCE(store_credit_cents, 0) AS cc,
+                    (pig_day IS DISTINCT FROM ${DAY}) AS pig_unclaimed,
+                    ${DAY}::text AS today,
+                    EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'America/Chicago'))
+                      + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE 'America/Chicago')) / 60.0 AS local_hour
+               FROM mkt_buyer WHERE id = $1`, [buyerId]
+        ).catch(() => null),
         pettingBudget(buyerId),
     ]);
     // Show the budget for the pets you're actually looking at: your own pool on your farm, the others pool on a friend's.
@@ -262,12 +301,30 @@ async function farmMineBits(buyerId, mine = true) {
     const treatShop = (cons.shop || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), price: o.effectivePrice ?? o.price, canAfford: o.canAfford }));
-    return { treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting, pigAvailable: Boolean(wallet?.pig_available) };
+    // He is only about once he has ARRIVED — see pigHourFor. Unclaimed is necessary and no longer sufficient.
+    const arrived = wallet
+        ? Number(wallet.local_hour) >= pigHourFor(buyerId, wallet.today)
+        : false;
+    return {
+        treats, treatShop, wallet: { gold: wallet?.gold || 0, storeCreditCents: wallet?.cc || 0 }, petting,
+        pigAvailable: Boolean(wallet?.pig_unclaimed) && arrived,
+    };
 }
 
 // The Wild Loot Pig payout — once per store-local day, guarded atomically. Rolls gold + a rare item drop.
 export async function claimPig(buyerId) {
     if (!buyerId) return { ok: false, error: "bad_request" };
+    // ── HE HAS TO HAVE TURNED UP ─────────────────────────────────────────────────────────────────────────
+    // The arrival time is enforced HERE as well as in the view. Gating it only where the pig is drawn would
+    // make the whole schedule a client-side suggestion: a crafted POST at 00:01 would collect every day.
+    const clock = await db.queryOne(
+        `SELECT ${DAY}::text AS today,
+                EXTRACT(HOUR FROM (NOW() AT TIME ZONE 'America/Chicago'))
+                  + EXTRACT(MINUTE FROM (NOW() AT TIME ZONE 'America/Chicago')) / 60.0 AS local_hour`
+    ).catch(() => null);
+    if (clock && Number(clock.local_hour) < pigHourFor(buyerId, clock.today)) {
+        return { ok: false, error: "no_pig" };
+    }
     const claim = await db.queryOne(`UPDATE mkt_buyer SET pig_day = ${DAY} WHERE id = $1 AND pig_day IS DISTINCT FROM ${DAY} RETURNING id`, [buyerId]).catch(() => null);
     if (!claim) {
         // Truffle Hog: a companion can bring the pig back for ONE more visit the same day. Tracked on its own

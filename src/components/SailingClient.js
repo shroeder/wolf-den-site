@@ -226,6 +226,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     // (fishing upgrades AND the cast recharge) lives in here as a tab, which means the Fishing page had no way
     // to point at it: it could only say "go to Sailing" and hope.
     const [station, setStation] = useState("helm"); // the boat-forms gallery is collapsed by default
+    // Where the stations live on the page, so something that SENDS you to a station can actually take you
+    // there — see onUpgradeShip below.
+    const stationsRef = useRef(null);
     useEffect(() => {
         const want = new URLSearchParams(window.location.search).get("station");
         if (want && ["helm", "dig", "rail"].includes(want)) setStation(want);
@@ -1106,7 +1109,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             ) : null}
 
             {/* ── STATIONS ── the ship as a place you move around, not a page you scroll. */}
-            <div className="sail-stations">
+            <div className="sail-stations" ref={stationsRef}>
                 {/* ONE WORD each, stacked under its glyph. Adding a fourth station broke the row: "Gun Deck",
                     "Dig Site" and "The Rail" all wrapped to two lines at 393px, and only the selected tab had
                     any chrome, so the other three read as loose text rather than controls. Short labels cannot
@@ -1662,7 +1665,19 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             tab={battleTab}
                             onTab={setBattleTab}
                             purse={state.combat?.doubloons || 0}
-                            onUpgradeShip={() => { setYardOpen(false); setStation("guns"); }}
+                            // ── AND ACTUALLY GO THERE ────────────────────────────────────────────────
+                            // This closed the modal and switched the station, which is the correct state
+                            // change and looks like nothing at all: the stations sit below the fold, so the
+                            // modal vanished and the page stayed exactly where it was. "Clicking upgrade
+                            // doesn't take me anywhere" — it did, silently, off screen.
+                            onUpgradeShip={() => {
+                                setYardOpen(false);
+                                setStation("guns");
+                                // After the modal unmounts, or we scroll to where the strip used to be.
+                                requestAnimationFrame(() => {
+                                    stationsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                });
+                            }}
                             onAct={({ action, ...extra }) => act(action, extra)} />
                     </div>
                 </div>

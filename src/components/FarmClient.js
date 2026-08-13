@@ -301,18 +301,23 @@ export default function FarmClient({ initial, viewingAlias }) {
         fetch("/api/marketplace/pet-income/recap", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.show && (d.xp > 0 || d.gold > 0)) setRecap(d); }).catch(() => {});
     }, [farm?.mine]);
 
-    // Wild Loot Pig: once/day, at a random moment after you land on YOUR farm, a crowned pig may rampage
-    // through dropping gold. The payout is server-guarded once/day; this just decides the dramatic entrance.
+    // ── THE WILD LOOT PIG ────────────────────────────────────────────────────────────────────────────────
+    // WHEN he turns up is decided on the server now (see pigHourFor in farm.js): a different hour every day,
+    // per member, unknowable in advance. `pigAvailable` already means "unclaimed AND he has arrived", so this
+    // only stages the entrance.
+    //
+    // The 70% coin flip that used to live here is GONE. It was a second layer of randomness on top of the
+    // first, and once the arrival time is the surprise, a roll that sometimes eats him as well just reads as
+    // the game being arbitrary — you cannot learn a rule that fails three visits in ten for no reason. If
+    // he is on the farm, you see him.
     useEffect(() => {
         if (!initial.mine || !initial.pigAvailable) return undefined;
         const t = setTimeout(() => {
-            if (Math.random() < 0.7) {
-                setPig("running");
-                setPigToast(true);
-                SFX.oink();
-                SFX.startPigMusic();
-                setTimeout(() => setPigToast(false), 4200);
-            }
+            setPig("running");
+            setPigToast(true);
+            SFX.oink();
+            SFX.startPigMusic();
+            setTimeout(() => setPigToast(false), 4200);
         }, 2500 + Math.random() * 5000);
         return () => clearTimeout(t);
     }, [initial.mine, initial.pigAvailable]);
