@@ -2,6 +2,15 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
+// ── A CLAIM DOES NOT PAY A CHEST ─────────────────────────────────────────────────────────────────────────────
+// Luke's rule, and the measurement that forced it: 130 chests a day were going out, and against the 37 members
+// who actually play on a given day that is 3.5 EACH, with the heaviest taking six to twelve. Two thirds of
+// them wooden. A chest stopped being a thing you found and became the wallpaper.
+//
+// The line is the one already drawn for the windfall: a chest comes off something you DUG UP or PUT DOWN — a
+// seam, a crop, a raider, a dungeon floor, a forge you spent shards at. A daily card, a check-in streak, a
+// quest tick and a guide chapter are CLAIMS: you press a button that hands you something you had already
+// earned by doing the thing the reward is for. Those pay gold, which is what a claim has always been for.
 import { addChests } from "@/lib/marketplace/chests.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -29,7 +38,7 @@ export const FEATURE_DAILIES = {
         // The chest moves to the visiting bounty rather than being minted twice: a full farm day still pays
         // exactly ONE chest, it is just no longer claimable without leaving your own patch. The petting one
         // pays the biggest gold on the card because it asks the most — you have to be on someone else's farm.
-        { key: "farm_rate2", label: "Rate 2 neighbours' farms", metric: "farm_rate", need: 2, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "farm_rate2", label: "Rate 2 neighbours' farms", metric: "farm_rate", need: 2, reward: { gold: 200 }, rewardLabel: "+200 gold" },
         { key: "farm_petother2", label: "Pet 2 of a neighbour's pets", metric: "pet_other", need: 2, reward: { gold: 200 }, rewardLabel: "+200 gold" },
     ],
     sailing: [
@@ -40,7 +49,7 @@ export const FEATURE_DAILIES = {
         // more: there is a single Battle button and matchOpponent decides whether you meet a fleet ship or a
         // rival captain. So one of the two ticked and the other did not, at random, and neither told you why.
         // `ship_battle` is bumped by BOTH paths now, and `sail_raid1` keeps its key so today's rows survive.
-        { key: "sail_raid1", label: "Win a ship battle", metric: "ship_battle", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "sail_raid1", label: "Win a ship battle", metric: "ship_battle", need: 1, reward: { gold: 220 }, rewardLabel: "+220 gold" },
         // Fishing is the thing to do DURING a voyage, so its bounty asks for a few catches rather than one — it's
         // the one task you can finish without waiting on a four-hour timer.
         { key: "sail_fish3", label: "Land 3 fish", metric: "fish", need: 3, reward: { gold: 110 }, rewardLabel: "+110 gold" },
@@ -51,7 +60,7 @@ export const FEATURE_DAILIES = {
     cooking: [
         { key: "cook_dish3", label: "Cook 3 dishes", metric: "cook_dish", need: 3, reward: { gold: 150 }, rewardLabel: "+150 gold" },
         { key: "cook_prep2", label: "Prep 2 ingredients", metric: "cook_prep", need: 2, reward: { gold: 110 }, rewardLabel: "+110 gold" },
-        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { chest: "wooden" }, rewardLabel: "Wooden chest" },
+        { key: "cook_clean1", label: "Cook a dish with a clean run", metric: "cook_clean", need: 1, reward: { gold: 200 }, rewardLabel: "+200 gold" },
     ],
 };
 

@@ -26,9 +26,9 @@ const STREAK_REWARDS = [
     { gold: 120, label: "120 gold", emoji: "🪙" },
     { treat: "treat_snack", label: "a Hearty Snack (pet XP)", emoji: "🍖" },
     { gold: 200, label: "200 gold", emoji: "🪙" },
-    { chest: "iron", label: "an Iron loot chest", emoji: "⚙️" },
+    { gold: 260, label: "260 gold", emoji: "🪙" },   // was an Iron chest — a check-in is a claim
     { gold: 320, treat: "treat_toy", label: "320 gold + a Chew Toy", emoji: "🎁" },
-    { gold: 480, chest: "iron", label: "480 gold + an Iron chest", emoji: "🏆" }, // day-7 reward (Iron, not Gold — free weekly legendary was too rich)
+    { gold: 900, label: "900 gold", emoji: "🏆" }, // day-7. Was 480 + an Iron chest; a streak is a claim, so it pays coin.
 ];
 const rewardForStreak = (streak) => STREAK_REWARDS[((Math.max(1, streak) - 1) % 7)];
 

@@ -22,7 +22,7 @@ export const QUEST_TEMPLATES = [
     { key: "land_crit", label: "Land a critical hit on the boss", metric: "crit", target: 1, gold: 150, area: "/marketplace/boss", cta: "Fight the boss" },
     { key: "deal_damage", label: "Deal 5,000 damage to the boss", metric: "boss_damage", target: 5000, gold: 220, area: "/marketplace/boss", cta: "Fight the boss" },
     { key: "open_chest", label: "Open a loot chest", metric: "chest_open", target: 1, gold: 150, area: "/marketplace/inventory", cta: "Open chests" },
-    { key: "open_two_chests", label: "Open 2 loot chests", metric: "chest_open", target: 2, gold: 260, chest: "wooden", area: "/marketplace/inventory", cta: "Open chests" },
+    { key: "open_two_chests", label: "Open 2 loot chests", metric: "chest_open", target: 2, gold: 260, area: "/marketplace/inventory", cta: "Open chests" },
     { key: "equip_gear", label: "Equip or swap a piece of gear", metric: "equip", target: 1, gold: 110, area: "/marketplace/inventory", cta: "Go to gear" },
     // /marketplace/inventory is the GEAR view; the gold shop is its own route. Sending people to the wrong one
     // and telling them to buy something is why this quest read as broken — there was nothing to buy on it.
@@ -32,7 +32,7 @@ export const QUEST_TEMPLATES = [
     { key: "donate_event", label: "Donate 1,000 gold to the pack (Happy Hour / rally)", metric: "donate_event", target: 1000, gold: 200, area: "/marketplace/boss", cta: "Donate gold" },
     { key: "spin_wheel", label: "Spin the daily wheel", metric: "spin", target: 1, gold: 100, area: "/marketplace/spin", cta: "Spin the wheel" },
     { key: "cheer_once", label: "Cheer a teammate in the boss fight", metric: "cheer", target: 1, gold: 90, area: "/marketplace/boss", cta: "Cheer a hero" },
-    { key: "cheer_thrice", label: "Cheer 3 times today", metric: "cheer", target: 3, gold: 180, chest: "wooden", area: "/marketplace/boss", cta: "Cheer a hero" },
+    { key: "cheer_thrice", label: "Cheer 3 times today", metric: "cheer", target: 3, gold: 180, area: "/marketplace/boss", cta: "Cheer a hero" },
     // ── Sailing quests (gated: only appear for members who can actually sail — see eligibleTemplates) ──
     { key: "sail_voyage", label: "Set sail on a voyage", metric: "voyage_start", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Set sail", gate: "sailing" },
     { key: "sail_wave", label: "Greet a passing sailor at sea", metric: "wave", target: 1, gold: 90, area: "/marketplace/sailing", cta: "Go sailing", gate: "sailing" },
@@ -42,12 +42,12 @@ export const QUEST_TEMPLATES = [
     // assigned today are not orphaned.
     { key: "sail_raid", label: "Fight a ship battle", metric: "ship_battle", target: 1, gold: 150, area: "/marketplace/sailing", cta: "Beat to quarters", gate: "sailing" },
     { key: "ship_battle", label: "Fight two ship battles", metric: "ship_battle", target: 2, gold: 170, area: "/marketplace/sailing", cta: "Beat to quarters", gate: "sailing" },
-    { key: "sail_dig", label: "Dig up buried treasure", metric: "dig_done", target: 1, gold: 160, chest: "wooden", area: "/marketplace/sailing", cta: "Go digging", gate: "sailing" },
+    { key: "sail_dig", label: "Dig up buried treasure", metric: "dig_done", target: 1, gold: 160, area: "/marketplace/sailing", cta: "Go digging", gate: "sailing" },
     // ── Farm quests (gated: only appear for members who can access the Farm — see eligibleTemplates) ──
     { key: "harvest_crop", label: "Harvest a crop from your farm", metric: "harvest_crop", target: 1, gold: 150, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
     { key: "plant_seed", label: "Plant a seed", metric: "plant_seed", target: 1, gold: 90, area: "/marketplace/farm", cta: "Plant a crop", gate: "farm" },
     { key: "pet_a_pet", label: "Pet a pet on the farm", metric: "pet_animal", target: 1, gold: 100, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
-    { key: "pet_three", label: "Pet 3 pets today", metric: "pet_animal", target: 3, gold: 190, chest: "wooden", area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
+    { key: "pet_three", label: "Pet 3 pets today", metric: "pet_animal", target: 3, gold: 190, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
     { key: "fertilize_crop", label: "Fertilize a growing crop", metric: "fertilize_crop", target: 1, gold: 110, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
     { key: "harvest_rare", label: "Harvest an epic-or-better crop", metric: "harvest_rare", target: 1, gold: 190, area: "/marketplace/farm", cta: "Tend your farm", gate: "farm" },
     { key: "feed_treat", label: "Feed a pet a treat", metric: "feed_pet", target: 1, gold: 120, area: "/marketplace/farm", cta: "Visit the farm", gate: "farm" },
@@ -62,28 +62,28 @@ export const QUEST_TEMPLATES = [
     // "Close the Kitchen again", the Kitchen reopened on 2026-08-01, and nobody came back for them — so four
     // of the bounties written to point at the newest feature pointed at nobody. Ungated 2026-08-09.
     { key: "cook_a_dish", label: "Cook a dish", metric: "cook_dish", target: 1, gold: 130, area: "/marketplace/cooking", cta: "Get cooking" },
-    { key: "cook_three", label: "Cook 3 dishes", metric: "cook_dish", target: 3, gold: 240, chest: "wooden", area: "/marketplace/cooking", cta: "Get cooking" },
+    { key: "cook_three", label: "Cook 3 dishes", metric: "cook_dish", target: 3, gold: 240, area: "/marketplace/cooking", cta: "Get cooking" },
     { key: "cook_a_prep", label: "Prep an ingredient", metric: "cook_prep", target: 1, gold: 110, area: "/marketplace/cooking", cta: "Get cooking" },
     { key: "cook_clean_run", label: "Cook a dish with a clean run", metric: "cook_clean", target: 1, gold: 200, area: "/marketplace/cooking", cta: "Get cooking" },
     // ── Fishing ──────────────────────────────────────────────────────────────────────────────────────────
     { key: "fish_one", label: "Land a fish", metric: "fish", target: 1, gold: 100, area: "/marketplace/sailing", cta: "Cast a line" },
-    { key: "fish_five", label: "Land 5 fish", metric: "fish", target: 5, gold: 220, chest: "wooden", area: "/marketplace/sailing", cta: "Cast a line" },
+    { key: "fish_five", label: "Land 5 fish", metric: "fish", target: 5, gold: 220, area: "/marketplace/sailing", cta: "Cast a line" },
 
     // ── Mine quests. One per verb,
     // because the three halves of the mine are genuinely different activities and a player who only likes the
     // descent should still be able to clear a mine quest.
     { key: "mine_descend", label: "Take 5 steps down the mine tunnel", metric: "mine_depth", target: 5, gold: 140, area: "/marketplace/mining", cta: "Head down" },
-    { key: "mine_deep_dive", label: "Take 10 steps down the mine tunnel", metric: "mine_depth", target: 10, gold: 260, chest: "wooden", area: "/marketplace/mining", cta: "Head down" },
+    { key: "mine_deep_dive", label: "Take 10 steps down the mine tunnel", metric: "mine_depth", target: 10, gold: 260, area: "/marketplace/mining", cta: "Head down" },
     { key: "mine_crack", label: "Crack open a seam", metric: "seam_crack", target: 1, gold: 120, area: "/marketplace/mining", cta: "Go swing a pick" },
-    { key: "mine_crack_three", label: "Crack open 3 seams", metric: "seam_crack", target: 3, gold: 240, chest: "wooden", area: "/marketplace/mining", cta: "Go swing a pick" },
+    { key: "mine_crack_three", label: "Crack open 3 seams", metric: "seam_crack", target: 3, gold: 240, area: "/marketplace/mining", cta: "Go swing a pick" },
     { key: "mine_smelt", label: "Pour a smelt at the furnace", metric: "ore_smelt", target: 1, gold: 130, area: "/marketplace/mining", cta: "Work the heat" },
     { key: "mine_smelt_three", label: "Pour 3 smelts", metric: "ore_smelt", target: 3, gold: 250, area: "/marketplace/mining", cta: "Work the heat" },
 
     // ── Dungeon quests. Public since the dungeons launched (2026-08-04). eligibleTemplates still filters out
     // for everyone else, so they can never be rolled for a member who cannot open the page.
     { key: "delve_floors", label: "Clear 5 dungeon floors", metric: "delve_floor", target: 5, gold: 150, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
-    { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, chest: "wooden", area: "/marketplace/dungeons", cta: "Enter a dungeon" },
-    { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, chest: "wooden", area: "/marketplace/dungeons", cta: "Enter a dungeon" },
+    { key: "delve_floors_ten", label: "Clear 10 dungeon floors", metric: "delve_floor", target: 10, gold: 280, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
+    { key: "delve_boss", label: "Fell a dungeon boss", metric: "delve_clear", target: 1, gold: 320, area: "/marketplace/dungeons", cta: "Enter a dungeon" },
 ];
 
 const TEMPLATE_BY_KEY = Object.fromEntries(QUEST_TEMPLATES.map((t) => [t.key, t]));
