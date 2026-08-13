@@ -491,7 +491,9 @@ export async function delveAct(buyerId, action, choice = null) {
             const xp = Math.round(randInt(d.xpPer[0], d.xpPer[1]) * (ev.lootMult || 1));
             // A chest sometimes holds a real chest — the tiers a dungeon pays scale with its gate.
             const tier = ev.lootMult >= 1.5 ? (d.minLevel >= 30 ? "gold" : "iron") : (d.minLevel >= 30 ? "iron" : "wooden");
-            const gotChest = Math.random() < 0.35;
+            // 0.35 -> 0.18. A room called "chest" still pays gold and XP every time; the loot CHEST inside
+            // it is the rarer half, which is what the room's own art has always implied.
+            const gotChest = Math.random() < 0.18;
             bank(run, { gold, xp, chest: gotChest ? tier : null });
             floor.done = true;
             run.log.push({ floor: run.floor, kind: "chest", text: `+${gold} gold, +${xp} XP${gotChest ? `, and a ${tier} chest` : ""}.` });

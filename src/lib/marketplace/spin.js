@@ -523,7 +523,6 @@ export async function doSpin(buyerId) {
     let refunded = false;
     if (respinChance > 0 && Math.random() < respinChance) { await grantSpinTokens(buyerId, 1).catch(() => {}); refunded = true; }
     await bumpQuestProgress(buyerId, "spin", 1).catch(() => {});
-    await dropSeedFrom(buyerId, "spin").catch(() => {}); // the wheel can also grant a farming seed
     await trackActivity(buyerId, "daily_spin", { prize: prize.label }).catch(() => {});
 
     await syncEarnedBadges(buyerId).catch(() => {}); // spin-count badges

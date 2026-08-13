@@ -97,7 +97,10 @@ const DUEL_THROTTLE_MS = 700;
 const DUEL_WIN_XP = 11;
 const DUEL_WIN_GOLD = 16;
 const DUEL_LOSS_GOLD = 5;       // consolation so a loss is never nothing
-const DUEL_LOOT_CHANCE = 0.18;  // chance a WIN also drops a low-tier chest
+// 0.18 -> 0.07. The word in the old comment was "also", which is the tell: a duel already pays gold and XP
+// and this was a chest on top. It stays — a raider dropping something they carried is exactly the kind of
+// found moment a chest belongs to — but at a rate that makes it loot rather than a wage.
+const DUEL_LOOT_CHANCE = 0.07;  // chance a WIN also drops a low-tier chest
 // ── SALVAGE FODDER ── goblins and bandits are the Den's scrap heap. The Forge consumes gear to make parts, but
 // every other gear source is slow or one-per-lifetime, so smiths run dry of things to melt. A won duel now has a
 // real chance to drop a junk COMMON/RARE piece straight into your bags — worth almost nothing equipped, which is
@@ -574,12 +577,7 @@ export async function attackTownEvent(buyerId, eventId, move = "normal") {
         ).catch(() => null),
     ]);
     bumpTownQuest(buyerId, "rally", 1).catch(() => {});
-    // Plaza skirmishes turn up recipes looted off the swarm.
-    try {
-        const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-        // Part of the skirmish payout, at the tier your contribution earned.
-        if (Math.random() < 0.045 * await recipeLuck(buyerId)) await grantRecipeReward(buyerId, "town_raid");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
+    // The recipe moved into the duel's own loot roll below — one outcome, not a second roll on top.
     let hp = updated?.hp ?? ev.hp;
     const defeated = false; // raids run their full duration now — a cleared wave just refills
     let wave = Number(ev.meta?.wave) || 1;
@@ -920,7 +918,22 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         xp = DUEL_WIN_XP + randInt(0, 10);
         coin = DUEL_WIN_GOLD + randInt(0, 14);
         // Low loot chance on a win.
-        if (Math.random() < DUEL_LOOT_CHANCE) { await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {}); loot.push({ kind: "chest", tier: "wooden", label: "Wooden Chest", emoji: "🧰" }); }
+        // ── ONE LOOT ROLL, TWO THINGS IT CAN BE ──────────────────────────────────────────────────────────
+        // A raider drops what they were carrying: usually a chest, sometimes a page torn out of something.
+        // The recipe used to be its own 4.5% roll fired further up, so a win could pay both.
+        if (Math.random() < DUEL_LOOT_CHANCE) {
+            let paid = null;
+            if (Math.random() < 0.22) {
+                const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+                const rec = await grantRecipeReward(buyerId, "town_raid").catch(() => null);
+                if (rec) paid = { kind: "recipe", label: `A torn page — ${rec.name}`, emoji: "📜", recipe: rec.id };
+            }
+            if (!paid) {
+                await addChests(buyerId, { wooden: 1 }, { source: "town_raid_loot" }).catch(() => {});
+                paid = { kind: "chest", tier: "wooden", label: "Wooden Chest", emoji: "🧰" };
+            }
+            loot.push(paid);
+        }
         // Kill the REAL foe on the shared roster (claim → strike), so the whole plaza sees the same board change.
         let foeKind = null;
         if (enemyId) {

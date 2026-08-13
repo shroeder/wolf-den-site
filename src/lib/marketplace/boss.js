@@ -926,7 +926,6 @@ async function finalizeBossKill(bossId) {
         if (drop) petWinners.add(p.id);
     }
     for (const p of pool) await syncEarnedBadges(p.id).catch(() => {});
-    for (const p of pool) await dropSeedFrom(p.id, "boss_kill").catch(() => {}); // slaying the boss showers seeds
 
     // IN-GAME REWARD ITEMS — the admin hand-picks 0+ items; each drops to a WEIGHTED-RANDOM participant.
     // The top 3 dealers get a modest edge (weights 3/2/2 vs 1 for everyone else), but it's far from a
@@ -966,10 +965,22 @@ async function finalizeBossKill(bossId) {
     // out-rewards the prizes.
     const rewardWinners = new Set([raffleWinner?.id, ...petWinners, ...itemWinners.keys()].filter(Boolean));
     const chestByBuyer = new Map();
+    const recipeByBuyer = new Map();
+    // Deferred: cooking.js imports chests.js which imports this file, so a static edge here is a cycle.
+    const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
     for (const p of pool) {
         if (rewardWinners.has(p.id)) continue; // already got a good reward — no bonus chest
         const ratio = Math.max(0, Math.min(1, p.dmg / topDmg));
-        if (Math.random() >= 0.2 + ratio * 0.8) continue; // didn't roll a chest this time
+        if (Math.random() >= 0.2 + ratio * 0.8) continue; // didn't roll loot this time
+        // ── ONE OUTCOME PER FIGHTER, AND A RECIPE IS ONE OF THEM ─────────────────────────────────────────
+        // The recipe used to be a separate 20% roll fired after the kill on the STRIKER alone — so the last
+        // hit paid a chest here and, unrelatedly, a page over there. It is drawn from the SAME roll now: a
+        // share of the fighters who land loot land a torn page instead of a chest. Never both.
+        if (Math.random() < 0.18) {
+            const rec = await grantRecipeReward(p.id, "boss_kill").catch(() => null);
+            // Knows every recipe the boss can teach? Fall through to the chest rather than paying nothing.
+            if (rec) { recipeByBuyer.set(p.id, rec); continue; }
+        }
         const tier = Math.random() < 0.4 + ratio * 0.3 ? "iron" : "wooden"; // capped at Iron
         chestByBuyer.set(p.id, tier);
         await addChests(p.id, { [tier]: 1 }, { source: "boss_kill", meta: { boss: boss.name } }).catch(() => {});
@@ -986,6 +997,8 @@ async function finalizeBossKill(bossId) {
         if (isTop) bits.push(`🥇 You dealt the most damage!`);
         if (isRaffle && boss.prize_name) bits.push(`🎟️ You won the raffle — come claim ${boss.prize_name} in-store!`);
         if (chestTier) { const c = CHEST_TIERS[chestTier]; bits.push(`${c.emoji} ${c.label} landed in your stash — open it!`); }
+        const foundRecipe = recipeByBuyer.get(p.id) || null;
+        if (foundRecipe) bits.push(`📜 A torn page off the corpse — ${foundRecipe.name}.`);
         if (isTop && top1Badge) bits.push(`You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.`);
         if (!bits.length) bits.push(`The whole pack took down ${boss.name}! See the final stats →`);
         const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : wonItems.length ? "🎁 Boss reward!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";
@@ -1283,7 +1296,6 @@ export async function attackBoss(buyerId) {
 
     const defeated = await markDefeatIfDead(boss.id, row.hp, buyerId);
     await syncEarnedBadges(buyerId).catch(() => {});
-    await dropSeedFrom(buyerId, "boss_strike").catch(() => {}); // a chance to find a farming seed
 
     // Report the EFFECTIVE hp (stored minus pending passive drain) so the client's bar stays consistent
     // with the polled state instead of snapping back up after a manual strike.
@@ -1295,12 +1307,8 @@ export async function attackBoss(buyerId) {
     // The felling blow, not every strike. The boss is the main route to Exquisite and Legendary recipes, and
     // gating it on the kill is what keeps those tiers weekly rather than farmable.
     if (defeated) {
-        try {
-            const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-            // The weekly boss is the main route to the top two tiers and is shared by everyone who fought, so
-            // it stays generous. It is part of the kill reward now, not a roll beside it.
-            if (Math.random() < 0.20 * await recipeLuck(buyerId)) await grantRecipeReward(buyerId, "boss_kill");
-        } catch { /* a recipe is a bonus; never let it fail the kill */ }
+        // The recipe moved INTO the kill's own loot draw (finalizeBossKill) — it is an alternative to the
+        // chest a fighter rolls there, not a second roll fired here on whoever happened to land the last hit.
     }
     // ── A STONE OFF THE KILL ── the rarest of the four sources to REACH, because the boss falls a few times a
     // week and only one person lands the last blow — so its rate is the highest of the four and it is still

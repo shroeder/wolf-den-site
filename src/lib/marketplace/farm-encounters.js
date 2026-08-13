@@ -24,17 +24,17 @@ const RARITY_BUMP = { common: 0, rare: 0.03, epic: 0.06, legendary: 0.1, mythic:
 // for its sprite. Loot is rolled from three buckets (seed / chest / parts) weighted by `loot`; the tiers/bands
 // below scale the payout by critter.
 const CREATURES = {
-    rat: { name: "Field Mouse", emoji: "🐭", art: "enc_rat", weight: 40, xp: 8, gold: 90, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 60, chest: 20, parts: 20 } },
-    crow: { name: "Crop Crow", emoji: "🐦", art: "enc_crow", weight: 28, xp: 12, gold: 150, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 58, chest: 22, parts: 20 } },
-    raccoon: { name: "Masked Raccoon", emoji: "🦝", art: "enc_raccoon", weight: 18, xp: 18, gold: 210, seedBand: ["common", "rare"], chestTier: "iron", partsTier: 2, partsMin: 1, partsMax: 3, loot: { seed: 54, chest: 24, parts: 22 } },
-    boar: { name: "Truffle Boar", emoji: "🐗", art: "enc_boar", weight: 10, xp: 26, gold: 340, seedBand: ["rare", "epic"], chestTier: "iron", partsTier: 2, partsMin: 2, partsMax: 3, loot: { seed: 50, chest: 26, parts: 24 } },
-    scarecrow: { name: "Merry Scarecrow", emoji: "🎃", art: "enc_scarecrow", weight: 4, xp: 45, gold: 640, seedBand: ["rare", "epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 3, loot: { seed: 46, chest: 28, parts: 26 } },
+    rat: { name: "Field Mouse", emoji: "🐭", art: "enc_rat", weight: 40, xp: 8, gold: 90, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 70, chest: 10, parts: 20 } },
+    crow: { name: "Crop Crow", emoji: "🐦", art: "enc_crow", weight: 28, xp: 12, gold: 150, seedBand: ["common"], chestTier: "wooden", partsTier: 1, partsMin: 1, partsMax: 2, loot: { seed: 69, chest: 11, parts: 20 } },
+    raccoon: { name: "Masked Raccoon", emoji: "🦝", art: "enc_raccoon", weight: 18, xp: 18, gold: 210, seedBand: ["common", "rare"], chestTier: "iron", partsTier: 2, partsMin: 1, partsMax: 3, loot: { seed: 66, chest: 12, parts: 22 } },
+    boar: { name: "Truffle Boar", emoji: "🐗", art: "enc_boar", weight: 10, xp: 26, gold: 340, seedBand: ["rare", "epic"], chestTier: "iron", partsTier: 2, partsMin: 2, partsMax: 3, loot: { seed: 63, chest: 13, parts: 24 } },
+    scarecrow: { name: "Merry Scarecrow", emoji: "🎃", art: "enc_scarecrow", weight: 4, xp: 45, gold: 640, seedBand: ["rare", "epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 3, loot: { seed: 60, chest: 14, parts: 26 } },
     // ── Rarer critters — much scarcer, much richer. A real thrill when one shows up. ──
-    fox: { name: "Sly Fox", emoji: "🦊", art: "enc_fox", weight: 3, xp: 65, gold: 900, seedBand: ["epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 4, loot: { seed: 44, chest: 28, parts: 28 } },
-    owl: { name: "Wise Owl", emoji: "🦉", art: "enc_owl", weight: 2, xp: 95, gold: 1300, seedBand: ["epic", "legendary"], chestTier: "gold", partsTier: 4, partsMin: 2, partsMax: 4, loot: { seed: 42, chest: 30, parts: 28 } },
-    stag: { name: "Golden Stag", emoji: "🦌", art: "enc_stag", weight: 1.2, xp: 140, gold: 1900, seedBand: ["legendary"], chestTier: "mythic", partsTier: 4, partsMin: 3, partsMax: 5, loot: { seed: 40, chest: 32, parts: 28 } },
-    dragon: { name: "Garden Dragonling", emoji: "🐉", art: "enc_dragon", weight: 0.6, xp: 210, gold: 2800, seedBand: ["legendary", "mythic"], chestTier: "mythic", partsTier: 5, partsMin: 3, partsMax: 5, loot: { seed: 38, chest: 34, parts: 28 } },
-    unicorn: { name: "Meadow Unicorn", emoji: "🦄", art: "enc_unicorn", weight: 0.3, xp: 320, gold: 4200, seedBand: ["mythic"], chestTier: "ascendant", partsTier: 5, partsMin: 4, partsMax: 6, loot: { seed: 36, chest: 36, parts: 28 } },
+    fox: { name: "Sly Fox", emoji: "🦊", art: "enc_fox", weight: 3, xp: 65, gold: 900, seedBand: ["epic"], chestTier: "gold", partsTier: 3, partsMin: 2, partsMax: 4, loot: { seed: 58, chest: 14, parts: 28 } },
+    owl: { name: "Wise Owl", emoji: "🦉", art: "enc_owl", weight: 2, xp: 95, gold: 1300, seedBand: ["epic", "legendary"], chestTier: "gold", partsTier: 4, partsMin: 2, partsMax: 4, loot: { seed: 57, chest: 15, parts: 28 } },
+    stag: { name: "Golden Stag", emoji: "🦌", art: "enc_stag", weight: 1.2, xp: 140, gold: 1900, seedBand: ["legendary"], chestTier: "mythic", partsTier: 4, partsMin: 3, partsMax: 5, loot: { seed: 56, chest: 16, parts: 28 } },
+    dragon: { name: "Garden Dragonling", emoji: "🐉", art: "enc_dragon", weight: 0.6, xp: 210, gold: 2800, seedBand: ["legendary", "mythic"], chestTier: "mythic", partsTier: 5, partsMin: 3, partsMax: 5, loot: { seed: 55, chest: 17, parts: 28 } },
+    unicorn: { name: "Meadow Unicorn", emoji: "🦄", art: "enc_unicorn", weight: 0.3, xp: 320, gold: 4200, seedBand: ["mythic"], chestTier: "ascendant", partsTier: 5, partsMin: 4, partsMax: 6, loot: { seed: 54, chest: 18, parts: 28 } },
 };
 const CREATURE_KEYS = Object.keys(CREATURES);
 // Public list (key + name + emoji) so the owner-debug UI can cycle through every critter to test each.

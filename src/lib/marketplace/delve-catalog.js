@@ -132,11 +132,18 @@ export const dungeonById = (id) => DUNGEONS.find((d) => d.id === id) || null;
 //
 // Expected haul over a five-fight run in the Warren: ~1 forge part roll, ~0.7 fragment drops, ~0.5 potions,
 // ~0.3 chests and a bit under a 1-in-3 shot at a piece of gear. The boss pays a chest and parts outright.
+// ── AND FOUND MOMENTS PAY LESS OFTEN ─────────────────────────────────────────────────────────────────────────
+// Removing chests from the CLAIMS took a quarter off the total and left the rest still too rich: measured
+// against the 37 members who play on a given day it was 3.5 chests each, and the heaviest were taking six to
+// twelve. These are all legitimate "you dug it up" drops and they keep paying chests — just at a rate where
+// finding one is a small event again rather than the third one before lunch.
 export const FIGHT_DROPS = {
     parts: 0.22,     // salvage for the Forge
     frags: 0.14,     // chest fragments for the docks
     potion: 0.10,    // the resource that actually decides a run
-    chest: 0.06,     // a whole loot chest
+    // 0.06 -> 0.02. A run is many fights deep, so six percent a fight was a chest most runs and often two;
+    // the dungeon was the second biggest source in the game at 572 a month across 27 people.
+    chest: 0.02,     // a whole loot chest
 };
 
 // ── UPGRADES ─────────────────────────────────────────────────────────────────────────────────────────────────

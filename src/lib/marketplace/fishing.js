@@ -165,7 +165,7 @@ export const TREASURE_CHANCE = 0.20;
 // out of fragments and seeds, which were the two things nobody was short of.
 // A treasure haul was a real object nearly half the time (gear 28 + chest 14). Fragments and seeds are what the
 // sea floor should mostly give up; gear is the exception you remember.
-const TREASURE = { fragment: 28, seed: 26, consumable: 27, gear: 12, chest: 6, pet: 1 };
+const TREASURE = { fragment: 25, seed: 26, consumable: 27, gear: 12, chest: 6, pet: 1, recipe: 3 };
 
 // Landing a rare FISH still sweetens things — but as a bonus on top, and only for the genuinely rare ones, so
 // a mythic is never a bare fish with no story attached.
@@ -177,10 +177,10 @@ const TREASURE = { fragment: 28, seed: 26, consumable: 27, gear: 12, chest: 6, p
 // there — a cast is rarely empty — it is just far more often fragments or a consumable than a weapon.
 const FISH_BONUS = {
     common: { nothing: 52, gear: 9, fragment: 24, consumable: 15 },
-    rare: { nothing: 46, gear: 12, fragment: 25, consumable: 15, chest: 2 },
-    epic: { nothing: 42, gear: 13, fragment: 26, consumable: 16, chest: 3 },
-    legendary: { nothing: 26, fragment: 32, consumable: 26, gear: 12, chest: 4 },
-    mythic: { nothing: 0, fragment: 34, consumable: 32, gear: 18, chest: 13, pet: 3 },
+    rare: { nothing: 45, gear: 12, fragment: 25, consumable: 15, chest: 2, recipe: 1 },
+    epic: { nothing: 40, gear: 13, fragment: 26, consumable: 16, chest: 3, recipe: 2 },
+    legendary: { nothing: 23, fragment: 32, consumable: 26, gear: 12, chest: 4, recipe: 3 },
+    mythic: { nothing: 0, fragment: 30, consumable: 32, gear: 18, chest: 13, pet: 3, recipe: 4 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
@@ -316,6 +316,18 @@ async function haulSprite(kind, id = null, chestTier = null) {
 
 async function grantHaul(buyerId, kind, tier = "common") {
     if (!kind || kind === "nothing") return null;
+    // ── A SEALED BOTTLE IS A CATCH, NOT A COINCIDENCE ────────────────────────────────────────────────────
+    // This used to be a separate 0.6% roll fired a few lines above the haul, so the line landed a fish AND,
+    // unrelatedly, a recipe. It is a wedge in the same table as the gear, the fragment and the chest now: you
+    // land a bottle INSTEAD of one of those, which is what "one of the things the line can land" means.
+    if (kind === "recipe") {
+        const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+        const rec = await grantRecipeReward(buyerId, "fish").catch(() => null);
+        // Knows every recipe the sea can teach? The bottle is empty and the fragment takes its place, rather
+        // than the haul silently paying nothing.
+        if (!rec) return grantHaul(buyerId, "fragment", tier);
+        return { kind: "recipe", label: `A sealed bottle — ${rec.name}`, recipe: rec.id };
+    }
     if (kind === "fragment") {
         const n = FRAGMENT_COUNT[tier] || 1;
         const { grantFragment } = await import("@/lib/marketplace/sailing.js");
@@ -329,6 +341,9 @@ async function grantHaul(buyerId, kind, tier = "common") {
         return { kind: "fragment", label: `${n > 1 ? `${n} ` : ""}${fname} Chest Fragment${n > 1 ? "s" : ""}`, emoji: "🔷", n, where: "Stored on your boat", spriteUrl: frag?.art || "/images/sailing/fragment-wooden.png" };
     }
     if (kind === "seed") {
+        // KEPT, because this one is not a bolt-on: `seed` is a wedge in the treasure table above, so the line
+        // brings up a seed INSTEAD of a fragment or a chest. The bolt-on that went was a second, separate
+        // dropSeedFrom fired on every cast regardless of what the haul rolled.
         const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
         const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
         return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seed.id) } : null;
@@ -864,14 +879,6 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const { addToPantry, grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
     // The Cellar Key: one landing in three puts a second copy of the fish on the pantry shelf.
     await addToPantry(buyerId, "fish", species.id, (await powerRoll(buyerId, "cellar_key", 3)) ? 2 : 1).catch(() => {});
-    // The sea drops recipes too. It carried the pantry hook but never a recipe roll, so every recipe in the
-    // game came from one 4% chance on a farm harvest.
-    // A SEALED BOTTLE comes up with the catch — one of the things the line can land, at the same odds as any
-    // other catch outcome, rather than a hidden roll made after the fish was already in the net.
-    const BOTTLE_CHANCE = 0.006;
-    const recipeFound = Math.random() < BOTTLE_CHANCE * await recipeLuck(buyerId).catch(() => 1)
-        ? await grantRecipeReward(buyerId, "fish").catch(() => null)
-        : null;
 
     // awardXp pays the gold too, so Happy Hour / prosperity multipliers apply consistently with everything else.
     await awardXp(buyerId, "sail_fish", { points: xp, gold }).catch(() => {});
@@ -882,10 +889,6 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
     const kind = rollFishBonus(species.rarity);
     const got = await grantHaul(buyerId, kind, species.rarity).catch(() => null);
     if (got) extras.push(got);
-    // Surfaced in the same haul strip as everything else — a recipe you were never told about is no reward.
-    // No emoji, and no celebrating here: RecipeFoundWatcher shows the card site-wide. This stays as the quiet
-    // inline receipt on the catch itself.
-    if (recipeFound) extras.push({ kind: "recipe", label: `A sealed bottle — ${recipeFound.name}`, recipe: recipeFound.id });
 
     // ── ASCENSION POWERS ON A LANDING ────────────────────────────────────────────────────────────────────────
     // Two Hooks lands a SECOND fish of the same species; The Trawl brings up one of every fish sharing this

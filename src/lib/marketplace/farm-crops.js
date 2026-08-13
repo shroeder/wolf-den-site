@@ -71,6 +71,7 @@ const HARVEST_BONUS_CHANCE = 0.05;
 export const seedById = (id) => SEEDS[id] || null;
 const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === r);
 
+// A SEED IS THE FARM'S. It used to be showered from six other systems as a bolt-on — a chest you opened, a fish you landed, a boss you struck, a wheel you spun — each one a grant fired after that system had already paid you. Seeds come from the farm loop and from tables that LIST them now.
 // Where seeds are FOUND. Each game action rolls dropSeedFrom(buyerId, source): `chance` (before the Forager
 // boost) that a seed drops at all, then a weighted pick of which RARITY, then a random seed of that rarity.
 // Everyday actions give common seeds; big/rare events are the only way to find legendary/mythic seeds.

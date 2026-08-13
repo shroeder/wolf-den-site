@@ -214,7 +214,6 @@ export async function openChest(buyerId, tier) {
     await trackActivity(buyerId, "open_chest", { tier });
     // Chest opens can also drop a farming seed (tier scales rarity). Dynamic import avoids a chests↔farm-crops
     // static import cycle (farm-crops pulls in quests/xp, which pull in chests).
-    try { const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js"); await dropSeedFrom(buyerId, ["wooden", "iron", "gold"].includes(tier) ? `chest_${tier}` : "chest_gold"); } catch { /* best-effort */ }
     // A RECIPE IS ONE OF THE THINGS A CHEST CAN CONTAIN — rolled here, in the chest's own priority chain,
     // and returned as the chest's contents. It used to be a separate hidden roll made BEFORE the chest decided
     // anything, then stapled to whatever else came out as a side field: you opened a chest, got a sword, and a

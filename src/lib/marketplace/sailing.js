@@ -3650,8 +3650,21 @@ async function finishDig(buyerId, board) {
         [buyerId, JSON.stringify(counts)]
     ).catch(() => {});
     // Rare bonus find: a one-shot SAILING RELIC (kept uncommon so they stay special) — the treasure-map/drum/etc.
+    // ── WHAT THE SAND GIVES UP ───────────────────────────────────────────────────────────────────────────
+    // One roll, and the page is one of the things it can be. It used to be a second roll fired thirty lines
+    // below this one, so a dig could turn up a relic AND, separately, a recipe — the bolt-on shape.
     let relicFound = null;
-    if (won && Math.random() < 0.08) { relicFound = SAIL_RELIC_DROPS[randInt(SAIL_RELIC_DROPS.length)]; await grantConsumable(buyerId, relicFound, 1).catch(() => {}); }
+    let digRecipe = null;
+    if (won && Math.random() < 0.08) {
+        const deep = (board.tier || 1) >= 3;
+        // A waterlogged page comes up in place of the relic, more often the deeper the board.
+        if (Math.random() < (deep ? 0.35 : 0.2)) {
+            const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
+            digRecipe = await grantRecipeReward(buyerId, deep ? "dig_deep" : "dig").catch(() => null);
+        }
+        // Nothing left for the sea to teach? The relic takes its place rather than the dig paying nothing.
+        if (!digRecipe) { relicFound = SAIL_RELIC_DROPS[randInt(SAIL_RELIC_DROPS.length)]; await grantConsumable(buyerId, relicFound, 1).catch(() => {}); }
+    }
     // Achievement badges: voyage milestones (first, 25, 100) + fully uncovering a deep chest (tier 3+) in one dig.
     const voyagesNow = (row?.voyages_completed || 0) + 1;
     if (voyagesNow >= BADGE_FIRST_VOYAGE) await grantEventBadge(buyerId, "first_voyage").catch(() => {});
@@ -3661,16 +3674,7 @@ async function finishDig(buyerId, board) {
     if (voyagesNow >= COSMETIC_SAILOR_VOYAGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'sailor') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
-    await dropSeedFrom(buyerId, "sail_dig").catch(() => {}); // a chance to unearth a farming seed
     await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
-    // A WATERLOGGED PAGE is one of the things buried down there, drawn as part of what the dig turns up and
-    // returned in the result so the recap can show it — not a roll made on the side once the dig was over.
-    let digRecipe = null;
-    try {
-        const { grantRecipeReward, recipeLuck } = await import("@/lib/marketplace/cooking.js");
-        const chance = ((board.tier || 1) >= 3 ? 0.045 : 0.018) * await recipeLuck(buyerId);
-        if (Math.random() < chance) digRecipe = await grantRecipeReward(buyerId, (board.tier || 1) >= 3 ? "dig_deep" : "dig");
-    } catch { /* a recipe is a bonus; never let it fail the action */ }
     const state = await getSailingState(buyerId);
     // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
     const haul = Object.entries(byTier).map(([tier, n]) => {
