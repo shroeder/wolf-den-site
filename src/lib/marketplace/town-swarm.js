@@ -267,7 +267,50 @@ export async function swarmState(eventId, viewerId = null, eventKind = null) {
         [eventId]
     ).catch(() => []);
     const wave = rows.length ? Math.min(...rows.map((r) => Number(r.wave))) : null;
-    const alive = rows.filter((r) => Number(r.wave) === wave);
+    let alive = rows.filter((r) => Number(r.wave) === wave);
+
+    // ── THE TAIL OF A WAVE STRANDS EVERYBODY BUT THE LAST FIGHTERS ───────────────────────────────────────
+    // A foe is claimed EXCLUSIVELY while somebody fights it, and a raid foe is a full arena bout now — rounds,
+    // not a tap. So the end of every wave looks the same: two foes left, both claimed, and everyone else
+    // standing in the plaza with nothing to hit until the wave clears. Luke, mid-raid: "stuck no enemies to
+    // fight", on a wave 5 with ten minutes left on the clock and both remaining bandits taken.
+    //
+    // The wave only advances on a FULL clear, so the fix is not to advance it sooner — that would cheat the
+    // people still fighting out of their kill — it is to send reinforcements to the people who have nothing.
+    // Fires only when there is genuinely NOTHING free, so a raid with spare foes behaves exactly as before.
+    //
+    // SAFE ON A READ PATH, which this is — every viewer polls it every couple of seconds:
+    //   · slots are derived from the current maximum, so two concurrent polls compute the SAME slot numbers
+    //     and the (event_id, wave, slot) unique index turns the loser into a no-op
+    //   · MAX_FOES_PER_WAVE caps the wave however many times this fires
+    //   · the chieftain is exempt — that wave is one boss on purpose
+    if (wave != null && wave !== CHIEFTAIN_WAVE && alive.length && !alive.some((r) => !r.engaged_by)) {
+        const fighters = await liveFighterCount(eventId).catch(() => 1);
+        const room = Math.min(fighters, MAX_FOES_PER_WAVE) - alive.length;
+        if (room > 0) {
+            const maxSlot = Math.max(...alive.map((r) => Number(r.slot) || 0));
+            for (let i = 1; i <= room; i += 1) {
+                const kind = pickKind(wave);
+                const def = enemyKind(kind);
+                const hp = Math.round(def.hp * (1 + (wave - 1) * 0.12));
+                await db.query(
+                    `INSERT INTO mkt_town_enemy (event_id, wave, slot, kind, hp, hp_max, x, y, flip)
+                     VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
+                    [eventId, wave, maxSlot + i, kind, hp,
+                        Math.round(rand(10, 90) * 10) / 10, Math.round(rand(70, 82) * 10) / 10, Math.random() < 0.5]
+                ).catch(() => {});
+            }
+            const fresh = await db.query(
+                `SELECT e.id, e.wave, e.slot, e.kind, e.hp, e.hp_max, e.x, e.y, e.flip, e.engaged_by,
+                        NULL::text AS engaged_name, NULL::text AS engaged_sprite
+                   FROM mkt_town_enemy e
+                  WHERE e.event_id = $1 AND e.wave = $2 AND e.slot > $3 AND e.died_at IS NULL
+                  ORDER BY e.slot ASC`,
+                [eventId, wave, maxSlot]
+            ).catch(() => []);
+            alive = alive.concat(fresh);
+        }
+    }
     return {
         wave,
         totalWaves: WAVES,
