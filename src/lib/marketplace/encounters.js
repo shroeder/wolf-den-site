@@ -113,7 +113,10 @@ export const ENCOUNTERS = [
     // ── TIER 5 ── run, or be a story.
     { id: "dread_corsair", kind: "ship", tier: 5, name: "The Dread Corsair", cls: "Black galleon",
         blurb: "The flag is courtesy. The broadside is the message.",
-        guns: 9, hits: 36, accuracy: 0.74, rake: 0.2, ammo: "explosive",
+        // 9 -> 7. A player's broadside caps at SEVEN (gunsFor: 2 + the Cannons track's 5), so nine barrels was
+        // a foe strictly beyond anything anybody could ever build toward. A wall you cannot out-equip is not
+        // difficulty, it is a locked door with loot behind it.
+        guns: 7, hits: 36, accuracy: 0.74, rake: 0.2, ammo: "explosive",
         loot: [L.doubloons(70), L.chest("mythic"), L.parts(4, 4)] },
     { id: "elder_kraken", kind: "monster", tier: 5, name: "The Elder", cls: "Elder kraken",
         blurb: "Every chart you own has the same word written over this water.", limb: "kraken",

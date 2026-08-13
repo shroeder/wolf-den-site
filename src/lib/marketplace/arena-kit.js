@@ -398,7 +398,16 @@ export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Numb
 // it produced was "broke off and ran after 14 rounds" while both decks still had guns.
 export const PIT_CLOSES_AT = 7;
 export const PIT_STEP = 0.35;
-export const pitFever = (beat = 1) => (beat < PIT_CLOSES_AT ? 1 : 1 + PIT_STEP * (beat - PIT_CLOSES_AT + 1));
+// ── THE SAND NO LONGER RUNS OUT ──────────────────────────────────────────────────────────────────────────────
+// Removed on request. From round seven both fighters' damage climbed 35% a beat, which did end long bouts —
+// that was the point — but it ended them by taking the fight off the player: past round ten the numbers were
+// so far above what either card said that nothing you had built mattered any more. It also punished the
+// Warden hardest, whose whole win condition is outlasting, which is the opposite of what a stalling rule
+// should do.
+//
+// Kept as a neutral function rather than deleted so every call site keeps compiling and no caller has to know
+// the mechanic went away — the same treatment elementClash got. The two constants stay for the same reason.
+export const pitFever = () => 1;
 
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);

@@ -300,9 +300,28 @@ export async function openChest(buyerId, tier) {
         }
     }
     const pool = isEliteRarity ? ELITE_POOL : CHEST_POOL;
-    // Prefer the rolled rarity; if you own them all, widen to any un-owned pool item before falling to dust.
     let candidates = pool.filter((i) => i.rarity === rarity && !owned.has(i.id));
-    if (!candidates.length) candidates = pool.filter((i) => !owned.has(i.id));
+    // ── IF YOU OWN THEM ALL, GO DOWN THE LADDER — NEVER UP ───────────────────────────────────────────────
+    // This was `pool.filter((i) => !owned.has(i.id))`: own every un-owned item at the rolled rarity and the
+    // chest handed you a uniformly random un-owned item from the WHOLE pool. It reads like a kindness ("do
+    // not pay dust") and it is the biggest hole in the economy, because of WHO it fires for.
+    //
+    // A heavy opener owns every common and rare within a fortnight. From then on their wooden chests — whose
+    // table caps at EPIC and cannot roll higher — roll "common", find nothing un-owned at that rarity, and
+    // draw uniformly from what is left, which by then is almost entirely legendary and mythic. Measured:
+    // Mr.Wakey pulled 8 mythics out of 77 chests that were overwhelmingly wooden and iron, with no chest-luck
+    // companion and no Locksmith. The rarity roll had become decoration for exactly the players who open the
+    // most chests.
+    //
+    // Widening DOWNWARD keeps the intent — a chest should try to give you an item before it gives you dust —
+    // while making the rolled rarity a CEILING rather than a suggestion. Going up is still possible, but only
+    // through The Sorting Table below, which is a primordial-tier power and is supposed to be the thing that
+    // does this.
+    if (!candidates.length) {
+        for (let i = RARITY_LADDER.indexOf(rarity) - 1; i >= 0 && !candidates.length; i -= 1) {
+            candidates = pool.filter((x) => x.rarity === RARITY_LADDER[i] && !owned.has(x.id));
+        }
+    }
     if (candidates.length) {
         const item = candidates[Math.floor(Math.random() * candidates.length)];
         await grantItem(buyerId, item.id, isEliteRarity ? "elite" : "chest");

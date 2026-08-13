@@ -1209,9 +1209,24 @@ async function readRow(buyerId) {
 // win is the reason an encounter is worth anything — it is just no longer the thing you expect.
 const ENC_TIER_WEIGHT = { "-1": 4, 0: 4, "1": 1 };
 
-/** Difficulty near your own boat level, so a fresh captain never opens with the Elder. */
-function pickEncounterFor(boatLevel = 1) {
-    const want = Math.max(1, Math.min(5, 1 + Math.floor((Number(boatLevel) || 1) / 8)));
+/**
+ * Difficulty near what you can actually FIGHT with, so a fresh captain never opens with the Elder.
+ *
+ * ── AND "WHAT YOU CAN FIGHT WITH" IS NOT YOUR BOAT LEVEL ─────────────────────────────────────────────────────
+ * This scaled off boat level alone, and boat level comes from SAILING — from sending the boat out over and
+ * over, which everyone does because it is the idle half of the feature. Your broadside comes from the Cannons
+ * track, which is a separate thing you have to choose to buy. So a captain at boat level 32 who had never
+ * touched Cannons was thrown at tier 5 — nine guns and thirty-six planks — while sailing with the two barrels
+ * everybody starts with. That is the whole of "everyone is getting their shit kicked in by the ships with 9
+ * guns": the game was measuring how much they had sailed and matching them on how much they had ARMED.
+ *
+ * Weighted toward guns because guns are what end a fight; hull only decides how long you last while losing.
+ */
+function pickEncounterFor(boatLevel = 1, gunLevel = 0, hullLevel = 0) {
+    const kit = Math.min(1,
+        (Math.max(0, Number(gunLevel) || 0) / COMBAT_TRACKS.guns.max) * 0.65
+        + (Math.max(0, Number(hullLevel) || 0) / COMBAT_TRACKS.hull.max) * 0.35);
+    const want = Math.max(1, Math.min(5, 1 + Math.round(kit * 4)));
     // One tier either side, so there is variety without a cliff.
     const pool = ENCOUNTERS.filter((e) => Math.abs(e.tier - want) <= 1);
     const list = pool.length ? pool : ENCOUNTERS;
@@ -1584,7 +1599,8 @@ export async function startVoyage(buyerId, optionId = "standard") {
     ENCOUNTER_MARKS.forEach((mk, i) => {
         const hit = (i === 0 && forcedEnc) || Math.random() < chance * mk.weight;
         if (!hit) return;
-        marks.push({ at: new Date(Date.now() + Math.round(ms * mk.at)).toISOString(), enc: pickEncounterFor(state.level), done: false });
+        marks.push({ at: new Date(Date.now() + Math.round(ms * mk.at)).toISOString(),
+            enc: pickEncounterFor(state.level, row?.gun_level || 0, row?.hull_level || 0), done: false });
     });
     const encMs = null;   // the old single-mark column is retired; `encounter_marks` carries them now
     await db.query(

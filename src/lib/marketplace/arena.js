@@ -763,7 +763,10 @@ const RESERVE_MEMBER = 2;
 // time the roster changes shape. This holds at any roster size by construction.
 // 0.45 was too much: three Gauntlet fights in a row is a run nobody wants, and at 45% that happens roughly
 // once every eleven matches. At 30% it is once every thirty-seven, which reads as variety rather than a rut.
-const GAUNTLET_SHARE = 0.3;
+// 0.3 -> 0.5. The mechanism is sound this time — measured against Luke's own card, 11 of 44 reachable tiers
+// clear the fairness gate and the closest sits 4% off his rating — so "I still never see npc fights" was three
+// in ten reading as never across a handful of taps. A coin flip is what he is actually asking for.
+const GAUNTLET_SHARE = 0.5;
 
 function matchArenaOpponent(buyerId, myPower, board, bestTier) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
