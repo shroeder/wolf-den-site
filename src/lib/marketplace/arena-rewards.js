@@ -108,9 +108,12 @@ export const FEATS = [
         },
     },
     {
+        // Was "won with your affinity smothered by theirs" — unearnable the moment the element clash was
+        // removed, and an achievement nobody can get is worse than one that does not exist. Same id, so it
+        // stays on the record of everyone who earned it; the condition is now the other kind of uphill fight.
         id: "upstream", name: "Against the Current", laurels: 50, vp: 10, color: "#4aa3ff",
-        blurb: "Won with your affinity smothered by theirs.",
-        test: (b) => b.won && (b.clash?.mult || 1) < 1,
+        blurb: "Won from under a third of your health.",
+        test: (b) => b.won && (b.maxHp || 0) > 0 && (b.hp || 0) <= (b.maxHp || 0) / 3,
     },
     {
         id: "devastating", name: "Devastating", laurels: 35, vp: 5, color: "#ffd75e",

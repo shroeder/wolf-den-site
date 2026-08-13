@@ -830,7 +830,6 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier) {
 const TOWN_EDGE = 2;
 
 function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {} } = {}) {
-    const clash = elementClash(me.element, foeKit.element);
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
         myPower, theirPower, npcTier, size,
@@ -893,7 +892,6 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
-        clash,                                   // your affinity against theirs, decided before a blow lands
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
         // This only ever multiplied the CHALLENGER's damage. The same two loadouts therefore fought two
         // different fights depending on who happened to open: challenge someone far above you and you came in
@@ -1332,9 +1330,7 @@ export async function fightRound(buyerId, opts = {}) {
         let gradeAtk = ATTACK;
         // Sunder Guard (a tree passive) cuts what their guard is worth on every swing, not just on a sunder.
         let pierce = Math.max(0.2, 1 - (P.pierce || 0));
-        let clashMult = b.clash?.mult || 1;
-        // Wheelwise: your element bites a little harder and slides off a little less.
-        if (P.elementEdge) clashMult = clashMult >= 1 ? clashMult * (1 + P.elementEdge) : clashMult + (1 - clashMult) * P.elementEdge;
+        // The element multiplier is gone (see elementClash). Nothing scales a swing by affinity now.
         // First Blood, and Bloodlust: the opening beat, and fighting hurt.
         const openMult = b.beat <= 1 ? 1 + (P.openMult || 0) : 1;
         const lowHpMult = b.hp <= b.maxHp / 3 ? 1 + (P.lowHpDmg || 0) : 1;
@@ -1356,13 +1352,11 @@ export async function fightRound(buyerId, opts = {}) {
                 gradeAtk = 1.45;
             }
             if (ability.kind === "spell") {
-                // Its own affinity against theirs, not the bout-wide one — so what you attuned this specific
-                // piece to at the Forge is a real decision. And magic cuts guard, paid for in raw power.
-                const c = elementClash(ability.element, b.foe.element);
-                clashMult = c.mult * (P.elementEdge ? (c.mult >= 1 ? 1 + P.elementEdge : 1) : 1);
+                // Magic cuts guard, paid for in raw power. It used to also re-roll the element clash off the
+                // spell's own affinity rather than the bout's; with the wheel gone there is nothing to re-roll,
+                // and what makes a spell a spell is the pierce.
                 pierce = Math.max(0.2, 0.6 - (P.pierce || 0));
                 power *= 0.88 * (1 + (P.spellPower || 0));
-                if (c.note) note += ` — ${c.note}`;
             }
             // ── THE FIVE THAT CHANGE THE SHAPE OF A BOUT ─────────────────────────────────────────────────
             // Nine archetypes used to collapse into "one big hit", which is why a four-piece kit read as the
@@ -1427,7 +1421,7 @@ export async function fightRound(buyerId, opts = {}) {
             hitsLanded += 1;
             const c = Math.random() < critChance;
             if (c) crit = true;
-            const raw = b.me.damage * gradeAtk * power * surge * clashMult * (b.underdog || 1)
+            const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
                 * openMult * lowHpMult * fever * (c ? myCritMult : 1);
             turned += Math.round(raw * guard);
             const landed = Math.max(1, Math.round(raw - raw * guard));
@@ -1625,8 +1619,7 @@ export async function fightRound(buyerId, opts = {}) {
         let foePierce = Math.max(0.25, 1 - (FP.pierce || 0));
         // Their element against yours is the mirror of yours against theirs — including their Wheelwise, which
         // sharpens their advantage and softens their disadvantage exactly as yours does.
-        let back = 1 / (b.clash?.mult || 1);
-        if (FP.elementEdge) back = back >= 1 ? back * (1 + FP.elementEdge) : back + (1 - back) * FP.elementEdge;
+        let back = 1;
         // ── THE SAME NINE KINDS, DOING THE SAME NINE THINGS ──────────────────────────────────
         // Read off the same list your own swing is read off. Every one of these used to collapse into a bare
         // `power` multiplier, so their surge, their sunder, their rend, their gamble and their flurry were all
@@ -1644,8 +1637,7 @@ export async function fightRound(buyerId, opts = {}) {
                 // Yours reads the affinity of the SPECIFIC piece you attuned at the Forge rather than the
                 // bout-wide clash; theirs was still using the bout-wide number, so the one decision the Forge
                 // asks you to make about a weapon was worth nothing on the half of your fights you defend.
-                const c = elementClash(theirAbility.element, b.me.element);
-                back = c.mult * (FP.elementEdge ? (c.mult >= 1 ? 1 + FP.elementEdge : 1) : 1);
+                // No affinity multiplier on their side either.
             }
             // ── AND THE STRIKE AMPLIFIER ── a strike is the high-variance kind: yours swings at 1.45 where
             // everything else swings at 1. Theirs swung at 1, so a strike kit was a strictly worse kit to be

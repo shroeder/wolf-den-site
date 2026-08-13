@@ -17,7 +17,7 @@ import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
-import { BATTLE_ITEMS, BEATS } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -477,7 +477,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
-    const [wheel, setWheel] = useState(false);    // the element-wheel explainer
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
@@ -1033,12 +1032,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-round">Round {bout.beat}</span>
 
                         <span className="ar-hud-tags">
-                            {bout.clash?.note ? (
-                                <button type="button" className={`ar-tag ${bout.clash.mult > 1 ? "is-good" : "is-bad"}`}
-                                    onClick={() => setWheel((w) => !w)}>
-                                    {bout.clash.note} · {bout.clash.mult > 1 ? "+" : "−"}{Math.round(Math.abs(bout.clash.mult - 1) * 100)}%{" "}<u>why?</u>
-                                </button>
-                            ) : null}
                             {/* THE PIT CLOSES. An escalation nobody is told about is the hidden roll all over
                                 again, so it says so the round it starts and keeps saying how much. */}
                             {bout.fever > 1 ? (
@@ -1092,26 +1085,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             </button>
                         </div>
                     </div>
-
-                    {wheel ? (
-                        <div className="ar-wheel" role="dialog" aria-label="Element wheel">
-                            <b>Every element beats two others</b>
-                            <div className="ar-wheel-rows">
-                                {Object.entries(BEATS).map(([el, beats]) => (
-                                    <span key={el} className={`ar-wheel-row${el === bout.me?.element ? " is-you" : ""}${el === bout.foe?.element ? " is-foe" : ""}`}>
-                                        <i style={{ "--el": ELEMENT_COLOR[el] || "#9aa0a6" }}>{el}</i>
-                                        <em>beats</em>
-                                        {beats.map((b2) => <i key={b2} style={{ "--el": ELEMENT_COLOR[b2] || "#9aa0a6" }}>{b2}</i>)}
-                                    </span>
-                                ))}
-                            </div>
-                            <em className="ar-wheel-foot">
-                                Answering their affinity is worth {Math.round(0.25 * 100)}% either way. Your element is
-                                whatever most of your gear carries — re-attune a piece at the Forge to change it.
-                            </em>
-                            <button type="button" className="ar-back" onClick={() => setWheel(false)}>Close</button>
-                        </div>
-                    ) : null}
 
                     {/* THE DECLARATION. Name, art and element, centre screen, at the moment of the cast. */}
                     {casting || foeCasting ? (() => {

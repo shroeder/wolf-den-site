@@ -37,11 +37,19 @@ export const BEATS = {
 };
 export const ELEMENT_EDGE = 0.25;   // damage swing when your affinity answers theirs
 
-export function elementClash(mine, theirs) {
-    if (!mine || !theirs || mine === theirs) return { mult: 1, note: null };
-    // "Earth overcomes Light" never said whose Earth or whose Light. Possessives, always.
-    if (BEATS[mine]?.includes(theirs)) return { mult: 1 + ELEMENT_EDGE, note: `Your ${ELEMENTS[mine]?.label} overcomes their ${ELEMENTS[theirs]?.label}` };
-    if (BEATS[theirs]?.includes(mine)) return { mult: 1 - ELEMENT_EDGE, note: `Their ${ELEMENTS[theirs]?.label} smothers your ${ELEMENTS[mine]?.label}` };
+// ── THE WHEEL IS GONE FROM THE RING ──────────────────────────────────────────────────────────────────────────
+// Removed on request. It decided a quarter of a fight's damage before either fighter moved, off a matchup
+// neither of them picked, and the only counter-play was a paid Forge re-attune between bouts — which is a
+// shop trip, not a decision in the fight. A member losing 25% of every swing to a coin flip they were dealt
+// at the door does not read as depth; it reads as the game having already chosen.
+//
+// ELEMENTS THEMSELVES STAY. Affinity still names your abilities, colours the particle effects and drives the
+// boss fight's weakness system, which is a different feature and untouched. What is gone is the arena damage
+// multiplier and nothing else.
+//
+// Kept as a neutral function rather than deleted so every call site keeps compiling and no caller has to know
+// the mechanic went away. BEATS is still exported for the boss and for anything that wants to draw the wheel.
+export function elementClash() {
     return { mult: 1, note: null };
 }
 

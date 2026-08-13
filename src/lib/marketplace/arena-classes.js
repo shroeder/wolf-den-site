@@ -240,8 +240,12 @@ export const TREES = {
     runecaller: [
         N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.035,
             desc: "+5% spell damage per rank.", sprite: "/images/arena/node/rc_power.webp" }),
-        N({ id: "rc_edge", tier: 0, name: "Wheelwise", ranks: 4, stat: "elementEdge", per: 0.03,
-            desc: "Your affinity is worth 3% more per rank, either way.", sprite: "/images/arena/node/rc_edge.webp" }),
+        // Was "Wheelwise", +3% element edge a rank. The wheel is gone from the ring, so the node had nothing
+        // left to modify — a passive that reads well and does nothing is the bug this file keeps being fixed
+        // for. Same id and same rank count, so anyone who bought it keeps every point; only what it buys has
+        // changed, to the other half of what a Runecaller is.
+        N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.006,
+            desc: "Your burns tick 0.6% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
         N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, cd: 4,
             desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
 
