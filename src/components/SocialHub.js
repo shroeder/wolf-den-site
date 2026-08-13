@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import MemberHeroCard from "@/components/MemberHeroCard";
 import { borderClass } from "@/lib/marketplace/borders.js";
+import NoticeBody from "@/components/NoticeBody";
 
 // ── STICK TO THE BOTTOM, BUT ONLY IF YOU WERE ALREADY THERE ──────────────────────────────────────────────────
 // Both threads used to jump to the newest message every time `messages` changed, and messages change on a
@@ -620,7 +621,11 @@ function GlobalChatTab({ open, onRead }) {
                                     )}
                                     <span className="gchat-time">{relTime(m.at)}</span>
                                 </span>
-                                <span className="gchat-body">{m.body}</span>
+                                {/* An Arbiter announcement gets structure and opens collapsed. Same
+                                    component the plaza uses — see NoticeBody on why it is shared. */}
+                                {m.notice
+                                    ? <NoticeBody body={m.body} className="gchat-body" />
+                                    : <span className="gchat-body">{m.body}</span>}
                             </span>
                         </div>
                     ))

@@ -6866,6 +6866,26 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .gchat-time { font-size: 0.68rem; opacity: 0.5; white-space: nowrap; }
 .gchat-body { font-size: 0.92rem; line-height: 1.36; background: rgba(255,255,255,0.06); padding: 8px 12px; border-radius: 13px; word-break: break-word; }
 .gchat-row.mine .gchat-body { background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; font-weight: 600; }
+/* ── AN ARBITER NOTICE ── shared by BOTH global-chat renderers (the plaza's TownClient and the Social
+   panel's SocialHub) and by the NoticeBody component they both mount. It lives in globals.css rather
+   than in TOWN_CSS precisely because of that: styling that only exists while the town page is open is
+   styling the Social panel does not get, which is how the first cut of this shipped a notice that was
+   formatted in one place and a wall of text in the other. */
+/* ── AN ANNOUNCEMENT ── a notice is not a chat bubble: it gets a rule down the side, real spacing between its
+   parts, and it opens shut. The colour is the Arbiter's, not a member's, so it reads as the house speaking. */
+.wd-notice { display: flex; flex-direction: column; gap: 7px; background: rgba(143,216,255,0.09);
+    border-left: 3px solid rgba(143,216,255,0.55); border-radius: 4px 11px 11px 4px; padding: 8px 11px; }
+.wd-notice.is-shut { flex-direction: row; align-items: center; gap: 9px; flex-wrap: wrap; }
+.wd-notice-gist { font-weight: 800; color: #cfeaff; }
+.wd-notice-head { font-size: 12px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase;
+    color: #8fd8ff; margin-top: 2px; }
+.wd-notice-head:first-child { margin-top: 0; }
+.wd-notice-p { display: block; }
+.wd-notice-list { display: flex; flex-direction: column; gap: 5px; }
+.wd-notice-item { display: grid; grid-template-columns: 12px 1fr; align-items: start; gap: 6px; }
+.wd-notice-item i { width: 5px; height: 5px; margin-top: 7px; border-radius: 50%; background: #8fd8ff; }
+.wd-notice-more { align-self: flex-start; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+    font-size: 11px; font-weight: 800; color: #06121a; background: #8fd8ff; border: 0; }
 .social-section-label {
     font-size: 0.72rem;
     font-weight: 800;

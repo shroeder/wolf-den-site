@@ -11,7 +11,7 @@ import CoinCta from "@/components/CoinCta";
 import { bandLeftPct, bandPct, gradeKeyForDist } from "@/lib/marketplace/timing.js";
 import { STAT_META, describeSea, describeFarm } from "@/lib/marketplace/items.js";
 import { useVisiblePoll } from "@/lib/use-visible-poll.js";
-import { noticeCount, noticeGist, parseNotice } from "@/lib/marketplace/notice-format.js";
+import NoticeBody from "@/components/NoticeBody";
 
 // ── THE WOLF DEN TOWN — side-scrolling social plaza ───────────────────────────────────────────────────────
 // A wide cobblestone street you scroll along (camera follows your hero sprite). Other recently-active members
@@ -196,55 +196,6 @@ function Avatar({ a, isYou, onTap, raiding }) {
 // Raid combat HUD: a shared HP bar (top) + a timed-strike meter and abilities (bottom). The marker sweeps; tap
 // Strike when it's in the gold zone for a PERFECT slash, or fire the Power Slash on cooldown.
 // Corner HUD for a live raid: time left, kills, and your damage. No timing meter — you just tap the foes.
-// ── THE ARBITER'S POSTS, AS SOMETHING YOU CAN ACTUALLY READ ──────────────────────────────────────────────────
-// Patch notes go into the plaza chat, and chat renders a message as one span — so the last one arrived as an
-// unbroken three-hundred-word wall that pushed the whole conversation off the screen.
-//
-// COLLAPSED BY DEFAULT, and that is the important half. The chat log is a shared room; somebody scrolling it
-// to see who is about should not have to scroll past a changelog to get there. What they see is the headline
-// and a count of what is in it, and opening it is one tap.
-//
-// Structure comes from parseNotice, which returns DATA — headings, paragraphs, lists — never markup. Nothing
-// here interpolates a string into the DOM, so a notice cannot carry anything but text no matter who writes it.
-function NoticeBody({ body }) {
-    const [open, setOpen] = useState(false);
-    const blocks = useMemo(() => parseNotice(body), [body]);
-    const gist = useMemo(() => noticeGist(body), [body]);
-    const count = useMemo(() => noticeCount(body), [body]);
-    // A short one is just a message with a bit of shape on it — no point hiding three lines behind a button.
-    const short = blocks.length <= 2 && count <= 2;
-    if (!open && !short) {
-        return (
-            <span className="tw-clog-body tw-notice is-shut">
-                <b className="tw-notice-gist">{gist}</b>
-                <button type="button" className="tw-notice-more" onClick={() => setOpen(true)}>
-                    Read it{count ? ` · ${count} change${count === 1 ? "" : "s"}` : ""}
-                </button>
-            </span>
-        );
-    }
-    return (
-        <span className="tw-clog-body tw-notice">
-            {blocks.map((b, i) => {
-                if (b.kind === "head") return <b key={i} className="tw-notice-head">{b.text}</b>;
-                if (b.kind === "list") {
-                    return (
-                        <span key={i} className="tw-notice-list">
-                            {b.items.map((it, j) => (
-                                <span key={j} className="tw-notice-item"><i aria-hidden="true" />{it}</span>
-                            ))}
-                        </span>
-                    );
-                }
-                return <span key={i} className="tw-notice-p">{b.text}</span>;
-            })}
-            {short ? null : (
-                <button type="button" className="tw-notice-more" onClick={() => setOpen(false)}>Close</button>
-            )}
-        </span>
-    );
-}
-
 function RaidHUD({ ev, kills, onExpire }) {
     const [left, setLeft] = useState("");
     const firedRef = useRef(false);
@@ -1657,7 +1608,7 @@ export default function TownClient({ initial }) {
                                 </span>
                                 <span className="tw-clog-main">
                                     <span className="tw-clog-top"><span className="tw-clog-name">{m.name}</span><span className="tw-clog-time">{relTime(m.at)}</span></span>
-                                    {m.notice ? <NoticeBody body={m.body} /> : <span className="tw-clog-body">{m.body}</span>}
+                                    {m.notice ? <NoticeBody body={m.body} className="tw-clog-body" /> : <span className="tw-clog-body">{m.body}</span>}
                                 </span>
                             </div>
                         ))}
@@ -2694,21 +2645,6 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
 .tw-clog-time { font-size: 10px; opacity: 0.45; white-space: nowrap; }
 .tw-clog-body { font-size: 13.5px; line-height: 1.34; background: rgba(255,255,255,0.06); padding: 6px 10px; border-radius: 11px; color: #f2ead9; word-break: break-word; }
 .tw-clog-row.mine .tw-clog-body { background: linear-gradient(180deg,#ffd75e,#f3b23a); color: #2a1a06; }
-/* ── AN ANNOUNCEMENT ── a notice is not a chat bubble: it gets a rule down the side, real spacing between its
-   parts, and it opens shut. The colour is the Arbiter's, not a member's, so it reads as the house speaking. */
-.tw-notice { display: flex; flex-direction: column; gap: 7px; background: rgba(143,216,255,0.09);
-    border-left: 3px solid rgba(143,216,255,0.55); border-radius: 4px 11px 11px 4px; padding: 8px 11px; }
-.tw-notice.is-shut { flex-direction: row; align-items: center; gap: 9px; flex-wrap: wrap; }
-.tw-notice-gist { font-weight: 800; color: #cfeaff; }
-.tw-notice-head { font-size: 12px; font-weight: 900; letter-spacing: .07em; text-transform: uppercase;
-    color: #8fd8ff; margin-top: 2px; }
-.tw-notice-head:first-child { margin-top: 0; }
-.tw-notice-p { display: block; }
-.tw-notice-list { display: flex; flex-direction: column; gap: 5px; }
-.tw-notice-item { display: grid; grid-template-columns: 12px 1fr; align-items: start; gap: 6px; }
-.tw-notice-item i { width: 5px; height: 5px; margin-top: 7px; border-radius: 50%; background: #8fd8ff; }
-.tw-notice-more { align-self: flex-start; padding: 3px 10px; border-radius: 999px; cursor: pointer;
-    font-size: 11px; font-weight: 800; color: #06121a; background: #8fd8ff; border: 0; }
 .tw-chat-form { display: flex; gap: 8px; }
 .tw-chat-form input { flex: 1 1 auto; min-width: 0; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(255,215,110,0.35); background: rgba(255,255,255,0.05); color: #f2ead9; font-size: 14px; }
 .tw-chat-form input::placeholder { color: #9a8fb0; }
