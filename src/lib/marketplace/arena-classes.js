@@ -75,6 +75,7 @@ export const CLASSES = [
         health: 0,
         dr: 0.16,
         accuracy: 0.92,
+        guard: 0.12,
     },
     {
         id: "warden",
@@ -86,6 +87,12 @@ export const CLASSES = [
         health: 110,
         dr: 0.40,
         accuracy: 0.95,
+        // ── THE BRACE IS THEIRS ──────────────────────────────────────────────────────────────────────────
+        // Double everyone else's, inherent, before a point is spent — and then multiplied by Fortune like
+        // anyone's (see guardSoakFrom in arena-kit.js). Guard used to be a flat share of health every class
+        // got identically, which made the one command a shield build exists to press the one command a
+        // shield build could not improve. Fortress still stacks flat on top of this.
+        guard: 0.24,
         // ── THE WARDEN DRINKS ────────────────────────────────────────────────────────────────────────────
         // A share of everything they put on the other fighter comes back as health — INCLUDING thorns and
         // ripostes, which is where 84% of a Warden's damage actually comes from. So the class heals by being
@@ -106,6 +113,7 @@ export const CLASSES = [
         health: 30,
         dr: 0.24,
         accuracy: 0.93,
+        guard: 0.12,
     },
 ];
 
@@ -117,6 +125,7 @@ export const CLASSES = [
 //   health    flat bonus on top of what Ferocity buys — the tank is bigger before they spend anything
 //   dr        damage reduction, the share of every incoming blow that never lands
 //   accuracy  the base chance a swing connects, before a skill's own penalty
+//   guard     the share of your health one Guard brackets, before Fortune multiplies it
 //
 // DR REPLACES "TURN ASIDE". Same mechanic, one name, and it is a class trait rather than a flat 34% everybody
 // shared. Footwork's ranks carry straight over — the node's stat is `dr` now and adds to the class base, so a
@@ -133,11 +142,15 @@ export const classBase = (id) => {
         dr: c?.dr ?? DEFAULT_DR,
         accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
         lifesteal: c?.lifesteal || 0,
+        guard: c?.guard ?? DEFAULT_GUARD,
     };
 };
 
 // What someone with no class at all fights with — a member who has not picked yet, and the shape NPCs use.
 export const DEFAULT_DR = 0.20;
+// Half a Warden's, which is the rule for every class that is not one: bracing well is the Warden's job.
+// NPCs use it too — they have no class and no Fortune, so a Gauntlet foe's guard is exactly this.
+export const DEFAULT_GUARD = 0.12;
 export const DEFAULT_ACCURACY = 0.95;
 // Nobody dodges forever and nobody hits forever: a ceiling on each so investment cannot end the interaction.
 export const DR_CAP = 0.60;

@@ -15,7 +15,8 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { DRAIN_SHARE, GUARD_SOAK } from "@/lib/marketplace/arena-kit.js";
+import { DRAIN_SHARE, guardSoakFrom } from "@/lib/marketplace/arena-kit.js";
+import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 
 // ── THE ABSENT DEFENDER PLAYS THEIR OWN BUILD ────────────────────────────────────────────────────────────────
@@ -228,7 +229,10 @@ export function pickIncoming(b) {
         // halved the AI would have gone on valuing a brace at twice what it now buys — guarding in the exact
         // spot where it should have reached for the poultice. The bug would have looked like the AI playing
         // badly rather than like a number that moved without its dependants.
-        const guardBank = b.foeMaxHp * (GUARD_SOAK + (FP.guardSoak || 0));
+        // Guard stopped being one number for everybody: it is the fighter's class base scaled by their
+        // Fortune, resolved at kit time and carried on the bout. Reading a shared constant here would have
+        // the AI value a Warden's brace at half what it banks and a Reaver's at double.
+        const guardBank = b.foeMaxHp * (b.foe?.guard ?? guardSoakFrom(DEFAULT_GUARD, 0, FP.guardSoak || 0));
         const drainMove = of("drain");
         if (potHeal > 0 && potHeal >= guardBank) return reachFor("poultice", { heal: POULTICE_HEAL });
         if (drainMove && theirFrac > 0.15) return swing(drainMove, null);

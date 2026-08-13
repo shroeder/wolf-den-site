@@ -8,7 +8,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
-    BATTLE_ITEMS, BLOCK, BLOCK_CAP, GUARD_SOAK, GUARD_COOL, speedOf,
+    BATTLE_ITEMS, BLOCK, BLOCK_CAP, guardSoakFrom, GUARD_COOL, speedOf,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -20,7 +20,7 @@ import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRung
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
-    ACCURACY_CAP, ACCURACY_FLOOR, arenaLevelFor, arenaXpFor, classBase, CLASSES, classById,
+    ACCURACY_CAP, ACCURACY_FLOOR, arenaLevelFor, arenaXpFor, classBase, CLASSES, classById, DEFAULT_GUARD,
     DEFAULT_ACCURACY, DEFAULT_DR, DR_CAP,
     FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
     pointsSpent, treeAbilities, treeEffects, treeState,
@@ -69,7 +69,11 @@ export function ringStats(stats = {}) {
         // the health above. See arena-npc.js.
         dr: Math.min(DR_CAP, Number(stats.dr) || 0),
         accuracy: Number(stats.accuracy) || DEFAULT_ACCURACY,
+        // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
+        // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
+        guard: Number(stats.guard) || DEFAULT_GUARD,
         might: Number(stats.might) || 0,
+        fortune: Number(stats.fortune) || 0,
     };
 }
 
@@ -198,6 +202,9 @@ async function combatStats(buyerId, gearStats, ids) {
         might: (gearStats.might || 0) + ((ps.might || 0) + (ps.ferocity || 0)) * bb + (bs.might || 0),
         crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (bs.crit_chance || 0),
         crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (bs.crit_power || 0),
+        // Fortune buys the brace now (see guardSoakFrom), so the pet's and the badges' share of it has to
+        // reach the ring. It was spread through from gear alone because until now nothing in a bout read it.
+        fortune: (gearStats.fortune || 0) + (ps.fortune || 0) * bb + (bs.fortune || 0),
     };
 }
 
@@ -326,7 +333,12 @@ async function kitFor(buyerId) {
         // swinging is also a body that lands them — and raised by the tree.
         accuracy: Math.min(ACCURACY_CAP, Math.max(ACCURACY_FLOOR,
             base.accuracy + accuracyFromFerocity((Number(stats.ferocity) || 0) + (perks.ferocity || 0)) + (perks.accuracy || 0))),
+        // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
+        // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
+        // command lands, so the number the button prints and the number the engine banks are the same one.
+        guard: guardSoakFrom(base.guard, (Number(stats.fortune) || 0) + (perks.fortune || 0), perks.guardSoak || 0),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
+        fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
         element: kit.element, abilities,
     };
 }
@@ -864,6 +876,9 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: foeKit.dr ?? DEFAULT_DR,
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
+            // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
+            // allowlist and their Guard silently falls back to a stranger's numbers.
+            guard: foeKit.guard ?? DEFAULT_GUARD,
             // ── AND THEIR TREE ────────────────────────────────────────────────────────────────────────────
             // kitFor() has always built these for whoever it is asked about, and four of them (critPower,
             // critMult, armour, and the stat nodes) were folded into the numbers above. The other fifteen —
@@ -891,6 +906,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: me.dr ?? DEFAULT_DR,
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
+            guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
         // This only ever multiplied the CHALLENGER's damage. The same two loadouts therefore fought two
@@ -1247,7 +1263,11 @@ export async function fightRound(buyerId, opts = {}) {
         // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.
         if (command === "guard") {
             // Fortress soaks more on a plain guard, which is the command a shield build spends turns on.
-            const soak = Math.min(Math.round(b.maxHp * (GUARD_SOAK + (P.guardSoak || 0))),
+            // `b.me.guard` already has the class base, Fortune and Fortress folded in at kit time. The
+            // fallback is for bouts written before guard was a built number — they carry no `me.guard`, and
+            // reading undefined here would brace them for nothing mid-fight.
+            const share = b.me?.guard ?? guardSoakFrom(DEFAULT_GUARD, 0, P.guardSoak || 0);
+            const soak = Math.min(Math.round(b.maxHp * share),
                 Math.max(0, Math.round(b.maxHp * (SHIELD_CAP + (P.shieldCap || 0))) - b.shield));
             b.shield += soak;
             cool(GUARD_COOL);
@@ -1578,7 +1598,8 @@ export async function fightRound(buyerId, opts = {}) {
             // cap. The flat 40% is gone with it — keeping BOTH would have made defending strictly better than
             // attacking, which is the same failure pointed the other way.
             const cap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
-            const foeSoak = Math.min(Math.round(b.foeMaxHp * (GUARD_SOAK + (FP.guardSoak || 0))),
+            const foeShare = b.foe?.guard ?? guardSoakFrom(DEFAULT_GUARD, 0, FP.guardSoak || 0);
+            const foeSoak = Math.min(Math.round(b.foeMaxHp * foeShare),
                 Math.max(0, cap - (b.foeShield || 0)));
             b.foeShield = (b.foeShield || 0) + foeSoak;
             b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false, soaked: foeSoak,

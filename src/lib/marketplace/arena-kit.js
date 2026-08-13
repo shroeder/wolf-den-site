@@ -479,7 +479,29 @@ export const BATTLE_ITEMS = [
 // them got a third harder — four defensive nerfs at once against a build whose entire win condition is
 // outlasting. Attrition fights went from thirty rounds to five. The expiry stays (that was the point, and a
 // brace should not be savings); only the compounding is undone.
-export const GUARD_SOAK = 0.21;     // of your max health, absorbed from the next blow — and only the next one
+// ── AND NOW IT IS BUILT, NOT ISSUED ──────────────────────────────────────────────────────────────────────────
+// A flat 0.21 for everybody meant Guard was the one command in the deck that no build could improve and no
+// class owned. The Warden — whose entire win condition is outlasting — braced for exactly as much as the
+// Reaver who wanted the bout over in six rounds, so the tank's signature move was the tank's least
+// distinctive one. Two inputs replace the constant, and both are already on your card:
+//
+//   CLASS BASE   the identity. A Warden's is double everyone else's, inherent, before a point is spent.
+//   FORTUNE      the scaling. Each point adds 1% to the brace, doubling it at 100 — so the stat that until
+//                now bought nothing in the ring is the defensive stat, and a Warden stacking Fortune is
+//                making a real build decision rather than reading a fixed number off the rules.
+//
+// Fortune MULTIPLIES the class base rather than adding a flat share, which is the only shape that keeps the
+// halves half: an additive term would have let a high-Fortune Reaver brace within 70% of a Warden and quietly
+// undo the identity the class base was there to create. Tree ranks (Fortress) add flat, AFTER — a point
+// spent is worth the same whatever your Fortune, which is what makes it a sane thing to spend a point on.
+export const GUARD_FORTUNE_PER = 0.01;   // each point of Fortune, +1% of the base
+export const GUARD_FORTUNE_CAP = 1.00;   // doubled at 100 Fortune, and no further
+
+/** The share of your max health one Guard brackets. See the note above; `base` comes from classBase(). */
+export const guardSoakFrom = (base = 0, fortune = 0, bonus = 0) =>
+    Math.max(0, (Number(base) || 0)
+        * (1 + Math.min(GUARD_FORTUNE_CAP, Math.max(0, Number(fortune) || 0) * GUARD_FORTUNE_PER))
+        + (Number(bonus) || 0));
 
 // ── WHAT A MEMBER TURNS ASIDE ────────────────────────────────────────────────────────────────────────────────
 // The counterpart to an NPC's `armour`, and the answer to "is armour just an NPC stat". It is — no gear rolls

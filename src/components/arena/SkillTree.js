@@ -149,6 +149,9 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                 <i><b>{Math.round((c.dr || 0) * 100)}%</b>reduction</i>
                                 <i><b>{Math.round((c.accuracy || 0) * 100)}%</b>accuracy</i>
                                 <i><b>{c.lifesteal ? `${Math.round(c.lifesteal * 100)}%` : "—"}</b>lifesteal</i>
+                                {/* The Warden's is double everyone else's, and Fortune multiplies it — so
+                                    this number is the floor, not the figure. */}
+                                <i><b>{Math.round((c.guard || 0) * 100)}%</b>guard</i>
                             </span>
                             <p>{c.blurb}</p>
                         </button>

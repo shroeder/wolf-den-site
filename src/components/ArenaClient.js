@@ -992,6 +992,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const foeCasting = reading && bout.incoming?.isAbility ? bout.incoming : null;
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const haveItems = BATTLE_ITEMS.some((i) => (bout.items?.[i.id] || 0) > 0);
+        // WHAT THE BRACE IS ACTUALLY WORTH, ON THE BUTTON. Guard is no longer a flat share every fighter
+        // gets — it is your class base scaled by your Fortune — so "Guard" alone stopped being enough to
+        // decide with. The number is the one the engine banks; see guardSoakFrom.
+        const braceFor = Math.round((bout.maxHp || 0) * (bout.me?.guard || 0));
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar ar-fight">
@@ -1364,6 +1368,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                     <button type="button" className="ar-cmd is-guard" disabled={busy}
                                         onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
                                         <GiShield aria-hidden="true" /><span>Guard</span>
+                                        {braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
                                     </button>
                                     <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
                                         onClick={() => { unlock(); Sfx.ui(); setMenu("item"); }}>
@@ -2669,6 +2674,10 @@ function Styles() {
             .ar-cmd.is-skill { --cmd: #b061ff; }
             .ar-cmd.is-guard { --cmd: #6fd0ff; }
             .ar-cmd.is-item { --cmd: #8bf0b4; }
+            /* The one command whose value is a number you can build up. All four buttons stretch to the
+               tallest, so this line does not make the deck ragged. */
+            .ar-cmd-sub { font-style: normal; font-size: 9.5px; font-weight: 900; letter-spacing: .06em;
+                color: var(--cmd, #6fd0ff); opacity: .9; }
 
             /* A submenu replaces the deck in place — you are still looking at the fight, not a new screen. */
             .ar-sub { display: grid; gap: 5px; max-height: min(46vh, 300px); overflow-y: auto; }

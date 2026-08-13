@@ -95,15 +95,15 @@ export const ARCHETYPES = [
     // a Wall took twenty. Compressed to 0.22-0.60. Each archetype still plainly IS itself; none of them is a
     // different game.
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
-      w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, tough: 1.11 },
+      w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, tough: 1.11, guard: 0.22 },
     { key: "brute", name: "Brute", tell: "Hits like a falling wall. End it early.",
-      w: { might: 0.44, crit_chance: 0.08, crit_power: 0.12, ferocity: 0.36 }, tough: 1.11 },
+      w: { might: 0.44, crit_chance: 0.08, crit_power: 0.12, ferocity: 0.36 }, tough: 1.11, guard: 0.16 },
     { key: "wall", name: "Wall", tell: "Soaks everything. Strip its guard or you are here all day.",
-      w: { might: 0.20, crit_chance: 0.10, crit_power: 0.10, ferocity: 0.60 }, tough: 1.35 },
+      w: { might: 0.20, crit_chance: 0.10, crit_power: 0.10, ferocity: 0.60 }, tough: 1.35, guard: 0.30 },
     { key: "duelist", name: "Duelist", tell: "Fishing for criticals. It only needs to land one.",
-      w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, tough: 1.14 },
+      w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, tough: 1.14, guard: 0.20 },
     { key: "berserker", name: "Berserker", tell: "All edge, no armour. Survive the opening and it folds.",
-      w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, tough: 1.06 },
+      w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, tough: 1.06, guard: 0.12 },
 ];
 // The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
 // harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
@@ -144,6 +144,12 @@ export function npcFor(tier) {
         // Toughness rides on the health the budget already bought, so an archetype is exactly as hard to kill
         // as it was when the same figure was a hidden percentage — the difference is you can now see it.
         tough: arch.tough || 1,
+        // ── HOW HARD THEY BRACE ──────────────────────────────────────────────────────────────────────────
+        // Guard stopped being one flat share for every fighter, so an NPC that inherited the member default
+        // would brace for 12% — a board-wide difficulty cut nobody asked for, landing right after the Road
+        // was tuned. These are set per archetype instead, averaging what they used to get, which keeps the
+        // curve where it was and makes the Wall's tell ("strip its guard") literally true.
+        guard: arch.guard ?? 0.20,
         // NPCs have no damage reduction at all, and no tree, so they hit at the neutral base.
         dr: 0,
         accuracy: DEFAULT_ACCURACY,
@@ -171,6 +177,7 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
         crit_power: Math.round(budget * arch.w.crit_power),
         ferocity: Math.round(budget * arch.w.ferocity),
         tough: arch.tough || 1,
+        guard: arch.guard ?? 0.20,
         dr: 0,
         accuracy: DEFAULT_ACCURACY,
         gearPower: budget,
