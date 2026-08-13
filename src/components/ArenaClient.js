@@ -1141,6 +1141,24 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
                     </div>
 
+                    {/* ── WHAT IS ON YOU ─────────────────────────────────────────────────────────────────
+                        The Road's fighters carry ten moves no member can learn, and every one of them leaves
+                        something behind: your damage cut, your aim off, your guard halved, a bell counting
+                        down. Said once in the log and then invisible, that is indistinguishable from the
+                        numbers being wrong — which is the oldest bug in this file. One chip each, on the
+                        field, for exactly as long as the effect lasts. */}
+                    {(bout.dread || bout.snare || bout.bound || bout.branded || bout.doom || bout.doomReady || bout.foeFrenzy) ? (
+                        <div className="ar-hexes" aria-live="polite">
+                            {bout.dread ? <i className="is-bad">Dread <b>{bout.dread}</b></i> : null}
+                            {bout.snare ? <i className="is-bad">Chained <b>{bout.snare}</b></i> : null}
+                            {bout.bound ? <i className="is-bad">Gravebound <b>{bout.bound}</b></i> : null}
+                            {bout.branded ? <i className="is-mark">Branded</i> : null}
+                            {bout.doomReady ? <i className="is-bell">THE BELL</i>
+                                : bout.doom ? <i className="is-bell">Bell <b>{bout.doom}</b></i> : null}
+                            {bout.foeFrenzy ? <i className="is-frenzy">Their frenzy <b>{bout.foeFrenzy}</b></i> : null}
+                        </div>
+                    ) : null}
+
                     <div className="ar-floor">
                         {/* YOUR HERO IS ALWAYS ON THE LEFT. Sprites are drawn facing right, so you need no
                             flip and the opponent gets `mirrored` to turn and face you. `mirrored` and `foe`
@@ -2220,6 +2238,20 @@ function Styles() {
                So the fighters are placed rather than gridded: each is wider than half, they overlap slightly
                in the middle, and the opponent sits a little smaller and a little further up the sand. That
                reads as distance rather than as a mistake, and it buys both of them about 45% more size. */
+            /* The hex row sits above the fighters and out of the way of the damage floats. Small, dense and
+               colour-coded by whether it is on you (red), a mark (amber) or on them (green — their frenzy is
+               the one that is also YOUR window). */
+            .ar-hexes { position: relative; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px;
+                justify-content: center; padding: 2px 8px 0; }
+            .ar-hexes i { font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: .05em;
+                text-transform: uppercase; padding: 2px 7px; border-radius: 999px;
+                border: 1px solid currentColor; background: rgba(6,4,10,0.55); }
+            .ar-hexes i b { margin-left: 4px; font-weight: 900; opacity: .85; }
+            .ar-hexes .is-bad { color: #ff8ba0; }
+            .ar-hexes .is-mark { color: #ffd75e; }
+            .ar-hexes .is-bell { color: #ff6f3d; animation: arBell 1s ease-in-out infinite alternate; }
+            .ar-hexes .is-frenzy { color: #8bf0b4; }
+            @keyframes arBell { from { opacity: .55 } to { opacity: 1 } }
             .ar-floor { position: relative; z-index: 2; flex: 1 1 auto; min-height: 0;
                 transition: transform .45s cubic-bezier(.2,.9,.3,1); }
             /* Sized so the two of them meet near the middle without occluding each other, and so the lit sand

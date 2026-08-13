@@ -494,6 +494,30 @@ export const BATTLE_ITEMS = [
 // halves half: an additive term would have let a high-Fortune Reaver brace within 70% of a Warden and quietly
 // undo the identity the class base was there to create. Tree ranks (Fortress) add flat, AFTER — a point
 // spent is worth the same whatever your Fortune, which is what makes it a sane thing to spend a point on.
+// ── WHAT THE ROAD KNOWS THAT YOU DO NOT ──────────────────────────────────────────────────────────────────────
+// Ten moves no member can ever learn. The Gauntlet and the Long Road used to fight out of the SAME eleven
+// kinds the skill tree grants, which made every opponent a mirror of a build you could already read: you knew
+// what Rend did because you could buy Rend. Nothing on the road could ever surprise you, and "surprise" is the
+// only thing a hundred hand-named fighters have to sell.
+//
+// Every one of these is telegraphed a beat ahead like any other move, and every one has an answer. That is the
+// line they are written to: a move you cannot see coming is a dice roll, and a move with no counter is a wall.
+// Read the tell, then decide whether to swing, brace or drink.
+export const DREAD_CUT = 0.30;      // Dread Howl — your damage, while it lasts
+export const DREAD_TURNS = 3;
+export const SNARE_ACC = 0.18;      // Hobbling Chain — off your accuracy
+export const SNARE_TURNS = 3;
+export const BIND_CUT = 0.5;        // Gravebind — your Guard banks this share of normal
+export const BIND_TURNS = 2;
+export const DOOM_TURNS = 3;        // Deathknell — beats until it lands
+export const DOOM_MULT = 2.8;       // and what it hits for when it does
+export const FRENZY_DMG = 1.45;     // Blood Frenzy — their damage up
+export const FRENZY_DR = 0.5;       // and their guard down, which is the window
+export const FRENZY_TURNS = 3;
+export const FEAST_SHARE = 0.35;    // Bonefeast — of the health they have LOST, not of their maximum
+export const SHATTER_SHARE = 0.6;   // Shatterguard — of the brace it eats, dealt as damage
+export const SIPHON_TURNS = 1;      // Willbreaker — turns added to everything you have cooling
+
 export const GUARD_FORTUNE_PER = 0.01;   // each point of Fortune, +1% of the base
 export const GUARD_FORTUNE_CAP = 1.00;   // doubled at 100 Fortune, and no further
 

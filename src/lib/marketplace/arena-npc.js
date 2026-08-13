@@ -204,7 +204,80 @@ const NPC_KIT = [
     { kind: "execute", name: "Finisher", sprite: "/images/arena/skill-opportunist.webp", power: 2.3, cd: 4 },
 ];
 
-export function npcAbilities(tier) {
+// ── AND TEN THINGS NO MEMBER CAN LEARN ───────────────────────────────────────────────────────────────────────
+// The kit above is drawn from the same eleven kinds the skill tree grants, which is why nothing on the road
+// has ever surprised anybody: you know what Rend does because you can buy Rend. These are NPC-only, they are
+// resolved in arena.js's defender branch, and no tree node grants any of them.
+//
+// Each one is a QUESTION rather than a bigger number, and each has an answer you can act on the beat you see
+// the tell:
+//
+//   Shatterguard   eats your banked brace and throws it back    → don't sit on a shield against it
+//   Dread Howl     your damage down 30% for three               → burst before it lands, or ride it out
+//   Hobbling Chain your accuracy down 18 for three              → your big committed swings get worse; jab
+//   Soulbrand      their next landed blow is a guaranteed crit  → brace THIS beat, not the next one
+//   Bonefeast      heals them by a third of what they've LOST   → kill them from high, not from low
+//   Second Wind    clears their burn and sunder, banks a shield → don't spend a rend right before it
+//   Deathknell     a three-beat timer, then a 2.8x hit          → the clock is visible; be ready or be gone
+//   Blood Frenzy   +45% their damage, HALF their guard          → the window: hit them while it's up
+//   Willbreaker    everything you have cooling gains a turn     → holding a skill back has a cost now
+//   Gravebind      your Guard banks half for two beats          → the anti-turtle, aimed straight at Wardens
+//
+// Deliberately NOT here: anything that skips your turn, anything undodgeable, anything that reads as the game
+// taking the controls away. Losing to a move you could see and answer is a lesson; losing to one you couldn't
+// is a bug report.
+const NPC_ONLY = [
+    { kind: "shatter", name: "Shatterguard", sprite: "/images/arena/skill-giantSlayer.webp", power: 1.2, cd: 4 },
+    { kind: "howl", name: "Dread Howl", sprite: "/images/arena/skill-bloodlust.webp", power: 0.9, cd: 5 },
+    { kind: "snare", name: "Hobbling Chain", sprite: "/images/arena/skill-onslaught.webp", power: 1.0, cd: 5 },
+    { kind: "brand", name: "Soulbrand", sprite: "/images/arena/skill-firstHitCrit.webp", power: 0.8, cd: 5 },
+    { kind: "feast", name: "Bonefeast", sprite: "/images/arena/skill-bloodlust.webp", power: 0, cd: 5 },
+    { kind: "rally", name: "Second Wind", sprite: "/images/arena/skill-packTactics.webp", power: 0, cd: 6 },
+    { kind: "doom", name: "Deathknell", sprite: "/images/arena/skill-overcharge.webp", power: 0, cd: 7 },
+    { kind: "frenzy", name: "Blood Frenzy", sprite: "/images/arena/skill-vanguard.webp", power: 0, cd: 5 },
+    { kind: "siphon", name: "Willbreaker", sprite: "/images/arena/skill-attuned.webp", power: 1.1, cd: 5 },
+    { kind: "bind", name: "Gravebind", sprite: "/images/arena/skill-eruptChance.webp", power: 1.0, cd: 5 },
+];
+
+// Which NPC-only move an opponent brings, by archetype — the same rule as the normal kit, so the shape you can
+// read on the card is still the shape that swings at you. Two each, picked off the rung so a given fighter
+// always brings the same one and the rematch is a plan.
+const ARCH_ONLY = {
+    balanced: ["snare", "brand"],
+    brute: ["shatter", "frenzy"],
+    wall: ["rally", "feast"],
+    duelist: ["siphon", "doom"],
+    berserker: ["howl", "bind"],
+};
+
+/**
+ * The NPC-only move for a fighter, or null if they are not hard enough to have earned one.
+ *
+ * `depth` is the gate and it is the whole difficulty dial for this feature: below it an opponent fights out of
+ * the ordinary kit and the road stays a warm-up, above it every fighter brings one thing you cannot answer
+ * with knowledge of your own tree.
+ */
+export function npcOnlyMove(tier, archKey, scale = 1) {
+    const t = Math.max(1, Math.round(tier));
+    if (t < NPC_ONLY_FROM) return null;
+    const want = ARCH_ONLY[archKey] || ARCH_ONLY.balanced;
+    // Which of the archetype's two, chosen off the tier so it is fixed per fighter rather than rolled.
+    const pick = want[t % want.length];
+    const move = NPC_ONLY.find((m) => m.kind === pick);
+    if (!move) return null;
+    return { ...move, power: Math.round((move.power || 0) * scale * 100) / 100 };
+}
+
+// From here on, every opponent carries one. Before it, none do — so the early road is still the place you
+// learn the ordinary rules before it starts breaking them.
+export const NPC_ONLY_FROM = 12;
+
+/**
+ * `archKey` overrides the archetype the moves are chosen for. The Long Road rotates its OWN archetypes
+ * (arena-ladder.js) and prints the result on the card as a tell — without this the card promised a Wall and
+ * the fighter swung a Berserker's kit, because the moves were being picked off archetypeForTier() instead.
+ */
+export function npcAbilities(tier, archKey = null) {
     const t = Math.max(1, Math.round(tier));
     const n = npcFor(t);
     // How deep into the kit this tier may reach. A Straw Dummy gets the first move; an Ascendant gets any.
@@ -215,12 +288,17 @@ export function npcAbilities(tier) {
         balanced: ["strike", "spell"], brute: ["strike", "sunder"], wall: ["drain", "rend"],
         duelist: ["flurry", "spell"], berserker: ["flurry", "execute"],
     };
-    const want = BY_ARCH[archetypeForTier(t).key] || BY_ARCH.balanced;
+    const arch = archKey || archetypeForTier(t).key;
+    const want = BY_ARCH[arch] || BY_ARCH.balanced;
     const allowed = NPC_KIT.slice(0, depth);
     const chosen = want.map((k) => allowed.find((x) => x.kind === k)).filter(Boolean);
     if (!chosen.length) chosen.push(NPC_KIT[0]);
     // Tier scales what the moves are worth, gently — the big lever is already their damage and health.
     const scale = 1 + Math.min(0.6, t * 0.006);
+    // THE THIRD MOVE, and the one you cannot have. Appended rather than replacing, so a hard opponent still
+    // fights out of its archetype and then does something you have no card for.
+    const only = npcOnlyMove(t, arch, scale);
+    if (only) chosen.push(only);
     return chosen.map((k, i) => ({
         id: `npc${t}:${k.kind}:${i}`,
         itemId: null,

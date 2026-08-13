@@ -9,6 +9,8 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, guardSoakFrom, GUARD_COOL, speedOf,
+    DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
+    FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -16,7 +18,7 @@ import { pickIncoming, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-a
 import { npcAbilities, npcFor, npcOffer, tierForRating, NPC_REACH, statsForPower } from "@/lib/marketplace/arena-npc.js";
 import { boutLaurels, defenceLaurels, DEFENCE_LAURELS_PER_DAY, featsFor, vpFor, vpPreview } from "@/lib/marketplace/arena-rewards.js";
 import { CRATES, armouryEv, rollable, rowArt } from "@/lib/marketplace/armoury.js";
-import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf, nextRung } from "@/lib/marketplace/arena-ladder.js";
+import { LADDER, LADDER_HOUSES, LADDER_SIZE, ladderFoe, ladderReward, ladderRungOf, nextRung, ladderDr } from "@/lib/marketplace/arena-ladder.js";
 import { getStones } from "@/lib/marketplace/pet-ascension.js";
 import { STONES, STONE_PRICE_LAURELS } from "@/lib/marketplace/pet-stones.js";
 import {
@@ -711,6 +713,11 @@ function publicBout(b) {
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
+        // The NPC-only states. Published because the fight screen draws a chip for each — an effect the
+        // player is under and cannot see is indistinguishable from the numbers being wrong.
+        dread: b.dread || 0, snare: b.snare || 0, bound: b.bound || 0,
+        branded: Boolean(b.branded), doom: b.doom || 0, doomReady: Boolean(b.doomReady),
+        foeFrenzy: b.foeFrenzy || 0,
         incoming: b.incoming || null,
         // `tell` was published here and read on the ladder row, but nothing has ever assigned it — a leftover
         // of the rock-paper-scissors build, where the opponent's next stance was printed for you to counter.
@@ -1059,7 +1066,10 @@ export async function startBout(buyerId, targetId = null) {
         const f = ladderFoe(rung);
         foe = f;
         const st = statsForPower(f.power, f.archetype, null, rung);
-        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, Math.round(rung * 0.9))) };
+        // A Road fighter turns aside a share of every blow, rising with the house — see ladderDr. Set BEFORE
+        // ringStats, which is what reads `dr` onto the card and into the engine.
+        st.dr = ladderDr(rung);
+        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, Math.round(rung * 0.9)), f.archetype) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.
@@ -1283,7 +1293,10 @@ export async function fightRound(buyerId, opts = {}) {
             // `b.me.guard` already has the class base, Fortune and Fortress folded in at kit time. The
             // fallback is for bouts written before guard was a built number — they carry no `me.guard`, and
             // reading undefined here would brace them for nothing mid-fight.
-            const share = b.me?.guard ?? guardSoakFrom(DEFAULT_GUARD, 0, P.guardSoak || 0);
+            // Gravebind: the anti-turtle. Halves the brace rather than forbidding it, because a command the
+            // game refuses to let you press is not a mechanic, it is a locked door.
+            const share = (b.me?.guard ?? guardSoakFrom(DEFAULT_GUARD, 0, P.guardSoak || 0))
+                * ((b.bound || 0) > 0 ? BIND_CUT : 1);
             const soak = Math.min(Math.round(b.maxHp * share),
                 Math.max(0, Math.round(b.maxHp * (SHIELD_CAP + (P.shieldCap || 0))) - b.shield));
             b.shield += soak;
@@ -1426,7 +1439,10 @@ export async function fightRound(buyerId, opts = {}) {
         // reward for guarding; now that a guard banks a real shield exactly as yours does (see their turn),
         // keeping the reduction as well would have made the same command strictly better in their hands than
         // in yours. Their shield eats the blow further down, which is where yours eats one too.
-        const guard = Math.max(0, Math.min(DR_CAP, (Number(b.foe.dr) || 0) * pierce * sundered));
+        // Blood Frenzy is a TRADE, and this is the half that makes it one: while it is up they hit far
+        // harder and their guard is halved, so the beat you see it go up is the beat to spend everything.
+        const frenzied = (b.foeFrenzy || 0) > 0 ? FRENZY_DR : 1;
+        const guard = Math.max(0, Math.min(DR_CAP, (Number(b.foe.dr) || 0) * pierce * sundered * frenzied));
         // A ward or a surge deals no damage, so it cannot crit — a "Critical" over a move that did nothing
         // would be the loudest possible way to say nothing happened.
         // EVERY blow of a flurry rolls separately, which is the whole point of it.
@@ -1449,8 +1465,10 @@ export async function fightRound(buyerId, opts = {}) {
         // point of "three chances" would be a single coin flip wearing a disguise.
         //
         // `hitsLanded` is kept so the log can say "2 of 3" and the screen can pop a number per blow.
+        // Hobbling Chain comes off the top, after the cap — a debuff that the cap could swallow is a debuff
+        // that does nothing to exactly the people who invested in accuracy.
         const acc = Math.max(ACCURACY_FLOOR, Math.min(ACCURACY_CAP,
-            (Number(b.me.accuracy) || DEFAULT_ACCURACY) + (ability?.acc || 0)));
+            (Number(b.me.accuracy) || DEFAULT_ACCURACY) + (ability?.acc || 0)) - ((b.snare || 0) > 0 ? SNARE_ACC : 0));
         const each = [];
         let hitsLanded = 0;
         for (let i = 0; i < hits && power > 0; i += 1) {
@@ -1459,7 +1477,8 @@ export async function fightRound(buyerId, opts = {}) {
             const c = Math.random() < critChance;
             if (c) crit = true;
             const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
-                * openMult * lowHpMult * fever * (c ? myCritMult : 1);
+                * openMult * lowHpMult * fever * (c ? myCritMult : 1)
+                * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1);   // Dread Howl
             turned += Math.round(raw * guard);
             const landed = Math.max(1, Math.round(raw - raw * guard));
             each.push(landed);
@@ -1649,6 +1668,9 @@ export async function fightRound(buyerId, opts = {}) {
             }
         }
         const theirAbility = incoming.isAbility ? incoming : null;
+        // What the NPC-only moves did, collected so the log line can say it. They are invisible otherwise —
+        // the single commonest bug in this file is an effect that fires and is never mentioned.
+        const extra = {};
         let power = incoming.power || 1;
         let foeHits = 1;
         let foeDrain = incoming.heal || 0;
@@ -1687,7 +1709,51 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "drain") { foeDrain = DRAIN_SHARE; power = 1; }
             if (k === "rend") rendNow = true;
             if (k === "sunder") sunderNow = true;
+
+            // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
+            // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of
+            // this block on your side of the ring. See NPC_ONLY in arena-npc.js for what each one is FOR;
+            // this is only how it lands. Every one either sets a visible timer or does its work at once, so
+            // nothing here can happen to you without a line in the log saying it did.
+            if (k === "shatter") {
+                // Eats the brace you were sitting on and throws most of it back. Against a fighter with no
+                // shield up it is a weak swing, which is exactly the point: it punishes the turtle, not you.
+                const ate = b.shield || 0;
+                b.shield = 0;
+                if (ate > 0) { power += (ate * SHATTER_SHARE) / Math.max(1, b.foe.damage); extra.shattered = ate; }
+            }
+            if (k === "howl") { b.dread = DREAD_TURNS; extra.howl = true; }
+            if (k === "snare") { b.snare = SNARE_TURNS; extra.snare = true; }
+            if (k === "bind") { b.bound = BIND_TURNS; extra.bind = true; }
+            if (k === "brand") { b.branded = true; extra.brand = true; }
+            if (k === "siphon") {
+                // Everything you are holding back gains a turn. Costs nothing if your kit is ready — it taxes
+                // the player who is saving a big move, which is the player it is written for.
+                for (const id of Object.keys(b.cd || {})) b.cd[id] += SIPHON_TURNS;
+                extra.siphon = Object.keys(b.cd || {}).length;
+            }
+            if (k === "feast") {
+                // Off what they have LOST, so it is worth nothing at full health and enormous at a sliver.
+                // The counter is to kill them from high rather than grinding them down.
+                const back = Math.round((b.foeMaxHp - b.foeHp) * FEAST_SHARE);
+                if (back > 0) { b.foeHp = Math.min(b.foeMaxHp, b.foeHp + back); extra.feast = back; }
+            }
+            if (k === "rally") {
+                // Clears what you spent beats putting on them. Do not lead with a rend into a Wall.
+                const had = Boolean(b.bleed) || (b.foeSunder || 0) > 0;
+                b.bleed = null; b.foeSunder = 0;
+                const cap = Math.round(b.foeMaxHp * (SHIELD_CAP + (FP.shieldCap || 0)));
+                const soak = Math.min(Math.round(b.foeMaxHp * WARD_SOAK * 2), Math.max(0, cap - (b.foeShield || 0)));
+                b.foeShield = (b.foeShield || 0) + soak;
+                extra.rally = { cleared: had, soak };
+            }
+            if (k === "frenzy") { b.foeFrenzy = FRENZY_TURNS; extra.frenzy = true; }
+            if (k === "doom") { b.doom = DOOM_TURNS; extra.doom = DOOM_TURNS; }
         }
+        // ── THE BELL ── Deathknell's timer ran out on a previous beat and this is the blow it was counting
+        // down to. Multiplied here rather than at the moment it was cast so the number reflects whatever
+        // they are worth NOW — a fighter who got weaker while it counted lands a weaker bell.
+        if (b.doomReady) { power = Math.max(power, 1) * DOOM_MULT; b.doomReady = false; extra.bell = true; }
         // Their surge spends itself on the swings AFTER the one that set it, exactly as yours does.
         const foeSurgeMult = (b.foeSurge > 0 && !foeJustSurged) ? 1.5 : 1;
         if (b.foeSurge > 0 && !foeJustSurged) b.foeSurge -= 1;
@@ -1721,10 +1787,14 @@ export async function fightRound(buyerId, opts = {}) {
         for (let i = 0; i < foeHits && power > 0; i += 1) {
             if (Math.random() >= foeAcc) { foeEach.push(0); continue; }
             foeLanded += 1;
-            const c = Math.random() < foeCritChance;
+            // SOULBRAND. The mark makes their next LANDED blow a certainty, not their next attempt — a brand
+            // spent on a miss would be a coin flip wearing a threat.
+            const c = Boolean(b.branded) || Math.random() < foeCritChance;
+            if (b.branded) b.branded = false;
             if (c) foeCrit = true;
             const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow
-                * (b.foeUnderdog || 1) * foeSurgeMult * (c ? foeCritMult : 1)));
+                * (b.foeUnderdog || 1) * foeSurgeMult * (c ? foeCritMult : 1)
+                * ((b.foeFrenzy || 0) > 0 ? FRENZY_DMG : 1)));
             const off = Math.round(one * myBlock);
             raw += one;
             blocked += off;
@@ -1810,7 +1880,18 @@ export async function fightRound(buyerId, opts = {}) {
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}`,
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
+                extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
+                extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${
+                extra.bind ? ` Gravebound — your guard banks half for ${BIND_TURNS}.` : ""}${
+                extra.brand ? " You are BRANDED — their next blow to land will crit." : ""}${
+                extra.siphon ? ` Willbroken — everything you were holding cools a turn slower.` : ""}${
+                extra.feast ? ` They feast on their own ruin and take ${extra.feast} back.` : ""}${
+                extra.rally ? ` Second wind — ${extra.rally.cleared ? "everything on them burns out" : "they steady"}, ${extra.rally.soak} banked.` : ""}${
+                extra.frenzy ? " BLOOD FRENZY — they hit far harder, and their guard is wide open." : ""}${
+                extra.doom ? ` A bell begins to toll. ${extra.doom} beats.` : ""}${
+                extra.bell ? " THE BELL FALLS." : ""}`,
             ability: theirAbility?.name || null });
 
         // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of
@@ -1826,6 +1907,21 @@ export async function fightRound(buyerId, opts = {}) {
             if (b.bleed.turns <= 0) b.bleed = null;
         }
         if (b.sunder > 0) b.sunder -= 1;
+        // ── THE NPC-ONLY TIMERS ──────────────────────────────────────────────────────────────────────────
+        // All on the same clock as sunder, so "three beats" means the same thing whichever effect said it.
+        if ((b.dread || 0) > 0) b.dread -= 1;
+        if ((b.snare || 0) > 0) b.snare -= 1;
+        if ((b.bound || 0) > 0) b.bound -= 1;
+        if ((b.foeFrenzy || 0) > 0) b.foeFrenzy -= 1;
+        if ((b.doom || 0) > 0) {
+            b.doom -= 1;
+            // Hitting zero ARMS the bell rather than firing it, so it lands on their next swing where you can
+            // see it coming and brace — a timer that resolves itself is just delayed damage with extra steps.
+            if (b.doom <= 0) { b.doom = 0; b.doomReady = true; }
+            b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: 0, kind: "doom",
+                text: b.doomReady ? "The bell is up. The next blow is the one it was counting for."
+                    : `The bell tolls — ${b.doom} to go.`, ability: "Deathknell" });
+        }
 
         // ── SECOND WIND ── a trickle back at the top of each of your rounds. Small on purpose: it is what
         // makes a long defensive bout survivable, not a way to out-heal a swing.

@@ -107,11 +107,30 @@ const HOUSES = [
 // makes the rest of the ladder distant: tripling your power now buys about eight rungs, where at 5.4% it
 // bought twenty-one. Rungs 30+ are future content rather than this season's content. That is the deliberate
 // choice — the alternative is the spread, where a new member is walled at rung 3 and nobody meets anybody.
-const FLOOR = 25;
-const GROWTH = 1.15;
+const FLOOR = 30;
+const GROWTH = 1.165;
+
+// ── AND A STEP AT EVERY GATE ─────────────────────────────────────────────────────────────────────────────────
+// A smooth exponential has no landmarks: rung 41 is 16% harder than 40 and so is every other pair, so the ten
+// houses are ten names over one unbroken slope. Each house now costs a step to walk into on top of the curve,
+// which is what makes arriving at The Deep feel like arriving somewhere — and gives a member a natural place
+// to stop, go and build, and come back.
+const HOUSE_STEP = 0.05;
+
+// ── WHAT THEY TURN ASIDE ─────────────────────────────────────────────────────────────────────────────────────
+// Gauntlet tiers carry no damage reduction at all; their bulk is health, which a health bar tells the truth
+// about. That is right for matchmaking, where the point is a fair mirror, and wrong for a hundred named
+// fighters who are supposed to get genuinely harder to hurt. A Road fighter turns aside a share of every blow,
+// rising with the house — printed on their card like anyone's, so it is a number you can plan against rather
+// than a mystery in the damage.
+export const ladderDr = (rung) => {
+    const house = Math.floor((Math.max(1, Math.min(LADDER_SIZE, Math.round(rung))) - 1) / 10);
+    return Math.round((0.04 + house * 0.028) * 1000) / 1000;   // 4% in the Yard, 29% at the end
+};
 export const LADDER_SIZE = 100;
 
-const powerAt = (rung) => Math.round(FLOOR * Math.pow(GROWTH, rung - 1));
+const powerAt = (rung) => Math.round(FLOOR * Math.pow(GROWTH, rung - 1)
+    * (1 + HOUSE_STEP * Math.floor((rung - 1) / 10)));
 
 // A champion (every tenth) is a step above its own rung — the house's name is on it.
 const isChampion = (rung) => rung % 10 === 0;
@@ -141,8 +160,12 @@ export function ladderFoe(rung) {
     const champion = isChampion(n);
     // The archetype rotates through the catalog rather than being random, so a given rung always fights the
     // same way and can be planned against — and a champion always takes the house's hardest shape.
-    const arch = ARCHETYPES[(champion ? within + 3 : within) % ARCHETYPES.length];
-    const power = Math.round(powerAt(n) * (champion ? 1.18 : 1));
+    // The house index rides along for CHAMPIONS so they are not all the same shape. `within + 3` is constant
+    // at the tenth of every house, so every champion on the road was a Wall — ten boss fights with one answer.
+    const arch = ARCHETYPES[(champion ? within + 3 + Math.floor((n - 1) / 10) : within) % ARCHETYPES.length];
+    // A champion was 18% over the rung below, which after a chest and a name reads as "the same fight again".
+    // 35% is a fighter you have to come back for, which is what the tenth of a house should be.
+    const power = Math.round(powerAt(n) * (champion ? 1.35 : 1));
     return {
         id: `ladder:${n}`,
         rung: n,

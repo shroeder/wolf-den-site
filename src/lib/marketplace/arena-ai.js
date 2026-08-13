@@ -15,7 +15,7 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { DRAIN_SHARE, guardSoakFrom } from "@/lib/marketplace/arena-kit.js";
+import { DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS } from "@/lib/marketplace/arena-kit.js";
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 
@@ -278,6 +278,45 @@ export function pickIncoming(b) {
         const dr = of("drain");
         if (dr) return swing(dr, free);
         if (!free) return guard();      // nothing to answer with: cover up rather than trade
+    }
+
+    // ── 6b. THE MOVES YOU CANNOT LEARN ───────────────────────────────────────────────────────────────────
+    // The ten NPC-only kinds (arena-npc.js). Each is gated on the state that makes it worth a beat, for the
+    // same reason every other rule here is: an opponent that opens with Bonefeast at full health is not
+    // "hard", it is broken in your favour, and a player who beats it learns nothing.
+    //
+    // Ordered by how decisive the move is, so a fighter with two of them plays the sharper one first.
+    {
+        // BONEFEAST scales off health already lost, so it is worthless until it is hurt.
+        const feast = of("feast");
+        if (feast && theirFrac <= 0.55) return swing(feast, free);
+        // SECOND WIND clears a burn and a sunder. Only worth a beat if there is something to clear.
+        const rally = of("rally");
+        if (rally && ((b.bleed?.turns || 0) > 1 || (b.foeSunder || 0) > 0)) return swing(rally, free);
+        // BLOOD FRENZY halves their own guard, so it is a gamble taken to CLOSE a fight, not to open one.
+        const frenzy = of("frenzy");
+        if (frenzy && runway >= 2 && (myFrac <= 0.5 || theirFrac <= 0.45)) return swing(frenzy, free);
+        // DEATHKNELL needs its full count to land, and the count is the whole move.
+        const doom = of("doom");
+        if (doom && runway > DOOM_BEATS) return swing(doom, free);
+        // SHATTERGUARD is a weak swing into a bare fighter and a huge one into a raised brace.
+        const shatter = of("shatter");
+        if (shatter && (b.shield || 0) > b.maxHp * 0.1) return swing(shatter, free);
+        // SOULBRAND spends the crit on their NEXT landed blow, so it wants a swing left to spend it on.
+        const brand = of("brand");
+        if (brand && !b.branded && runway >= 2) return swing(brand, free);
+        // WILLBREAKER taxes what you are holding back. Nothing cooling, nothing taxed.
+        const siphon = of("siphon");
+        if (siphon && Object.keys(b.cd || {}).length >= 2) return swing(siphon, free);
+        // DREAD HOWL and HOBBLING CHAIN are attrition: they only pay across several of your turns.
+        const howl = of("howl");
+        if (howl && !(b.dread > 0) && runway >= 3) return swing(howl, free);
+        const snare = of("snare");
+        if (snare && !(b.snare > 0) && runway >= 3) return swing(snare, free);
+        // GRAVEBIND is aimed at the fighter who is actually bracing. Against someone who never guards it is a
+        // wasted beat, and "have they used the shield" is the readable version of that test.
+        const bind = of("bind");
+        if (bind && !(b.bound > 0) && (b.shield || 0) > 0) return swing(bind, free);
     }
 
     // ── 7. THINGS THAT ONLY PAY IF THE FIGHT LASTS ───────────────────────────────────────────────────────
