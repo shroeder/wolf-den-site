@@ -137,6 +137,16 @@ export const GUIDE_CHAPTERS = [
         reward: { gold: 700, chest: "gold" },
     },
     {
+        id: "arena", name: "The Arena", minLevel: 10, tint: "#ff6f7d", icon: "/images/guide/ch-arena.webp",
+        blurb: "Everything you have built, pointed at somebody else.",
+        steps: [
+            { key: "arena_class", label: "Pick a class", why: "Reaver, Warden or Runecaller. It is the one choice here you cannot drift into — each starts with different health, damage reduction and accuracy, and the tree you spend points in follows from it. Changing your mind later costs gold, not progress.", href: "/marketplace/arena", cta: "Choose", gold: 250, events: ["arena_class"] },
+            { key: "arena_win", label: "Win a bout", why: "The ring reads the same four stat sources the boss does — your gear, your compendium, your companion and your badges all swing. Nothing here is a separate grind; it is the scoreboard for everything else you own.", href: "/marketplace/arena", cta: "Find a fight", gold: 350, events: ["arena_win"] },
+            { key: "arena_ladder", label: "Take a rung of the Long Road", why: "A hundred named fighters, each beatable exactly once, walked in order. They do not spend your daily arena challenges, so the Road is always open — and from the thirteenth rung they start bringing moves no member can learn.", href: "/marketplace/arena", cta: "Walk the Road", gold: 400, events: ["arena_ladder"] },
+        ],
+        reward: { gold: 700, chest: "gold" },
+    },
+    {
         id: "trade", name: "Trading", minLevel: 12, tint: "#7defd0", icon: "/images/guide/ch-trade.webp",
         blurb: "Members trade gear and pets directly.",
         steps: [
