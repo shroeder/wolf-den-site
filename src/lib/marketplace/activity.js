@@ -123,10 +123,11 @@ async function chronicle(buyerId, event) {
     const me = await db.queryOne(`SELECT COALESCE(NULLIF(display_name,''), alias) AS name FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     if (!me?.name) return;
     const what = CHRONICLE_LABEL[event] || event.replace(/_/g, " ");
-    await db.query(
-        `INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`,
-        [buyerId, `${me.name} is the first in the Den to ${what}. Written into the chronicle.`]
-    ).catch(() => {});
+    // Same correction as the Long Road's: the chronicle speaks for the DEN, so it is the Arbiter that says so.
+    // Posting it as the member wrapped a third-person sentence about them in their own avatar and bubble, which
+    // reads as them announcing themselves.
+    const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
+    await postSystemChat(`${me.name} is the first in the Den to ${what}. Written into the chronicle.`).catch(() => {});
 }
 
 const CHRONICLE_LABEL = {

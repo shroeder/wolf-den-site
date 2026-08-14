@@ -1,0 +1,31 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+
+// ── THE DEN SAYS SOMETHING, NOT A MEMBER ─────────────────────────────────────────────────────────────────────
+// Automated announcements go out as the WOLF DEN ARBITER, which is the game's established system voice — a real
+// mkt_buyer row with its own hero sprite, so it renders like any other speaker without the chat needing to learn
+// a new kind of message.
+//
+// This exists because the first cut of the Long Road announcement posted as the MEMBER who earned it, and the
+// result was Luke's own avatar and bubble saying "The Wolf Den is the first in the Den to take rung 22" — a
+// third-person boast, apparently typed by him, about himself. Luke: "I didn't picture the announcement being me
+// sending a message. I told you a system announcement." He is right, and the comment I wrote defending it
+// (something about it reading as "a celebration of a person") was reasoning backwards from what the code
+// already did.
+//
+// The rule is simple: if a HUMAN did not type it, a human's name must not be on it.
+//
+// Looked up by ALIAS rather than a pasted uuid — the id is stable today and an id in source is the kind of
+// thing that rots silently. Returns false if the Arbiter is missing, so a failure is a missing announcement
+// rather than an exception in the middle of paying somebody out.
+export async function postSystemChat(body) {
+    const text = String(body || "").trim();
+    if (!text) return false;
+    const arbiter = await db.queryOne(`SELECT id FROM mkt_buyer WHERE alias = 'arbiter' LIMIT 1`).catch(() => null);
+    if (!arbiter?.id) return false;
+    const r = await db.queryOne(
+        `INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2) RETURNING id`, [arbiter.id, text]
+    ).catch(() => null);
+    return Boolean(r);
+}

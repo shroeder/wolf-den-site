@@ -2103,9 +2103,11 @@ function boutTelemetry(b, won) {
 // the claim unrepeatable — the second person to reach it finds two rows and says nothing.
 //
 // Global chat rather than a push. There are a hundred rungs, and a notification per rung would be the same
-// mistake the game already made by ringing the owner's phone for every raid. Posted as the MEMBER, matching how
-// `chronicle` writes its firsts, so the line renders with their hero beside it and reads as a celebration of a
-// person rather than an announcement from the building.
+// mistake the game already made by ringing the owner's phone for every raid.
+//
+// POSTED BY THE ARBITER, not by the member. The first cut posted as the winner, which put their own avatar and
+// bubble around a third-person sentence about themselves — it read as a boast they had typed. If a human did
+// not write it, a human's name does not go on it. See system-chat.js.
 async function announceRoadFirst(buyerId, rung, foeName) {
     const held = await db.queryOne(
         `SELECT COUNT(*)::int AS n FROM mkt_arena WHERE $1::int = ANY(ladder_beaten)`, [rung]
@@ -2122,7 +2124,8 @@ async function announceRoadFirst(buyerId, rung, foeName) {
     const body = opensHouse
         ? `${me.name} is the first in the Den to break into ${house.name} — rung ${rung} of the Long Road, and ${foeName || "its keeper"} is down. ${house.blurb}`
         : `${me.name} is the first in the Den to take rung ${rung} of the Long Road${foeName ? `, past ${foeName}` : ""}. Nobody has stood further.`;
-    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, body]).catch(() => {});
+    const { postSystemChat } = await import("@/lib/marketplace/system-chat.js");
+    await postSystemChat(body).catch(() => {});
     // ── A PUSH, BUT ONLY WHEN A HOUSE OPENS ──────────────────────────────────────────────────────────────
     // A hundred rungs means a hundred notifications if every first is pushed, which is the mistake this game
     // already made once by ringing the owner's phone for every raid. A HOUSE opening is one of ten events in
