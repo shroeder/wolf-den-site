@@ -93,28 +93,37 @@ export async function placedDecoBuffs(buyerId) {
     return decorationBuffs((rows || []).map((r) => r.deco_id), await hasPower(buyerId, "garden_path"));
 }
 
+// ── ONE PLACEMENT SHAPE, ONE PLACE ───────────────────────────────────────────────────────────────────────────
+// This was written out twice — here and inside decoState — and the copies drifted, which is the whole reason
+// the Petting Stand changed size when you moved it. getPlacements carried `size` and `tiers`; decoState's copy
+// did not. So the page load drew the stand at its real 132px base (132 x 2.25 = 297px, pets on their cushions)
+// and the response to ANY decoration action drew the same piece at the 66px fallback (148px, no pets) — until
+// you refreshed and it jumped back. Two mappers for one shape is two things to remember to update, and nobody
+// remembers the second one.
+const mapPlacement = (r, sprites, customMap) => {
+    const def = decorationById(r.deco_id);
+    const cm = customMap.get(r.deco_id);
+    return {
+        id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: resolveLight(r), ...lightSettings(r),
+        name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
+        spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
+        // Most decorations are 66px props. A piece that has to hold three legible pets on it is not, so a
+        // decoration may declare its own base size — see DecoLayer, which reads this instead of the constant.
+        size: def?.size || null,
+        // Where pets sit on it, as percentages of the sprite box. Only the Petting Stand has these.
+        tiers: def?.tiers || null,
+        // Credit the original artist on a gifted copy.
+        copiedFrom: cm?.creatorName || null, copiedFromAlias: cm?.creatorAlias || null,
+    };
+};
+
 // Placed decorations for rendering (position + sprite + flip), newest last so higher z / later placements draw on top.
 export async function getPlacements(buyerId) {
     if (!buyerId) return [];
     const rows = await db.query(`SELECT id, deco_id, x, y, z, flip, scale, rot, view, light_on, light_color, light_intensity, light_radius, brightness FROM mkt_deco_placement WHERE buyer_id = $1 ORDER BY z ASC, id ASC`, [buyerId]).catch(() => []);
     if (!rows.length) return [];
     const [sprites, customMap] = await Promise.all([getDecoSprites(rows.map((r) => r.deco_id)), listFinalCustomDecos(buyerId)]);
-    return rows.map((r) => {
-        const def = decorationById(r.deco_id);
-        const cm = customMap.get(r.deco_id);
-        return {
-            id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: resolveLight(r), ...lightSettings(r),
-            name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
-            spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
-            // Most decorations are 66px props. A piece that has to hold three legible pets on it is not, so a
-            // decoration may declare its own base size — see DecoLayer, which reads this instead of the constant.
-            size: def?.size || null,
-            // Where pets sit on it, as percentages of the sprite box. Only the Petting Stand has these.
-            tiers: def?.tiers || null,
-            // Credit the original artist on a gifted copy.
-            copiedFrom: cm?.creatorName || null, copiedFromAlias: cm?.creatorAlias || null,
-        };
-    });
+    return rows.map((r) => mapPlacement(r, sprites, customMap));
 }
 
 // The full decoration state for the farm UI: owned (with placed counts + how many free to place), placements,
@@ -156,11 +165,7 @@ export async function decoState(buyerId) {
         .map((r) => ownedEntry(r.deco_id, placedCount[r.deco_id] || 0))
         .filter(Boolean)
         .sort((a, b) => (a.custom ? 1 : 0) - (b.custom ? 1 : 0) || (DECO_RARITY[b.rarity]?.rank || 0) - (DECO_RARITY[a.rarity]?.rank || 0));
-    const placements = (placeRows || []).map((r) => {
-        const def = decorationById(r.deco_id);
-        const cm = customMap.get(r.deco_id);
-        return { id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: resolveLight(r), ...lightSettings(r), name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color, spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null) };
-    });
+    const placements = (placeRows || []).map((r) => mapPlacement(r, sprites, customMap));
     const buffs = decorationBuffs((placeRows || []).map((r) => r.deco_id));
     const ownedSet = new Set((ownedRows || []).map((r) => r.deco_id));
     // The FULL catalog (all 100) annotated with owned/placed/price/buyable — the drawer shows everything: owned
