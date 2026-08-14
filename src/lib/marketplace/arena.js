@@ -2093,6 +2093,37 @@ function boutTelemetry(b, won) {
     };
 }
 
+// ── FIRST UP THE ROAD ────────────────────────────────────────────────────────────────────────────────────────
+// The Road is a hundred rungs and the whole Den is stacked on the low twenties, so every rung above that is
+// unbroken ground. Being the first person ever to take one should be a thing the Den finds out about — that is
+// the entire reward for pushing into a stretch nobody has cleared, and until now it happened in silence.
+//
+// FIRST IS MEASURED OFF ladder_beaten, which is the only honest source: the winner's rung was appended moments
+// ago inside the same guarded UPDATE, so exactly one row holding it means nobody had it before. That also makes
+// the claim unrepeatable — the second person to reach it finds two rows and says nothing.
+//
+// Global chat rather than a push. There are a hundred rungs, and a notification per rung would be the same
+// mistake the game already made by ringing the owner's phone for every raid. Posted as the MEMBER, matching how
+// `chronicle` writes its firsts, so the line renders with their hero beside it and reads as a celebration of a
+// person rather than an announcement from the building.
+async function announceRoadFirst(buyerId, rung, foeName) {
+    const held = await db.queryOne(
+        `SELECT COUNT(*)::int AS n FROM mkt_arena WHERE $1::int = ANY(ladder_beaten)`, [rung]
+    ).catch(() => null);
+    if ((Number(held?.n) || 0) !== 1) return;   // somebody stood here before
+    const me = await db.queryOne(
+        `SELECT COALESCE(NULLIF(display_name,''), alias) AS name FROM mkt_buyer WHERE id = $1`, [buyerId]
+    ).catch(() => null);
+    if (!me?.name) return;
+    const house = LADDER_HOUSES.find((h) => rung >= h.from && rung <= h.to) || null;
+    // Opening a HOUSE is the bigger moment of the two, so it gets the bigger line — otherwise rung 31 and rung
+    // 37 read identically and arriving somewhere new is worth no more than walking another step.
+    const body = house && rung === house.from
+        ? `${me.name} is the first in the Den to break into ${house.name} — rung ${rung} of the Long Road, and ${foeName || "its keeper"} is down. ${house.blurb}`
+        : `${me.name} is the first in the Den to take rung ${rung} of the Long Road${foeName ? `, past ${foeName}` : ""}. Nobody has stood further.`;
+    await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, body]).catch(() => {});
+}
+
 async function finishBout(buyerId, row, b, won) {
     b.over = true; b.won = won;
 
@@ -2254,6 +2285,7 @@ async function finishBout(buyerId, row, b, won) {
             }
             await trackActivity(buyerId, "arena_ladder", { rung: wonRung, foe: b.foe.name }).catch(() => {});
             ladderPrize = prize;
+            await announceRoadFirst(buyerId, wonRung, b.foe?.name).catch(() => {});
         }
     }
 

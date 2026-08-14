@@ -1514,7 +1514,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <i title="Rank. Won by beating people — more for harder opponents. Never spent.">
                             <b>{money(st.vp)}</b> VP<em>rank · never spent</em>
                         </i>
-                        <i title="The arena's own currency. Earned every bout, win or lose. Spent in the Armoury.">
+                        <i title="The arena's own currency. Won by winning bouts, and spent in the Armoury.">
                             <b>{money(st.laurels)}</b>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={LAUREL} alt="" className="ar-laurel" draggable="false" /> Laurels
@@ -1637,7 +1637,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         hard toward the everyday recipes, and it opens the ordinary recipe-found card. */}
                     {st.recipeShop ? <RecipeShelf shop={st.recipeShop} busy={busy}
                         canAfford={(st.laurels || 0) >= st.recipeShop.price}
-                        priceLabel={`${money(st.recipeShop.price)} laurels`}
+                        price={st.recipeShop.price}
                         onBuy={() => { Sfx.ui(); act("buy_recipe"); }} /> : null}
                     <PurserPanel st={st} busy={busy} act={act} />
                 </section>
@@ -1907,10 +1907,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="ar-find-ico" src="/images/arena/node/rv_strike.webp" alt="" draggable="false" />
                 <span>
-                    <b>{st.fightsLeft > 0 ? "Find a fight" : "No fights left today"}</b>
+                    {/* THE COUNT GOES ON THE BUTTON. It was already on Your card, at the top of the screen —
+                        which is above the fold on a phone by the time you have scrolled to the thing you press,
+                        so the one place the allowance matters was the one place it was not written. Luke, who
+                        wrote it: "where do I see my use count and remaining for find a fight?" */}
+                    <b>{st.fightsLeft > 0 ? `Find a fight · ${st.fightsLeft} of ${st.fightsPerDay} left` : "No fights left today"}</b>
                     <em>{st.fightsLeft > 0
                         ? "Someone your own size — a member of the Den, or the Gauntlet"
-                        : "They come back at midnight"}</em>
+                        : "They come back at 5am — the Road does not use them"}</em>
                 </span>
             </button>
 

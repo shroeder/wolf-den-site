@@ -468,7 +468,11 @@ export const RECIPE_BANDS = {
 // against 7,500 laurels), so neither counter is the obviously correct one to use — and the laurel price lands
 // exactly on the Armoury's middle crate, which is the tier a permanent unlock belongs beside.
 export const RECIPE_PRICE_DOUBLOONS = 400;
-export const RECIPE_PRICE_LAURELS = 750;
+// 750 -> 2,500. Recipes were far and away the biggest laurel sink and priced like the smallest: 71 bought in
+// three days against 24 Armoury crates in the same window, which is not a choice between two counters, it is one
+// counter with a queue. At 750 a page cost less than a third of the cheapest crate while being the thing
+// everybody actually wanted.
+export const RECIPE_PRICE_LAURELS = 2500;
 
 /**
  * Teach a recipe from a source's band. Call this WHEN THE FEATURE'S OWN TABLE HAS ALREADY DECIDED to pay one

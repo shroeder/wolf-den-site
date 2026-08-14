@@ -16,7 +16,7 @@ import { GiSpellBook } from "react-icons/gi";
 //
 // It also ANTICIPATES. Pressing buy starts the book opening immediately rather than waiting on the round trip,
 // so the moment belongs to the tap; the site-wide RecipeFoundWatcher lands the actual reveal a beat later.
-export default function RecipeShelf({ shop, busy, canAfford, priceLabel, onBuy }) {
+export default function RecipeShelf({ shop, busy, canAfford, priceLabel, price = null, onBuy }) {
     const known = Number(shop?.known) || 0;
     const total = Number(shop?.total) || 0;
     const tiers = Array.isArray(shop?.tiers) ? shop.tiers : [];
@@ -80,8 +80,18 @@ export default function RecipeShelf({ shop, busy, canAfford, priceLabel, onBuy }
                 </div>
             ) : null}
 
+            {/* THE SAME PRICE TAG THE CRATES WEAR. This button spelled out "750 laurels" in words while every
+                other laurel button on the screen showed the wreath sprite and a bare number, so the one shelf
+                that is not a crate also looked like it belonged to a different shop. `priceLabel` is still
+                accepted for callers that want to override it (the powers lab passes a fixed string). */}
             <button type="button" className="rsh-buy" disabled={busy || done || !canAfford} onClick={buy}>
-                {done ? "Nothing left to learn" : <>{priceLabel}</>}
+                {done ? "Nothing left to learn" : price != null ? (
+                    <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src="/images/arena/armoury/laurel.png" alt="" className="rsh-laurel" draggable="false" />
+                        {price.toLocaleString()}
+                    </>
+                ) : priceLabel}
             </button>
 
             <style jsx>{`
@@ -159,6 +169,8 @@ export default function RecipeShelf({ shop, busy, canAfford, priceLabel, onBuy }
                     box-shadow: 0 2px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.55);
                     transition: transform .1s ease, filter .12s ease; }
                 .rsh-buy:hover:not(:disabled) { filter: brightness(1.06); }
+                /* Same 17px the Armoury's crate buttons use, so the two price tags sit at one size. */
+                .rsh-laurel { width: 17px; height: 17px; object-fit: contain; }
                 .rsh-buy:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 rgba(0,0,0,0.35); }
                 .rsh-buy:disabled { cursor: default; filter: grayscale(.75) brightness(.7); }
             `}</style>

@@ -334,8 +334,10 @@ export default function PowersLab() {
                     <div className="ar-arm-head"><b>The Armoury</b><span className="ar-arm-purse">1,240</span></div>
                     {/* The REAL shelf, not a copy of its markup — the whole reason the old fixture was worth
                         replacing is that it could not have shown the collection it does not know about. */}
+                    {/* The price is a literal because cooking.js is server-only and this is a client lab. The
+                        real figure is RECIPE_PRICE_LAURELS — if the two disagree, that one is right. */}
                     <RecipeShelf key={scene} shop={scene === "recipe-done" ? RECIPE_BOOK_FULL : RECIPE_BOOK}
-                        busy={false} canAfford priceLabel="750 laurels" onBuy={() => {}} />
+                        busy={false} canAfford price={2500} onBuy={() => {}} />
                 </section>
             ) : null}
             {/* The watcher is mounted site-wide in the real app; here it is mounted only for its own scenes so
