@@ -356,6 +356,23 @@ function Recap({ bout, busy, onClose }) {
                     ))}
                 </div>
 
+                {/* ── FIRST IN THE DEN ────────────────────────────────────────────────────────────────────
+                    A world-first on the Long Road was announced to global chat and to nobody else, so the one
+                    member who had actually earned it saw exactly what everybody standing outside the plaza saw:
+                    nothing. This is the moment it belongs to. Above the Victory kicker on purpose — it is the
+                    bigger fact, and a hundred-rung ladder only hands it out a hundred times ever. */}
+                {r?.roadFirst ? (
+                    <div className="ar-first">
+                        <span className="ar-first-kick">First in the Den</span>
+                        <b>{r.roadFirst.opensHouse
+                            ? `You broke open ${r.roadFirst.house}`
+                            : `Rung ${r.roadFirst.rung} — nobody has stood further`}</b>
+                        <em>{r.roadFirst.opensHouse
+                            ? "A stretch of the Road nobody had touched is open behind you. The Den has been told."
+                            : "You are the first member of the Den ever to take it. The plaza has been told."}</em>
+                    </div>
+                ) : null}
+
                 <span className="ar-recap-kick">{won ? "Victory" : "Defeated"}</span>
                 <b className="ar-recap-title">
                     {won ? `You beat ${bout?.foe?.name || "them"}` : `${bout?.foe?.name || "They"} put you down`}
@@ -2577,6 +2594,27 @@ function Styles() {
                 border-radius: 22px; text-align: center; background: linear-gradient(180deg, #221a26, #120e15);
                 border: 2px solid var(--tint); box-shadow: 0 24px 70px rgba(0,0,0,0.8), 0 0 66px -12px var(--tint);
                 animation: arCardIn .42s cubic-bezier(.2,1.5,.35,1) both; }
+            /* ── A WORLD FIRST ON THE LONG ROAD ───────────────────────────────────────────────────────
+               Rare by construction: a hundred rungs, each claimable once by one person, ever. So it gets the
+               loudest treatment on the recap and sits ABOVE the Victory line — winning the fight is the small
+               half of it. Keyframes are ar-prefixed: two @keyframes sharing a name across styled-jsx blocks
+               silently break both, and this file has several. */
+            .ar-first { position: relative; overflow: hidden; margin: 0 0 12px; padding: 13px 14px;
+                border-radius: 15px; text-align: center;
+                background: radial-gradient(120% 140% at 50% 0%, rgba(255,215,94,0.30), rgba(255,215,94,0.06) 65%);
+                border: 1px solid rgba(255,215,94,0.62);
+                box-shadow: 0 0 0 1px rgba(255,215,94,0.20), 0 10px 30px rgba(255,180,40,0.22);
+                animation: arFirstIn .5s cubic-bezier(.2,1,.3,1) both; }
+            .ar-first::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+                background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.34) 50%, transparent 65%);
+                transform: translateX(-120%); animation: arFirstSheen 2.4s ease-in-out .35s infinite; }
+            @keyframes arFirstIn { from { transform: scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+            @keyframes arFirstSheen { 0% { transform: translateX(-120%); } 55%,100% { transform: translateX(120%); } }
+            .ar-first-kick { display: block; font-size: 10px; font-weight: 900; letter-spacing: .16em;
+                text-transform: uppercase; color: #ffd75e; }
+            .ar-first b { display: block; margin-top: 3px; font-size: 1.12rem; line-height: 1.2; color: #fff4dc; }
+            .ar-first em { display: block; margin-top: 4px; font-style: normal; font-size: .76rem;
+                line-height: 1.4; color: #e2d3b0; }
             .ar-recap-kick { position: relative; font-size: 10px; font-weight: 900; letter-spacing: .22em;
                 text-transform: uppercase; color: color-mix(in srgb, var(--tint) 80%, white); }
             .ar-recap-title { position: relative; display: block; margin: 4px 0 2px; font-size: 1.25rem; font-weight: 900; color: #fff; }

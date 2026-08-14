@@ -2110,18 +2110,34 @@ async function announceRoadFirst(buyerId, rung, foeName) {
     const held = await db.queryOne(
         `SELECT COUNT(*)::int AS n FROM mkt_arena WHERE $1::int = ANY(ladder_beaten)`, [rung]
     ).catch(() => null);
-    if ((Number(held?.n) || 0) !== 1) return;   // somebody stood here before
+    if ((Number(held?.n) || 0) !== 1) return null;   // somebody stood here before
     const me = await db.queryOne(
         `SELECT COALESCE(NULLIF(display_name,''), alias) AS name FROM mkt_buyer WHERE id = $1`, [buyerId]
     ).catch(() => null);
-    if (!me?.name) return;
+    if (!me?.name) return null;
     const house = LADDER_HOUSES.find((h) => rung >= h.from && rung <= h.to) || null;
+    const opensHouse = Boolean(house && rung === house.from);
     // Opening a HOUSE is the bigger moment of the two, so it gets the bigger line — otherwise rung 31 and rung
     // 37 read identically and arriving somewhere new is worth no more than walking another step.
-    const body = house && rung === house.from
+    const body = opensHouse
         ? `${me.name} is the first in the Den to break into ${house.name} — rung ${rung} of the Long Road, and ${foeName || "its keeper"} is down. ${house.blurb}`
         : `${me.name} is the first in the Den to take rung ${rung} of the Long Road${foeName ? `, past ${foeName}` : ""}. Nobody has stood further.`;
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, body]).catch(() => {});
+    // ── A PUSH, BUT ONLY WHEN A HOUSE OPENS ──────────────────────────────────────────────────────────────
+    // A hundred rungs means a hundred notifications if every first is pushed, which is the mistake this game
+    // already made once by ringing the owner's phone for every raid. A HOUSE opening is one of ten events in
+    // the ladder's whole life — rare enough that it is genuinely news, and it is the moment that says a
+    // stretch nobody had touched is now open.
+    if (opensHouse) {
+        const { broadcastToEveryone } = await import("@/lib/push/broadcast.js");
+        await broadcastToEveryone({
+            kind: "announce",
+            title: `${house.name} has been broken open`,
+            body: `${me.name} is the first in the Den past rung ${rung} of the Long Road. ${house.blurb}`,
+            url: "/marketplace/arena", tag: "road-first", data: { type: "road_first", rung },
+        }).catch(() => {});
+    }
+    return { rung, house: house?.name || null, opensHouse };
 }
 
 async function finishBout(buyerId, row, b, won) {
@@ -2261,6 +2277,8 @@ async function finishBout(buyerId, row, b, won) {
     // paid nothing and stayed standing. The rider is the primary source now; `b.foe` is the fallback so a
     // bout already open when this deploys still pays out instead of being the last fight to lose its prize.
     let ladderPrize = null;
+    // Set when this win was a WORLD first — nobody in the Den had ever taken this rung. The recap reads it.
+    let roadFirst = null;
     const wonRung = Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0);
     if (won && wonRung > 0) {
         const marked = await db.queryOne(
@@ -2285,7 +2303,7 @@ async function finishBout(buyerId, row, b, won) {
             }
             await trackActivity(buyerId, "arena_ladder", { rung: wonRung, foe: b.foe.name }).catch(() => {});
             ladderPrize = prize;
-            await announceRoadFirst(buyerId, wonRung, b.foe?.name).catch(() => {});
+            roadFirst = await announceRoadFirst(buyerId, wonRung, b.foe?.name).catch(() => null);
         }
     }
 
@@ -2296,6 +2314,11 @@ async function finishBout(buyerId, row, b, won) {
         vpGain: vp, vpFrom: vpBefore, vpTo: Number(after?.vp) ?? vpAfter,
         npcTier: npcTier || null,
         ladder: wonRung ? { rung: wonRung, prize: ladderPrize } : null,
+        // THE PERSON WHO DID IT GETS TOLD. The first cut announced a world-first to global chat and to nobody
+        // else — so the one member who had actually earned it saw the same nothing everyone standing outside
+        // the plaza saw. Luke, having taken rung 22: "where's the big announcement?" It was in chat. He was
+        // in the Arena.
+        roadFirst,
         npcUnlocked: won && npcTier > 0 && npcTier > (Number(row?.npc_best) || 0),
         streak: streakNow, bestStreak: Math.max(Number(row?.best_streak) || 0, streakNow),
         rounds: b.beat || (b.log || []).length,
