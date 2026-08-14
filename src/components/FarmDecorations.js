@@ -363,12 +363,12 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                     {placed && mine && onTransform ? (
                         <div style={{ padding: "2px 2px 6px", display: "flex", flexDirection: "column", gap: 8 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>📏 Size</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, flex: "0 0 68px", whiteSpace: "nowrap" }}>📏 Size</span>
                                 <input type="range" min="0.4" max="2.5" step="0.05" value={scale} onChange={(e) => setScale(Number(e.target.value))} onPointerUp={() => commit(scale, rot)} onKeyUp={() => commit(scale, rot)} style={{ flex: 1, accentColor: "#c9a2ff" }} />
                                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#c9a2ff", width: 40, textAlign: "right" }}>{Math.round(scale * 100)}%</span>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>📐 Rotate</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, flex: "0 0 68px", whiteSpace: "nowrap" }}>📐 Rotate</span>
                                 <input type="range" min="0" max="355" step="5" value={rot} onChange={(e) => setRot(Number(e.target.value))} onPointerUp={() => commit(scale, rot)} onKeyUp={() => commit(scale, rot)} style={{ flex: 1, accentColor: "#c9a2ff" }} />
                                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#c9a2ff", width: 40, textAlign: "right" }}>{rot}°</span>
                             </div>
@@ -378,7 +378,7 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                             </div>
                             {/* 🔆 Per-sprite brightness — a real filter on the sprite, not an overlay. */}
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>🔆 Bright</span>
+                                <span style={{ fontSize: 12, fontWeight: 800, flex: "0 0 68px", whiteSpace: "nowrap" }}>🔆 Bright</span>
                                 <input type="range" min="0.3" max="2.2" step="0.05" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} onPointerUp={() => onTransform?.(item.placementId, { brightness })} onKeyUp={() => onTransform?.(item.placementId, { brightness })} style={{ flex: 1, accentColor: "#ffd27a" }} />
                                 <span style={{ fontSize: 11.5, fontWeight: 800, color: "#ffd27a", width: 40, textAlign: "right" }}>{Math.round(brightness * 100)}%</span>
                             </div>
@@ -397,12 +397,12 @@ export function DecoInspect({ item, mine = false, gold = 0, busy, onBuy, onPicku
                                             <input type="color" value={lightColor} onChange={(e) => { setLightColor(e.target.value); }} onBlur={() => commitLight({ color: lightColor })} aria-label="custom light color" style={{ width: 26, height: 26, padding: 0, border: "none", background: "none", cursor: "pointer" }} />
                                         </div>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>Glow</span>
+                                            <span style={{ fontSize: 12, fontWeight: 800, flex: "0 0 68px", whiteSpace: "nowrap" }}>Glow</span>
                                             <input type="range" min="0.15" max="1" step="0.05" value={lightIntensity} onChange={(e) => setLightIntensity(Number(e.target.value))} onPointerUp={() => commitLight({ intensity: lightIntensity })} onKeyUp={() => commitLight({ intensity: lightIntensity })} style={{ flex: 1, accentColor: lightColor }} />
                                             <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2", width: 40, textAlign: "right" }}>{Math.round(lightIntensity * 100)}%</span>
                                         </div>
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 800, width: 58 }}>Falloff</span>
+                                            <span style={{ fontSize: 12, fontWeight: 800, flex: "0 0 68px", whiteSpace: "nowrap" }}>Falloff</span>
                                             <input type="range" min="30" max="260" step="5" value={lightRadius} onChange={(e) => setLightRadius(Number(e.target.value))} onPointerUp={() => commitLight({ radius: lightRadius })} onKeyUp={() => commitLight({ radius: lightRadius })} style={{ flex: 1, accentColor: lightColor }} />
                                             <span style={{ fontSize: 11.5, fontWeight: 800, color: "#e6d7c2", width: 40, textAlign: "right" }}>{lightRadius}px</span>
                                         </div>
