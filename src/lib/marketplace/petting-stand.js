@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { collectibleById } from "@/lib/marketplace/collectibles.js";
+import { xpForLevel } from "@/lib/marketplace/xp-curve.js";
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
@@ -77,6 +78,21 @@ export async function petOwnerCounts(petIds = []) {
     ).catch(() => []);
     const out = {};
     for (const r of rows || []) out[r.pet_id] = Number(r.n) || 0;
+    // ── AND THE ONES NOBODY HAS A ROW FOR ────────────────────────────────────────────────────────────────
+    // A level pet is unlocked by reaching a level, so it has NO unlock row for anybody. Counting rows alone
+    // reported 0 for it — and the panel reads `owners <= 1` as "the only one in the Den", so a Bunny that
+    // every member at level 2 already owns would have been announced as the rarest thing on the farm. The
+    // count for those is simply how many members are at or past that level.
+    // At most three ids reach here (one per cushion), so a query each is cheaper than the SQL to fuse them.
+    for (const id of ids) {
+        const def = collectibleById(id);
+        if (!def || def.source !== "level") continue;
+        const r = await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE COALESCE(xp, 0) >= $1`, [xpForLevel(def.level)]
+        ).catch(() => null);
+        // Granted rows and level-unlocks can overlap, so take whichever is larger rather than summing.
+        out[id] = Math.max(out[id] || 0, Number(r?.n) || 0);
+    }
     return out;
 }
 
@@ -130,10 +146,10 @@ export async function setStandPet(buyerId, slot, petId) {
     if (!(await standIsPlaced(buyerId))) return { ok: false, error: "no_stand" };
     const def = collectibleById(petId);
     if (!def) return { ok: false, error: "bad_pet" };
-    const owns = await db.queryOne(
-        `SELECT 1 FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet' AND ref = $2 LIMIT 1`, [buyerId, def.id]
-    ).catch(() => null);
-    if (!owns) return { ok: false, error: "not_owned" };
+    // ⚠️ NOT a mkt_cosmetic_unlock lookup. That table only holds GRANTED pets; level-unlocked ones have no row,
+    // so the raw check refused 15 of the 52 pets showing on the farm — you could pick one and nothing happened.
+    const { ownsPet } = await import("@/lib/marketplace/pets.js");
+    if (!(await ownsPet(buyerId, def.id))) return { ok: false, error: "not_owned" };
     const elsewhere = await db.queryOne(
         `SELECT slot FROM mkt_petting_stand WHERE buyer_id = $1 AND pet_id = $2 AND slot <> $3`, [buyerId, def.id, s]
     ).catch(() => null);

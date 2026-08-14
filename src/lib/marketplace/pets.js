@@ -73,6 +73,27 @@ export async function syncPetAchievements(buyerId) {
 
 // The member's full pet state. With { sync: true } it first grants any due achievement pets (used on page
 // load); action paths skip the sync to stay cheap.
+// ── DOES THIS MEMBER HAVE THIS PET? ──────────────────────────────────────────────────────────────────────────
+// The one place to ask. Owning a pet is NOT "there is a row in mkt_cosmetic_unlock" — that table only holds
+// pets you were GRANTED. Plenty are unlocked by account level and have no row at all, which is exactly how
+// bunny, frog, chick, kitten, fox_kit and wolf_pup work. A raw table check therefore says "you do not own this"
+// about a pet sitting on the member's own farm; the Petting Stand shipped with that check and silently refused
+// 15 of Luke's 52 pets.
+//
+// Mirrors petsState's own rule, including its ownerOnly guard: unlaunched pets count only for whoever actually
+// holds one.
+export async function ownsPet(buyerId, petId) {
+    const def = collectibleById(petId);
+    if (!buyerId || !def) return false;
+    const [buyer, rows] = await Promise.all([
+        db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
+        db.query(`SELECT ref FROM mkt_cosmetic_unlock WHERE buyer_id = $1 AND category = 'pet'`, [buyerId]).catch(() => []),
+    ]);
+    const granted = new Set((rows || []).map((r) => r.ref));
+    if (def.ownerOnly && !granted.has(def.id)) return false;
+    return isCollectibleUnlocked(def, levelForXp(buyer?.xp || 0).level, { owned: granted });
+}
+
 export async function petsState(buyerId, { sync = false } = {}) {
     if (!buyerId) return { ownedIds: [], tradeableIds: [], featured: null, level: 1, gold: 0, passiveTotal: 0, signedIn: false, incoming: [], outgoing: {}, petLevels: {} };
     if (sync) {
