@@ -67,7 +67,17 @@ export async function visiblePackages(buyerId, { withArt = false } = {}) {
     return out;
 }
 
-/** The one to advertise right now, or null. First visible wins — packages are a rotating slot, not a shelf. */
+/**
+ * The one to advertise right now, or null.
+ *
+ * ONE PACKAGE AT A TIME, and deliberately no rotation machinery. There was a plan for a rotating slot — a
+ * package that arrives, runs, and retires with a "gone soon" line — and it was dropped on purpose as
+ * overcomplicating a thing that currently has exactly one entry. First visible wins; that is the whole rule.
+ *
+ * If a second package is ever added, THIS is the function that has to decide between them, and the honest
+ * options at that point are a hand-set "featured" flag or a date window. Neither exists yet and neither should
+ * be built until there is a second package to point it at.
+ */
 export async function featuredPackage(buyerId, opts = {}) {
     const all = await visiblePackages(buyerId, opts);
     return all[0] || null;

@@ -11,6 +11,8 @@
 // it is a shortcut — and the moment one drops for free the purchase looks like a con. `deco_petting_stand`
 // carries `source: "package"`, which no hand-out path in the game matches. See decorations.js.
 
+// One entry today, and no rotation/scheduling machinery on purpose — see featuredPackage in packages-server.js
+// for why that was deferred rather than forgotten.
 export const PACKAGES = [
     {
         id: "petting_stand",
