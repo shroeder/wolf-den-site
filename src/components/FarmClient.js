@@ -648,9 +648,6 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, []);
     useEffect(() => { loadArtPending(); }, [loadArtPending]);
     const [decoBusy, setDecoBusy] = useState(false);
-    // A refused placement used to do NOTHING visible — decoAct only ever acted on success, so the piece just
-    // sprang back to the tray with no reason given and the obvious read was "the farm is broken".
-    const [decoNote, setDecoNote] = useState("");
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
         const sx = scrollRef.current?.scrollLeft; // remember how far the pasture is scrolled…
@@ -668,16 +665,9 @@ export default function FarmClient({ initial, viewingAlias }) {
             }));
             // …and restore it after the re-render, so a piece placed while scrolled right doesn't vanish off-screen.
             if (sx != null) requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollLeft = sx; });
-        } else if (r && r.ok === false && r.message) {
-            setDecoNote(r.message);
         }
         return r;
     }, [post]);
-    useEffect(() => {
-        if (!decoNote) return undefined;
-        const t = setTimeout(() => setDecoNote(""), 4200);
-        return () => clearTimeout(t);
-    }, [decoNote]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
 
     // ── Custom farm background (3 creations; generate → LIVE preview on the scene → accept/discard) ──
@@ -736,6 +726,13 @@ export default function FarmClient({ initial, viewingAlias }) {
     // The three seated companions, resolved to the sprites the pasture already draws them with — so a level-six
     // enshrined pet sits on the cushion wearing the form it actually wears. Index matches the tier order, and a
     // gap stays a gap (an empty tier renders no animal rather than shuffling the next one up).
+    // WHERE the stand is standing. Decorations live per-view (outside / inside), so the pill has to appear in
+    // the view the stand is actually in — it was pinned to "outside", which meant putting it in the barn made
+    // its only reliable entry point vanish.
+    const standPlacement = useMemo(
+        () => (farm?.placements || []).find((p) => p.decoId === STAND_DECO_ID) || null,
+        [farm?.placements]
+    );
     const standPets = useMemo(() => {
         const slots = farm?.stand?.slots || [];
         if (!slots.length) return null;
@@ -843,7 +840,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 overlaps SOMETHING almost wherever it goes.
                 This pill does not care where the stand is standing. Shown to visitors too — who is on display
                 is the whole point of the thing. */}
-            {farm.stand?.placed && view === "outside" ? (
+            {farm.stand?.placed && (standPlacement?.view || "outside") === view ? (
                 <button type="button" onClick={() => setInspectDeco({ decoId: STAND_DECO_ID })} title="The Petting Stand" style={{ ...CTRL_PILL, border: "1px solid rgba(255,215,110,0.55)", background: "linear-gradient(180deg, rgba(52,42,16,0.96), rgba(32,26,10,0.96))", color: "#ffe6a6" }}>
                     <GiPawPrint size={15} aria-hidden="true" />Petting Stand
                 </button>
@@ -1469,11 +1466,6 @@ export default function FarmClient({ initial, viewingAlias }) {
             {/* THE STAND GETS ITS OWN PANEL, not the generic decoration inspector — it is the one decoration
                 with state of its own to show (three tiers, three owner counts) and to change. Opened by the
                 same tap that inspects any other placed piece, on your farm or anybody else's. */}
-            {decoNote ? (
-                <div role="status" style={{ position: "fixed", left: "50%", bottom: 92, transform: "translateX(-50%)", zIndex: 10070, maxWidth: 340, padding: "11px 14px", borderRadius: 12, background: "linear-gradient(180deg, #2a2410, #17181c)", border: "1px solid rgba(255,215,110,0.45)", boxShadow: "0 14px 40px rgba(0,0,0,0.55)", color: "#f0e4c8", fontSize: 13, fontWeight: 700, lineHeight: 1.4, textAlign: "center" }}>
-                    {decoNote}
-                </div>
-            ) : null}
             {/* The stand shows its companion panel, EXCEPT when it has explicitly asked for the ordinary
                 decoration inspector (`adjust`) — resize / rotate / flip / brightness / pick up. Those live in
                 exactly one component and are not restated in the stand's panel. */}
@@ -1487,10 +1479,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onClear={standClear}
                     // Hand over to the real inspector. The pill opens this panel without a placement attached,
                     // so find the placed stand to hand it the row it needs (id, scale, rot, flip, light).
-                    onAdjust={() => {
-                        const pl = (farm.placements || []).find((p) => p.decoId === STAND_DECO_ID);
-                        if (pl) setInspectDeco({ ...pl, placementId: pl.id, adjust: true });
-                    }}
+                    onAdjust={() => { if (standPlacement) setInspectDeco({ ...standPlacement, placementId: standPlacement.id, adjust: true }); }}
                     onClose={() => setInspectDeco(null)}
                 />
             ) : inspectDeco ? (
