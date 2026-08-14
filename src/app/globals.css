@@ -10812,26 +10812,77 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-chip.is-featured { border-color: rgba(255,215,94,0.7); box-shadow: 0 0 0 1px rgba(255,215,94,0.5) inset, 0 4px 16px rgba(240,160,40,0.3); padding-top: 20px; }
 .credit-chip-flag { position: absolute; top: 0; left: 0; right: 0; padding: 2px 0; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em;
     color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffbf3c); border-radius: 13px 13px 0 0; }
-/* ── PAID PACKAGES on the store-credit screen ─────────────────────────────────────────────────────────────
-   A package is the same money going in with more coming back, so it is drawn as an offer rather than as
-   another amount chip: full width, its contents listed, and visibly selected once chosen. */
-.credit-pkgs { display: grid; gap: 10px; margin-bottom: 4px; }
-.credit-pkg { display: grid; gap: 5px; width: 100%; text-align: left; padding: 13px 14px; border-radius: 16px;
-    cursor: pointer; color: #f0e6d2;
-    background: radial-gradient(120% 140% at 100% 0%, rgba(214,160,255,0.16), rgba(255,255,255,0.04) 60%);
-    border: 1px solid rgba(214,160,255,0.42); }
-.credit-pkg.is-on { border-color: rgba(214,160,255,0.95);
-    box-shadow: 0 0 0 1px rgba(214,160,255,0.5), 0 8px 26px rgba(140,80,200,0.28); }
-.credit-pkg-top { display: flex; align-items: baseline; gap: 8px; }
-.credit-pkg-top b { font-size: 1rem; }
-.credit-pkg-top i { margin-left: auto; font-style: normal; font-weight: 900; font-size: 1.05rem; color: #ffd75e; }
-.credit-pkg em { font-style: normal; font-size: 0.78rem; color: #cbbcda; line-height: 1.4; }
-.credit-pkg ul { margin: 3px 0 0; padding-left: 17px; display: grid; gap: 2px; }
-.credit-pkg li { font-size: 0.78rem; color: #e8dcc2; line-height: 1.35; }
-.credit-pkg-preview { justify-self: start; font-size: 0.7rem; font-weight: 800; color: #ffb347;
-    background: rgba(255,179,71,0.12); border: 1px solid rgba(255,179,71,0.4); border-radius: 8px; padding: 2px 8px; }
-.credit-pkg-pick { justify-self: start; margin-top: 4px; font-size: 0.78rem; font-weight: 900; color: #d6a0ff; }
-.credit-pkg.is-on .credit-pkg-pick { color: #8fe39a; }
+/* ── THE PACKAGE CARD ─────────────────────────────────────────────────────────────────────────────────────
+   Built as an advertisement: the item drawn working, the numbers in large type, three lines on what it does.
+   pkgc- prefixed so nothing here can collide with the plain credit chips below. */
+.credit-pkgs { display: grid; gap: 12px; margin-bottom: 6px; }
+.pkgc { position: relative; overflow: hidden; border-radius: 20px; padding: 16px;
+    background:
+        radial-gradient(110% 90% at 85% 0%, rgba(214,160,255,0.20), transparent 62%),
+        radial-gradient(90% 80% at 0% 100%, rgba(255,215,110,0.10), transparent 60%),
+        linear-gradient(180deg, #241b31, #14101d);
+    border: 1px solid rgba(214,160,255,0.45);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.45); }
+.pkgc.is-on { border-color: rgba(214,160,255,0.95);
+    box-shadow: 0 0 0 1px rgba(214,160,255,0.55), 0 18px 48px rgba(140,80,200,0.35); }
+.pkgc-preview { display: inline-block; margin-bottom: 10px; font-size: 0.7rem; font-weight: 800;
+    color: #ffb347; background: rgba(255,179,71,0.13); border: 1px solid rgba(255,179,71,0.45);
+    border-radius: 999px; padding: 3px 10px; }
+
+/* HERO — the item on the left, the pitch on the right; stacks on a narrow phone. */
+.pkgc-hero { display: flex; align-items: center; gap: 14px; }
+.pkgc-stage { position: relative; flex: 0 0 auto; display: grid; place-items: center; }
+.pkgc-glow { position: absolute; width: 128%; height: 128%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(214,160,255,0.32) 0%, rgba(214,160,255,0.10) 45%, transparent 70%);
+    animation: pkgcPulse 3.4s ease-in-out infinite; }
+@keyframes pkgcPulse { 0%,100% { transform: scale(0.94); opacity: 0.75; } 50% { transform: scale(1.06); opacity: 1; } }
+.pkgc-stand { position: relative; }
+.pkgc-deco { display: block; width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); }
+.pkgc-pet { position: absolute; object-fit: contain; transform: translate(-50%, -100%);
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
+.pkgc-head { min-width: 0; }
+.pkgc-kicker { display: inline-block; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.14em;
+    text-transform: uppercase; color: #d6a0ff; }
+.pkgc-head h3 { margin: 2px 0 4px; font-size: 1.32rem; line-height: 1.12; color: #fff4dc; }
+.pkgc-head p { margin: 0; font-size: 0.82rem; line-height: 1.42; color: #cbbcda; }
+.pkgc-price { display: inline-block; margin-top: 8px; font-size: 1.9rem; font-weight: 900; line-height: 1;
+    color: #ffd75e; text-shadow: 0 2px 12px rgba(255,215,94,0.35); }
+
+/* WHAT YOU GET — three tiles, the number is the message. */
+.pkgc-gets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.pkgc-get { display: grid; justify-items: center; text-align: center; gap: 1px; padding: 10px 6px;
+    border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+.pkgc-get-ico { display: grid; place-items: center; height: 34px; }
+.pkgc-get-ico img { max-width: 34px; max-height: 34px; object-fit: contain; }
+.pkgc-get b { font-size: 1.24rem; line-height: 1.1; color: #ffd75e; }
+.pkgc-get em { font-style: normal; font-size: 0.72rem; font-weight: 700; color: #f0e6d2; }
+.pkgc-get i { font-style: normal; font-size: 0.63rem; line-height: 1.25; color: #a99bb8; }
+
+.pkgc-back { margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-size: 0.78rem; line-height: 1.45;
+    color: #bfe8c6; background: rgba(143,227,154,0.10); border: 1px solid rgba(143,227,154,0.32); }
+.pkgc-back b { color: #8fe39a; }
+
+.pkgc-does { display: grid; gap: 9px; margin-top: 12px; }
+.pkgc-do { display: flex; gap: 9px; align-items: flex-start; }
+.pkgc-do > span { font-size: 1rem; line-height: 1.3; }
+.pkgc-do b { display: block; font-size: 0.82rem; color: #f0e6d2; }
+.pkgc-do em { display: block; font-style: normal; font-size: 0.74rem; line-height: 1.4; color: #a99bb8; }
+
+.pkgc-cta { width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 14px; cursor: pointer;
+    font-family: var(--font-display); font-size: 1rem; font-weight: 900; color: #2a0f45;
+    background: linear-gradient(180deg, #e9c2ff, #b06bf0);
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5); }
+.pkgc-cta.is-on { color: #06311f; background: linear-gradient(180deg, #a9f0b8, #4bbf6a); }
+
+@media (max-width: 430px) {
+    .pkgc-hero { flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+    .pkgc-head h3 { font-size: 1.22rem; }
+    .pkgc-gets { gap: 6px; }
+    .pkgc-get { padding: 9px 3px; }
+    .pkgc-get b { font-size: 1.06rem; }
+    .pkgc-get i { display: none; }
+}
 .credit-chip { position: relative; }
 .credit-chip { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 6px; border-radius: 14px; cursor: pointer;
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.25)); border: 1px solid rgba(255,255,255,0.14);

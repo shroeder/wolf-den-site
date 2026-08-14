@@ -3,6 +3,7 @@
 import QRCode from "qrcode";
 import { useEffect, useRef, useState } from "react";
 import { redeemUrl } from "@/lib/marketplace/redeem-link";
+import PackageCard from "@/components/PackageCard";
 
 // Buy store credit (real dollars on your account) with a card, and spend it in-store via a QR staff scan.
 // $1 = 200 coins on top of the credit. Card capture uses the Square Web Payments SDK, same as shop checkout.
@@ -222,30 +223,14 @@ export default function StoreCreditClient({
                         plain amounts because that is the offer, and selecting one takes over the amount. */}
                     {offers.length ? (
                         <div className="credit-pkgs">
-                            {offers.map((o) => {
-                                const on = pkgId === o.id;
-                                return (
-                                    <button
-                                        type="button"
-                                        key={o.id}
-                                        className={`credit-pkg${on ? " is-on" : ""}`}
-                                        onClick={() => setPkgId(on ? null : o.id)}
-                                    >
-                                        <span className="credit-pkg-top">
-                                            <b>{o.name}</b>
-                                            <i>{usd(o.priceCents)}</i>
-                                        </span>
-                                        <em>{o.blurb}</em>
-                                        <ul>
-                                            {(o.perks || []).map((p) => <li key={p}>{p}</li>)}
-                                        </ul>
-                                        {/* Says out loud that it is not live yet, so a preview can never be
-                                            mistaken for something members can already see. */}
-                                        {o.ownerPreview ? <span className="credit-pkg-preview">🔒 Owner preview — not on sale yet</span> : null}
-                                        <span className="credit-pkg-pick">{on ? "✓ Selected" : "Choose this"}</span>
-                                    </button>
-                                );
-                            })}
+                            {offers.map((o) => (
+                                <PackageCard
+                                    key={o.id}
+                                    offer={o}
+                                    selected={pkgId === o.id}
+                                    onToggle={() => setPkgId(pkgId === o.id ? null : o.id)}
+                                />
+                            ))}
                         </div>
                     ) : null}
                     <h2 style={{ marginTop: offers.length ? 14 : 0 }}>{pkg ? "Or add credit on its own" : "Add credit"}</h2>

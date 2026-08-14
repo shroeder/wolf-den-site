@@ -24,6 +24,24 @@ export const PACKAGES = [
         // The coin line is the hook and it should be stated as one: a plain $5 load pays 1,000 coins
         // (COINS_PER_CENT = 2), so this is exactly double. If that constant ever moves, move this with it.
         coinsNote: "double the coins a normal $5 load pays",
+        // ── WHAT THE CARD SHOWS, AND WHY IT IS DATA ──────────────────────────────────────────────────────
+        // A package is the one screen in the game whose job is to SELL, so it gets the item drawn at size with
+        // pets actually sitting on it — a member should understand what they are buying by looking, not by
+        // reading. These three are the demo companions on the tiers: a wolf pup (the Den's own animal), a bear
+        // cub and a flamingo, chosen to be instantly different from each other at a glance.
+        demoPets: ["wolf_pup", "bear_cub", "flamingo"],
+        // The three things you actually receive, drawn as tiles. `big` is the number that gets the large type.
+        gets: [
+            { key: "credit", big: "$5.00", label: "store credit", note: "the full amount, back in your pocket", icon: "/images/nav/credit.png" },
+            { key: "coins", big: "2,000", label: "coins", note: "double a normal $5 load", icon: "/images/ui/coin.png" },
+            { key: "stand", big: "1", label: "Petting Stand", note: "not sold, won or gifted anywhere else", deco: true },
+        ],
+        // How it works, in one line each, in the order they matter.
+        does: [
+            { icon: "🐾", head: "Three pets on display", body: "They earn passive XP exactly as your equipped pet does — a full stand is four companions levelling instead of one." },
+            { icon: "✋", head: "Worth double to pet", body: "Every petting on the stand gives twice the usual XP. Yours and every visitor's." },
+            { icon: "💎", head: "Shows how rare they are", body: "Each tier says how many members own that companion. Yours might be the only one in the Den." },
+        ],
         perks: [
             "$5 store credit — the full amount, spendable in the shop",
             "2,000 coins — double a normal $5 load",

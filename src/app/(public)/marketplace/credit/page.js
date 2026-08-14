@@ -14,6 +14,9 @@ import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
 import { PACKAGES, packageSettingKey } from "@/lib/marketplace/packages.js";
 import { getSetting } from "@/lib/settings.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
+import { decorationById } from "@/lib/marketplace/decorations.js";
+import { getDecoSprites } from "@/lib/marketplace/farm-decorations.js";
+import { getPetSpriteData } from "@/lib/marketplace/pet-sprite.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -51,7 +54,23 @@ export default async function StoreCreditPage() {
     const offers = [];
     for (const p of PACKAGES) {
         const open = String(await getSetting(packageSettingKey(p.id), "off").catch(() => "off")) === "on";
-        if (open || isOwner(buyer.id)) offers.push({ ...p, ownerPreview: !open });
+        if (!open && !isOwner(buyer.id)) continue;
+        // The ART comes with the offer, because the card's whole job is to show the thing rather than describe
+        // it: the decoration itself, and the three demo companions that sit on its tiers. Resolved here so the
+        // client renders the real sprites at the real tier positions — the same numbers the farm draws with.
+        const def = decorationById(p.decoId);
+        const [decoSprites, petSprites] = await Promise.all([
+            getDecoSprites([p.decoId]).catch(() => ({})),
+            getPetSpriteData().catch(() => ({})),
+        ]);
+        offers.push({
+            ...p,
+            ownerPreview: !open,
+            decoSprite: decoSprites[p.decoId] || null,
+            decoSize: def?.size || 132,
+            tiers: def?.tiers || [],
+            demoPetSprites: (p.demoPets || []).map((id) => petSprites[id]?.url || null),
+        });
     }
 
     return (
