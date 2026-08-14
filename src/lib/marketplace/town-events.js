@@ -5,7 +5,7 @@ import { logCoin } from "@/lib/marketplace/coins.js";
 import { broadcastToEveryone } from "@/lib/push/broadcast.js";
 import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { bandTable, GRADE_RANK } from "@/lib/marketplace/timing.js";
-import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
+import { CHIEFTAIN_WAVE, engageEnemy, liveFighterCount, releaseEnemy, spawnWave, strikeEnemy, swarmState } from "@/lib/marketplace/town-swarm.js";
 import { bumpTownQuest } from "@/lib/marketplace/town-quests.js";
 import { getSetting } from "@/lib/settings.js";
 import { getEquippedStats, getEquippedIds, grantSalvageFodder } from "@/lib/marketplace/inventory.js";
@@ -970,6 +970,10 @@ export async function duelRaidEnemy(buyerId, eventId, enemyId = null, dist = nul
         hp = Math.max(0, upd?.hp ?? ev.hp);
     } else {
         coin = DUEL_LOSS_GOLD; // never nothing
+        // AND THE FOE GOES BACK ON THE BOARD. Losing used to keep the claim, so a foe you could not beat stayed
+        // locked to you — unclickable by anyone else — until you left the plaza for 45 seconds. Whoever is
+        // holding up the wave is exactly the person least able to free it.
+        if (enemyId) await releaseEnemy(buyerId, enemyId).catch(() => {});
     }
 
     // ── THE PER-RAID CEILING ─────────────────────────────────────────────────────────────────────────────────

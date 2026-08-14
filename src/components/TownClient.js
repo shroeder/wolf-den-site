@@ -1246,6 +1246,13 @@ export default function TownClient({ initial }) {
         await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set_events_live", on: !state?.eventsLive }) }).catch(() => {});
         load();
     }, [state?.eventsLive, load]);
+    // Owner: whether game announcements also ring the ledger app. Off by default — the owner's member account
+    // already gets these in the browser, so leaving it on delivered every raid twice, into the app that carries
+    // orders and customer messages.
+    const toggleOwnerGamePush = useCallback(async () => {
+        await fetch("/api/marketplace/town", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "set_owner_game_push", on: !state?.ownerGamePush }) }).catch(() => {});
+        load();
+    }, [state?.ownerGamePush, load]);
     const camDur = clamp((me.moveDist || 0) * 0.05, 0.4, 2.6);
 
     if (state && state.signedIn === false) {
@@ -1997,6 +2004,10 @@ export default function TownClient({ initial }) {
                                 <button type="button" className={`tw-live-toggle${state?.eventsLive ? " is-on" : ""}`} onClick={toggleEventsLive}>
                                     {state?.eventsLive ? "🟢 Auto opening-events: LIVE" : "⚪ Auto opening-events: off"}
                                     <span className="muted">tap to {state?.eventsLive ? "turn off" : "turn on"} — pushes members when the shop opens</span>
+                                </button>
+                                <button type="button" className={`tw-live-toggle${state?.ownerGamePush ? " is-on" : ""}`} onClick={toggleOwnerGamePush}>
+                                    {state?.ownerGamePush ? "🟢 Game push to the ledger app: ON" : "⚪ Game push to the ledger app: off"}
+                                    <span className="muted">tap to {state?.ownerGamePush ? "turn off" : "turn on"} — you already get these in the browser; this is the second copy</span>
                                 </button>
                             </div>
                         ) : null}

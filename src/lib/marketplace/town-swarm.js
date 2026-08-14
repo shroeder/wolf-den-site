@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { ARCHETYPES } from "@/lib/marketplace/arena-npc.js";
+import { ARCHETYPES, npcPower } from "@/lib/marketplace/arena-npc.js";
 
 // ── THE SHARED SWARM ─────────────────────────────────────────────────────────────────────────────────────────
 // A skirmish raid is now a real, finite, SHARED roster of foes: 5 waves, then a chieftain, then it's over.
@@ -135,14 +135,36 @@ export const enemyKind = (k, eventKind = null) => {
 //   chieftain     BALANCED   no weakness and no lever. The raid's boss is meant to take a real kit.
 //
 // `power` is a budget, not a stat line — statsForPower spends it through the archetype's weights, exactly as a
-// Gauntlet tier or a Long Road rung does. Scaled off the kind's old HP so a shield-bearer is still the tanky
-// one and a chieftain is still ten times a scrapper.
+// Gauntlet tier or a Long Road rung does.
+//
+// ── AND IT IS A GAUNTLET TIER, NOT A NUMBER SOMEBODY PICKED ──────────────────────────────────────────────────
+// These were "scaled off the kind's old HP": the 18/26/44/70/260 hit points a foe carried back when a raid was
+// a tap-to-damage duel, multiplied by about ten. That is a UNIT ERROR, not a difficulty setting — a gear power
+// budget is measured in the units a member's gear is measured in, where best-in-slot across all nine slots
+// totals 644. So a "plain brawler, nothing fancy" was built as a tier-34 Warlord and the Lieutenant as a
+// tier-47 Titan, in a Den whose best Gauntlet record is tier 27 and belongs to one person.
+//
+// On 2026-08-13 that raid one-shot the plaza — the Lieutenant's best move landed 286 on members with 250
+// health, and at speed 78 it swung first every time, so people died without taking a turn. JT: "It keeps 1
+// shotting me from the jump." Eric D: "First hit hits me for 1000." Rumorleigh: "he'd kill me the first blow."
+//
+// Stated as TIERS now, resolved through the same npcPower curve the ladder uses, because "the Lieutenant is
+// tier 20" is a claim you can check against where members actually are and "760" is not. scripts/check-raid-foes.mjs
+// simulates every one of these against four real loadouts and FAILS if any of them can take more than a third
+// of a starting member's health in one blow. Change a tier here, run that.
+const RAID_TIER = {
+    scrapper: 6,        // a mook. Everyone beats it; it should cost a few rounds, not a loadout.
+    archer: 7,          // squishier, bites harder — the duelist weights do that, not a bigger budget
+    shieldbearer: 10,   // the tanky one. Its bulk comes from the wall's ferocity weight and 1.35 tough
+    elite: 20,          // a real threat to a new member and a speed bump to a geared one
+    chieftain: 28,      // the raid's boss: the one foe a starting member should not expect to solo
+};
 const ARENA_SHAPE = {
-    scrapper: { archetype: "brute", power: 320, kitTier: 4 },
-    archer: { archetype: "duelist", power: 300, kitTier: 5 },
-    shieldbearer: { archetype: "wall", power: 480, kitTier: 6 },
-    elite: { archetype: "berserker", power: 760, kitTier: 9 },
-    chieftain: { archetype: "balanced", power: 1900, kitTier: 14 },
+    scrapper: { archetype: "brute", power: npcPower(RAID_TIER.scrapper), kitTier: 4 },
+    archer: { archetype: "duelist", power: npcPower(RAID_TIER.archer), kitTier: 5 },
+    shieldbearer: { archetype: "wall", power: npcPower(RAID_TIER.shieldbearer), kitTier: 6 },
+    elite: { archetype: "berserker", power: npcPower(RAID_TIER.elite), kitTier: 9 },
+    chieftain: { archetype: "balanced", power: npcPower(RAID_TIER.chieftain), kitTier: 14 },
 };
 
 // ── AND A FACTION HAS A SHAPE ────────────────────────────────────────────────────────────────────────────────
@@ -356,6 +378,29 @@ export async function engageEnemy(buyerId, enemyId) {
         return { ok: false, error: cur?.dead ? "already_dead" : "taken", who: cur?.who || null };
     }
     return { ok: true, enemyId: Number(got.id), kind: got.kind, hp: Number(got.hp), hpMax: Number(got.hp_max) };
+}
+
+// ── PUT A FOE BACK ON THE BOARD ──────────────────────────────────────────────────────────────────────────────
+// A claim was released in exactly ONE place — releaseAbandoned, which needs the holder to stop appearing in
+// mkt_town_presence for 45 seconds, i.e. to leave the plaza entirely. Nothing released it when a fighter simply
+// LOST, so a lost bout left the foe locked to the loser and unclickable by everyone else for the rest of the
+// raid. arena.js's forfeit even documents the opposite ("a raid foe goes back on the shared roster the same way
+// it does when you are killed") — it was describing behaviour no code had.
+//
+// That is the second half of the 2026-08-13 raid. One member held a Lieutenant they could not kill and the
+// plaza stood watching: "if a new player joins the raid and attacks a boss they can't kill, [we're] stuck
+// twiddling thumbs until raid ends" (GrayKitsune). The only known workaround was closing the tab — which is
+// precisely what Rumorleigh found: "Closed out and came back in and it cleared me from that one."
+//
+// Guarded on the holder so a stale client cannot free somebody else's fight.
+export async function releaseEnemy(buyerId, enemyId) {
+    if (!buyerId || !enemyId) return false;
+    const r = await db.queryOne(
+        `UPDATE mkt_town_enemy SET engaged_by = NULL, engaged_at = NULL
+          WHERE id = $1 AND engaged_by = $2 AND died_at IS NULL RETURNING id`,
+        [Number(enemyId), buyerId]
+    ).catch(() => null);
+    return Boolean(r);
 }
 
 // Damage the foe you hold. Returns whether it died, and whether that cleared the wave.

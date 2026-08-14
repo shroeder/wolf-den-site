@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { isPrimaryOwner } from "@/lib/marketplace/owner.js";
-import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, getTownTodo, moveTown, sendTownChat, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
+import { buyMerchantChest, gambleMerchantGear, contributeTownProject, getTownState, getTownTodo, moveTown, sendTownChat, setOwnerGamePush, setTownEventsLive, setTownTyping } from "@/lib/marketplace/town.js";
 import { attackTownEvent, spawnTownEvent, duelRaidEnemy, bossRaidStrike, endTownEvent, markRaidRecapSeen } from "@/lib/marketplace/town-events.js";
 import { claimTownQuest } from "@/lib/marketplace/town-quests.js";
 import { claimWishingWell } from "@/lib/marketplace/town-projects.js";
@@ -66,6 +66,7 @@ export async function POST(request) {
             else if (body?.action === "spawn_event") res = isPrimaryOwner(buyer.id) ? await spawnTownEvent(body?.kind || "bandit_raid") : { ok: false, error: "forbidden" };
             else if (body?.action === "end_event") res = isPrimaryOwner(buyer.id) ? await endTownEvent() : { ok: false, error: "forbidden" };
             else if (body?.action === "set_events_live") res = isPrimaryOwner(buyer.id) ? await setTownEventsLive(buyer.id, Boolean(body?.on)) : { ok: false, error: "forbidden" };
+            else if (body?.action === "set_owner_game_push") res = isPrimaryOwner(buyer.id) ? await setOwnerGamePush(buyer.id, Boolean(body?.on)) : { ok: false, error: "forbidden" };
             else res = await moveTown(buyer.id, { x: body?.x, y: body?.y, facing: body?.facing });
             if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.error === "forbidden" ? 403 : 400 });
             return NextResponse.json(res, { headers: { "Cache-Control": "no-store" } });

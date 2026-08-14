@@ -23,7 +23,7 @@ import { grantItem } from "@/lib/marketplace/inventory.js";
 import { itemSpriteFor } from "@/lib/marketplace/item-sprites.js";
 import { checkTownContribBadges, checkMerchantBadges } from "@/lib/marketplace/town-badges.js";
 import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
-import { setSetting } from "@/lib/settings.js";
+import { getSetting, setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
 
@@ -440,6 +440,10 @@ export async function getTownState(buyerId) {
         signedIn: Boolean(buyerId),
         owner,
         raidAdmin: isPrimaryOwner(buyerId), // ONLY Luke sees the raid trigger/end controls (surprise-drop lever)
+        // Read only for the one person who can act on it — everybody else would pay a query to render nothing.
+        ownerGamePush: isPrimaryOwner(buyerId)
+            ? String(await getSetting("push.owner_game", "off").catch(() => "off")) === "on"
+            : false,
         you: {
             id: buyerId,
             name: me?.display_name || (me?.alias ? `@${me.alias}` : "You"),
@@ -513,6 +517,16 @@ export async function setTownEventsLive(buyerId, on) {
     if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
     await setSetting("town_events_live", on ? "1" : "0").catch(() => {});
     return { ok: true, eventsLive: Boolean(on) };
+}
+
+// Owner toggle for whether GAME announcements also ring the ledger app (see lib/push/broadcast.js). Off by
+// default and deliberately not something the game asks for: the owner's member account already carries browser
+// push, so leaving this on delivered every raid twice and put game traffic in the surface that carries orders
+// and customer messages. Business push is unaffected either way — it never came through broadcastToEveryone.
+export async function setOwnerGamePush(buyerId, on) {
+    if (!isOwner(buyerId)) return { ok: false, error: "forbidden" };
+    await setSetting("push.owner_game", on ? "on" : "off").catch(() => {});
+    return { ok: true, ownerGamePush: Boolean(on) };
 }
 
 // Buy a loot chest from the Traveling Merchant (owner-gated during the build). Price/stock follow the town's
