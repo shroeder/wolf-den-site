@@ -12,6 +12,15 @@ import { grantEventBadge } from "@/lib/marketplace/badges.js";
 // finalize on the single pending→paid transition) so a retried charge can never double-grant. On finalize we
 // grant TOKENS (grantCustomCredit → mkt_buyer.custom_deco_credits) + COINS (grantCoins → gold). We deliberately
 // do NOT touch store_credit_cents — this is a token/coin bundle, not a dollar balance.
+//
+// ── AND THE EXCLUSIVITY RUNS BOTH WAYS NOW ───────────────────────────────────────────────────────────────────
+// The rule was always "buy tokens or buy credit, not both", and only this half of it was ever enforced. The
+// store-credit checkout paid one token per full $5 loaded, which made it the largest source of Creation tokens
+// in the game — 75 from $350 loaded, against the 16 this shop has sold. Removed 2026-08-13, because a credit
+// load hands the money back as goods: the dollars are still spendable, so the token cost nothing. If you ever
+// add a token to another purchase path, that is the test — does the member still have the money afterwards.
+//
+// A Creation token is minted HERE, by an admin grant, or not at all.
 
 // Record a pending purchase BEFORE charging the card, so granting can be made idempotent on success.
 export async function createPendingCreationPurchase({ buyerId, tierId, amountCents, tokens, coins, idempotencyKey }) {

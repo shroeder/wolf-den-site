@@ -18,7 +18,6 @@ import {
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
-import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -125,20 +124,23 @@ export async function POST(request) {
                 }).catch(() => {});
                 // Grant any newly-earned store-credit badges from the higher lifetime total.
                 syncEarnedBadges(buyer.id).catch(() => {});
-                // 1 custom-decoration creation credit per full $5 loaded (design-your-own-decoration perk).
-                const creations = Math.floor(amountCents / 500);
-                if (creations > 0) {
-                    // Label it. Passing no context made grantCustomCredit fall back to source "admin_grant",
-                    // so tokens a member PAID for appeared in the gift audit feed as an admin handout — which
-                    // is exactly how a member buying $25 of store credit came to look like he was comping
-                    // himself creations.
-                    grantCustomCredit(buyer.id, creations, {
-                        source: "purchase_credit",
-                        actorId: buyer.id,
-                        actorLabel: "self (store credit)",
-                        meta: { amountCents },
-                    }).catch(() => {});
-                }
+                // ── NO CREATION TOKENS ON THIS PATH ──────────────────────────────────────────────────
+                // This used to mint one Creation token per full $5 loaded, and it was the single largest
+                // source of them in the game: $350 loaded produced 75 tokens, against 16 ever sold by the
+                // Creations shop itself.
+                //
+                // The two purchases are meant to be exclusive, and only one of them was. A Creation bundle
+                // deliberately never touches store_credit_cents ("a token/coin bundle, not a dollar
+                // balance" — creation-tokens-server.js); loading credit paid credit AND coins AND tokens.
+                //
+                // The asymmetry that matters is not the count, it is that A CREDIT LOAD DOES NOT CONSUME
+                // THE MONEY. Load $350 and you still have $350 to spend in the shop — the dollars come back
+                // as goods, so the token rode along free. The $5 that buys a bundle is gone for good. A
+                // paid-only resource cannot have a path that hands it out for nothing, which is the same
+                // rule that just took it off the cooking ladder.
+                //
+                // Tokens already granted stay granted (89 unspent across all members, most of them one
+                // member's) — they were paid for in good faith under the old rule.
             }
 
             return noStore({
