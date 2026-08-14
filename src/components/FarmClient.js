@@ -721,7 +721,17 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r?.ok) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), credits: r.credits, draft: r.draft } } }));
         return r;
     }, [post]);
-    const customRefine = useCallback((id, correction) => post({ action: "deco_custom_refine", id, correction }), [post]);
+    // The refreshed draft is folded back into farm state, not just returned: the dock reads it to decide whether
+    // its button says "Make your own" or "Resume your creation", and a stale copy there is the difference between
+    // a member seeing their work waiting and assuming their token is gone.
+    const customRefine = useCallback(async (id, correction) => {
+        const r = await post({ action: "deco_custom_refine", id, correction });
+        if (r?.ok && r.draft) setFarm((f) => ({ ...f, decorations: { ...f.decorations, custom: { ...(f.decorations?.custom || {}), draft: r.draft } } }));
+        return r;
+    }, [post]);
+    // Autosave of the half-typed tweak. Deliberately does NOT touch farm state or surface errors — it fires while
+    // the member is mid-sentence, and the only thing worse than a lost note is a re-render that eats a keystroke.
+    const customNote = useCallback((id, note) => { post({ action: "deco_custom_note", id, note }).catch(() => {}); }, [post]);
     const customSuggest = useCallback((name) => post({ action: "deco_custom_suggest", name }), [post]);
     const customFinalize = useCallback(async (id, chosenUrl) => {
         const r = await post({ action: "deco_custom_finalize", id, chosenUrl });
@@ -1420,6 +1430,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onRefine={customRefine}
                     onFinalize={customFinalize}
                     onSuggest={customSuggest}
+                    onSaveNote={customNote}
                     onClose={() => setCustomOpen(false)}
                 />
             ) : null}

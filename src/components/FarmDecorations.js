@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AskForCopy, CreationShareHub } from "@/components/CreationShare";
 
@@ -13,6 +13,8 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
     const [bright, setBright] = useState(Number(spriteBrightness) || 1);
     const { catalog = [], placedTotal = 0, placedCap = 500 } = deco || {};
     const atCap = placedTotal >= placedCap;
+    // A live draft means a token has already been spent and the work is waiting — not "make a new one".
+    const resuming = Boolean(deco?.custom?.draft);
     const ownedItems = catalog.filter((d) => d.owned);
     const lockedItems = catalog.filter((d) => !d.owned);
     // Imperative ghost: we set the sprite ONCE on drag-start (one render), then move the ghost by writing
@@ -104,8 +106,13 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                     <strong style={{ fontSize: 14 }}>🪴 Decorating</strong>
                     <span style={{ fontSize: 12, fontWeight: 800, color: atCap ? "#ff9a9a" : "#a7e6a7" }}>{placedTotal}/{placedCap}</span>
                     <span style={{ marginLeft: "auto" }} />
+                    {/* A creation already in progress is the loudest thing this button can say. Someone who closed
+                        the panel mid-tweak should not have to guess whether their token survived — the way back in
+                        is labelled, and it pulses. */}
                     {onOpenCreator ? (
-                        <button type="button" onClick={onOpenCreator} title="Design your own decoration with AI" style={{ padding: "6px 12px", borderRadius: 9, border: "1px solid rgba(201,162,255,0.6)", background: "linear-gradient(180deg,#c9a2ff,#a56be8)", color: "#2a0f45", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent", boxShadow: "0 2px 10px rgba(165,107,232,0.4)" }}>🎨 Make your own</button>
+                        <button type="button" onClick={onOpenCreator} title={resuming ? "Pick up the creation you started" : "Design your own decoration with AI"} style={{ padding: "6px 12px", borderRadius: 9, border: `1px solid ${resuming ? "rgba(143,227,154,0.7)" : "rgba(201,162,255,0.6)"}`, background: resuming ? "linear-gradient(180deg,#8fe39a,#4bbf6a)" : "linear-gradient(180deg,#c9a2ff,#a56be8)", color: resuming ? "#06311f" : "#2a0f45", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent", boxShadow: resuming ? "0 2px 10px rgba(75,191,106,0.45)" : "0 2px 10px rgba(165,107,232,0.4)", animation: resuming ? "farmBob 1.8s ease-in-out infinite" : undefined }}>
+                            {resuming ? "🎨 Resume your creation" : "🎨 Make your own"}
+                        </button>
                     ) : null}
                     <button type="button" onClick={onDone} style={{ padding: "6px 16px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#8fe39a,#4bbf6a)", color: "#06311f", fontWeight: 900, fontSize: 12.5, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>✓ Done</button>
                 </div>
@@ -163,9 +170,9 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
                         </button>
                     ))}
                     {onOpenCreator ? (
-                        <button type="button" onClick={onOpenCreator} title="Design your own decoration" style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" , WebkitTapHighlightColor: "transparent" }}>
-                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: "1px dashed rgba(201,162,255,0.6)", fontSize: 26 }}>🎨</span>
-                            <span style={{ display: "block", fontSize: 10, marginTop: 2, color: "#d9b8ff", fontWeight: 700 }}>Make your own</span>
+                        <button type="button" onClick={onOpenCreator} title={resuming ? "Pick up the creation you started" : "Design your own decoration"} style={{ flex: "0 0 auto", width: 66, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" , WebkitTapHighlightColor: "transparent" }}>
+                            <span style={{ display: "grid", placeItems: "center", width: 58, height: 58, margin: "0 auto", borderRadius: 12, background: resuming ? "radial-gradient(120% 120% at 50% 0%, rgba(143,227,154,0.28), rgba(255,255,255,0.03))" : "radial-gradient(120% 120% at 50% 0%, rgba(201,162,255,0.25), rgba(255,255,255,0.03))", border: `1px dashed ${resuming ? "rgba(143,227,154,0.75)" : "rgba(201,162,255,0.6)"}`, fontSize: 26 }}>🎨</span>
+                            <span style={{ display: "block", fontSize: 10, marginTop: 2, color: resuming ? "#a7e6a7" : "#d9b8ff", fontWeight: 700 }}>{resuming ? "Resume" : "Make your own"}</span>
                         </button>
                     ) : null}
                 </div>
@@ -525,18 +532,65 @@ const customErr = (e) => ({ no_credits: "You're out of creations — grab a bund
 // ── Custom decoration creator: describe → draw 3 options → up to 2 refines → pick one. Uses a Creation
 // (bought on /marketplace/creations; owner can self-grant). Never sellable — but a finished creation CAN be
 // passed on to exactly one other member, once (see creation-share.js); their copy is the end of the line.
-export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onSuggest, onClose }) {
+// ── A TOKEN BUYS A DRAFT, NOT A MODAL SESSION ────────────────────────────────────────────────────────────────
+// A Creation token costs real money and buys one image plus three redraws to steer it. All of that has always
+// lived on the server (mkt_custom_deco, status 'drafting'), but three things conspired to make closing the panel
+// feel like losing the token, and Kaishiern lost his to exactly this:
+//
+//   "I was in the middle of tweaking the creation, typing out how I wanted to change it, and it closed and
+//    finalized the creation. I had it redrawn only once and I was in the middle of the second of three tweaks."
+//
+//   1. ✓ USE THIS ONE WAS ALWAYS ARMED and sat 14px under "Redraw with my tweak", with `chosen` pre-set to the
+//      newest image. One mis-tap on a phone ended a creation that had two redraws left, silently and forever.
+//      It now asks, and only when redraws remain — confirming something you cannot undo is not friction.
+//   2. THE HALF-TYPED TWEAK WAS NEVER SAVED. It is autosaved as you type now (deco_custom_note).
+//   3. THE DRAFT WAS READ ONCE, AT MOUNT. `useState(custom?.draft)` seeds from the first render; the farm loads
+//      its decoration state asynchronously, so opening the creator before that landed showed the blank "start a
+//      new one" form over a live draft — offering to spend a second token on a creation already in progress.
+export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize, onSuggest, onSaveNote, onClose }) {
     const [draft, setDraft] = useState(custom?.draft || null);
     const [credits, setCredits] = useState(custom?.credits || 0);
     const [free, setFree] = useState(Boolean(custom?.free)); // owners/admins draw without spending a token
     const [name, setName] = useState(draft?.name || "");
     const [prompt, setPrompt] = useState(draft?.prompt || "");
-    const [correction, setCorrection] = useState(""); // a tweak note for a redraw; the original prompt is preserved
+    const [correction, setCorrection] = useState(draft?.pendingNote || ""); // tweak note; the original prompt is preserved
     const [chosen, setChosen] = useState(draft?.options?.[draft.options.length - 1]?.url || null);
     const [gen, setGen] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
+    const [confirmFinal, setConfirmFinal] = useState(false);
     const [err, setErr] = useState(null);
     const attemptsLeft = draft ? Math.max(0, (draft.maxAttempts || 4) - draft.attempts) : 4;
+
+    // ADOPT A DRAFT THAT ARRIVES AFTER MOUNT — the fix for (3). Guarded on id so a late poll can never clobber
+    // the draft we are actively working on, and skipped entirely once we hold one, because our copy is fresher
+    // than anything the farm's periodic state carries.
+    const serverDraftId = custom?.draft?.id || null;
+    useEffect(() => {
+        if (!serverDraftId || draft?.id === serverDraftId) return;
+        if (draft) return;
+        const d = custom.draft;
+        setDraft(d);
+        setCorrection(d.pendingNote || "");
+        setChosen(d.options?.[d.options.length - 1]?.url || null);
+    }, [serverDraftId, draft, custom]);
+    useEffect(() => { if (custom?.credits != null) setCredits(custom.credits); }, [custom?.credits]);
+
+    // AUTOSAVE THE HALF-TYPED TWEAK — the fix for (2). Debounced so typing is not a request per keystroke, and
+    // fire-and-forget because a failed save must never interrupt someone mid-sentence; the worst case is the
+    // note being a second or two stale, which is still infinitely better than losing it.
+    const noteRef = useRef(correction);
+    noteRef.current = correction;
+    useEffect(() => {
+        if (!draft?.id || !onSaveNote) return undefined;
+        if (correction === (draft.pendingNote || "")) return undefined; // nothing new to persist
+        const t = setTimeout(() => { onSaveNote(draft.id, noteRef.current); }, 700);
+        return () => clearTimeout(t);
+    }, [correction, draft?.id, draft?.pendingNote, onSaveNote]);
+    // A close is not a save point — it is the moment the debounce would otherwise be cancelled mid-flight.
+    const closeSaved = () => {
+        if (draft?.id && onSaveNote && noteRef.current !== (draft.pendingNote || "")) onSaveNote(draft.id, noteRef.current);
+        onClose();
+    };
 
     const run = async (fn) => {
         setGen(true); setErr(null);
@@ -544,7 +598,7 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
         setGen(false);
         // Prefer a specific server reason (e.g. "blocked — names a copyrighted character") over the generic map.
         if (!r?.ok) { setErr(r?.reason || customErr(r?.error)); return r; }
-        if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(""); }
+        if (r.draft) { setDraft(r.draft); setChosen(r.draft.options?.[r.draft.options.length - 1]?.url || null); setCorrection(r.draft.pendingNote || ""); }
         if (r.credits != null) setCredits(r.credits);
         if (r.free != null) setFree(Boolean(r.free));
         return r;
@@ -559,15 +613,22 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
     };
     const doStart = () => { if (prompt.trim().length < 4) { setErr("Describe your decoration (a few words at least)."); return; } run(() => onStart(name, prompt)); };
     const doRefine = () => { if (!correction.trim()) { setErr("Add a quick note on what to change."); return; } run(() => onRefine(draft.id, correction)); };
-    const doFinalize = async () => { if (!chosen) return; setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false); if (r?.ok) onClose(); else setErr(r?.reason || customErr(r?.error)); };
+    // Finalizing ENDS the creation and burns any redraws still owed. It asks first while they remain — and does
+    // not ask when they don't, because at that point there is nothing left to protect.
+    const doFinalize = async () => {
+        if (!chosen) return;
+        if (attemptsLeft > 0 && !confirmFinal) { setConfirmFinal(true); return; }
+        setGen(true); const r = await onFinalize(draft.id, chosen); setGen(false);
+        if (r?.ok) onClose(); else { setConfirmFinal(false); setErr(r?.reason || customErr(r?.error)); }
+    };
 
     return (
-        <div onClick={onClose} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
+        <div onClick={closeSaved} role="presentation" style={{ position: "fixed", inset: 0, zIndex: 10058, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Make your own decoration" style={{ width: "100%", maxWidth: 420, maxHeight: "90dvh", overflowY: "auto", borderRadius: 16, background: "var(--card-bg,#17181c)", border: "2px solid #c9a2ff", boxShadow: "0 20px 60px rgba(0,0,0,0.55)", padding: 18 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <strong style={{ fontSize: 17 }}>🎨 Make your own</strong>
+                    <strong style={{ fontSize: 17 }}>{draft ? "🎨 Your creation" : "🎨 Make your own"}</strong>
                     <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: free ? "#8fe39a" : credits > 0 ? "#c9a2ff" : "#9aa0a6" }}>{free ? "Owner · free" : `${credits} creation${credits === 1 ? "" : "s"}`}</span>
-                    <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
+                    <button type="button" onClick={closeSaved} aria-label="Close" style={{ background: "none", border: "none", color: "inherit", fontSize: 22, cursor: "pointer", opacity: 0.7 }}>×</button>
                 </div>
 
                 {gen ? (
@@ -605,6 +666,15 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
                     <div style={{ marginTop: 12 }}>
                         <div style={{ fontWeight: 800, fontSize: 14 }}>{draft.name}</div>
                         <div className="muted" style={{ fontSize: 11.5, margin: "2px 0 10px", fontStyle: "italic" }}>&ldquo;{draft.prompt}&rdquo;</div>
+                        {/* THE PROMISE, MADE IN WRITING. The whole reason a token felt losable was that nothing
+                            ever said it wasn't. This is the first thing you see on a draft. */}
+                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "8px 10px", marginBottom: 10, borderRadius: 10, background: "rgba(143,227,154,0.10)", border: "1px solid rgba(143,227,154,0.35)" }}>
+                            <span style={{ fontSize: 14, lineHeight: 1.2 }}>💾</span>
+                            <span style={{ fontSize: 11.5, color: "#bfe8c6", fontWeight: 600 }}>
+                                Saved automatically — close this any time and pick up right here. Your creation isn&apos;t
+                                spent until you finish it.
+                            </span>
+                        </div>
                         {/* The generated image, big. If you redrew, earlier versions stay as thumbnails so you can pick any. */}
                         <div style={{ display: "grid", gridTemplateColumns: draft.options.length > 1 ? "repeat(auto-fill, minmax(96px, 1fr))" : "1fr", gap: 8 }}>
                             {[...draft.options].reverse().map((o) => (
@@ -619,11 +689,29 @@ export function CustomDecoCreator({ custom, busy, onStart, onRefine, onFinalize,
                         {attemptsLeft > 0 ? (
                             <div style={{ marginTop: 12 }}>
                                 <label style={{ display: "block", fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Not quite? Add a tweak &amp; redraw ({attemptsLeft} redraw{attemptsLeft === 1 ? "" : "s"} left)</label>
-                                <input value={correction} onChange={(e) => setCorrection(e.target.value)} maxLength={200} placeholder="e.g. make it bigger, add snow on top" style={CINP} />
+                                <input value={correction} onChange={(e) => { setCorrection(e.target.value); setConfirmFinal(false); }} maxLength={200} placeholder="e.g. make it bigger, add snow on top" style={CINP} />
                                 <button type="button" onClick={doRefine} disabled={busy || !correction.trim()} style={{ ...CGHOST, marginTop: 8, width: "100%", opacity: correction.trim() ? 1 : 0.55 }}>🎨 Redraw with my tweak</button>
                             </div>
                         ) : <div className="muted" style={{ fontSize: 12, marginTop: 10, textAlign: "center" }}>No redraws left — pick your favorite to finish.</div>}
-                        <button type="button" onClick={doFinalize} disabled={!chosen || busy} style={{ ...CPRIMARY, marginTop: 14, opacity: chosen ? 1 : 0.5 }}>✓ Use this one</button>
+
+                        {/* FINISHING IS A DIFFERENT KIND OF ACTION to redrawing, so it is fenced off rather than
+                            stacked flush under the redraw button where a thumb finds it by accident. */}
+                        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+                            {confirmFinal ? (
+                                <div style={{ borderRadius: 12, padding: 12, background: "rgba(255,154,154,0.09)", border: "1px solid rgba(255,154,154,0.4)" }}>
+                                    <div style={{ fontWeight: 800, fontSize: 13 }}>Finish and keep this one?</div>
+                                    <div className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>
+                                        This ends your creation. You still have {attemptsLeft} redraw{attemptsLeft === 1 ? "" : "s"} — once you finish, {attemptsLeft === 1 ? "it's" : "they're"} gone.
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                                        <button type="button" onClick={() => setConfirmFinal(false)} style={{ ...CGHOST, flex: 1 }}>Keep tweaking</button>
+                                        <button type="button" onClick={doFinalize} disabled={busy} style={{ ...CPRIMARY, flex: 1, marginTop: 0 }}>Finish</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button type="button" onClick={doFinalize} disabled={!chosen || busy} style={{ ...CPRIMARY, marginTop: 0, opacity: chosen ? 1 : 0.5 }}>✓ Use this one</button>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

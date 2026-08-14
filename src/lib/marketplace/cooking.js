@@ -15,7 +15,6 @@ import { getChestArt } from "@/lib/marketplace/chest-art.js";
 import { PART_TIERS } from "@/lib/marketplace/crafting.js";
 import { addParts } from "@/lib/marketplace/crafting.js";
 import { grantSeed } from "@/lib/marketplace/farm-crops.js";
-import { grantCustomCredit } from "@/lib/marketplace/custom-deco.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { equippedPowers, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powers.js";
@@ -177,7 +176,18 @@ export const TIERS = [
             { kind: "consumable", id: "treat_golden" },
             { kind: "spin", n: 3 },
             { kind: "chest", chestTier: "mythic" },
-            { kind: "creation", n: 1 },
+            // ── WHY THIS IS NOT A CREATION TOKEN ─────────────────────────────────────────────────────────
+            // It was one, and it should never have been. A Creation token is bought with REAL MONEY — it is
+            // the only paid-only resource in the game — so putting one on a reward ladder means the kitchen
+            // mints dollars. Exactly one ever dropped (Kaishiern's, 2026-08-13, off a Stormpot) and it went
+            // straight into the bug that lost it.
+            //
+            // The rung it occupied is the second-best on the best ladder in the game, so the replacement has
+            // to carry that weight without being purchasable: an enshrinement stone is the rarest thing a pet
+            // can be given, it is already earnable (a deep seam, a dig, a boss kill, the dungeons) and buying
+            // one costs about three weeks of doubloons or laurels. Which stone is rolled, because Light and
+            // Dark are a real choice per pet and handing over a fixed one would quietly decide it for them.
+            { kind: "stone" },
             { kind: "chest", chestTier: "ascendant" },
         ],
     },
@@ -213,7 +223,7 @@ export const KIND_FALLBACK = {
     chest: "/images/ui/chest.png",
     seed: "/images/ui/seed.png",
     spin: "/images/nav/spin.png",
-    creation: "/images/nav/creations.png",
+    stone: "/images/nav/pets.png",
     consumable: "/images/ui/potion.png",
     prep: "/images/cooking/prep.png",
     dish: "/images/cooking/dish.png",
@@ -244,8 +254,8 @@ export function rewardLabel(r, art = {}) {
             return { name: `${r.n} wheel spin${r.n === 1 ? "" : "s"}`, desc: "Spend them on the Daily Spin.", rarity: r.n >= 3 ? "epic" : "rare", fallback: KIND_FALLBACK.spin };
         case "recipe":
             return { name: "A new recipe", desc: "A page for the book — something new you can cook.", rarity: "epic", fallback: KIND_FALLBACK.dish };
-        case "creation":
-            return { name: "A Creation token", desc: "Design your own decoration with custom AI art — the only reward here that otherwise costs real money.", rarity: "mythic", fallback: KIND_FALLBACK.creation };
+        case "stone":
+            return { name: "An Enshrinement Stone", desc: "Light or Dark — makes one pet's signature ability permanent, whether it's equipped or not.", rarity: "mythic", fallback: KIND_FALLBACK.stone };
         case "consumable": {
             const c = CONSUMABLES[r.id] || {};
             return { name: c.name || r.id, desc: c.desc || "", rarity: "rare", sprite: consumables[r.id] || null, fallback: KIND_FALLBACK.consumable };
@@ -1127,9 +1137,9 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
             //             spins — about 24,000 gold, which is $120 of store credit.
             //   CHEST     multiplying a mythic chest by pot size is a windfall multiplier, and chest volume
             //             is the thing we just spent a week halving.
-            //   CREATION  a Creation token is bought with REAL MONEY. A second helping of one is the game
-            //             minting dollars. Exactly one has ever dropped from a cook and it was not doubled,
-            //             so this closes an exposure rather than a leak.
+            //   STONE     an enshrinement stone is a once-in-weeks unlock, not an ingredient. (This rung used
+            //             to be a CREATION token, which was worse than un-doubleable — it was bought with real
+            //             money and had no business on a reward ladder at all. See the tier-5 ladder.)
             //
             // The track still lands on five of the eight rungs in most tiers, which is where a second helping
             // reads as a second helping instead of as a jackpot multiplier.
@@ -1153,7 +1163,13 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 break;
             }
             case "spin": await db.query(`UPDATE mkt_buyer SET spin_tokens = COALESCE(spin_tokens,0) + $2 WHERE id = $1`, [buyerId, rw.n]).catch(() => {}); break;
-            case "creation": await grantCustomCredit(buyerId, rw.n, { source: "cooking", meta: { recipe: forRecipe.id, tier: tierN } }).catch(() => {}); break;
+            // Rolled, not fixed: Light and Dark are a genuine per-pet decision, and handing over a specific one
+            // would make that choice for them. Never multiplied by portions — see the note above.
+            case "stone": {
+                const { grantStone } = await import("@/lib/marketplace/pet-ascension.js");
+                await grantStone(buyerId, Math.random() < 0.5 ? "light" : "dark", 1, "cooking").catch(() => {});
+                break;
+            }
             case "consumable": await grantConsumable(buyerId, rw.id, serve(1)).catch(() => {}); break;
             default: break;
         }

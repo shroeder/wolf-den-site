@@ -79,7 +79,14 @@ async function genOne(prompt, attempt, meta = {}) {
     }
 }
 
-const mapDraft = (r) => ({ id: Number(r.id), name: r.name, prompt: r.prompt, attempts: r.attempts, maxAttempts: MAX_ATTEMPTS, options: r.options || [], status: r.status });
+// `pendingNote` is the half-typed tweak the member had in the box when they last closed the panel. It is part of
+// "where I was", exactly as much as the images are — losing it is what turned a closed tab into a wasted token.
+const mapDraft = (r) => ({
+    id: Number(r.id), name: r.name, prompt: r.prompt, attempts: r.attempts, maxAttempts: MAX_ATTEMPTS,
+    options: r.options || [], status: r.status,
+    pendingNote: r.pending_note || "",
+    updatedAt: r.updated_at || null,
+});
 
 // Suggest an editable description from a decoration's name (the player can then tweak it before drawing).
 export async function suggestDecoDescription(name) {
@@ -109,6 +116,24 @@ export async function getCustomState(buyerId) {
         db.queryOne(`SELECT * FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'drafting' ORDER BY id DESC LIMIT 1`, [buyerId]).catch(() => null),
     ]);
     return { credits: b?.c || 0, draft: draftRow ? mapDraft(draftRow) : null, free: isOwner(buyerId) };
+}
+
+// ── THE HALF-WRITTEN TWEAK ───────────────────────────────────────────────────────────────────────────────────
+// Saved as it is typed (the client debounces), so a closed tab, a dead battery or a mis-tap costs a member
+// nothing. A token buys one draft and three redraws; none of that should depend on keeping a modal open.
+//
+// Deliberately NOT guarded on attempts remaining: somebody who has used every redraw can still be part-way
+// through deciding, and a note they cannot save is a note they lose.
+export async function saveDraftNote(buyerId, id, note) {
+    if (!buyerId || !id) return { ok: false, error: "bad_request" };
+    const r = await db.queryOne(
+        `UPDATE mkt_custom_deco SET pending_note = $3
+          WHERE id = $1 AND buyer_id = $2 AND status = 'drafting' RETURNING id`,
+        [Number(id), buyerId, String(note || "").slice(0, 200)]
+    ).catch(() => null);
+    // `updated_at` is left alone on purpose — it is what the stale-draft sweep in getCustomState reads, and
+    // typing is not progress. Touching it would let an idle tab keep a dead draft alive forever.
+    return r ? { ok: true } : { ok: false, error: "not_found" };
 }
 
 // Grant tokens. `ctx` = { source, actorId, actorLabel, meta } identifies WHO gifted them and WHY — every grant is
@@ -172,7 +197,7 @@ export async function startCustomDeco(buyerId, name, prompt) {
         [row.id, JSON.stringify(opts)]
     ).catch(() => {});
     const credits = free ? (await db.queryOne(`SELECT COALESCE(custom_deco_credits,0) AS c FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null))?.c ?? 0 : paid.custom_deco_credits;
-    return { ok: true, draft: { id: Number(row.id), name: nm, prompt: desc, attempts: 1, maxAttempts: MAX_ATTEMPTS, options: opts, status: "drafting" }, credits, free };
+    return { ok: true, draft: { id: Number(row.id), name: nm, prompt: desc, attempts: 1, maxAttempts: MAX_ATTEMPTS, options: opts, status: "drafting", pendingNote: "" }, credits, free };
 }
 
 // Refine: redraw ONE more image. The ORIGINAL description is preserved (row.prompt, never overwritten); the
@@ -202,12 +227,14 @@ export async function refineCustomDeco(buyerId, id, correction) {
     const opts = gen.urls.map((o) => ({ ...o, note }));
     const merged = [...(row.options || []), ...opts];
     // Same reasoning as startCustomDeco: a successful redraw asserts the row is live.
+    // pending_note is cleared: the tweak it was holding has now been SPENT on this redraw, so leaving it in the
+    // box would offer to apply the same instruction twice.
     await db.query(
-        `UPDATE mkt_custom_deco SET attempts = attempts + 1, options = $2::jsonb, status = 'drafting', last_error = NULL, updated_at = NOW()
+        `UPDATE mkt_custom_deco SET attempts = attempts + 1, options = $2::jsonb, status = 'drafting', last_error = NULL, pending_note = NULL, updated_at = NOW()
           WHERE id = $1 AND status <> 'final'`,
         [Number(id), JSON.stringify(merged)]
     ).catch(() => {});
-    return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting" } };
+    return { ok: true, draft: { id: Number(id), name: row.name, prompt: row.prompt, attempts: row.attempts + 1, maxAttempts: MAX_ATTEMPTS, options: merged, status: "drafting", pendingNote: "" } };
 }
 
 // Finalize: lock in the chosen image → grant it as an owned, placeable decoration.
