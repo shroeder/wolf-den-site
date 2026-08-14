@@ -1,5 +1,7 @@
 "use client";
 
+import { GiPadlock, GiPawPrint, GiHand, GiCutDiamond, GiCheckMark, GiTwoCoins } from "react-icons/gi";
+
 // ── THE SHOP WINDOW ──────────────────────────────────────────────────────────────────────────────────────────
 // This is the one screen in the game whose job is to SELL something, so it is built like an advertisement
 // rather than like a form. The rules it follows:
@@ -16,6 +18,14 @@
 //
 //   THE MONEY COMES BACK. Stated plainly and given its own line, because it is the strongest fact in the offer
 //   and the easiest one to miss: the five dollars is not spent, it turns into credit you spend in the shop.
+// The glyphs the package data names. Kept as a map rather than a dynamic import so the bundle only carries
+// the handful actually used.
+const DO_ICON = {
+    GiPawPrint: <GiPawPrint aria-hidden="true" />,
+    GiHand: <GiHand aria-hidden="true" />,
+    GiCutDiamond: <GiCutDiamond aria-hidden="true" />,
+};
+
 export default function PackageCard({ offer, selected, onToggle }) {
     if (!offer) return null;
     const price = `$${((offer.priceCents || 0) / 100).toFixed(2)}`;
@@ -26,7 +36,7 @@ export default function PackageCard({ offer, selected, onToggle }) {
     return (
         <div className={`pkgc${selected ? " is-on" : ""}`}>
             {offer.ownerPreview ? (
-                <div className="pkgc-preview">🔒 Owner preview — members cannot see this</div>
+                <div className="pkgc-preview"><GiPadlock aria-hidden="true" /> Owner preview — members cannot see this</div>
             ) : null}
 
             <div className="pkgc-hero">
@@ -81,21 +91,21 @@ export default function PackageCard({ offer, selected, onToggle }) {
             </div>
 
             <div className="pkgc-back">
-                💡 The <b>{price}</b> is not spent — it lands in your account as store credit and buys whatever
+                <GiTwoCoins className="pkgc-back-ico" aria-hidden="true" /> The <b>{price}</b> is not spent — it lands in your account as store credit and buys whatever
                 you like in the shop. The coins and the stand come on top.
             </div>
 
             <div className="pkgc-does">
                 {(offer.does || []).map((d) => (
                     <div className="pkgc-do" key={d.head}>
-                        <span>{d.icon}</span>
+                        <span className="pkgc-do-ico">{DO_ICON[d.icon] || null}</span>
                         <div><b>{d.head}</b><em>{d.body}</em></div>
                     </div>
                 ))}
             </div>
 
             <button type="button" className={`pkgc-cta${selected ? " is-on" : ""}`} onClick={onToggle}>
-                {selected ? "✓ Selected — pay below" : `Get it — ${price}`}
+                {selected ? <><GiCheckMark aria-hidden="true" /> Selected — pay below</> : `Get it — ${price}`}
             </button>
         </div>
     );

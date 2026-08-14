@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { GiPawPrint } from "react-icons/gi";
 
 // ── THE PETTING STAND PANEL ──────────────────────────────────────────────────────────────────────────────────
 // Opens when the placed stand is tapped, on your own farm and on anybody else's.
@@ -32,8 +33,8 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
         <div className="ps-wrap" onClick={onClose} role="presentation">
             <div className="ps-card" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="The Petting Stand">
                 <div className="ps-head">
-                    <b>🐾 The Petting Stand</b>
-                    <button type="button" className="ps-x" onClick={onClose} aria-label="Close">✕</button>
+                    <b><GiPawPrint aria-hidden="true" /> The Petting Stand</b>
+                    <button type="button" className="ps-x" onClick={onClose} aria-label="Close">×</button>
                 </div>
                 <p className="ps-sub">
                     {mine
@@ -41,6 +42,7 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
                         : "On display. Petting one of these gives it double the usual — and they are the ones this wolf wants fussed over."}
                 </p>
 
+                <div className="ps-scroll">
                 {picking != null ? (
                     <div className="ps-pick">
                         <div className="ps-pick-head">
@@ -95,6 +97,7 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
                         ))}
                     </div>
                 )}
+                </div>
 
                 <div className="ps-foot">
                     <span className="ps-mult">×{stand?.petMult || 2} petting XP</span>
@@ -106,10 +109,21 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
                        styled-jsx blocks silently break both. */
                     .ps-wrap { position: fixed; inset: 0; z-index: 10060; background: rgba(0,0,0,0.62);
                         display: grid; place-items: center; padding: 16px; }
-                    .ps-card { width: 100%; max-width: 420px; max-height: 88dvh; overflow-y: auto; padding: 16px;
-                        border-radius: 18px; background: linear-gradient(180deg, #241a2e, #16101f);
-                        border: 2px solid rgba(214,160,255,0.5); box-shadow: 0 24px 60px rgba(0,0,0,0.6);
-                        animation: psUp .24s cubic-bezier(.2,1,.3,1) both; }
+                    .ps-card { width: 100%; max-width: 420px; max-height: min(88dvh, 720px); padding: 16px;
+                        border-radius: 18px;
+                        /* NEUTRAL, NOT PURPLE. The first ground was a saturated aubergine and every pet sprite
+                           on it looked tinted — the panel was competing with the artwork it exists to show. */
+                        background: linear-gradient(180deg, #1b1d24, #121317);
+                        border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+                        animation: psUp .24s cubic-bezier(.2,1,.3,1) both;
+                        /* ── THE SCROLL FIX ────────────────────────────────────────────────────────────
+                           overflow-y on the CARD scrolled the header and the action out of reach on a short
+                           phone, and on iOS a scrollable element inside a fixed overlay drags the page behind
+                           it. The card is a column now: the head and the footer are fixed, and only the middle
+                           scrolls, with momentum and overscroll containment so the pull stops here. */
+                        display: flex; flex-direction: column; overflow: hidden; }
+                    .ps-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+                        -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
                     @keyframes psUp { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
                     .ps-head { display: flex; align-items: center; gap: 8px; }
                     .ps-head b { font-size: 1.02rem; }
@@ -118,18 +132,20 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
                     .ps-sub { margin: 6px 0 12px; font-size: .8rem; color: #cbbcda; line-height: 1.45; }
                     .ps-tiers { display: grid; gap: 9px; }
                     .ps-tier { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 13px;
-                        background: rgba(255,255,255,0.04); border: 1px solid rgba(214,160,255,0.22); min-height: 62px; }
-                    .ps-tier.is-full { background: rgba(214,160,255,0.10); }
+                        background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); min-height: 62px; }
+                    .ps-tier.is-full { background: rgba(255,215,110,0.07); border-color: rgba(255,215,110,0.28); }
                     .ps-tier-art { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; }
                     .ps-art { width: 46px; height: 46px; object-fit: contain; }
                     .ps-tier-body { display: grid; gap: 1px; min-width: 0; }
                     .ps-tier-body b { font-size: .9rem; }
                     .ps-tier-body em { font-size: .72rem; color: #b9a8c9; font-style: normal; }
                     .ps-owners { font-size: .72rem; color: #ffd75e; font-style: normal; }
+                    .ps-head svg { vertical-align: -2px; margin-right: 2px; }
                     .ps-take { margin-left: auto; }
-                    .ps-add { width: 100%; padding: 10px; border-radius: 11px; cursor: pointer;
-                        background: none; border: 1px dashed rgba(214,160,255,0.45); color: #d6a0ff;
-                        font-weight: 800; font-size: .82rem; }
+                    .ps-add { width: 100%; padding: 12px; border-radius: 12px; cursor: pointer;
+                        background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.28);
+                        color: #cdd3d8; font-weight: 800; font-size: .84rem; transition: background .12s ease; }
+                    .ps-add:hover:not(:disabled) { background: rgba(255,255,255,0.09); }
                     .ps-add:disabled { opacity: .55; cursor: default; }
                     .ps-ghost { padding: 6px 11px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: .76rem;
                         background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #e8dcc2; }

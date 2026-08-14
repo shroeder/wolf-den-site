@@ -353,9 +353,18 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                 // levels into one barrel changed nothing you could see mid-fight. `flip`
                                 // normalises the two stage sprites that were drawn facing left; the far
                                 // ship's whole gun is already mirrored by CSS, so the two compose.
-                                <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}${dead ? " is-dead" : ""}${hurtGun ? " is-damaged" : ""}`}
+                                <span key={i} className={`sbt-gun${firing ? " is-firing" : ""}${dead ? " is-dead" : ""}${hurtGun ? " is-damaged" : ""}${alive ? " is-limb" : ""}`}
                                     style={{ left: `${(mirror ? 1 - g.x : g.x) * 100}%`, top: `${g.y * 100}%`, animationDelay: `${i * 80}ms` }}>
-                                    <i className="sbt-gun-barrel"
+                                    {/* ── A CREATURE HAS NO GUNS ──────────────────────────────────────────
+                                        A monster's LIMBS arrive through this same `ports` field (see
+                                        monster-parts.js — its arms are its broadside, mechanically), and the
+                                        barrel element falls back to deck-cannon.png whenever no gun art is
+                                        set. So every sea creature in the game has been carrying artillery: the
+                                        chips correctly read "2 JAWS" while two cannons sat on the ray.
+                                        The fix is not a different sprite, it is NO sprite. The limb is already
+                                        drawn — it is part of the creature's own artwork — so the marker over it
+                                        is all that is needed, and a lunge stands in for the muzzle flash. */}
+                                    {alive ? null : <i className="sbt-gun-barrel"
                                         style={gunArts[i]?.url ? {
                                             backgroundImage: `url("${gunArts[i].url}")`,
                                             // A CUSTOM PROPERTY, NOT A TRANSFORM. The recoil is a keyframe on
@@ -363,9 +372,13 @@ function Ship({ f, side, hurt, heavy, low, sinking, hp = null, hpMax = null, sys
                                             // the flip there would drop it the instant the gun fired. The
                                             // keyframes multiply this in instead.
                                             "--gflip": gunArts[i].flip ? -1 : 1,
-                                        } : undefined} />
-                                    {firing ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 80}ms` }} /> : null}
-                                    {firing ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 80}ms` }} /> : null}
+                                        } : undefined} />}
+                                    {/* Powder and smoke belong to a gun deck. A creature striking gets a
+                                        surge of water and a lunge instead — same beat, same timing, nothing
+                                        that implies it loaded anything. */}
+                                    {firing && !alive ? <i className="sbt-gun-flash" style={{ animationDelay: `${i * 80}ms` }} /> : null}
+                                    {firing && !alive ? <i className="sbt-gun-smoke" style={{ animationDelay: `${i * 80}ms` }} /> : null}
+                                    {firing && alive ? <i className="sbt-limb-strike" style={{ animationDelay: `${i * 80}ms` }} /> : null}
                                 </span>
                             );
                         })}

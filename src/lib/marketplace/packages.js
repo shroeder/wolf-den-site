@@ -36,11 +36,13 @@ export const PACKAGES = [
             { key: "coins", big: "2,000", label: "coins", note: "double a normal $5 load", icon: "/images/ui/coin.png" },
             { key: "stand", big: "1", label: "Petting Stand", note: "not sold, won or gifted anywhere else", deco: true },
         ],
-        // How it works, in one line each, in the order they matter.
+        // How it works, in one line each, in the order they matter. `icon` is a react-icons/gi NAME, not an
+        // emoji — emoji are the OS's artwork, different on every device, and this card is meant to look like
+        // the game rather than like a text message. PackageCard maps the name to the component.
         does: [
-            { icon: "🐾", head: "Three pets on display", body: "They earn passive XP exactly as your equipped pet does — a full stand is four companions levelling instead of one." },
-            { icon: "✋", head: "Worth double to pet", body: "Every petting on the stand gives twice the usual XP. Yours and every visitor's." },
-            { icon: "💎", head: "Shows how rare they are", body: "Each tier says how many members own that companion. Yours might be the only one in the Den." },
+            { icon: "GiPawPrint", head: "Three pets on display", body: "They earn passive XP exactly as your equipped pet does — a full stand is four companions levelling instead of one." },
+            { icon: "GiHand", head: "Worth double to pet", body: "Every petting on the stand gives twice the usual XP. Yours and every visitor's." },
+            { icon: "GiCutDiamond", head: "Shows how rare they are", body: "Each tier says how many members own that companion. Yours might be the only one in the Den." },
         ],
         perks: [
             "$5 store credit — the full amount, spendable in the shop",
