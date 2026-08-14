@@ -14,6 +14,8 @@ import FeatureDailies from "@/components/FeatureDailies";
 import CollectionPanel from "@/components/CollectionPanel";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
+import PettingStand from "@/components/PettingStand";
+import { STAND_DECO_ID } from "@/lib/marketplace/petting-stand-const";
 import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
 import { petPerk, GOLD_PER_POINT, TICKETS_PER_FORTUNE_PER_DAY } from "@/lib/marketplace/pet-perks";
@@ -715,6 +717,18 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [decoAct]);
     const fieldRef = useRef(null);
     const scrollRef = useRef(null); // the horizontal pasture scroller — preserved across deco re-renders so a placed piece doesn't scroll away
+    // The Petting Stand's three tiers. The whole farm state comes back so the panel, the passive and the pet
+    // list all refresh together — seating a pet changes what the tiers say AND what a petting is worth.
+    const standSeat = useCallback(async (slot, petId) => {
+        const r = await post({ action: "stand_seat", slot, petId });
+        if (r?.ok) setFarm((f) => ({ ...f, stand: { placed: r.placed, slots: r.slots, petMult: r.petMult } }));
+        return r;
+    }, [post]);
+    const standClear = useCallback(async (slot) => {
+        const r = await post({ action: "stand_clear", slot });
+        if (r?.ok) setFarm((f) => ({ ...f, stand: { placed: r.placed, slots: r.slots, petMult: r.petMult } }));
+        return r;
+    }, [post]);
     // Custom (player-made) decorations
     const customStart = useCallback(async (name, prompt) => {
         const r = await post({ action: "deco_custom_start", name, prompt });
@@ -1408,7 +1422,20 @@ export default function FarmClient({ initial, viewingAlias }) {
                 />
             ) : null}
 
-            {inspectDeco ? (
+            {/* THE STAND GETS ITS OWN PANEL, not the generic decoration inspector — it is the one decoration
+                with state of its own to show (three tiers, three owner counts) and to change. Opened by the
+                same tap that inspects any other placed piece, on your farm or anybody else's. */}
+            {inspectDeco?.decoId === STAND_DECO_ID && farm.stand?.placed ? (
+                <PettingStand
+                    stand={farm.stand}
+                    mine={farm.mine}
+                    pets={farm.pets || []}
+                    busy={decoBusy}
+                    onSeat={standSeat}
+                    onClear={standClear}
+                    onClose={() => setInspectDeco(null)}
+                />
+            ) : inspectDeco ? (
                 <DecoInspect
                     item={inspectDeco}
                     mine={farm.mine}

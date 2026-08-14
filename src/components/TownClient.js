@@ -1634,9 +1634,14 @@ export default function TownClient({ initial }) {
                 {state?.raidAdmin && !state?.event ? (
                     <div className="tw-owner-spawn">
                         <span className="muted">🔒 Surprise drop — pushes the whole pack:</span>
-                        <button type="button" onClick={() => spawnEvent("bandit_raid")}>🗡️ Bandits</button>
-                        <button type="button" onClick={() => spawnEvent("goblin_swarm")}>👺 Goblins</button>
-                        <button type="button" onClick={() => spawnEvent("treasure_golem")}>💎 Golem (boss)</button>
+                        {/* Driven by the server's raid catalog, not a typed-out list. Three factions shipped
+                            with art, archetypes and push copy and had no button here, so the only way one could
+                            ever appear was a random cron roll. */}
+                        {(state?.raidKinds || []).map((k) => (
+                            <button type="button" key={k.key} onClick={() => spawnEvent(k.key)}>
+                                {k.emoji} {k.name}{k.boss ? " (boss)" : ""}
+                            </button>
+                        ))}
                     </div>
                 ) : null}
                 {state?.raidAdmin && state?.event ? (

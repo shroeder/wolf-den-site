@@ -25,8 +25,11 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // The stand only DOES any of this while it is actually placed on the farm. Owning it and leaving it in the
 // drawer earns nothing; that is what makes it a decoration rather than a passive upgrade you buy and forget.
 
-export const STAND_DECO_ID = "deco_petting_stand";
-export const STAND_SLOTS = 3;
+// Imported AND re-exported: `export … from` alone creates no local binding, so every use below would be an
+// undefined reference. lint:undef is what catches that class of mistake and it caught this one.
+import { STAND_DECO_ID, STAND_SLOTS } from "@/lib/marketplace/petting-stand-const.js";
+
+export { STAND_DECO_ID, STAND_SLOTS };
 // What a petting is worth on the stand, as a multiplier on PET_PET_XP. Named here rather than written as a `2`
 // inside farm.js so the number and the reason live together.
 export const STAND_PET_MULT = 2;

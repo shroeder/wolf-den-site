@@ -14,7 +14,7 @@ import { storeStatus } from "@/lib/marketplace/store-hours.js";
 import { shared, TTL } from "@/lib/marketplace/shared-cache.js";
 import { getDefaultSpriteUrl } from "@/lib/marketplace/avatar-sprite.js";
 import { bumpTownQuest, getTownQuests, townQuestsClaimable } from "@/lib/marketplace/town-quests.js";
-import { townEventsLive } from "@/lib/marketplace/town-events.js";
+import { townEventsLive, TOWN_EVENT_TYPES } from "@/lib/marketplace/town-events.js";
 import { getTownProjects, getTownBonuses, contributeToProject, wellClaimedToday } from "@/lib/marketplace/town-projects.js";
 import { ITEMS } from "@/lib/marketplace/items.js";
 import { signatureFor } from "@/lib/marketplace/signatures.js";
@@ -440,6 +440,15 @@ export async function getTownState(buyerId) {
         signedIn: Boolean(buyerId),
         owner,
         raidAdmin: isPrimaryOwner(buyerId), // ONLY Luke sees the raid trigger/end controls (surprise-drop lever)
+        // ── EVERY RAID THERE IS, NOT THE THREE SOMEBODY TYPED OUT ────────────────────────────────────────
+        // The spawn buttons were three hard-coded kinds while TOWN_EVENT_TYPES held six. Frost Pack, the
+        // Drowned Crew and the Hollow Court shipped with their own archetypes, art and push copy and could
+        // only ever appear by random cron roll — the owner had no way to fire one on purpose, which is the
+        // whole point of the lever. Derived from the catalog now, so a seventh faction gets its button by
+        // existing rather than by somebody remembering this list.
+        raidKinds: isPrimaryOwner(buyerId)
+            ? Object.entries(TOWN_EVENT_TYPES).map(([key, t]) => ({ key, name: t.name, emoji: t.emoji || "⚔️", boss: Boolean(t.boss) }))
+            : [],
         // Read only for the one person who can act on it — everybody else would pay a query to render nothing.
         ownerGamePush: isPrimaryOwner(buyerId)
             ? String(await getSetting("push.owner_game", "off").catch(() => "off")) === "on"
