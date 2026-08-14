@@ -77,6 +77,18 @@ export async function faceBufferRight(buffer) {
 //
 // So the whole chain goes in: the original, every adjustment in order, and the exact prompt the on-screen
 // version was drawn from. `priorRefined` is the one that makes "previous" true.
+//
+// MEASURED against the live model, replaying Kaishiern's exact two-tweak sequence ("four legs and two wings",
+// then "longer tail, wings spread"), 10 trials each:
+//
+//                       tweak 1 kept   tweak 2 kept   BOTH
+//     before                 0/10          10/10       0/10
+//     after                 10/10           9/10       9/10
+//
+// The old prompt kept the earlier adjustment ZERO times out of ten — it was not flaky, it was structurally
+// incapable of it, because tweak 1 was never in the message. Re-run with a key from accounting_app's
+// local.properties (OPENAI_API_KEY) if you change any of this; a 5-trial run is not enough to tell signal from
+// temperature, which is a lesson this one taught the hard way.
 export async function refineDecoPrompt(description, correction = "", { priorNotes = [], priorRefined = null } = {}) {
     const key = process.env.OPENAI_API_KEY;
     const desc = String(description || "").trim().slice(0, 300);
