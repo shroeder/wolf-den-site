@@ -96,7 +96,11 @@ const DUEL_THROTTLE_MS = 700;
 // raising the per-kill rate makes a raid feel generous without raising what one person can extract from it.
 const DUEL_WIN_XP = 11;
 const DUEL_WIN_GOLD = 16;
-const DUEL_LOSS_GOLD = 5;       // consolation so a loss is never nothing
+// Losing a plaza duel pays NOTHING. It used to pay 5 gold "so a loss is never nothing", which is the same
+// mistake the Arena made in laurels: a defeat that pays is a defeat worth farming. Turning up still pays — the
+// raid's completion tiers pay every fighter who took part, including the one who barely swung — but the fight
+// you lost is not itself an income.
+const DUEL_LOSS_GOLD = 0;
 // 0.18 -> 0.07. The word in the old comment was "also", which is the tell: a duel already pays gold and XP
 // and this was a chest on top. It stays — a raider dropping something they carried is exactly the kind of
 // found moment a chest belongs to — but at a rate that makes it loot rather than a wage.

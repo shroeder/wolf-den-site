@@ -8,14 +8,28 @@
 //   away. That is what makes it safe to fight anyone: there is no rung to fall off, so challenging up is a
 //   free roll and challenging down is still worth something.
 //
-//   LAURELS are MONEY. Paid on every bout, win or lose, and spent in the Armoury.
+//   LAURELS are MONEY. Won by winning, and spent in the Armoury.
 //
 // They are kept separate because collapsing them punishes you for shopping: if rank and currency were one
 // number, buying a chest would cost you your place on the leaderboard.
 //
-// LAURELS ARE ALSO A CLOSED CURRENCY — earned only in the arena, spent only in the Armoury. That is what makes
-// it safe to pay out on a loss. Paying gold would pump the Den's general economy, and this ladder is symmetric
-// enough that a refund loop mints money out of nothing.
+// LAURELS ARE ALSO A CLOSED CURRENCY — earned only in the arena, spent only in the Armoury. Paying gold would
+// pump the Den's general economy, and this ladder is symmetric enough that a refund loop mints money out of
+// nothing.
+//
+// ── NOTHING IS PAID FOR LOSING ───────────────────────────────────────────────────────────────────────────────
+// A loss used to pay 30% of a win in laurels and 35% in arena XP. The reasoning was that a defeat against
+// something far bigger should be a consolation rather than a wasted evening — and the effect was the opposite
+// of the intent. It made losing a viable income, so a member walled at a rung they could not beat kept feeding
+// themselves to it. Sunflower Jinxx, stopped at rung 21 and describing exactly that: "I'm just taking loss
+// after loss to try and get laurels for recipes." The game was paying her to keep doing the thing that was
+// making her want to stop playing.
+//
+// A loss now costs nothing and pays nothing. VP already carries the "challenge upward" incentive this was
+// reaching for — it pays only on a win and scales with how much harder the opponent was, so picking a hard
+// fight is still worth more than farming a soft one, and it is worth more only when you actually win it.
+//
+// The DEFENCE payout below is untouched: that is a defender WINNING while absent, not anybody losing.
 
 export const VP = { name: "Victory Point", plural: "Victory Points", short: "VP", color: "#ffd75e" };
 export const LAUREL = { name: "Laurel", plural: "Laurels", color: "#c8b06a" };
@@ -37,10 +51,7 @@ export function vpFor({ won, myPower = 1, theirPower = 1 }) {
 export const vpPreview = (myPower, theirPower) => vpFor({ won: true, myPower, theirPower });
 
 // ── LAURELS ──────────────────────────────────────────────────────────────────────────────────────────────────
-// Every bout pays. A loss used to pay literally nothing, which made farming the weakest reachable opponent the
-// correct play — a treadmill wearing a ladder's clothes. A defeat is a fraction of a win against the same
-// opponent, so throwing yourself at something far too big is a consolation, never a strategy.
-export const LOSS_SHARE = 0.3;
+// Winning pays. Losing does not — see the note above.
 // ── WHAT TURNING SOMEBODY AWAY IS WORTH ──────────────────────────────────────────────────────────────────────
 // A defender did not choose the fight, was not present for it, and spent nothing — so this is deliberately a
 // fraction of what the challenger risked, not a mirror of it. It is a dividend on a good build, not a wage.
@@ -58,7 +69,7 @@ export function defenceLaurels({ myPower = 1, theirPower = 1 }) {
 export function boutLaurels({ won, myPower = 1, theirPower = 1 }) {
     const ratio = Math.max(VP_FLOOR, Math.min(VP_CEIL, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
     const win = Math.round(18 + 34 * ratio);
-    return won ? win : Math.max(4, Math.round(win * LOSS_SHARE));
+    return won ? win : 0;
 }
 
 // ── FEATS ────────────────────────────────────────────────────────────────────────────────────────────────────

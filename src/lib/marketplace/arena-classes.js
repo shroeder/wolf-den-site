@@ -41,10 +41,13 @@ export function arenaLevelFor(xp = 0) {
 }
 
 /** What a bout is worth in arena XP. Harder opponents teach you more — the same idea as Victory Points. */
+// Arena XP levels the class and feeds the skill tree. A loss used to pay 35% of a win, which made a member
+// stuck at a wall able to keep levelling by feeding themselves to it — progress for failing. Nothing is paid
+// for losing any more; see the note in arena-rewards.js.
 export function arenaXpFor({ won, myPower = 1, theirPower = 1 }) {
     const ratio = Math.max(0.3, Math.min(2.5, (Number(theirPower) || 1) / Math.max(1, Number(myPower) || 1)));
     const win = Math.round(26 + 48 * ratio);
-    return won ? win : Math.max(6, Math.round(win * 0.35));
+    return won ? win : 0;
 }
 
 // ── RESPEC ───────────────────────────────────────────────────────────────────────────────────────────────────
