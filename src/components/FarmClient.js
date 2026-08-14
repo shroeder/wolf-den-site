@@ -733,6 +733,14 @@ export default function FarmClient({ initial, viewingAlias }) {
         () => (farm?.placements || []).find((p) => p.decoId === STAND_DECO_ID) || null,
         [farm?.placements]
     );
+    // ── SEATED PETS LEAVE THE PASTURE ────────────────────────────────────────────────────────────────────
+    // A pet on display is standing on the stand, so it must not also be wandering the field — it was rendering
+    // in both places at once, which read as a duplicate of itself. It stays in `farm.pets` (the picker, the
+    // sprite lookups and the counts all need it); only the roaming layer skips it.
+    const standSeatedIds = useMemo(
+        () => new Set(((farm?.stand?.slots) || []).map((s) => s.pet?.id).filter(Boolean)),
+        [farm?.stand?.slots]
+    );
     const standPets = useMemo(() => {
         const slots = farm?.stand?.slots || [];
         if (!slots.length) return null;
@@ -795,7 +803,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Pets auto-split by index parity (even → Outside, odd → Inside); crops live in the Garden; a decoration
     // belongs to Outside OR Inside; each view's single backdrop scrolls sideways. (`view` state declared earlier.) ──
     const petView = (i) => (i % 2 === 0 ? "outside" : "inside");
-    const viewPetCount = view === "garden" ? 0 : pets.filter((_, i) => petView(i) === view).length;
+    const viewPetCount = view === "garden" ? 0 : pets.filter((p, i) => petView(i) === view && !standSeatedIds.has(p.id)).length;
     const wx = { tod: weather.tod, condition: weather.condition, located: weather.located, forced: false };
     const visTod = wx.tod;
     // Backdrop per view (single images, shown as a cover): Inside = barn, Garden = soil beds, Outside = your custom
@@ -1050,7 +1058,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     .map(([v, ico, label]) => {
                     // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
-                    const petAttn = v !== "garden" && farm.mine && liveNudge > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted).length : 0;
+                    const petAttn = v !== "garden" && farm.mine && liveNudge > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted && !standSeatedIds.has(p.id)).length : 0;
                     const badge = v === "art" ? artPending : (attn || petAttn);
                     return (
                         <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
@@ -1184,6 +1192,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 onMove={decoMove}
                                 onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
                                 standPets={standPets}
+                                onPetClick={(pet) => setInspect(pet)}
                             />
                         ) : null}
 
@@ -1195,6 +1204,7 @@ export default function FarmClient({ initial, viewingAlias }) {
 
                         {pets.map((pet, i) => {
                             if (view === "garden" || petView(i) !== view) return null; // pets live in Outside / Inside, split by index
+                            if (standSeatedIds.has(pet.id)) return null; // it's on the stand — drawn there instead
                             const p = pos[i] || { x: 50, y: 82, flip: false, dur: 2, moving: false, hopMs: 500 };
                             const canTap = farm.canPet && !pet.petted && !pet.maxed;
                             return (

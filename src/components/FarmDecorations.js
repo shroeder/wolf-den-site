@@ -184,7 +184,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
 // ── Scene layer: renders a member's PLACED decorations inside the pasture field. TAP any decoration to open its
 // inspect modal (details/effects + pick up). When "editing" (decorate mode), you can also DRAG to reposition —
 // a short movement is treated as a tap (inspect), a longer one as a drag (move). No always-visible ✕.
-export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day", spriteBrightness = 1, standPets = null }) {
+export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day", spriteBrightness = 1, standPets = null, onPetClick = null }) {
     const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
     const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
     const suppressClick = useRef(false); // set after a real drag so the trailing click doesn't also inspect
@@ -282,13 +282,23 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                                     src={pet.spriteUrl}
                                     alt={pet.name || ""}
                                     draggable={false}
+                                    // ── A PET ON THE STAND IS STILL A PET ────────────────────────────────
+                                    // It opens the same detail modal a roaming one does — petting, feeding,
+                                    // everything — because it is on display, not in storage. Seated pets are
+                                    // removed from the pasture, so if this were not clickable they would be
+                                    // unreachable, and the stand's whole pitch is that visitors pet them for
+                                    // double. stopPropagation keeps the tap off the decoration underneath.
+                                    // Inert while decorating, so dragging the stand starts from anywhere on it.
+                                    onClick={editing ? undefined : (e) => { e.stopPropagation(); onPetClick?.(pet); }}
+                                    title={editing ? undefined : `${pet.name} · Lv ${pet.level} · tap to open`}
                                     style={{
                                         position: "absolute", left: `${t.x}%`, top: `${t.y}%`,
                                         width: petPx, height: petPx, objectFit: "contain",
                                         // -50% centres it on the tier; -100% puts its FEET on the cushion's
                                         // top surface, which is the y the tier records.
                                         transform: `translate(-50%, -100%)${pet.flip ? " scaleX(-1)" : ""}`,
-                                        zIndex: 2, pointerEvents: "none",
+                                        zIndex: 2, pointerEvents: editing ? "none" : "auto",
+                                        cursor: editing ? undefined : "pointer",
                                         filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.45)) brightness(${(p.brightness ?? 1) * spriteBrightness})`,
                                         WebkitUserSelect: "none", userSelect: "none",
                                     }}
