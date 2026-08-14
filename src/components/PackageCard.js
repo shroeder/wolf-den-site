@@ -35,9 +35,7 @@ export default function PackageCard({ offer, selected, onToggle }) {
 
     return (
         <div className={`pkgc${selected ? " is-on" : ""}`}>
-            {offer.owned ? (
-                <div className="pkgc-owned"><GiCheckMark aria-hidden="true" /> You own this — it is in your farm decorations</div>
-            ) : offer.ownerPreview ? (
+            {offer.ownerPreview ? (
                 <div className="pkgc-preview"><GiPadlock aria-hidden="true" /> Owner preview — members cannot see this</div>
             ) : null}
 
@@ -106,16 +104,9 @@ export default function PackageCard({ offer, selected, onToggle }) {
                 ))}
             </div>
 
-            {/* Owned: the shop still SHOWS it (a shop that silently deletes what you just bought looks broken)
-                but there is nothing left to sell you — the stand is one-per-farm, so a second copy could never
-                leave the drawer. */}
-            {offer.owned ? (
-                <div className="pkgc-have">Already yours. Place it from the farm decorating tray.</div>
-            ) : (
-                <button type="button" className={`pkgc-cta${selected ? " is-on" : ""}`} onClick={onToggle}>
-                    {selected ? <><GiCheckMark aria-hidden="true" /> Selected — pay below</> : `Get it — ${price}`}
-                </button>
-            )}
+            <button type="button" className={`pkgc-cta${selected ? " is-on" : ""}`} onClick={onToggle}>
+                {selected ? <><GiCheckMark aria-hidden="true" /> Selected — pay below</> : `Get it — ${price}`}
+            </button>
         </div>
     );
 }
