@@ -7,7 +7,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
-    arenaWinGold, arenaWinXp,
+    arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
@@ -2158,10 +2158,31 @@ async function finishBout(buyerId, row, b, won) {
     const laurels = Math.round((baseLaurels + featLaurels) * renown);
 
     // Gold and XP still pay on a win — this sits on top rather than replacing them.
+    //
+    // ── PVP PAYS A FLAT RANDOM PURSE, NOT A SLICE OF THE OTHER PLAYER ────────────────────────────────────
+    // Paying off the opponent's rating is what actually broke the economy, and neither the square root nor the
+    // coefficient cut reached it. Rating is damage x health — a PRODUCT — so it grows with the SQUARE of gear,
+    // and taking a square root of a square just hands the growth straight back. Beating the best-geared member
+    // in the Den paid 3,114 gold a fight, and the same fight after both cuts still paid over a thousand.
+    //
+    // Measured across every arena win before this: fights against members rated 15k+ were 405 wins and 574,543
+    // gold — 82% of everything the Arena ever minted. The Long Road, which was the prime suspect, was 213 wins
+    // and 27,825 gold, about 4%, and its rungs cannot even be refought.
+    //
+    // The tell was one member's day: six wins, six identical payouts of 3,114, the same opponent each time. The
+    // ladder was not paying for a good fight, it was paying for the existence of somebody well geared and then
+    // paying again every time you beat them.
+    //
+    // So a PvP purse is FLAT and rolled, with no input from either fighter's gear. Rank still comes from VP,
+    // which does scale with how much harder they were — that is the right place for "who you beat" to matter,
+    // because VP cannot be spent. The Road and the Gauntlet keep the curve: both are bounded (a rung pays once,
+    // a tier is capped by the daily allowance) and neither compounds with gear.
+    const isPvp = Number(b.npcTier) === 0
+        && !(Number(b.ladder?.rung) || (b.foe?.ladder ? Number(b.foe.rung) || 0 : 0));
     let reward = null;
     if (won) {
-        const gold = arenaWinGold(theirPower);
-        const xp = arenaWinXp(theirPower);
+        const gold = isPvp ? PVP_GOLD_MIN + Math.floor(Math.random() * (PVP_GOLD_MAX - PVP_GOLD_MIN + 1)) : arenaWinGold(theirPower);
+        const xp = isPvp ? PVP_XP_MIN + Math.floor(Math.random() * (PVP_XP_MAX - PVP_XP_MIN + 1)) : arenaWinXp(theirPower);
         reward = { gold, xp, vp, laurels, feats, arenaXp: axp };
         const g = await db.queryOne(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]).catch(() => null);
         await logCoin(buyerId, gold, "arena_win", { balanceAfter: g?.gold, meta: { foe: b.foe.id, vp } }).catch(() => {});

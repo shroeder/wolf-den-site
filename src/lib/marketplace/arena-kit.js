@@ -473,6 +473,24 @@ export const ARENA_GOLD_BASE = 12;
 export const ARENA_GOLD_PER_ROOT = 2.5;
 export const ARENA_XP_BASE = 5;
 export const ARENA_XP_PER_ROOT = 0.8;
+
+// ── AND PVP DOES NOT USE THE CURVE AT ALL ────────────────────────────────────────────────────────────────────
+// The curve above is fine for the Road and the Gauntlet, where the opponent's power is a designed number on a
+// bounded ladder. It was never fine for a MEMBER, whose "power" is their arena rating — damage x health, a
+// product, so it grows with the square of their gear. A square root of a square is linear: the harder the Den
+// geared, the more a win paid, forever. That is 82% of every coin the Arena has ever minted (405 wins against
+// members rated 15k+, 574,543 gold) and it survived both previous nerfs untouched.
+//
+// A PvP purse is a flat roll instead — no input from either fighter's gear, so the spiral has nowhere to grip.
+// Rank still scales with difficulty through VP, which is the honest home for "who you beat" because VP cannot
+// be spent on anything.
+//
+// The XP range is set at the same ratio to gold the curve used (~0.32), so the two stay in proportion and XP
+// does not quietly become the thing that needs fixing next.
+export const PVP_GOLD_MIN = 109;
+export const PVP_GOLD_MAX = 300;
+export const PVP_XP_MIN = 35;
+export const PVP_XP_MAX = 95;
 export const arenaWinGold = (power = 0) =>
     Math.round(ARENA_GOLD_BASE + ARENA_GOLD_PER_ROOT * Math.sqrt(Math.max(0, Number(power) || 0)));
 export const arenaWinXp = (power = 0) =>
