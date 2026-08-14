@@ -263,6 +263,18 @@ export default function StoreCreditClient({
                     </label>
 
                     <div className="credit-summary">
+                        {/* ── SAY WHAT IS BEING BOUGHT ──────────────────────────────────────────────────────
+                            This summary used to read "Credit added / Coins earned / fee / You pay" whether you
+                            had the package selected or not — identical shape, different numbers, and the item
+                            never named anywhere. Kaishiern saw the stand advertised, topped up $25 on its own
+                            an hour after launch, and got no stand: "I had a deal pop up offering a pet stand if
+                            I topped up, which I did, but I can't find the pet stand?" He was not careless; the
+                            checkout never told him what he was buying. */}
+                        {pkg ? (
+                            <div className="credit-summary-item">
+                                <span>{pkg.name}</span><strong>included</strong>
+                            </div>
+                        ) : null}
                         <div><span className="muted">Credit added</span><strong>{usd(amountCents)}</strong></div>
                         <div><span className="muted">Coins earned</span><strong>{coins.toLocaleString()} 🪙</strong></div>
                         {bonusCoins > 0 ? (
@@ -271,6 +283,15 @@ export default function StoreCreditClient({
                         <div><span className="muted">Processing fee (3.5%)</span><strong>{usd(feeCents)}</strong></div>
                         <div className="credit-summary-total"><span>You pay</span><strong>{usd(chargedCents)}</strong></div>
                     </div>
+
+                    {/* The other half: an offer is on the page and they have NOT taken it. Topping up on its own
+                        is a perfectly good thing to do, but it must not be mistaken for the offer. */}
+                    {!pkg && offers.length ? (
+                        <p className="credit-nopkg" role="note">
+                            This is store credit on its own — it does not include {offers[0].name}. To get that,
+                            choose the {usd(offers[0].priceCents)} offer above.
+                        </p>
+                    ) : null}
 
                     {!paymentsEnabled ? (
                         <p className="muted">Online purchases are currently unavailable. You can still spend existing credit in-store.</p>

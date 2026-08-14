@@ -10971,6 +10971,14 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
     background: linear-gradient(180deg, rgba(255,215,94,0.07), rgba(255,255,255,0.02)); border: 1px solid rgba(255,215,94,0.22); }
 .credit-summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.92rem; color: #e8ddc8; }
 .credit-summary > div strong { color: #ffffff; }
+/* The line that names the thing you are buying. Gold and first, because "Credit added $5.00" alone reads
+   identically whether or not the package is attached — which is exactly how a member paid $25 for a top-up
+   believing the advertised item came with it. */
+.credit-summary-item { border-bottom: 1px solid rgba(255,215,110,0.22); padding-bottom: 7px; margin-bottom: 1px; }
+.credit-summary-item span { color: #ffd75e; font-weight: 900; }
+.credit-summary-item strong { color: #ffd75e !important; text-transform: uppercase; font-size: 0.72rem; letter-spacing: .6px; }
+.credit-nopkg { margin: -6px 0 12px; padding: 9px 12px; border-radius: 11px; font-size: 0.78rem; line-height: 1.45;
+    color: #f0e0bb; background: rgba(255,215,110,0.08); border: 1px solid rgba(255,215,110,0.26); }
 .credit-summary-total { padding-top: 10px; margin-top: 2px; border-top: 1px solid rgba(255,215,94,0.25); font-size: 1.15rem; font-weight: 900; color: #ffffff; }
 .credit-summary-total strong { color: #ffd75e; }
 .credit-card-field { min-height: 52px; padding: 6px; border-radius: 12px; background: #15161c; border: 1px solid rgba(255,215,94,0.22); margin-bottom: 12px; }
