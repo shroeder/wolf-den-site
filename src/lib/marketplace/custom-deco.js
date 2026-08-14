@@ -29,11 +29,22 @@ const ART_SUBJECT_PREFIX = "A single decorative object for a farm:";
 // model takes terse descriptions too literally and misses the point) to get a vivid, concrete subject that
 // captures their intent; on any failure we fall back to their literal words. The ART style suffix is always
 // appended. Original description is the base; an optional correction note steers a redraw.
-async function buildPrompt(desc, correction) {
-    const note = String(correction || "").trim() ? ` Adjustments to apply: ${String(correction).trim().slice(0, 200)}.` : "";
-    const refined = await refineDecoPrompt(String(desc || ""), String(correction || "")).catch(() => null);
-    const subject = refined || `A ${String(desc || "").slice(0, 300)}.${note}`;
-    return housePrompt(`${ART_SUBJECT_PREFIX} ${subject}`);
+// `history` is what makes a redraw iterative rather than a fresh start wearing the same name:
+//   { notes: [every earlier adjustment, oldest first], refined: "the prompt the on-screen version was drawn from" }
+// Both are replayed into the refinement pass. Returns the image prompt AND the refined subject, because the
+// subject has to be STORED on the option — it is what the next redraw treats as "the previous version", and
+// without keeping it every iteration was reasoning from the original description again.
+async function buildPrompt(desc, correction, history = {}) {
+    const notes = [...(history.notes || []), correction].map((n) => String(n || "").trim()).filter(Boolean);
+    const refined = await refineDecoPrompt(String(desc || ""), String(correction || ""), {
+        priorNotes: history.notes || [],
+        priorRefined: history.refined || null,
+    }).catch(() => null);
+    // The fallback carries the WHOLE chain too. It used to append only the newest note, so on the one path where
+    // the refinement pass fails — an outage, a timeout — the drift this fixes came straight back.
+    const tail = notes.length ? ` Adjustments to apply, all of them: ${notes.map((n) => n.slice(0, 200)).join("; ")}.` : "";
+    const subject = refined || `A ${String(desc || "").slice(0, 300)}.${tail}`;
+    return { prompt: housePrompt(`${ART_SUBJECT_PREFIX} ${subject}`), refined: subject };
 }
 
 // Turn a raw OpenAI image error into a short, member-friendly reason (so a refused prompt explains itself
@@ -172,9 +183,11 @@ export async function startCustomDeco(buyerId, name, prompt) {
     // drafts across three members were found in: a paid token gone, a draft the UI offers to resume, and
     // nothing to resume it with.
     let gen;
+    let built = null;
     try {
         const who = await creationActor(buyerId);
-        gen = await genOne(await buildPrompt(desc), 1, { origin: "creation", subject: nm, label: `Creation — ${nm}`, ...who });
+        built = await buildPrompt(desc);
+        gen = await genOne(built.prompt, 1, { origin: "creation", subject: nm, label: `Creation — ${nm}`, ...who });
     } catch (e) {
         gen = { urls: [], error: classifyGenError(e) };
     }
@@ -187,7 +200,9 @@ export async function startCustomDeco(buyerId, name, prompt) {
         await db.query(`UPDATE mkt_custom_deco SET status = 'failed', last_error = $2, updated_at = NOW() WHERE id = $1`, [row.id, gen.error?.raw || null]).catch(() => {});
         return { ok: false, error: "gen_failed", reason: gen.error?.reason || null };
     }
-    const opts = gen.urls;
+    // `refined` rides on the option: the next redraw reads it back as "the version currently on screen was drawn
+    // from this", which is the only way an iteration can build on the last one instead of on the first.
+    const opts = gen.urls.map((o) => ({ ...o, refined: built?.refined || null }));
     // Art landed, so this row IS live — say so explicitly rather than assuming nothing touched it while we drew.
     // The response below hands the member a draft marked 'drafting'; if the stored row disagrees, every button
     // they press looks up `status = 'drafting'` and returns not_found against art they can see on screen.
@@ -209,10 +224,23 @@ export async function refineCustomDeco(buyerId, id, correction) {
     if (row.attempts >= MAX_ATTEMPTS) return { ok: false, error: "no_attempts", draft: mapDraft(row) };
     // Same guard as startCustomDeco: buildPrompt and creationActor sit outside genOne's own try, so a throw
     // there left the draft jammed with no error recorded and no way forward.
+    // ── THE CHAIN, NOT JUST THE LAST LINK ────────────────────────────────────────────────────────────────────
+    // This passed row.prompt + the newest correction and nothing else, so every earlier adjustment was thrown
+    // away on each redraw: "four legs and two wings" then "add snow" produced the ORIGINAL dragon with snow on
+    // it. Everything needed to do it properly was already being stored on the options — each carries the note
+    // that produced it — it was simply never read back.
+    const prior = row.options || [];
+    const history = {
+        notes: prior.map((o) => o?.note).filter(Boolean),
+        // What the member is actually looking at is the LAST option drawn, so that is "the previous version".
+        refined: prior.length ? prior[prior.length - 1]?.refined || null : null,
+    };
     let gen;
+    let built = null;
     try {
         const who = await creationActor(buyerId);
-        gen = await genOne(await buildPrompt(row.prompt, correction), row.attempts + 1, {
+        built = await buildPrompt(row.prompt, correction, history);
+        gen = await genOne(built.prompt, row.attempts + 1, {
             origin: "creation", subject: row.name, label: `Creation redraw ${row.attempts + 1} — ${row.name}`, ...who,
         });
     } catch (e) {
@@ -224,7 +252,7 @@ export async function refineCustomDeco(buyerId, id, correction) {
     }
     // Stamp each redraw with the correction that produced it, so the full prompting history is visible to admins.
     const note = String(correction || "").trim().slice(0, 200) || null;
-    const opts = gen.urls.map((o) => ({ ...o, note }));
+    const opts = gen.urls.map((o) => ({ ...o, note, refined: built?.refined || null }));
     const merged = [...(row.options || []), ...opts];
     // Same reasoning as startCustomDeco: a successful redraw asserts the row is live.
     // pending_note is cleared: the tweak it was holding has now been SPENT on this redraw, so leaving it in the

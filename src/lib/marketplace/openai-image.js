@@ -61,24 +61,48 @@ export async function faceBufferRight(buffer) {
 // 2D decoration art model. The image model takes terse prompts too literally and misses the point; this pass
 // fixes that. Best-effort: returns null on any failure so the caller falls back to the raw wording. Never adds
 // brands/copyrighted characters (those get refused downstream anyway).
-export async function refineDecoPrompt(description, correction = "") {
+// ── A REDRAW HAS TO KNOW WHAT IT IS REDRAWING ────────────────────────────────────────────────────────────────
+// This took the original description and the NEWEST tweak, and nothing else. Two things were wrong with that,
+// and together they are why a creation drifts away from what the player is building:
+//
+//   EARLIER TWEAKS WERE DROPPED. Ask for "four legs and two wings", then ask for "add snow", and the second
+//   redraw was built from the ORIGINAL description plus "add snow" — the legs and wings silently reverted.
+//   Kaishiern, who spent his only token discovering this: "I tried being descriptive as I could but on the last
+//   redraw it ignored half of my tweak."
+//
+//   "THE PREVIOUS VERSION" WAS A PHRASE WITH NOTHING BEHIND IT. The instruction said to adjust the previous
+//   version while handing over only the first description. The model had never seen the previous version — not
+//   its image (every redraw is a fresh text-to-image call, there is no image-to-image here) and not even the
+//   refined prompt that produced it. It was adjusting the original and calling it the previous.
+//
+// So the whole chain goes in: the original, every adjustment in order, and the exact prompt the on-screen
+// version was drawn from. `priorRefined` is the one that makes "previous" true.
+export async function refineDecoPrompt(description, correction = "", { priorNotes = [], priorRefined = null } = {}) {
     const key = process.env.OPENAI_API_KEY;
     const desc = String(description || "").trim().slice(0, 300);
     if (!key || desc.length < 3) return null;
     try {
         const sys =
-            "You are a prompt engineer for a 2D RPG game's decoration art generator. Rewrite the player's short description of a decoration into ONE vivid, concrete visual description of a SINGLE decorative object or creature. Generously interpret their intent: infer sensible form, materials, colors, and standout details so the art looks intentional rather than a clumsy literal reading. Describe ONLY the object itself — do NOT specify an art style, rendering, lighting, or background (the renderer applies a fixed house style). Keep it one standalone decoration a player would place on a farm. Never reference a real brand, company, or copyrighted/trademarked character. Output ONLY the description as a noun phrase — no 'a picture of', no preamble, no quotes — 40 words max.";
-        const user =
-            correction && correction.trim()
-                ? `Description: ${desc}\nThe player asked to adjust the PREVIOUS version like this: ${correction.trim().slice(0, 200)}\nRewrite the full description with that adjustment applied.`
-                : `Description: ${desc}`;
+            "You are a prompt engineer for a 2D RPG game's decoration art generator. Rewrite the player's description of a decoration into ONE vivid, concrete visual description of a SINGLE decorative object or creature. Generously interpret their intent: infer sensible form, materials, colors, and standout details so the art looks intentional rather than a clumsy literal reading. When adjustments are listed, the result MUST satisfy EVERY one of them at once — they accumulate, and an earlier adjustment is still in force unless a later one plainly contradicts it, in which case the later one wins. Describe ONLY the object itself — do NOT specify an art style, rendering, lighting, or background (the renderer applies a fixed house style). Keep it one standalone decoration a player would place on a farm. Never reference a real brand, company, or copyrighted/trademarked character. Output ONLY the description as a noun phrase — no 'a picture of', no preamble, no quotes — 60 words max.";
+        const notes = [...priorNotes, correction].map((n) => String(n || "").trim()).filter(Boolean).slice(-6);
+        let user = `Original description: ${desc}`;
+        if (priorRefined) user += `\n\nThe version currently on screen was drawn from this prompt:\n${String(priorRefined).slice(0, 400)}`;
+        if (notes.length) {
+            user += `\n\nAdjustments the player has asked for, oldest first — ALL of them must hold in the result:\n`
+                + notes.map((n, i) => `${i + 1}. ${n.slice(0, 200)}`).join("\n")
+                + `\n\nRewrite the full description with every one of those applied.`;
+        }
         const resp = await fetch(CHAT_URL, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
             body: JSON.stringify({
                 model: "gpt-4o-mini",
-                max_tokens: 120,
-                temperature: 0.7,
+                // Raised with the word cap: a fourth redraw carries the original plus three accumulated
+                // adjustments, and 120 tokens truncated exactly the prompts that had the most to say.
+                max_tokens: 260,
+                // Cooler on a redraw. At 0.7 two runs of the SAME prompt drift, so a tweak arrived mixed in with
+                // random change the player never asked for and could not distinguish from their own edit.
+                temperature: notes.length ? 0.3 : 0.7,
                 messages: [
                     { role: "system", content: sys },
                     { role: "user", content: user },
