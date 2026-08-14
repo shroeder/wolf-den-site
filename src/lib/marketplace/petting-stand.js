@@ -91,7 +91,12 @@ export async function getStandState(ownerId) {
     const rows = await db.query(
         `SELECT s.slot, s.pet_id, COALESCE(l.xp, 0) AS xp
            FROM mkt_petting_stand s
-           LEFT JOIN mkt_pet_level l ON l.buyer_id = s.buyer_id AND l.pet_id = s.pet_id
+           -- WARNING: the ::text cast is load-bearing. mkt_petting_stand.buyer_id is UUID (FK to mkt_buyer);
+           -- mkt_pet_level.buyer_id is TEXT. Without the cast Postgres refuses the whole statement with
+           -- 42883 "operator does not exist: text = uuid" — and the .catch(() => []) below turned that into
+           -- an empty result, so every seated pet silently read back as an empty tier. The feature looked
+           -- like it did nothing at all.
+           LEFT JOIN mkt_pet_level l ON l.buyer_id = s.buyer_id::text AND l.pet_id = s.pet_id
           WHERE s.buyer_id = $1 ORDER BY s.slot`, [ownerId]
     ).catch(() => []);
     const counts = await petOwnerCounts((rows || []).map((r) => r.pet_id));

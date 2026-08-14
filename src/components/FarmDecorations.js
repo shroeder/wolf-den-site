@@ -229,17 +229,28 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
             {placements.map((p) => {
                 const live = drag && drag.id === p.id ? { ...p, ...drag } : p;
                 const size = p.size || 66;
+                // ── BIG PIECES DRAG BY A HANDLE, NOT BY THEIR WHOLE BODY ─────────────────────────────────
+                // `touch-action: none` is what stops the browser stealing a drag gesture — but it also stops it
+                // scrolling ANY ancestor, including the page, whenever a touch STARTS on the element. On a 66px
+                // prop that is an unnoticeable dead spot. The Petting Stand is 132px and scales to 2.5x from
+                // there: at 2.25x it was 297x297 inside a pasture only 375x347 on a phone, so a finger landing
+                // almost anywhere in the field could neither pan the farm nor scroll the page. Luke: "whenever I
+                // drag the pet stand decoration onto my farm, it bricks the ability to scroll."
+                // So an oversized piece keeps `auto` over its artwork and puts the drag on a small handle at its
+                // base. Everything under the sprite scrolls normally again, and the piece is still movable.
+                const bigPiece = size > 66;
+                const dragHere = editing && !bigPiece;
                 return (
                     <div
                         key={p.id}
-                        onPointerDown={editing ? (e) => start(e, p) : undefined}
-                        onPointerMove={editing ? move : undefined}
-                        onPointerUp={editing ? end : undefined}
-                        onPointerCancel={editing ? () => { gr.current = {}; setDrag(null); } : undefined}
+                        onPointerDown={dragHere ? (e) => start(e, p) : undefined}
+                        onPointerMove={dragHere ? move : undefined}
+                        onPointerUp={dragHere ? end : undefined}
+                        onPointerCancel={dragHere ? () => { gr.current = {}; setDrag(null); } : undefined}
                         onClick={() => clickInspect(p)}
                         style={{
                             position: "absolute", left: `${live.x}%`, top: `${live.y}%`, transform: `translate(-50%, -100%) rotate(${live.rot || 0}deg) scale(${live.scale || 1})`,
-                            zIndex: Math.round(live.y), cursor: "pointer", touchAction: editing ? "none" : "auto",
+                            zIndex: Math.round(live.y), cursor: "pointer", touchAction: dragHere ? "none" : "auto",
                             transition: drag && drag.id === p.id ? "none" : "left .15s ease, top .15s ease",
                             WebkitTapHighlightColor: "transparent", WebkitTouchCallout: "none", userSelect: "none", outline: "none",
                         }}
@@ -263,6 +274,25 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         ) : (
                             <span style={{ position: "relative", zIndex: 1, fontSize: 40, filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.4)) brightness(${(p.brightness ?? 1) * spriteBrightness})`, pointerEvents: "none" }}>{p.emoji}</span>
                         )}
+                        {/* The drag grip for an oversized piece. Sized back down by the container's own scale so
+                            it stays a thumb-sized target instead of ballooning with the artwork, and it is the
+                            ONLY part of the piece that takes touch away from the scroller. */}
+                        {editing && bigPiece ? (
+                            <span
+                                onPointerDown={(e) => start(e, p)}
+                                onPointerMove={move}
+                                onPointerUp={end}
+                                onPointerCancel={() => { gr.current = {}; setDrag(null); }}
+                                title={`Drag to move ${p.name}`}
+                                style={{
+                                    position: "absolute", left: "50%", bottom: 0, transform: `translate(-50%, 40%) scale(${1 / (live.scale || 1)})`,
+                                    width: 38, height: 38, borderRadius: 999, zIndex: 3, cursor: "grab", touchAction: "none",
+                                    display: "grid", placeItems: "center", fontSize: 17, lineHeight: 1,
+                                    background: "rgba(18,20,24,0.86)", border: "1px solid rgba(255,215,110,0.6)", color: "#ffe6a6",
+                                    boxShadow: "0 3px 10px rgba(0,0,0,0.5)", WebkitTapHighlightColor: "transparent", userSelect: "none",
+                                }}
+                            >✥</span>
+                        ) : null}
                         {/* ── PETS SITTING ON THE PEDESTAL ────────────────────────────────────────────────
                             Rendered INSIDE this container, which is what makes them survive the tools every
                             decoration has: the scale, rotation and flip are on the parent, so the animals ride
