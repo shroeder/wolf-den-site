@@ -180,7 +180,16 @@ export async function decoState(buyerId) {
             if (a.owned !== b.owned) return a.owned ? -1 : 1; // owned (placeable) first
             return (RANK[a.rarity]?.rank || 0) - (RANK[b.rarity]?.rank || 0) || (a.price || 0) - (b.price || 0);
         });
-    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, custom: customState, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
+    // ── THE STAND RIDES ALONG ────────────────────────────────────────────────────────────────────────────
+    // Every decoration action returns this object and the client merges it wholesale, so anything NOT in here
+    // is stale until a full page load. The Petting Stand's panel only opens when `stand.placed` is true — so
+    // without this you could place the stand, tap it, and get the ordinary decoration inspector, because the
+    // client still held the `placed: false` it was served when the page first rendered. Placing a thing and
+    // then not being able to use it until you reload is the worst kind of bug: it looks like the feature is
+    // broken rather than the state.
+    const { getStandState } = await import("@/lib/marketplace/petting-stand.js");
+    const stand = await getStandState(buyerId).catch(() => ({ placed: false, slots: [] }));
+    return { owned, placements, buffs, buffMeta: DECO_STATS, keepout: decoKeepout(), catalog, custom: customState, stand, placedTotal: (placeRows || []).length, placedCap: PLACE_CAP };
 }
 
 // Near-full range so decorations can live anywhere on the farm (matches the client drag clamps). A hair of

@@ -656,6 +656,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 ...f,
                 placements: r.placements || f.placements,
                 decorations: { owned: r.owned, placements: r.placements, buffs: r.buffs, buffMeta: r.buffMeta, keepout: r.keepout, catalog: r.catalog, placedTotal: r.placedTotal, placedCap: r.placedCap },
+                // Placing or picking up the stand changes whether its panel can open at all — without this the
+                // client keeps the `placed` it was rendered with and the stand is untappable until a reload.
+                stand: r.stand || f.stand,
                 wallet: f.wallet && r.gold != null ? { ...f.wallet, gold: r.gold } : f.wallet,
             }));
             // …and restore it after the re-render, so a piece placed while scrolled right doesn't vanish off-screen.
