@@ -1474,7 +1474,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                     {decoNote}
                 </div>
             ) : null}
-            {inspectDeco?.decoId === STAND_DECO_ID && farm.stand?.placed ? (
+            {/* The stand shows its companion panel, EXCEPT when it has explicitly asked for the ordinary
+                decoration inspector (`adjust`) — resize / rotate / flip / brightness / pick up. Those live in
+                exactly one component and are not restated in the stand's panel. */}
+            {inspectDeco?.decoId === STAND_DECO_ID && farm.stand?.placed && !inspectDeco.adjust ? (
                 <PettingStand
                     stand={farm.stand}
                     mine={farm.mine}
@@ -1482,6 +1485,12 @@ export default function FarmClient({ initial, viewingAlias }) {
                     busy={decoBusy}
                     onSeat={standSeat}
                     onClear={standClear}
+                    // Hand over to the real inspector. The pill opens this panel without a placement attached,
+                    // so find the placed stand to hand it the row it needs (id, scale, rot, flip, light).
+                    onAdjust={() => {
+                        const pl = (farm.placements || []).find((p) => p.decoId === STAND_DECO_ID);
+                        if (pl) setInspectDeco({ ...pl, placementId: pl.id, adjust: true });
+                    }}
                     onClose={() => setInspectDeco(null)}
                 />
             ) : inspectDeco ? (
