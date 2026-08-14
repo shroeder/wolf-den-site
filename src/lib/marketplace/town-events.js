@@ -712,7 +712,18 @@ async function announceRaidOver(ev, { title, body }) {
     if (ev?.meta?.silent) return;
     const push = await broadcastToEveryone({
         kind: "raid", title, body,
-        url: "/marketplace/town", route: "town", tag: "town-event", data: { type: "town_event_end" },
+        // ── A DIFFERENT TAG FROM THE SPAWN, AND THAT IS THE WHOLE FIX ────────────────────────────────────
+        // A web push `tag` is a COLLAPSE KEY: a newer notification with the same tag REPLACES the older one in
+        // the tray (see web-push.js). Both the "a raid has landed" push and this one were tagged "town-event",
+        // so the result notification quietly overwrote the summons. Anybody who did not happen to look at
+        // their phone during the raid itself saw exactly one notification — the one telling them it was over.
+        //
+        // Luke, having watched a whole raid come and go: "this boss spawned and the only notification I got
+        // was that he died." Nothing failed to send; meta on that event records pushWeb 31 for BOTH. The second
+        // one ate the first.
+        //
+        // The boss broadcasts already got this right ("boss" vs "boss-defeated"); the plaza raid did not.
+        url: "/marketplace/town", route: "town", tag: "town-event-end", data: { type: "town_event_end" },
     });
     await db.query(`UPDATE mkt_town_event SET meta = meta || $2::jsonb WHERE id = $1`,
         [ev.id, JSON.stringify({ endPushWeb: push.web, endPushApp: push.app, endPushOwner: push.owner })]).catch(() => {});

@@ -11,6 +11,9 @@ import {
 } from "@/lib/marketplace/store-credit.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
+import { PACKAGES, packageSettingKey } from "@/lib/marketplace/packages.js";
+import { getSetting } from "@/lib/settings.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -41,6 +44,15 @@ export default async function StoreCreditPage() {
         getEquippedIds(buyer.id).catch(() => ({})),
     ]);
     const coinBonus = creditPurchaseBonus(equipped); // bonus fraction from equipped credit gear
+    // ── WHICH PACKAGES THIS MEMBER MAY ACTUALLY SEE ──────────────────────────────────────────────────────
+    // Resolved on the SERVER and never shipped as "here is the catalog, hide some of it": an unreleased
+    // package must not reach the browser at all, or its name and contents are one devtools tab away. The
+    // checkout enforces the same rule again — this decides what is drawn, that decides what can be bought.
+    const offers = [];
+    for (const p of PACKAGES) {
+        const open = String(await getSetting(packageSettingKey(p.id), "off").catch(() => "off")) === "on";
+        if (open || isOwner(buyer.id)) offers.push({ ...p, ownerPreview: !open });
+    }
 
     return (
         <div className="stack reveal">
@@ -55,6 +67,7 @@ export default async function StoreCreditPage() {
                 minCents={MIN_CREDIT_CENTS}
                 maxCents={MAX_CREDIT_CENTS}
                 coinBonus={coinBonus}
+                offers={offers}
             />
         </div>
     );

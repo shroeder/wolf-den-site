@@ -54,6 +54,7 @@ export default function StoreCreditClient({
     minCents = 500,
     maxCents = 50000,
     coinBonus = 0,
+    offers = [],
 }) {
     const [balanceCents, setBalanceCents] = useState(initialBalanceCents);
     const [events, setEvents] = useState(initialEvents);
@@ -63,6 +64,9 @@ export default function StoreCreditClient({
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState("");
     const [done, setDone] = useState(null); // { amountCents, coins }
+    // The selected package, or null for an ordinary credit load. A package fixes the amount and the coin line,
+    // so everything derived below reads off it when one is chosen.
+    const [pkgId, setPkgId] = useState(null);
     const cardRef = useRef(null);
 
     // In-store spend QR.
@@ -70,9 +74,13 @@ export default function StoreCreditClient({
     const [claimBusy, setClaimBusy] = useState(false);
 
     const missingSquareConfig = !squareApplicationId || !squareLocationId;
-    const feeCents = Math.round(amountCents * feeRate);
-    const chargedCents = amountCents + feeCents;
-    const baseCoins = amountCents * coinsPerCent;
+    const pkg = pkgId ? offers.find((o) => o.id === pkgId) || null : null;
+    // A package is a credit load with a fixed price and a better coin line — so the fee, the charge and the
+    // coins all come off the package when one is selected, and off the slider when one is not.
+    const payCents = pkg ? pkg.priceCents : amountCents;
+    const feeCents = Math.round(payCents * feeRate);
+    const chargedCents = payCents + feeCents;
+    const baseCoins = pkg ? pkg.coins : payCents * coinsPerCent;
     const bonusCoins = Math.round(baseCoins * coinBonus); // guaranteed bonus from equipped credit gear
     const coins = baseCoins + bonusCoins;
 
@@ -126,17 +134,18 @@ export default function StoreCreditClient({
         if (r && typeof r.balanceCents === "number") { setBalanceCents(r.balanceCents); setEvents(r.events || []); }
     }
 
-    function pickPreset(cents) { setAmountCents(cents); setCustomDollars(""); }
+    function pickPreset(cents) { setAmountCents(cents); setCustomDollars(""); setPkgId(null); }
     function onCustom(v) {
         setCustomDollars(v);
+        setPkgId(null);
         const dollars = Math.floor(Number(v) || 0);
         if (dollars > 0) setAmountCents(Math.min(maxCents, Math.max(0, dollars * 100)));
     }
 
     async function buy() {
         setErr(""); setDone(null);
-        if (amountCents < minCents) { setErr(`Minimum is ${usd(minCents)}.`); return; }
-        if (amountCents > maxCents) { setErr(`Maximum is ${usd(maxCents)}.`); return; }
+        if (!pkg && amountCents < minCents) { setErr(`Minimum is ${usd(minCents)}.`); return; }
+        if (!pkg && amountCents > maxCents) { setErr(`Maximum is ${usd(maxCents)}.`); return; }
         if (!cardRef.current) { setErr("Card form isn't ready yet."); return; }
         setBusy(true);
         try {
@@ -145,11 +154,11 @@ export default function StoreCreditClient({
             const res = await fetch("/api/marketplace/credit/checkout", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sourceId: tokenized.token, amountCents }),
+                body: JSON.stringify(pkg ? { sourceId: tokenized.token, packageId: pkg.id } : { sourceId: tokenized.token, amountCents }),
             });
             const d = await res.json().catch(() => null);
             if (!res.ok || !d?.ok) throw new Error(d?.error || "Purchase failed.");
-            setBalanceCents(d.balanceCents ?? balanceCents + amountCents);
+            setBalanceCents(d.balanceCents ?? balanceCents + payCents);
             setDone({ amountCents: d.amountCents, coins: d.coins, bonusCoins: d.bonusCoins || 0 });
             refresh();
         } catch (e) {
@@ -207,8 +216,40 @@ export default function StoreCreditClient({
                 </section>
             ) : (
                 <section className="card">
-                    <h2 style={{ marginTop: 0 }}>Add credit</h2>
-                    <div className="credit-presets">
+                    {/* ── PACKAGES, ABOVE THE ORDINARY AMOUNTS ────────────────────────────────────────────
+                        A package is the same $5 going in — you still get every cent back as spendable credit —
+                        with more coins and something you cannot get any other way on top. It sits above the
+                        plain amounts because that is the offer, and selecting one takes over the amount. */}
+                    {offers.length ? (
+                        <div className="credit-pkgs">
+                            {offers.map((o) => {
+                                const on = pkgId === o.id;
+                                return (
+                                    <button
+                                        type="button"
+                                        key={o.id}
+                                        className={`credit-pkg${on ? " is-on" : ""}`}
+                                        onClick={() => setPkgId(on ? null : o.id)}
+                                    >
+                                        <span className="credit-pkg-top">
+                                            <b>{o.name}</b>
+                                            <i>{usd(o.priceCents)}</i>
+                                        </span>
+                                        <em>{o.blurb}</em>
+                                        <ul>
+                                            {(o.perks || []).map((p) => <li key={p}>{p}</li>)}
+                                        </ul>
+                                        {/* Says out loud that it is not live yet, so a preview can never be
+                                            mistaken for something members can already see. */}
+                                        {o.ownerPreview ? <span className="credit-pkg-preview">🔒 Owner preview — not on sale yet</span> : null}
+                                        <span className="credit-pkg-pick">{on ? "✓ Selected" : "Choose this"}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                    <h2 style={{ marginTop: offers.length ? 14 : 0 }}>{pkg ? "Or add credit on its own" : "Add credit"}</h2>
+                    <div className="credit-presets" style={pkg ? { opacity: 0.45 } : undefined}>
                         {PRESETS_CENTS.map((c) => (
                             <button
                                 key={c}

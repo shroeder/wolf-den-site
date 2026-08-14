@@ -10812,6 +10812,26 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-chip.is-featured { border-color: rgba(255,215,94,0.7); box-shadow: 0 0 0 1px rgba(255,215,94,0.5) inset, 0 4px 16px rgba(240,160,40,0.3); padding-top: 20px; }
 .credit-chip-flag { position: absolute; top: 0; left: 0; right: 0; padding: 2px 0; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em;
     color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffbf3c); border-radius: 13px 13px 0 0; }
+/* ── PAID PACKAGES on the store-credit screen ─────────────────────────────────────────────────────────────
+   A package is the same money going in with more coming back, so it is drawn as an offer rather than as
+   another amount chip: full width, its contents listed, and visibly selected once chosen. */
+.credit-pkgs { display: grid; gap: 10px; margin-bottom: 4px; }
+.credit-pkg { display: grid; gap: 5px; width: 100%; text-align: left; padding: 13px 14px; border-radius: 16px;
+    cursor: pointer; color: #f0e6d2;
+    background: radial-gradient(120% 140% at 100% 0%, rgba(214,160,255,0.16), rgba(255,255,255,0.04) 60%);
+    border: 1px solid rgba(214,160,255,0.42); }
+.credit-pkg.is-on { border-color: rgba(214,160,255,0.95);
+    box-shadow: 0 0 0 1px rgba(214,160,255,0.5), 0 8px 26px rgba(140,80,200,0.28); }
+.credit-pkg-top { display: flex; align-items: baseline; gap: 8px; }
+.credit-pkg-top b { font-size: 1rem; }
+.credit-pkg-top i { margin-left: auto; font-style: normal; font-weight: 900; font-size: 1.05rem; color: #ffd75e; }
+.credit-pkg em { font-style: normal; font-size: 0.78rem; color: #cbbcda; line-height: 1.4; }
+.credit-pkg ul { margin: 3px 0 0; padding-left: 17px; display: grid; gap: 2px; }
+.credit-pkg li { font-size: 0.78rem; color: #e8dcc2; line-height: 1.35; }
+.credit-pkg-preview { justify-self: start; font-size: 0.7rem; font-weight: 800; color: #ffb347;
+    background: rgba(255,179,71,0.12); border: 1px solid rgba(255,179,71,0.4); border-radius: 8px; padding: 2px 8px; }
+.credit-pkg-pick { justify-self: start; margin-top: 4px; font-size: 0.78rem; font-weight: 900; color: #d6a0ff; }
+.credit-pkg.is-on .credit-pkg-pick { color: #8fe39a; }
 .credit-chip { position: relative; }
 .credit-chip { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 6px; border-radius: 14px; cursor: pointer;
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.25)); border: 1px solid rgba(255,255,255,0.14);
