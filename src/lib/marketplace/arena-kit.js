@@ -444,10 +444,35 @@ export const BRACE_LIMIT = 6;
 //
 // Both numbers live here, together, because they are the same decision made twice — see the memory note on
 // balance constants never being copied. If you retune one, look at the other.
-export const ARENA_GOLD_BASE = 20;
-export const ARENA_GOLD_PER_ROOT = 7;
-export const ARENA_XP_BASE = 10;
-export const ARENA_XP_PER_ROOT = 3;
+//
+// ── SECOND PASS, 3.5 HOURS LATER, MEASURED RATHER THAN ESTIMATED ─────────────────────────────────────────────
+// The square root did what it was meant to: the top win fell 3,501 → 469 and the median 279 → 153. It was still
+// too much, and the reason the first pass looked sufficient is that it was checked as a PER-WIN number. Checked
+// as a share of the economy — which is the only number that matters — the Arena was still minting:
+//
+//   24.8% of every coin        (next-largest single source: 18.1%)
+//   41.6% of ALL XP in the game (next-largest: 11.5%)
+//
+// XP was the real outlier and the first pass barely touched it, because 3·√p was cut proportionally less than
+// the gold was. Nearly half of all progression in the Den came from one repeatable button.
+//
+// These coefficients were not guessed: 86 real post-fix bouts were replayed through candidate curves against
+// the same window's non-Arena earnings (scripts, and the note below). Projected landing:
+//
+//   top win 172 gold / 56 XP  →  11.1% of gold, 17.1% of XP
+//
+// which puts the Arena among the game's activities rather than above them. It stays the best-paying single
+// action in the Den; it stops being half the Den.
+//
+// ⚠️ THE PER-WIN NUMBER IS ONLY HALF THE FAUCET. Cutting it 7x moved gold-per-hour only ~24%, because VOLUME
+// rose to meet it. The daily allowance is 10 (+5 from the Stamina track, so 15 absolute maximum) and members
+// are taking THIRTY-TWO wins a day — because arena.js's fight gate reads `roadRung <= 0 && ...`, so the Long
+// Road does not count against the allowance at all. Retuning these constants again without closing that will
+// keep producing the same result.
+export const ARENA_GOLD_BASE = 12;
+export const ARENA_GOLD_PER_ROOT = 2.5;
+export const ARENA_XP_BASE = 5;
+export const ARENA_XP_PER_ROOT = 0.8;
 export const arenaWinGold = (power = 0) =>
     Math.round(ARENA_GOLD_BASE + ARENA_GOLD_PER_ROOT * Math.sqrt(Math.max(0, Number(power) || 0)));
 export const arenaWinXp = (power = 0) =>
