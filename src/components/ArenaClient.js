@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiCrossedSwords, GiExitDoor, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiBurn, GiCrossedSwords, GiExitDoor, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -171,7 +171,7 @@ function SkillFace({ ab, left = 0 }) {
 // hero inside the stage — which meant the camera push-in during a cast scaled and slid it too, so on every
 // single skill the two name plates drifted across each other and printed one name on top of the other. A HUD
 // that reads the state of the fight cannot be part of the shot.
-function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0 }) {
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
@@ -199,9 +199,10 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
     const danger = frac > 0 && frac <= 0.35;
     const shieldPct = maxHp ? Math.min(1, shield / maxHp) * 100 : 0;
 
+    const burning = (burn?.turns || 0) > 0;
     return (
         <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
-            + `${healing ? " is-healing" : ""}`}>
+            + `${healing ? " is-healing" : ""}${burning ? " is-burning" : ""}`}>
             <span className="ar-namerow">
                 <b className="ar-fname">{f?.name}</b>
                 {element ? (
@@ -218,6 +219,20 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
             <em className="ar-hpnum">
                 {Math.max(0, hp)}<span>/{maxHp}</span>
                 {shield > 0 ? <u>+{shield}</u> : null}
+                {/* ── THE BURN, WORN BY THE FIGHTER THAT IS BURNING ────────────────────────────────────
+                    A rend ticks at the END of their turn, so the damage lands right after they swing — which
+                    is indistinguishable from thorns. Kaishiern: "Why does Emberbrand act like a spikes move?"
+                    The server has published `bleed` (turns, stacks, per-turn damage) all along and nothing
+                    drew it, so the only account of it was a line of log text that scrolls away.
+                    It sits ON their bar, states what it costs them and how many turns are left, and the bar
+                    itself carries an ember pulse for as long as it burns — so the tick has a visible cause. */}
+                {burning ? (
+                    <i className="ar-burn" aria-label={`Burning: ${burn.dmg} a turn, ${burn.turns} turns left`}>
+                        <GiBurn aria-hidden="true" />
+                        <b>{burn.dmg}</b>
+                        <u>{burn.turns}<s>t</s></u>
+                    </i>
+                ) : null}
             </em>
             {/* ── EVERY NUMBER THAT DECIDES THE FIGHT ──────────────────────────────────────────────────────
                 The ring used to roll the defender's mitigation per blow, at 12%, 32% or 55%, and print
@@ -1168,7 +1183,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
                         </span>
-                        <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
+                        <FighterBar burn={bout.bleed} f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
                             foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
                     </div>
 
@@ -2368,6 +2383,28 @@ function Styles() {
             @keyframes arShadowBreathe { from { opacity: .95; transform: translateX(-50%) scale(1) }
                 to { opacity: .72; transform: translateX(-50%) scale(.9) } }
             /* The old value, holding for a beat before it slides down to meet the new one. */
+            /* THE BURN. Ember on the fighter that is burning: what it costs a turn, how many turns are left,
+               and a stack count only when it is actually stacked. */
+            .ar-burn { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
+                margin-left: 5px; vertical-align: middle;
+                font-size: 10.5px; font-weight: 900; font-style: normal; letter-spacing: .2px; color: #ffd0a0;
+                background: linear-gradient(180deg, rgba(255,138,42,0.30), rgba(255,86,20,0.16));
+                border: 1px solid rgba(255,138,42,0.55); box-shadow: 0 0 10px rgba(255,110,30,0.35);
+                animation: arBurnPulse 1.15s ease-in-out infinite; }
+            .ar-burn svg { font-size: 12px; color: #ff8a2a; }
+            .ar-burn b { color: #ffb066; }
+            .ar-burn u { text-decoration: none; padding-left: 4px; margin-left: 1px; color: #ffe3c4;
+                border-left: 1px solid rgba(255,138,42,0.45); }
+            .ar-burn s { text-decoration: none; color: #ffb066; opacity: .75; }
+            @keyframes arBurnPulse {
+                0%, 100% { box-shadow: 0 0 8px rgba(255,110,30,0.28); }
+                50% { box-shadow: 0 0 16px rgba(255,110,30,0.6); } }
+            /* …and the bar it is eating, so the tick has a visible cause and not just a number. */
+            .ar-bar.is-burning .ar-hp { box-shadow: inset 0 0 12px rgba(255,110,30,0.55); }
+            .ar-bar.is-burning .ar-hp > i { animation: arBurnBar 1.15s ease-in-out infinite; }
+            @keyframes arBurnBar {
+                0%, 100% { filter: none; }
+                50% { filter: brightness(1.25) saturate(1.3) drop-shadow(0 0 6px rgba(255,120,40,0.75)); } }
             .ar-hp-ghost { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit;
                 background: rgba(255,120,140,0.55); transition: width .38s cubic-bezier(.4,0,.2,1); }
             .ar-hp > i { position: relative; z-index: 2; }
@@ -2453,6 +2490,9 @@ function Styles() {
             /* The chip must not be inside the ellipsis, or a long name eats the affinity — which is the one
                thing on the plate you need before choosing a move. */
             .ar-namerow { display: flex; align-items: center; gap: 5px; min-width: 0; }
+            /* The burn chip must never cost the fighter their name — it shrinks to nothing before the chip
+               does, and the chip is fixed. Without this the foe's name was squeezed clean out of the row. */
+            .ar-fname { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .ar-bar.is-foe .ar-namerow { justify-content: flex-end; }
             .ar-fname { font-size: 12px; font-weight: 900; color: #fff; text-shadow: 0 2px 7px #000;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
