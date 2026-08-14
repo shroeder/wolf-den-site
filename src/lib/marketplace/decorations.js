@@ -171,10 +171,44 @@ export const DECORATIONS = [
     deco("deco_glint_gilded_acorn", "Gilded Acorn", "🌰", "epic", "glint", null, { stat: "fertPower", value: 5 }, "a polished golden acorn on a tiny pedestal, gleaming like treasure"),
     deco("deco_glint_starforge", "Starforge Relic", "⭐", "epic", "glint", null, { stat: "growSpeed", value: 6 }, "a small floating anvil-shaped relic forged from a star, ringed with orbiting sparks of light"),
     deco("deco_glint_aurora_orb", "Aurora Orb", "🔮", "epic", "glint", null, { stat: "harvestLuck", value: 5 }, "a crystal orb swirling with shifting aurora-borealis light, greens and purples"),
+    // ── THE PETTING STAND ── the one decoration you cannot win, find, or be given ─────────────────────────
+    // Sold ONLY inside the $5 Petting Stand package (store credit + coins + this), so it needs a source no
+    // existing hand-out path can reach. Every one of them filters by source and this matches none:
+    //
+    //   the wheel      DECORATIONS.filter(d => d.source === "spin")        (spin.js)
+    //   the glint      GLINT_DECOS, i.e. source === "glint"                (town-shiny.js)
+    //   both shops     ["shop","special"].includes(source) && price        (buyDecoration)
+    //   the boss       grants one hard-coded id                            (boss-trophy.js)
+    //   a creation     only ever touches custom:<id> rows                  (creation-share.js)
+    //
+    // `price: null` is a second lock on the shop path, and `unique: true` caps it at one PLACED copy. It is
+    // also `unreleased` until the package goes live — see PUBLIC_DECORATIONS below, which is what the catalog
+    // drawer must read so an unlaunched item does not advertise itself to everyone who opens the farm.
+    {
+        id: "deco_petting_stand", name: "The Petting Stand", emoji: "🐾", rarity: "mythic",
+        source: "package", price: null, buff: null, unique: true, unreleased: true, pets: 3,
+        prompt: prompt("an ornate three-tiered stone display pedestal with soft cushions on each tier, garlanded with flowers, built for small animals to sit and be admired"),
+    },
 ];
 
 // The pool a claimed shiny glint draws its reward from (source-exclusive — see town-shiny.js).
 export const GLINT_DECOS = DECORATIONS.filter((d) => d.source === "glint").map((d) => d.id);
+
+// ── WHAT A MEMBER MAY SEE ────────────────────────────────────────────────────────────────────────────────────
+// The catalog drawer shows EVERY decoration, owned or not, because seeing what you have not got yet is the
+// point of it. That is exactly wrong for something that is not released: it would put an unbuyable mythic in
+// front of everybody with no way to get it and no explanation.
+//
+// So the drawer reads THIS, not DECORATIONS. Anything `unreleased` is filtered out unless the member already
+// owns it — which keeps the owner (and any early tester granted one) able to see and place theirs while it is
+// invisible to everyone else. Grant paths are guarded separately by `source`; this is the display half, and the
+// two must both hold. See the memory note on ownerOnly content being simultaneously leaky and unobtainable.
+export const PUBLIC_DECORATIONS = (ownedIds = null) => {
+    const own = ownedIds instanceof Set ? ownedIds : new Set(ownedIds || []);
+    return DECORATIONS.filter((d) => !d.unreleased || own.has(d.id));
+};
+// One PLACED copy per farm, however many you somehow come to own.
+export const UNIQUE_DECOS = new Set(DECORATIONS.filter((d) => d.unique).map((d) => d.id));
 
 const BY_ID = new Map(DECORATIONS.map((d) => [d.id, d]));
 export const decorationById = (id) => BY_ID.get(id) || null;

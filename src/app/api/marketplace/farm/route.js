@@ -5,6 +5,7 @@ import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, reso
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState, setSpriteBrightness } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, saveDraftNote, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
+import { setStandPet, clearStandPet } from "@/lib/marketplace/petting-stand.js";
 import { getFarmBgState, startFarmBg, finalizeFarmBg, discardFarmBgDraft, equipFarmBg, unequipFarmBg, deleteFarmBg } from "@/lib/marketplace/farm-bg.js";
 import { plantSeed, harvestPlot, buyFertilizer, applyFertilizer, buyUpgrade, movePlot, applyRainBoost, getGarden } from "@/lib/marketplace/farm-crops.js";
 import { upgradePlotTrack } from "@/lib/marketplace/farm-plot-upgrades.js";
@@ -112,6 +113,10 @@ export async function POST(request) {
             else if (b?.action === "deco_custom_refine") res = await refineCustomDeco(buyer.id, Number(b?.id), String(b?.correction || ""));
             // Autosaved as the member types, so closing the panel never costs them the tweak they were writing.
             else if (b?.action === "deco_custom_note") res = await saveDraftNote(buyer.id, Number(b?.id), String(b?.note || ""));
+            // The Petting Stand's three tiers. Seating is guarded server-side on ownership of both the stand
+            // and the pet — see petting-stand.js.
+            else if (b?.action === "stand_seat") res = await setStandPet(buyer.id, b?.slot, String(b?.petId || ""));
+            else if (b?.action === "stand_clear") res = await clearStandPet(buyer.id, b?.slot);
             else if (b?.action === "deco_custom_finalize") { res = await finalizeCustomDeco(buyer.id, Number(b?.id), String(b?.chosenUrl || "")); if (res?.ok) res = { ...res, ...(await decoState(buyer.id)) }; }
             // ── Custom farm background LIBRARY (3 creations; live-preview draft → save; equip/switch/delete) ──
             else if (b?.action === "farm_bg_state") res = { ok: true, ...(await getFarmBgState(buyer.id)) };

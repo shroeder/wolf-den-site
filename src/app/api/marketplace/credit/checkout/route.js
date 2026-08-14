@@ -18,6 +18,10 @@ import {
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getEquippedIds } from "@/lib/marketplace/inventory.js";
 import { creditPurchaseBonus } from "@/lib/marketplace/signatures.js";
+import { packageById, packageSettingKey } from "@/lib/marketplace/packages.js";
+import { grantDecoration } from "@/lib/marketplace/farm-decorations.js";
+import { getSetting } from "@/lib/settings.js";
+import { isOwner } from "@/lib/marketplace/owner.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -49,7 +53,22 @@ export async function POST(request) {
             const sourceId = String(body?.sourceId || "").trim();
             if (!sourceId) return noStore({ error: "Missing payment source." }, { status: 400 });
 
-            const amountCents = Math.round(Number(body?.amountCents) || 0);
+            // ── A PACKAGE IS A CREDIT LOAD WITH SOMETHING ON TOP ──────────────────────────────────────────
+            // Same charge, same store credit, same idempotency — the only differences are a fixed price, a
+            // richer coin line, and an item granted on the paid transition. Routed through this endpoint on
+            // purpose: a second checkout would be a second place for a double-grant bug to live.
+            //
+            // OWNER-GATED UNTIL RELEASED. A package is invisible and unbuyable to members until its setting
+            // says otherwise, so it can be built and tested against real Square on the live site without
+            // anybody being able to buy it. The owner can always buy their own.
+            const pkg = body?.packageId ? packageById(String(body.packageId)) : null;
+            if (body?.packageId && !pkg) return noStore({ error: "Unknown package." }, { status: 400 });
+            if (pkg) {
+                const open = String(await getSetting(packageSettingKey(pkg.id), "off").catch(() => "off")) === "on";
+                if (!open && !isOwner(buyer.id)) return noStore({ error: "That package isn't available." }, { status: 403 });
+            }
+
+            const amountCents = pkg ? pkg.priceCents : Math.round(Number(body?.amountCents) || 0);
             if (!Number.isFinite(amountCents) || amountCents < MIN_CREDIT_CENTS || amountCents > MAX_CREDIT_CENTS) {
                 return noStore(
                     { error: `Choose an amount between $${(MIN_CREDIT_CENTS / 100).toFixed(0)} and $${(MAX_CREDIT_CENTS / 100).toFixed(0)}.` },
@@ -60,7 +79,10 @@ export async function POST(request) {
             const feeCents = feeForCents(amountCents);
             const chargedCents = amountCents + feeCents;
             // Equipped "credit" gear grants guaranteed, additive bonus coins on the buy — locked in at purchase.
-            const baseCoins = coinsForCents(amountCents);
+            // A package states its own coin figure — the whole pitch is that it beats the normal rate — and the
+            // equipped-gear credit bonus still rides on top, because a member who built for it should not be
+            // punished for buying the better offer.
+            const baseCoins = pkg ? pkg.coins : coinsForCents(amountCents);
             const creditBonus = creditPurchaseBonus(await getEquippedIds(buyer.id).catch(() => ({})));
             const coins = Math.round(baseCoins * (1 + creditBonus));
             const bonusCoins = coins - baseCoins;
@@ -124,6 +146,14 @@ export async function POST(request) {
                 }).catch(() => {});
                 // Grant any newly-earned store-credit badges from the higher lifetime total.
                 syncEarnedBadges(buyer.id).catch(() => {});
+                // THE PACKAGE ITEM, on the same paid transition that credited the money. `result.credited` is
+                // true only on the first pending→paid flip, so a retried or duplicated charge cannot hand out a
+                // second one — the same guard the coins and the credit already rely on. Awaited rather than
+                // fire-and-forget: on Vercel the response freezes the instance, and an un-awaited grant is how
+                // somebody pays and receives nothing.
+                if (pkg?.decoId) {
+                    await grantDecoration(buyer.id, pkg.decoId, 1, `package:${pkg.id}`).catch(() => {});
+                }
                 // ── NO CREATION TOKENS ON THIS PATH ──────────────────────────────────────────────────
                 // This used to mint one Creation token per full $5 loaded, and it was the single largest
                 // source of them in the game: $350 loaded produced 75 tokens, against 16 ever sold by the

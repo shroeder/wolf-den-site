@@ -18,6 +18,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { farmRatingBits, farmLoveBoard } from "@/lib/marketplace/farm-rating.js";
 import { decoState, getPlacements } from "@/lib/marketplace/farm-decorations.js";
+import { getStandState } from "@/lib/marketplace/petting-stand.js";
 import { farmBonuses } from "@/lib/marketplace/farm-bonus.js";
 import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
 import { getSetting } from "@/lib/settings.js";
@@ -470,6 +471,9 @@ export async function getFarm(ownerId, viewerId) {
         petGold: mine ? PET_PET_GOLD : PET_OTHER_GOLD,
         pets: mine ? pets : pets.map((p) => ({ ...p, petted: false })),
         placements, // decorations placed in this pasture (rendered for everyone)
+        // THE PETTING STAND, for the OWNER of this farm — so a visitor sees whose pets are on display and how
+        // rare each one is, which is the entire point of putting them there. Keyed off ownerId, never viewerId.
+        stand: await getStandState(ownerId).catch(() => ({ placed: false, slots: [] })),
         decorations, // your owned-decoration inventory + buffs (own farm only; null when visiting)
         crownCfg, // loot-pig crown placement
         neighbours, // own farm only: who you have not visited yet today (see farmNeighbours)
@@ -592,7 +596,16 @@ export async function petPet(petterId, petId, ownerId = null) {
     // The FARM OWNER's farm bonuses (decorations + their equipped gear farm affix + equipped pet's pet-bond
     // passive) boost the pet XP earned from petting on their farm.
     const ownerBuffs = await farmBonuses(petOwner).catch(() => null);
-    const petXpAmt = Math.round(PET_PET_XP * (1 + (ownerBuffs?.petXp || 0) / 100));
+    // ── ON THE PETTING STAND, A PETTING IS WORTH DOUBLE ──────────────────────────────────────────────────────
+    // This is the social half of the stand: putting a companion on display is how you tell visitors which one
+    // you want fussed over, and the doubling is what makes answering worth their tap. It applies to the OWNER
+    // petting their own too — the stand is a statement about that animal, not a tax on the person reading it.
+    //
+    // Multiplied on top of the farm's petXp buffs rather than folded into them, so a decorated farm and a
+    // stand stack the way anyone would expect them to.
+    const { isOnStand, STAND_PET_MULT } = await import("@/lib/marketplace/petting-stand.js");
+    const onStand = await isOnStand(petOwner, petId).catch(() => false);
+    const petXpAmt = Math.round(PET_PET_XP * (1 + (ownerBuffs?.petXp || 0) / 100) * (onStand ? STAND_PET_MULT : 1));
     let newXp = null;
     if (own) {
         // Your OWN pet: once/day/pet guard (spread the love). If already petted today, refund the slot.

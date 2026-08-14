@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { DECORATIONS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
+import { DECORATIONS, PUBLIC_DECORATIONS, UNIQUE_DECOS, decorationById, isDecoration, decorationBuffs, decoLight, DECO_RARITY, DECO_STATS, buffText } from "@/lib/marketplace/decorations.js";
 import { trophyMap } from "@/lib/marketplace/boss-trophy.js";
 import { listFinalCustomDecos, getCustomState } from "@/lib/marketplace/custom-deco.js";
 import { syncEarnedBadges, grantEventBadge } from "@/lib/marketplace/badges.js";
@@ -159,13 +159,17 @@ export async function decoState(buyerId) {
         spriteUrl: sprites[id] || cm.url || null, buff: null, buffText: null, owned: true, placed: placedCount[id] || 0, buyable: false, custom: true,
         copiedFrom: cm.creatorName || null, copiedFromAlias: cm.creatorAlias || null,
     }));
-    const catalog = [...customCatalog, ...DECORATIONS
+    // PUBLIC_DECORATIONS, not DECORATIONS: an unreleased piece is hidden from everybody who does not already
+    // own one, so the drawer cannot advertise something with no way to get it. Owners of a granted copy still
+    // see theirs, which is what makes the pre-launch test possible at all.
+    const catalog = [...customCatalog, ...PUBLIC_DECORATIONS(ownedSet)
         .map((d) => ({
             id: d.id, name: d.name, emoji: d.emoji, rarity: d.rarity, rarityColor: RANK[d.rarity]?.color,
             source: d.source, price: d.price || null, spriteUrl: sprites[d.id] || null,
             buff: d.buff || null, buffText: d.buff ? buffText(d.buff) : null,
             owned: ownedSet.has(d.id), placed: placedCount[d.id] || 0,
             buyable: ["shop", "special"].includes(d.source) && Boolean(d.price),
+            unique: Boolean(d.unique), pets: d.pets || 0,
         }))]
         .sort((a, b) => {
             if (a.owned !== b.owned) return a.owned ? -1 : 1; // owned (placeable) first
@@ -190,6 +194,17 @@ export async function placeDecoration(buyerId, decoId, x, y, view = "outside") {
     if (!owned) return { ok: false, error: "not_owned" };
     const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
     if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
+    // ── ONE TO A FARM ────────────────────────────────────────────────────────────────────────────────────
+    // The Petting Stand holds three pets and doubles what they earn from being petted; two of them would be
+    // six pets and a second helping of the whole feature. Enforced on the SERVER because the placement is a
+    // POST body, and checked against PLACEMENTS rather than owned qty — owning two is harmless, standing two
+    // in the same field is not.
+    if (UNIQUE_DECOS.has(decoId)) {
+        const already = await db.queryOne(
+            `SELECT 1 FROM mkt_deco_placement WHERE buyer_id = $1 AND deco_id = $2 LIMIT 1`, [buyerId, decoId]
+        ).catch(() => null);
+        if (already) return { ok: false, error: "already_placed", ...(await decoState(buyerId)) };
+    }
     const topZ = await db.queryOne(`SELECT COALESCE(MAX(z), 0) AS z FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ z: 0 }));
     await db.query(`INSERT INTO mkt_deco_placement (buyer_id, deco_id, x, y, z, view) VALUES ($1, $2, $3, $4, $5, $6)`, [buyerId, decoId, px, py, (topZ?.z || 0) + 1, vw]).catch(() => {});
     await trackActivity(buyerId, "place_deco", { decoId }).catch(() => {});

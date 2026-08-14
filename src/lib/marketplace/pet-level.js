@@ -115,11 +115,20 @@ export function levelsFromXpMap(xpMap = {}) {
 // Add a FLAT amount of XP to the member's equipped pet (capped). Returns { ok, petId, xp, level, leveled }
 // or { ok: false }. Used by pet-feed consumables (full amount) and, via creditEquippedPetXp, the XP share.
 export async function addEquippedPetXp(buyerId, amount) {
-    let add = Math.round(Number(amount) || 0);
-    if (!buyerId || add <= 0) return { ok: false };
+    if (!buyerId) return { ok: false };
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
     const petId = buyer?.featured_collectible;
     if (!petId) return { ok: false, error: "no_pet_equipped" };
+    return addPetXpById(buyerId, petId, amount);
+}
+
+// The same grant against a NAMED pet rather than whichever is equipped. Extracted so the Petting Stand can
+// credit the three animals standing on it through the identical path — the cap, the Pet Bond attunement and
+// the level-up detection are the parts that must not be reimplemented, because a second copy of them is how a
+// stand pet would quietly level on different rules from an equipped one.
+export async function addPetXpById(buyerId, petId, amount) {
+    let add = Math.round(Number(amount) || 0);
+    if (!buyerId || !petId || add <= 0) return { ok: false };
     // Pet Bond forge attunement on equipped gear boosts ALL pet XP gains.
     const petBond = (await getEquippedUtilTotals(buyerId).catch(() => ({ petXp: 0 }))).petXp || 0;
     if (petBond > 0) add = Math.round(add * (1 + petBond / 100));
@@ -222,6 +231,16 @@ export async function creditEquippedPetXp(buyerId, memberXp) {
     const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE * (vigil ? 3 : 1));
     if (share <= 0) return;
     await addEquippedPetXp(buyerId, share).catch(() => {});
+    // ── AND THE PETTING STAND ────────────────────────────────────────────────────────────────────────────
+    // Pets on the stand take the SAME share, not a fraction of it — the package says "passive XP just like
+    // your equipped pet" and a discount here would make that a half-truth. It is the paid feature, and it is
+    // deliberately the largest thing $5 buys: a full stand is four pets levelling instead of one.
+    //
+    // Gated on the stand being PLACED (standPetIds returns [] otherwise), so this costs one indexed lookup
+    // for the overwhelming majority of members who do not own one.
+    const { standPetIds } = await import("@/lib/marketplace/petting-stand.js");
+    const ids = await standPetIds(buyerId).catch(() => []);
+    for (const petId of ids) await addPetXpById(buyerId, petId, share).catch(() => {});
 }
 
 // Lazy time-trickle for the equipped pet: add PET_TRICKLE_PER_DAY worth of XP for the time elapsed since the
@@ -230,8 +249,15 @@ export async function creditEquippedPetXp(buyerId, memberXp) {
 export async function accrueEquippedPetTrickle(buyerId) {
     if (!buyerId) return;
     const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const petId = buyer?.featured_collectible;
-    if (!petId) return;
+    if (buyer?.featured_collectible) await accruePetTrickle(buyerId, buyer.featured_collectible);
+    // Each pet on the Petting Stand runs its own clock off its own mkt_pet_level.last_tick_at, which is why the
+    // stand needed no timestamp of its own. Reseating one restarts only that pet's clock.
+    const { standPetIds } = await import("@/lib/marketplace/petting-stand.js");
+    for (const id of await standPetIds(buyerId).catch(() => [])) await accruePetTrickle(buyerId, id).catch(() => {});
+}
+
+async function accruePetTrickle(buyerId, petId) {
+    if (!buyerId || !petId) return;
     const maxXp = petMaxXp(rarityOf(petId));
     const row = await db.queryOne(`SELECT xp, last_tick_at FROM mkt_pet_level WHERE buyer_id = $1 AND pet_id = $2`, [buyerId, petId]).catch(() => null);
     if (!row) {
