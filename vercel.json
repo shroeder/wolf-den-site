@@ -126,10 +126,6 @@
         {
             "path": "/api/jobs/prune-app-releases",
             "schedule": "20 8 * * *"
-        },
-        {
-            "path": "/api/jobs/trade-square-match",
-            "schedule": "15,45 * * * *"
         }
     ]
 }

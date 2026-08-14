@@ -538,6 +538,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [boardAll, setBoardAll] = useState(false);
     const [upgFlash, setUpgFlash] = useState(null);
     const prev = useRef({ hp: null, foeHp: null, round: null });
+    // How much of the log has already been turned into floating numbers. Without this the screen only ever
+    // showed the LAST line of an exchange — see the effect that reads it.
+    const lastLogSeen = useRef(0);
     const resultAtRef = useRef(0);
     const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
@@ -747,7 +750,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             Sfx.hurt(w);
             Haptic.hurt(w);
             duck(0.35, 0.2);
-        } else if (p.foeHp != null && bout.foeHp < p.foeHp) {
+        }
+        // ⚠️ NOT `else if`. Both bars can move in one exchange — you land a blow and their swing, their
+        // riposte or a burn takes some of yours back. Chained, the blow you LANDED was silently dropped
+        // whenever anything hit you in the same beat: no shake, no impact sound, nothing.
+        if (p.foeHp != null && bout.foeHp < p.foeHp) {
             // YOU LANDED IT.
             const w = Math.min(1, (p.foeHp - bout.foeHp) / Math.max(1, bout.foeMaxHp * 0.22));
             setHitSide("them");
@@ -945,64 +952,79 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // amount is a number too: "you turned aside 9" was buried in grey log text under the buttons, so the one
     // thing your defensive choices actually bought you was the one thing never shown on the field.
     useEffect(() => {
-        const l = bout?.log?.length ? bout.log[bout.log.length - 1] : null;
-        if (!l) return undefined;
+        // ── EVERY LINE THAT ARRIVED, NOT JUST THE LAST ONE ──────────────────────────────────────────────
+        // This read bout.log[length - 1] and nothing else. One exchange writes SEVERAL lines — your swing,
+        // their swing, a riposte, a burn ticking — so whichever landed last was the only one that ever put a
+        // number on screen. While a burn was on you that was the burn, every single beat: you would hit them,
+        // watch their bar drop, and see no number, no shake and hear no impact.
+        // Luke: "I hit him and it doesnt show the hit on him like no damage numbers at all and I burn and
+        // take damage."
+        const len = bout?.log?.length || 0;
+        if (!len) return undefined;
+        const from = Math.min(lastLogSeen.current || 0, len);
+        const fresh = len > from ? bout.log.slice(from) : [bout.log[len - 1]];
+        lastLogSeen.current = len;
         const pops = [];
-        const target = l.who === "you" ? "right" : "left";
-        // ── ONE NUMBER PER BLOW ──────────────────────────────────────────────────────────────────────────
-        // A three-hit flurry used to arrive as a single accumulated number, so the one thing that makes it a
-        // flurry — that it is THREE — was invisible, and Rampage looked exactly like a big swing with a
-        // different sprite. `each` is the per-blow breakdown from the engine; every entry gets its own float,
-        // staggered so they read as a sequence rather than a pile, and a missed blow says MISS in its place.
-        const each = Array.isArray(l.each) ? l.each : null;
-        if (each && each.length > 1) {
-            each.forEach((n, i) => {
-                pops.push({
-                    side: target,
-                    n: n > 0 ? n : null,
-                    text: n > 0 ? null : "MISS",
-                    kind: n > 0 ? (l.crit ? "crit" : "dmg") : "miss",
-                    at: i * 170,
+        fresh.forEach((l, li) => {
+            const sub = [];
+            const target = l.who === "you" ? "right" : "left";
+            // ── ONE NUMBER PER BLOW ──────────────────────────────────────────────────────────────────────────
+            // A three-hit flurry used to arrive as a single accumulated number, so the one thing that makes it a
+            // flurry — that it is THREE — was invisible, and Rampage looked exactly like a big swing with a
+            // different sprite. `each` is the per-blow breakdown from the engine; every entry gets its own float,
+            // staggered so they read as a sequence rather than a pile, and a missed blow says MISS in its place.
+            const each = Array.isArray(l.each) ? l.each : null;
+            if (each && each.length > 1) {
+                each.forEach((n, i) => {
+                    sub.push({
+                        side: target,
+                        n: n > 0 ? n : null,
+                        text: n > 0 ? null : "MISS",
+                        kind: n > 0 ? (l.crit ? "crit" : "dmg") : "miss",
+                        at: i * 170,
+                    });
                 });
-            });
-        } else if (l.damage > 0) {
-            // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
-            pops.push({ side: target, n: l.damage, kind: l.crit ? "crit" : "dmg" });
-        } else if (l.grade === "miss") {
-            pops.push({ side: target, n: null, text: "MISS", kind: "miss" });
-        }
-        // ── AND THEY BELONG TO WHOEVER EARNED THEM ──────────────────────────────────────────────────────
-        // All three of these were pinned to "left", which is YOU. Damage was already handled correctly, so a
-        // blow you took floated over you and a blow you landed floated over them — but a heal, a block and a
-        // ward always floated over you no matter who did it. So the opponent drinking a poultice put a big
-        // green +N over YOUR hero, and the opponent bracing looked like you had been handed a shield. The
-        // engine was right about all of it; only the side was wrong.
-        const mine = l.who === "you";
-        const ownSide = mine ? "left" : "right";
-        if (l.blocked > 0) pops.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
-        if (l.healed > 0) pops.push({ side: ownSide, n: l.healed, kind: "heal" });
-        // Lifesteal off thorns and ripostes lands on THEIR log line (it happens during their swing), so it
-        // floats over whoever drank it rather than over the fighter whose line it is written on.
-        // ALWAYS YOURS. `stolen` is only ever written on the opponent's swing line (it is your lifesteal off
-        // thorns and ripostes, which happen during their beat), so keying it to whose line it is put your own
-        // drink over THEIR head every single time — the exact mistake the comment above it warns against.
-        if (l.stolen > 0) pops.push({ side: "left", n: l.stolen, kind: "heal", at: 240 });
-        if (l.soaked > 0) pops.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
-        // A BRACE IS A SHIELD NOW, on both sides of the ring, so it floats the same green number your own
-        // Guard does — `soaked`, handled one line up. `bracedPct` is gone with the flat reduction it named.
-        // A DEFENDER'S THORNS COME OFF YOU. It is their number, but it lands on your health, so it floats over
-        // you — the same rule as any other blow: the pop goes where the damage went.
-        if (l.theirThorns > 0) pops.push({ side: "left", n: l.theirThorns, kind: "thorn", at: 220 });
-        // What their banked guard ate — over THEM, because it is their shield doing it.
-        if (l.theirSoak > 0) pops.push({ side: "right", n: l.theirSoak, kind: "ward", at: 40 });
-        // ── WHAT YOU SENT BACK ── over THEM, because it is damage you dealt. A shield build's whole offence
-        // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
-        // said why. Staggered after the incoming hit so the two do not land on the same frame.
-        if (l.thorned > 0) pops.push({ side: "right", n: l.thorned, kind: "thorn", at: 200 });
-        // ── AND WHAT THEY SENT BACK ── their riposte lands on YOU, so it floats over you. Same rule again:
-        // the pop goes where the damage went, not to whoever owns the move.
-        if (l.takenBack > 0) pops.push({ side: "left", n: l.takenBack, kind: "thorn", at: 280 });
-        if (l.riposted > 0) pops.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
+            } else if (l.damage > 0) {
+                // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
+                sub.push({ side: target, n: l.damage, kind: l.crit ? "crit" : "dmg" });
+            } else if (l.grade === "miss") {
+                sub.push({ side: target, n: null, text: "MISS", kind: "miss" });
+            }
+            // ── AND THEY BELONG TO WHOEVER EARNED THEM ──────────────────────────────────────────────────────
+            // All three of these were pinned to "left", which is YOU. Damage was already handled correctly, so a
+            // blow you took floated over you and a blow you landed floated over them — but a heal, a block and a
+            // ward always floated over you no matter who did it. So the opponent drinking a poultice put a big
+            // green +N over YOUR hero, and the opponent bracing looked like you had been handed a shield. The
+            // engine was right about all of it; only the side was wrong.
+            const mine = l.who === "you";
+            const ownSide = mine ? "left" : "right";
+            if (l.blocked > 0) sub.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
+            if (l.healed > 0) sub.push({ side: ownSide, n: l.healed, kind: "heal" });
+            // Lifesteal off thorns and ripostes lands on THEIR log line (it happens during their swing), so it
+            // floats over whoever drank it rather than over the fighter whose line it is written on.
+            // ALWAYS YOURS. `stolen` is only ever written on the opponent's swing line (it is your lifesteal off
+            // thorns and ripostes, which happen during their beat), so keying it to whose line it is put your own
+            // drink over THEIR head every single time — the exact mistake the comment above it warns against.
+            if (l.stolen > 0) sub.push({ side: "left", n: l.stolen, kind: "heal", at: 240 });
+            if (l.soaked > 0) sub.push({ side: ownSide, n: l.soaked, kind: "ward", at: 60 });
+            // A BRACE IS A SHIELD NOW, on both sides of the ring, so it floats the same green number your own
+            // Guard does — `soaked`, handled one line up. `bracedPct` is gone with the flat reduction it named.
+            // A DEFENDER'S THORNS COME OFF YOU. It is their number, but it lands on your health, so it floats over
+            // you — the same rule as any other blow: the pop goes where the damage went.
+            if (l.theirThorns > 0) sub.push({ side: "left", n: l.theirThorns, kind: "thorn", at: 220 });
+            // What their banked guard ate — over THEM, because it is their shield doing it.
+            if (l.theirSoak > 0) sub.push({ side: "right", n: l.theirSoak, kind: "ward", at: 40 });
+            // ── WHAT YOU SENT BACK ── over THEM, because it is damage you dealt. A shield build's whole offence
+            // is thorns and riposte, and neither has ever put a number on the screen: the bar moved and nothing
+            // said why. Staggered after the incoming hit so the two do not land on the same frame.
+            if (l.thorned > 0) sub.push({ side: "right", n: l.thorned, kind: "thorn", at: 200 });
+            // ── AND WHAT THEY SENT BACK ── their riposte lands on YOU, so it floats over you. Same rule again:
+            // the pop goes where the damage went, not to whoever owns the move.
+            if (l.takenBack > 0) sub.push({ side: "left", n: l.takenBack, kind: "thorn", at: 280 });
+            if (l.riposted > 0) sub.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
+            // Each line's numbers come after the previous line's, so an exchange reads as a sequence.
+            for (const item of sub) pops.push({ ...item, at: (item.at || 0) + li * 150 });
+        });
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
         // Outlives the animation (2.1s, crit 2.4s) rather than cutting it off — unmounting at 1000ms is what
