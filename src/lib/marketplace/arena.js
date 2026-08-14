@@ -438,9 +438,26 @@ async function purserBits(buyerId) {
     return { doubloons: Number(sail?.d) || 0, rate: PURSER_RATE, max: PURSER_MAX };
 }
 
-export async function getArenaState(buyerId) {
+// ── WHY THIS TAKES PRE-COMPUTED PIECES ───────────────────────────────────────────────────────────────────────
+// Almost every arena action ends with `return { ok: true, ...(await getArenaState(buyerId)) }`, which is the
+// right shape — the caller gets the whole refreshed screen back. It also means an action that ALREADY built the
+// board and the kit to do its work then builds both again to answer.
+//
+// startBout was the worst of them: standings() is three queries over every member with XP (90 of them, ~390ms
+// measured against prod) and kitFor assembles a loadout from gear, sets, the compendium, forge levels, sockets,
+// pets and badges. Both ran twice per press. That is where "I click Find a fight and it just times out" was
+// coming from — not a hang, a request doing double the work it needed to on a cold function.
+//
+// `pre` lets a caller hand over what it has already computed. Deliberately not a cache: a TTL here would risk
+// serving a stale kit to somebody who just changed gear and pressed Fight, which is a far worse bug than a slow
+// button. Same request, same values, no staleness possible.
+export async function getArenaState(buyerId, pre = {}) {
     const row = await arenaRow(buyerId);
-    const [me, board, kit] = await Promise.all([arenaPower(buyerId), standings(), kitFor(buyerId)]);
+    const [me, board, kit] = await Promise.all([
+        pre.me ?? arenaPower(buyerId),
+        pre.board ?? standings(),
+        pre.kit ?? kitFor(buyerId),
+    ]);
     const used = fightsUsed(row);
     // The Stamina upgrade track buys extra challenges a day.
     const dailyFights = dailyFightsFor(row);
@@ -1009,6 +1026,8 @@ export async function startTownBout(buyerId, eventId, enemyId) {
         extra: { town: { eventId: Number(eventId), enemyId: Number(enemyId) }, townEdge: TOWN_EDGE },
     });
     await saveBout(buyerId, b);
+    // Hands back the board and kit it already built rather than making getArenaState rebuild both — see the
+    // note on its `pre` parameter. This is the press that was timing out.
     // THE WHOLE STATE, not just the bout — which is what every other action in this file returns, and what the
     // fight renderer actually needs. It draws your own fighter from `me` (sprite, element, the card), so a
     // response carrying only `bout` could not mount it, and the town had to bounce the player to
@@ -1038,8 +1057,9 @@ export async function startBout(buyerId, targetId = null) {
         return { ok: false, error: "no_fights", ...(await getArenaState(buyerId)) };
     }
 
-    const board = await standings();
-    const me = await kitFor(buyerId);
+    // In parallel: they share no inputs, and serialising them added a whole round trip to the press that was
+    // timing out. ~390ms and ~a loadout assembly, previously one after the other for no reason.
+    const [board, me] = await Promise.all([standings(), kitFor(buyerId)]);
     const myPower = arenaRating(me);
 
     // ── WHO ARE WE FIGHTING ──────────────────────────────────────────────────────────────────────────────
@@ -1050,7 +1070,7 @@ export async function startBout(buyerId, targetId = null) {
     let target = targetId;
     if (!target || target === "auto") {
         const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0);
-        if (!m) return { ok: false, error: "no_target", ...(await getArenaState(buyerId)) };
+        if (!m) return { ok: false, error: "no_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         target = m.kind === "npc" ? `npc:${m.tier}` : m.id;
     }
     const npcTier = typeof target === "string" && target.startsWith("npc:") ? Number(target.slice(4)) : 0;
@@ -1062,15 +1082,15 @@ export async function startBout(buyerId, targetId = null) {
     let foe = null;
     let foeKit = null;
     if (rung > 0) {
-        if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+        if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         const beaten = new Set(row?.ladder_beaten || []);
-        if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId)) };
+        if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId, { board, kit: me })) };
         // ── IN ORDER, AND ENFORCED HERE ──────────────────────────────────────────────────────────────────
         // Refused on the SERVER, not merely greyed out on the screen: the target is a string in a POST body,
         // and `ladder:100` is as easy to send as `ladder:3`. The screen locks the same rungs (see the
         // `locked` flag in getArenaState) off this identical rule, so the two cannot drift.
         if (rung !== nextRung(beaten)) {
-            return { ok: false, error: "locked", ...(await getArenaState(buyerId)) };
+            return { ok: false, error: "locked", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
         const f = ladderFoe(rung);
         foe = f;
@@ -1084,7 +1104,7 @@ export async function startBout(buyerId, targetId = null) {
         // tier 900 for points on day one.
         const bestTier = Number(row?.npc_best) || 0;
         if (!Number.isFinite(npcTier) || npcTier < 1 || npcTier > bestTier + NPC_REACH) {
-            return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+            return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
         const n = npcFor(npcTier);
         foe = n;
@@ -1094,7 +1114,7 @@ export async function startBout(buyerId, targetId = null) {
         foeKit = { ...n, ...ringStats(n), abilities: npcAbilities(npcTier) };
     } else {
         foe = board.find((o) => o.id === target);
-        if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId)) };
+        if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         foeKit = await kitFor(foe.id);
     }
 
@@ -1126,7 +1146,7 @@ export async function startBout(buyerId, targetId = null) {
         [buyerId, JSON.stringify(bout), rung > 0]
     ).catch(() => {});
     await trackActivity(buyerId, "arena_start", { target: foe.id, npcTier: npcTier || null, theirPower: bout.theirPower }).catch(() => {});
-    return { ok: true, ...(await getArenaState(buyerId)) };
+    return { ok: true, ...(await getArenaState(buyerId, { board, kit: me })) };
 }
 
 /** One exchange. Your stance against theirs, resolved on the server so the pick can't be read or replayed. */
