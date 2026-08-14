@@ -197,7 +197,11 @@ const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$
 //
 // `line` is the whole thing said as one sentence — used in the compact rail and the tooltip, where a headline
 // and a sub would be two things to read instead of one.
-function effectOf(kind, power, element, hits = 1) {
+// Exported so the CLASS TREE can describe its actives with the same words the gear cards use. A tree node
+// carries a short authored line ("You keep half of what it takes off them") which says the flavour and not the
+// numbers — no damage, no share, nothing you could weigh a point against. Rather than write those numbers a
+// second time into every node, the tree runs the ability through this.
+export function effectOf(kind, power, element, hits = 1) {
     const el = element ? ELEMENTS[element]?.label || element : null;
     switch (kind) {
         case "strike":

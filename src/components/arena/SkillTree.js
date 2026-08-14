@@ -70,6 +70,23 @@ function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, onTake, 
             </div>
             <p className="skt-detail-desc">{n.desc}</p>
 
+            {/* ── WHAT IT ACTUALLY DOES ────────────────────────────────────────────────────────────────
+                A passive shows "now 3% → next 4.5%" below; an active showed nothing but its flavour line,
+                so Tithe read "You keep half of what it takes off them" — half of what, at what cost, how
+                often? These are the node's own numbers, run through the same builder that writes the gear
+                ability cards, so the tree and the ring cannot describe one move two ways.
+                The accuracy cost is stated because it is the price of the big ones and is invisible
+                otherwise: the strongest actives are also the easiest to miss with. */}
+            {n.kind === "active" && n.effect ? (
+                <>
+                    <p className="skt-detail-eff">{n.effect.line}</p>
+                    <div className="skt-detail-facts">
+                        {n.cd ? <span className="skt-fact">Cools {n.cd} turns</span> : null}
+                        {n.acc ? <span className="skt-fact is-cost">{`−${Math.abs(Math.round(n.acc * 100))}% accuracy`}</span> : null}
+                    </div>
+                </>
+            ) : null}
+
             {n.kind === "passive" && n.rank > 0 ? (
                 <p className="skt-detail-now">
                     now <b>{fmt(n)}</b>
@@ -429,6 +446,11 @@ function Styles() {
                 font-size: 15px; line-height: 1; color: #9aa2ab; background: rgba(255,255,255,.06);
                 border: 1px solid rgba(255,255,255,.12); }
             .skt-detail-desc { margin: 0; font-size: 12px; line-height: 1.5; color: #b6bec7; }
+            .skt-detail-eff { margin: 7px 0 0; font-size: 12.5px; line-height: 1.45; font-weight: 800; color: #e8eef5; }
+            .skt-detail-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+            .skt-fact { font-size: 10.5px; font-weight: 800; letter-spacing: .2px; padding: 3px 8px; border-radius: 999px;
+                color: #9fd0f5; background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.28); }
+            .skt-fact.is-cost { color: #ffb4a2; background: rgba(255,122,107,0.12); border-color: rgba(255,122,107,0.30); }
             .skt-detail-now { margin: 0; font-size: 11.5px; color: #9aa2ab; }
             .skt-detail-now b { color: color-mix(in srgb, var(--c) 70%, white); }
             .skt-detail-now em { font-style: normal; color: #7f8790; }

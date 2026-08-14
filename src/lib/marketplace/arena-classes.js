@@ -302,6 +302,8 @@ export const TREES = {
 export const treeFor = (classId) => TREES[classId] || [];
 export const nodeById = (classId, nodeId) => treeFor(classId).find((n) => n.id === nodeId) || null;
 
+import { effectOf } from "@/lib/marketplace/arena-kit.js";
+
 /** Total points sunk into a tree. `taken` is { nodeId: ranks }. */
 export const pointsSpent = (taken = {}) => Object.values(taken).reduce((n, v) => n + (Number(v) || 0), 0);
 
@@ -326,6 +328,11 @@ export function treeState(classId, taken = {}, pointsAvailable = 0) {
             // What it is doing for you right now, and what one more point would do.
             valueNow: n.kind === "passive" ? Math.round((n.per || 0) * rank * 1000) / 1000 : null,
             valueNext: n.kind === "passive" ? Math.round((n.per || 0) * (rank + 1) * 1000) / 1000 : null,
+            // ── AND WHAT AN ACTIVE ACTUALLY DOES ──────────────────────────────────────────────────────
+            // A passive gets "now 3% → next 4.5%"; an active got only its flavour line, so Tithe read as
+            // "You keep half of what it takes off them" — half of WHAT, at what cost, how often? The same
+            // builder the gear ability cards use answers all of it, from the node's own numbers.
+            effect: n.kind === "active" ? effectOf(n.ability, n.power || 1, null, n.hits || 1) : null,
         };
     });
 }
