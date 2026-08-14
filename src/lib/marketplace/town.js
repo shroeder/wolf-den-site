@@ -26,7 +26,6 @@ import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
-import { PACKAGES, packageSettingKey } from "@/lib/marketplace/packages.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -450,12 +449,13 @@ export async function getTownState(buyerId) {
         // Owner-preview packages are deliberately EXCLUDED: the plaza is the most public surface in the game
         // and an unreleased item must not advertise itself there even to the owner, or the one place the gate
         // is easiest to forget is the one place everybody looks.
+        // The Vault flies a sign when something is for sale. The owner sees an unreleased one too, labelled
+        // as a preview by `ownerPreview` — building the advertising and never being able to look at it in
+        // place is how you ship a banner nobody checked.
         vaultOffer: await (async () => {
-            for (const p of PACKAGES) {
-                const open = String(await getSetting(packageSettingKey(p.id), "off").catch(() => "off")) === "on";
-                if (open) return { id: p.id, name: p.name, priceCents: p.priceCents };
-            }
-            return null;
+            const { featuredPackage } = await import("@/lib/marketplace/packages-server.js");
+            const p = await featuredPackage(buyerId).catch(() => null);
+            return p ? { id: p.id, name: p.name, priceCents: p.priceCents, ownerPreview: p.ownerPreview } : null;
         })(),
         // ── EVERY RAID THERE IS, NOT THE THREE SOMEBODY TYPED OUT ────────────────────────────────────────
         // The spawn buttons were three hard-coded kinds while TOWN_EVENT_TYPES held six. Frost Pack, the

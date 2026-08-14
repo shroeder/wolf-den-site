@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import FarmClient from "@/components/FarmClient";
+import { featuredPackage } from "@/lib/marketplace/packages-server.js";
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { getFarm, resolveFarmOwner } from "@/lib/marketplace/farm.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
@@ -25,6 +26,13 @@ export default async function FarmPage({ searchParams }) {
     // Owner-debug flag (powers the "Test critter" button) — the GET route sets this, but the initial page render
     // must too, since the client doesn't re-fetch the full farm on mount.
     farm.ownerDebug = !u && isOwner(buyer.id);
+    // ── THE OFFER, WHERE THE INTENT IS ───────────────────────────────────────────────────────────────────────
+    // The Petting Stand is a FARM decoration, so the farm is where somebody is most likely to want one — they
+    // are already arranging the thing it goes in. Own farm only: an advertisement on somebody else's pasture is
+    // an advertisement in a place you are visiting as a guest.
+    //
+    // Null for everybody while a package is unreleased; the owner gets a labelled preview. See packages-server.
+    farm.packageOffer = !u ? await featuredPackage(buyer.id, { withArt: true }).catch(() => null) : null;
 
     // ── THE KEY IS LOAD-BEARING ──────────────────────────────────────────────────────────────────────────────
     // FarmClient seeds ALL of its state from `initial` with useState, and a <Link> from one farm to another is

@@ -15,6 +15,7 @@ import CollectionPanel from "@/components/CollectionPanel";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
 import PettingStand from "@/components/PettingStand";
+import PackageBanner from "@/components/PackageBanner";
 import { STAND_DECO_ID } from "@/lib/marketplace/petting-stand-const";
 import { CreationShareHub } from "@/components/CreationShare";
 import { collectibleById, petPassive, PET_STAT_META } from "@/lib/marketplace/collectibles";
@@ -1415,6 +1416,10 @@ export default function FarmClient({ initial, viewingAlias }) {
                 </div>
             ) : null}
 
+
+            {/* The package, advertised where somebody is already arranging their farm. Renders nothing at all
+                when there is no visible offer — which is everybody, until one goes live. */}
+            {farm.mine && farm.packageOffer ? <PackageBanner offer={farm.packageOffer} /> : null}
 
             {/* Decorate DOCK: bottom tray you drag decorations out of, onto the (still-visible) farm scene. */}
             {decorating && canDecorate && farm.mine && farm.decorations ? (

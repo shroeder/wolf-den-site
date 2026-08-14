@@ -10812,6 +10812,49 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-chip.is-featured { border-color: rgba(255,215,94,0.7); box-shadow: 0 0 0 1px rgba(255,215,94,0.5) inset, 0 4px 16px rgba(240,160,40,0.3); padding-top: 20px; }
 .credit-chip-flag { position: absolute; top: 0; left: 0; right: 0; padding: 2px 0; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em;
     color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffbf3c); border-radius: 13px 13px 0 0; }
+/* ── THE PACKAGE BANNER ───────────────────────────────────────────────────────────────────────────────────
+   The offer where members actually are, rather than at the till. Deliberately a strip and not a second copy of
+   the card: the item working, the name, the three numbers, a price, done. Tapping goes to the real card. */
+.pkgb { display: flex; align-items: center; gap: 12px; padding: 12px 13px; margin: 0 0 12px; border-radius: 18px;
+    text-decoration: none; color: #f0e6d2;
+    background:
+        radial-gradient(110% 130% at 88% 0%, rgba(214,160,255,0.22), transparent 62%),
+        linear-gradient(180deg, #241b31, #15111e);
+    border: 1px solid rgba(214,160,255,0.48);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.42);
+    transition: transform .12s ease, box-shadow .12s ease; }
+.pkgb:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(140,80,200,0.34); }
+.pkgb-art { position: relative; flex: 0 0 auto; display: grid; place-items: center; }
+.pkgb-glow { position: absolute; width: 130%; height: 130%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(214,160,255,0.30) 0%, rgba(214,160,255,0.08) 46%, transparent 70%);
+    animation: pkgbPulse 3.2s ease-in-out infinite; }
+@keyframes pkgbPulse { 0%,100% { transform: scale(0.92); opacity: .7; } 50% { transform: scale(1.06); opacity: 1; } }
+.pkgb-stand { position: relative; }
+.pkgb-deco { display: block; width: 100%; height: 100%; object-fit: contain;
+    filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); }
+.pkgb-pet { position: absolute; object-fit: contain; transform: translate(-50%, -100%);
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
+.pkgb-body { min-width: 0; flex: 1 1 auto; }
+.pkgb-kick, .pkgb-preview { display: inline-flex; align-items: center; gap: 4px; font-size: .6rem; font-weight: 900;
+    letter-spacing: .14em; text-transform: uppercase; color: #d6a0ff; }
+.pkgb-preview { color: #ffb347; }
+.pkgb-body b { display: block; font-size: 1.02rem; line-height: 1.15; color: #fff4dc; }
+.pkgb-body em { display: block; margin-top: 2px; font-style: normal; font-size: .74rem; line-height: 1.35;
+    color: #bfb0cd; }
+.pkgb-gets { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+.pkgb-gets i { font-style: normal; font-size: .68rem; color: #cbbcda; }
+.pkgb-gets i b { display: inline; font-size: .76rem; color: #ffd75e; }
+.pkgb-cta { flex: 0 0 auto; display: grid; justify-items: center; gap: 1px; padding: 8px 12px; border-radius: 12px;
+    background: linear-gradient(180deg, #e9c2ff, #b06bf0); color: #2a0f45; }
+.pkgb-cta b { font-size: 1.02rem; font-weight: 900; }
+.pkgb-cta i { font-style: normal; font-size: .62rem; font-weight: 800; }
+@media (max-width: 430px) {
+    .pkgb { gap: 9px; padding: 10px; }
+    .pkgb-body em { display: none; }
+    .pkgb-cta { padding: 7px 9px; }
+    .pkgb-cta b { font-size: .92rem; }
+}
+
 /* ── THE PACKAGE CARD ─────────────────────────────────────────────────────────────────────────────────────
    Built as an advertisement: the item drawn working, the numbers in large type, three lines on what it does.
    pkgc- prefixed so nothing here can collide with the plain credit chips below. */
