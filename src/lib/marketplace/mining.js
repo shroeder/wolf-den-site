@@ -756,7 +756,7 @@ export const SMELT_TRACKS = {
     bellows: { max: 10, per: 0.03, cap: 0.30, kind: "pct", name: "Bellows", icon: "/images/mining/track-bellows.png", col: "bellows_level",
         desc: "A hotter burn sometimes yields an extra part.", effect: "Bonus part chance" },
     crucible: { max: 10, per: 1, cap: 10, kind: "count", name: "Crucible", icon: "/images/mining/track-crucible.png", col: "crucible_level",
-        desc: "A bigger pot needs less ore for the same part — and once it's deep enough, some ore survives the melt.", effect: "Ore per part" },
+        desc: "A bigger pot needs less ore for the same part — and once it's deep enough, it sometimes runs over.", effect: "Ore per part" },
     flux: { max: 10, per: 0.02, cap: 0.20, kind: "pct", name: "Flux", icon: "/images/mining/track-flux.png", col: "flux_level",
         desc: "A purer melt sometimes lifts a part a whole tier.", effect: "Tier-up chance" },
 };
@@ -775,22 +775,21 @@ export const smeltCostFor = (crucibleLevel = 0, free = false) =>
 //   "Level 8 brought me to a 1 to 1, level 9 didn't change that, and I'm wondering if there's a point to max out
 //    the skill or if I'll be wasting my gold getting it to 10/10 for it to have stayed a 1/1 ratio?"
 //
-// He was right, and the fix is to make the top of the track worth reaching rather than to stop selling it. An
-// integer ratio cannot go below 1, so the last two levels move the AVERAGE instead: the pot is deep enough that
-// some ore survives the melt and comes back. That is the same promise the track has always made — "a bigger pot
-// needs less ore for the same part" — carried past the point where whole numbers can express it.
+// THE OVERFLOW, AND WHY IT IS NOT AN ORE REFUND. The first cut of this gave ore back — the melt sparing some of
+// what you fed it — and it was wrong three ways. It was rolled PER BATCH, so a ten-batch pour fired it ten times
+// and the payoff became a drip you stop reading. It walked the effective cost toward zero, which is a smelt that
+// increasingly pays for itself. And "you got some of your ore back" is a rebate, not a reward: nothing new comes
+// out of the pot, so there is no moment in it.
 //
-// BACK-LOADED ON PURPOSE. 10% then 25%, so the last level is the one you feel, which is the entire ask. At max
-// the effective cost is 0.75 ore per part — a better step than 2→1 was, and it is what the card now displays.
+// A bigger pot should now and then simply hold MORE. So the top of the track is a rare overflow: once in a while
+// a pour yields extra parts on top of everything else, rolled ONCE PER POUR rather than per batch — that is what
+// keeps it an event instead of a metronome. Nothing is refunded and the ore cost never moves off 1:1, so the
+// faucet stays bounded by ore you actually mined.
 //
-// Rolled PER BATCH and folded into the same refund the Cold Crucible capstone already uses, so a ten-batch pour
-// gets ten chances exactly as ten single smelts would, and the two sources stack without double-refunding.
-const CRUCIBLE_SPARE = { 9: 0.10, 10: 0.25 };
-export const crucibleSpare = (crucibleLevel = 0) => CRUCIBLE_SPARE[Math.max(0, Number(crucibleLevel) || 0)] || 0;
-// What a part ACTUALLY costs once spared ore is counted — the number the card shows, because a member deciding
-// whether to buy the level should be reading the real figure and not inferring it from a percentage.
-export const effectiveOrePerPart = (crucibleLevel = 0) =>
-    Math.round(smeltCostFor(crucibleLevel) * (1 - crucibleSpare(crucibleLevel)) * 100) / 100;
+// Back-loaded on purpose — the last level is the one you feel, which was the ask. Expected yield at max is about
+// +0.44 parts per pour, so it reads as luck rather than as a rate.
+const CRUCIBLE_OVERFLOW = { 9: { chance: 0.12, parts: 1 }, 10: { chance: 0.22, parts: 2 } };
+export const crucibleOverflow = (crucibleLevel = 0) => CRUCIBLE_OVERFLOW[Math.max(0, Number(crucibleLevel) || 0)] || null;
 
 // FURNACE FORMS — the smelting equivalent of the pickaxe ladder. Total smelting levels (0..30) decide which
 // furnace you're feeding, and it's the one you see in the smelt animation, so investment is visible at the
@@ -1000,13 +999,13 @@ export async function getMiningState(buyerId) {
         }),
         furnace: furnaceForm(totalSmeltLevels(row)),
         smeltLevels: totalSmeltLevels(row),
-        // The Crucible card shows the EFFECTIVE cost once spared ore is counted, so the last two levels visibly
-        // move the number they are being sold on. It read "1 ore → 1" at 8, 9 and 10 identically, which is how a
-        // member came to buy a level that did nothing and then have to ask whether the next one would too.
+        // The Crucible card has to SHOW the overflow, or the last two levels are back to reading "1 ore → 1"
+        // identically at 8, 9 and 10 — which is exactly how a member came to buy a level that did nothing and
+        // then had to ask whether the next one would too.
         smeltTracks: trackCards(SMELT_TRACKS, row, smeltValue, trackCost, (key, lvl) => {
             if (key === "crucible") {
-                const spare = crucibleSpare(lvl);
-                return spare > 0 ? `${effectiveOrePerPart(lvl)} ore → 1` : `${smeltCostFor(lvl)} ore → 1`;
+                const ov = crucibleOverflow(lvl);
+                return ov ? `1 ore → 1 · ${Math.round(ov.chance * 100)}% +${ov.parts}` : `${smeltCostFor(lvl)} ore → 1`;
             }
             return `${Math.round(smeltValue(key, lvl) * 100)}%`;
         }),
@@ -1355,20 +1354,10 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
     // spend rather than skipping it, so the "do you actually have the ore" check still has to pass — you can
     // never smelt ore you don't own just because the capstone happened to roll. Rolled PER BATCH, so a ten-
     // batch pour gets ten chances at it exactly as ten single smelts would.
-    // A MAXED CRUCIBLE SPARES ORE the same way, and the two roll together: one decision per batch, so a member
-    // holding both never gets the same ore back twice. Skipped entirely when the pour was already free, because
-    // refunding a batch that cost nothing would hand back ore that was never spent.
     const smeltCaps = setDepthCapstones(await (await import("@/lib/marketplace/collection-owned.js")).getOwnedSetIds(buyerId).catch(() => []));
-    const spare = crucibleSpare(row?.crucible_level);
     let refundedBatches = 0;
-    let sparedBatches = 0;
-    if (cost > 0 && (smeltCaps.freeSmelt > 0 || spare > 0)) {
-        for (let i = 0; i < n; i += 1) {
-            const byCapstone = smeltCaps.freeSmelt > 0 && Math.random() < smeltCaps.freeSmelt;
-            const bySpare = !byCapstone && spare > 0 && Math.random() < spare;
-            if (byCapstone || bySpare) refundedBatches += 1;
-            if (bySpare) sparedBatches += 1;
-        }
+    if (smeltCaps.freeSmelt > 0) {
+        for (let i = 0; i < n; i += 1) if (Math.random() < smeltCaps.freeSmelt) refundedBatches += 1;
     }
     const refunded = refundedBatches > 0;
     if (refunded) {
@@ -1445,6 +1434,14 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
         }
     }
 
+    // ── THE POT RUNS OVER ────────────────────────────────────────────────────────────────────────────────────
+    // The Crucible's last two levels, rolled ONCE for the whole pour rather than per batch. Per batch it would
+    // fire on most ten-batch hands and become a rate you stop noticing; once per pour it stays something that
+    // happens to you. Added after the bag so it is a clean bonus on top and cannot displace a tier-up or a curio.
+    const overflow = crucibleOverflow(row?.crucible_level);
+    const overflowed = overflow && Math.random() < overflow.chance ? overflow.parts : 0;
+    if (overflowed > 0) add(o.part, overflowed);
+
     const { addParts } = await import("@/lib/marketplace/crafting.js");
     for (const [partTier, count] of Object.entries(made)) await addParts(buyerId, Number(partTier), count).catch(() => {});
 
@@ -1489,10 +1486,11 @@ export async function smeltOre(buyerId, tier, dists = null, batches = 1) {
             phases: bands.map((b) => ({ key: b.key, label: b.label, mult: b.mult })),
             band: band.key, bandLabel: band.label, bandBlurb: null,
             parts: totalParts, ups, extras, bonus,
-            // Ore that came back out of the pot. Reported because it was NOT before — the Cold Crucible has been
-            // quietly refunding ore since it shipped with nothing on screen ever saying so, and a maxed Crucible
-            // sparing ore would have inherited exactly that silence. A payoff nobody can see is not a payoff.
-            oreBack: cost * refundedBatches, sparedBatches,
+            // Ore the Cold Crucible gave back. Reported because it was NOT before — the capstone has been
+            // refunding ore since it shipped with nothing on screen ever saying so.
+            oreBack: cost * refundedBatches,
+            // Parts the pot threw in on top, so the Crucible's top levels have a visible moment of their own.
+            overflowed,
             byTier: Object.entries(made).map(([pt, count]) => ({ partTier: Number(pt), count, lifted: Number(pt) > o.part })).sort((a, b) => a.partTier - b.partTier),
         },
         ...(await getMiningState(buyerId)),

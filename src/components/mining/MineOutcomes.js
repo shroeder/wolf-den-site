@@ -173,17 +173,23 @@ export function SmeltModal({ smelting, onClose }) {
                                 </span>
                             ))}
                         </div>
-                        {/* ORE THAT CAME BACK OUT OF THE POT. A deep Crucible spares some of what it melts, and
-                            the Cold Crucible capstone has always done the same — but neither ever said so, so the
-                            ore reappeared in the pack with nothing to connect it to the upgrade that earned it. */}
-                        {(smelting.result?.oreBack || 0) > 0 ? (
-                            <div className="mine-rung-won" style={{ marginTop: 10 }}>
-                                <b style={{ color: "#8fe39a" }}>
-                                    ⛏ {smelting.result.oreBack} ore survived the melt
+                        {/* THE POT RAN OVER — the Crucible's top levels, once per pour. Loud on purpose: it is
+                            rare enough to be a moment, and a bonus nobody notices is not a reward. */}
+                        {(smelting.result?.overflowed || 0) > 0 ? (
+                            <div className="mine-rung-won is-flawless" style={{ marginTop: 10 }}>
+                                <b style={{ color: "#ffd08a" }}>
+                                    The pot ran over — {smelting.result.overflowed} extra
                                 </b>
                                 <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
-                                    {smelting.result.sparedBatches > 0 ? "Your crucible runs deep enough to give some back." : "The cold crucible gave it back."}
+                                    Your crucible is deep enough to hold more than you put in it.
                                 </div>
+                            </div>
+                        ) : null}
+                        {/* Ore the Cold Crucible gave back. It has been doing this silently since it shipped. */}
+                        {(smelting.result?.oreBack || 0) > 0 ? (
+                            <div className="mine-rung-won" style={{ marginTop: 10 }}>
+                                <b style={{ color: "#8fe39a" }}>⛏ {smelting.result.oreBack} ore survived the melt</b>
+                                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>The cold crucible gave it back.</div>
                             </div>
                         ) : null}
                         {(smelting.result?.bonus || []).length ? (
