@@ -195,13 +195,13 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
 //
 //   HARDER TIERS GET NASTIER KINDS — the early bands swing and bleed, the late ones drain and execute.
 const NPC_KIT = [
-    { kind: "strike", name: "Heavy Blow", sprite: "/images/arena/skill-firstHitMult.webp", power: 2.0, cd: 3 },
-    { kind: "rend", name: "Ragged Cut", sprite: "/images/arena/skill-eruptChance.webp", power: 1.4, cd: 3 },
-    { kind: "flurry", name: "Rain of Blows", sprite: "/images/arena/skill-onslaught.webp", power: 0.85, cd: 3, hits: 3 },
-    { kind: "sunder", name: "Armour Break", sprite: "/images/arena/skill-giantSlayer.webp", power: 1.5, cd: 4 },
-    { kind: "spell", name: "Elemental Lash", sprite: "/images/arena/skill-attuned.webp", power: 2.1, cd: 4 },
-    { kind: "drain", name: "Life Tithe", sprite: "/images/arena/skill-bloodlust.webp", power: 1.8, cd: 3 },
-    { kind: "execute", name: "Finisher", sprite: "/images/arena/skill-opportunist.webp", power: 2.3, cd: 4 },
+    { kind: "strike", name: "Heavy Blow", sprite: "/images/arena/skill-firstHitMult.webp", power: 2.0, acc: -0.12, cd: 3 },
+    { kind: "rend", name: "Ragged Cut", sprite: "/images/arena/skill-eruptChance.webp", power: 1.4, acc: -0.06, cd: 3 },
+    { kind: "flurry", name: "Rain of Blows", sprite: "/images/arena/skill-onslaught.webp", power: 0.85, acc: -0.10, cd: 3, hits: 3 },
+    { kind: "sunder", name: "Armour Break", sprite: "/images/arena/skill-giantSlayer.webp", power: 1.5, acc: -0.07, cd: 4 },
+    { kind: "spell", name: "Elemental Lash", sprite: "/images/arena/skill-attuned.webp", power: 2.1, acc: -0.13, cd: 4 },
+    { kind: "drain", name: "Life Tithe", sprite: "/images/arena/skill-bloodlust.webp", power: 1.8, acc: -0.10, cd: 3 },
+    { kind: "execute", name: "Finisher", sprite: "/images/arena/skill-opportunist.webp", power: 2.3, acc: -0.15, cd: 4 },
 ];
 
 // ── AND TEN THINGS NO MEMBER CAN LEARN ───────────────────────────────────────────────────────────────────────
@@ -227,16 +227,16 @@ const NPC_KIT = [
 // taking the controls away. Losing to a move you could see and answer is a lesson; losing to one you couldn't
 // is a bug report.
 const NPC_ONLY = [
-    { kind: "shatter", name: "Shatterguard", sprite: "/images/arena/skill-giantSlayer.webp", power: 1.2, cd: 4 },
-    { kind: "howl", name: "Dread Howl", sprite: "/images/arena/skill-bloodlust.webp", power: 0.9, cd: 5 },
-    { kind: "snare", name: "Hobbling Chain", sprite: "/images/arena/skill-onslaught.webp", power: 1.0, cd: 5 },
-    { kind: "brand", name: "Soulbrand", sprite: "/images/arena/skill-firstHitCrit.webp", power: 0.8, cd: 5 },
+    { kind: "shatter", name: "Shatterguard", sprite: "/images/arena/skill-giantSlayer.webp", power: 1.2, acc: -0.20, cd: 4 },
+    { kind: "howl", name: "Dread Howl", sprite: "/images/arena/skill-bloodlust.webp", power: 0.9, acc: -0.15, cd: 5 },
+    { kind: "snare", name: "Hobbling Chain", sprite: "/images/arena/skill-onslaught.webp", power: 1.0, acc: -0.15, cd: 5 },
+    { kind: "brand", name: "Soulbrand", sprite: "/images/arena/skill-firstHitCrit.webp", power: 0.8, acc: -0.18, cd: 5 },
     { kind: "feast", name: "Bonefeast", sprite: "/images/arena/skill-bloodlust.webp", power: 0, cd: 5 },
     { kind: "rally", name: "Second Wind", sprite: "/images/arena/skill-packTactics.webp", power: 0, cd: 6 },
-    { kind: "doom", name: "Deathknell", sprite: "/images/arena/skill-overcharge.webp", power: 0, cd: 7 },
-    { kind: "frenzy", name: "Blood Frenzy", sprite: "/images/arena/skill-vanguard.webp", power: 0, cd: 5 },
-    { kind: "siphon", name: "Willbreaker", sprite: "/images/arena/skill-attuned.webp", power: 1.1, cd: 5 },
-    { kind: "bind", name: "Gravebind", sprite: "/images/arena/skill-eruptChance.webp", power: 1.0, cd: 5 },
+    { kind: "doom", name: "Deathknell", sprite: "/images/arena/skill-overcharge.webp", power: 0, acc: -0.22, cd: 7 },
+    { kind: "frenzy", name: "Blood Frenzy", sprite: "/images/arena/skill-vanguard.webp", power: 0, acc: -0.18, cd: 5 },
+    { kind: "siphon", name: "Willbreaker", sprite: "/images/arena/skill-attuned.webp", power: 1.1, acc: -0.16, cd: 5 },
+    { kind: "bind", name: "Gravebind", sprite: "/images/arena/skill-eruptChance.webp", power: 1.0, acc: -0.16, cd: 5 },
 ];
 
 // Which NPC-only move an opponent brings, by archetype — the same rule as the normal kit, so the shape you can
@@ -307,6 +307,9 @@ export function npcAbilities(tier, archKey = null) {
         kind: k.kind,
         cooldown: k.cd,
         hits: k.hits || 1,
+        // The accuracy each move costs to throw — read by resolveBeat as `ability.acc`. Without carrying it
+        // here the penalties would sit in the catalog doing nothing, which is this codebase's favourite bug.
+        acc: k.acc || 0,
         power: Math.round(k.power * scale * 100) / 100,
         element: n.element,
         rarity: "epic",

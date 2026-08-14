@@ -77,7 +77,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/reaver.webp",
         health: 0,
         dr: 0.16,
-        accuracy: 0.92,
+        accuracy: 0.72,
         guard: 0.12,
     },
     {
@@ -89,7 +89,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/warden.webp",
         health: 110,
         dr: 0.40,
-        accuracy: 0.95,
+        accuracy: 0.75,
         // ── THE BRACE IS THEIRS ──────────────────────────────────────────────────────────────────────────
         // Double everyone else's, inherent, before a point is spent — and then multiplied by Fortune like
         // anyone's (see guardSoakFrom in arena-kit.js). Guard used to be a flat share of health every class
@@ -115,7 +115,7 @@ export const CLASSES = [
         emblem: "/images/arena/class/runecaller.webp",
         health: 30,
         dr: 0.24,
-        accuracy: 0.93,
+        accuracy: 0.73,
         guard: 0.12,
     },
 ];
@@ -135,9 +135,17 @@ export const CLASSES = [
 // member who spent five points on it keeps exactly what they paid for.
 //
 // The spread is the identity. A Reaver is soft on purpose: 16% against a Warden's 34% is the difference
-// between a fight you have to end quickly and one you can afford to lose rounds in. Accuracy runs the other
-// way and deliberately narrowly — 94 to 97 — because it is a tiebreaker, not a second damage stat, and the
-// real accuracy decisions live on the skills.
+// between a fight you have to end quickly and one you can afford to lose rounds in.
+//
+// ── ACCURACY STARTS AT 75, NOT 95 ────────────────────────────────────────────────────────────────────────────
+// At a 95% base every swing landed and the whole mechanic was decoration: a skill's accuracy cost came off a
+// number so close to certain that paying it changed nothing, and Ferocity's contribution to it was capped at
+// six points because there was nowhere left to go. Landing a blow was not a thing you could be good at.
+//
+// From 75 it is. A bare fighter misses one swing in four, Ferocity buys that back over a real investment (see
+// accuracyFromFerocity), and a heavy skill's penalty is now felt because it is coming off a number that can
+// actually reach down and hurt. The class spread stays exactly as wide as it was — 72 / 73 / 75 — because the
+// identity was never in the size of the gap.
 export const classBase = (id) => {
     const c = classById(id);
     return {
@@ -154,7 +162,7 @@ export const DEFAULT_DR = 0.20;
 // Half a Warden's, which is the rule for every class that is not one: bracing well is the Warden's job.
 // NPCs use it too — they have no class and no Fortune, so a Gauntlet foe's guard is exactly this.
 export const DEFAULT_GUARD = 0.12;
-export const DEFAULT_ACCURACY = 0.95;
+export const DEFAULT_ACCURACY = 0.75;
 // Nobody dodges forever and nobody hits forever: a ceiling on each so investment cannot end the interaction.
 export const DR_CAP = 0.60;
 // 0.98 rather than 1.0, deliberately: a plain swing must ALWAYS be able to miss. At a cap of 1 a
@@ -185,7 +193,7 @@ export const TREES = {
             desc: "+2 Might per rank.", sprite: "/images/arena/node/rv_might.webp" }),
         N({ id: "rv_crit", tier: 0, name: "Killer Instinct", ranks: 5, stat: "crit", per: 0.02,
             desc: "+2% critical chance per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
-        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 1.45, cd: 3,
+        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 1.45, acc: -0.06, cd: 3,
             desc: "A committed blow. One big hit.", sprite: "/images/arena/node/rv_strike.webp" }),
 
         N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.08, needs: 3,
@@ -208,10 +216,10 @@ export const TREES = {
             desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
         N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.06, needs: 7,
             desc: "Cut 6% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
-        N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, cd: 4, needs: 7,
+        N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, acc: -0.10, cd: 4, needs: 7,
             desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
 
-        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, cd: 5, needs: 12,
+        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, acc: -0.14, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
         N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.06, needs: 12,
             desc: "+10% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
@@ -237,7 +245,7 @@ export const TREES = {
         N({ id: "wd_thorns", tier: 1, name: "Iron Thorns", ranks: 3, stat: "thorns", per: 0.07, needs: 3,
             desc: "Return 7% of every blow you take, per rank.", sprite: "/images/arena/node/wd_thorns.webp" }),
 
-        N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.55, cd: 3, needs: 7,
+        N({ id: "wd_drain", tier: 2, kind: "active", ability: "drain", name: "Tithe", power: 1.55, acc: -0.07, cd: 3, needs: 7,
             desc: "You keep half of what it takes off them.", sprite: "/images/arena/node/wd_drain.webp" }),
         N({ id: "wd_regen", tier: 2, name: "Second Wind", ranks: 4, stat: "regen", per: 0.015, needs: 7,
             desc: "Recover 1.5% of your health each round, per rank.", sprite: "/images/arena/node/wd_regen.webp" }),
@@ -262,7 +270,7 @@ export const TREES = {
         // changed, to the other half of what a Runecaller is.
         N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.006,
             desc: "Your burns tick 0.6% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
-        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, cd: 4,
+        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, acc: -0.08, cd: 4,
             desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
 
         N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
@@ -272,14 +280,14 @@ export const TREES = {
         N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendStacks", per: 1, needs: 3,
             desc: "+1 burn stack per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
 
-        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 1.50, cd: 3, needs: 7,
+        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 1.50, acc: -0.07, cd: 3, needs: 7,
             desc: "Strips their guard for what comes next.", sprite: "/images/arena/node/rc_sunder.webp" }),
         N({ id: "rc_cd", tier: 2, name: "Quickening", ranks: 3, stat: "cdCut", per: 1, needs: 7,
             desc: "Every third rank shaves a turn off one cooldown.", sprite: "/images/arena/node/rc_cd.webp" }),
         N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.05, needs: 7,
             desc: "Cut 5% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 
-        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 2.15, cd: 6, needs: 12,
+        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 2.15, acc: -0.16, cd: 6, needs: 12,
             desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
         N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
             desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),

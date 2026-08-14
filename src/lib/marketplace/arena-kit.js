@@ -379,10 +379,29 @@ export const SWING_BASE = 11;
 // The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
 // trap on its own — a Fortune kit critted constantly in here and never against the boss.
 export const CRIT_BASE = 0.25;
-export const CRIT_CAP = 0.9;
+// ── BOTH HALVES OF CRIT ARE CAPPED, AND THE SECOND ONE NEVER WAS ─────────────────────────────────────────────
+// Chance was capped at 0.9 and power was capped at nothing at all, which is the combination that makes a fight
+// stop being a fight: at 90% every swing is effectively a critical, so the multiplier is not a spike any more,
+// it is just the damage number — and being uncapped it grew with gear forever.
+//
+// It showed up worst on the things built out of a power BUDGET rather than a gear list. A Road fighter or a
+// plaza raider spends its budget through archetype weights, so a big budget poured 130-300 points into crit
+// chance against a 90% ceiling (most of it burnt) and the same again into crit power against no ceiling at all
+// (all of it live). That is why the Bandit Lieutenant was landing 4x hits: not because it was designed to, but
+// because half its wasted stat had nowhere to go and the other half had no roof.
+//
+// 65% and 3x. A critical is a thing that HAPPENS to you again, rather than the baseline with an occasional
+// miss, and the ceiling is now the same shape for both numbers.
+//
+// Applies to every arena-based fight, which is all of them: PvP, the Gauntlet, the Long Road and the plaza
+// skirmishes all resolve through these two functions, for the member AND the opponent. The fighter cards read
+// the same helpers, so what is printed before you commit is what the engine uses.
+export const CRIT_CAP = 0.65;
 export const CRIT_MULT_BASE = 2.5;
+export const CRIT_MULT_CAP = 3;
 export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / 100 + bonus);
-export const critMultFrom = (critPower = 0, bonus = 0) => CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;
+export const critMultFrom = (critPower = 0, bonus = 0) =>
+    Math.min(CRIT_MULT_CAP, CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus);
 
 // ── THE PIT CLOSES ───────────────────────────────────────────────────────────────────────────────────────────
 // A beat costs about 2.6 seconds of animation before anybody has decided anything, so a twenty-round bout is a
@@ -499,12 +518,25 @@ export const arenaWinXp = (power = 0) =>
 /** Damage for one plain swing. No roll: the same kit against the same armour always reads the same number. */
 export const swingFrom = (might = 0) => SWING_BASE * (1 + (Number(might) || 0) / 100);
 
-// ── FEROCITY BUYS A LITTLE ACCURACY ──────────────────────────────────────────────────────────────────────────
-// Deliberately small and hard-capped: accuracy is a tiebreaker between builds, not a second damage stat, and a
-// stat that can be stacked to "never miss" turns every skill's accuracy cost into a rounding error. 200
-// Ferocity — a very heavy investment — buys four points of it.
-export const ACCURACY_PER_FEROCITY = 0.0002;
-export const ACCURACY_FROM_FEROCITY_CAP = 0.06;
+// ── FEROCITY IS THE ACCURACY STAT ────────────────────────────────────────────────────────────────────────────
+// It used to buy four points at 200 Ferocity, which is not a stat, it is a rounding error — and that was the
+// right call while the base sat at 95%, because there was nothing to climb toward. With the base at 75 there
+// is 23 points of room under the ceiling, and Ferocity is what buys it back.
+//
+// Deliberately Ferocity rather than a new stat. The four gear stats are Might, Crit Chance, Crit Power and
+// Ferocity; adding a fifth would mean re-rolling every item in the game. Ferocity already buys health and
+// speed, and "a body built to keep swinging is also a body that lands them" is a sentence a member can hold
+// in their head — a kit that wants to hit reliably now has a reason to take the defensive stat, which is a
+// real build decision where there was none.
+//
+//   starting out    20 fero  →  +2   (77%)
+//   half geared     70 fero  →  +7   (82%)
+//   well geared    135 fero  →  +14  (89%)
+//   best in slot   207 fero  →  +18  (93%, at the cap)
+//
+// The ceiling stays below ACCURACY_CAP so the tree still has somewhere to go and a plain swing can always miss.
+export const ACCURACY_PER_FEROCITY = 0.001;
+export const ACCURACY_FROM_FEROCITY_CAP = 0.18;
 export const accuracyFromFerocity = (fero = 0) =>
     Math.min(ACCURACY_FROM_FEROCITY_CAP, Math.max(0, Number(fero) || 0) * ACCURACY_PER_FEROCITY);
 

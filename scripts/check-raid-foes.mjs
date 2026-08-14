@@ -30,8 +30,8 @@ const OLD = process.argv.includes("--old");
 const SWING_BASE = 11;                                    // arena-kit.js SWING_BASE
 const health = (fero) => Math.round(200 + fero * 2.5);    // HEALTH_BASE + fero * HEALTH_PER_FEROCITY
 const swing = (might) => SWING_BASE * (1 + might / 100);
-const critChance = (cc) => Math.min(0.9, 0.25 + cc / 100); // CRIT_BASE, CRIT_CAP
-const critMult = (cp) => 2.5 + cp / 100;                   // CRIT_MULT_BASE
+const critChance = (cc) => Math.min(0.65, 0.25 + cc / 100);      // CRIT_BASE, CRIT_CAP
+const critMult = (cp) => Math.min(3, 2.5 + cp / 100);            // CRIT_MULT_BASE, CRIT_MULT_CAP
 const speedOf = (level, fero) => Math.round(10 + level * 0.3 + fero * 0.5);
 const npcSpeed = (power) => Math.round(10 + power * 0.09);
 const BLOCK = 0.34;          // what a member turns aside from every blow
