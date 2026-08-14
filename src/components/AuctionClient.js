@@ -180,10 +180,16 @@ export default function AuctionClient({ initial }) {
                                     {l.signature ? <div className="ah-card-sig">★ {l.signature.label} — {l.signature.desc}</div> : null}
                                     {l.compare && !l.mine ? <CompareBlock c={l.compare} /> : null}
                                     <div className="ah-card-meta muted">by {l.sellerName} · {ago(l.listedAt)} · ⏳ {timeLeft(l.expiresAt)}</div>
+                                    {/* ── THE PRICE IS ALWAYS ON THE CARD ─────────────────────────────────────
+                                        Two of the four states used to replace it with a word. "Your listing ·
+                                        view" hid what you had ASKED for, and "Owned" hid what the thing you
+                                        own is going for — which are the two prices a member most wants and the
+                                        only two the market could not show them. The button still refuses the
+                                        purchase in both cases; it just stops withholding the number to do it. */}
                                     {l.mine ? (
-                                        <button type="button" className="ah-buy is-mine" onClick={(e) => { e.stopPropagation(); setDetail(l); }}>Your listing · view</button>
+                                        <button type="button" className="ah-buy is-mine" onClick={(e) => { e.stopPropagation(); setDetail(l); }}>🪙 {l.price.toLocaleString()} · yours</button>
                                     ) : l.owned ? (
-                                        <button type="button" className="ah-buy" disabled onClick={(e) => e.stopPropagation()}>Owned</button>
+                                        <button type="button" className="ah-buy" disabled onClick={(e) => e.stopPropagation()}>🪙 {l.price.toLocaleString()} · owned</button>
                                     ) : gold < l.price ? (
                                         <span onClick={(e) => e.stopPropagation()}><CoinCta price={l.price} have={gold} label="coins" /></span>
                                     ) : (
@@ -293,9 +299,15 @@ export default function AuctionClient({ initial }) {
                             {detail.mine ? (
                                 detail.status === "active" ? (
                                     <button type="button" className="ah-cancel-btn" style={{ flex: 1 }} disabled={busy} onClick={() => { cancel(detail.id); setDetail(null); }}>Cancel listing · 🪙 {detail.price.toLocaleString()}</button>
-                                ) : null
+                                ) : (
+                                    // A sold or expired listing of your own showed NOTHING here — not even what it
+                                    // went for, which is the one fact you open a finished listing to find out.
+                                    <span className="ah-buy is-mine" style={{ flex: 1, textAlign: "center" }}>
+                                        🪙 {detail.price.toLocaleString()} · {detail.status === "sold" ? "sold" : "expired"}
+                                    </span>
+                                )
                             ) : detail.owned ? (
-                                <button type="button" className="ah-buy" disabled style={{ flex: 1 }}>You own this</button>
+                                <button type="button" className="ah-buy" disabled style={{ flex: 1 }}>🪙 {detail.price.toLocaleString()} · you own this</button>
                             ) : gold < detail.price ? (
                                 <div style={{ flex: 1 }}><CoinCta price={detail.price} have={gold} label="coins" /></div>
                             ) : (
