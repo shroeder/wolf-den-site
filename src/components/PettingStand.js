@@ -103,69 +103,76 @@ export default function PettingStand({ stand, mine, pets = [], busy, onSeat, onC
                     <span className="ps-mult">×{stand?.petMult || 2} petting XP</span>
                     <span className="muted">and passive XP as if equipped</span>
                 </div>
-
-                <style jsx>{`
-                    /* ps- prefixed throughout, keyframes included — two @keyframes sharing a name across
-                       styled-jsx blocks silently break both. */
-                    .ps-wrap { position: fixed; inset: 0; z-index: 10060; background: rgba(0,0,0,0.62);
-                        display: grid; place-items: center; padding: 16px; }
-                    .ps-card { width: 100%; max-width: 420px; max-height: min(88dvh, 720px); padding: 16px;
-                        border-radius: 18px;
-                        /* NEUTRAL, NOT PURPLE. The first ground was a saturated aubergine and every pet sprite
-                           on it looked tinted — the panel was competing with the artwork it exists to show. */
-                        background: linear-gradient(180deg, #1b1d24, #121317);
-                        border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 60px rgba(0,0,0,0.65);
-                        animation: psUp .24s cubic-bezier(.2,1,.3,1) both;
-                        /* ── THE SCROLL FIX ────────────────────────────────────────────────────────────
-                           overflow-y on the CARD scrolled the header and the action out of reach on a short
-                           phone, and on iOS a scrollable element inside a fixed overlay drags the page behind
-                           it. The card is a column now: the head and the footer are fixed, and only the middle
-                           scrolls, with momentum and overscroll containment so the pull stops here. */
-                        display: flex; flex-direction: column; overflow: hidden; }
-                    .ps-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto;
-                        -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-                    @keyframes psUp { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
-                    .ps-head { display: flex; align-items: center; gap: 8px; }
-                    .ps-head b { font-size: 1.02rem; }
-                    .ps-x { margin-left: auto; background: none; border: none; color: inherit; font-size: 20px;
-                        cursor: pointer; opacity: .7; }
-                    .ps-sub { margin: 6px 0 12px; font-size: .8rem; color: #cbbcda; line-height: 1.45; }
-                    .ps-tiers { display: grid; gap: 9px; }
-                    .ps-tier { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 13px;
-                        background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); min-height: 62px; }
-                    .ps-tier.is-full { background: rgba(255,215,110,0.07); border-color: rgba(255,215,110,0.28); }
-                    .ps-tier-art { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; }
-                    .ps-art { width: 46px; height: 46px; object-fit: contain; }
-                    .ps-tier-body { display: grid; gap: 1px; min-width: 0; }
-                    .ps-tier-body b { font-size: .9rem; }
-                    .ps-tier-body em { font-size: .72rem; color: #b9a8c9; font-style: normal; }
-                    .ps-owners { font-size: .72rem; color: #ffd75e; font-style: normal; }
-                    .ps-head svg { vertical-align: -2px; margin-right: 2px; }
-                    .ps-take { margin-left: auto; }
-                    .ps-add { width: 100%; padding: 12px; border-radius: 12px; cursor: pointer;
-                        background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.28);
-                        color: #cdd3d8; font-weight: 800; font-size: .84rem; transition: background .12s ease; }
-                    .ps-add:hover:not(:disabled) { background: rgba(255,255,255,0.09); }
-                    .ps-add:disabled { opacity: .55; cursor: default; }
-                    .ps-ghost { padding: 6px 11px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: .76rem;
-                        background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #e8dcc2; }
-                    .ps-pick-head { display: flex; align-items: center; margin-bottom: 8px; }
-                    .ps-pick-head b { font-size: .9rem; }
-                    .ps-pick-head .ps-ghost { margin-left: auto; }
-                    .ps-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px;
-                        max-height: 46dvh; overflow-y: auto; }
-                    .ps-pick-one { display: grid; gap: 2px; justify-items: center; padding: 8px 4px; border-radius: 11px;
-                        cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14);
-                        color: #e8dcc2; }
-                    .ps-pick-art { width: 42px; height: 42px; object-fit: contain; }
-                    .ps-pick-one em { font-size: .68rem; font-style: normal; text-align: center; line-height: 1.15; }
-                    .ps-pick-one i { font-size: .64rem; color: #b9a8c9; font-style: normal; }
-                    .ps-empty { font-size: .8rem; color: #b9a8c9; text-align: center; padding: 14px 0; }
-                    .ps-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px;
-                        border-top: 1px solid rgba(255,255,255,0.1); font-size: .74rem; }
-                    .ps-mult { font-weight: 900; color: #8fe39a; }
-                `}</style>
             </div>
+            {/* ⚠️ THIS MUST STAY A DIRECT CHILD OF THE ROOT ELEMENT.
+                styled-jsx only stamps its `jsx-<hash>` scoping class onto the JSX subtree that CONTAINS the
+                style tag. It lived inside .ps-card, so every element in the card got the hash and the root
+                .ps-wrap did not — and the compiled rule is `.ps-wrap.jsx-<hash>`, which needs both classes.
+                The wrapper therefore got NONE of its styles: no position:fixed, no inset:0, no z-index. The
+                panel rendered as an ordinary block 1102px down the page, below the fold, while the body was
+                pinned (position:fixed, top:-400px) by the modal scroll-lock. That reads exactly like "no modal
+                appeared and now the page won't scroll", which is how it was reported four times.
+                The CSS compiles into the bundle either way, so checking that the stylesheet exists proves
+                nothing — check that the ELEMENT carries the hash class. */}
+            <style jsx>{`
+                .ps-wrap { position: fixed; inset: 0; z-index: 10060; background: rgba(0,0,0,0.62);
+                    display: grid; place-items: center; padding: 16px; }
+                .ps-card { width: 100%; max-width: 420px; max-height: min(88dvh, 720px); padding: 16px;
+                    border-radius: 18px;
+                    /* NEUTRAL, NOT PURPLE. The first ground was a saturated aubergine and every pet sprite
+                       on it looked tinted — the panel was competing with the artwork it exists to show. */
+                    background: linear-gradient(180deg, #1b1d24, #121317);
+                    border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 24px 60px rgba(0,0,0,0.65);
+                    animation: psUp .24s cubic-bezier(.2,1,.3,1) both;
+                    /* ── THE SCROLL FIX ────────────────────────────────────────────────────────────
+                       overflow-y on the CARD scrolled the header and the action out of reach on a short
+                       phone, and on iOS a scrollable element inside a fixed overlay drags the page behind
+                       it. The card is a column now: the head and the footer are fixed, and only the middle
+                       scrolls, with momentum and overscroll containment so the pull stops here. */
+                    display: flex; flex-direction: column; overflow: hidden; }
+                .ps-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+                    -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+                @keyframes psUp { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+                .ps-head { display: flex; align-items: center; gap: 8px; }
+                .ps-head b { font-size: 1.02rem; }
+                .ps-x { margin-left: auto; background: none; border: none; color: inherit; font-size: 20px;
+                    cursor: pointer; opacity: .7; }
+                .ps-sub { margin: 6px 0 12px; font-size: .8rem; color: #cbbcda; line-height: 1.45; }
+                .ps-tiers { display: grid; gap: 9px; }
+                .ps-tier { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 13px;
+                    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); min-height: 62px; }
+                .ps-tier.is-full { background: rgba(255,215,110,0.07); border-color: rgba(255,215,110,0.28); }
+                .ps-tier-art { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; }
+                .ps-art { width: 46px; height: 46px; object-fit: contain; }
+                .ps-tier-body { display: grid; gap: 1px; min-width: 0; }
+                .ps-tier-body b { font-size: .9rem; }
+                .ps-tier-body em { font-size: .72rem; color: #b9a8c9; font-style: normal; }
+                .ps-owners { font-size: .72rem; color: #ffd75e; font-style: normal; }
+                .ps-head svg { vertical-align: -2px; margin-right: 2px; }
+                .ps-take { margin-left: auto; }
+                .ps-add { width: 100%; padding: 12px; border-radius: 12px; cursor: pointer;
+                    background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.28);
+                    color: #cdd3d8; font-weight: 800; font-size: .84rem; transition: background .12s ease; }
+                .ps-add:hover:not(:disabled) { background: rgba(255,255,255,0.09); }
+                .ps-add:disabled { opacity: .55; cursor: default; }
+                .ps-ghost { padding: 6px 11px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: .76rem;
+                    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #e8dcc2; }
+                .ps-pick-head { display: flex; align-items: center; margin-bottom: 8px; }
+                .ps-pick-head b { font-size: .9rem; }
+                .ps-pick-head .ps-ghost { margin-left: auto; }
+                .ps-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px;
+                    max-height: 46dvh; overflow-y: auto; }
+                .ps-pick-one { display: grid; gap: 2px; justify-items: center; padding: 8px 4px; border-radius: 11px;
+                    cursor: pointer; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14);
+                    color: #e8dcc2; }
+                .ps-pick-art { width: 42px; height: 42px; object-fit: contain; }
+                .ps-pick-one em { font-size: .68rem; font-style: normal; text-align: center; line-height: 1.15; }
+                .ps-pick-one i { font-size: .64rem; color: #b9a8c9; font-style: normal; }
+                .ps-empty { font-size: .8rem; color: #b9a8c9; text-align: center; padding: 14px 0; }
+                .ps-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px;
+                    border-top: 1px solid rgba(255,255,255,0.1); font-size: .74rem; }
+                .ps-mult { font-weight: 900; color: #8fe39a; }
+            `}</style>
         </div>
     );
 }
