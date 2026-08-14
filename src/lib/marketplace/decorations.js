@@ -187,6 +187,24 @@ export const DECORATIONS = [
     {
         id: "deco_petting_stand", name: "The Petting Stand", emoji: "🐾", rarity: "mythic",
         source: "package", price: null, buff: null, unique: true, unreleased: true, pets: 3,
+        // Twice the 66px every other prop renders at. Three pets have to sit ON this and stay recognisable —
+        // at 66 each companion would be about 25 CSS pixels, which is a smudge.
+        size: 132,
+        // ── WHERE THE PETS SIT, AND HOW BIG ──────────────────────────────────────────────────────────────
+        // `y` is the TOP SURFACE of each cushion, measured off the finished sprite: scanning it for crimson
+        // finds three bands at 10.5-20.5%, 33.6-49.6% and 60-72.5% of the height. A pet is anchored by its feet
+        // (translate -100%) a couple of points into the pillow, so it reads as sitting rather than hovering.
+        //
+        // `s` is its size as a share of the sprite box, and it is derived from the TIER SPACING — not, as the
+        // first cut had it, from the cushion's width. The cushions are 34-57% wide but only ~26% apart, so
+        // sizing off width produced animals half the height of the whole pedestal: each one buried the tier
+        // below it and the stand itself vanished under a pile of pets. Sized off the gap, every companion has
+        // clear air above it and the pedestal still reads as a pedestal.
+        tiers: [
+            { x: 49, y: 14, s: 22 },
+            { x: 49, y: 37, s: 25 },
+            { x: 49, y: 63.5, s: 28 },
+        ],
         // No leading article — `prompt()` prepends "A ", exactly as it does for every other entry above.
         prompt: prompt("ornate three-tiered carved stone display pedestal, each tier topped with a plush velvet cushion, garlanded with trailing flowers and gold filigree, built for small animals to sit and be admired"),
     },

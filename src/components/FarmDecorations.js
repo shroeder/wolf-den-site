@@ -184,7 +184,7 @@ export function DecoDock({ deco, fieldRef, busy, editing, onPlaceAt, onInspect, 
 // ── Scene layer: renders a member's PLACED decorations inside the pasture field. TAP any decoration to open its
 // inspect modal (details/effects + pick up). When "editing" (decorate mode), you can also DRAG to reposition —
 // a short movement is treated as a tap (inspect), a longer one as a drag (move). No always-visible ✕.
-export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day", spriteBrightness = 1 }) {
+export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, onInspect, tod = "day", spriteBrightness = 1, standPets = null }) {
     const [drag, setDrag] = useState(null); // { id, x, y } live position during an actual drag
     const gr = useRef({}); // gesture: { id, pointerId, sx, sy, moved, x, y, el }
     const suppressClick = useRef(false); // set after a real drag so the trailing click doesn't also inspect
@@ -228,7 +228,7 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
         <>
             {placements.map((p) => {
                 const live = drag && drag.id === p.id ? { ...p, ...drag } : p;
-                const size = 66;
+                const size = p.size || 66;
                 return (
                     <div
                         key={p.id}
@@ -263,6 +263,38 @@ export function DecoLayer({ placements = [], editing = false, fieldRef, onMove, 
                         ) : (
                             <span style={{ position: "relative", zIndex: 1, fontSize: 40, filter: `drop-shadow(0 3px 4px rgba(0,0,0,0.4)) brightness(${(p.brightness ?? 1) * spriteBrightness})`, pointerEvents: "none" }}>{p.emoji}</span>
                         )}
+                        {/* ── PETS SITTING ON THE PEDESTAL ────────────────────────────────────────────────
+                            Rendered INSIDE this container, which is what makes them survive the tools every
+                            decoration has: the scale, rotation and flip are on the parent, so the animals ride
+                            the artwork instead of drifting off it. Positions are percentages of the sprite box
+                            measured from the finished art (decorations.js `tiers`), and each pet is anchored by
+                            its FEET at the cushion's top so it reads as seated rather than hovering.
+                            Sized off the cushion it sits on, so the wide bottom tier holds a bigger animal than
+                            the narrow top one, exactly as the drawing implies. */}
+                        {(p.tiers || []).map((t, i) => {
+                            const pet = standPets?.[i];
+                            if (!pet?.spriteUrl) return null;
+                            const petPx = Math.round(size * (t.s / 100));
+                            return (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    key={t.y}
+                                    src={pet.spriteUrl}
+                                    alt={pet.name || ""}
+                                    draggable={false}
+                                    style={{
+                                        position: "absolute", left: `${t.x}%`, top: `${t.y}%`,
+                                        width: petPx, height: petPx, objectFit: "contain",
+                                        // -50% centres it on the tier; -100% puts its FEET on the cushion's
+                                        // top surface, which is the y the tier records.
+                                        transform: `translate(-50%, -100%)${pet.flip ? " scaleX(-1)" : ""}`,
+                                        zIndex: 2, pointerEvents: "none",
+                                        filter: `drop-shadow(0 2px 3px rgba(0,0,0,0.45)) brightness(${(p.brightness ?? 1) * spriteBrightness})`,
+                                        WebkitUserSelect: "none", userSelect: "none",
+                                    }}
+                                />
+                            );
+                        })}
                     </div>
                 );
             })}

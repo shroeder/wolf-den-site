@@ -717,6 +717,15 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, [decoAct]);
     const fieldRef = useRef(null);
     const scrollRef = useRef(null); // the horizontal pasture scroller — preserved across deco re-renders so a placed piece doesn't scroll away
+    // The three seated companions, resolved to the sprites the pasture already draws them with — so a level-six
+    // enshrined pet sits on the cushion wearing the form it actually wears. Index matches the tier order, and a
+    // gap stays a gap (an empty tier renders no animal rather than shuffling the next one up).
+    const standPets = useMemo(() => {
+        const slots = farm?.stand?.slots || [];
+        if (!slots.length) return null;
+        const byId = new Map((farm?.pets || []).map((p) => [p.id, p]));
+        return slots.map((s) => (s.pet ? byId.get(s.pet.id) || null : null));
+    }, [farm?.stand?.slots, farm?.pets]);
     // The Petting Stand's three tiers. The whole farm state comes back so the panel, the passive and the pet
     // list all refresh together — seating a pet changes what the tiers say AND what a petting is worth.
     const standSeat = useCallback(async (slot, petId) => {
@@ -1147,6 +1156,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                                 spriteBrightness={farm.spriteBrightness ?? 1}
                                 onMove={decoMove}
                                 onInspect={(p) => { if (p) setInspectDeco({ ...p, placementId: p.id }); }}
+                                standPets={standPets}
                             />
                         ) : null}
 

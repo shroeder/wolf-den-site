@@ -99,6 +99,11 @@ export async function getPlacements(buyerId) {
             id: r.id, decoId: r.deco_id, x: r.x, y: r.y, z: r.z, flip: r.flip === true, scale: Number(r.scale ?? 1), rot: Number(r.rot ?? 0), view: r.view || "outside", light: resolveLight(r), ...lightSettings(r),
             name: def?.name || cm?.name || r.deco_id, emoji: def?.emoji || "🎨", rarity: def?.rarity || (cm ? "custom" : "common"), rarityColor: cm ? CUSTOM_COLOR : DECO_RARITY[def?.rarity]?.color,
             spriteUrl: sprites[r.deco_id] || cm?.url || null, buff: def?.buff || null, buffText: def?.buff ? buffText(def.buff) : null, source: def?.source || (cm ? "custom" : null),
+            // Most decorations are 66px props. A piece that has to hold three legible pets on it is not, so a
+            // decoration may declare its own base size — see DecoLayer, which reads this instead of the constant.
+            size: def?.size || null,
+            // Where pets sit on it, as percentages of the sprite box. Only the Petting Stand has these.
+            tiers: def?.tiers || null,
             // Credit the original artist on a gifted copy.
             copiedFrom: cm?.creatorName || null, copiedFromAlias: cm?.creatorAlias || null,
         };
