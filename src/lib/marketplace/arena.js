@@ -762,6 +762,21 @@ function publicBout(b) {
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
+        // ── AND THE ONES ON YOU ──────────────────────────────────────────────────────────────────────
+        // These were deliberately held back as "the opponent's business". They are not: a burn eating your
+        // health every turn that the screen never mentions is indistinguishable from the numbers being
+        // wrong, which is the oldest bug in this file. You could not see you were on fire.
+        foeBleed: b.foeBleed || null, foeSunder: b.foeSunder || 0,
+        // ── WHAT OF THEIRS IS COOLING ────────────────────────────────────────────────────────────────
+        // Your own rail counts down in turns; theirs was three icons that never changed, so there was no
+        // way to know whether the move you were dreading could even be thrown this beat. Published as
+        // TURNS REMAINING rather than the raw beat it comes back on, because the beat number is an
+        // internal clock and nobody should have to subtract to read a fight.
+        foeCd: Object.fromEntries(
+            Object.entries(b.foeCd || {})
+                .map(([id, until]) => [id, Math.max(0, Number(until) - (b.beat || 0))])
+                .filter(([, turns]) => turns > 0)
+        ),
         // The NPC-only states. Published because the fight screen draws a chip for each — an effect the
         // player is under and cannot see is indistinguishable from the numbers being wrong.
         dread: b.dread || 0, snare: b.snare || 0, bound: b.bound || 0,

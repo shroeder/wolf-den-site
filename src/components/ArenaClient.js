@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiBurn, GiCrossedSwords, GiExitDoor, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiBurn, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -17,7 +17,7 @@ import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
-import { BATTLE_ITEMS } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS, BIND_CUT, DOOM_MULT, DREAD_CUT, REND_PER_TURN, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -172,6 +172,77 @@ function SkillFace({ ab, left = 0 }) {
 // hero inside the stage — which meant the camera push-in during a cast scaled and slid it too, so on every
 // single skill the two name plates drifted across each other and printed one name on top of the other. A HUD
 // that reads the state of the fight cannot be part of the shot.
+
+// ── WHAT IS ON EACH FIGHTER, AND WHAT IT IS DOING ────────────────────────────────────────────────────────────
+// Every lingering effect in the ring, described from the ENGINE'S OWN CONSTANTS rather than retyped — a number
+// in prose is a number that goes stale the first time somebody retunes it.
+//
+// Luke: "if im taking dot damage whether it be burn bleed or otherwise there should be an icon for each dot
+// type active like a debuff icon ... so I can see what debuffs are on me and inspect them as well as see how
+// many turns until they expire and be able to click them for more details. both on me and on the enemy."
+const pct = (n) => `${Number((n * 100).toFixed(1))}%`;
+const STATUS_KINDS = {
+    burn:    { Icon: GiBurn,          label: "Burning",        tone: "fire",
+               what: () => `Takes ${pct(REND_PER_TURN)} of max health at the end of every turn. Stacks.` },
+    sunder:  { Icon: GiCrackedShield, label: "Guard stripped", tone: "bad",
+               what: () => `${pct(SUNDER_CUT)} of their damage reduction is gone while it lasts.` },
+    dread:   { Icon: GiTerror,        label: "Dread",          tone: "bad",
+               what: () => `Your damage is cut by ${pct(DREAD_CUT)}.` },
+    snare:   { Icon: GiChainedHeart,  label: "Chained",        tone: "bad",
+               what: () => `${pct(SNARE_ACC)} off your accuracy — you will miss more.` },
+    bound:   { Icon: GiTombstone,     label: "Gravebound",     tone: "bad",
+               what: () => `Your Guard banks only ${pct(BIND_CUT)} of what it should.` },
+    branded: { Icon: GiSpikedHalo,    label: "Branded",        tone: "mark",
+               what: () => "Every blow they land on you is a guaranteed crit." },
+    doom:    { Icon: GiRingingBell,   label: "The Bell",       tone: "doom",
+               what: () => `When it finishes counting down they hit for ${DOOM_MULT}x.` },
+    frenzy:  { Icon: GiAngryEyes,     label: "Their frenzy",   tone: "bad",
+               what: () => "They are swinging faster than they should." },
+};
+
+// The effects riding a given fighter, in the order they matter. `you` reads the ones the OPPONENT has put on
+// you; `them` reads the ones you have put on them.
+function statusesFor(bout, side) {
+    if (!bout) return [];
+    const out = [];
+    const add = (kind, turns, extra) => { if (turns > 0 || turns === true) out.push({ kind, turns: turns === true ? null : turns, ...extra }); };
+    if (side === "them") {
+        if (bout.bleed?.turns > 0) add("burn", bout.bleed.turns, { dmg: bout.bleed.dmg, stacks: bout.bleed.stacks });
+        add("sunder", Number(bout.sunder) || 0);
+        return out;
+    }
+    if (bout.foeBleed?.turns > 0) add("burn", bout.foeBleed.turns, { dmg: bout.foeBleed.dmg, stacks: bout.foeBleed.stacks });
+    add("sunder", Number(bout.foeSunder) || 0);
+    add("dread", Number(bout.dread) || 0);
+    add("snare", Number(bout.snare) || 0);
+    add("bound", Number(bout.bound) || 0);
+    if (bout.branded) add("branded", true);
+    if (bout.doomReady) add("doom", true); else add("doom", Number(bout.doom) || 0);
+    add("frenzy", Number(bout.foeFrenzy) || 0);
+    return out;
+}
+
+// One chip per effect: its icon, and the turns it has left. Tapping one opens what it actually does.
+function StatusRow({ list, side, onPick }) {
+    if (!list.length) return null;
+    return (
+        <span className={`ar-status is-${side}`}>
+            {list.map((s) => {
+                const def = STATUS_KINDS[s.kind];
+                if (!def) return null;
+                const { Icon } = def;
+                return (
+                    <button type="button" key={s.kind} className={`ar-stat is-${def.tone}`} onClick={() => onPick(s)}
+                        aria-label={`${def.label}${s.turns ? `, ${s.turns} turns left` : ""} — tap for detail`}>
+                        <Icon aria-hidden="true" />
+                        {s.turns ? <b>{s.turns}</b> : null}
+                    </button>
+                );
+            })}
+        </span>
+    );
+}
+
 function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
@@ -220,45 +291,7 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
             <em className="ar-hpnum">
                 {Math.max(0, hp)}<span>/{maxHp}</span>
                 {shield > 0 ? <u>+{shield}</u> : null}
-                {/* ── THE BURN, WORN BY THE FIGHTER THAT IS BURNING ────────────────────────────────────
-                    A rend ticks at the END of their turn, so the damage lands right after they swing — which
-                    is indistinguishable from thorns. Kaishiern: "Why does Emberbrand act like a spikes move?"
-                    The server has published `bleed` (turns, stacks, per-turn damage) all along and nothing
-                    drew it, so the only account of it was a line of log text that scrolls away.
-                    It sits ON their bar, states what it costs them and how many turns are left, and the bar
-                    itself carries an ember pulse for as long as it burns — so the tick has a visible cause. */}
-                {burning ? (
-                    <i className="ar-burn" aria-label={`Burning: ${burn.dmg} a turn, ${burn.turns} turns left`}>
-                        <GiBurn aria-hidden="true" />
-                        <b>{burn.dmg}</b>
-                        <u>{burn.turns}<s>t</s></u>
-                    </i>
-                ) : null}
             </em>
-            {/* ── EVERY NUMBER THAT DECIDES THE FIGHT ──────────────────────────────────────────────────────
-                The ring used to roll the defender's mitigation per blow, at 12%, 32% or 55%, and print
-                nothing — so the same kit into the same opponent read 14 on one swing and 36 on the next and
-                there was no way to learn why. Nothing is hidden now, so nothing needs to be: this is the
-                whole calculation, on both cards, before you press anything. DMG x CRIT, minus their ARMOUR. */}
-            <span className="ar-stats">
-                <i title="Damage on a plain swing"><b>{Math.round(f?.damage || 0)}</b> dmg</i>
-                <i title="Chance to crit, and what a crit multiplies by">
-                    <b>{Math.round((f?.critChance || 0) * 100)}%</b> crit &times;{(f?.critMult || 2.5).toFixed(1)}
-                </i>
-                {/* BOTH sides, or the promise above is only half kept. An NPC's mitigation is `armour`, a
-                    member's is `block` — two names for the same thing, and only theirs was ever printed. That
-                    is the whole reason armour reads as a stat the enemy gets and you do not: a member turns
-                    aside 34% before Footwork, usually MORE than the 6-26% an NPC carries, and nothing on your
-                    half of the screen has ever said so. Summed, because a member defender has both. */}
-                {/* One name, both sides. NPCs read 0 here — their toughness is health now, which the bar
-                    already tells you about. */}
-                {(f?.dr || 0) > 0 ? (
-                    <i title="Share of every incoming blow that never lands"><b>{Math.round(f.dr * 100)}%</b> reduction</i>
-                ) : null}
-                {(f?.accuracy ?? 1) < 1 ? (
-                    <i title="Chance a plain swing connects"><b>{Math.round((f.accuracy ?? 1) * 100)}%</b> acc</i>
-                ) : null}
-            </span>
         </div>
     );
 }
@@ -542,6 +575,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // How much of the log has already been turned into floating numbers. Without this the screen only ever
     // showed the LAST line of an exchange — see the effect that reads it.
     const lastLogSeen = useRef(0);
+    const [statusPick, setStatusPick] = useState(null);   // the effect whose detail card is open
     const resultAtRef = useRef(0);
     const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
@@ -986,8 +1020,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     });
                 });
             } else if (l.damage > 0) {
+                // ── A TICK IS NOT A SWING ────────────────────────────────────────────────────────────
+                // A burn eating 14 looked exactly like a hit landing 14, so the one number you had no
+                // control over read as the one you did. It floats with its own mark instead.
+                // Luke: "if we take fire damage the text should have a burn icon next to it, same a bleed
+                // that would be a blood droplet icon".
+                const dot = l.kind === "rend" || l.grade === "burn" ? "burn" : null;
                 // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
-                sub.push({ side: target, n: l.damage, kind: l.crit ? "crit" : "dmg" });
+                sub.push({ side: target, n: l.damage, kind: dot || (l.crit ? "crit" : "dmg"), dot });
             } else if (l.grade === "miss") {
                 sub.push({ side: target, n: null, text: "MISS", kind: "miss" });
             }
@@ -1201,33 +1241,42 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 
                     {/* ── THE BARS ── outside the stage, so the camera never touches them. */}
                     <div className="ar-bars">
-                        <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
-                            active={yourTurn} shield={bout.shield || 0} />
+                        <span className="ar-barcol">
+                            <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
+                                active={yourTurn} shield={bout.shield || 0} />
+                            <StatusRow list={statusesFor(bout, "you")} side="you" onPick={setStatusPick} />
+                        </span>
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
                         </span>
-                        <FighterBar burn={bout.bleed} f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                            foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
+                        <span className="ar-barcol is-foe">
+                            <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
+                                foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
+                            <StatusRow list={statusesFor(bout, "them")} side="them" onPick={setStatusPick} />
+                        </span>
                     </div>
 
-                    {/* ── WHAT IS ON YOU ─────────────────────────────────────────────────────────────────
-                        The Road's fighters carry ten moves no member can learn, and every one of them leaves
-                        something behind: your damage cut, your aim off, your guard halved, a bell counting
-                        down. Said once in the log and then invisible, that is indistinguishable from the
-                        numbers being wrong — which is the oldest bug in this file. One chip each, on the
-                        field, for exactly as long as the effect lasts. */}
-                    {(bout.dread || bout.snare || bout.bound || bout.branded || bout.doom || bout.doomReady || bout.foeFrenzy) ? (
-                        <div className="ar-hexes" aria-live="polite">
-                            {bout.dread ? <i className="is-bad">Dread <b>{bout.dread}</b></i> : null}
-                            {bout.snare ? <i className="is-bad">Chained <b>{bout.snare}</b></i> : null}
-                            {bout.bound ? <i className="is-bad">Gravebound <b>{bout.bound}</b></i> : null}
-                            {bout.branded ? <i className="is-mark">Branded</i> : null}
-                            {bout.doomReady ? <i className="is-bell">THE BELL</i>
-                                : bout.doom ? <i className="is-bell">Bell <b>{bout.doom}</b></i> : null}
-                            {bout.foeFrenzy ? <i className="is-frenzy">Their frenzy <b>{bout.foeFrenzy}</b></i> : null}
+                    {/* ── TAP ONE, LEARN WHAT IT IS DOING ────────────────────────────────────────────────
+                        The chip says WHICH and HOW LONG; this says what it costs you, in the engine's own
+                        numbers. */}
+                    {statusPick && STATUS_KINDS[statusPick.kind] ? (
+                        <div className="ar-statcard" role="dialog" aria-label={STATUS_KINDS[statusPick.kind].label}
+                            onClick={() => setStatusPick(null)}>
+                            <b className={`is-${STATUS_KINDS[statusPick.kind].tone}`}>
+                                {STATUS_KINDS[statusPick.kind].label}
+                                {statusPick.turns ? <u>{statusPick.turns} {statusPick.turns === 1 ? "turn" : "turns"} left</u> : null}
+                            </b>
+                            <p>{STATUS_KINDS[statusPick.kind].what()}</p>
+                            {statusPick.dmg ? (
+                                <p className="ar-statcard-now">Right now: <b>{statusPick.dmg}</b> a turn
+                                    {statusPick.stacks > 1 ? <> · stacked <b>{statusPick.stacks}x</b></> : null}</p>
+                            ) : null}
                         </div>
                     ) : null}
 
+                    {/* The old `ar-hexes` strip lived here: a second, separate list of the effects on you,
+                        drawn as words, while burns and sunders had no chip at all and the opponent's had
+                        nowhere to live. It is folded into StatusRow above — one renderer, both fighters. */}
                     <div className="ar-floor">
                         {/* YOUR HERO IS ALWAYS ON THE LEFT. Sprites are drawn facing right, so you need no
                             flip and the opponent gets `mirrored` to turn and face you. `mirrored` and `foe`
@@ -1275,6 +1324,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         <span key={`${it.kind}-${i}`}
                                             className={`ar-pop is-${it.side} is-${it.kind}`}
                                             style={it.at ? { animationDelay: `${it.at}ms` } : undefined}>
+                                            {/* A damage-over-time tick wears its own mark, so it can never be
+                                                mistaken for a blow somebody chose to throw. */}
+                                            {it.dot && STATUS_KINDS[it.dot] ? (() => {
+                                                const { Icon } = STATUS_KINDS[it.dot];
+                                                return <Icon className="ar-pop-dot" aria-hidden="true" />;
+                                            })() : null}
                                             {it.text
                                                 ? it.text
                                                 : <>
@@ -1344,16 +1399,24 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {bout.foe?.abilities?.length ? (
                                 <span className="ar-theirs">
                                     <i className="ar-theirs-lab">Theirs</i>
-                                    {bout.foe.abilities.map((ab) => (
-                                        <span key={ab.id} className="ar-theirchip"
-                                            style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                            title={`${ab.name} — ${ab.from}`}>
-                                            {ab.sprite ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img src={ab.sprite} alt="" draggable="false" />
-                                            ) : null}
-                                        </span>
-                                    ))}
+                                    {/* THEIR CLOCKS, NOT JUST THEIR ICONS. Your rail counts down; theirs was
+                                        three pictures that never changed, so you could not tell whether the
+                                        move you were bracing for was even available this beat. A cooling
+                                        skill dims and wears the turns it has left, exactly like yours. */}
+                                    {bout.foe.abilities.map((ab) => {
+                                        const cool = Number(bout.foeCd?.[ab.id] || 0);
+                                        return (
+                                            <span key={ab.id} className={`ar-theirchip${cool > 0 ? " is-cooling" : ""}`}
+                                                style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
+                                                title={cool > 0 ? `${ab.name} — ready in ${cool}` : `${ab.name} — ready`}>
+                                                {ab.sprite ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={ab.sprite} alt="" draggable="false" />
+                                                ) : null}
+                                                {cool > 0 ? <b className="ar-theircd">{cool}</b> : null}
+                                            </span>
+                                        );
+                                    })}
                                 </span>
                             ) : null}
                         </div>
@@ -2341,6 +2404,26 @@ function Styles() {
             /* The hex row sits above the fighters and out of the way of the damage floats. Small, dense and
                colour-coded by whether it is on you (red), a mark (amber) or on them (green — their frenzy is
                the one that is also YOUR window). */
+            .ar-barcol { display: grid; gap: 3px; min-width: 0; }
+            .ar-status { display: flex; flex-wrap: wrap; gap: 3px; }
+            .ar-status.is-them { justify-content: flex-end; }
+            .ar-stat { display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px;
+                font-size: 10px; font-weight: 900; line-height: 1.5; cursor: pointer; font-variant-numeric: tabular-nums;
+                background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.16); color: #dfe6ee; }
+            .ar-stat svg { font-size: 12px; }
+            .ar-stat.is-fire { color: #ffb066; border-color: rgba(255,138,42,0.55); background: rgba(255,110,30,0.14);
+                animation: arBurnPulse 1.15s ease-in-out infinite; }
+            .ar-stat.is-bad { color: #ff9f9f; border-color: rgba(255,120,120,0.45); background: rgba(255,90,90,0.12); }
+            .ar-stat.is-mark { color: #ffd75e; border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.12); }
+            .ar-stat.is-doom { color: #fff; border-color: rgba(255,80,80,0.7); background: rgba(200,30,30,0.28);
+                animation: arBurnPulse .8s ease-in-out infinite; }
+            .ar-statcard { position: relative; z-index: 7; margin: 6px 0 0; padding: 9px 11px; border-radius: 12px; cursor: pointer;
+                background: linear-gradient(180deg, rgba(26,28,34,0.98), rgba(16,17,21,0.98));
+                border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 26px rgba(0,0,0,0.5); }
+            .ar-statcard b { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+            .ar-statcard b u { text-decoration: none; margin-left: auto; font-size: 10px; font-weight: 800; color: #b9c2cc; }
+            .ar-statcard p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: #c8d0d9; }
+            .ar-statcard-now b { display: inline; color: #ffb066; }
             .ar-hexes { position: relative; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px;
                 justify-content: center; padding: 2px 8px 0; }
             .ar-hexes i { font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: .05em;
@@ -3031,6 +3114,8 @@ function Styles() {
                only then drifts off. Slower, not laggier: the beat behind it is unchanged. */
             /* The COLUMN is the positioned thing. column-reverse so the first number sits lowest and each
                extra one stacks above it — damage at the bottom, then what you blocked, healed and soaked. */
+            .ar-pop.is-burn { color: #ffa04a; text-shadow: 0 0 12px rgba(255,120,30,.75); }
+            .ar-pop-dot { font-size: .8em; margin-right: .12em; vertical-align: -.06em; }
             .ar-pop.is-thorn { color: #ff9f9f; text-shadow: 0 0 10px rgba(255,120,120,.65); }
             .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
                 align-items: center; gap: 6px; pointer-events: none; }
@@ -3156,6 +3241,11 @@ function Styles() {
             .ar-buff.is-surge { color: #ffd75e; border: 1px solid rgba(255,215,94,.5); }
 
             /* ── THEIR KIT ── same rail, their side, smaller. Readable, not actionable. */
+            .ar-theirchip { position: relative; }
+            .ar-theirchip.is-cooling img { filter: grayscale(1) brightness(.55); }
+            .ar-theircd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px;
+                font-weight: 900; color: #fff; text-shadow: 0 1px 4px #000, 0 0 8px rgba(0,0,0,.9);
+                font-variant-numeric: tabular-nums; }
             .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
                 padding-left: 6px; }
             .ar-theirs-lab { font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .14em;
