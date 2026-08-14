@@ -10812,113 +10812,138 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .credit-chip.is-featured { border-color: rgba(255,215,94,0.7); box-shadow: 0 0 0 1px rgba(255,215,94,0.5) inset, 0 4px 16px rgba(240,160,40,0.3); padding-top: 20px; }
 .credit-chip-flag { position: absolute; top: 0; left: 0; right: 0; padding: 2px 0; font-size: 0.6rem; font-weight: 900; letter-spacing: 0.06em;
     color: #2a1400; background: linear-gradient(180deg, #ffe08a, #ffbf3c); border-radius: 13px 13px 0 0; }
-/* ── THE PACKAGE BANNER ───────────────────────────────────────────────────────────────────────────────────
-   The offer where members actually are, rather than at the till. Deliberately a strip and not a second copy of
-   the card: the item working, the name, the three numbers, a price, done. Tapping goes to the real card. */
-.pkgb { display: flex; align-items: center; gap: 12px; padding: 12px 13px; margin: 0 0 12px; border-radius: 18px;
-    text-decoration: none; color: #f0e6d2;
+/* ── THE PACKAGE BANNER ─────────────────────────────────────────────────
+   GOLD, not purple. The whole Den is gold and ember — the wolf, the coin, every primary button, the Arbiter
+   banner — and a violet offer read like a different product bolted onto the side. This is the store selling
+   something, so it should look like the store.
+
+   And it MOVES: a slow sheen crosses it, the item bobs, the glow breathes. A static rectangle is a thing the
+   eye files as furniture within a day. */
+.pkgb { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px;
+    padding: 12px 13px; margin: 0 0 12px; border-radius: 18px; text-decoration: none; color: #f7ecd2;
     background:
-        radial-gradient(110% 130% at 88% 0%, rgba(214,160,255,0.22), transparent 62%),
-        linear-gradient(180deg, #241b31, #15111e);
-    border: 1px solid rgba(214,160,255,0.48);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.42);
+        radial-gradient(120% 150% at 88% 0%, rgba(255,215,94,0.26), transparent 60%),
+        radial-gradient(90% 120% at 0% 100%, rgba(243,120,40,0.16), transparent 62%),
+        linear-gradient(180deg, #2a2012, #17110a);
+    border: 1px solid rgba(255,215,94,0.60);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.14), 0 12px 34px rgba(0,0,0,0.5), 0 0 28px rgba(243,178,58,0.14);
     transition: transform .12s ease, box-shadow .12s ease; }
-.pkgb:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgba(140,80,200,0.34); }
+.pkgb:hover { transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 16px 40px rgba(0,0,0,0.55), 0 0 44px rgba(243,178,58,0.3); }
+/* Wide and slow, so it reads as light moving over gold rather than as a loading shimmer. */
+.pkgb::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,235,170,0.16) 50%, transparent 62%);
+    transform: translateX(-130%); animation: pkgbSheen 5.5s ease-in-out 1s infinite; }
+@keyframes pkgbSheen { 0% { transform: translateX(-130%); } 60%,100% { transform: translateX(130%); } }
 .pkgb-art { position: relative; flex: 0 0 auto; display: grid; place-items: center; }
-.pkgb-glow { position: absolute; width: 130%; height: 130%; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(214,160,255,0.30) 0%, rgba(214,160,255,0.08) 46%, transparent 70%);
+.pkgb-glow { position: absolute; width: 135%; height: 135%; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,215,94,0.34) 0%, rgba(243,178,58,0.12) 45%, transparent 70%);
     animation: pkgbPulse 3.2s ease-in-out infinite; }
-@keyframes pkgbPulse { 0%,100% { transform: scale(0.92); opacity: .7; } 50% { transform: scale(1.06); opacity: 1; } }
-.pkgb-stand { position: relative; }
+@keyframes pkgbPulse { 0%,100% { transform: scale(0.9); opacity: .65; } 50% { transform: scale(1.08); opacity: 1; } }
+.pkgb-stand { position: relative; animation: pkgbBob 4.2s ease-in-out infinite; }
+@keyframes pkgbBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 .pkgb-deco { display: block; width: 100%; height: 100%; object-fit: contain;
-    filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5)); }
+    filter: drop-shadow(0 6px 9px rgba(0,0,0,0.55)); }
 .pkgb-pet { position: absolute; object-fit: contain; transform: translate(-50%, -100%);
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
-.pkgb-body { min-width: 0; flex: 1 1 auto; }
-.pkgb-kick, .pkgb-preview { display: inline-flex; align-items: center; gap: 4px; font-size: .6rem; font-weight: 900;
-    letter-spacing: .14em; text-transform: uppercase; color: #d6a0ff; }
-.pkgb-preview { color: #ffb347; }
-.pkgb-body b { display: block; font-size: 1.02rem; line-height: 1.15; color: #fff4dc; }
+.pkgb-body { position: relative; z-index: 1; min-width: 0; flex: 1 1 auto; }
+.pkgb-kick, .pkgb-preview { display: inline-flex; align-items: center; gap: 4px; font-size: .6rem;
+    font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #ffd75e; }
+.pkgb-preview { color: #ff9f4a; }
+.pkgb-body b { display: block; font-size: 1.04rem; line-height: 1.15; color: #fff6de;
+    text-shadow: 0 1px 10px rgba(255,215,94,0.28); }
 .pkgb-body em { display: block; margin-top: 2px; font-style: normal; font-size: .74rem; line-height: 1.35;
-    color: #bfb0cd; }
+    color: #cdbb96; }
 .pkgb-gets { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
-.pkgb-gets i { font-style: normal; font-size: .68rem; color: #cbbcda; }
-.pkgb-gets i b { display: inline; font-size: .76rem; color: #ffd75e; }
-.pkgb-cta { flex: 0 0 auto; display: grid; justify-items: center; gap: 1px; padding: 8px 12px; border-radius: 12px;
-    background: linear-gradient(180deg, #e9c2ff, #b06bf0); color: #2a0f45; }
-.pkgb-cta b { font-size: 1.02rem; font-weight: 900; }
+.pkgb-gets i { font-style: normal; font-size: .68rem; color: #cdbb96; }
+.pkgb-gets i b { display: inline; font-size: .78rem; color: #ffd75e; }
+.pkgb-cta { position: relative; z-index: 1; flex: 0 0 auto; display: grid; justify-items: center; gap: 1px;
+    padding: 9px 13px; border-radius: 12px; color: #3a2c08;
+    background: linear-gradient(180deg, #ffe488, #f3b23a);
+    box-shadow: 0 3px 0 #b57f22, 0 5px 16px rgba(243,178,58,0.4); }
+.pkgb-cta b { font-size: 1.04rem; font-weight: 900; }
 .pkgb-cta i { font-style: normal; font-size: .62rem; font-weight: 800; }
 @media (max-width: 430px) {
     .pkgb { gap: 9px; padding: 10px; }
     .pkgb-body em { display: none; }
-    .pkgb-cta { padding: 7px 9px; }
-    .pkgb-cta b { font-size: .92rem; }
+    .pkgb-cta { padding: 8px 10px; }
+    .pkgb-cta b { font-size: .94rem; }
 }
 
-/* ── THE PACKAGE CARD ─────────────────────────────────────────────────────────────────────────────────────
-   Built as an advertisement: the item drawn working, the numbers in large type, three lines on what it does.
-   pkgc- prefixed so nothing here can collide with the plain credit chips below. */
+/* ── THE PACKAGE CARD ────────────────────────────────────────────────────
+   The full pitch, in the same gold. Built as an advertisement: the item drawn working, the numbers in large
+   type, three lines on what it does. pkgc- prefixed so nothing collides with the plain credit chips below. */
 .credit-pkgs { display: grid; gap: 12px; margin-bottom: 6px; }
 .pkgc { position: relative; overflow: hidden; border-radius: 20px; padding: 16px;
     background:
-        radial-gradient(110% 90% at 85% 0%, rgba(214,160,255,0.20), transparent 62%),
-        radial-gradient(90% 80% at 0% 100%, rgba(255,215,110,0.10), transparent 60%),
-        linear-gradient(180deg, #241b31, #14101d);
-    border: 1px solid rgba(214,160,255,0.45);
-    box-shadow: 0 14px 40px rgba(0,0,0,0.45); }
-.pkgc.is-on { border-color: rgba(214,160,255,0.95);
-    box-shadow: 0 0 0 1px rgba(214,160,255,0.55), 0 18px 48px rgba(140,80,200,0.35); }
-.pkgc-preview { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 10px; font-size: 0.7rem; font-weight: 800;
-    color: #ffb347; background: rgba(255,179,71,0.13); border: 1px solid rgba(255,179,71,0.45);
+        radial-gradient(110% 90% at 85% 0%, rgba(255,215,94,0.24), transparent 62%),
+        radial-gradient(90% 80% at 0% 100%, rgba(243,120,40,0.16), transparent 60%),
+        linear-gradient(180deg, #2a2012, #16110b);
+    border: 1px solid rgba(255,215,94,0.55);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.5), 0 0 30px rgba(243,178,58,0.12); }
+.pkgc.is-on { border-color: rgba(255,215,94,0.95);
+    box-shadow: 0 0 0 1px rgba(255,215,94,0.5), 0 18px 48px rgba(243,178,58,0.3); }
+.pkgc::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(105deg, transparent 40%, rgba(255,235,170,0.13) 50%, transparent 60%);
+    transform: translateX(-130%); animation: pkgcSheen 6s ease-in-out 1.2s infinite; }
+@keyframes pkgcSheen { 0% { transform: translateX(-130%); } 60%,100% { transform: translateX(130%); } }
+.pkgc-preview { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px;
+    margin-bottom: 10px; font-size: 0.7rem; font-weight: 800; color: #ff9f4a;
+    background: rgba(255,159,74,0.13); border: 1px solid rgba(255,159,74,0.45);
     border-radius: 999px; padding: 3px 10px; }
 
-/* HERO — the item on the left, the pitch on the right; stacks on a narrow phone. */
-.pkgc-hero { display: flex; align-items: center; gap: 14px; }
+.pkgc-hero { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; }
 .pkgc-stage { position: relative; flex: 0 0 auto; display: grid; place-items: center; }
 .pkgc-glow { position: absolute; width: 128%; height: 128%; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(214,160,255,0.32) 0%, rgba(214,160,255,0.10) 45%, transparent 70%);
+    background: radial-gradient(circle, rgba(255,215,94,0.34) 0%, rgba(243,178,58,0.12) 45%, transparent 70%);
     animation: pkgcPulse 3.4s ease-in-out infinite; }
-@keyframes pkgcPulse { 0%,100% { transform: scale(0.94); opacity: 0.75; } 50% { transform: scale(1.06); opacity: 1; } }
-.pkgc-stand { position: relative; }
+@keyframes pkgcPulse { 0%,100% { transform: scale(0.94); opacity: 0.72; } 50% { transform: scale(1.06); opacity: 1; } }
+.pkgc-stand { position: relative; animation: pkgcBob 4.6s ease-in-out infinite; }
+@keyframes pkgcBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .pkgc-deco { display: block; width: 100%; height: 100%; object-fit: contain;
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5)); }
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.55)); }
 .pkgc-pet { position: absolute; object-fit: contain; transform: translate(-50%, -100%);
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
 .pkgc-head { min-width: 0; }
 .pkgc-kicker { display: inline-block; font-size: 0.64rem; font-weight: 900; letter-spacing: 0.14em;
-    text-transform: uppercase; color: #d6a0ff; }
-.pkgc-head h3 { margin: 2px 0 4px; font-size: 1.32rem; line-height: 1.12; color: #fff4dc; }
-.pkgc-head p { margin: 0; font-size: 0.82rem; line-height: 1.42; color: #cbbcda; }
-.pkgc-price { display: inline-block; margin-top: 8px; font-size: 1.9rem; font-weight: 900; line-height: 1;
-    color: #ffd75e; text-shadow: 0 2px 12px rgba(255,215,94,0.35); }
+    text-transform: uppercase; color: #ffd75e; }
+.pkgc-head h3 { margin: 2px 0 4px; font-size: 1.34rem; line-height: 1.12; color: #fff6de;
+    text-shadow: 0 2px 14px rgba(255,215,94,0.3); }
+.pkgc-head p { margin: 0; font-size: 0.82rem; line-height: 1.42; color: #cdbb96; }
+.pkgc-price { display: inline-block; margin-top: 8px; font-size: 2rem; font-weight: 900; line-height: 1;
+    color: #ffd75e; text-shadow: 0 2px 16px rgba(255,215,94,0.45); }
 
-/* WHAT YOU GET — three tiles, the number is the message. */
-.pkgc-gets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+.pkgc-gets { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-top: 14px; }
 .pkgc-get { display: grid; justify-items: center; text-align: center; gap: 1px; padding: 10px 6px;
-    border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); }
+    border-radius: 14px; background: rgba(255,215,94,0.07); border: 1px solid rgba(255,215,94,0.24); }
 .pkgc-get-ico { display: grid; place-items: center; height: 34px; }
 .pkgc-get-ico img { max-width: 34px; max-height: 34px; object-fit: contain; }
-.pkgc-get b { font-size: 1.24rem; line-height: 1.1; color: #ffd75e; }
-.pkgc-get em { font-style: normal; font-size: 0.72rem; font-weight: 700; color: #f0e6d2; }
-.pkgc-get i { font-style: normal; font-size: 0.63rem; line-height: 1.25; color: #a99bb8; }
+.pkgc-get b { font-size: 1.26rem; line-height: 1.1; color: #ffd75e; }
+.pkgc-get em { font-style: normal; font-size: 0.72rem; font-weight: 700; color: #f7ecd2; }
+.pkgc-get i { font-style: normal; font-size: 0.63rem; line-height: 1.25; color: #b0a184; }
 
 .pkgc-back-ico { vertical-align: -2px; margin-right: 3px; color: #8fe39a; }
-.pkgc-back { margin-top: 12px; padding: 10px 12px; border-radius: 12px; font-size: 0.78rem; line-height: 1.45;
-    color: #bfe8c6; background: rgba(143,227,154,0.10); border: 1px solid rgba(143,227,154,0.32); }
+.pkgc-back { position: relative; z-index: 1; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+    font-size: 0.78rem; line-height: 1.45; color: #bfe8c6;
+    background: rgba(143,227,154,0.10); border: 1px solid rgba(143,227,154,0.32); }
 .pkgc-back b { color: #8fe39a; }
 
-.pkgc-does { display: grid; gap: 9px; margin-top: 12px; }
+.pkgc-does { position: relative; z-index: 1; display: grid; gap: 9px; margin-top: 12px; }
 .pkgc-do { display: flex; gap: 9px; align-items: flex-start; }
-.pkgc-do-ico { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px;
-    color: #d6a0ff; font-size: 15px; background: rgba(214,160,255,0.13); border: 1px solid rgba(214,160,255,0.28); }
-.pkgc-do b { display: block; font-size: 0.82rem; color: #f0e6d2; }
-.pkgc-do em { display: block; font-style: normal; font-size: 0.74rem; line-height: 1.4; color: #a99bb8; }
+.pkgc-do-ico { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 8px; color: #ffd75e; font-size: 15px;
+    background: rgba(255,215,94,0.13); border: 1px solid rgba(255,215,94,0.3); }
+.pkgc-do b { display: block; font-size: 0.82rem; color: #f7ecd2; }
+.pkgc-do em { display: block; font-style: normal; font-size: 0.74rem; line-height: 1.4; color: #b0a184; }
 
-.pkgc-cta { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 14px; cursor: pointer;
-    font-family: var(--font-display); font-size: 1rem; font-weight: 900; color: #2a0f45;
-    background: linear-gradient(180deg, #e9c2ff, #b06bf0);
-    box-shadow: 0 3px 0 rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5); }
-.pkgc-cta.is-on { color: #06311f; background: linear-gradient(180deg, #a9f0b8, #4bbf6a); }
+.pkgc-cta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center;
+    gap: 7px; width: 100%; margin-top: 14px; padding: 14px; border: 0; border-radius: 14px; cursor: pointer;
+    font-family: var(--font-display); font-size: 1.04rem; font-weight: 900; color: #3a2c08;
+    background: linear-gradient(180deg, #ffe488, #f3b23a);
+    box-shadow: 0 4px 0 #b57f22, 0 6px 20px rgba(243,178,58,0.42); }
+.pkgc-cta.is-on { color: #06311f; background: linear-gradient(180deg, #a9f0b8, #4bbf6a);
+    box-shadow: 0 4px 0 #2b7a45, 0 6px 20px rgba(75,191,106,0.4); }
 
 @media (max-width: 430px) {
     .pkgc-hero { flex-direction: column; align-items: center; text-align: center; gap: 8px; }
