@@ -173,6 +173,19 @@ export function SmeltModal({ smelting, onClose }) {
                                 </span>
                             ))}
                         </div>
+                        {/* ORE THAT CAME BACK OUT OF THE POT. A deep Crucible spares some of what it melts, and
+                            the Cold Crucible capstone has always done the same — but neither ever said so, so the
+                            ore reappeared in the pack with nothing to connect it to the upgrade that earned it. */}
+                        {(smelting.result?.oreBack || 0) > 0 ? (
+                            <div className="mine-rung-won" style={{ marginTop: 10 }}>
+                                <b style={{ color: "#8fe39a" }}>
+                                    ⛏ {smelting.result.oreBack} ore survived the melt
+                                </b>
+                                <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                                    {smelting.result.sparedBatches > 0 ? "Your crucible runs deep enough to give some back." : "The cold crucible gave it back."}
+                                </div>
+                            </div>
+                        ) : null}
                         {(smelting.result?.bonus || []).length ? (
                             <div className="mine-rung-won is-flawless" style={{ marginTop: 12 }}>
                                 <b>Out of the slag</b>
