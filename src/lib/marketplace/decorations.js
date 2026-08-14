@@ -187,7 +187,8 @@ export const DECORATIONS = [
     {
         id: "deco_petting_stand", name: "The Petting Stand", emoji: "🐾", rarity: "mythic",
         source: "package", price: null, buff: null, unique: true, unreleased: true, pets: 3,
-        prompt: prompt("an ornate three-tiered stone display pedestal with soft cushions on each tier, garlanded with flowers, built for small animals to sit and be admired"),
+        // No leading article — `prompt()` prepends "A ", exactly as it does for every other entry above.
+        prompt: prompt("ornate three-tiered carved stone display pedestal, each tier topped with a plush velvet cushion, garlanded with trailing flowers and gold filigree, built for small animals to sit and be admired"),
     },
 ];
 
