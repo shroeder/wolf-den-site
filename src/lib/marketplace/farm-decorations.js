@@ -35,9 +35,34 @@ const lightSettings = (row) => ({ brightness: Number(row.brightness ?? 1), light
 // there — this keep-out box (in field %) keeps them from burying your crops. Kept generous so the UI hint lines
 // up with the guard.
 const PLOT_KEEPOUT = { xMax: 42, yMin: 74 };
+// ── WHERE THE CROPS ACTUALLY ARE ─────────────────────────────────────────────────────────────────────────────
+// PLOT_KEEPOUT above says the beds cluster "front-left" (x <= 42). That was true of an older layout and is not
+// true now: PLOT_SLOTS in farm-crops.js puts them in TWO FULL-WIDTH ROWS, x = 10..92 at y = 89 and y = 69, and
+// each bed is drawn upward from its anchor. The band they really occupy is the whole width from roughly y = 44
+// down. Anything checking the old box was asking about a garden that no longer exists.
+const CROP_BAND_TOP = 44;
+const inCropBand = (y) => Number(y) >= CROP_BAND_TOP;
 export function nearPlots(x, y) {
     return Number(x) <= PLOT_KEEPOUT.xMax && Number(y) >= PLOT_KEEPOUT.yMin;
 }
+// ── AND WHO THE KEEP-OUT ACTUALLY APPLIES TO ─────────────────────────────────────────────────────────────────
+// `nearPlots` was written to keep decorations off the crop bed and then never called by anything — the server
+// never checked it and the client ships `keepout` to a screen that never draws it. Dead on both ends.
+//
+// Turning it on for EVERYTHING would be wrong now: 54 of 224 placed decorations already sit in this box across
+// 15 farms. Members decorate around their gardens, it looks good, and at 66px nothing is harmed. Enforcing the
+// rule retroactively would rearrange fifteen people's farms to satisfy a guard none of them ever saw.
+//
+// What genuinely does not work is an OVERSIZED piece landing on the plots. Both plots and decorations stack by
+// their own y (`zIndex: Math.round(y)`), so a plot anchored even slightly lower renders in FRONT of the piece —
+// and a plot is a <button>, so its rectangle then swallows every tap aimed at the decoration behind it. That is
+// exactly how the Petting Stand ended up placed, plainly visible, and completely untappable: the stand at
+// y=83.8 (z 84) with plot slot 0 at y=89 (z 89) sitting right across its base.
+const BASE_DECO_SIZE = 66;
+const buriedByPlots = (decoId, x, y) =>
+    (decorationById(decoId)?.size || BASE_DECO_SIZE) > BASE_DECO_SIZE && inCropBand(y);
+const PLOTS_MSG = "That piece is too big to stand in the garden — the crops would cover it. Drop it on open ground.";
+
 // Owning a decoration is a PERMANENT unlock — you can place it as many times as you like (reusable, never
 // consumed). The only limit is a global cap on how many items you can have placed at once.
 export const PLACE_CAP = 500;
@@ -208,6 +233,7 @@ export async function placeDecoration(buyerId, decoId, x, y, view = "outside") {
     if (!owned) return { ok: false, error: "not_owned" };
     const total = await db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_deco_placement WHERE buyer_id = $1`, [buyerId]).catch(() => ({ n: 0 }));
     if ((total?.n || 0) >= PLACE_CAP) return { ok: false, error: "placement_limit", ...(await decoState(buyerId)) };
+    if (buriedByPlots(decoId, px, py)) return { ok: false, error: "near_plots", message: PLOTS_MSG };
     // ── ONE TO A FARM ────────────────────────────────────────────────────────────────────────────────────
     // The Petting Stand holds three pets and doubles what they earn from being petted; two of them would be
     // six pets and a second helping of the whole feature. Enforced on the SERVER because the placement is a
@@ -274,6 +300,9 @@ export async function moveDecoration(buyerId, placementId, x, y) {
     if (!buyerId || !placementId) return { ok: false, error: "bad_request" };
     const px = clampPct(x, 50, 1, 99);
     const py = clampPct(y, 55, 2, 100);
+    // Read the piece first: the guard needs to know WHAT is being dragged, and a bare UPDATE doesn't say.
+    const cur = await db.queryOne(`SELECT deco_id FROM mkt_deco_placement WHERE id = $1 AND buyer_id = $2`, [placementId, buyerId]).catch(() => null);
+    if (cur && buriedByPlots(cur.deco_id, px, py)) return { ok: false, error: "near_plots", message: PLOTS_MSG };
     const moved = await db.queryOne(`UPDATE mkt_deco_placement SET x = $3, y = $4 WHERE id = $1 AND buyer_id = $2 RETURNING id`, [placementId, buyerId, px, py]).catch(() => null);
     if (!moved) return { ok: false, error: "not_found" };
     await trackActivity(buyerId, "arrange_deco", { placementId, kind: "move" }).catch(() => {});

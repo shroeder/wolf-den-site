@@ -14,6 +14,8 @@ import FeatureDailies from "@/components/FeatureDailies";
 import CollectionPanel from "@/components/CollectionPanel";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
+import { GiPawPrint } from "react-icons/gi";
+
 import PettingStand from "@/components/PettingStand";
 import PackageBanner from "@/components/PackageBanner";
 import { STAND_DECO_ID } from "@/lib/marketplace/petting-stand-const";
@@ -646,6 +648,9 @@ export default function FarmClient({ initial, viewingAlias }) {
     }, []);
     useEffect(() => { loadArtPending(); }, [loadArtPending]);
     const [decoBusy, setDecoBusy] = useState(false);
+    // A refused placement used to do NOTHING visible — decoAct only ever acted on success, so the piece just
+    // sprang back to the tray with no reason given and the obvious read was "the farm is broken".
+    const [decoNote, setDecoNote] = useState("");
     const decoAct = useCallback(async (body) => {
         setDecoBusy(true);
         const sx = scrollRef.current?.scrollLeft; // remember how far the pasture is scrolled…
@@ -663,9 +668,16 @@ export default function FarmClient({ initial, viewingAlias }) {
             }));
             // …and restore it after the re-render, so a piece placed while scrolled right doesn't vanish off-screen.
             if (sx != null) requestAnimationFrame(() => { if (scrollRef.current) scrollRef.current.scrollLeft = sx; });
+        } else if (r && r.ok === false && r.message) {
+            setDecoNote(r.message);
         }
         return r;
     }, [post]);
+    useEffect(() => {
+        if (!decoNote) return undefined;
+        const t = setTimeout(() => setDecoNote(""), 4200);
+        return () => clearTimeout(t);
+    }, [decoNote]);
     const decoBuy = useCallback((decoId) => decoAct({ action: "deco_buy", decoId }), [decoAct]);
 
     // ── Custom farm background (3 creations; generate → LIVE preview on the scene → accept/discard) ──
@@ -820,6 +832,20 @@ export default function FarmClient({ initial, viewingAlias }) {
             {farm.mine && view === "outside" ? (
                 <button type="button" onClick={() => setBgOpen(true)} title="Custom farm background" style={{ ...CTRL_PILL, border: "1px solid rgba(201,162,255,0.5)", background: "linear-gradient(180deg, rgba(44,34,64,0.96), rgba(28,22,42,0.96))", color: "#d9c9ff" }}>
                     <span style={{ fontSize: 15 }} aria-hidden="true">🎨</span>Backdrop
+                </button>
+            ) : null}
+            {/* ── A DOOR THAT IS NOT THE SPRITE ───────────────────────────────────────────────────────────
+                Tapping the stand itself is the natural way in and it is not a RELIABLE way in. Plots and
+                decorations both stack by their own y (`zIndex: Math.round(y)`), and a plot is a <button> whose
+                rectangle covers a lot of transparent ground — so a plot anchored lower renders in front of the
+                stand and eats taps meant for it. The stand is the biggest piece in the game (132px against the
+                usual 66, and scalable to 2.5x from there) in a pasture only ~347px tall on a phone, so it
+                overlaps SOMETHING almost wherever it goes.
+                This pill does not care where the stand is standing. Shown to visitors too — who is on display
+                is the whole point of the thing. */}
+            {farm.stand?.placed && view === "outside" ? (
+                <button type="button" onClick={() => setInspectDeco({ decoId: STAND_DECO_ID })} title="The Petting Stand" style={{ ...CTRL_PILL, border: "1px solid rgba(255,215,110,0.55)", background: "linear-gradient(180deg, rgba(52,42,16,0.96), rgba(32,26,10,0.96))", color: "#ffe6a6" }}>
+                    <GiPawPrint size={15} aria-hidden="true" />Petting Stand
                 </button>
             ) : null}
             {farm.mine && canDecorate && farm.decorations && !decorating ? (
@@ -1443,6 +1469,11 @@ export default function FarmClient({ initial, viewingAlias }) {
             {/* THE STAND GETS ITS OWN PANEL, not the generic decoration inspector — it is the one decoration
                 with state of its own to show (three tiers, three owner counts) and to change. Opened by the
                 same tap that inspects any other placed piece, on your farm or anybody else's. */}
+            {decoNote ? (
+                <div role="status" style={{ position: "fixed", left: "50%", bottom: 92, transform: "translateX(-50%)", zIndex: 10070, maxWidth: 340, padding: "11px 14px", borderRadius: 12, background: "linear-gradient(180deg, #2a2410, #17181c)", border: "1px solid rgba(255,215,110,0.45)", boxShadow: "0 14px 40px rgba(0,0,0,0.55)", color: "#f0e4c8", fontSize: 13, fontWeight: 700, lineHeight: 1.4, textAlign: "center" }}>
+                    {decoNote}
+                </div>
+            ) : null}
             {inspectDeco?.decoId === STAND_DECO_ID && farm.stand?.placed ? (
                 <PettingStand
                     stand={farm.stand}
