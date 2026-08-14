@@ -451,6 +451,28 @@ async function purserBits(buyerId) {
 // `pre` lets a caller hand over what it has already computed. Deliberately not a cache: a TTL here would risk
 // serving a stale kit to somebody who just changed gear and pressed Fight, which is a far worse bug than a slow
 // button. Same request, same values, no staleness possible.
+// ── AND NOT THE SAME PERSON TWICE ────────────────────────────────────────────────────────────────────────────
+// After you fight someone, they are off your card until five more PvP bouts have gone by. Two members close in
+// power used to lock onto each other and trade the same fight all evening, which is dull for them and starves
+// everybody else of opponents.
+//
+// Counted over bouts YOU CHALLENGED, not ones you defended. Being attacked is not a choice, and blocking a
+// rematch because somebody keeps picking you would punish the person who did nothing.
+//
+// The board carries 91 members, so removing five can never leave you with nobody to fight.
+export const REMATCH_BLOCK = 5;
+export async function recentPvpFoes(buyerId, limit = REMATCH_BLOCK) {
+if (!buyerId) return new Set();
+// npc_tier IS NULL is what a member-vs-member bout looks like; the NPC ladder writes a tier.
+const rows = await db.query(
+    `SELECT defender_id FROM mkt_arena_bout
+      WHERE challenger_id = $1 AND npc_tier IS NULL AND defender_id IS NOT NULL
+      ORDER BY created_at DESC LIMIT $2`,
+    [buyerId, Math.max(1, limit)]
+).catch(() => []);
+return new Set((rows || []).map((r) => String(r.defender_id)));
+}
+
 export async function getArenaState(buyerId, pre = {}) {
     const row = await arenaRow(buyerId);
     const [me, board, kit] = await Promise.all([
@@ -509,6 +531,10 @@ export async function getArenaState(buyerId, pre = {}) {
     // top of the Den.") and it existed only because winning SWAPPED positions, which made fighting downward
     // self-harming. Points are accrued now, so a fight can never cost you rank and any opponent is fair game.
     const myPower = me.power;
+    // NO `recentlyFought` FLAG HERE. I added one, then went looking for the row that would draw it: `.ar-target`
+    // is CSS with no JSX left, and nothing renders this list any more — every fight goes through Find a fight.
+    // A flag nobody draws is the Den's favourite bug, so the rule lives where the choice is actually made:
+    // matchArenaOpponent skips them, and startBout refuses them.
     const targets = board
         .filter((o) => o.id !== buyerId)
         .map((o) => ({ ...o, reward: { vp: vpPreview(myPower, o.power), laurels: boutLaurels({ won: true, myPower, theirPower: o.power }) } }))
@@ -791,12 +817,14 @@ const RESERVE_MEMBER = 2;
 // in ten reading as never across a handful of taps. A coin flip is what he is actually asking for.
 const GAUNTLET_SHARE = 0.5;
 
-function matchArenaOpponent(buyerId, myPower, board, bestTier) {
+function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set()) {
     const dist = (p) => Math.abs(p / Math.max(1, myPower) - TARGET_RATIO);
     const members = [];
     const npcs = [];
     for (const o of board) {
         if (String(o.id) === String(buyerId)) continue;
+        // Silently skipped here, unlike the board — matchmaking picks FOR you, so there is nothing to explain.
+        if (blocked.has(String(o.id))) continue;
         members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
     }
     // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can
@@ -1059,7 +1087,7 @@ export async function startBout(buyerId, targetId = null) {
 
     // In parallel: they share no inputs, and serialising them added a whole round trip to the press that was
     // timing out. ~390ms and ~a loadout assembly, previously one after the other for no reason.
-    const [board, me] = await Promise.all([standings(), kitFor(buyerId)]);
+    const [board, me, blockedFoes] = await Promise.all([standings(), kitFor(buyerId), recentPvpFoes(buyerId).catch(() => new Set())]);
     const myPower = arenaRating(me);
 
     // ── WHO ARE WE FIGHTING ──────────────────────────────────────────────────────────────────────────────
@@ -1069,7 +1097,7 @@ export async function startBout(buyerId, targetId = null) {
     // No target (or an explicit "auto") means: find me one.
     let target = targetId;
     if (!target || target === "auto") {
-        const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0);
+        const m = matchArenaOpponent(buyerId, myPower, board, Number(row?.npc_best) || 0, blockedFoes);
         if (!m) return { ok: false, error: "no_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         target = m.kind === "npc" ? `npc:${m.tier}` : m.id;
     }
@@ -1115,6 +1143,11 @@ export async function startBout(buyerId, targetId = null) {
     } else {
         foe = board.find((o) => o.id === target);
         if (!foe) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
+        // The board draws these as unavailable; this is what makes them unavailable. A crafted POST is the
+        // only way to reach this line, and it gets the same answer the screen gave.
+        if (blockedFoes.has(String(foe.id))) {
+            return { ok: false, error: "recently_fought", ...(await getArenaState(buyerId, { board, kit: me })) };
+        }
         foeKit = await kitFor(foe.id);
     }
 

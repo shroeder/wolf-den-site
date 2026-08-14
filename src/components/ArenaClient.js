@@ -63,6 +63,7 @@ const REFUSALS = {
     // into a bug report, and that is precisely how the stall was reported.
     brace_cooling: "You braced last beat. Not twice in a row — swing, drink, or cast.",
     no_braces: "You are out of braces for this bout. Six is all anybody gets.",
+    recently_fought: "You just fought them. Five more bouts before a rematch.",
 };
 
 // How long their move sits on screen before the block ring starts. Long enough to actually read a name.
