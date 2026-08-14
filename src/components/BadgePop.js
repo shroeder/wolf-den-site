@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+
+import { useVisiblePoll } from "@/lib/use-visible-poll";
 
 // ── YOU EARNED A BADGE ───────────────────────────────────────────────────────────────────────────────────────
 //
@@ -17,12 +19,28 @@ export default function BadgePop() {
     const [badge, setBadge] = useState(null);
     const [closing, setClosing] = useState(false);
 
-    const load = () => fetch("/api/marketplace/badge-pop", { cache: "no-store" })
+    const load = useCallback(() => fetch("/api/marketplace/badge-pop", { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => { if (d?.badge) setBadge(d.badge); })
-        .catch(() => {});
+        .catch(() => {}), []);
 
-    useEffect(() => { let alive = true; load().then(() => alive); return () => { alive = false; }; }, []);
+    // ── IT ONLY ASKED ONCE, ON MOUNT ─────────────────────────────────────────────────────────────────────
+    // This ran a single fetch when the nav mounted and never looked again — so a badge earned while you were
+    // already standing on a page did not appear until you happened to NAVIGATE somewhere that remounted the
+    // nav. Luke: "the badge modal fires like way late, almost like it only fires if you are on the farm
+    // screen or something." It was not the farm; it was whichever page he opened next.
+    //
+    // Two signals now, and the cheap one does the real work:
+    //   · `wolfden-hud-refresh` is already dispatched by ~39 places the instant an action pays out, which is
+    //     exactly when a badge can have landed. That makes the pop feel immediate rather than polled.
+    //   · A slow poll underneath catches anything earned by a cron or by another device. useVisiblePoll, not
+    //     setInterval, so a backgrounded phone is not asking all night — see that file for why that matters.
+    useVisiblePoll(() => { if (!badge) load(); }, 45000);
+    useEffect(() => {
+        const onHud = () => { if (!badge) load(); };
+        window.addEventListener("wolfden-hud-refresh", onHud);
+        return () => window.removeEventListener("wolfden-hud-refresh", onHud);
+    }, [badge, load]);
 
     // Marked seen on DISMISS, not on show: a request that fails, or a tab closed mid-read, should hand the
     // badge back next time rather than silently spending the one telling.

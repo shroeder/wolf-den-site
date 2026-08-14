@@ -1421,6 +1421,17 @@ export default function TownClient({ initial }) {
                                 {!raidActive && (todo.byBuilding?.[b.id] || 0) > 0 ? (
                                     <span className="tw-bld-todo" aria-hidden="true">{todo.byBuilding[b.id]}</span>
                                 ) : null}
+                                {/* ── SOMETHING IS FOR SALE ────────────────────────────────────────────
+                                    A package used to live on one screen nobody visits unless they were already
+                                    buying credit — which is backwards, since the package is the reason to go.
+                                    The Vault is already the door to it on the street, so it flies a sign. It
+                                    names the thing, because a banner with no noun is one people stop seeing. */}
+                                {!raidActive && b.id === "vault" && state?.vaultOffer ? (
+                                    <span className="tw-bld-sale">
+                                        <b>{state.vaultOffer.name}</b>
+                                        <i>${(state.vaultOffer.priceCents / 100).toFixed(0)}</i>
+                                    </span>
+                                ) : null}
                                 {bart ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img className="tw-building-art" src={bart.url} alt={b.label} draggable={false} style={bart.flip ? { transform: "translateX(-50%) scaleX(-1)" } : undefined} />
@@ -2438,6 +2449,14 @@ button.tw-centerpiece.tw-well.can-wish img { filter: drop-shadow(0 0 10px rgba(2
     background: linear-gradient(90deg, rgba(255,228,136,0) 0%, rgba(255,228,136,0.28) 100%); pointer-events: none; }
 .tw-strike-bar.is-hit { animation: twStrikeFlash 0.3s ease-out; }
 @keyframes twStrikeFlash { 0% { filter: brightness(2.4); transform: scale(1.03); } 100% { filter: brightness(1); transform: scale(1); } }
+.tw-bld-sale { position: absolute; top: -30px; left: 50%; transform: translateX(-50%); z-index: 4;
+    display: flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+    background: linear-gradient(180deg, #ffe488, #f3b23a); border: 1px solid rgba(120,80,10,0.5);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.45); animation: twSaleBob 2.6s ease-in-out infinite; }
+.tw-bld-sale b { font-size: 0.66rem; font-weight: 900; color: #3a2c08; }
+.tw-bld-sale i { font-size: 0.66rem; font-weight: 900; font-style: normal; color: #6b4a00;
+    background: rgba(255,255,255,0.55); border-radius: 999px; padding: 0 5px; }
+@keyframes twSaleBob { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
 .tw-bld-todo { position: absolute; top: -6px; right: -6px; z-index: 3; min-width: 21px; height: 21px; padding: 0 5px;
     display: grid; place-items: center; border-radius: 999px; font-size: 0.72rem; font-weight: 900; color: #2a1c05;
     background: linear-gradient(180deg,#ffe488,#f3b23a); border: 2px solid #17121f;

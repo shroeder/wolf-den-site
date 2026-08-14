@@ -26,6 +26,7 @@ import { getActiveShiny } from "@/lib/marketplace/town-shiny.js";
 import { getSetting, setSetting } from "@/lib/settings.js";
 import { equippedPowers, hasPower } from "@/lib/marketplace/ascension-powers.js";
 import { NOTICE_ALIAS } from "@/lib/marketplace/notice-format.js";
+import { PACKAGES, packageSettingKey } from "@/lib/marketplace/packages.js";
 
 // The Traveling Merchant's wares — loot chests sold for gold (a gold SINK), always at a DISCOUNT off their
 // "list" price. Stock + the discount improve as the community levels up the Trading Post (merchantTier): rarer
@@ -440,6 +441,22 @@ export async function getTownState(buyerId) {
         signedIn: Boolean(buyerId),
         owner,
         raidAdmin: isPrimaryOwner(buyerId), // ONLY Luke sees the raid trigger/end controls (surprise-drop lever)
+        // ── SOMETHING IS FOR SALE AT THE VAULT ───────────────────────────────────────────────────────────
+        // A package lived on one screen nobody visits unless they were already buying credit, which is
+        // backwards — the package is the REASON to go there. The Vault is already the door to it on the
+        // street, so it gets a flag when there is something behind it. Names the package so the plaza says
+        // WHAT is for sale rather than just that something is; a banner with no noun is ignorable.
+        //
+        // Owner-preview packages are deliberately EXCLUDED: the plaza is the most public surface in the game
+        // and an unreleased item must not advertise itself there even to the owner, or the one place the gate
+        // is easiest to forget is the one place everybody looks.
+        vaultOffer: await (async () => {
+            for (const p of PACKAGES) {
+                const open = String(await getSetting(packageSettingKey(p.id), "off").catch(() => "off")) === "on";
+                if (open) return { id: p.id, name: p.name, priceCents: p.priceCents };
+            }
+            return null;
+        })(),
         // ── EVERY RAID THERE IS, NOT THE THREE SOMEBODY TYPED OUT ────────────────────────────────────────
         // The spawn buttons were three hard-coded kinds while TOWN_EVENT_TYPES held six. Frost Pack, the
         // Drowned Crew and the Hollow Court shipped with their own archetypes, art and push copy and could

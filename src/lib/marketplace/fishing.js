@@ -305,6 +305,14 @@ async function haulSprite(kind, id = null, chestTier = null) {
             const v = art?.[chestTier];
             return (typeof v === "string" ? v : v?.url) || null;
         }
+        // A recipe's art is its finished DISH, keyed by the recipe id in mkt_cooking_sprite. Without this the
+        // reveal fell through to the generic key emoji — so the one haul that teaches you something looked
+        // like a placeholder next to a fish with a painted sprite, which is the exact complaint the fragment
+        // and chest art were added to fix. The bottle is the wrapper; the dish is the prize.
+        if (kind === "recipe" && id) {
+            const r = await db.queryOne(`SELECT url FROM mkt_cooking_sprite WHERE ref = $1`, [id]).catch(() => null);
+            return r?.url || null;
+        }
         if (kind === "pet" && id) {
             const { getPetSpriteData } = await import("@/lib/marketplace/pet-sprite.js");
             const map = await getPetSpriteData().catch(() => ({}));
@@ -326,7 +334,11 @@ async function grantHaul(buyerId, kind, tier = "common") {
         // Knows every recipe the sea can teach? The bottle is empty and the fragment takes its place, rather
         // than the haul silently paying nothing.
         if (!rec) return grantHaul(buyerId, "fragment", tier);
-        return { kind: "recipe", label: `A sealed bottle — ${rec.name}`, recipe: rec.id };
+        return {
+            kind: "recipe", label: `A sealed bottle — ${rec.name}`, recipe: rec.id,
+            where: "Written into your recipe book",
+            spriteUrl: await haulSprite("recipe", rec.id),
+        };
     }
     if (kind === "fragment") {
         const n = FRAGMENT_COUNT[tier] || 1;
