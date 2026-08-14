@@ -66,6 +66,17 @@ export async function POST(request) {
             if (pkg) {
                 const open = String(await getSetting(packageSettingKey(pkg.id), "off").catch(() => "off")) === "on";
                 if (!open && !isOwner(buyer.id)) return noStore({ error: "That package isn't available." }, { status: 403 });
+                // AND NOT TWICE. The item is one-per-farm, so a second purchase buys a duplicate that can never
+                // be placed — refused HERE rather than only hidden on the screen, because the screen is not what
+                // takes the money. A stale tab is all it would take.
+                if (pkg.decoId) {
+                    const { db } = await import("@/lib/db");
+                    const has = await db.queryOne(
+                        `SELECT 1 FROM mkt_deco_owned WHERE buyer_id = $1 AND deco_id = $2 AND qty > 0 LIMIT 1`,
+                        [buyer.id, pkg.decoId]
+                    ).catch(() => null);
+                    if (has) return noStore({ error: "You already own this package's item." }, { status: 409 });
+                }
             }
 
             const amountCents = pkg ? pkg.priceCents : Math.round(Number(body?.amountCents) || 0);
