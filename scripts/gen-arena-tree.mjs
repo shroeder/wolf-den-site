@@ -30,9 +30,12 @@ const EMBLEM = (s) => `A fantasy GLADIATOR CLASS EMBLEM — a bold heraldic cres
 const ART = {
     // Reaver — damage, criticals, volume
     "node/rv_might": NODE("a clenched armoured gauntlet crushing a stone, shards flying, deep red accents."),
-    "node/rv_crit": NODE("a dagger point striking a glowing weak-point rune, red sparks bursting outward."),
-    "node/rv_strike": NODE("a single heavy greatsword cleaving downward through a shockwave."),
-    "node/rv_critdmg": NODE("a cracked skull with a blade driven through it, crimson glow in the fracture."),
+    // Shieldsplitter — was Killer Instinct. Damage into a RAISED brace, so the icon is the moment of breaking one.
+    "node/rv_crit": NODE("a heavy axe blade smashing through a raised round shield, the shield splitting apart, red sparks at the break."),
+    // Bloodfeast — was Cleave. A drain now, so the blade is drinking.
+    "node/rv_strike": NODE("a fanged sword blade drinking a ribbon of blood that spirals up it into a crimson glow."),
+    // Retaliation — was Overkill. A counter-swing off their blow: two blades, theirs turned, yours coming back.
+    "node/rv_critdmg": NODE("an incoming blade being knocked aside while a second blade strikes back along it, crimson counter-arc."),
     "node/rv_flurry": NODE("four overlapping speed-blurred blade arcs in a rushing fan."),
     "node/rv_speed": NODE("a winged armoured boot trailing red afterimages."),
     "node/rv_surge": NODE("a roaring wolf head inside a war-horn, sound rings radiating."),
@@ -62,9 +65,11 @@ const ART = {
     "node/rc_burn": NODE("a slow-burning ember creeping along a fuse of runes."),
     "node/rc_stacks": NODE("three stacked burning rune tiles, each brighter than the last."),
     "node/rc_sunder": NODE("a rune-etched hammer shattering an armour plate into gold shards."),
-    "node/rc_cd": NODE("an hourglass wrapped in violet lightning, sand racing through."),
+    // Emberdrinker — was Quickening. Burn damage returned as health, so: embers being drunk.
+    "node/rc_cd": NODE("a chalice catching falling embers, orange firelight rising out of it in a curling ribbon."),
     "node/rc_pierce": NODE("a violet bolt punching a clean hole through a rune-warded plate."),
-    "node/rc_overcharge": NODE("a crystal overloading with violet lightning, cracks blazing white."),
+    // Rimeshatter — was Overcharge. The ICE capstone that can freeze a turn away.
+    "node/rc_overcharge": NODE("a jagged blue-white ice crystal shattering outward into frozen shards, pale cold light in the cracks."),
     "node/rc_spread": NODE("a bursting star of fire scattering smaller flames outward."),
     "node/rc_fortune": NODE("a rune-carved coin spinning inside a ring of luck-sparks."),
     // Training tracks — bought with gold, so they get the same treatment as the Kitchen's tracks: sprites,

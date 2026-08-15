@@ -252,6 +252,41 @@ export const Sfx = {
         noise({ at, dur: 0.44, gain: 0.09, type: v.filt, freq: v.cut, sweepTo: v.cut * 2.2, q: 1.6 });
     },
 
+    /**
+     * ── THE FREEZE ── the most expensive sound in the ring, because it is the most expensive event: the
+     * other fighter has just lost a turn.
+     *
+     * Built to be unmistakable with your eyes shut, which is the whole job of this file. Three layers, and
+     * each is doing something a burn cannot: a bright shard-glitter UP the register (everything else in the
+     * arena sweeps DOWN, so rising alone reads as "not a hit"), a hard crystalline crack for the moment of
+     * contact, and a long low sub that keeps ringing after the visuals have finished — the sound of the
+     * beat that is about to be skipped.
+     */
+    freeze(at = 0) {
+        // The glitter. High, thin, and the only ascending sweep in the whole kit.
+        tone({ at, freq: 1400, to: 3400, type: "triangle", dur: 0.34, gain: 0.11 });
+        tone({ at: at + 0.03, freq: 2100, to: 4600, type: "sine", dur: 0.28, gain: 0.07 });
+        // The crack of something going solid.
+        noise({ at: at + 0.02, dur: 0.09, gain: 0.16, type: "highpass", freq: 4200 });
+        noise({ at: at + 0.05, dur: 0.3, gain: 0.09, type: "bandpass", freq: 2600, sweepTo: 900, q: 2.2 });
+        // And the weight underneath, held long so the silence after it feels like the lost turn.
+        tone({ at: at + 0.04, freq: 96, to: 38, type: "sine", dur: 0.62, gain: 0.2 });
+    },
+
+    /** A burn ticking. Deliberately SMALL — it fires every single turn a burn is up, so anything with a
+     *  transient would turn a five-turn burn into five clicks in the listener's ear. Breath, not impact. */
+    burn(at = 0) {
+        noise({ at, dur: 0.26, gain: 0.075, type: "bandpass", freq: 900, sweepTo: 2100, q: 0.9 });
+        tone({ at, freq: 240, to: 150, type: "sawtooth", dur: 0.2, gain: 0.05 });
+    },
+
+    /** A guard taken away — the same cold family as the freeze, but blunt where the freeze is bright. */
+    disarm(at = 0) {
+        noise({ at, dur: 0.16, gain: 0.2, type: "highpass", freq: 2400 });
+        tone({ at, freq: 300, to: 70, type: "square", dur: 0.28, gain: 0.15 });
+        tone({ at: at + 0.03, freq: 1800, to: 700, type: "triangle", dur: 0.22, gain: 0.08 });
+    },
+
     /** A committed physical skill. */
     strike(at = 0) {
         Sfx.whoosh(at);

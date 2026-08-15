@@ -124,6 +124,10 @@ const ELEMENT_COLOR = {
 // The synthesis itself lives in arena-audio.js; this is only the mapping from a move to its voice.
 function castSound(kind, element) {
     switch (kind) {
+        // The two new voices. Freeze is the loudest thing in the kit on purpose — it costs somebody a turn.
+        case "freeze": return Sfx.freeze();
+        case "disarm": return Sfx.disarm();
+        case "rend": return Sfx.burn();
         case "spell": return Sfx.spell(element);
         case "execute": return Sfx.execute();
         case "gamble": return Sfx.gamble();
@@ -803,6 +807,20 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const last = bout.log?.length ? bout.log[bout.log.length - 1] : null;
         const isNew = last && bout.log.length !== p.round;
         const crit = Boolean(last?.crit);
+        // ── THE FREEZE STING ── fires on the beat the freeze LANDS and again on the beat it is paid, because
+        // those are two separate events for whoever it happened to: the moment it hits, and the moment their
+        // turn evaporates. Played outside the damage branches below — a freeze can land on a blow that also
+        // dealt damage, and chaining it after `else if` would have silenced it exactly then.
+        if (isNew && typeof last.text === "string") {
+            if (/FROZEN|frozen solid|THE COLD TAKES YOU/i.test(last.text)) {
+                Sfx.freeze();
+                Haptic.crit();
+                duck(0.5, 0.35);
+            } else if (last.ability === "Shattered") {
+                Sfx.disarm();
+                Haptic.cast();
+            }
+        }
 
         if (p.hp != null && bout.hp < p.hp) {
             // YOU TOOK IT. Weight is the fraction of your whole bar this blow cost, which is what decides how
@@ -829,6 +847,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         } else if (isNew && last.grade === "ward") { Sfx.ward(); Haptic.cast(); }
         else if (isNew && last.grade === "guard") { Sfx.guard(); Haptic.cast(); }
         else if (isNew && last.grade === "item") { (last.item === "poultice" ? Sfx.heal : Sfx.refresh)(); Haptic.cast(); }
+        else if (isNew && last.grade === "burn") { Sfx.burn(); }
         else if (isNew && last.damage === 0) { Sfx.block(0.4); }
 
         // SHOW the exchange. The MOVE, named, across the middle. The damage number is NOT repeated here — it
