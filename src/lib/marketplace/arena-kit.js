@@ -155,6 +155,10 @@ export const REND_PER_TURN = 0.045; // of their MAX health, per tick
 // time in the game; it is just no longer a runaway.
 export const REND_MAX_STACKS = 3;
 export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as health
+// ── RETALIATION ── what a counter-swing is worth, as a share of your normal damage. Half: it is a free
+// blow off somebody else's turn, so at four ranks (20% of their swings) it must not out-earn actually
+// attacking. Read on BOTH sides in arena.js — see the counter blocks either side of the riposte.
+export const COUNTER_POWER = 0.5;
 export const SUNDER_CUT = 0.4;      // of their guard, removed
 export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.

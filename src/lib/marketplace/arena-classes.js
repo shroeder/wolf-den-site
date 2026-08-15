@@ -191,13 +191,29 @@ export const TREES = {
     reaver: [
         N({ id: "rv_might", tier: 0, name: "Brutality", ranks: 5, stat: "might", per: 2,
             desc: "+2 Might per rank.", sprite: "/images/arena/node/rv_might.webp" }),
-        N({ id: "rv_crit", tier: 0, name: "Killer Instinct", ranks: 5, stat: "crit", per: 0.02,
-            desc: "+2% critical chance per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
-        N({ id: "rv_strike", tier: 0, kind: "active", ability: "strike", name: "Cleave", power: 1.45, acc: -0.06, cd: 3,
-            desc: "A committed blow. One big hit.", sprite: "/images/arena/node/rv_strike.webp" }),
+        // ── WAS KILLER INSTINCT (+2% crit chance a rank) ────────────────────────────────────────────────
+        // Reaver had crit chance AND crit damage, which is one idea bought twice, and neither did anything
+        // about the matchup the class actually loses: Warden challenging Reaver won 94% of 145 bouts.
+        // This is the answer to a turtle. It fires ONLY on beats where their brace is actually up — "any
+        // amount of guard" is always true (everyone has 12% base), so a bonus keyed on that is just flat
+        // damage wearing a condition. Keyed on the brace, it is a real decision on both sides: they choose
+        // when to guard, and you choose when to swing into it.
+        // Same id and rank count, so anyone holding Killer Instinct keeps every point.
+        N({ id: "rv_crit", tier: 0, name: "Shieldsplitter", ranks: 5, stat: "guardBreak", per: 0.06,
+            desc: "+6% damage per rank while their brace is up.", sprite: "/images/arena/node/rv_crit.webp" }),
+        // WAS A PLAIN STRIKE. "A committed blow. One big hit." was the most generic thing in the game and
+        // there was no reason to take it over Rampage. Reaver is the blood class and had no sustain at all;
+        // it drinks now. Weaker than it was and weaker than the Warden's Tithe (x1.55, tier 3) on purpose —
+        // this sits at tier 1, so it buys sustain earlier and pays for it in power.
+        N({ id: "rv_strike", tier: 0, kind: "active", ability: "drain", name: "Bloodfeast", power: 1.25, acc: -0.06, cd: 3,
+            desc: "Tear it out of them and swallow it.", sprite: "/images/arena/node/rv_strike.webp" }),
 
-        N({ id: "rv_critdmg", tier: 1, name: "Overkill", ranks: 4, stat: "critMult", per: 0.08, needs: 3,
-            desc: "Criticals hit +12% harder per rank.", sprite: "/images/arena/node/rv_critdmg.webp" }),
+        // ── WAS OVERKILL (crit damage) ──────────────────────────────────────────────────────────────────
+        // The other half of the crit pair. A counter is the aggressive answer to being hit that the Warden
+        // already has as an active (Answer) and a passive (Iron Thorns) — Reaver had neither, so a Reaver
+        // being ground down had nothing happening on their opponent's beat at all.
+        N({ id: "rv_critdmg", tier: 1, name: "Retaliation", ranks: 4, stat: "counter", per: 0.05, needs: 3,
+            desc: "5% chance per rank to strike back when their blow lands.", sprite: "/images/arena/node/rv_critdmg.webp" }),
         // ── RAMPAGE, RETUNED ────────────────────────────────────────────────────────────────────────────
         // 0.95 x 3 = 285% on a three-turn cooldown, against Cleave's 230% on the SAME cooldown — more damage,
         // and three separate crit rolls, from the same class. There was no reason to ever take Cleave.
@@ -214,17 +230,17 @@ export const TREES = {
 
         N({ id: "rv_surge", tier: 2, kind: "active", ability: "surge", name: "Warcry", cd: 3, needs: 7,
             desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
-        N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.06, needs: 7,
-            desc: "Cut 6% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
+        N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
+            desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
         N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, acc: -0.10, cd: 4, needs: 7,
             desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
 
         N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, acc: -0.14, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
         N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.06, needs: 12,
-            desc: "+10% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
+            desc: "+6% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
         N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.18, needs: 12,
-            desc: "+25% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
+            desc: "+18% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
     ],
 
     // ── WARDEN ── mitigation, counters, sustain.
@@ -262,7 +278,7 @@ export const TREES = {
 
     // ── RUNECALLER ── affinity, burns, broken armour.
     runecaller: [
-        N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.035,
+        N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.05,
             desc: "+5% spell damage per rank.", sprite: "/images/arena/node/rc_power.webp" }),
         // Was "Wheelwise", +3% element edge a rank. The wheel is gone from the ring, so the node had nothing
         // left to modify — a passive that reads well and does nothing is the bug this file keeps being fixed
@@ -284,8 +300,8 @@ export const TREES = {
             desc: "Strips their guard for what comes next.", sprite: "/images/arena/node/rc_sunder.webp" }),
         N({ id: "rc_cd", tier: 2, name: "Quickening", ranks: 3, stat: "cdCut", per: 1, needs: 7,
             desc: "Every third rank shaves a turn off one cooldown.", sprite: "/images/arena/node/rc_cd.webp" }),
-        N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.05, needs: 7,
-            desc: "Cut 5% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
+        N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
+            desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 
         N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 2.15, acc: -0.16, cd: 6, needs: 12,
             desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
@@ -294,8 +310,8 @@ export const TREES = {
         // Was "+8 Fortune per rank — the arena's critical stat", which stopped being true the moment the ring
         // started reading the boss fight's crit model. Fortune is the raffle stat and nothing else; this node
         // now buys the stat whose name says what it does.
-        N({ id: "rc_fortune", tier: 3, name: "Runes of Fortune", ranks: 3, stat: "critStat", per: 5, needs: 12,
-            desc: "+5% critical chance per rank.", sprite: "/images/arena/node/rc_fortune.webp" }),
+        N({ id: "rc_fortune", tier: 3, name: "Runes of Fortune", ranks: 3, stat: "accuracy", per: 0.03, needs: 12,
+            desc: "+3% accuracy per rank.", sprite: "/images/arena/node/rc_fortune.webp" }),
     ],
 };
 

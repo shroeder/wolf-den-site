@@ -11,6 +11,7 @@ import {
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
+    COUNTER_POWER,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -1501,6 +1502,10 @@ export async function fightRound(buyerId, opts = {}) {
         // First Blood, and Bloodlust: the opening beat, and fighting hurt.
         const openMult = b.beat <= 1 ? 1 + (P.openMult || 0) : 1;
         const lowHpMult = b.hp <= b.maxHp / 3 ? 1 + (P.lowHpDmg || 0) : 1;
+        // ── SHIELDSPLITTER ── swinging into a raised brace. Read off `foeShield` BEFORE the soak below
+        // spends it, so it means "their brace is up as this blow arrives", which is the whole decision:
+        // they choose when to guard and you choose when to swing into it. The mirror is on their side.
+        const splitMult = (b.foeShield || 0) > 0 ? 1 + (P.guardBreak || 0) : 1;
         if (ability) {
             b.cd[ability.id] = coolFor(ability);   // Quickening — see the free-action branch above
             power = ability.power;
@@ -1594,7 +1599,7 @@ export async function fightRound(buyerId, opts = {}) {
             const c = Math.random() < critChance;
             if (c) crit = true;
             const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
-                * openMult * lowHpMult * fever * (c ? myCritMult : 1)
+                * openMult * lowHpMult * splitMult * fever * (c ? myCritMult : 1)
                 * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1);   // Dread Howl
             turned += Math.round(raw * guard);
             const landed = Math.max(1, Math.round(raw - raw * guard));
@@ -1634,6 +1639,12 @@ export async function fightRound(buyerId, opts = {}) {
         if ((FP.thorns || 0) > 0 && dmg > 0) {
             theirThorns = Math.max(1, Math.round((dmg / Math.max(0.15, 1 - guard)) * FP.thorns));
             b.hp = Math.max(0, b.hp - theirThorns);
+        }
+        // ── THEIR RETALIATION ── the mirror of yours, off your whole swing, rolled on their tree's node.
+        let theirCounter = 0;
+        if ((FP.counter || 0) > 0 && dmg > 0 && Math.random() < Math.min(0.6, FP.counter)) {
+            theirCounter = Math.max(1, Math.round(b.foe.damage * COUNTER_POWER));
+            b.hp = Math.max(0, b.hp - theirCounter);
         }
         // ── THEIR RIPOSTE ── set on a beat they spent standing ready, spent on the first blow that lands.
         // The mirror of yours: off what actually got through their guard, and reading their Vengeance node.
@@ -1877,6 +1888,10 @@ export async function fightRound(buyerId, opts = {}) {
         // Their First Blood, their Bloodlust — read off their tree exactly as yours are read off yours.
         const foeOpen = b.beat <= 1 ? 1 + (FP.openMult || 0) : 1;
         const foeLow = b.foeHp <= b.foeMaxHp / 3 ? 1 + (FP.lowHpDmg || 0) : 1;
+        // THEIR SHIELDSPLITTER — the mirror of yours, read off YOUR brace before the soak spends it. A tree
+        // passive that only worked when the player owned it would be the attacker-only bug this file has been
+        // fixed for before: the same kit must hit exactly as hard in the opponent's hands.
+        const foeSplit = (b.shield || 0) > 0 ? 1 + (FP.guardBreak || 0) : 1;
         // Your stance is a BLOCK, cut by their Pierce and by whatever a Sunder of theirs has already stripped
         // off it — the mirror of what your own Sunder does to their armour.
         const mySundered = (b.foeSunder || 0) > 0 ? 1 - SUNDER_CUT : 1;
@@ -1909,7 +1924,7 @@ export async function fightRound(buyerId, opts = {}) {
             const c = Boolean(b.branded) || Math.random() < foeCritChance;
             if (b.branded) b.branded = false;
             if (c) foeCrit = true;
-            const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow
+            const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow * foeSplit
                 * (b.foeUnderdog || 1) * foeSurgeMult * (c ? foeCritMult : 1)
                 * ((b.foeFrenzy || 0) > 0 ? FRENZY_DMG : 1)));
             const off = Math.round(one * myBlock);
@@ -1950,6 +1965,16 @@ export async function fightRound(buyerId, opts = {}) {
         let stood = false;
         if (through >= b.hp && (P.lastStand || 0) > 0 && !b.stood) { through = Math.max(0, b.hp - 1); b.stood = true; stood = true; }
         b.hp = Math.max(0, b.hp - through);
+        // ── RETALIATION ── a Reaver's answer to being hit. Rolled off THEIR landed blow, so it is the
+        // opponent's aggression that feeds it — the aggressive twin of Iron Thorns, which returns a share
+        // every time; this returns a real swing, sometimes. Off `raw` rather than `through` for the same
+        // reason thorns is: a counter that shrank the better you blocked would pay least to the build that
+        // earned it. It cannot fire on a blow that entirely missed.
+        let countered = 0;
+        if ((P.counter || 0) > 0 && raw > 0 && Math.random() < Math.min(0.6, P.counter)) {
+            countered = Math.max(1, Math.round(b.me.damage * COUNTER_POWER));
+            b.foeHp = Math.max(0, b.foeHp - countered);
+        }
         // ── WHAT THEIR MOVE LEAVES BEHIND ── their drain feeding them, their burn on you, their sunder on
         // your block. All three were computed on their card and then dropped: `heal` in particular was set by
         // the picker on every drain and read by nothing at all, so a life-steal kit healed for zero on defence.
