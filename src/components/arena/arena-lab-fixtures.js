@@ -295,6 +295,25 @@ export function baseState(extra = {}) {
 
 // ── THE SCENES ───────────────────────────────────────────────────────────────────────────────────────────────
 export const SCENES = {
+    // ── THE TWO NEW STATUSES, ON THE BAR ─────────────────────────────────────────────────────────────────
+    // A freeze and a burn are the only effects that can cost you a whole turn or kill you without anybody
+    // swinging, so they have to be legible while they are ON — not just at the instant they land. This is
+    // the state a player is actually looking at: both fighters carrying something, every chip counting down.
+    statuses: {
+        label: "Frozen & burning",
+        note: "Their bar carries a burn, a freeze and a shattered guard; yours carries a burn. What the chips look like mid-bout.",
+        state: () => baseState({
+            bout: makeBout({
+                // On THEM: your burn stacked twice, the freeze that eats their next turn, and Shatter's lockout.
+                bleed: { turns: 4, stacks: 2, dmg: 96 },
+                foeFrozen: 1,
+                foeNoGuard: 3,
+                // On YOU: their burn, so both sides of the readout can be seen at once.
+                foeBleed: { turns: 2, stacks: 1, dmg: 41 },
+                hp: 402, foeHp: 318,
+            }),
+        }),
+    },
     newkinds: {
         label: "New skill kinds",
         note: "One of each new archetype — rend, flurry, drain, sunder, riposte — on the ladder card layout.",
