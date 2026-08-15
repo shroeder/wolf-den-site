@@ -179,6 +179,26 @@ export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as healt
 // blow off somebody else's turn, so at four ranks (20% of their swings) it must not out-earn actually
 // attacking. Read on BOTH sides in arena.js — see the counter blocks either side of the riposte.
 export const COUNTER_POWER = 0.5;
+// ── SHATTER DOES NOT CUT GUARD ANY MORE, IT TAKES IT AWAY ────────────────────────────────────────────────────
+// The Runecaller had THREE skills that all cut guard — Channel, Shatter and Overcharge — which is one idea
+// sold three times and, between them, more guard-cutting than the game wants. Luke: "too much guard cutting
+// this skill needs to change to disables them from guarding for 3 turns." So Shatter is now the only
+// guard-facing move the class has, and it is categorically different from a percentage: for three of their
+// beats they cannot raise a guard at all.
+export const GUARD_DISABLE_TURNS = 3;
+// ── FREEZE ───────────────────────────────────────────────────────────────────────────────────────────────────
+// An ice spell can lock the other fighter out of a beat. Deliberately UNCOMMON — Luke asked for "a rare
+// chance" — because losing a turn is the most frustrating thing that can happen to you in a fight, and the
+// difference between a thrill and a grievance is how often it happens to you rather than by you.
+//
+// TWO RULES KEEP IT FROM BREAKING A BOUT, and both matter:
+//   1. A FROZEN TURN STILL BURNS A BEAT. Every stall guarantee in this file keys off `b.beat` — the pit
+//      escalates from beat 10, the ring is called at 50. Freezing skips the ACTION, never the beat, so a
+//      frozen fighter still walks toward the end of the bout instead of parking it.
+//   2. NO RE-FREEZE WHILE FROZEN. Without it, two ice casts could chain into a lock the other player never
+//      acts through, which is the shape of every deadlock this file has already been fixed for.
+export const FREEZE_CHANCE = 0.18;
+export const FREEZE_TURNS = 1;
 export const SUNDER_CUT = 0.4;      // of their guard, removed
 export const SUNDER_TURNS = 3;
 // Also free, also measured too strong at 56%. Trimmed and slowed for the same reason as the ward.

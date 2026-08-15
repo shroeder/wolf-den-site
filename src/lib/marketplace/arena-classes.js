@@ -286,8 +286,11 @@ export const TREES = {
         // changed, to the other half of what a Runecaller is.
         N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.30,
             desc: "Your burns tick 30% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
-        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, acc: -0.08, cd: 4,
-            desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
+        // ── FIRE ── Channel used to be a third guard-cutter. It is the class's bread-and-butter BURN now, which
+        // is what "Burn it down" on the class card has always promised. Still `spell` kind, so Attunement
+        // (spell damage) applies to it — the thing no card previously told you.
+        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", element: "fire", burns: true, name: "Channel", power: 1.45, acc: -0.08, cd: 4,
+            desc: "Fire. It sets them burning.", sprite: "/images/arena/node/rc_spell.webp" }),
 
         N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
@@ -296,15 +299,18 @@ export const TREES = {
         N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendStacks", per: 1, needs: 3,
             desc: "+1 burn stack per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
 
-        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 1.50, acc: -0.07, cd: 3, needs: 7,
-            desc: "Strips their guard for what comes next.", sprite: "/images/arena/node/rc_sunder.webp" }),
+        // The ONLY guard-facing move the class has left, and it is a different KIND of thing from a percentage:
+        // for three of their beats they cannot raise a guard at all.
+        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "disarm", name: "Shatter", power: 1.50, acc: -0.07, cd: 3, needs: 7,
+            desc: "They cannot guard at all for three turns.", sprite: "/images/arena/node/rc_sunder.webp" }),
         N({ id: "rc_cd", tier: 2, name: "Emberdrinker", ranks: 3, stat: "burnLeech", per: 0.10, needs: 7,
             desc: "You drink back 10% of your burn damage as health, per rank.", sprite: "/images/arena/node/rc_cd.webp" }),
         N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
             desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 
-        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", name: "Overcharge", power: 2.15, acc: -0.16, cd: 6, needs: 12,
-            desc: "Everything at once.", sprite: "/images/arena/node/rc_overcharge.webp" }),
+        // ── ICE ── the capstone, and the only thing in the game that can take a turn off somebody.
+        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", element: "ice", freezes: true, name: "Rimeshatter", power: 2.05, acc: -0.16, cd: 6, needs: 12,
+            desc: "Ice, hard enough that they may lose their next turn.", sprite: "/images/arena/node/rc_overcharge.webp" }),
         N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
             desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),
         // Was "+8 Fortune per rank — the arena's critical stat", which stopped being true the moment the ring

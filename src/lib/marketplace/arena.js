@@ -11,7 +11,7 @@ import {
     BATTLE_ITEMS, BLOCK, BLOCK_CAP, BOUT_BEAT_CAP, BRACE_LIMIT, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
-    COUNTER_POWER,
+    COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, REND_TICK_CAP, REND_TURNS_CAP,
     SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
@@ -1297,6 +1297,41 @@ export async function fightRound(buyerId, opts = {}) {
     }
 
     const mine = b.turn === "you";
+    // ── YOUR TURN, SKIPPED WHILE FROZEN ──────────────────────────────────────────────────────────────
+    // The mirror of the block on their side, and it has to be here rather than inside any one command:
+    // frozen means you do not act, whatever you were reaching for. Resolved BEFORE the command is read so
+    // no branch can slip past it, and it hands the beat straight to them — the beat still passes, which is
+    // what keeps the pit closing and the 50-beat call counting down under a frozen fighter.
+    if (mine && (b.frozen || 0) > 0) {
+        b.frozen -= 1;
+        b.log.push({ beat: b.beat, who: "you", grade: "ward", damage: 0,
+            text: "You are frozen solid — the beat passes you by." });
+        // THEIR BURN STILL EATS YOU while you stand frozen — it ticks at the end of your beat, and this
+        // IS your beat. Skipping it would have made a freeze partly protective, which is the opposite of
+        // what it is for.
+        if (b.foeBleed?.turns > 0) {
+            const tick = Math.min(b.hp, b.foeBleed.dmg);
+            b.hp = Math.max(0, b.hp - tick);
+            b.foeBleed.turns -= 1;
+            if (tick > 0) {
+                b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend",
+                    text: `You are frozen, and still burning — another ${tick}.`, ability: null });
+            }
+            if (b.foeBleed.turns <= 0) b.foeBleed = null;
+        }
+        if (b.foeSunder > 0) b.foeSunder -= 1;
+        if ((b.foeNoGuard || 0) > 0) b.foeNoGuard -= 1;
+        b.turn = "them";
+        b.beat += 1;
+        // The same one-liner `cool` runs, written out: `cool` is a const declared further down this
+        // function, so calling it from up here throws "cannot access before initialization" — a temporal
+        // dead zone that no lint rule in this repo is watching for.
+        for (const k of Object.keys(b.cd || {})) b.cd[k] = Math.max(0, (b.cd[k] || 0) - 1);
+        if (b.hp <= 0 || b.foeHp <= 0) return finishBout(buyerId, row, b, b.foeHp <= 0 && b.hp > 0);
+        if (!b.incoming) b.incoming = pickIncoming(b);
+        await saveBout(buyerId, b);
+        return { ok: true, ...(await getArenaState(buyerId)) };
+    }
     const command = String(opts.command || (mine ? "attack" : "block"));
     // ── NO TIMING ────────────────────────────────────────────────────────────────────────────────────
     // The closing ring is gone. A beat is decided by the COMMAND you pick and the gear behind it, not by
@@ -1391,6 +1426,12 @@ export async function fightRound(buyerId, opts = {}) {
     if (mine && (command === "guard" || command === "item")) {
         // ── NO RING ── these spend the turn outright, which is exactly what makes the menu a decision.
         if (command === "guard") {
+            // ── SHATTERED ── their Shatter took your guard away for three beats. Refused rather than
+            // silently downgraded, the same convention as the two rules below: a command that quietly does
+            // something else is worse than one that says no. The mirror of the block on their side.
+            if ((b.noGuard || 0) > 0) {
+                return { ok: false, error: "guard_shattered", ...(await getArenaState(buyerId)) };
+            }
             // ── AND NOT TWICE IN A ROW ───────────────────────────────────────────────────────────────
             // The mirror of the rule that binds the defender (arena-ai.js). A brace eats the next blow
             // whole, so a fighter whose brace is bigger than the incoming blow takes nothing, gives
@@ -1519,6 +1560,10 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "surge") { b.surge = SURGE_SWINGS; power = 0; justSurged = true; note += " — sharpened"; }
             if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
+            // ── SHATTER ── not a cut, a lockout: they cannot raise a guard at all for three of their beats.
+            if (ability.kind === "disarm") { b.foeNoGuard = GUARD_DISABLE_TURNS; note += " — their guard is broken"; }
+            // FIRE leaves a burn (resolved with `rend` below); ICE may take their next turn off them.
+            if (ability.burns) rend = true;
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
@@ -1694,11 +1739,20 @@ export async function fightRound(buyerId, opts = {}) {
             b.bleed = { turns, stacks, dmg: tick };
         }
         if (sunder) b.sunder = SUNDER_TURNS;
+        // ── ICE ── a rare lockout. Only on a blow that LANDED, and never onto a fighter already frozen:
+        // chaining two casts into a turn they never act through is the deadlock shape this file has been
+        // fixed for before. The beat still passes while they are frozen — see their turn.
+        let froze = false;
+        if (ability?.freezes && dmg > 0 && !(b.foeFrozen > 0) && Math.random() < FREEZE_CHANCE) {
+            b.foeFrozen = FREEZE_TURNS;
+            froze = true;
+        }
 
         const extra = [
             healed > 0 ? `+${healed} back` : null,
             turned > 0 ? `${turned} turned aside` : null,
             rend && dmg > 0 ? `burning ${b.bleed.dmg}/turn` : null,
+            froze ? `FROZEN — they lose their next turn` : null,
             sunder ? `guard stripped` : null,
             hits > 1 ? `${hits} hits` : null,
         ].filter(Boolean).join(", ");
@@ -1742,6 +1796,7 @@ export async function fightRound(buyerId, opts = {}) {
             if (b.foeBleed.turns <= 0) b.foeBleed = null;
         }
         if (b.foeSunder > 0) b.foeSunder -= 1;
+        if ((b.foeNoGuard || 0) > 0) b.foeNoGuard -= 1;
         b.turn = "them";
     } else {
         // ── A BRACED DEFENDER DOES NOT SWING ── it covers up, and your next blow lands on a raised guard.
@@ -1766,6 +1821,12 @@ export async function fightRound(buyerId, opts = {}) {
                         text: `${b.foe.name} drains a draught — everything they have is ready again.`, ability: "Quickening Draught" });
                 }
             }
+        } else if (b.incoming?.brace && (b.foeNoGuard || 0) > 0) {
+            // ── SHATTER'S LOCKOUT ── they went to raise a guard and there is nothing to raise. Their beat
+            // is spent, which is the whole value of the skill: three turns where the turtle cannot turtle.
+            b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false, soaked: 0,
+                text: `${b.foe.name} reaches for a guard and finds it shattered — the beat is wasted.`,
+                ability: "Shattered" });
         } else if (b.incoming?.brace) {
             // ── A GUARD IS A GUARD, WHOEVER RAISES IT ───────────────────────────────────────
             // Your Guard banks a shield worth 30% of your health, capped by your own Unyielding. Theirs banked
@@ -1793,7 +1854,18 @@ export async function fightRound(buyerId, opts = {}) {
         // FREE_KINDS is your rule: a ward or a riposte does not spend your beat — you set it, and you still
         // swing. The defender was never given it, so the picker's own ward branch fell through and resolved
         // as a plain punch. A Warden's signature move, downgraded to a punch, every time its owner was away.
-        if (incoming.free) {
+        // ── FROZEN: THE ACTION IS SKIPPED, THE BEAT IS NOT ──────────────────────────────────────
+        // This sits INSIDE their turn, as the first branch, so it falls through to the SAME tail every
+        // other outcome uses — your burn ticks on them, every timer runs down, the turn comes back to
+        // you and the beat increments. It was written one level up first, which skipped all of that and
+        // would have left the ring stuck on their turn forever: the exact deadlock the note at the top
+        // of this block warns about, and the reason every stall guarantee in this file counts BEATS.
+        // A freeze costs them the action. It never costs the bout its clock.
+        if ((b.foeFrozen || 0) > 0) {
+            b.foeFrozen -= 1;
+            b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: false,
+                text: `${b.foe.name} is frozen solid — the beat passes them by.`, ability: "Frozen" });
+        } else if (incoming.free) {
             if (incoming.free === "riposte") {
                 b.foeRiposte = RIPOSTE_SHARE;
                 b.log.push({ beat: b.beat, who: "them", grade: "ward", damage: 0, free: true,
@@ -1851,6 +1923,11 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "drain") { foeDrain = DRAIN_SHARE; power = 1; }
             if (k === "rend") rendNow = true;
             if (k === "sunder") sunderNow = true;
+            // ── THEIR SHATTER, THEIR FIRE, THEIR ICE ── the mirror of the three Runecaller moves. A tree
+            // that only works when the player owns it is the attacker-only bug this file keeps being fixed
+            // for; the same kit has to do the same thing in an opponent's hands.
+            if (k === "disarm") b.noGuard = GUARD_DISABLE_TURNS;
+            if (theirAbility.burns) rendNow = true;
 
             // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
             // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of
@@ -2010,6 +2087,11 @@ export async function fightRound(buyerId, opts = {}) {
             b.foeBleed = { turns, stacks, dmg: tick };
         }
         if (sunderNow) b.foeSunder = SUNDER_TURNS;
+        let theyFroze = false;
+        if (theirAbility?.freezes && through > 0 && !(b.frozen > 0) && Math.random() < FREEZE_CHANCE) {
+            b.frozen = FREEZE_TURNS;
+            theyFroze = true;
+        }
         // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
         // which meant the entire payoff of guarding and warding was a line of grey text under the buttons.
         // ── RIPOSTE ── their blow comes back at them. Resolved off what actually LANDED, so bracing first and
@@ -2041,7 +2123,7 @@ export async function fightRound(buyerId, opts = {}) {
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
                 extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
                 extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
                 extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${
@@ -2078,6 +2160,7 @@ export async function fightRound(buyerId, opts = {}) {
             if (b.bleed.turns <= 0) b.bleed = null;
         }
         if (b.sunder > 0) b.sunder -= 1;
+        if ((b.noGuard || 0) > 0) b.noGuard -= 1;
         // ── THE NPC-ONLY TIMERS ──────────────────────────────────────────────────────────────────────────
         // All on the same clock as sunder, so "three beats" means the same thing whichever effect said it.
         if ((b.dread || 0) > 0) b.dread -= 1;
