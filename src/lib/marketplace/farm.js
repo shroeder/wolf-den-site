@@ -519,6 +519,22 @@ export async function feedPetItem(feederId, petId, consumableId, ownerId = null)
     const applied = c.effect.type === "pet_level"
         ? await levelUpPet(petOwner, petId).catch(() => ({ ok: false }))
         : await addPetXp(petOwner, petId, c.effect.amount).catch(() => ({ ok: false }));
+    // ── AND EVERY OTHER PET THAT EARNS FOR THIS OWNER ────────────────────────────────────────────────────
+    // Luke: "if I feed my active pet it should also give that exp to the stand pets." A treat was the one
+    // pet-XP source the stand did not share in — the farm, the character-XP share and the passive trickle all
+    // pay every earning pet, and this paid exactly one.
+    //
+    // It pays whichever pet was fed AND the rest, rather than only firing when the FEATURED pet is the one
+    // fed: an asymmetry there would quietly make "always feed the equipped one" the correct play, and a
+    // hidden optimal way to use an item is worse than either rule on its own.
+    //
+    // A LEVEL treat is deliberately NOT shared. `pet_level` grants a whole level outright, and four levels
+    // from one item is a different item — this shares the XP treats, which is what was asked for.
+    if (c.effect.type === "pet_xp") {
+        const { earningPetIds } = await import("@/lib/marketplace/pet-level.js");
+        const others = (await earningPetIds(petOwner).catch(() => [])).filter((id) => id !== petId);
+        for (const id of others) await addPetXp(petOwner, id, c.effect.amount).catch(() => {});
+    }
     const leveled = c.effect.type === "pet_level" ? Boolean(applied?.ok) : Boolean(applied?.leveled);
     await awardXp(feederId, "feed_other", { points: FEED_OTHER_PLAYER_XP, gold: FEED_OTHER_GOLD }).catch(() => {});
     await trackActivity(feederId, "feed_other", { petId, owner: petOwner }).catch(() => {});

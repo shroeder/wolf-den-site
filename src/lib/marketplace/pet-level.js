@@ -114,12 +114,41 @@ export function levelsFromXpMap(xpMap = {}) {
 
 // Add a FLAT amount of XP to the member's equipped pet (capped). Returns { ok, petId, xp, level, leveled }
 // or { ok: false }. Used by pet-feed consumables (full amount) and, via creditEquippedPetXp, the XP share.
+/**
+ * ── WHICH PETS EARN ──────────────────────────────────────────────────────────────────────────────────────
+ * Your featured pet, plus the three on the Petting Stand. ONE definition, because there were three: the
+ * character-XP share looped the stand, the passive trickle looped the stand, and this — the path the FARM and
+ * the boss pay through — credited the featured pet alone. So a stand pet earned from levelling up and from
+ * sitting still, and earned nothing at all from the farm, which is the Den's single biggest pet-XP engine.
+ *
+ * Luke: "all 3 should get every source of exp on the equipped pet, farming, character exp, and the passive
+ * trickle." Every source now means every source, because every source asks the same function.
+ *
+ * The featured pet is FIRST in the list on purpose — callers that report one result report that one.
+ */
+export async function earningPetIds(buyerId) {
+    if (!buyerId) return [];
+    const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const featured = buyer?.featured_collectible || null;
+    // Returns [] when no stand is placed, so this costs one indexed lookup for the members who own none.
+    const { standPetIds } = await import("@/lib/marketplace/petting-stand.js");
+    const stand = await standPetIds(buyerId).catch(() => []);
+    // A pet can be BOTH featured and seated. Paying it twice would make the stand a duplication glitch.
+    return [...new Set([featured, ...stand].filter(Boolean))];
+}
+
 export async function addEquippedPetXp(buyerId, amount) {
     if (!buyerId) return { ok: false };
-    const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const petId = buyer?.featured_collectible;
-    if (!petId) return { ok: false, error: "no_pet_equipped" };
-    return addPetXpById(buyerId, petId, amount);
+    const ids = await earningPetIds(buyerId);
+    if (!ids.length) return { ok: false, error: "no_pet_equipped" };
+    // The featured pet's result is what comes back, so the farm's "your pet grew" line still names the animal
+    // the member thinks of as theirs. The stand pets are credited on the same call, silently.
+    let first = null;
+    for (const petId of ids) {
+        const r = await addPetXpById(buyerId, petId, amount).catch(() => null);
+        if (!first) first = r;
+    }
+    return first || { ok: false };
 }
 
 // The same grant against a NAMED pet rather than whichever is equipped. Extracted so the Petting Stand can
@@ -230,17 +259,9 @@ export async function creditEquippedPetXp(buyerId, memberXp) {
     const vigil = await hasPower(buyerId, "long_vigil");
     const share = Math.round((Number(memberXp) || 0) * PET_XP_SHARE * (vigil ? 3 : 1));
     if (share <= 0) return;
+    // Every earning pet takes the SAME share, not a fraction — the package promises "passive XP just like
+    // your equipped pet" and a discount here would make that a half-truth. addEquippedPetXp walks them all.
     await addEquippedPetXp(buyerId, share).catch(() => {});
-    // ── AND THE PETTING STAND ────────────────────────────────────────────────────────────────────────────
-    // Pets on the stand take the SAME share, not a fraction of it — the package says "passive XP just like
-    // your equipped pet" and a discount here would make that a half-truth. It is the paid feature, and it is
-    // deliberately the largest thing $5 buys: a full stand is four pets levelling instead of one.
-    //
-    // Gated on the stand being PLACED (standPetIds returns [] otherwise), so this costs one indexed lookup
-    // for the overwhelming majority of members who do not own one.
-    const { standPetIds } = await import("@/lib/marketplace/petting-stand.js");
-    const ids = await standPetIds(buyerId).catch(() => []);
-    for (const petId of ids) await addPetXpById(buyerId, petId, share).catch(() => {});
 }
 
 // Lazy time-trickle for the equipped pet: add PET_TRICKLE_PER_DAY worth of XP for the time elapsed since the
@@ -248,12 +269,9 @@ export async function creditEquippedPetXp(buyerId, memberXp) {
 // runs on pet-state reads and on equip/unequip. Only the featured pet accrues.
 export async function accrueEquippedPetTrickle(buyerId) {
     if (!buyerId) return;
-    const buyer = await db.queryOne(`SELECT featured_collectible FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    if (buyer?.featured_collectible) await accruePetTrickle(buyerId, buyer.featured_collectible);
-    // Each pet on the Petting Stand runs its own clock off its own mkt_pet_level.last_tick_at, which is why the
-    // stand needed no timestamp of its own. Reseating one restarts only that pet's clock.
-    const { standPetIds } = await import("@/lib/marketplace/petting-stand.js");
-    for (const id of await standPetIds(buyerId).catch(() => [])) await accruePetTrickle(buyerId, id).catch(() => {});
+    // Each earning pet runs its own clock off its own mkt_pet_level.last_tick_at, which is why the stand
+    // needed no timestamp of its own. Reseating one restarts only that pet's clock.
+    for (const id of await earningPetIds(buyerId)) await accruePetTrickle(buyerId, id).catch(() => {});
 }
 
 async function accruePetTrickle(buyerId, petId) {

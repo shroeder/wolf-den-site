@@ -261,6 +261,20 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
             res = await levelUpPet(buyerId, petId).catch(() => ({ ok: false }));
         } else {
             res = await addPetXp(buyerId, petId, e.amount).catch(() => ({ ok: false }));
+            // ── AND EVERY OTHER PET THAT EARNS FOR YOU ───────────────────────────────────────────────
+            // Luke: "if I feed my active pet it should also give that exp to the stand pets." THIS is the
+            // path a member feeding their OWN pet takes — farm.js only handles feeding somebody ELSE'S —
+            // so patching that one alone would have fixed the rarer case and left the one he described.
+            //
+            // Pays the fed pet AND the rest rather than only firing when the featured pet is fed: an
+            // asymmetry there would quietly make "always feed the equipped one" the correct play, and a
+            // hidden optimal way to use an item is worse than either rule on its own.
+            //
+            // A LEVEL treat is deliberately NOT shared — `pet_level` grants a whole level outright, and four
+            // levels from one item is a different item. This shares XP treats, which is what was asked for.
+            const { earningPetIds } = await import("@/lib/marketplace/pet-level.js");
+            const others = (await earningPetIds(buyerId).catch(() => [])).filter((x) => x !== petId);
+            for (const other of others) await addPetXp(buyerId, other, e.amount).catch(() => {});
         }
         await trackActivity(buyerId, "use_consumable", { id, name: c.name, petId }).catch(() => {});
         const leveled = e.type === "pet_level" ? Boolean(res?.ok) : Boolean(res?.leveled);
