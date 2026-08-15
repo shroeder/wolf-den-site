@@ -11,6 +11,7 @@ import {
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
 import ArenaFx from "@/components/arena/ArenaFx";
+import SpriteFx, { hasSheet } from "@/components/arena/SpriteFx";
 import ArenaUpgrades from "@/components/arena/ArenaUpgrades";
 import RecipeShelf from "@/components/RecipeShelf";
 import SkillTree from "@/components/arena/SkillTree";
@@ -583,6 +584,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // looked like taking one. Two pieces of state, because they are two facts.
     const [shake, setShake] = useState(0);          // 0 = still, 1 = a hit, 2 = a heavy one. Intensity only.
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
+    // The painted effect currently playing. Cleared on a timer so the element unmounts and the next cast
+    // gets a fresh animation rather than re-triggering a finished one.
+    const [sprite, setSprite] = useState(null);
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
@@ -1033,6 +1037,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         } else {
             const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
             fxRef.current?.play({ kind, element: froze ? "ice" : element, side: target, power, crit: Boolean(l.crit) });
+            // The painted frame rides the SAME event as the particles, not a second one — one cast, one
+            // picture. Only kinds that actually have art; everything else stays canvas-only as before.
+            if (hasSheet(kind)) {
+                // SpriteFx positions on "left"/"right", NOT on "you"/"them" — handing it the wrong vocabulary
+                // silently falls through to the default side, which put the fire over the fighter who THREW
+                // it while the damage number floated over the one who took it.
+                setSprite({ id: `${bout.log.length}-${kind}`, kind, side: target === "you" ? "left" : "right", crit: Boolean(l.crit) });
+                timers.push(setTimeout(() => setSprite(null), 620));
+            }
         }
         return () => timers.forEach(clearTimeout);
     }, [bout?.log?.length]);
@@ -1405,6 +1418,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     {/* ── THE SPELL LAYER ── full-screen additive canvas, FF6-style: the sprites stay put and
                         the SCREEN does the work. */}
                     <ArenaFx ref={fxRef} onShake={onShake} />
+
+                    {/* ── THE SPRITE LAYER, WHICH NOTHING WAS RENDERING ────────────────────────────────────
+                        SpriteFx and seventeen generated effect frames have been in the repo unused: the
+                        component was imported by NOTHING, so every effect in every bout was the procedural
+                        canvas above drawing shapes from maths, and the painted art was never once on screen.
+                        Keyed on the beat AND the kind so a repeat of the same move replays from scratch
+                        rather than sitting there as a finished animation. */}
+                    {sprite ? (
+                        <SpriteFx key={sprite.id} kind={sprite.kind} side={sprite.side} crit={sprite.crit} />
+                    ) : null}
 
                     {/* WHAT'S READY. Cooldowns, guard and surge live ON the field — combat state, not page
                         furniture. Focus was a single pool that made every skill interchangeable and could lock

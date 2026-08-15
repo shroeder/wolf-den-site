@@ -39,6 +39,10 @@ const ART = {
     strike: "/images/arena/vfx/impact-peak.webp",
     hit: "/images/arena/vfx/impact-peak.webp",
     execute: "/images/arena/vfx/impact-peak.webp",
+    // Generated as single frames rather than harvested from a sheet — see gen-arena-vfx-frame.mjs, which
+    // acts on the conclusion the peak extractor already reached.
+    freeze: "/images/arena/vfx/freeze-peak.webp",
+    disarm: "/images/arena/vfx/disarm-peak.webp",
 };
 
 // Which movement each kind uses. The name is the gesture, not the art.
@@ -46,6 +50,9 @@ const MOVE = {
     rend: "rise", flurry: "stutter", drain: "siphon", sunder: "burst",
     riposte: "ringback", spell: "spin", ward: "raise", guard: "raise",
     strike: "punch", hit: "punch", execute: "punch",
+    // A freeze LOCKS SHUT, so it snaps in and holds rather than rising or bursting; a shattered guard blows
+    // apart, so it borrows the sunder gesture. The name is the gesture, not the art.
+    freeze: "raise", disarm: "burst",
 };
 
 export const hasSheet = (kind) => Boolean(ART[kind]);
@@ -70,7 +77,14 @@ export default function SpriteFx({ kind = "hit", side = "right", size = 210, cri
                 .sfx.is-right { right: 0; }
                 .sfx.is-left { left: 0; }
 
+                /* ── SCREEN BLENDING IS NOT OPTIONAL ─────────────────────────────────────────────────────
+                   Every one of these frames is painted on PURE BLACK, deliberately: gen-arena-vfx.mjs says so
+                   in its own header — "pure black is load-bearing: it is what mix-blend-mode: screen turns
+                   into transparency". Without this rule the black is just black, so the effect arrives as a
+                   dark rectangle with a picture in it, sitting over the fighters. The art has been generated
+                   for screen compositing since the day it was made; this is the line that honours it. */
                 .sfx-art { display: block; object-fit: contain; transform-origin: 50% 60%;
+                    mix-blend-mode: screen;
                     filter: saturate(1.12); will-change: transform, opacity; }
 
                 /* ── THE GESTURES ── one per kind, so two effects can never move alike. */
