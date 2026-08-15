@@ -844,6 +844,15 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
         if (blocked.has(String(o.id))) continue;
         members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
     }
+    // ── THE BLOCK IS A PREFERENCE, NOT A WALL ────────────────────────────────────────────────────────────
+    // "Do not rematch" must never become "there is nobody to fight". On a quiet board — or one where you
+    // have already fought everyone present — the five-bout rule would empty the list entirely.
+    if (!members.length && blocked.size) {
+        for (const o of board) {
+            if (String(o.id) === String(buyerId)) continue;
+            members.push({ kind: "member", id: o.id, boost: MEMBER_WEIGHT, d: dist(o.power || 0) });
+        }
+    }
     // Only tiers you are allowed to fight — the same reach the explicit path enforces, so matchmaking can
     // never hand you a tier a crafted POST would have been refused.
     //
@@ -881,6 +890,10 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // guaranteed share cannot drift to zero, and it cannot drift to one either: if a kind has nobody in it,
     // the other kind takes the roll, and that is the only case where the split moves.
     const pickWithin = (pool, reserve) => {
+        // An empty pool used to fall out of here as `undefined` — `weighted.find(...) || weighted[0]` is
+        // undefined twice over — and undefined reads as "no opponent", which is how a tapped Fight button
+        // spent a round trip and came back with nothing.
+        if (!pool.length) return null;
         const seats = pool.slice(0, Math.max(1, reserve));
         const weighted = seats.map((c, i) => ({ ...c, w: c.boost / (1 + i) }));
         let roll = Math.random() * weighted.reduce((sum, c) => sum + c.w, 0);
@@ -891,6 +904,14 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
     // rather than being forced in, and the members take it.
     const fairNpcs = npcs.filter((n) => n.d <= 0.5);
     const npcPool = fairNpcs.length ? fairNpcs : [];
+    // ── SOMEBODY HAS TO TAKE THE ROLL ────────────────────────────────────────────────────────────────────
+    // The two lines below each assume the OTHER pool has somebody in it. Both can be empty at once: no tier
+    // lands within half a power-step (so the Gauntlet "stands down"), and the member list is empty or has
+    // been emptied — by the rematch block, or simply by being the only one on the board. That returned
+    // undefined and the Fight button came back with no match after a round trip.
+    // Luke: "often times I hit the fight button and it makes a server request but then doesn't find a match".
+    // Standing down is a preference, not a rule: if nobody else can take it, the nearest tier fights anyway.
+    if (!npcPool.length && !members.length) return npcs.length ? pickWithin(npcs, RESERVE_NPC + 1) : null;
     if (!npcPool.length) return pickWithin(members, SHORTLIST);
     if (!members.length) return pickWithin(npcPool, RESERVE_NPC + 1);
     return Math.random() < GAUNTLET_SHARE

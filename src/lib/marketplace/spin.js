@@ -422,7 +422,11 @@ async function grantPrize(buyerId, prize, opts = {}) {
         const rec = await grantRecipeReward(buyerId, "spin").catch(() => null);
         // Knows every recipe the wheel can teach? Pay gold rather than landing on a blank wedge.
         if (!rec) { await db.query(`UPDATE mkt_buyer SET gold = gold + 300 WHERE id = $1`, [buyerId]).catch(() => {}); return { sprite, text: "300 gold — you already know them all" }; }
-        return { sprite, text: `${rec.name} — a new recipe!` };
+        // Same fault, same fix: the recipe wedge showed its own icon for every page in the book. A
+        // recipe's art is the dish it makes (mkt_cooking_sprite, keyed by the recipe's `out`).
+        // Keyed by the RECIPE id (k_flour), not the thing it outputs — every one of the 78 has art.
+        const dish = await db.queryOne(`SELECT url FROM mkt_cooking_sprite WHERE ref = $1`, [rec.id]).catch(() => null);
+        return { sprite: dish?.url || sprite, text: `${rec.name} — a new recipe!` };
     }
     if (prize.kind === "seed") {
         const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
@@ -447,7 +451,13 @@ async function grantPrize(buyerId, prize, opts = {}) {
         }
         const pick = fresh[Math.floor(Math.random() * fresh.length)];
         await grantDecoration(buyerId, pick.id, 1, "spin").catch(() => {});
-        return { sprite, text: `${pick.name} — for the farm!` };
+        // ── THE PIECE YOU WON, NOT THE WEDGE IT CAME OFF ────────────────────────────────────────
+        // `sprite` is the WEDGE's art — one generic planter for all eighteen decorations — so winning
+        // Bunting Flags showed you a birdhouse. The real art is already drawn and stored; this is the
+        // one moment the player is looking straight at the thing they just got.
+        const { getDecoSprites } = await import("@/lib/marketplace/farm-decorations.js");
+        const art = (await getDecoSprites([pick.id]).catch(() => ({})))[pick.id] || sprite;
+        return { sprite: art, text: `${pick.name} — for the farm!` };
     }
     return { sprite, text: prize.label };
 }

@@ -243,7 +243,7 @@ function StatusRow({ list, side, onPick }) {
     );
 }
 
-function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null }) {
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burning = false }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
@@ -271,7 +271,6 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
     const danger = frac > 0 && frac <= 0.35;
     const shieldPct = maxHp ? Math.min(1, shield / maxHp) * 100 : 0;
 
-    const burning = (burn?.turns || 0) > 0;
     return (
         <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
             + `${healing ? " is-healing" : ""}${burning ? " is-burning" : ""}`}>
@@ -292,6 +291,25 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 {Math.max(0, hp)}<span>/{maxHp}</span>
                 {shield > 0 ? <u>+{shield}</u> : null}
             </em>
+            <span className="ar-stats">
+                <i title="Damage on a plain swing"><b>{Math.round(f?.damage || 0)}</b> dmg</i>
+                <i title="Chance to crit, and what a crit multiplies by">
+                    <b>{Math.round((f?.critChance || 0) * 100)}%</b> crit &times;{(f?.critMult || 2.5).toFixed(1)}
+                </i>
+                {/* BOTH sides, or the promise above is only half kept. An NPC's mitigation is `armour`, a
+                    member's is `block` — two names for the same thing, and only theirs was ever printed. That
+                    is the whole reason armour reads as a stat the enemy gets and you do not: a member turns
+                    aside 34% before Footwork, usually MORE than the 6-26% an NPC carries, and nothing on your
+                    half of the screen has ever said so. Summed, because a member defender has both. */}
+                {/* One name, both sides. NPCs read 0 here — their toughness is health now, which the bar
+                    already tells you about. */}
+                {(f?.dr || 0) > 0 ? (
+                    <i title="Share of every incoming blow that never lands"><b>{Math.round(f.dr * 100)}%</b> reduction</i>
+                ) : null}
+                {(f?.accuracy ?? 1) < 1 ? (
+                    <i title="Chance a plain swing connects"><b>{Math.round((f.accuracy ?? 1) * 100)}%</b> acc</i>
+                ) : null}
+            </span>
         </div>
     );
 }
