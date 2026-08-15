@@ -235,7 +235,11 @@ export default function ArenaLab() {
     // ── THE CONTRACT CHECK ── these fixtures are mirrored by hand from arena.js. If a required key goes
     // missing the lab says so loudly rather than rendering a subtly wrong screen and being trusted.
     const missing = useMemo(() => {
-        const need = ["unlocked", "me", "position", "size", "rank", "fightsLeft", "stats", "targets", "board"];
+        // `position` was required here long after the rung ladder was deleted (see arena.js, "THE RUNG LADDER
+        // IS GONE"). Standing is an accrued total now and no server response carries a position, so the check
+        // failed on every scene but the two that still set the dead field — a warning firing at the fixtures
+        // when the CHECK was the stale half. Nothing in the app reads `.position`.
+        const need = ["unlocked", "me", "size", "rank", "fightsLeft", "stats", "targets", "board"];
         const gaps = need.filter((k) => initial[k] === undefined);
         if (initial.bout) {
             const nb = ["foe", "beat", "turn", "hp", "maxHp", "foeHp", "foeMaxHp", "cd", "clash", "me", "items", "log"];

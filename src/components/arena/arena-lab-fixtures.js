@@ -133,7 +133,7 @@ export const FOE = {
 
 export const ME = {
     level: 31, gearPower: 141, health: 206, might: 24,
-    sprite: YOU_SPRITE, name: "You", position: 12,
+    sprite: YOU_SPRITE, name: "You",
     element: "fire", abilities: MY_ABILITIES,
 };
 
@@ -374,7 +374,6 @@ export const SCENES = {
         label: "Victory recap",
         note: "The modal. Place counts down, rank bar, purse, streak.",
         state: () => baseState({
-            position: 8,
             bout: makeBout({ over: true, won: true, foeHp: 0, hp: 71, recap: RECAP_WIN, reward: RECAP_WIN.reward }),
         }),
     },
@@ -382,7 +381,6 @@ export const SCENES = {
         label: "Victory + rank up",
         note: "Crossing a band. The biggest single moment the ladder has.",
         state: () => baseState({
-            position: 6,
             bout: makeBout({
                 over: true, won: true, foeHp: 0, hp: 44,
                 recap: RECAP_RANKUP, reward: RECAP_RANKUP.reward, rankUp: RECAP_RANKUP.rankUp,

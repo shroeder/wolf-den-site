@@ -972,9 +972,11 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             // name; with none left the button stops pulsing, goes quiet, and says what would
                             // actually change that — the yard still opens either way, because the gun deck,
                             // the racks and the fleet are all in there and none of them are spent.
+                            // openRaid already picks the tab and opens the yard. Doing it here TOO defeated its one
+                            // guard: with a fight still open it would show the yard and the battle at the same time.
                             return (
                                 <button className={`sail-cta sail-cta-raid${left ? "" : " is-spent"}`} disabled={busy}
-                                    onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
+                                    onClick={openRaid}>
                                     <span className="sail-cta-stack">
                                         <b>⚔️ Ship battles</b>
                                         <em>{left
