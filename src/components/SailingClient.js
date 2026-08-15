@@ -961,12 +961,29 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                         {/* SHIP BATTLES, public since 2026-08-09. Still keyed off `combat.fleet` rather than a
                             bare truthy check: a state that came back without it (an error shape, a stale cache)
                             should not draw a button that opens an empty yard. */}
-                        {state.combat?.fleet ? (
-                            <button className="sail-cta sail-cta-raid" disabled={busy}
-                                onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
-                                ⚔️ Ship battles — {Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0))} left today
-                            </button>
-                        ) : null}
+                        {state.combat?.fleet ? (() => {
+                            const left = Math.max(0, (state.raid?.cap ?? 0) - (state.raid?.used ?? 0));
+                            const resetCost = Number(state.raid?.reset?.cost || 0);
+                            // ── A SPENT BUTTON MUST NOT SHOUT ────────────────────────────────────────────
+                            // This read "⚔️ Ship battles — 0 left today" in full red pulsing hero styling,
+                            // which is a call to action announcing that there is no action. Luke: "this cta
+                            // doesnt make sense, its acting as if it has charges."
+                            // The count is CONTEXT, not the headline. With battles left it sits under the
+                            // name; with none left the button stops pulsing, goes quiet, and says what would
+                            // actually change that — the yard still opens either way, because the gun deck,
+                            // the racks and the fleet are all in there and none of them are spent.
+                            return (
+                                <button className={`sail-cta sail-cta-raid${left ? "" : " is-spent"}`} disabled={busy}
+                                    onClick={() => { setBattleTab("battles"); setYardOpen(true); openRaid(); }}>
+                                    <span className="sail-cta-stack">
+                                        <b>⚔️ Ship battles</b>
+                                        <em>{left
+                                            ? `${left} left today`
+                                            : resetCost > 0 ? `none left — another for 🪙 ${resetCost.toLocaleString()}` : "none left today"}</em>
+                                    </span>
+                                </button>
+                            );
+                        })() : null}
                     </div>
                 )}
 
