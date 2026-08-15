@@ -330,7 +330,9 @@ export const ITEMS = [
     { id: "oracle_diadem", name: "Oracle's Diadem", slot: "helmet", rarity: "mythic", icon: "GiCrenelCrown", flavor: "It knows where you'll strike.", stats: { crit_chance: 20, crit_power: 20 }, reqLevel: 94, source: "chest", sort: 324 },
     // -- Chest --
     { id: "studded_vest", name: "Studded Vest", slot: "chest", rarity: "common", icon: "GiArmorVest", flavor: "Riveted and ready.", stats: { ferocity: 8, crit_chance: 3 }, reqLevel: 4, source: "chest", sort: 330 },
-    { id: "war_cape", name: "War Cape", slot: "chest", rarity: "rare", icon: "GiCape", flavor: "Flair with function.", stats: { ferocity: 9, fortune: 7 }, reqLevel: 22, source: "chest", sort: 331 },
+    // A CAPE ON THE CHEST SLOT, like the Dragoncape was. Neither of these is in a set so nothing was made
+    // unreachable, but "War Cape" competing with breastplates is still the catalog contradicting itself.
+    { id: "war_cape", name: "War Cape", slot: "back", rarity: "rare", icon: "GiCape", flavor: "Flair with function.", stats: { ferocity: 9, fortune: 7 }, reqLevel: 22, source: "chest", sort: 331 },
     { id: "pauldron_plate", name: "Pauldron Plate", slot: "chest", rarity: "epic", icon: "GiSpikedShoulderArmor", flavor: "Shoulders like a fortress.", stats: { might: 9, ferocity: 13 }, reqLevel: 38, source: "chest", sort: 332 },
     // SLOT WAS "chest" AND IT BROKE ITS OWN SET. Dragonlord's Aspect is five pieces, and with the cape on chest
     // it held TWO chest pieces — so at most four could ever be worn and the five-piece capstone was unreachable
@@ -460,7 +462,7 @@ export const ITEMS = [
     // -- Low end (250–800 gold) --
     { id: "gs_bronze_buckler", name: "Bronze Buckler", slot: "off_hand", rarity: "common", icon: "GiRoundShield", flavor: "A first line of defense.", stats: { ferocity: 8, might: 3 }, reqLevel: 4, source: "xp_shop", xpCost: 250, sort: 600 },
     { id: "gs_swift_ring", name: "Swift Ring", slot: "ring", rarity: "common", icon: "GiSwirlRing", flavor: "A quick little band.", stats: { crit_chance: 6, might: 5 }, reqLevel: 5, source: "xp_shop", xpCost: 350, sort: 601 },
-    { id: "gs_traveler_cloak", name: "Traveler's Cloak", slot: "chest", rarity: "common", icon: "GiCape", flavor: "Road-worn and warm.", stats: { ferocity: 6, crit_chance: 5 }, reqLevel: 5, source: "xp_shop", xpCost: 400, sort: 602 },
+    { id: "gs_traveler_cloak", name: "Traveler's Cloak", slot: "back", rarity: "common", icon: "GiCape", flavor: "Road-worn and warm.", stats: { ferocity: 6, crit_chance: 5 }, reqLevel: 5, source: "xp_shop", xpCost: 400, sort: 602 },
     { id: "gs_apprentice_wand", name: "Apprentice Wand", slot: "main_hand", rarity: "rare", icon: "GiCrystalWand", flavor: "Every mage starts here.", stats: { might: 11, crit_chance: 5 }, reqLevel: 8, source: "xp_shop", xpCost: 550, sort: 603 },
     { id: "gs_lucky_coin", name: "Lucky Coin Amulet", slot: "amulet", rarity: "rare", icon: "GiGems", flavor: "Heads, you win.", stats: { fortune: 16 }, reqLevel: 10, source: "xp_shop", xpCost: 800, sort: 604 },
     // -- Medium (1,500–4,000 gold) --
