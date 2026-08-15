@@ -399,7 +399,7 @@ const digRefillCost = (n = 0) => DIG_REFILL_COST * Math.pow(2, Math.max(0, n));
 
 // ── DIGGING UPGRADES (separate from the boat) ── five gold-leveled tracks. Each track's PER-LEVEL value ×
 // its MAX level = the cap Luke asked for.
-const DIG_TRACKS = {
+export const DIG_TRACKS = {
     stamina:   { max: 10, per: 1,    cap: 10,   kind: "count" }, // +1 dig per trip / level
     pierce:    { max: 5,  per: 0.03, cap: 0.15, kind: "pct" },   // dig clears ALL layers of a tile — 15% max
     strike:    { max: 5,  per: 0.006, cap: 0.03, kind: "pct" },  // a dig strikes a lucky bonus fragment — 3% max (was 10%, far too rich)

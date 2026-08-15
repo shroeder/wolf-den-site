@@ -12,9 +12,10 @@ import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
 import FeatureDailies from "@/components/FeatureDailies";
 import CollectionPanel from "@/components/CollectionPanel";
+import TrophyRoom from "@/components/TrophyRoom";
 import Leaderboard from "@/components/Leaderboard";
 import { DecoLayer, DecoDock, DecoInspect, CustomDecoCreator } from "@/components/FarmDecorations";
-import { GiPawPrint } from "react-icons/gi";
+import { GiPawPrint, GiTrophyCup } from "react-icons/gi";
 
 import PettingStand from "@/components/PettingStand";
 import PackageBanner from "@/components/PackageBanner";
@@ -813,7 +814,10 @@ export default function FarmClient({ initial, viewingAlias }) {
         : view === "garden" ? VIEW_BG.garden
         : (customBg || pickFarmBg(visTod, wx.condition));
     const showWeather = view === "outside"; // weather effects only in the open pasture
-    const canDecorate = view !== "garden"; // decorate Outside & Inside; the Garden is just for planting
+    // Decorate Outside & Inside; the Garden is just for planting and the Trophy Room hangs what it hangs.
+    // Stated POSITIVELY on purpose — as `view !== "garden"` every view added later opted in by default, which
+    // is how the Trophy Room briefly grew a "Decorate" button and a placement tray it has no scene for.
+    const canDecorate = view === "outside" || view === "inside";
     // Sprite brightness only — NO scene tint/overlay (overlays wash the whole scene out; time-of-day mood must be
     // baked into the artwork itself). A tiny brightness nudge on the SPRITES at dusk/dawn keeps them from glowing
     // like noon against a darker painted backdrop.
@@ -1053,8 +1057,11 @@ export default function FarmClient({ initial, viewingAlias }) {
                 tab row reads as an interruption, while the other three swap the panel underneath. Same tab,
                 same behaviour, no exception to learn. */}
             <div className="farm-viewtabs">
-                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"]]
-                    .filter(([v]) => farm.mine || (v !== "garden" && v !== "art")) // the Garden and your Art are yours alone
+                {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"],
+                  ["trophy", <GiTrophyCup key="t" />, "Trophies"]]
+                    // The Garden, your Art and your Trophy Room are yours alone. The room is gated on the SERVER
+                    // too — /farm/trophies takes no owner parameter — so this filter is presentation, not the lock.
+                    .filter(([v]) => farm.mine || (v !== "garden" && v !== "art" && v !== "trophy"))
                     .map(([v, ico, label]) => {
                     // Garden tab badge = crops READY TO HARVEST. Pet-view tabs badge = pets you can still pet today.
                     const attn = v === "garden" && farm.mine ? (garden?.readyCount || 0) : 0;
@@ -1071,7 +1078,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                 })}
             </div>
 
-            {farm.mine && liveNudge > 0 && view !== "garden" ? (
+            {farm.mine && liveNudge > 0 && (view === "outside" || view === "inside") ? (
                 <div className="farm-petnudge">🐾 <b>{liveNudge}</b> free {liveNudge === 1 ? "petting" : "pettings"} left today — tap your pets for XP &amp; gold!</div>
             ) : null}
 
@@ -1098,10 +1105,14 @@ export default function FarmClient({ initial, viewingAlias }) {
                 below a scene roughly a phone-screen tall, so you scrolled past the whole farm
                 to reach the buttons that change how the farm looks. Above it, nothing is covered and nothing
                 has to be hunted. */}
-            {view !== "art" ? (
+            {view !== "art" && view !== "trophy" ? (
                 <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>{sceneControls}</div>
             ) : null}
-            <div ref={sceneWrapRef} hidden={view === "art"} style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
+            {/* TROPHIES — like Art, a real VIEW that swaps the panel underneath rather than a sheet over it.
+                `active` is what triggers its one fetch, so switching tabs back and forth never refetches. */}
+            {view === "trophy" ? <TrophyRoom active /> : null}
+
+            <div ref={sceneWrapRef} hidden={view === "art" || view === "trophy"} style={{ position: "relative", borderRadius: 16, overflow: "hidden" }}>
                 <div ref={scrollRef} className="farm-scroll" onPointerDown={onScrollPointerDown} onPointerMove={onScrollPointerMove} onPointerUp={onScrollPointerUp} onPointerLeave={onScrollPointerUp} style={{ width: "100%", overflowX: "auto", overflowY: "hidden", cursor: "grab" }}>
                     <div
                         ref={fieldRef}
