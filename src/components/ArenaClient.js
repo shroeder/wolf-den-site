@@ -1289,6 +1289,26 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 onClick={() => setLogOpen((v) => !v)}>
                                 <GiScrollUnfurled aria-hidden="true" />
                             </button>
+                            {/* ── GIVE UP, FROM INSIDE THE FIGHT ──────────────────────────────────────────
+                                The forfeit already existed and lived on the Arena landing screen, under the
+                                Resume button. From IN a bout there was no route to it at all: you had to know
+                                to step out first and then find a deliberately small link. Luke: "we need a way
+                                to forfeit a match" — there was one, and it was unreachable from the only place
+                                you would ever want it.
+                                Same two-tap confirm and the same `giveUp` state as the landing-screen copy, so
+                                there is ONE forfeit with one guard rather than a second one that could drift.
+                                It costs the loss, deliberately: a free exit from a bad matchup is a re-roll. */}
+                            <button type="button" className={`ar-mute ar-giveup${giveUp ? " is-armed" : ""}`}
+                                disabled={busy}
+                                aria-label={giveUp ? "Tap again to take the loss" : "Give up this fight"}
+                                title={giveUp ? "Tap again to take the loss" : "Give up this fight"}
+                                onClick={() => {
+                                    Sfx.ui();
+                                    if (!giveUp) { setGiveUp(true); setTimeout(() => setGiveUp(false), 4000); return; }
+                                    setGiveUp(false); setStepped(false); act("forfeit");
+                                }}>
+                                <GiTombstone aria-hidden="true" />
+                            </button>
                         </div>
                     </div>
 
@@ -2530,6 +2550,9 @@ function Styles() {
             .ar-statcard b u { text-decoration: none; margin-left: auto; font-size: 10px; font-weight: 800; color: #b9c2cc; }
             .ar-statcard p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: #c8d0d9; }
             .ar-statcard-now b { display: inline; color: #ffb066; }
+            /* The only header control that costs you anything, so armed it stops looking like its neighbours. */
+            .ar-giveup.is-armed { color: #fff; border-color: rgba(255,90,90,0.85); background: rgba(200,30,30,0.34);
+                animation: arBurnPulse .8s ease-in-out infinite; }
             .ar-statcard-x { margin-left: 8px; font-size: 15px; line-height: 1; color: #b9c2cc; flex: none; }
             .ar-statcard-tap { margin-top: 6px !important; font-size: 10px !important; letter-spacing: .06em;
                 text-transform: uppercase; color: #7f8790 !important; }
