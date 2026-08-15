@@ -617,7 +617,9 @@ export async function getArenaState(buyerId, pre = {}) {
         recipeShop: await (async () => {
             const { RECIPE_PRICE_LAURELS, recipeProgress } = await import("@/lib/marketplace/cooking.js");
             const p = await recipeProgress(buyerId);
-            return { price: RECIPE_PRICE_LAURELS, knowsAll: p.known >= p.total, ...p };
+            // knowsAll is now about the SHOP's own shelf (tiers 1-2), not the whole book — the button must go
+            // quiet when it has nothing left it is allowed to sell, not when you have finished Legendary.
+            return { price: RECIPE_PRICE_LAURELS, knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
         })().catch(() => null),
         stats: {
             wins: Number(row?.wins) || 0, losses: Number(row?.losses) || 0,

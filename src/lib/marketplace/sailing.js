@@ -1568,7 +1568,7 @@ export async function getSailingState(buyerId, skyKey = null) {
         // knowsAll is derived from the progress rather than asked for separately — two queries answering the
         // same question is how two counters end up disagreeing on the same screen.
         const p = await recipeProgress(buyerId);
-        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.known >= p.total, ...p };
+        return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
     })().catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
@@ -3112,7 +3112,7 @@ export async function buyLocker(buyerId, id) {
  */
 export async function buyRecipe(buyerId) {
     const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_DOUBLOONS } = await import("@/lib/marketplace/cooking.js");
-    if (!(await hasUnknownRecipe(buyerId))) {
+    if (!(await hasUnknownRecipe(buyerId, "shop"))) {
         return { ok: false, error: "knows_them_all", ...(await getSailingState(buyerId)) };
     }
     const paid = await db.queryOne(

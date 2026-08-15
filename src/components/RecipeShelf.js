@@ -48,9 +48,14 @@ export default function RecipeShelf({ shop, busy, canAfford, priceLabel, price =
                 <span className="rsh-who">
                     <b>A Recipe</b>
                     <em>
+                        {/* `done` now means the SHOP is out of stock — it only sells the first two tiers —
+                            rather than the whole book being finished. Saying "the book is finished" when you
+                            still have 45 Legendary pages missing would be a plain lie. */}
                         {done
-                            ? "Every page. The book is finished."
-                            : "One page, drawn at random from what you have not learned. Mostly everyday cooking — occasionally not."}
+                            ? (shop?.knowsBook
+                                ? "Every page. The book is finished."
+                                : `You know every ${(shop?.shopTiers || ["Simple", "Hearty"]).join(" and ")} page. The rest come from bosses, raids and deep seams.`)
+                            : `One page, drawn at random from the ${(shop?.shopTiers || ["Simple", "Hearty"]).join(" and ")} pages you have not learned.`}
                     </em>
                 </span>
             </div>

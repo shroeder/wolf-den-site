@@ -338,7 +338,7 @@ export async function purserExchange(buyerId, from, amount) {
 export async function buyArmouryRecipe(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const { hasUnknownRecipe, grantBoughtRecipe, RECIPE_PRICE_LAURELS } = await import("@/lib/marketplace/cooking.js");
-    if (!(await hasUnknownRecipe(buyerId))) return { ok: false, error: "knows_them_all" };
+    if (!(await hasUnknownRecipe(buyerId, "shop"))) return { ok: false, error: "knows_them_all" };
 
     const paid = await db.queryOne(
         `UPDATE mkt_arena SET laurels = laurels - $2 WHERE buyer_id = $1 AND laurels >= $2 RETURNING laurels`,

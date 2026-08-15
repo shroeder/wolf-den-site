@@ -457,11 +457,15 @@ export const RECIPE_BANDS = {
     raid_win:     { min: 3, max: 4 },
     town_raid:    { min: 3, max: 4 },
     boss_kill:    { min: 4, max: 5 },   // weekly, shared, and the route to the top tiers
-    // BOUGHT, with doubloons at the Quartermaster or laurels at the Armoury. The whole book is in range on
-    // purpose — DROP_WEIGHT already leans hard on the bottom (46/32/20/9/3), so what you pay for is reliably a
-    // tier 1 or 2 and just occasionally something you would never otherwise see. Narrowing the band to the
-    // low tiers would have made every purchase identical and killed the only interesting thing about it.
-    shop:         { min: 1, max: 5 },
+    // BOUGHT, with doubloons at the Quartermaster or laurels at the Armoury.
+    //
+    // ⚠️ THIS USED TO BE THE WHOLE BOOK (1-5), argued for on the grounds that DROP_WEIGHT leans hard on the
+    // bottom anyway so a purchase was "reliably a tier 1 or 2 and just occasionally something you would never
+    // otherwise see". Luke's call, and it is the better line: a shop is the ON-RAMP, not a lottery ticket for
+    // Legendary pages. "this should only be active if you dont have the first 2 tiers, and only allow the
+    // first 2 tiers to get from the button." The top tiers come from bosses, raids and deep seams, which is
+    // where the interesting ones should come from.
+    shop:         { min: 1, max: 2 },
 };
 
 // What a random recipe costs. The two prices hold the same ratio the pet stones already set (4,000 doubloons
@@ -481,13 +485,13 @@ export const RECIPE_PRICE_LAURELS = 2500;
  * Returns the recipe when it was new to them, else null (they already know everything in that band), so the
  * caller can fall back to another prize rather than paying out nothing.
  */
-export async function grantRecipeReward(buyerId, band) {
+export async function grantRecipeReward(buyerId, band, { strict = false } = {}) {
     const def = RECIPE_BANDS[band];
     if (!buyerId || !def) return null;
     // `band` IS the source — every caller already passes the name of the thing that dropped it (spin, fish,
     // seam_deep, boss_kill, town_raid, a chest's tier). It was being used to pick the rarity and then thrown
     // away, which is why the card could never say where the page came from.
-    return learnRecipe(buyerId, null, { min: def.min, max: def.max }, band);
+    return learnRecipe(buyerId, null, { min: def.min, max: def.max, strict }, band);
 }
 
 /**
@@ -521,13 +525,28 @@ export async function recipeProgress(buyerId) {
         const t = tiers.find((x) => x.tier === r.tier);
         if (t) t.known += 1;
     }
-    return { known: tiers.reduce((n, t) => n + t.known, 0), total, tiers };
+    // What the SHOP can still teach, so the button and the server agree about when it is finished. Derived
+    // from the band rather than hardcoded to "two", or the two would drift the moment the band moves.
+    const shopBand = RECIPE_BANDS.shop;
+    const inBand = tiers.filter((t) => t.tier >= shopBand.min && t.tier <= shopBand.max);
+    return {
+        known: tiers.reduce((n, t) => n + t.known, 0), total, tiers,
+        shopKnown: inBand.reduce((n, t) => n + t.known, 0),
+        shopTotal: inBand.reduce((n, t) => n + t.total, 0),
+        shopTiers: inBand.map((t) => t.name),
+    };
 }
 
-export async function hasUnknownRecipe(buyerId) {
+export async function hasUnknownRecipe(buyerId, band = null) {
     if (!buyerId) return false;
     const known = await db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []);
-    return known.length < RECIPES.length;
+    // ── ASK ABOUT THE TIERS THE SOURCE CAN ACTUALLY TEACH ────────────────────────────────────────────────
+    // Counting the WHOLE book meant the shop stayed open, and charging, long after it had run out of anything
+    // it was allowed to hand over — you would pay 2,500 laurels for a roll that could only fail.
+    const def = band ? RECIPE_BANDS[band] : null;
+    if (!def) return known.length < RECIPES.length;
+    const have = new Set((known || []).map((r) => r.recipe_id));
+    return RECIPES.some((r) => r.tier >= def.min && r.tier <= def.max && !have.has(r.id));
 }
 
 /**
@@ -539,7 +558,7 @@ export async function hasUnknownRecipe(buyerId) {
  * same card as finding one in a bottle, for free, and there is only ever one celebration to maintain.
  */
 export async function grantBoughtRecipe(buyerId) {
-    return grantRecipeReward(buyerId, "shop");
+    return grantRecipeReward(buyerId, "shop", { strict: true });
 }
 
 /**
@@ -561,11 +580,17 @@ export async function recipeLuck(buyerId) {
  * Falls back to the full pool when the band is exhausted — once you know every Legendary recipe a boss kill
  * should still give you something rather than silently nothing.
  */
-export function rollRecipe(known = [], { min = 1, max = 5 } = {}) {
+export function rollRecipe(known = [], { min = 1, max = 5, strict = false } = {}) {
     const have = new Set(known);
     const all = RECIPES.filter((r) => !have.has(r.id));
     if (!all.length) return null;
     const banded = all.filter((r) => r.tier >= min && r.tier <= max);
+    // ── `strict` REFUSES RATHER THAN WIDENS ──────────────────────────────────────────────────────────────
+    // The fallback below is right for a chest or a boss: once you know every Legendary page, a kill should
+    // still give you SOMETHING. It is wrong for a shop that is only allowed to sell two tiers — the buy gate
+    // checks the band first, but a race (the last Hearty page learned elsewhere between the check and the
+    // roll) would otherwise hand over a Legendary from a 2,500-laurel button that promised everyday cooking.
+    if (!banded.length && strict) return null;
     const pool = banded.length ? banded : all;
     const total = pool.reduce((s, r) => s + (DROP_WEIGHT[r.tier] || 1), 0);
     let n = Math.random() * total;
