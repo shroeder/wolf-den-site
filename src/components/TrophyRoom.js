@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // ── THE TROPHY ROOM ──────────────────────────────────────────────────────────────────────────────────────────
 // A room hung with one object per subsystem. The object IS the readout: its plaque carries your best placing
-// there, and a wall you have never touched hangs dark and unlabelled. Tapping one opens what you have built
-// (upgrade levels) and what you have done (records, each with where you stand).
+// there, and a wall you have never touched hangs dark and unlabelled. Tapping one opens a modal: what the
+// system actually is, where to go and do it, what you have built there (upgrade levels) and what you have done
+// (records, each with where you stand).
+//
+// WHY A MODAL AND NOT THE CARD IT WAS. The detail opened inline underneath the room, which put a 400px card
+// below the fold on a phone and left the wall — the thing you were reading it against — scrolled off the top.
+// It also could not say much: anything longer made the scroll worse. A sheet takes the screen, so it can carry
+// the explanation, and closing it puts you back on the wall exactly where you were.
+//
+// It is PORTALLED TO <body>. The room lives inside FarmClient, whose scenes carry transforms — a `position:
+// fixed` overlay inside a transformed ancestor is positioned against that ancestor instead of the viewport and
+// lands off-screen. Same reason <InspectableGear> portals its inspect sheet.
 //
 // NOTE ON <style jsx>: it lives as a DIRECT CHILD of the root <section>. Nested inside a child, styled-jsx
 // stamps its hash class only on the subtree containing the tag, and the root renders unstyled — which cost
@@ -36,7 +47,10 @@ export default function TrophyRoom({ active, initial = null }) {
     const [room, setRoom] = useState(initial);
     const [err, setErr] = useState(null);
     const [open, setOpen] = useState(null);
-    const detailRef = useRef(null);
+    const cardRef = useRef(null);
+    // Which button opened the sheet, so closing hands focus back to the piece on the wall rather than dumping
+    // it at the top of the document.
+    const openerRef = useRef(null);
 
     // Fetched when the tab is opened — assembling the room reads every member's rows across ten tables, and
     // that has no business running each time somebody looks at their pigs. FarmClient unmounts this component
@@ -64,17 +78,44 @@ export default function TrophyRoom({ active, initial = null }) {
         return () => { dead = true; };
     }, [active, initial]);
 
-    const pick = useCallback((key) => {
+    const pick = useCallback((key, ev) => {
+        openerRef.current = ev?.currentTarget || null;
         setOpen((k) => (k === key ? null : key));
     }, []);
 
-    // On a phone the detail card opens below the fold, so bring it to the reader rather than making them hunt.
+    const close = useCallback(() => {
+        setOpen(null);
+        // The wall button is still mounted behind the sheet, so this is a straight hand-back.
+        openerRef.current?.focus?.();
+    }, []);
+
+    // ESCAPE CLOSES IT, AND THE PAGE BEHIND IT HOLDS STILL. Without the overflow lock, a phone scrolls the farm
+    // underneath the sheet while you drag inside it, and closing leaves you somewhere you never navigated to.
     useEffect(() => {
-        if (!open || !detailRef.current) return;
-        detailRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        if (!open) return undefined;
+        const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+        window.addEventListener("keydown", onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            window.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prev;
+        };
+    }, [open, close]);
+
+    // Focus the sheet itself when it opens, so Escape lands and a screen reader is put inside the dialog rather
+    // than left on the wall behind it.
+    useEffect(() => {
+        if (open && cardRef.current) cardRef.current.focus();
     }, [open]);
 
-    const shelf = room?.shelves?.find((s) => s.key === open) || null;
+    const shelves = room?.shelves || [];
+    const at = shelves.findIndex((s) => s.key === open);
+    const shelf = at >= 0 ? shelves[at] : null;
+    // The room is a ring: off the end of the last wall is the first one. Walking it is how you read the whole
+    // room without closing and re-aiming at an 80px target eleven times.
+    const prevShelf = shelf ? shelves[(at - 1 + shelves.length) % shelves.length] : null;
+    const nextShelf = shelf ? shelves[(at + 1) % shelves.length] : null;
 
     return (
         <section className="trophy">
@@ -117,13 +158,77 @@ export default function TrophyRoom({ active, initial = null }) {
                 .tr-plaque.is-cold { color: #9d8f80; background: rgba(20,13,8,0.7); border-color: rgba(255,255,255,0.08); }
                 .tr-hook.is-open .tr-plaque { box-shadow: 0 0 0 2px rgba(255,214,130,0.55); }
 
-                .tr-detail { margin-top: 12px; border-radius: 14px; padding: 14px 14px 12px;
-                    background: linear-gradient(180deg, rgba(58,38,22,0.55), rgba(30,20,12,0.55));
-                    border: 1px solid rgba(255,205,120,0.22); }
-                .tr-detail h4 { margin: 0 0 2px; font-size: 1rem; color: #ffe6b8; }
-                .tr-detail .tr-blurb { margin: 0 0 12px; font-size: 0.84rem; color: #cbb79c; font-style: italic; }
-                .tr-sub { margin: 14px 0 6px; font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase;
+                /* ── THE SHEET ──────────────────────────────────────────────────────────────────────────────
+                   Bottom sheet on a phone, centred card on a wide screen — the same shape the inspect sheet
+                   uses elsewhere, because this is the same gesture: tap a thing, read the thing, dismiss.
+                   KEYFRAME NAMES ARE PREFIXED. styled-jsx does not scope @keyframes, so a second "fadeIn"
+                   anywhere in the app silently wins and both animations play the wrong one. */
+                @keyframes trmBackIn { from { opacity: 0 } to { opacity: 1 } }
+                @keyframes trmCardIn { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+
+                .trm-back { position: fixed; inset: 0; z-index: 10050; display: flex; justify-content: center;
+                    align-items: center; padding: 16px; background: rgba(6,4,2,0.78);
+                    backdrop-filter: blur(3px); animation: trmBackIn 180ms ease both; }
+                .trm-card { position: relative; width: 100%; max-width: 560px; max-height: 88vh;
+                    display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; outline: none;
+                    background: linear-gradient(180deg, #3b2716, #1d130a);
+                    border: 1px solid rgba(255,205,120,0.34);
+                    box-shadow: 0 26px 70px rgba(0,0,0,0.66), 0 0 40px rgba(255,180,90,0.08);
+                    animation: trmCardIn 240ms cubic-bezier(.2,.9,.3,1.1) both; }
+                @media (max-width: 620px) {
+                    /* Flush to the bottom edge: on a phone the reachable half of the screen is the bottom half,
+                       and 88vh of card floating in the middle wastes the only part you can comfortably touch. */
+                    .trm-back { padding: 0; align-items: flex-end; }
+                    .trm-card { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0;
+                        border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+                }
+
+                .trm-x { position: absolute; top: 9px; right: 10px; z-index: 3; width: 32px; height: 32px;
+                    border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); cursor: pointer;
+                    background: rgba(0,0,0,0.45); color: #f0dcc0; font-size: 19px; line-height: 1; padding: 0; }
+                .trm-x:hover { background: rgba(0,0,0,0.7); color: #fff; }
+
+                /* Header — the piece itself, big, so the sheet is visibly the thing you just tapped. */
+                .trm-top { display: flex; gap: 13px; align-items: center; padding: 15px 52px 13px 15px;
+                    background: radial-gradient(120% 130% at 12% 0%, rgba(255,190,110,0.2), transparent 62%);
+                    border-bottom: 1px solid rgba(255,205,120,0.16); }
+                .trm-top img { width: 66px; height: 66px; object-fit: contain; flex: none;
+                    filter: drop-shadow(0 4px 7px rgba(0,0,0,0.6)); }
+                .trm-top.is-cold img { filter: grayscale(0.85) brightness(0.55) drop-shadow(0 4px 7px rgba(0,0,0,0.5)); }
+                .trm-top h4 { margin: 0; font-size: 1.16rem; color: #ffe6b8; }
+                .trm-top .tr-blurb { margin: 2px 0 0; font-size: 0.8rem; line-height: 1.35; color: #cbb79c; font-style: italic; }
+
+                /* The one number the wall was bragging about, said in words. */
+                .trm-best { display: inline-flex; align-items: baseline; gap: 6px; margin-top: 7px;
+                    padding: 3px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
+                    color: #ffd98a; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,205,120,0.3); }
+                .trm-best.is-first { color: #1d1206; background: linear-gradient(#ffdc7a, #e8ac3c); border-color: #ffe9a8; }
+                .trm-best em { font-style: normal; font-weight: 600; opacity: 0.85; }
+                .trm-best.is-none { color: #a99b86; border-color: rgba(255,255,255,0.12); font-weight: 600; }
+
+                /* The body scrolls; the header and the walk-the-room footer do not. */
+                .trm-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 13px 15px 16px; }
+                .trm-what { margin: 0; font-size: 0.875rem; line-height: 1.5; color: #ddcbb0; }
+                .trm-field { margin: 9px 0 0; font-size: 0.775rem; line-height: 1.45; color: #a99b86; }
+                .trm-field b { color: #ffd98a; font-weight: 700; }
+                .trm-go { display: inline-block; margin-top: 12px; padding: 9px 16px; border-radius: 11px;
+                    font-weight: 800; font-size: 0.88rem; text-decoration: none; color: #241604;
+                    background: linear-gradient(180deg, #ffdc8f, #e5a63a); box-shadow: 0 3px 0 #96661b; }
+                .trm-go:hover { filter: brightness(1.06); }
+
+                .tr-sub { margin: 16px 0 6px; font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase;
                     color: #c69a5c; font-weight: 700; }
+
+                /* Walk the room. The NEXT WALL'S NAME, not a bare chevron — you are choosing where to go, and
+                   "‹" alone makes you open it to find out what it was. */
+                .trm-nav { display: flex; gap: 8px; padding: 9px 12px; border-top: 1px solid rgba(255,205,120,0.16);
+                    background: rgba(0,0,0,0.3); }
+                .trm-nav button { flex: 1 1 0; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+                    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d9c6ab;
+                    font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden;
+                    text-overflow: ellipsis; }
+                .trm-nav button:hover { background: rgba(255,205,120,0.14); color: #ffe6b8; }
+                .trm-nav .is-next { text-align: right; }
 
                 /* Wider cells than the bare name+level version needed: each card now carries a sentence, and at
                    148px a description wrapped to five ragged lines. */
@@ -201,7 +306,8 @@ export default function TrophyRoom({ active, initial = null }) {
                                     key={s.key} type="button"
                                     className={`tr-hook${open === s.key ? " is-open" : ""}${cold ? " is-cold" : ""}`}
                                     style={{ left: `${pos.left}%`, top: `${pos.top}%` }}
-                                    onClick={() => pick(s.key)}
+                                    onClick={(e) => pick(s.key, e)}
+                                    aria-haspopup="dialog"
                                     title={s.best ? `${s.name} — ${s.best.label}: ${ord(s.best.rank)} of ${s.best.of}` : s.name}
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -223,70 +329,141 @@ export default function TrophyRoom({ active, initial = null }) {
                         Tap one for everything it counts.
                     </p>
 
-                    {shelf ? (
-                        <div className="tr-detail" ref={detailRef}>
-                            <h4>{shelf.name}</h4>
-                            <p className="tr-blurb">{shelf.blurb}</p>
+                    {/* No `mounted` guard is needed: `open` can only be set by a click, so a server render
+                        never reaches createPortal and there is no hydration mismatch to avoid. */}
+                    {shelf ? createPortal((
+                        <div
+                            className="trm-back" role="dialog" aria-modal="true" aria-label={shelf.name}
+                            onClick={close}
+                        >
+                            <div
+                                className="trm-card" ref={cardRef} tabIndex={-1}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <button type="button" className="trm-x" onClick={close} aria-label="Close">×</button>
 
-                            {shelf.tools.length ? (
-                                <>
-                                    <p className="tr-sub">What you&apos;ve built — {shelf.built} of {shelf.buildable}</p>
-                                    <div className="tr-tools">
-                                        {shelf.tools.map((t) => (
-                                            <div key={t.name} className={`tr-tool${t.level >= t.max ? " is-max" : ""}`}>
-                                                <b>{t.name}</b>
-                                                <span>{t.level}/{t.max}</span>
-                                                <div className="tr-bar"><i style={{ width: `${Math.round((t.level / Math.max(1, t.max)) * 100)}%` }} /></div>
-                                                {/* What it is, then what you have actually bought. A title tooltip
-                                                    was useless here — this screen is read on a phone, where
-                                                    nothing hovers. */}
-                                                {t.desc ? <em className="tr-what">{t.desc}</em> : null}
-                                                {t.now || t.effect ? (
-                                                    <em className="tr-now">
-                                                        {t.effect ? <span>{t.effect}</span> : null}
-                                                        {t.now ? <b>{t.now}</b> : null}
-                                                    </em>
-                                                ) : null}
-                                            </div>
-                                        ))}
+                                <div className={`trm-top${shelf.touched ? "" : " is-cold"}`}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={shelf.art} alt="" draggable={false} />
+                                    <div>
+                                        <h4>{shelf.name}</h4>
+                                        <p className="tr-blurb">{shelf.blurb}</p>
+                                        {/* THE PLAQUE, IN WORDS. On the wall it is "#6" and you have to already
+                                            know what it counts; here it says which record earned it. */}
+                                        {shelf.best ? (
+                                            <span className={`trm-best${shelf.best.rank === 1 ? " is-first" : ""}`}>
+                                                {ord(shelf.best.rank)} of {shelf.best.of}
+                                                {" "}<em>in {shelf.best.label.toLowerCase()}</em>
+                                            </span>
+                                        ) : (
+                                            <span className="trm-best is-none">
+                                                {shelf.touched ? "No placing here yet" : "You haven't started this one"}
+                                            </span>
+                                        )}
                                     </div>
-                                </>
-                            ) : null}
+                                </div>
 
-                            {shelf.records.length ? (
-                                <>
-                                    <p className="tr-sub">What you&apos;ve done</p>
-                                    <div className="tr-recs">
-                                        {shelf.records.map((r) => (
-                                            <div key={r.label} className="tr-rec">
-                                                <b>{r.label}</b>
-                                                <span>{fmtVal(r)}</span>
-                                                {r.rank ? (
-                                                    <em className={`tr-place${r.rank === 1 ? " is-first" : r.pct >= 75 ? " is-top" : ""}`}>
-                                                        {ord(r.rank)} of {r.of}
-                                                    </em>
-                                                ) : r.note ? (
-                                                    <em className="tr-note">{r.note}</em>
-                                                ) : r.of ? (
-                                                    // You have none of this, so everyone with any is ahead — which
-                                                    // is both accurate and the more useful thing to be told.
-                                                    <em className="tr-note">{r.of} ahead of you</em>
-                                                ) : <em className="tr-note" />}
-                                                {r.hint ? <em className="tr-what">{r.hint}</em> : null}
-                                                {r.pct != null ? (
-                                                    <div className="tr-pctbar"><i style={{ width: `${r.pct}%` }} /></div>
-                                                ) : null}
+                                <div className="trm-body">
+                                    {/* WHAT THE THING IS. The blurb above is the object talking; this is the
+                                        system explained to somebody who has never opened it. */}
+                                    {shelf.what ? <p className="trm-what">{shelf.what}</p> : null}
+
+                                    {/* WHO YOU ARE BEING MEASURED AGAINST. "6th of 27" reads as a small field
+                                        until you know the room only counts people who have actually played it.
+                                        THE SECOND SENTENCE ONLY HOLDS IF THERE ARE PLACINGS BELOW. On a wall
+                                        you have never touched there are none, and promising them under an
+                                        empty card is how a screen loses the reader's trust. */}
+                                    <p className="trm-field">
+                                        {shelf.players === 0 ? (
+                                            "Nobody in the Den has played this yet — the wall is waiting."
+                                        ) : shelf.touched ? (
+                                            <>
+                                                <b>{shelf.players}</b> of {room.memberCount} members have played this.
+                                                {" "}Every placing below is out of them — not out of everybody.
+                                            </>
+                                        ) : (
+                                            <>
+                                                <b>{shelf.players}</b> of {room.memberCount} members have played this.
+                                                {" "}You haven&apos;t yet, so nothing of yours hangs here.
+                                            </>
+                                        )}
+                                    </p>
+
+                                    {shelf.href ? (
+                                        <a className="trm-go" href={shelf.href}>{shelf.cta}</a>
+                                    ) : null}
+
+                                    {shelf.tools.length ? (
+                                        <>
+                                            <p className="tr-sub">What you&apos;ve built — {shelf.built} of {shelf.buildable}</p>
+                                            <div className="tr-tools">
+                                                {shelf.tools.map((t) => (
+                                                    <div key={t.name} className={`tr-tool${t.level >= t.max ? " is-max" : ""}`}>
+                                                        <b>{t.name}</b>
+                                                        <span>{t.level}/{t.max}</span>
+                                                        <div className="tr-bar"><i style={{ width: `${Math.round((t.level / Math.max(1, t.max)) * 100)}%` }} /></div>
+                                                        {/* What it is, then what you have actually bought. A title
+                                                            tooltip was useless here — this screen is read on a
+                                                            phone, where nothing hovers. */}
+                                                        {t.desc ? <em className="tr-what">{t.desc}</em> : null}
+                                                        {t.now || t.effect ? (
+                                                            <em className="tr-now">
+                                                                {t.effect ? <span>{t.effect}</span> : null}
+                                                                {t.now ? <b>{t.now}</b> : null}
+                                                            </em>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="tr-empty">Nothing on this wall yet — play some and it fills in.</p>
-                            )}
+                                        </>
+                                    ) : null}
+
+                                    {shelf.records.length ? (
+                                        <>
+                                            <p className="tr-sub">What you&apos;ve done</p>
+                                            <div className="tr-recs">
+                                                {shelf.records.map((r) => (
+                                                    <div key={r.label} className="tr-rec">
+                                                        <b>{r.label}</b>
+                                                        <span>{fmtVal(r)}</span>
+                                                        {r.rank ? (
+                                                            <em className={`tr-place${r.rank === 1 ? " is-first" : r.pct >= 75 ? " is-top" : ""}`}>
+                                                                {ord(r.rank)} of {r.of}
+                                                            </em>
+                                                        ) : r.note ? (
+                                                            <em className="tr-note">{r.note}</em>
+                                                        ) : r.of ? (
+                                                            // You have none of this, so everyone with any is ahead —
+                                                            // which is both accurate and the more useful thing to
+                                                            // be told.
+                                                            <em className="tr-note">{r.of} ahead of you</em>
+                                                        ) : <em className="tr-note" />}
+                                                        {r.hint ? <em className="tr-what">{r.hint}</em> : null}
+                                                        {r.pct != null ? (
+                                                            <div className="tr-pctbar"><i style={{ width: `${r.pct}%` }} /></div>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="tr-empty">Nothing on this wall yet — play some and it fills in.</p>
+                                    )}
+                                </div>
+
+                                {/* WALK THE ROOM. Eleven pieces at 80px on a phone is eleven careful taps and ten
+                                    dismissals to read the wall; this reads it in ten. */}
+                                <div className="trm-nav">
+                                    <button type="button" onClick={() => setOpen(prevShelf.key)}>
+                                        ‹ {prevShelf.name}
+                                    </button>
+                                    <button type="button" className="is-next" onClick={() => setOpen(nextShelf.key)}>
+                                        {nextShelf.name} ›
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    ) : (
-                        null /* the legend above already says to tap; two prompts in a row is nagging */
-                    )}
+                    ), document.body) : null}
                 </>
             )}
         </section>

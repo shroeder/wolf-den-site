@@ -138,10 +138,78 @@ const RECORD_HINT = {
     "Quests completed": "Daily quests you finished AND collected.",
 };
 
+// ── WHAT THE SUBSYSTEM ACTUALLY IS ───────────────────────────────────────────────────────────────────────────
+// `blurb` is the object on the wall talking ("Blades on the rack") — flavour, and it earns its place. It is not
+// an explanation, and a member who has never opened the Arena learns nothing from it. `what` is the plain
+// version: how the system works in two sentences, for somebody standing in front of a wall they have never
+// touched. `href`/`cta` finish the thought — having just explained the thing, send them to it.
+//
+// These are prose, not balance constants, so they are written here rather than imported: the owning modules
+// state their tracks' effects (which this room does import), not what the feature is for.
+const ABOUT = {
+    arena: {
+        what: "One-on-one bouts against other members' heroes, fought on a timer off the gear you are wearing. "
+            + "Challenging is free — a win takes victory points off whoever you beat and pays laurels, which is "
+            + "the currency the tracks below are bought with.",
+        href: "/marketplace/arena", cta: "Go to the Arena",
+    },
+    ships: {
+        what: "Your boat against another, broadside by broadside. You aim at a part of her ship — hull, guns or "
+            + "rigging — and the whole volley goes there, so what you cripple first decides the fight.",
+        href: "/marketplace/sailing", cta: "Go to the docks",
+    },
+    sailing: {
+        what: "Send the boat out and it sails whether the tab is open or not, meeting whatever is on the water "
+            + "at the midpoint of the trip and coming home loaded. The upgrades below shorten the trip, sweeten "
+            + "the hold and decide how much trouble it finds.",
+        href: "/marketplace/sailing", cta: "Set sail",
+    },
+    digging: {
+        what: "A patch of sand uncovered one tile at a time, with a limited number of digs per trip. What comes "
+            + "up are fragments; enough of one kind forges a whole chest back at the docks.",
+        href: "/marketplace/sailing", cta: "Go and dig",
+    },
+    fishing: {
+        what: "Free casts, refreshed daily. Every fish is worth gold and the rare ones are worth showing off — "
+            + "the tracks below buy more casts a day and better odds on what takes the line.",
+        href: "/marketplace/fishing", cta: "Go fishing",
+    },
+    mining: {
+        what: "Read the seam, then swing on the beat — a clean run of swings builds a combo that pays out at the "
+            + "end. Ore comes back up and is smelted into the parts the forge builds with.",
+        href: "/marketplace/mining", cta: "Head down the mine",
+    },
+    delves: {
+        what: "A run of floors that gets harder the deeper you take it, with one flask between you and the "
+            + "bottom. Walk out and you keep the run; die and you keep nothing from it.",
+        href: "/marketplace/dungeons", cta: "Open a dungeon",
+    },
+    kitchen: {
+        what: "A timing minigame that turns what the farm grows into dishes. A dish is a buff you eat before a "
+            + "boss night or a hard delve, and the better you hit the band the better it comes out.",
+        href: "/marketplace/cooking", cta: "Go to the kitchen",
+    },
+    forge: {
+        what: "Gear you will never wear is salvaged into parts, parts combine upward into rarer parts, and those "
+            + "enhance a piece you are keeping. The Jewelcutter next to it cuts gems for the sockets.",
+        href: "/marketplace/blacksmith", cta: "Go to the forge",
+    },
+    farm: {
+        what: "Crops grow on a real clock whether you are here or not, pets earn while they roam it, and other "
+            + "members can walk in and rate what you have built. You are standing in it.",
+        href: "/marketplace/farm", cta: "Look around the farm",
+    },
+    den: {
+        what: "Everything that is not one single system — the level and gold everything else feeds, the badges "
+            + "you have been awarded, and the things you have done for other members.",
+        href: "/marketplace/play", cta: "Back to the Den",
+    },
+};
+
 // ── THE WALL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Order is hanging order, and it is deliberate: the things you fight with first, then the things you make with,
 // then the life you have lived. `src` names which row the loader reads.
-export const SHELVES = [
+const WALLS = [
     {
         key: "arena", name: "The Arena", src: "arena", art: "/images/trophy/tool-arena.webp",
         blurb: "Blades on the rack. What you have taken off other members.",
@@ -317,6 +385,11 @@ export const SHELVES = [
     },
 ];
 
+// The wall with its prose folded in. ABOUT is written as its own block above only so the eleven explanations
+// read together — this is the single export, so the loader, the lab and anything else all see one shape and
+// nobody has to remember to merge the two halves a second time.
+export const SHELVES = WALLS.map((sh) => ({ ...sh, ...(ABOUT[sh.key] || {}) }));
+
 // Read a column that may be a dotted path into a JSON column ("upgrades.edge", "farm_upgrades.plots").
 function readCol(row, col) {
     if (!row) return 0;
@@ -452,9 +525,20 @@ export async function trophyRoom(buyerId) {
         }).filter((r) => r.value > 0 || r.of || r.note); // an untouched subsystem shows its wall object, not twelve zeroes
 
         const touched = built > 0 || records.some((r) => r.value > 0);
+
+        // HOW BIG THE FIELD IS. "6th of 27" begs the question the room never answered: 27 out of how many? This
+        // is the same test as `touched` above, run over everybody — anything bought or any record above zero —
+        // so the number the modal reports is the field those placings are actually drawn from.
+        let players = 0;
+        for (const [, row] of rows) {
+            if (sh.tools.some((t) => readCol(row, t.col) > 0)
+                || sh.records.some((r) => (valueOf(row, r) || 0) > 0)) players += 1;
+        }
+
         return {
             key: sh.key, name: sh.name, art: sh.art, blurb: sh.blurb,
-            tools, built, buildable,
+            what: sh.what || null, href: sh.href || null, cta: sh.cta || null,
+            tools, built, buildable, players,
             // A shelf's headline is its best placing — what the object on the wall is actually bragging about.
             best: records.filter((r) => r.rank).sort((a, b) => a.rank - b.rank)[0] || null,
             // A wall you have never touched hangs there empty. Listing nine zeroes under it would read as a

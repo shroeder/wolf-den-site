@@ -13,8 +13,13 @@
 //   THE THIRD TRAP: remote sprites arrive after load. Shooting immediately gives you a clean, empty, wrong
 //   picture — hence the settle delay below.
 //
+//   THE FOURTH TRAP: half of what needs looking at is not on the page at load — a modal, an open panel, a
+//   selected tab. Shooting the closed state and calling the feature checked is the same class of mistake as
+//   shooting a 500px "phone". Hence the optional click selector below, which FAILS LOUDLY when it matches
+//   nothing rather than quietly handing you a picture of the thing not open.
+//
 // Usage:
-//   node scripts/shot.mjs <url> <out.png> [width=375] [height=667] [portOffset=0]
+//   node scripts/shot.mjs <url> <out.png> [width=375] [height=667] [portOffset=0] [clickSelector] [waitForSelector]
 //
 // A file:// URL works, which is how a fixture page (one component, real sprite URLs, the app's real numbers)
 // gets checked without standing up an authenticated session.
@@ -29,6 +34,8 @@ const out = process.argv[3];
 const W = Number(process.argv[4] || 375);
 const H = Number(process.argv[5] || 667);
 const PORT = 9333 + (Number(process.argv[6] || 0));
+const CLICK = process.argv[7] || null;
+const WAIT = process.argv[8] || null;   // what the click should have produced; the proof it actually landed
 
 const chrome = spawn(CHROME, [
     `--remote-debugging-port=${PORT}`, "--headless=new", "--disable-gpu", "--hide-scrollbars",
@@ -63,6 +70,38 @@ await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: true });
 await send("Page.navigate", { url });
 await sleep(2600); // let the remote sprites actually arrive — a blank shot proves nothing
+
+// Open whatever state is being judged.
+//
+// THE CLICK MUST BE RETRIED, AND ITS RESULT MUST BE CHECKED. The element exists in the server-rendered HTML
+// long before React attaches a handler to it, so a single well-timed .click() dispatches into nothing and the
+// page sits there closed — and the screenshot comes out looking entirely reasonable. So: click, look for what
+// the click was supposed to produce, click again. Nothing matching after the window is a hard failure rather
+// than a picture of the thing not open.
+if (CLICK) {
+    await send("Runtime.enable");
+    const evaluate = async (expression) =>
+        (await send("Runtime.evaluate", { expression, returnByValue: true }))?.result?.value;
+
+    let opened = false;
+    for (let i = 0; i < 20 && !opened; i += 1) {
+        const state = await evaluate(`(() => {
+            if (${JSON.stringify(!!WAIT)} && document.querySelector(${JSON.stringify(WAIT || "*")})) return "open";
+            const el = document.querySelector(${JSON.stringify(CLICK)});
+            if (!el) return "missing";
+            el.click();
+            return ${JSON.stringify(!!WAIT)} ? "clicked" : "open";
+        })()`);
+        if (state === "open") opened = true;
+        else await sleep(400);
+    }
+    if (!opened) {
+        console.error(`shot.mjs: ${CLICK} never produced ${WAIT || "a click"} — refusing to shoot the unopened page`);
+        sock.close(); chrome.kill(); process.exit(1);
+    }
+    await sleep(800); // let the open animation land
+}
+
 const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
 writeFileSync(out, Buffer.from(data, "base64"));
 console.log(`${out}  ${W}x${H}`);
