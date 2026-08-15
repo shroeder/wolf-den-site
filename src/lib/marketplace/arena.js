@@ -1569,7 +1569,10 @@ export async function fightRound(buyerId, opts = {}) {
                 // more so than any other kind. High variance, paid for with execution rather than power.
                 gradeAtk = 1.45;
             }
-            if (ability.kind === "spell") {
+            // AN ELEMENTAL SPELL TRADES THE PIERCE FOR ITS STATUS. Luke: "not redundant guard spells."
+            // A gear signature spell is still defined by cutting guard; the Runecaller's fire and ice are
+            // defined by what they LEAVE BEHIND, so they do not also cut it. Spell damage still feeds both.
+            if (ability.kind === "spell" && !ability.burns && !ability.freezes) {
                 // Magic cuts guard, paid for in raw power. It used to also re-roll the element clash off the
                 // spell's own affinity rather than the bout's; with the wheel gone there is nothing to re-roll,
                 // and what makes a spell a spell is the pierce.
@@ -1908,7 +1911,10 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "gamble") power = Math.random() < 0.5 ? power * 2 : 0;
             if (k === "spell") {
                 power *= 0.88 * (1 + (FP.spellPower || 0));
-                foePierce = Math.max(0.2, 0.6 - (FP.pierce || 0));
+                // Their elemental spells trade the pierce for their status, exactly as yours do.
+                if (!theirAbility.burns && !theirAbility.freezes) {
+                    foePierce = Math.max(0.2, 0.6 - (FP.pierce || 0));
+                }
                 // ── A SPELL BRINGS ITS OWN ELEMENT, ON THEIR SIDE TOO ────────────────────────────────────
                 // Yours reads the affinity of the SPECIFIC piece you attuned at the Forge rather than the
                 // bout-wide clash; theirs was still using the bout-wide number, so the one decision the Forge

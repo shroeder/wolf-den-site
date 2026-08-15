@@ -33,6 +33,9 @@ const PALETTE = {
     light: ["#ffffff", "#fff6d0", "#ffe89a", "#ffd75e"],
     shadow: ["#e8d0ff", "#b061ff", "#6a2fb0", "#2e1050"],
     neutral: ["#ffffff", "#ffe9b8", "#ffc978", "#ff9a3c"],
+    // ICE is its own palette rather than borrowing water: a freeze has to be instantly separable from a
+    // water hit, and the whiter, harder end of the range is what reads as cold instead of wet.
+    ice: ["#ffffff", "#d8f4ff", "#8fd8ff", "#3f9fd8"],
 };
 const paletteFor = (el) => PALETTE[el] || PALETTE.neutral;
 
@@ -224,6 +227,24 @@ class Fx {
                 this.siphon(at, me, PALETTE.shadow, Math.round(70 * big));
                 this.ring(at, PALETTE.shadow, { to: 150, max: 0.5, w: 3 });
                 this.hit(0.4 * big, "#8a3cff");
+                break;
+            // ── FROZEN ── a hard white ring that snaps outward and a shower of shards, then the screen
+            // takes a cold flash. Bigger than a normal hit on purpose: it has just cost somebody a turn,
+            // which is the most expensive thing that happens in a bout, and the feedback should match the
+            // price. The status chip keeps breathing afterwards so it is not a moment you can miss.
+            case "freeze":
+                this.ring(at, PALETTE.ice, { to: 260, max: 0.7, w: 9 });
+                this.ring(at, PALETTE.ice, { to: 150, max: 0.5, w: 3 });
+                this.burst(at, PALETTE.ice, Math.round(90 * big), 380);
+                this.column(at, PALETTE.ice, Math.round(60 * p * big), 90);
+                this.hit(0.95 * big, "#bfeaff");
+                break;
+            // A guard taken away, rather than shaved. Same cold family as the freeze, because they are the
+            // same skill line and should read as relatives.
+            case "disarm":
+                this.erupt(at, PALETTE.ice, Math.round(64 * big), 140);
+                this.ring(at, PALETTE.ice, { to: 240, max: 0.5, w: 7 });
+                this.hit(0.7 * big, "#a8e4ff");
                 break;
             case "sunder":
                 this.erupt(at, PALETTE.earth, Math.round(56 * big), 120);

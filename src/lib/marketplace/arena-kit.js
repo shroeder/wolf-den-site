@@ -245,7 +245,10 @@ const x = (n) => `\u00d7${(Math.round(n * 100) / 100).toFixed(2).replace(/\.?0+$
 // carries a short authored line ("You keep half of what it takes off them") which says the flavour and not the
 // numbers — no damage, no share, nothing you could weigh a point against. Rather than write those numbers a
 // second time into every node, the tree runs the ability through this.
-export function effectOf(kind, power, element, hits = 1) {
+// `opts` carries what a Runecaller spell DOES besides damage — {burns, freezes}. Two spells that read
+// identically on the card and behave completely differently in the ring is the thing this whole pass is
+// undoing, so the card has to know.
+export function effectOf(kind, power, element, hits = 1, opts = {}) {
     const el = element ? ELEMENTS[element]?.label || element : null;
     switch (kind) {
         case "strike":
@@ -256,11 +259,37 @@ export function effectOf(kind, power, element, hits = 1) {
                 line: `${hits} hits of ${x(power)} — every one can crit`,
                 tags: [{ t: "More crit rolls", k: "good" }],
             };
-        case "spell":
+        case "spell": {
+            // ── A SPELL SAYS WHETHER SPELL DAMAGE FEEDS IT ───────────────────────────────────────────
+            // Luke: "no way to tell if something benefits from spell damage or not." Attunement only ever
+            // multiplied `spell` kind, so it did nothing for Emberbrand or Shatter — and NOTHING anywhere
+            // said so. Every spell card carries the tag now, and only spell cards can.
+            const feeds = { t: "Spell damage applies", k: "good" };
+            if (opts.burns) {
+                return {
+                    head: x(power * SPELL_POWER_TAX), sub: "damage",
+                    line: `${x(power * SPELL_POWER_TAX)} ${el || "fire"} damage, and it sets them burning`,
+                    tags: [feeds],
+                };
+            }
+            if (opts.freezes) {
+                return {
+                    head: x(power * SPELL_POWER_TAX), sub: "damage",
+                    line: `${x(power * SPELL_POWER_TAX)} ${el || "ice"} damage — ${Math.round(FREEZE_CHANCE * 100)}% to freeze them for a turn`,
+                    tags: [{ t: `${Math.round(FREEZE_CHANCE * 100)}% freeze`, k: "good" }],
+                };
+            }
             return {
                 head: x(power * SPELL_POWER_TAX), sub: "damage",
-                line: `${x(power * SPELL_POWER_TAX)} ${el || "elemental"} damage, cuts ${Math.round(SPELL_PIERCE * 100)}% guard`,
-                tags: [{ t: `Cuts ${Math.round(SPELL_PIERCE * 100)}% guard`, k: "good" }],
+                line: `${x(power * SPELL_POWER_TAX)} ${el || "elemental"} damage, bypasses ${Math.round(SPELL_PIERCE * 100)}% of their guard`,
+                tags: [feeds],
+            };
+        }
+        case "disarm":
+            return {
+                head: `${GUARD_DISABLE_TURNS} turns`, sub: "no guard",
+                line: `${x(power)} damage, and they cannot guard at all for ${GUARD_DISABLE_TURNS} turns`,
+                tags: [{ t: "Guard disabled", k: "good" }],
             };
         case "execute":
             return {

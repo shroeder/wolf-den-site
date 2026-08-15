@@ -354,7 +354,7 @@ export function treeState(classId, taken = {}, pointsAvailable = 0) {
             // A passive gets "now 3% → next 4.5%"; an active got only its flavour line, so Tithe read as
             // "You keep half of what it takes off them" — half of WHAT, at what cost, how often? The same
             // builder the gear ability cards use answers all of it, from the node's own numbers.
-            effect: n.kind === "active" ? effectOf(n.ability, n.power || 1, null, n.hits || 1) : null,
+            effect: n.kind === "active" ? effectOf(n.ability, n.power || 1, n.element || null, n.hits || 1, { burns: n.burns, freezes: n.freezes }) : null,
         };
     });
 }

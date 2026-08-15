@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiBurn, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiBurn, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -198,6 +198,13 @@ const STATUS_KINDS = {
                what: () => `When it finishes counting down they hit for ${DOOM_MULT}x.` },
     frenzy:  { Icon: GiAngryEyes,     label: "Their frenzy",   tone: "bad",
                what: () => "They are swinging faster than they should." },
+    // ── THE TWO NEW ONES ── a lost turn and a lost guard are the biggest things that can happen to you in
+    // a bout, so neither is allowed to be only a line in the log. Same chip, same inspect, same countdown
+    // as every other effect — that is the whole point of this registry existing.
+    frozen:  { Icon: GiIciclesAura,       label: "Frozen",         tone: "ice",
+               what: () => "Solid. The next turn is lost — the beat passes without an action." },
+    noguard: { Icon: GiCrackedShield, label: "Guard shattered", tone: "ice",
+               what: () => "No guard can be raised at all while this lasts." },
 };
 
 // The effects riding a given fighter, in the order they matter. `you` reads the ones the OPPONENT has put on
@@ -209,10 +216,14 @@ function statusesFor(bout, side) {
     if (side === "them") {
         if (bout.bleed?.turns > 0) add("burn", bout.bleed.turns, { dmg: bout.bleed.dmg, stacks: bout.bleed.stacks });
         add("sunder", Number(bout.sunder) || 0);
+        add("frozen", Number(bout.foeFrozen) || 0);
+        add("noguard", Number(bout.foeNoGuard) || 0);
         return out;
     }
     if (bout.foeBleed?.turns > 0) add("burn", bout.foeBleed.turns, { dmg: bout.foeBleed.dmg, stacks: bout.foeBleed.stacks });
     add("sunder", Number(bout.foeSunder) || 0);
+    add("frozen", Number(bout.frozen) || 0);
+    add("noguard", Number(bout.noGuard) || 0);
     add("dread", Number(bout.dread) || 0);
     add("snare", Number(bout.snare) || 0);
     add("bound", Number(bout.bound) || 0);
@@ -951,7 +962,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // generic impact, and half the fight had no visual identity at all.
         const caster = mineNow ? bout.me?.abilities : bout.foe?.abilities;
         const thrown = l.ability ? (caster || []).find((a) => a.name === l.ability)?.kind : null;
-        const kind = l.grade === "burn" ? "rend"
+        // A FREEZE IS ITS OWN PICTURE, and it has to be looked up before the grade is, because the log line
+        // that lands one is an ordinary skill line — the freeze rides in its `extra`. Without this the most
+        // expensive event in the game plays the same generic impact as any other spell.
+        const froze = typeof l.text === "string" && /FROZEN|frozen solid|THE COLD TAKES YOU/i.test(l.text);
+        const kind = froze ? "freeze"
+            : l.ability === "Shattered" ? "disarm"
+            : l.grade === "burn" ? "rend"
             : l.grade === "ward" ? (l.kind === "riposte" ? "riposte" : "ward")
                 : l.grade === "guard" ? "ward"
                     : l.grade === "item" ? "heal"
@@ -996,7 +1013,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             });
         } else {
             const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
-            fxRef.current?.play({ kind, element, side: target, power, crit: Boolean(l.crit) });
+            fxRef.current?.play({ kind, element: froze ? "ice" : element, side: target, power, crit: Boolean(l.crit) });
         }
         return () => timers.forEach(clearTimeout);
     }, [bout?.log?.length]);
@@ -2443,6 +2460,14 @@ function Styles() {
             .ar-stat.is-mark { color: #ffd75e; border-color: rgba(255,215,94,0.5); background: rgba(255,215,94,0.12); }
             .ar-stat.is-doom { color: #fff; border-color: rgba(255,80,80,0.7); background: rgba(200,30,30,0.28);
                 animation: arBurnPulse .8s ease-in-out infinite; }
+            /* ICE. Deliberately the coldest thing on the screen — the burn pulses warm and fast, this one
+               breathes slowly, so which of the two is on you is readable at a glance without reading a word. */
+            .ar-stat.is-ice { color: #a8e4ff; border-color: rgba(120,205,255,0.6); background: rgba(90,180,255,0.15);
+                animation: arFrostPulse 1.9s ease-in-out infinite; }
+            @keyframes arFrostPulse {
+                0%, 100% { box-shadow: 0 0 0 0 rgba(140,215,255,0); }
+                50% { box-shadow: 0 0 9px 1px rgba(140,215,255,0.45); }
+            }
             .ar-statcard { position: relative; z-index: 7; margin: 6px 0 0; padding: 9px 11px; border-radius: 12px; cursor: pointer;
                 background: linear-gradient(180deg, rgba(26,28,34,0.98), rgba(16,17,21,0.98));
                 border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 26px rgba(0,0,0,0.5); }
