@@ -12298,6 +12298,9 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .sail-cta-raid:not(:disabled):active { box-shadow: 0 2px 0 #5a1220, 0 6px 14px rgba(180,40,60,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
 .sail-cta-raid:disabled { filter: grayscale(0.4) brightness(0.85); }
 /* The name leads; the count sits under it as context rather than being the headline. */
+/* The stack centres its own text, but the BUTTON was laying it out at flex-start — `.sail-cta` sets
+   `align-items: center` and never a justify, so on a full-width raid button the whole block sat left. */
+.sail-cta-raid { justify-content: center; }
 .sail-cta-stack { display: grid; gap: 1px; line-height: 1.15; text-align: center; }
 .sail-cta-stack b { font-size: 1.24rem; }
 .sail-cta-stack em { font-style: normal; font-size: 0.78rem; font-weight: 800; opacity: 0.82; }
