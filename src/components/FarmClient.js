@@ -1006,11 +1006,22 @@ export default function FarmClient({ initial, viewingAlias }) {
                 .farm-rank-next { font-size: 10.5px; color: #b9a892; }
                 .farm-viewtabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.08); }
                 /* Four tabs on a phone: the label has to survive, so the row gets tighter and the badge stops
-                   taking inline width — it used to push the text sideways and collide with the next tab's icon. */
+                   taking inline width — it used to push the text sideways and collide with the next tab's icon.
+                   FIVE tabs is where that stops working. With Trophies added, five equal labelled tabs need
+                   72px each inside a 70px slot at 375px and 67px inside 59px at 320px, so "Trophies" ran off
+                   the row and "Outside" collided with the Inside icon. Below 480px the labels now collapse to
+                   icons EXCEPT on the selected tab, which keeps its name and takes the slack — so you can
+                   always read where you are, every tab keeps a 44px touch target, and the row stops overflowing.
+                   Each button carries aria-label/title, so an icon-only tab is still named to a screen reader. */
                 .farm-viewtabs button { position: relative; flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 9px 4px; border-radius: 10px; font-weight: 800; font-size: 12px; letter-spacing: -0.01em; cursor: pointer; border: none; background: transparent; color: #b7c2ad; transition: background .15s ease, color .15s ease, box-shadow .15s ease; white-space: nowrap; }
                 .farm-viewtabs button > span[aria-hidden] { font-size: 15px; flex: 0 0 auto; }
                 .farm-viewtabs button.on { background: linear-gradient(180deg, #7ed57e, #4bbf6a); color: #10240f; box-shadow: 0 2px 6px rgba(75,191,106,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
                 @media (hover: hover) { .farm-viewtabs button:not(.on):hover { background: rgba(255,255,255,0.05); color: #e8f0e0; } }
+                @media (max-width: 480px) {
+                    .farm-viewtabs button { flex: 0 0 auto; min-width: 44px; padding: 9px 6px; }
+                    .farm-viewtabs button.on { flex: 1 1 auto; }
+                    .farm-viewtabs button:not(.on) .farm-tab-label { display: none; }
+                }
                 .farm-viewtabs button.has-attn:not(.on) { box-shadow: inset 0 0 0 1px rgba(224,67,63,0.55); }
                 /* Absolutely positioned so a badge never widens the tab or shoves the label into its neighbour. */
                 .farm-viewtabs .farm-tab-badge { position: absolute; top: 1px; right: 2px; font-size: 9px; font-weight: 900; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px; background: #e0433f; color: #fff; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0,0,0,0.45); animation: farmTabPulse 1.6s ease-in-out infinite; }
@@ -1058,7 +1069,9 @@ export default function FarmClient({ initial, viewingAlias }) {
                 same behaviour, no exception to learn. */}
             <div className="farm-viewtabs">
                 {[["garden", "🌾", "Garden"], ["outside", "🏡", "Outside"], ["inside", "🛖", "Inside"], ["art", "🎨", "Art"],
-                  ["trophy", <GiTrophyCup key="t" />, "Trophies"]]
+                  // Sized up a touch: a monochrome line glyph at the emoji's 15px reads thinner than its four
+                  // full-colour neighbours. It inherits currentColor, so it tracks the tab's selected state.
+                  ["trophy", <GiTrophyCup key="t" size={18} />, "Trophies"]]
                     // The Garden, your Art and your Trophy Room are yours alone. The room is gated on the SERVER
                     // too — /farm/trophies takes no owner parameter — so this filter is presentation, not the lock.
                     .filter(([v]) => farm.mine || (v !== "garden" && v !== "art" && v !== "trophy"))
@@ -1068,8 +1081,8 @@ export default function FarmClient({ initial, viewingAlias }) {
                     const petAttn = v !== "garden" && farm.mine && liveNudge > 0 ? pets.filter((p, i) => petView(i) === v && !p.petted && !standSeatedIds.has(p.id)).length : 0;
                     const badge = v === "art" ? artPending : (attn || petAttn);
                     return (
-                        <button key={v} type="button" className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
-                            <span aria-hidden="true">{ico}</span>{label}
+                        <button key={v} type="button" aria-label={label} title={label} className={`${view === v ? "on" : ""}${badge ? " has-attn" : ""}`} onClick={() => { setView(v); if (v === "garden") setDecoEditing(false); }}>
+                            <span aria-hidden="true">{ico}</span><span className="farm-tab-label">{label}</span>
                             {v === "art" && artPending ? <span className="farm-tab-badge" title={`${artPending} waiting on you`}>{artPending}</span>
                                 : attn ? <span className="farm-tab-badge" title={`${attn} to grab in the Garden`}>{attn}</span>
                                     : petAttn ? <span className="farm-tab-badge" title={`${petAttn} pet${petAttn === 1 ? "" : "s"} to pet — a free daily reward`}>{petAttn}</span> : null}

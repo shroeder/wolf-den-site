@@ -37,13 +37,19 @@ export default function TrophyRoom({ active, initial = null }) {
     const [err, setErr] = useState(null);
     const [open, setOpen] = useState(null);
     const detailRef = useRef(null);
-    const loaded = useRef(Boolean(initial));
 
-    // Fetched once, the first time the tab is opened — assembling the room reads every member's rows, and that
-    // has no business running when somebody is looking at their pigs.
+    // Fetched when the tab is opened — assembling the room reads every member's rows across ten tables, and
+    // that has no business running each time somebody looks at their pigs. FarmClient unmounts this component
+    // when you leave the tab, so opening it again refetches; at ~250ms that is the right trade.
+    //
+    // THERE WAS A `loaded` REF GUARD HERE AND IT WAS THE BUG. It could not prevent a refetch — the component is
+    // unmounted between visits, so the ref is new every time — but under StrictMode's double-invoke it did
+    // real damage: pass one set the flag and its cleanup set `dead`, so its response was discarded; pass two
+    // saw the flag and returned without fetching. Nothing ever resolved and the room sat on "Unlocking the
+    // trophy room…" forever. The `dead` flag alone is the whole correct pattern.
     useEffect(() => {
-        if (!active || loaded.current) return;
-        loaded.current = true;
+        // A server-supplied payload is the whole point of `initial`; fetching over it would defeat the rig.
+        if (!active || initial) return undefined;
         let dead = false;
         (async () => {
             try {
@@ -56,7 +62,7 @@ export default function TrophyRoom({ active, initial = null }) {
             }
         })();
         return () => { dead = true; };
-    }, [active]);
+    }, [active, initial]);
 
     const pick = useCallback((key) => {
         setOpen((k) => (k === key ? null : key));
