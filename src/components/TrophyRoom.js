@@ -177,10 +177,20 @@ export default function TrophyRoom({ active, initial = null }) {
                     animation: trmCardIn 240ms cubic-bezier(.2,.9,.3,1.1) both; }
                 @media (max-width: 620px) {
                     /* Flush to the bottom edge: on a phone the reachable half of the screen is the bottom half,
-                       and 88vh of card floating in the middle wastes the only part you can comfortably touch. */
+                       and 88vh of card floating in the middle wastes the only part you can comfortably touch.
+                       BUT NOT 92vh. At that height the sheet reaches the top of the viewport and stops reading
+                       as a sheet at all — it looks like the page navigated somewhere. Luke: "modals a little
+                       odd because of the sizing its like a modal that is full screen." 78vh leaves a real band
+                       of the room visible above it, which is what says "this is on top of something". */
                     .trm-back { padding: 0; align-items: flex-end; }
-                    .trm-card { max-width: none; max-height: 92vh; border-radius: 18px 18px 0 0;
+                    .trm-card { max-width: none; max-height: 78vh; border-radius: 20px 20px 0 0;
                         border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+                    /* The grabber. Costs 10px and tells you, before you read a word, which edge this came from
+                       and that it can be dismissed. */
+                    .trm-card::before { content: ""; position: absolute; top: 7px; left: 50%; z-index: 4;
+                        transform: translateX(-50%); width: 38px; height: 4px; border-radius: 999px;
+                        background: rgba(255,225,180,0.34); }
+                    .trm-top { padding-top: 20px; }
                 }
 
                 .trm-x { position: absolute; top: 9px; right: 10px; z-index: 3; width: 32px; height: 32px;
@@ -219,16 +229,25 @@ export default function TrophyRoom({ active, initial = null }) {
                 .tr-sub { margin: 16px 0 6px; font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase;
                     color: #c69a5c; font-weight: 700; }
 
-                /* Walk the room. The NEXT WALL'S NAME, not a bare chevron — you are choosing where to go, and
-                   "‹" alone makes you open it to find out what it was. */
-                .trm-nav { display: flex; gap: 8px; padding: 9px 12px; border-top: 1px solid rgba(255,205,120,0.16);
-                    background: rgba(0,0,0,0.3); }
-                .trm-nav button { flex: 1 1 0; min-width: 0; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+                /* Walk the room. THE PIECE ITSELF, not just its name — the wall is a room full of objects and
+                   these two buttons are the only place that forgot it. You recognise the anvil before you read
+                   "The Forge", so the art does the work and the name confirms it. */
+                .trm-nav { display: flex; gap: 8px; padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+                    border-top: 1px solid rgba(255,205,120,0.16); background: rgba(0,0,0,0.34); }
+                .trm-nav button { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px;
+                    padding: 7px 10px; border-radius: 12px; cursor: pointer;
                     border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: #d9c6ab;
-                    font-size: 0.78rem; font-weight: 700; white-space: nowrap; overflow: hidden;
-                    text-overflow: ellipsis; }
-                .trm-nav button:hover { background: rgba(255,205,120,0.14); color: #ffe6b8; }
-                .trm-nav .is-next { text-align: right; }
+                    font-size: 0.78rem; font-weight: 700; }
+                .trm-nav button:hover { background: rgba(255,205,120,0.14); color: #ffe6b8;
+                    border-color: rgba(255,205,120,0.34); }
+                .trm-nav button:hover img { transform: scale(1.09); }
+                .trm-nav img { width: 30px; height: 30px; flex: none; object-fit: contain;
+                    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.6)); transition: transform 140ms ease; }
+                /* A wall you have not touched hangs dark on the room; it hangs dark here too. */
+                .trm-nav button.is-cold img { filter: grayscale(0.85) brightness(0.5); }
+                .trm-nav span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .trm-nav i { font-style: normal; opacity: 0.55; flex: none; }
+                .trm-nav .is-next { flex-direction: row-reverse; text-align: right; }
 
                 /* Wider cells than the bare name+level version needed: each card now carries a sentence, and at
                    148px a description wrapped to five ragged lines. */
@@ -454,11 +473,27 @@ export default function TrophyRoom({ active, initial = null }) {
                                 {/* WALK THE ROOM. Eleven pieces at 80px on a phone is eleven careful taps and ten
                                     dismissals to read the wall; this reads it in ten. */}
                                 <div className="trm-nav">
-                                    <button type="button" onClick={() => setOpen(prevShelf.key)}>
-                                        ‹ {prevShelf.name}
+                                    <button
+                                        type="button" onClick={() => setOpen(prevShelf.key)}
+                                        className={prevShelf.touched ? "" : "is-cold"}
+                                        aria-label={`Previous wall: ${prevShelf.name}`}
+                                    >
+                                        {/* Chevron FIRST in the DOM for both, with the next button reversed in
+                                            CSS — so the arrows point outward (‹ left, › right) from one order. */}
+                                        <i>‹</i>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={prevShelf.art} alt="" draggable={false} />
+                                        <span>{prevShelf.name}</span>
                                     </button>
-                                    <button type="button" className="is-next" onClick={() => setOpen(nextShelf.key)}>
-                                        {nextShelf.name} ›
+                                    <button
+                                        type="button" onClick={() => setOpen(nextShelf.key)}
+                                        className={`is-next${nextShelf.touched ? "" : " is-cold"}`}
+                                        aria-label={`Next wall: ${nextShelf.name}`}
+                                    >
+                                        <i>›</i>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={nextShelf.art} alt="" draggable={false} />
+                                        <span>{nextShelf.name}</span>
                                     </button>
                                 </div>
                             </div>
