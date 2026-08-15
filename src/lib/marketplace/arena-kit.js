@@ -147,6 +147,23 @@ const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 // ── THE NEW KINDS' CONSTANTS ─────────────────────────────────────────────────────────────────────────────────
 // Same contract as the block above: every number here is the one arena.js actually applies, so a card can
 // never drift away from the behaviour it is describing.
+// ── BLEED: THE OTHER DAMAGE-OVER-TIME, AND THE PHYSICAL ONE ──────────────────────────────────────────────────
+// `rend` means to TEAR, and it set you on fire. An NPC skill called "Ragged Cut" — a knife wound — announced
+// itself as burning, which is how "how am I burning?" became unanswerable from the log: the log was wrong.
+// Fire comes from fire now; a cut bleeds.
+//
+// It is a SEPARATE track from the burn, not a re-skin, so a fighter can be burning and bleeding at once and
+// the Reaver's nodes scale one while the Runecaller's scale the other.
+//
+// ⚠️ BLEED IGNORES SHIELDS ENTIRELY. It is the answer to a fighter who never lowers their guard: a brace
+// banks a shield that eats SWINGS, and a wound does not care. This is the whole reason the Reaver owns it —
+// see the tick in arena.js, which subtracts from health directly and never touches `shield`.
+export const BLEED_PER_TURN = 0.035;   // of their MAX health, per stack, per turn
+export const BLEED_TURNS = 3;
+export const BLEED_MAX_STACKS = 3;
+export const BLEED_TICK_CAP = 0.16;    // whatever the stacks, one turn of bleeding cannot exceed this
+export const BLEED_TURNS_CAP = 5;
+
 export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
 // ── THE BURN, REBUILT SO INVESTING IN IT MEANS SOMETHING ─────────────────────────────────────────────────────
 // `rendTick` used to be ADDED to this: Runebrand read "+0.6% harder per rank", which sounds like nothing and

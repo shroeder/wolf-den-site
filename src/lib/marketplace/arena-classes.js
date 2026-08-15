@@ -220,10 +220,10 @@ export const TREES = {
         //
         // 0.50 x 3 = 150% and every blow can miss. That is the trade an all-out attack should be: more total
         // damage than a single committed swing only if it lands, and three chances for it not to.
-        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", name: "Rampage", power: 0.52, hits: 3, acc: -0.10, cd: 3, needs: 3,
-            desc: "Three wild blows — each can miss, each can crit.", sprite: "/images/arena/node/rv_flurry.webp" }),
-        N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "speed", per: 3, needs: 3,
-            desc: "+3 Speed per rank — decides who opens.", sprite: "/images/arena/node/rv_speed.webp" }),
+        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", bleeds: true, name: "Rampage", power: 0.52, hits: 3, acc: -0.10, cd: 3, needs: 3,
+            desc: "Three wild blows — each can miss, each can crit, and they leave them bleeding.", sprite: "/images/arena/node/rv_flurry.webp" }),
+        N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "bleedTurns", per: 0.5, needs: 3,
+            desc: "Your bleeds last one turn longer every two ranks.", sprite: "/images/arena/node/rv_speed.webp" }),
         // The answer to Rampage's penalty: a Reaver who wants the wild swing can pay for it to land.
         N({ id: "rv_aim", tier: 1, name: "Killer's Eye", ranks: 4, stat: "accuracy", per: 0.02, needs: 3,
             desc: "+2% accuracy per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
@@ -237,8 +237,9 @@ export const TREES = {
 
         N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, acc: -0.14, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
-        N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "openMult", per: 0.06, needs: 12,
-            desc: "+6% damage on round one per rank.", sprite: "/images/arena/node/rv_open.webp" }),
+        // Was +6% damage on round one. The NAME was always about opening a wound, and now the class has one.
+        N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "bleedTick", per: 0.25, needs: 12,
+            desc: "Your bleeds tick 25% harder per rank.", sprite: "/images/arena/node/rv_open.webp" }),
         N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.18, needs: 12,
             desc: "+18% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
     ],
@@ -292,7 +293,9 @@ export const TREES = {
         N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", element: "fire", burns: true, name: "Channel", power: 1.45, acc: -0.08, cd: 4,
             desc: "Fire. It sets them burning.", sprite: "/images/arena/node/rc_spell.webp" }),
 
-        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
+        // A `rend` that BURNS. The damage-over-time is a property of the ABILITY, not of its kind — which is the
+        // whole fix: "Ragged Cut" is a rend too, and a knife wound has no business setting anybody on fire.
+        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", burns: true, name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
         N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTurns", per: 0.5, needs: 3,
             desc: "Your burns last one turn longer every two ranks.", sprite: "/images/arena/node/rc_burn.webp" }),

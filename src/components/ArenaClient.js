@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiFlame, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiFlame, GiDroplets, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -18,7 +18,7 @@ import SkillTree from "@/components/arena/SkillTree";
 import {
     duck, Haptic, isMuted, setIntensity, setMuted, Sfx, startMusic, stopMusic, unlock,
 } from "@/components/arena/arena-audio.js";
-import { BATTLE_ITEMS, BIND_CUT, DOOM_MULT, DREAD_CUT, REND_PER_TURN, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
+import { BATTLE_ITEMS, BIND_CUT, BLEED_PER_TURN, DOOM_MULT, DREAD_CUT, REND_PER_TURN, SNARE_ACC, SUNDER_CUT } from "@/lib/marketplace/arena-kit.js";
 
 // Render an overlay into <body>. `position: fixed` is measured against the nearest ancestor with a transform,
 // filter or animation — and the arena page sits inside `.reveal`, whose children get a fade-in-up ANIMATION.
@@ -207,6 +207,11 @@ const STATUS_KINDS = {
     // ── THE TWO NEW ONES ── a lost turn and a lost guard are the biggest things that can happen to you in
     // a bout, so neither is allowed to be only a line in the log. Same chip, same inspect, same countdown
     // as every other effect — that is the whole point of this registry existing.
+    // A WOUND, NOT A FIRE. `rend` means to tear and it used to announce itself as burning — an NPC's
+    // "Ragged Cut" told you that you were on fire. Its own track, its own colour, and it says the one thing
+    // that makes it different from a burn.
+    bleed:   { Icon: GiDroplets,      label: "Bleeding",       tone: "blood",
+               what: () => `Takes ${pct(BLEED_PER_TURN)} of max health every turn, and it goes STRAIGHT to health — a guard does not stop it. Stacks.` },
     frozen:  { Icon: GiIciclesAura,       label: "Frozen",         tone: "ice",
                what: () => "Solid. The next turn is lost — the beat passes without an action." },
     noguard: { Icon: GiCrackedShield, label: "Guard shattered", tone: "ice",
@@ -221,12 +226,14 @@ function statusesFor(bout, side) {
     const add = (kind, turns, extra) => { if (turns > 0 || turns === true) out.push({ kind, turns: turns === true ? null : turns, ...extra }); };
     if (side === "them") {
         if (bout.bleed?.turns > 0) add("burn", bout.bleed.turns, { dmg: bout.bleed.dmg, stacks: bout.bleed.stacks });
+        if (bout.gash?.turns > 0) add("bleed", bout.gash.turns, { dmg: bout.gash.dmg, stacks: bout.gash.stacks });
         add("sunder", Number(bout.sunder) || 0);
         add("frozen", Number(bout.foeFrozen) || 0);
         add("noguard", Number(bout.foeNoGuard) || 0);
         return out;
     }
     if (bout.foeBleed?.turns > 0) add("burn", bout.foeBleed.turns, { dmg: bout.foeBleed.dmg, stacks: bout.foeBleed.stacks });
+    if (bout.foeGash?.turns > 0) add("bleed", bout.foeGash.turns, { dmg: bout.foeGash.dmg, stacks: bout.foeGash.stacks });
     add("sunder", Number(bout.foeSunder) || 0);
     add("frozen", Number(bout.frozen) || 0);
     add("noguard", Number(bout.noGuard) || 0);
@@ -1094,7 +1101,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // control over read as the one you did. It floats with its own mark instead.
                 // Luke: "if we take fire damage the text should have a burn icon next to it, same a bleed
                 // that would be a blood droplet icon".
-                const dot = l.kind === "rend" || l.grade === "burn" ? "burn" : null;
+                const dot = l.kind === "bleed" ? "bleed" : (l.kind === "rend" || l.grade === "burn" ? "burn" : null);
                 // You are on the LEFT, so a blow YOU land floats over the right-hand opponent.
                 sub.push({ side: target, n: l.damage, kind: dot || (l.crit ? "crit" : "dmg"), dot });
             } else if (l.grade === "miss") {
@@ -2537,6 +2544,7 @@ function Styles() {
                 animation: arBurnPulse .8s ease-in-out infinite; }
             /* ICE. Deliberately the coldest thing on the screen — the burn pulses warm and fast, this one
                breathes slowly, so which of the two is on you is readable at a glance without reading a word. */
+            .ar-stat.is-blood { color: #ff8f8f; border-color: rgba(220,70,70,0.6); background: rgba(190,40,40,0.16); }
             .ar-stat.is-ice { color: #a8e4ff; border-color: rgba(120,205,255,0.6); background: rgba(90,180,255,0.15);
                 animation: arFrostPulse 1.9s ease-in-out infinite; }
             @keyframes arFrostPulse {

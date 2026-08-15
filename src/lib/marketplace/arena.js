@@ -12,6 +12,7 @@ import {
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
+    BLEED_PER_TURN, BLEED_TURNS, BLEED_MAX_STACKS, BLEED_TICK_CAP, BLEED_TURNS_CAP,
     DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, REND_TICK_CAP, REND_TURNS_CAP,
     SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
@@ -1314,6 +1315,17 @@ export async function fightRound(buyerId, opts = {}) {
         // THEIR BURN STILL EATS YOU while you stand frozen — it ticks at the end of your beat, and this
         // IS your beat. Skipping it would have made a freeze partly protective, which is the opposite of
         // what it is for.
+        // Their wound on you. Off health, past any brace you banked — the mirror of yours.
+        if (b.foeGash?.turns > 0) {
+            const tick = Math.min(b.hp, b.foeGash.dmg);
+            b.hp = Math.max(0, b.hp - tick);
+            b.foeGash.turns -= 1;
+            if (tick > 0) {
+                b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "bleed",
+                    text: `Your wound opens again — ${tick}.`, ability: null });
+            }
+            if (b.foeGash.turns <= 0) b.foeGash = null;
+        }
         if (b.foeBleed?.turns > 0) {
             const tick = Math.min(b.hp, b.foeBleed.dmg);
             b.hp = Math.max(0, b.hp - tick);
@@ -1529,7 +1541,8 @@ export async function fightRound(buyerId, opts = {}) {
         let note = "";
         let hits = 1;              // flurry lands more than once
         let drain = 0;             // share of damage returned to you as health
-        let rend = false;          // leaves a burn behind
+        let rend = false;          // leaves a BURN behind (fire)
+        let gash = false;          // leaves a BLEED behind (a wound)
         let sunder = false;        // strips their guard for a few turns
         let justSurged = false;    // cast THIS turn, so it must not be spent on the cast itself
         // ── WHAT MAKES ONE SKILL DIFFERENT FROM ANOTHER ──────────────────────────────────────────────────
@@ -1567,8 +1580,8 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
             // ── SHATTER ── not a cut, a lockout: they cannot raise a guard at all for three of their beats.
             if (ability.kind === "disarm") { b.foeNoGuard = GUARD_DISABLE_TURNS; note += " — their guard is broken"; }
-            // FIRE leaves a burn (resolved with `rend` below); ICE may take their next turn off them.
-            if (ability.burns) rend = true;
+            // FIRE leaves a burn, a wound bleeds — both resolved below.
+            if (ability.bleeds) gash = true;
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
@@ -1593,7 +1606,12 @@ export async function fightRound(buyerId, opts = {}) {
                 hits = Math.max(1, ability.hits || 3);
             }
             if (ability.kind === "drain") drain = DRAIN_SHARE;
-            if (ability.kind === "rend") rend = true;
+            // ── A REND TEARS; ONLY FIRE BURNS ────────────────────────────────────────────────────────
+            // The kind used to decide the damage-over-time, which is how an NPC's "Ragged Cut" set people
+            // alight. The ABILITY decides now: `burns` for fire, `bleeds` for a wound, and a bare rend
+            // defaults to the wound its own name describes.
+            if (ability.burns) rend = true;
+            else if (ability.kind === "rend" || ability.bleeds) gash = true;
             if (ability.kind === "sunder") sunder = true;
         }
         // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
@@ -1746,6 +1764,15 @@ export async function fightRound(buyerId, opts = {}) {
             const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
             b.bleed = { turns, stacks, dmg: tick };
         }
+        // ── THE WOUND ── same shape as the burn and a separate track, so a fighter can carry both and the
+        // Reaver's nodes scale one while the Runecaller's scale the other.
+        if (gash && dmg > 0) {
+            const per = Math.max(1, Math.round(b.foeMaxHp * BLEED_PER_TURN * (1 + (P.bleedTick || 0))));
+            const stacks = Math.min(BLEED_MAX_STACKS, (b.gash?.stacks || 0) + 1);
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * BLEED_TICK_CAP)));
+            const turns = Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(P.bleedTurns || 0));
+            b.gash = { turns, stacks, dmg: tick };
+        }
         if (sunder) b.sunder = SUNDER_TURNS;
         // ── ICE ── a rare lockout. Only on a blow that LANDED, and never onto a fighter already frozen:
         // chaining two casts into a turn they never act through is the deadlock shape this file has been
@@ -1760,6 +1787,7 @@ export async function fightRound(buyerId, opts = {}) {
             healed > 0 ? `+${healed} back` : null,
             turned > 0 ? `${turned} turned aside` : null,
             rend && dmg > 0 ? `burning ${b.bleed.dmg}/turn` : null,
+            gash && dmg > 0 ? `bleeding ${b.gash.dmg}/turn` : null,
             froze ? `FROZEN — they lose their next turn` : null,
             sunder ? `guard stripped` : null,
             hits > 1 ? `${hits} hits` : null,
@@ -1897,6 +1925,7 @@ export async function fightRound(buyerId, opts = {}) {
         let foeHits = 1;
         let foeDrain = incoming.heal || 0;
         let rendNow = false;
+        let gashNow = false;
         let sunderNow = false;
         let foeJustSurged = false;
         // How much of YOUR block their swing cuts through. Their Pierce, and a spell cuts guard on its own.
@@ -1932,13 +1961,15 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "strike") power *= 1.45;
             if (k === "flurry") foeHits = Math.max(1, theirAbility.hits || 3);
             if (k === "drain") { foeDrain = DRAIN_SHARE; power = 1; }
-            if (k === "rend") rendNow = true;
+            if (k === "rend" && theirAbility.burns) rendNow = true;
+            else if (k === "rend" || theirAbility.bleeds) gashNow = true;
             if (k === "sunder") sunderNow = true;
             // ── THEIR SHATTER, THEIR FIRE, THEIR ICE ── the mirror of the three Runecaller moves. A tree
             // that only works when the player owns it is the attacker-only bug this file keeps being fixed
             // for; the same kit has to do the same thing in an opponent's hands.
             if (k === "disarm") b.noGuard = GUARD_DISABLE_TURNS;
             if (theirAbility.burns) rendNow = true;
+            if (theirAbility.bleeds) gashNow = true;
 
             // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
             // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of
@@ -2097,6 +2128,13 @@ export async function fightRound(buyerId, opts = {}) {
             const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
             b.foeBleed = { turns, stacks, dmg: tick };
         }
+        if (gashNow && through > 0) {
+            const per = Math.max(1, Math.round(b.maxHp * BLEED_PER_TURN * (1 + (FP.bleedTick || 0))));
+            const stacks = Math.min(BLEED_MAX_STACKS, (b.foeGash?.stacks || 0) + 1);
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * BLEED_TICK_CAP)));
+            const turns = Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(FP.bleedTurns || 0));
+            b.foeGash = { turns, stacks, dmg: tick };
+        }
         if (sunderNow) b.foeSunder = SUNDER_TURNS;
         let theyFroze = false;
         if (theirAbility?.freezes && through > 0 && !(b.frozen > 0) && Math.random() < FREEZE_CHANCE) {
@@ -2134,7 +2172,7 @@ export async function fightRound(buyerId, opts = {}) {
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
                 extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
                 extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
                 extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${
@@ -2150,6 +2188,20 @@ export async function fightRound(buyerId, opts = {}) {
 
         // ── THE BURN ── a rend keeps working after the beat that applied it. It ticks HERE, at the end of
         // their turn, so it reads as "time passing hurts them" rather than as extra damage on your own swing.
+        // ── THE WOUND BLEEDS THROUGH A RAISED GUARD ─────────────────────────────────────────────────────
+        // Straight off health, never off `foeShield`. A brace banks a shield that eats SWINGS; a cut does not
+        // care that they covered up, and that is the entire reason the Reaver owns this. Ticked before the
+        // burn purely so the log reads in a stable order.
+        if (b.gash?.turns > 0) {
+            const tick = Math.min(b.foeHp, b.gash.dmg);
+            b.foeHp = Math.max(0, b.foeHp - tick);
+            b.gash.turns -= 1;
+            if (tick > 0) {
+                b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "bleed",
+                    text: `The wound opens again — ${tick}.`, ability: null });
+            }
+            if (b.gash.turns <= 0) b.gash = null;
+        }
         if (b.bleed?.turns > 0) {
             const tick = Math.min(b.foeHp, b.bleed.dmg);
             b.foeHp = Math.max(0, b.foeHp - tick);
