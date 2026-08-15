@@ -332,7 +332,12 @@ export const ITEMS = [
     { id: "studded_vest", name: "Studded Vest", slot: "chest", rarity: "common", icon: "GiArmorVest", flavor: "Riveted and ready.", stats: { ferocity: 8, crit_chance: 3 }, reqLevel: 4, source: "chest", sort: 330 },
     { id: "war_cape", name: "War Cape", slot: "chest", rarity: "rare", icon: "GiCape", flavor: "Flair with function.", stats: { ferocity: 9, fortune: 7 }, reqLevel: 22, source: "chest", sort: 331 },
     { id: "pauldron_plate", name: "Pauldron Plate", slot: "chest", rarity: "epic", icon: "GiSpikedShoulderArmor", flavor: "Shoulders like a fortress.", stats: { might: 9, ferocity: 13 }, reqLevel: 38, source: "chest", sort: 332 },
-    { id: "dragoncape", name: "Dragoncape", slot: "chest", rarity: "legendary", icon: "GiCapeArmor", flavor: "Scaled and unburnt.", stats: { might: 10, ferocity: 20 }, reqLevel: 60, source: "chest", sort: 333 },
+    // SLOT WAS "chest" AND IT BROKE ITS OWN SET. Dragonlord's Aspect is five pieces, and with the cape on chest
+    // it held TWO chest pieces — so at most four could ever be worn and the five-piece capstone was unreachable
+    // by anybody, forever. (ValkyrieSylve, in global chat: "it has 2 chest pieces of the 5 pieces. How are we
+    // able to equip all 5?") It is a cape, its stats are a byte-for-byte clone of dragonplate's, and every other
+    // cape, cloak and mantle in the catalog is `back` — it was cloned off the plate and the slot never changed.
+    { id: "dragoncape", name: "Dragoncape", slot: "back", rarity: "legendary", icon: "GiCapeArmor", flavor: "Scaled and unburnt.", stats: { might: 10, ferocity: 20 }, reqLevel: 60, source: "chest", sort: 333 },
     { id: "starforged_mail", name: "Starforged Mail", slot: "chest", rarity: "mythic", icon: "GiLayeredArmor", flavor: "Hammered from a fallen star.", stats: { ferocity: 27, fortune: 13 }, reqLevel: 94, source: "chest", sort: 334 },
     // -- Boots --
     { id: "kickers", name: "Steel Kickers", slot: "boots", rarity: "common", icon: "GiBootKick", flavor: "Put some weight behind it.", stats: { ferocity: 6, might: 5 }, reqLevel: 5, source: "chest", sort: 340 },

@@ -17,6 +17,7 @@
     "check:guide": "node scripts/check-guide.mjs",
     "check:art": "node scripts/check-image-paths.mjs",
     "check:arena": "node scripts/check-arena.mjs",
+    "check:sets": "node scripts/check-sets.mjs",
     "check:hook-deps": "node scripts/check-hook-deps.mjs"
   },
   "keywords": [],
