@@ -292,31 +292,14 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                 The tree draws a node's dots and never totals them, so four ranks of Conditioning was a row of
                 pips and nothing else — there was no screen anywhere that said what your passives came to.
                 Summed from the same node data the tree renders, so the two cannot disagree.
-                In preview this lists what the discipline OFFERS instead, at one rank each, which is the
-                question you are asking when you are reading a class you do not have. */}
-            {viewing ? (
-                <div className="skt-have is-read">
-                    <b>What {viewCls?.name} offers</b>
-                    <div className="skt-have-rows">
-                        {nodes.filter((n) => n.kind !== "active").map((n) => (
-                            <span key={n.id} className="skt-have-row">
-                                <i>{n.name}</i>
-                                <u>{fmt({ ...n, rank: 1 })} per rank</u>
-                                <em>{n.ranks > 1 ? `${n.ranks} ranks` : "1 rank"}</em>
-                            </span>
-                        ))}
-                    </div>
-                    <b className="skt-have-sub">Its actives</b>
-                    <div className="skt-have-rows">
-                        {nodes.filter((n) => n.kind === "active").map((n) => (
-                            <span key={n.id} className="skt-have-row">
-                                <i>{n.name}</i>
-                                <u>{n.effect ? n.effect.line : n.desc}</u>
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            ) : held.length ? (
+
+                PREVIEW USED TO GET A SECOND VERSION OF THIS — "What Reaver offers", every passive at one rank
+                and every active's effect line, thirteen rows of bare numbers above the tree. It was a spec
+                sheet: no order, no shape, nothing to tell you which rows mattered, and it pushed the tree
+                itself off the screen on a phone. The tree below already IS the answer, tier by tier, and
+                tapping any node gives that node's real description. So preview shows the tree and nothing
+                else. */}
+            {!viewing && held.length ? (
                 <div className="skt-have">
                     <b>What your points are doing</b>
                     <div className="skt-have-rows">
@@ -574,7 +557,6 @@ function Styles() {
             .skt-have { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px;
                 background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
             .skt-have > b { display: block; font-size: 12px; margin-bottom: 6px; }
-            .skt-have-sub { margin-top: 9px; }
             .skt-have-rows { display: grid; gap: 4px; }
             .skt-have-row { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; }
             .skt-have-row i { font-style: normal; color: #e9eef3; font-weight: 800; flex: 0 0 auto; }
