@@ -125,12 +125,26 @@ export default function TrophyRoom({ active, initial = null }) {
                 .tr-sub { margin: 14px 0 6px; font-size: 0.74rem; letter-spacing: 0.09em; text-transform: uppercase;
                     color: #c69a5c; font-weight: 700; }
 
-                .tr-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 7px; }
+                /* Wider cells than the bare name+level version needed: each card now carries a sentence, and at
+                   148px a description wrapped to five ragged lines. */
+                .tr-tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 7px; }
                 .tr-tool { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center;
-                    padding: 6px 9px; border-radius: 9px; background: rgba(0,0,0,0.22); }
+                    align-content: start; padding: 8px 10px; border-radius: 9px; background: rgba(0,0,0,0.22); }
                 .tr-tool b { font-weight: 600; font-size: 0.82rem; color: #ecdcc4; }
                 .tr-tool span { font-size: 0.78rem; font-variant-numeric: tabular-nums; color: #ffd98a; }
                 .tr-tool.is-max span { color: #8ce39a; }
+                /* The explainer line. Same class under a tool and under a record, because they answer the same
+                   question — "what is this?" — and two different treatments would read as two different kinds
+                   of thing. Sits full width under the row so a long sentence never squeezes the number. */
+                .tr-what { grid-column: 1 / -1; font-style: normal; font-size: 0.755rem; line-height: 1.35;
+                    color: #a99b86; margin-top: 3px; }
+                /* What the level is worth RIGHT NOW — the live number, next to the axis it moves. */
+                .tr-now { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+                    font-style: normal; font-size: 0.74rem; margin-top: 2px; }
+                .tr-now span { color: #8d7f6c; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68rem; }
+                .tr-now b { color: #ffd98a; font-weight: 700; font-variant-numeric: tabular-nums; }
+                .tr-tool.is-max .tr-now b { color: #8ce39a; }
+
                 .tr-bar { grid-column: 1 / -1; height: 4px; border-radius: 3px; background: rgba(255,255,255,0.1); overflow: hidden; }
                 .tr-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #d99a3c, #ffd27a); }
                 .tr-tool.is-max .tr-bar i { background: linear-gradient(90deg, #4fae63, #8ce39a); }
@@ -145,9 +159,13 @@ export default function TrophyRoom({ active, initial = null }) {
                 .tr-place.is-first { color: #1d1206; background: linear-gradient(#ffdc7a, #e8ac3c);
                     padding: 1px 7px; border-radius: 999px; }
                 .tr-note { font-size: 0.72rem; color: #90806e; white-space: nowrap; }
-                .tr-pctbar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+                /* Sits clear of the row above it — flush against the label it read as a strikethrough. */
+                .tr-pctbar { grid-column: 1 / -1; margin-top: 6px; height: 3px; border-radius: 2px;
+                    background: rgba(255,255,255,0.08); overflow: hidden; }
                 .tr-pctbar i { display: block; height: 100%; background: linear-gradient(90deg, #8a6a3a, #ffd27a); }
 
+                .tr-legend { margin: 9px 2px 0; font-size: 0.775rem; line-height: 1.4; color: #a99b86; }
+                .tr-legend b { color: #ffd98a; font-weight: 700; }
                 .tr-empty { margin: 10px 0 2px; font-size: 0.86rem; color: #c0ad95; }
                 .tr-loading, .tr-err { padding: 26px 12px; text-align: center; color: var(--muted, #9aa4b2); font-size: 0.88rem; }
             `}</style>
@@ -194,6 +212,17 @@ export default function TrophyRoom({ active, initial = null }) {
                         })}
                     </div>
 
+                    {/* SAY WHAT THE PLAQUE MEANS. A bare "#6" hanging under a helmet is only obvious to whoever
+                        wrote it; on the wall it could as easily be a level, a count or a tier. The legend stays
+                        up whether or not something is open — it explains the room, it is not a prompt. */}
+                    <p className="tr-legend">
+                        {/* Explicit {" "} after the bold: the space written after </b> is swallowed because the
+                            text node runs on to the next line, and it shipped as "#1is the best in the Den." */}
+                        Each plaque is your best <b>placing</b> on that wall — <b>#1</b>{" "}
+                        is the best in the Den. A dark piece is something you haven&apos;t started.
+                        Tap one for everything it counts.
+                    </p>
+
                     {shelf ? (
                         <div className="tr-detail" ref={detailRef}>
                             <h4>{shelf.name}</h4>
@@ -204,10 +233,20 @@ export default function TrophyRoom({ active, initial = null }) {
                                     <p className="tr-sub">What you&apos;ve built — {shelf.built} of {shelf.buildable}</p>
                                     <div className="tr-tools">
                                         {shelf.tools.map((t) => (
-                                            <div key={t.name} className={`tr-tool${t.level >= t.max ? " is-max" : ""}`} title={t.desc || ""}>
+                                            <div key={t.name} className={`tr-tool${t.level >= t.max ? " is-max" : ""}`}>
                                                 <b>{t.name}</b>
                                                 <span>{t.level}/{t.max}</span>
                                                 <div className="tr-bar"><i style={{ width: `${Math.round((t.level / Math.max(1, t.max)) * 100)}%` }} /></div>
+                                                {/* What it is, then what you have actually bought. A title tooltip
+                                                    was useless here — this screen is read on a phone, where
+                                                    nothing hovers. */}
+                                                {t.desc ? <em className="tr-what">{t.desc}</em> : null}
+                                                {t.now || t.effect ? (
+                                                    <em className="tr-now">
+                                                        {t.effect ? <span>{t.effect}</span> : null}
+                                                        {t.now ? <b>{t.now}</b> : null}
+                                                    </em>
+                                                ) : null}
                                             </div>
                                         ))}
                                     </div>
@@ -233,6 +272,7 @@ export default function TrophyRoom({ active, initial = null }) {
                                                     // is both accurate and the more useful thing to be told.
                                                     <em className="tr-note">{r.of} ahead of you</em>
                                                 ) : <em className="tr-note" />}
+                                                {r.hint ? <em className="tr-what">{r.hint}</em> : null}
                                                 {r.pct != null ? (
                                                     <div className="tr-pctbar"><i style={{ width: `${r.pct}%` }} /></div>
                                                 ) : null}
@@ -245,7 +285,7 @@ export default function TrophyRoom({ active, initial = null }) {
                             )}
                         </div>
                     ) : (
-                        <p className="tr-empty">Tap anything on the wall to see what it&apos;s worth.</p>
+                        null /* the legend above already says to tap; two prompts in a row is nagging */
                     )}
                 </>
             )}

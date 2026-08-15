@@ -21,8 +21,8 @@ import { db } from "@/lib/db.js";
 import { ARENA_UPGRADES } from "@/lib/marketplace/arena-upgrades.js";
 import { COMBAT_TRACKS } from "@/lib/marketplace/ship-battle.js";
 import { MINE_TRACKS, SMELT_TRACKS, SURVEY_TRACKS } from "@/lib/marketplace/mining.js";
-import { COOK_TRACKS, TRACK_COL as COOK_TRACK_COL } from "@/lib/marketplace/cooking.js";
-import { FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
+import { COOK_TRACKS, TRACK_COL as COOK_TRACK_COL, trackValue as cookValue } from "@/lib/marketplace/cooking.js";
+import { FISH_TRACKS, FISH_TRACK_COL, fishTrackValue } from "@/lib/marketplace/fishing.js";
 import { DELVE_TRACKS } from "@/lib/marketplace/delve-catalog.js";
 import { FORGE_UPGRADES } from "@/lib/marketplace/crafting.js";
 import { FARM_UPGRADES } from "@/lib/marketplace/farm-crops.js";
@@ -49,13 +49,94 @@ const rec = (label, col, extra = {}) => ({ label, col, ...extra });
 const RATE_MIN = 10;
 
 // Turn a module's own track map into tools. `colOf` bridges the two shapes in use: most tracks carry their own
-// `col`, cooking and fishing keep a separate key→column map.
-const tracksToTools = (tracks, colOf = (k, t) => t.col || k) =>
-    Object.entries(tracks).map(([k, t]) => tool(t.name || k, colOf(k, t), t.max, { icon: t.icon || null, desc: t.desc || null }));
+// `col`, cooking and fishing keep a separate key→column map. `fx` renders the live effect at a given level and
+// is ALWAYS the owning module's own value function — never arithmetic repeated here.
+const tracksToTools = (tracks, colOf = (k, t) => t.col || k, fx = null) =>
+    Object.entries(tracks).map(([k, t]) => tool(t.name || k, colOf(k, t), t.max, {
+        icon: t.icon || null, desc: t.desc || null, effect: t.effect || null,
+        fx: fx ? (lvl) => fx(k, lvl) : null,
+    }));
+
+// ── THE ONE PLACE PROSE IS DUPLICATED, AND WHY ───────────────────────────────────────────────────────────────
+// Every other subsystem keeps its `desc` on the track definition, so this room imports it and the two screens
+// can never drift. Sailing and digging keep theirs as JSX inside SailingClient (with <b> tags), which cannot be
+// imported into a server module. Rather than move a live screen's copy under this feature, the nine lines are
+// restated here as plain text. IF YOU EDIT THE SAILING UPGRADE CARDS, EDIT THESE TOO — they are prose, not
+// balance constants, so a drift is a wrong sentence rather than a wrong game, but it is still a drift.
+const SAIL_DESC = {
+    speed_level: "Faster voyages — shaves time off every trip, per level.",
+    luck_level: "Draws trouble — raises the chance of a marine encounter at your voyage's midpoint.",
+    rarity_level: "Better loot — a chance your forged chest is bumped up a tier.",
+    raid_level: "Sharper raiding — a stronger hand when you go after another captain.",
+};
+const DIG_DESC = {
+    stamina: "More digs each trip — one more per level.",
+    pierce: "Chance a dig breaks through every layer of a tile at once.",
+    strike: "Chance a dig strikes a lucky bonus fragment.",
+    efficient: "Adds to every tool's proc chance while you dig.",
+    detonator: "Chance a dig spawns an explosion, clearing a 3x3 one layer deep.",
+};
+
+// Fishing states its own `kind` per track, so rendering BY that kind is reading the module's declaration
+// rather than re-deriving it: a "count" track adds whole casts, a "pct" track adds a chance.
+const fishFx = (k, v) => (FISH_TRACKS[k]?.kind === "count" ? `+${Math.round(v)}` : `+${Math.round(v * 100)}%`);
 
 // Tracks whose level lives inside a JSON blob rather than its own column.
 const jsonTools = (defs, jsonCol) =>
     Object.entries(defs).map(([k, d]) => tool(d.name || k, `${jsonCol}.${k}`, d.max, { desc: d.desc || null }));
+
+// ── WHAT EACH RECORD ACTUALLY COUNTS ─────────────────────────────────────────────────────────────────────────
+// Keyed by label, and deliberately not exhaustive: "Bouts won" and "Fish landed" explain themselves, and a
+// gloss under every single row buries the ones that need it. These are the rows a member cannot decode from
+// the name — currencies, bests, and anything whose unit is not obvious. Luke, looking at the live screen:
+// "This is cool, but I need it to tell me what everything actually is."
+const RECORD_HINT = {
+    "Victory points": "Your arena standing. An accrued total won off members above you — not a rung you hold.",
+    "Best VP held": "The most victory points you have ever held at once.",
+    "Laurels earned": "The arena's own currency, paid for fighting and spent on its upgrade tracks.",
+    "Ladder rungs beaten": "How far up the NPC ladder you have cleared.",
+    "Best ladder rung": "The highest rung you have ever put down.",
+    "Toughest NPC felled": "The hardest ladder opponent you have beaten.",
+    "Arena XP": "Experience earned inside the ring specifically, separate from your account level.",
+    "Win rate": "The share of your fights you won. Needs 10 fights before it earns a placing.",
+    "Deepest fleet run": "The furthest through an enemy fleet you have fought before going down.",
+    "Doubloons held": "Ship-battle currency, spent on shot and repairs.",
+    "Encounters fought": "Ships met mid-voyage, won or lost.",
+    "Raids defended": "Times another captain came for your hold and failed.",
+    "Waves ridden": "Passing sailors greeted at sea for XP and coin.",
+    "Wind recharges": "Times you paid to refill the wind and sail again the same day.",
+    "Boat XP": "Experience the boat itself has earned — what raises its form.",
+    "Chests forged": "Chests assembled out of the fragments you dug up.",
+    "Chest points": "Chest value banked, weighted by tier. This is what unlocks the dig tools.",
+    "Fragments held": "Dug-up pieces still waiting to be forged into a chest.",
+    "Line recharges": "Times you paid for more casts after the day's ran out.",
+    "Best combo": "The longest unbroken run of good swings in a single descent.",
+    "Best read streak": "The longest run of correctly read seams while surveying.",
+    "Masterwork runs": "Descents finished at the top grade.",
+    "Emberheart cracked": "The rarest seam in the mine, opened.",
+    "Flawless pours": "Smelts poured without a single mistake.",
+    "Steps underground": "Every step you have ever taken into the dark.",
+    "Deepest floor": "The furthest down you have reached in any single delve.",
+    "Clear rate": "The share of your delves you walked out of. Needs 10 runs before it earns a placing.",
+    "Best dish tier": "The highest tier of recipe you have successfully cooked.",
+    "Best quality": "The best quality grade any dish of yours has come out at.",
+    "Best chain": "Your longest run of cooks without a failure.",
+    "Preps done": "Ingredients prepared ahead of a cook.",
+    "Pieces salvaged": "Gear broken down into parts at the forge.",
+    "Parts combined": "Parts fused together into higher-tier parts.",
+    "Enhancements made": "Times you have enhanced a piece of gear.",
+    "Gems cut": "Gems produced at the Jewelcutter.",
+    "Pet levels earned": "Every level across every pet you keep, added together.",
+    "Decorations owned": "Every decoration in your possession, placed or not.",
+    "Farm love": "Your farm's rating score — an Admire counts triple a Like, a Love double.",
+    "Ratings received": "How many members have rated your farm at all.",
+    "Collections completed": "Full sets finished in the compendium.",
+    "Cheers given": "Hype you have sent members fighting a boss.",
+    "Cheers received": "Hype other members have sent you.",
+    "Bosses struck": "Every blow you have landed on a world boss.",
+    "Mystery bags opened": "Mystery bags bought and opened in the shop.",
+    "Quests completed": "Daily quests you finished AND collected.",
+};
 
 // ── THE WALL ─────────────────────────────────────────────────────────────────────────────────────────────────
 // Order is hanging order, and it is deliberate: the things you fight with first, then the things you make with,
@@ -64,7 +145,11 @@ export const SHELVES = [
     {
         key: "arena", name: "The Arena", src: "arena", art: "/images/trophy/tool-arena.webp",
         blurb: "Blades on the rack. What you have taken off other members.",
-        tools: ARENA_UPGRADES.map((u) => tool(u.name, `upgrades.${u.id}`, u.max, { icon: u.icon })),
+        tools: ARENA_UPGRADES.map((u) => tool(u.name, `upgrades.${u.id}`, u.max, {
+            icon: u.icon, desc: u.desc,
+            // The track's OWN unit formatter, fed its own per-level value. Nothing about the maths lives here.
+            fx: (lvl) => (lvl > 0 && u.unit ? u.unit(u.per * lvl) : null),
+        })),
         records: [
             rec("Bouts won", "wins", { rank: true }),
             rec("Bouts lost", "losses"),
@@ -101,10 +186,10 @@ export const SHELVES = [
         key: "sailing", name: "The Voyage", src: "sailing", art: "/images/trophy/tool-sailing.webp",
         blurb: "A charted map and a brass glass. Everywhere the boat has been.",
         tools: [
-            tool("Speed", "speed_level", MAX_SPEED_LEVEL),
-            tool("Fortune", "luck_level", MAX_LUCK_LEVEL),
-            tool("Rarity", "rarity_level", MAX_RARITY_LEVEL),
-            tool("Raiding", "raid_level", MAX_RAID_LEVEL),
+            tool("Speed", "speed_level", MAX_SPEED_LEVEL, { desc: SAIL_DESC.speed_level }),
+            tool("Fortune", "luck_level", MAX_LUCK_LEVEL, { desc: SAIL_DESC.luck_level }),
+            tool("Rarity", "rarity_level", MAX_RARITY_LEVEL, { desc: SAIL_DESC.rarity_level }),
+            tool("Raiding", "raid_level", MAX_RAID_LEVEL, { desc: SAIL_DESC.raid_level }),
         ],
         records: [
             rec("Voyages completed", "voyages_completed", { rank: true }),
@@ -119,9 +204,9 @@ export const SHELVES = [
         key: "digging", name: "Digging", src: "sailing", art: "/images/trophy/tool-digging.webp",
         blurb: "A worn shovel and a sieve. Everything you pulled out of the sand.",
         tools: [
-            ...Object.entries(DIG_TRACKS).map(([k, t]) => tool(k[0].toUpperCase() + k.slice(1), `dig_${k}_level`, t.max)),
-            tool("Deep charge", "dig_tool_levels.deep", 3),
-            tool("Wide charge", "dig_tool_levels.wide", 3),
+            ...Object.entries(DIG_TRACKS).map(([k, t]) => tool(k[0].toUpperCase() + k.slice(1), `dig_${k}_level`, t.max, { desc: DIG_DESC[k] })),
+            tool("Deep charge", "dig_tool_levels.deep", 3, { desc: "A charge that clears deeper — more layers in one blast." }),
+            tool("Wide charge", "dig_tool_levels.wide", 3, { desc: "A charge that clears wider — a bigger patch in one blast." }),
         ],
         records: [
             rec("Chests forged", "chests_forged", { rank: true }),
@@ -132,7 +217,8 @@ export const SHELVES = [
     {
         key: "fishing", name: "Fishing", src: "sailing", art: "/images/trophy/tool-fishing.webp",
         blurb: "Rod, net and gaff. The ones that did not get away.",
-        tools: tracksToTools(FISH_TRACKS, (k) => FISH_TRACK_COL[k]),
+        tools: tracksToTools(FISH_TRACKS, (k) => FISH_TRACK_COL[k],
+            (k, lvl) => (lvl > 0 ? fishFx(k, fishTrackValue(k, lvl)) : null)),
         records: [
             rec("Fish landed", "fish_caught", { rank: true }),
             rec("Casts made", "fish_casts"),
@@ -159,7 +245,7 @@ export const SHELVES = [
     {
         key: "delves", name: "The Delve", src: "delve", art: "/images/trophy/tool-delves.webp",
         blurb: "A warded cloak and an empty flask. How deep you went, and what came back.",
-        tools: tracksToTools(DELVE_TRACKS),
+        tools: tracksToTools(DELVE_TRACKS, undefined, (k, lvl) => DELVE_TRACKS[k].fmt(lvl)),
         records: [
             rec("Deepest floor", "deepest_floor", { rank: true }),
             rec("Runs cleared", "runs_cleared", { rank: true }),
@@ -173,7 +259,8 @@ export const SHELVES = [
     {
         key: "kitchen", name: "The Kitchen", src: "kitchen", art: "/images/trophy/tool-kitchen.webp",
         blurb: "Copper pots and a worn board. Everything you have cooked for the hall.",
-        tools: tracksToTools(COOK_TRACKS, (k) => COOK_TRACK_COL[k]),
+        tools: tracksToTools(COOK_TRACKS, (k) => COOK_TRACK_COL[k],
+            (k, lvl) => (lvl > 0 ? `+${Math.round(cookValue(k, lvl) * 100)}%` : null)),
         records: [
             rec("Dishes cooked", "cooks_total", { rank: true }),
             rec("Cooking XP", "cook_xp", { rank: true }),
@@ -186,7 +273,9 @@ export const SHELVES = [
     {
         key: "forge", name: "The Forge", src: "forge", art: "/images/trophy/tool-forge.webp",
         blurb: "Hammer, tongs and a bin of scrap. What you have broken down and built up.",
-        tools: Object.entries(FORGE_UPGRADES).map(([k, u]) => tool(u.name, k, u.max, { desc: u.desc })),
+        tools: Object.entries(FORGE_UPGRADES).map(([k, u]) => tool(u.name, k, u.max, {
+            desc: u.desc, fx: (lvl) => (lvl > 0 ? `${(u.per * lvl * 100).toFixed(1)}${u.unit || ""}` : null),
+        })),
         records: [
             rec("Pieces salvaged", "salvaged", { rank: true }),
             rec("Parts combined", "combined", { rank: true }),
@@ -197,7 +286,7 @@ export const SHELVES = [
     {
         key: "farm", name: "The Farm", src: "farm", art: "/images/trophy/tool-farm.webp",
         blurb: "A scythe and a seed tin. The ground you work and the beasts you keep.",
-        tools: jsonTools(FARM_UPGRADES, "farm_upgrades"),
+        tools: jsonTools(FARM_UPGRADES, "farm_upgrades"),  // FARM_UPGRADES carries its own desc
         records: [
             rec("Crops harvested", "harvests", { rank: true }),
             rec("Pets kept", "pets", { rank: true }),
@@ -314,7 +403,16 @@ export async function trophyRoom(buyerId) {
 
         const tools = sh.tools.map((t) => {
             const level = readCol(mine, t.col);
-            return { name: t.name, icon: t.icon || null, desc: t.desc || null, level, max: t.max };
+            // What the level is WORTH right now, rendered by the owning module's own formatter. Wrapped
+            // because a track's formatter is that module's business and must never take this room down.
+            let now = null;
+            try { now = t.fx ? t.fx(level) : null; } catch { now = null; }
+            return {
+                name: t.name, icon: t.icon || null, level, max: t.max,
+                desc: t.desc || null,     // what the track does, in the owning module's own words
+                effect: t.effect || null, // what axis it moves ("Swing power"), where the module names one
+                now,                      // what you have bought so far ("+24 health")
+            };
         });
         const built = tools.reduce((n, t) => n + t.level, 0);
         const buildable = tools.reduce((n, t) => n + t.max, 0);
@@ -344,6 +442,7 @@ export async function trophyRoom(buyerId) {
             }
             return {
                 label: r.label, kind: r.kind || "count",
+                hint: RECORD_HINT[r.label] || null,
                 value: mineVal === null ? 0 : mineVal,
                 rank, of,
                 // Below the bar we say WHY there is no place, rather than showing a blank and looking broken.
