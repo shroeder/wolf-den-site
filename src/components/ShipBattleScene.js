@@ -20,7 +20,9 @@ const REWARD_ART = {
     loot: "/images/ui/gear.png",
 };
 const FRAG_ART = (tier) => `/images/sailing/fragment-${tier || "wooden"}.png`;
-const rewardArt = (r) => (r.kind === "fragments" ? FRAG_ART(r.tier) : REWARD_ART[r.kind] || null);
+// A spoil that carries its OWN art uses it — a consumable is a specific object, not a category, and the card
+// should show the vial you were handed rather than a generic badge for "consumable".
+const rewardArt = (r) => r.sprite || (r.kind === "fragments" ? FRAG_ART(r.tier) : REWARD_ART[r.kind] || null);
 
 const TIER_WORD = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
 const cap1 = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : "");
@@ -36,7 +38,10 @@ function rewardText(r) {
         case "loot": return `${r.name} · ${cap1(r.rarity)}`;
         case "item": return `plundered ${r.name}`;
         case "free": return "battle not used up!";
-        case "seed": return "a seed for the farm";
+        case "seed": return r.name ? `${r.name} seed` : "a seed for the farm";
+        case "consumable": return `+${r.n || 1} ${r.name || "consumable"}`;
+        // Anything unhandled says its kind, which is how "consumable" ended up on screen as a word. Kept as
+        // the last resort it was meant to be, now that the kinds that actually drop are all named above.
         default: return String(r.kind);
     }
 }

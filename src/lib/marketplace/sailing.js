@@ -1400,7 +1400,13 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
                 spoils.push({ kind: "chest", tier: l.tier });
             } else if (l.kind === "consumable") {
                 await grantConsumable(buyerId, l.id, 1).catch(() => {});
-                spoils.push({ kind: "consumable", id: l.id });
+                // ── SAY WHAT IT WAS ─────────────────────────────────────────────────────────────────
+                // This pushed the id and nothing else, so the victory card printed the literal word
+                // "consumable" with no sprite beside it — every other spoil on that screen names itself
+                // and shows its art. Luke: "sprites and readout of actually what we got".
+                const { CONSUMABLES } = await import("@/lib/marketplace/consumables.js");
+                const art = await db.queryOne(`SELECT url FROM mkt_consumable_sprite WHERE consumable_id = $1`, [l.id]).catch(() => null);
+                spoils.push({ kind: "consumable", id: l.id, n: 1, name: CONSUMABLES[l.id]?.name || l.id, sprite: art?.url || null });
             } else if (l.kind === "parts") {
                 try {
                     const { addParts } = await import("@/lib/marketplace/crafting.js");

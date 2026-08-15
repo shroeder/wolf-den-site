@@ -15,21 +15,37 @@ const DEFAULT_TTL_MINUTES = 24 * 60;
 // duplicates. Returns { token, amountCents, isNew } or null.
 export async function createLoyaltyClaim({ squarePaymentId, awardOrderId, amountCents = 0, locationId = null, ttlMinutes = DEFAULT_TTL_MINUTES }) {
     if (!squarePaymentId || !awardOrderId) return null;
+    // ── ONE PURCHASE, ONE CLAIM ──────────────────────────────────────────────────────────────────────────
+    // Keyed on the ORDER, not the payment. A single Square order can carry more than one payment — a split
+    // tender, or a first attempt superseded by a second — and each one used to mint its own claim for the
+    // FULL amount and fire its own push. Luke: "im getting double alerts sometimes", two of them 14 seconds
+    // apart for the same $83.70. Ten orders out of 505 did it; three were redeemed twice, and only awardXp's
+    // `spend:<orderId>` dedupe stopped that becoming real points. That dedupe is PER BUYER, so two different
+    // people each holding one of a pair would both have been paid for the same purchase.
+    const already = await db
+        .queryOne(`SELECT token, amount_cents FROM mkt_loyalty_claim WHERE award_order_id = $1`, [awardOrderId])
+        .catch(() => null);
+    if (already) return { token: already.token, amountCents: already.amount_cents, isNew: false };
+
     const token = randomBytes(24).toString("hex");
     const rows = await db
         .query(
             `INSERT INTO mkt_loyalty_claim (token, square_payment_id, award_order_id, amount_cents, location_id, expires_at)
              VALUES ($1, $2, $3, $4, $5, NOW() + ($6 || ' minutes')::interval)
-             ON CONFLICT (square_payment_id) DO NOTHING
+             ON CONFLICT DO NOTHING
              RETURNING token, amount_cents`,
             [token, squarePaymentId, awardOrderId, Math.max(0, Math.trunc(amountCents) || 0), locationId, String(Math.max(1, ttlMinutes))]
         )
         .catch(() => []);
     if (rows.length) return { token: rows[0].token, amountCents: rows[0].amount_cents, isNew: true };
 
-    // A claim already exists for this payment (retry) — reuse it.
+    // A claim already exists for this payment or this order (a retry, or a race with the sibling payment
+    // that arrived a second earlier) — reuse it rather than minting a second.
     const existing = await db
-        .queryOne(`SELECT token, amount_cents FROM mkt_loyalty_claim WHERE square_payment_id = $1`, [squarePaymentId])
+        .queryOne(
+            `SELECT token, amount_cents FROM mkt_loyalty_claim WHERE square_payment_id = $1 OR award_order_id = $2`,
+            [squarePaymentId, awardOrderId]
+        )
         .catch(() => null);
     return existing ? { token: existing.token, amountCents: existing.amount_cents, isNew: false } : null;
 }
