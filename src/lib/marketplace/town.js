@@ -637,6 +637,36 @@ export async function sendTownChat(buyerId, body) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const text = String(body || "").replace(/\s+/g, " ").trim().slice(0, 200);
     if (!text) return { ok: false, error: "empty" };
+
+    // ── SAYING THE SAME THING OVER AND OVER ──────────────────────────────────────────────────────────────
+    // Five identical wolf emoji in a row, then "There's bugs". The daily that once PAID for five chats is
+    // long gone (see town-quests.js) and people still do it, because nothing stops them.
+    //
+    // Checked against the last few messages rather than only the previous one — a straight "no repeats in a
+    // row" is beaten by alternating two things, which is the same wall of noise. Saying something again
+    // LATER is fine and always was; this only refuses it while it is still on screen.
+    const recent = await db.query(
+        `SELECT body FROM mkt_town_chat
+          WHERE buyer_id = $1 AND created_at > NOW() - INTERVAL '5 minutes'
+          ORDER BY created_at DESC LIMIT 4`,
+        [buyerId]
+    ).catch(() => []);
+    const norm = (v) => String(v || "").toLowerCase().replace(/[\s\p{P}]+/gu, "");
+    const key = norm(text);
+    if (key && (recent || []).some((r) => norm(r.body) === key)) {
+        return { ok: false, error: "duplicate_chat" };
+    }
+    // And a ceiling on sheer volume, whatever the words are. Generous enough that a fast conversation never
+    // trips it — six in a minute is typing, not talking.
+    if ((recent || []).length >= 4) {
+        const burst = await db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_town_chat
+              WHERE buyer_id = $1 AND created_at > NOW() - INTERVAL '1 minute'`,
+            [buyerId]
+        ).catch(() => null);
+        if ((burst?.n || 0) >= 6) return { ok: false, error: "too_fast" };
+    }
+
     await db.query(`INSERT INTO mkt_town_chat (buyer_id, body) VALUES ($1, $2)`, [buyerId, text]).catch(() => {});
     // Chatting pays NOTHING. It used to tick a "send 5 chats" daily, which turned the Den's global feed into
     // five identical wolf emoji from whoever wanted the 80 gold. See the note in town-quests.js.

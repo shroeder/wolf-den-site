@@ -546,6 +546,7 @@ function GlobalChatTab({ open, onRead }) {
     const [messages, setMessages] = useState(null);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
+    const [note, setNote] = useState("");   // why the last message was refused
     const endRef = useRef(null);
     // Whether we have already dropped this thread to its newest message once. A ref, not state: flipping it
     // must not itself cause a render, and it has to survive every poll.
@@ -583,18 +584,31 @@ function GlobalChatTab({ open, onRead }) {
         e.preventDefault();
         const body = input.trim();
         if (!body || sending) return;
+        setNote("");
         setSending(true);
         const r = await fetch("/api/marketplace/global-chat", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ body }),
         }).catch(() => null);
-        if (r && r.ok) { setInput(""); await load(); scrollToEndIfPinned(endRef, true); }
+        if (r && r.ok) {
+            setInput(""); setNote(""); await load(); scrollToEndIfPinned(endRef, true);
+        } else {
+            // ── A REFUSED MESSAGE HAS TO SAY SO ──────────────────────────────────────────────────────────
+            // This branch did nothing at all: the text stayed in the box, nothing moved, and the only reading
+            // available was that the button was broken. Now the guards actually refuse things, silence is not
+            // an option.
+            const d = r ? await r.json().catch(() => null) : null;
+            setNote(d?.error === "duplicate_chat" ? "You just said that — try something new."
+                : d?.error === "too_fast" ? "Easy — give the Den a second to keep up."
+                : "That didn't send. Try again.");
+        }
         setSending(false);
     }
 
     return (
         <div className="social-global">
+            {note ? <p className="social-note" role="status">{note}</p> : null}
             <div className="social-global-feed">
                 {messages === null ? (
                     <p className="muted social-empty">Loading the plaza…</p>
