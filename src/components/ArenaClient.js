@@ -1552,7 +1552,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             : `Brace for ${braceFor} · ${bracesLeft} left`}
                                         onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
                                         <GiShield aria-hidden="true" /><span>Guard</span>
-                                        {braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
+                                        {/* ── SAY WHY IT IS OFF, ON THE BUTTON ────────────────────────────
+                                            The reason lived only in `title`, which does not exist on a phone:
+                                            the button just greyed out still showing what it WOULD soak, so it
+                                            read as broken. Luke, at round 31: "I cant defend anymore and I
+                                            havent guarded for like 8 turns." He was out of braces — six is
+                                            the whole bout's budget — and nothing on screen said so. */}
+                                        {bracesLeft <= 0 ? <em className="ar-cmd-sub is-off">none left</em>
+                                            : !bout.braceReady ? <em className="ar-cmd-sub is-off">not twice</em>
+                                            : braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
                                         {bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
                                     </button>
                                     <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
@@ -2424,6 +2432,7 @@ function Styles() {
             .ar-statcard b u { text-decoration: none; margin-left: auto; font-size: 10px; font-weight: 800; color: #b9c2cc; }
             .ar-statcard p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: #c8d0d9; }
             .ar-statcard-now b { display: inline; color: #ffb066; }
+            .ar-cmd-sub.is-off { color: #ff9f9f; font-size: 10.5px; letter-spacing: .02em; }
             .ar-hexes { position: relative; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px;
                 justify-content: center; padding: 2px 8px 0; }
             .ar-hexes i { font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: .05em;

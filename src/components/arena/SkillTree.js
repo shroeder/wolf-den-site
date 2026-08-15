@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { treeState } from "@/lib/marketplace/arena-classes.js";
 import { GiLaurelCrown, GiUpgrade } from "react-icons/gi";
 
 import { TIER_GATE } from "@/lib/marketplace/arena-classes.js";
@@ -56,7 +57,7 @@ function Node({ n, selected, onPick, busy }) {
 // ── THE DETAIL PANEL ─────────────────────────────────────────────────────────────────────────────────────────
 // One of these at a time, docked under the row of the node you tapped, so the answer appears next to the
 // question instead of scrolling the tree out from under you.
-function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, onTake, onRefund, onClose }) {
+function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, readOnly = false, onTake, onRefund, onClose }) {
     const ranked = (n.ranks || 1) > 1;
     return (
         <div className="skt-detail">
@@ -95,7 +96,10 @@ function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, onTake, 
             ) : null}
 
             <div className="skt-detail-acts">
-                {!n.tierOpen ? (
+                {readOnly ? (
+                    // Reading someone else's discipline: everything above is true, nothing here is spendable.
+                    <span className="skt-detail-lock">Preview — switch to Yours to spend points.</span>
+                ) : !n.tierOpen ? (
                     <span className="skt-detail-lock">Spend {n.gate} points in this tree to open this tier.</span>
                 ) : n.maxed ? (
                     <span className="skt-detail-lock is-ok">Fully learned.</span>
@@ -108,7 +112,7 @@ function Detail({ n, busy, points, refundCost, canAfford, freeLeft = 0, onTake, 
                 )}
                 {/* THE FIRST THREE OF THE DAY ARE FREE, and the button says so — a price you have to discover
                     by tapping is a price that stops people tapping. */}
-                {n.rank > 0 ? (
+                {n.rank > 0 && !readOnly ? (
                     <button type="button" className="skt-refund" disabled={busy || (freeLeft <= 0 && !canAfford)}
                         onClick={() => onRefund(n.id)}>
                         {freeLeft > 0
@@ -135,9 +139,15 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
     const pts = p.points || { total: 0, spent: 0, available: 0 };
     const [confirm, setConfirm] = useState(null);   // "tree" | classId
     const [sel, setSel] = useState(null);           // the node whose detail panel is open
+    // ── READING A CLASS YOU ARE NOT ──────────────────────────────────────────────────────────────────────
+    // "I need a way to see the other class skill trees and passives without respeccing." The catalog is pure
+    // (arena-classes.js: no DB, no server-only), so any class's tree can be built right here from nothing —
+    // no round trip, no state on the server, and no way for a preview to touch your own points.
+    const [preview, setPreview] = useState(null);   // classId being read, or null for your own
 
     // ── CHOOSE A CLASS ── the first level asks, and nothing else on this screen exists until it is answered.
-    if (p.needsClass) {
+    // …unless they asked to READ one first, in which case the tree below renders with nothing spendable.
+    if (p.needsClass && !preview) {
         return (
             <div className="skt">
                 <div className="skt-head is-intro">
@@ -171,6 +181,15 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                                 <i><b>{Math.round((c.guard || 0) * 100)}%</b>guard</i>
                             </span>
                             <p>{c.blurb}</p>
+                            {/* ── READ IT BEFORE YOU PICK IT ──────────────────────────────────────────
+                                A newcomer was choosing off a name, a tagline and five numbers, with the
+                                twelve nodes that actually make the class invisible until after they had
+                                committed. This opens the whole tree, read-only, before anything is spent. */}
+                            <span role="button" tabIndex={0} className="skt-class-see"
+                                onClick={(e) => { e.stopPropagation(); setPreview(c.id); }}
+                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setPreview(c.id); } }}>
+                                See its tree
+                            </span>
                         </button>
                     ))}
                 </div>
@@ -188,29 +207,129 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
         );
     }
 
-    const tiers = [0, 1, 2, 3].map((t) => (p.tree || []).filter((n) => n.tier === t));
-    const picked = (p.tree || []).find((n) => n.id === sel) || null;
+    // Your own tree, or the one you are reading. A previewed tree is built with NO points spent and every
+    // tier open, because the question being answered is "what is in this class", not "what could I take now".
+    const viewing = preview && preview !== cls?.id ? preview : null;
+    const choosing = Boolean(p.needsClass);   // reading a tree before any class exists
+    const viewCls = viewing ? (p.classes || []).find((c) => c.id === viewing) || null : cls;
+    const nodes = viewing
+        ? treeState(viewing, {}, 0).map((n) => ({ ...n, tierOpen: true, canTake: false }))
+        : (p.tree || []);
+    const tiers = [0, 1, 2, 3].map((t) => nodes.filter((n) => n.tier === t));
+    const picked = nodes.find((n) => n.id === sel) || null;
+
+    // ── WHAT YOUR POINTS ARE ACTUALLY DOING ──────────────────────────────────────────────────────────────
+    // "where do I see the passives, I cant even see my own." The tree draws a node's dots but never totals
+    // them, so a Warden with four ranks of Conditioning had no way to read what that came to. Summed from the
+    // same node data the tree renders, so the two cannot disagree.
+    const held = nodes.filter((n) => n.kind !== "active" && n.rank > 0);
 
     return (
-        <div className="skt" style={{ "--c": colour }}>
+        <div className="skt" style={{ "--c": (viewCls?.color || colour) }}>
+            {/* ── EVERY DISCIPLINE, READABLE ──────────────────────────────────────────────────────────────
+                Tapping one reads its whole tree; nothing here can spend a point. Changing class still costs
+                gold and still lives behind the confirm below — this only removes the need to PAY to find out
+                what you would be buying. */}
+            {(p.classes || []).length > 1 && !choosing ? (
+                <div className="skt-switch">
+                    <button type="button" className={`skt-sw${!viewing ? " is-on" : ""}`} onClick={() => { setPreview(null); setSel(null); }}>
+                        Yours
+                    </button>
+                    {(p.classes || []).filter((c) => c.id !== cls?.id).map((c) => (
+                        <button key={c.id} type="button" className={`skt-sw${viewing === c.id ? " is-on" : ""}`}
+                            style={{ "--c": c.color }} onClick={() => { setPreview(c.id); setSel(null); }}>
+                            {c.name}
+                        </button>
+                    ))}
+                </div>
+            ) : null}
+            {viewing ? (
+                <p className="skt-preview">
+                    {choosing
+                        ? <>Reading <b>{viewCls?.name}</b> before you commit. Nothing here spends a point.</>
+                        : <>Reading <b>{viewCls?.name}</b> — you are a {cls?.name}. Nothing here spends a point.</>}
+                    {choosing ? (
+                        <button type="button" className="skt-sw skt-back" onClick={() => { setPreview(null); setSel(null); }}>
+                            Back to choosing
+                        </button>
+                    ) : null}
+                </p>
+            ) : null}
             <div className="skt-head">
-                {cls.emblem ? (
+                {viewCls?.emblem ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img className="skt-emblem" src={cls.emblem} alt="" draggable="false" />
+                    <img className="skt-emblem" src={viewCls.emblem} alt="" draggable="false" />
                 ) : null}
                 <div className="skt-head-body">
-                    <span className="skt-kick">{cls.tag}</span>
-                    <b className="skt-title">{cls.name}</b>
-                    <span className="skt-lv">
-                        Arena level <b>{p.level}</b>
-                        <i className="skt-xpbar"><u style={{ width: `${Math.min(100, (p.into / p.span) * 100)}%` }} /></i>
-                        <em>{money(p.into)} / {money(p.span)} xp</em>
-                    </span>
+                    <span className="skt-kick">{viewCls?.tag}</span>
+                    <b className="skt-title">{viewCls?.name}</b>
+                    {viewing ? (
+                        <span className="skt-lv">
+                            {/* The numbers that ARE the choice — the same five the class-pick cards show, so
+                                reading a class and picking one tell you the same things. */}
+                            <span className="skt-class-stats is-read">
+                                <i><b>{viewCls?.health > 0 ? `+${viewCls.health}` : "—"}</b>health</i>
+                                <i><b>{Math.round((viewCls?.dr || 0) * 100)}%</b>reduction</i>
+                                <i><b>{Math.round((viewCls?.accuracy || 0) * 100)}%</b>accuracy</i>
+                                <i><b>{viewCls?.lifesteal ? `${Math.round(viewCls.lifesteal * 100)}%` : "—"}</b>lifesteal</i>
+                                <i><b>{Math.round((viewCls?.guard || 0) * 100)}%</b>guard</i>
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="skt-lv">
+                            Arena level <b>{p.level}</b>
+                            <i className="skt-xpbar"><u style={{ width: `${Math.min(100, (p.into / p.span) * 100)}%` }} /></i>
+                            <em>{money(p.into)} / {money(p.span)} xp</em>
+                        </span>
+                    )}
                 </div>
                 <span className={`skt-points${pts.available ? " is-live" : ""}`}>
                     <b>{pts.available}</b><em>point{pts.available === 1 ? "" : "s"}</em>
                 </span>
             </div>
+
+            {/* ── WHAT YOU ARE CARRYING ───────────────────────────────────────────────────────────────────
+                The tree draws a node's dots and never totals them, so four ranks of Conditioning was a row of
+                pips and nothing else — there was no screen anywhere that said what your passives came to.
+                Summed from the same node data the tree renders, so the two cannot disagree.
+                In preview this lists what the discipline OFFERS instead, at one rank each, which is the
+                question you are asking when you are reading a class you do not have. */}
+            {viewing ? (
+                <div className="skt-have is-read">
+                    <b>What {viewCls?.name} offers</b>
+                    <div className="skt-have-rows">
+                        {nodes.filter((n) => n.kind !== "active").map((n) => (
+                            <span key={n.id} className="skt-have-row">
+                                <i>{n.name}</i>
+                                <u>{fmt({ ...n, rank: 1 })} per rank</u>
+                                <em>{n.ranks > 1 ? `${n.ranks} ranks` : "1 rank"}</em>
+                            </span>
+                        ))}
+                    </div>
+                    <b className="skt-have-sub">Its actives</b>
+                    <div className="skt-have-rows">
+                        {nodes.filter((n) => n.kind === "active").map((n) => (
+                            <span key={n.id} className="skt-have-row">
+                                <i>{n.name}</i>
+                                <u>{n.effect ? n.effect.line : n.desc}</u>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : held.length ? (
+                <div className="skt-have">
+                    <b>What your points are doing</b>
+                    <div className="skt-have-rows">
+                        {held.map((n) => (
+                            <span key={n.id} className="skt-have-row">
+                                <i>{n.name}</i>
+                                <u>{fmt(n)}</u>
+                                <em>{n.rank}/{n.ranks || 1}</em>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
 
             {/* ── THE TREE ── four tiers of three. The spines between them light up as each gate falls, so the
                 shape of your progress is visible from across the room rather than read off the labels. */}
@@ -231,7 +350,7 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                             ))}
                         </div>
                         {picked && picked.tier === t ? (
-                            <Detail n={picked} busy={busy} points={pts.available}
+                            <Detail n={picked} busy={busy} points={viewing ? 0 : pts.available} readOnly={Boolean(viewing)}
                                 refundCost={p.respec?.one || 0} canAfford={gold >= (p.respec?.one || 0)}
                                 freeLeft={p.respec?.free || 0}
                                 onClose={() => setSel(null)}
@@ -445,6 +564,26 @@ function Styles() {
             .skt-detail-x { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 7px; cursor: pointer;
                 font-size: 15px; line-height: 1; color: #9aa2ab; background: rgba(255,255,255,.06);
                 border: 1px solid rgba(255,255,255,.12); }
+            .skt-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+            .skt-sw { padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 11.5px; font-weight: 900;
+                background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #c6cfd8; }
+            .skt-sw.is-on { color: #0b0d10; background: var(--c, #ffd75e); border-color: transparent; }
+            .skt-preview { margin: 0 0 10px; padding: 8px 11px; border-radius: 10px; font-size: 11.5px; line-height: 1.45;
+                color: #d8e2ec; background: rgba(96,165,250,0.10); border: 1px solid rgba(96,165,250,0.30); }
+            .skt-preview b { color: #fff; }
+            .skt-have { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px;
+                background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.10); }
+            .skt-have > b { display: block; font-size: 12px; margin-bottom: 6px; }
+            .skt-have-sub { margin-top: 9px; }
+            .skt-have-rows { display: grid; gap: 4px; }
+            .skt-have-row { display: flex; align-items: baseline; gap: 8px; font-size: 11.5px; }
+            .skt-have-row i { font-style: normal; color: #e9eef3; font-weight: 800; flex: 0 0 auto; }
+            .skt-have-row u { text-decoration: none; color: var(--c, #ffd75e); font-weight: 900; }
+            .skt-have-row em { margin-left: auto; font-style: normal; font-size: 10.5px; color: #93a0ad; }
+            .skt-class-stats.is-read { margin-top: 2px; }
+            .skt-class-see { display: inline-block; margin-top: 8px; padding: 5px 12px; border-radius: 999px;
+                font-size: 11px; font-weight: 900; color: #0b0d10; background: var(--c, #ffd75e); }
+            .skt-back { margin-left: 8px; vertical-align: middle; }
             .skt-detail-desc { margin: 0; font-size: 12px; line-height: 1.5; color: #b6bec7; }
             .skt-detail-eff { margin: 7px 0 0; font-size: 12.5px; line-height: 1.45; font-weight: 800; color: #e8eef5; }
             .skt-detail-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
