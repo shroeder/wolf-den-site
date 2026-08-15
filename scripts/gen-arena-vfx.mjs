@@ -41,6 +41,11 @@ const LOOK = `Bright saturated painterly 2D game VFX, bold shapes, strong glow, 
 // Pure black is load-bearing: it is what mix-blend-mode: screen turns into transparency.
 const BLACK = `PURE SOLID BLACK background (#000000) everywhere, absolutely no background detail, no scenery, no character, no weapon, no grid lines, no borders between cells, no numbers, no text, no words, no watermark, no UI.`;
 
+// ⚠️ SHAPE. The slicer reads VFX_COLS x VFX_ROWS (4x2), and `rend.webp` on disk is 1024x512 — the right
+// aspect for that. gpt-image-1 asked for size "1024x1024" returns a SQUARE image, and a square sliced as 4x2
+// gives cells 256 wide by 512 tall, i.e. two rows of art crammed into every frame. freeze and disarm were
+// generated that way on 2026-08-15 and thrown away; the proof sheet is what caught it, which is exactly what
+// it is for. Fix the request size (or crop to 2:1) before generating these two again.
 const VFX = {
     // One per new archetype, plus a generic impact the plain Attack can use.
     rend: `${SHEET} The effect: a violent burst of molten orange-red fire erupting upward from a point, throwing embers, then guttering down to drifting sparks. ${LOOK} ${BLACK}`,
@@ -50,6 +55,11 @@ const VFX = {
     riposte: `${SHEET} The effect: a pale cyan shockwave ring expanding outward, reversing, and snapping back inward to a bright point, like a blow being returned. ${LOOK} ${BLACK}`,
     impact: `${SHEET} The effect: a sharp white-yellow impact flash with radiating spikes and a dust puff, expanding fast then dissipating. ${LOOK} ${BLACK}`,
     // The four kinds still falling back to the generated-shape layer.
+    // ── ICE ── the Runecaller's freeze. Has to be unmistakable against `rend`, which is the other status
+    // sheet and is molten orange rising: this one is white-blue and CLOSES INWARD, crystal locking shut.
+    freeze: `${SHEET} The effect: pale white-blue frost crystals stabbing inward from the edges and locking together into a solid jagged block of ice at the centre, a bright cold flash as it seals, then a scatter of glittering shards. ${LOOK} ${BLACK}`,
+    // Shatter's lockout — the same cold family, but breaking apart where the freeze locks together.
+    disarm: `${SHEET} The effect: a pale blue-white shield of ice cracking, splitting and blowing apart into sharp frozen shards flying outward, then dimming to drifting frost. ${LOOK} ${BLACK}`,
     spell: `${SHEET} The effect: a rune circle igniting and rotating, throwing off arcane sparks, then collapsing inward into a bright violet flash. ${LOOK} ${BLACK}`,
     ward: `${SHEET} The effect: interlocking translucent hexagonal shield plates snapping into place to form a curved barrier, flaring bright at the seams, then dimming. ${LOOK} ${BLACK}`,
     surge: `${SHEET} The effect: sharp golden light streaks and distinct rising embers shooting upward, crisp defined shapes with hard bright edges, intensifying then dispersing. NO soft haze, NO large smooth gradient wash, NO fog. ${LOOK} ${BLACK}`,
