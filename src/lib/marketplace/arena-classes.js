@@ -284,22 +284,22 @@ export const TREES = {
         // left to modify — a passive that reads well and does nothing is the bug this file keeps being fixed
         // for. Same id and same rank count, so anyone who bought it keeps every point; only what it buys has
         // changed, to the other half of what a Runecaller is.
-        N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.006,
-            desc: "Your burns tick 0.6% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
+        N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.30,
+            desc: "Your burns tick 30% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
         N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", name: "Channel", power: 1.65, acc: -0.08, cd: 4,
             desc: "Its own element, and it cuts guard.", sprite: "/images/arena/node/rc_spell.webp" }),
 
         N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
-        N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTick", per: 0.008, needs: 3,
-            desc: "Burns tick 0.8% harder per rank.", sprite: "/images/arena/node/rc_burn.webp" }),
+        N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTurns", per: 0.5, needs: 3,
+            desc: "Your burns last one turn longer every two ranks.", sprite: "/images/arena/node/rc_burn.webp" }),
         N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendStacks", per: 1, needs: 3,
             desc: "+1 burn stack per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
 
         N({ id: "rc_sunder", tier: 2, kind: "active", ability: "sunder", name: "Shatter", power: 1.50, acc: -0.07, cd: 3, needs: 7,
             desc: "Strips their guard for what comes next.", sprite: "/images/arena/node/rc_sunder.webp" }),
-        N({ id: "rc_cd", tier: 2, name: "Quickening", ranks: 3, stat: "cdCut", per: 1, needs: 7,
-            desc: "Every third rank shaves a turn off one cooldown.", sprite: "/images/arena/node/rc_cd.webp" }),
+        N({ id: "rc_cd", tier: 2, name: "Emberdrinker", ranks: 3, stat: "burnLeech", per: 0.10, needs: 7,
+            desc: "You drink back 10% of your burn damage as health, per rank.", sprite: "/images/arena/node/rc_cd.webp" }),
         N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
             desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
 

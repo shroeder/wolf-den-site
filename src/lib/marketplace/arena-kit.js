@@ -148,7 +148,27 @@ const EXECUTE_UNDER = 0.35;     // arena.js: foeHp <= foeMaxHp * 0.35
 // Same contract as the block above: every number here is the one arena.js actually applies, so a card can
 // never drift away from the behaviour it is describing.
 export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their beats
-export const REND_PER_TURN = 0.045; // of their MAX health, per tick
+// ── THE BURN, REBUILT SO INVESTING IN IT MEANS SOMETHING ─────────────────────────────────────────────────────
+// `rendTick` used to be ADDED to this: Runebrand read "+0.6% harder per rank", which sounds like nothing and
+// very nearly was — four ranks moved a tick from 4.5% to 6.9% of their health. Luke: "should be like 30
+// percent each rank." So the tree now MULTIPLIES the tick instead of nudging it, and the base drops to make
+// room for that multiplier. Uninvested burns are gentler than they were; an invested one is more than twice
+// what it ever was.
+//
+//   base           0.022 x 3 stacks             = 6.6% of their max health a turn
+//   Runebrand x4   0.022 x 2.2 x 3 stacks       = 14.5%  (every rank still under the cap, so all four pay)
+//   + Kindling     0.022 x 2.2 x 5 stacks       = 24%    -> held at the cap below
+export const REND_PER_TURN = 0.022;  // of their MAX health, per tick, PER STACK, before the tree multiplies it
+// A CEILING ON WHAT ONE TURN OF BURNING CAN COST, whatever the stacks and whatever the investment. An
+// uncapped stacking burn has already been shipped here once: it won 83.8% of 3,000 simulated bouts and ended
+// them in 5.7 beats, because every application added another full tick forever. The cap is set just above
+// what a fully-ranked Runebrand reaches on its own, so all four of its ranks are worth buying and it is
+// Kindling's extra stacks that run into the ceiling rather than the node Luke asked to make matter.
+export const REND_TICK_CAP = 0.15;
+// And a ceiling on how LONG. Slow Burn buys turns rather than a second copy of "harder", which is what its
+// name has always said; without a cap four ranks would take a burn to seven of their beats and the class
+// would win by waiting.
+export const REND_TURNS_CAP = 5;
 // A BLEED CAP. Simulated at 3,000 bouts a cell, an uncapped stacking burn won 83.8% and ended fights in 5.7
 // beats — every extra application added another full tick forever, so the correct play was "rend, rend, rend"
 // and the bout was over before any other kind got to matter. Three stacks is still the strongest damage-over-

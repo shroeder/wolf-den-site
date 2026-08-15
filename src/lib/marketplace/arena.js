@@ -12,7 +12,8 @@ import {
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER,
-    DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
+    DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, REND_TICK_CAP, REND_TURNS_CAP,
+    SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
 import { pickIncoming, itemsFor, POULTICE_HEAL } from "@/lib/marketplace/arena-ai.js";
@@ -1677,13 +1678,20 @@ export async function fightRound(buyerId, opts = {}) {
             // Stacks with itself rather than refreshing, so leaning on a burn kit is a real plan — but only
             // up to REND_MAX_STACKS. Uncapped it won 83.8% of simulated bouts in under six beats.
             // Slow Burn: each rank makes the burn tick for more of their health.
-            const per = Math.max(1, Math.round(b.foeMaxHp * (REND_PER_TURN + (P.rendTick || 0))));
+            // RUNEBRAND MULTIPLIES, it no longer nudges. Four ranks is +120% on the tick rather than the
+            // +2.4 percentage points it used to be worth.
+            const per = Math.max(1, Math.round(b.foeMaxHp * REND_PER_TURN * (1 + (P.rendTick || 0))));
             // KINDLING: "+1 burn stack per rank" was read by nothing, so two ranks of a tier-1 node did
             // nothing at all. It raises the CEILING — the cap is what the node is worth, since a burn kit
             // reaches the old cap of its own accord and then stops.
             const cap = REND_MAX_STACKS + Math.round(P.rendStacks || 0);
             const stacks = Math.min(cap, (b.bleed?.stacks || 0) + 1);
-            b.bleed = { turns: REND_TURNS, stacks, dmg: per * stacks };
+            // The ceiling on one turn of burning, whatever the stacks and whatever the investment. An
+            // uncapped stacking burn has been shipped here once already and won 83.8% of simulated bouts.
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * REND_TICK_CAP)));
+            // SLOW BURN buys turns — what its name always said, instead of being a weaker second Runebrand.
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
+            b.bleed = { turns, stacks, dmg: tick };
         }
         if (sunder) b.sunder = SUNDER_TURNS;
 
@@ -1721,9 +1729,15 @@ export async function fightRound(buyerId, opts = {}) {
             const tick = Math.min(b.hp, b.foeBleed.dmg);
             b.hp = Math.max(0, b.hp - tick);
             b.foeBleed.turns -= 1;
+            let theyDrank = 0;
+            if (tick > 0 && (FP.burnLeech || 0) > 0) {
+                theyDrank = Math.min(b.foeMaxHp - b.foeHp, Math.round(tick * FP.burnLeech));
+                b.foeHp += theyDrank;
+            }
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend",
-                    text: `You are still burning — another ${tick}.`, ability: null });
+                    text: `You are still burning — another ${tick}.${theyDrank ? ` They drink ${theyDrank} of it back.` : ""}`,
+                    ability: null });
             }
             if (b.foeBleed.turns <= 0) b.foeBleed = null;
         }
@@ -1985,10 +1999,15 @@ export async function fightRound(buyerId, opts = {}) {
         }
         if (foeCrit && (FP.burnOnCrit || 0) > 0 && through > 0) rendNow = true;
         if (rendNow && through > 0) {
-            const per = Math.max(1, Math.round(b.maxHp * (REND_PER_TURN + (FP.rendTick || 0))));
+            // Their Runebrand multiplies exactly as yours does, their Slow Burn lengthens exactly as yours
+            // does, and their burn hits the same ceiling. The same kit has to burn identically in an
+            // opponent's hands or the tree is only real on one side of the ring.
+            const per = Math.max(1, Math.round(b.maxHp * REND_PER_TURN * (1 + (FP.rendTick || 0))));
             const cap = REND_MAX_STACKS + Math.round(FP.rendStacks || 0);
             const stacks = Math.min(cap, (b.foeBleed?.stacks || 0) + 1);
-            b.foeBleed = { turns: REND_TURNS, stacks, dmg: per * stacks };
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * REND_TICK_CAP)));
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
+            b.foeBleed = { turns, stacks, dmg: tick };
         }
         if (sunderNow) b.foeSunder = SUNDER_TURNS;
         // `blocked` and `soaked` ride along so the field can SHOW them. They were only ever in the sentence,
@@ -2042,9 +2061,19 @@ export async function fightRound(buyerId, opts = {}) {
             const tick = Math.min(b.foeHp, b.bleed.dmg);
             b.foeHp = Math.max(0, b.foeHp - tick);
             b.bleed.turns -= 1;
+            // ── EMBERDRINKER ── a share of what the burn takes comes back as health. The Runecaller's
+            // damage arrives on the OTHER fighter's beats, so a lifesteal that only read your own swings
+            // would have skipped the thing the class is actually for — the same lesson the Warden's
+            // lifesteal learned when it ignored thorns.
+            let drank = 0;
+            if (tick > 0 && (P.burnLeech || 0) > 0) {
+                drank = Math.min(b.maxHp - b.hp, Math.round(tick * P.burnLeech));
+                b.hp += drank;
+            }
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "rend",
-                    text: `The burn takes another ${tick}.`, ability: null });
+                    text: `The burn takes another ${tick}.${drank ? ` You drink ${drank} of it back.` : ""}`,
+                    ability: null });
             }
             if (b.bleed.turns <= 0) b.bleed = null;
         }
