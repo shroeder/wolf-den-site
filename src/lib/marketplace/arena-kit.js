@@ -155,16 +155,23 @@ export const REND_TURNS = 3;        // arena.js: bleed ticks this many of their 
 // room for that multiplier. Uninvested burns are gentler than they were; an invested one is more than twice
 // what it ever was.
 //
-//   base           0.022 x 3 stacks             = 6.6% of their max health a turn
-//   Runebrand x4   0.022 x 2.2 x 3 stacks       = 14.5%  (every rank still under the cap, so all four pay)
-//   + Kindling     0.022 x 2.2 x 5 stacks       = 24%    -> held at the cap below
-export const REND_PER_TURN = 0.022;  // of their MAX health, per tick, PER STACK, before the tree multiplies it
+// ⚠️ ONE CAST IS ONE STACK. Stacks build a cast at a time on a 3-turn cooldown, against a burn that is
+// expiring the whole while — so the number that matters is the SINGLE-STACK tick, not the three-stack one.
+// This was tuned against three stacks first, which halved a single burn (45/turn -> 22/turn) while claiming
+// to buff it. Luke, immediately: "does burning do anything, doesnt seem like it does any damage over time."
+// He was right. The base is back where it was, so nothing regressed, and the multiplier is what the ranks buy:
+//
+//   1 stack, no points     4.5% of their max health a turn      (exactly what it always was)
+//   1 stack, Runebrand x4  9.9%                                 (the rank is worth taking)
+//   3 stacks, no points   13.5%
+//   3 stacks, Runebrand x4 29.7%  -> held at the 20% cap below
+export const REND_PER_TURN = 0.045;  // of their MAX health, per tick, PER STACK, before the tree multiplies it
 // A CEILING ON WHAT ONE TURN OF BURNING CAN COST, whatever the stacks and whatever the investment. An
 // uncapped stacking burn has already been shipped here once: it won 83.8% of 3,000 simulated bouts and ended
 // them in 5.7 beats, because every application added another full tick forever. The cap is set just above
 // what a fully-ranked Runebrand reaches on its own, so all four of its ranks are worth buying and it is
 // Kindling's extra stacks that run into the ceiling rather than the node Luke asked to make matter.
-export const REND_TICK_CAP = 0.15;
+export const REND_TICK_CAP = 0.20;
 // And a ceiling on how LONG. Slow Burn buys turns rather than a second copy of "harder", which is what its
 // name has always said; without a cap four ranks would take a burn to seven of their beats and the class
 // would win by waiting.

@@ -5,13 +5,13 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiBurn, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiFlame, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
 import SkillFx from "@/components/arena/SkillFx";
 import ArenaFx from "@/components/arena/ArenaFx";
-import SpriteFx, { hasSheet } from "@/components/arena/SpriteFx";
+import { classById } from "@/lib/marketplace/arena-classes.js";
 import ArenaUpgrades from "@/components/arena/ArenaUpgrades";
 import RecipeShelf from "@/components/RecipeShelf";
 import SkillTree from "@/components/arena/SkillTree";
@@ -187,7 +187,8 @@ function SkillFace({ ab, left = 0 }) {
 // many turns until they expire and be able to click them for more details. both on me and on the enemy."
 const pct = (n) => `${Number((n * 100).toFixed(1))}%`;
 const STATUS_KINDS = {
-    burn:    { Icon: GiBurn,          label: "Burning",        tone: "fire",
+    // The old icon was a marshmallow on a stick; at 12px it read as a slice of toast.
+    burn:    { Icon: GiFlame,          label: "Burning",        tone: "fire",
                what: () => `Takes ${pct(REND_PER_TURN)} of max health at the end of every turn. Stacks.` },
     sunder:  { Icon: GiCrackedShield, label: "Guard stripped", tone: "bad",
                what: () => `${pct(SUNDER_CUT)} of their damage reduction is gone while it lasts.` },
@@ -285,12 +286,25 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
     // Under a quarter is the danger band: the bar goes red and breathes, so you feel the fight turning before
     // you have read a number. It is also the threshold Execute fires under, so the two agree.
     const danger = frac > 0 && frac <= 0.35;
+    // Bouts saved before classId was published carry none, and an NPC has no class at all — both simply
+    // render no emblem rather than a broken image.
+    const cls = f?.classId ? classById(f.classId) : null;
     const shieldPct = maxHp ? Math.min(1, shield / maxHp) * 100 : 0;
 
     return (
         <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
             + `${healing ? " is-healing" : ""}${burning ? " is-burning" : ""}`}>
             <span className="ar-namerow">
+                {/* ── WHO YOU ARE SWINGING AT ─────────────────────────────────────────────────────────────
+                    The row named them and stated their element, and said nothing about the one fact that
+                    actually changes how the fight goes. A Warden and a Reaver play completely differently and
+                    were indistinguishable here. The emblem is the class's own art, tinted by its own colour,
+                    and it carries a title so it can be identified rather than merely recognised. */}
+                {cls?.emblem ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="ar-cls" src={cls.emblem} alt="" title={cls.name} draggable="false"
+                        style={{ "--cls": cls.color || "#9aa0a6" }} />
+                ) : null}
                 <b className="ar-fname">{f?.name}</b>
                 {element ? (
                     <i className="ar-el-chip" style={{ "--el": ELEMENT_COLOR[element] || "#9aa0a6" }}>{element}</i>
@@ -584,9 +598,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // looked like taking one. Two pieces of state, because they are two facts.
     const [shake, setShake] = useState(0);          // 0 = still, 1 = a hit, 2 = a heavy one. Intensity only.
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
-    // The painted effect currently playing. Cleared on a timer so the element unmounts and the next cast
-    // gets a fresh animation rather than re-triggering a finished one.
-    const [sprite, setSprite] = useState(null);
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
@@ -1037,15 +1048,6 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         } else {
             const power = 0.6 + Math.min(1.6, (l.damage || 0) / Math.max(1, pool * 0.2));
             fxRef.current?.play({ kind, element: froze ? "ice" : element, side: target, power, crit: Boolean(l.crit) });
-            // The painted frame rides the SAME event as the particles, not a second one — one cast, one
-            // picture. Only kinds that actually have art; everything else stays canvas-only as before.
-            if (hasSheet(kind)) {
-                // SpriteFx positions on "left"/"right", NOT on "you"/"them" — handing it the wrong vocabulary
-                // silently falls through to the default side, which put the fire over the fighter who THREW
-                // it while the damage number floated over the one who took it.
-                setSprite({ id: `${bout.log.length}-${kind}`, kind, side: target === "you" ? "left" : "right", crit: Boolean(l.crit) });
-                timers.push(setTimeout(() => setSprite(null), 620));
-            }
         }
         return () => timers.forEach(clearTimeout);
     }, [bout?.log?.length]);
@@ -1311,7 +1313,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-barcol">
                             <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
                                 active={yourTurn} shield={bout.shield || 0} />
-                            <StatusRow list={statusesFor(bout, "you")} side="you" onPick={setStatusPick} />
+                            <StatusRow list={statusesFor(bout, "you")} side="you" onPick={(s) => setStatusPick({ kind: s.kind, side: "you" })} />
                         </span>
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
                             {bout.over ? "—" : yourTurn ? "Your turn" : "Their turn"}
@@ -1319,27 +1321,46 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <span className="ar-barcol is-foe">
                             <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
                                 foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
-                            <StatusRow list={statusesFor(bout, "them")} side="them" onPick={setStatusPick} />
+                            <StatusRow list={statusesFor(bout, "them")} side="them" onPick={(s) => setStatusPick({ kind: s.kind, side: "them" })} />
                         </span>
                     </div>
 
                     {/* ── TAP ONE, LEARN WHAT IT IS DOING ────────────────────────────────────────────────
                         The chip says WHICH and HOW LONG; this says what it costs you, in the engine's own
                         numbers. */}
-                    {statusPick && STATUS_KINDS[statusPick.kind] ? (
-                        <div className="ar-statcard" role="dialog" aria-label={STATUS_KINDS[statusPick.kind].label}
-                            onClick={() => setStatusPick(null)}>
-                            <b className={`is-${STATUS_KINDS[statusPick.kind].tone}`}>
-                                {STATUS_KINDS[statusPick.kind].label}
-                                {statusPick.turns ? <u>{statusPick.turns} {statusPick.turns === 1 ? "turn" : "turns"} left</u> : null}
-                            </b>
-                            <p>{STATUS_KINDS[statusPick.kind].what()}</p>
-                            {statusPick.dmg ? (
-                                <p className="ar-statcard-now">Right now: <b>{statusPick.dmg}</b> a turn
-                                    {statusPick.stacks > 1 ? <> · stacked <b>{statusPick.stacks}x</b></> : null}</p>
-                            ) : null}
-                        </div>
-                    ) : null}
+                    {/* ── IT READS THE LIVE EFFECT, NOT A SNAPSHOT OF ONE ──────────────────────────────
+                        `statusPick` used to hold the whole effect object as it was at the instant you tapped
+                        it, so the card froze: it kept last fight's "60 a turn, stacked 3x, 3 turns left" while
+                        the log underneath said 10/turn, and it survived into the next bout entirely. Luke:
+                        "there is no way to close this info modal and it persists between fights."
+                        Now it remembers only WHICH effect and on WHOM, and re-reads the numbers from the bout
+                        every render — so it counts down as the effect does, and when the effect ends there is
+                        nothing to look up and the card closes itself. */}
+                    {(() => {
+                        if (!statusPick) return null;
+                        const def = STATUS_KINDS[statusPick.kind];
+                        if (!def) return null;
+                        const live = statusesFor(bout, statusPick.side).find((x) => x.kind === statusPick.kind);
+                        if (!live) return null;
+                        return (
+                            <div className="ar-statcard" role="dialog" aria-label={def.label}
+                                onClick={() => setStatusPick(null)}>
+                                <b className={`is-${def.tone}`}>
+                                    {def.label}
+                                    {live.turns ? <u>{live.turns} {live.turns === 1 ? "turn" : "turns"} left</u> : null}
+                                    {/* A VISIBLE WAY OUT. The whole card has always been tappable and nothing
+                                        said so, which on a phone is indistinguishable from being stuck. */}
+                                    <span className="ar-statcard-x" aria-hidden="true">×</span>
+                                </b>
+                                <p>{def.what()}</p>
+                                {live.dmg ? (
+                                    <p className="ar-statcard-now">Right now: <b>{live.dmg}</b> a turn
+                                        {live.stacks > 1 ? <> · stacked <b>{live.stacks}x</b></> : null}</p>
+                                ) : null}
+                                <p className="ar-statcard-tap">Tap to close</p>
+                            </div>
+                        );
+                    })()}
 
                     {/* The old `ar-hexes` strip lived here: a second, separate list of the effects on you,
                         drawn as words, while burns and sunders had no chip at all and the opponent's had
@@ -1419,15 +1440,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         the SCREEN does the work. */}
                     <ArenaFx ref={fxRef} onShake={onShake} />
 
-                    {/* ── THE SPRITE LAYER, WHICH NOTHING WAS RENDERING ────────────────────────────────────
-                        SpriteFx and seventeen generated effect frames have been in the repo unused: the
-                        component was imported by NOTHING, so every effect in every bout was the procedural
-                        canvas above drawing shapes from maths, and the painted art was never once on screen.
-                        Keyed on the beat AND the kind so a repeat of the same move replays from scratch
-                        rather than sitting there as a finished animation. */}
-                    {sprite ? (
-                        <SpriteFx key={sprite.id} kind={sprite.kind} side={sprite.side} crit={sprite.crit} />
-                    ) : null}
+
 
                     {/* WHAT'S READY. Cooldowns, guard and surge live ON the field — combat state, not page
                         furniture. Focus was a single pool that made every skill interchangeable and could lock
@@ -2517,6 +2530,9 @@ function Styles() {
             .ar-statcard b u { text-decoration: none; margin-left: auto; font-size: 10px; font-weight: 800; color: #b9c2cc; }
             .ar-statcard p { margin: 4px 0 0; font-size: 11.5px; line-height: 1.45; color: #c8d0d9; }
             .ar-statcard-now b { display: inline; color: #ffb066; }
+            .ar-statcard-x { margin-left: 8px; font-size: 15px; line-height: 1; color: #b9c2cc; flex: none; }
+            .ar-statcard-tap { margin-top: 6px !important; font-size: 10px !important; letter-spacing: .06em;
+                text-transform: uppercase; color: #7f8790 !important; }
             .ar-cmd-sub.is-off { color: #ff9f9f; font-size: 10.5px; letter-spacing: .02em; }
             .ar-hexes { position: relative; z-index: 6; display: flex; flex-wrap: wrap; gap: 4px;
                 justify-content: center; padding: 2px 8px 0; }
@@ -2689,6 +2705,11 @@ function Styles() {
             .ar-bar.is-foe { text-align: right; }
             /* The chip must not be inside the ellipsis, or a long name eats the affinity — which is the one
                thing on the plate you need before choosing a move. */
+            /* Sized to the cap height of the name beside it, so the row reads as one line rather than an
+               icon with text after it. The class colour is a soft glow, not a border — a hard ring here
+               competes with the element chip two millimetres away. */
+            .ar-cls { width: 17px; height: 17px; flex: none; object-fit: contain; border-radius: 4px;
+                filter: drop-shadow(0 0 4px color-mix(in srgb, var(--cls, #9aa0a6) 65%, transparent)); }
             .ar-namerow { display: flex; align-items: center; gap: 5px; min-width: 0; }
             /* The burn chip must never cost the fighter their name — it shrinks to nothing before the chip
                does, and the chip is fixed. Without this the foe's name was squeezed clean out of the row. */

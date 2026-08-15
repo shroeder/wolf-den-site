@@ -969,6 +969,10 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             archetypeName: foe.archetypeName || null, spriteFallback: foe.spriteFallback || null,
             element: foeKit.element, abilities: foeKit.abilities, might: foeKit.might, gearPower: foeKit.gearPower,
             speed: foeKit.speed,
+            // WHICH DISCIPLINE THEY FIGHT AS. The bout knew everyone's class and published nobody's, so the
+            // card could tell you their element and their crit but not whether you were swinging at a Warden.
+            // Named here or the allowlist above drops it, which is how The Long Road lost its rung.
+            classId: foeKit.classId || null,
             // The four numbers the fight is made of, carried onto the bout so the card and the engine cannot
             // disagree — the card reads the same fields resolveBeat multiplies.
             health: foeKit.health, damage: foeKit.damage,
@@ -1008,7 +1012,8 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
             guard: me.guard ?? DEFAULT_GUARD,
-            gearPower: me.gearPower, level: me.level, perks: me.perks || {} },
+            gearPower: me.gearPower, level: me.level, perks: me.perks || {},
+            classId: me.classId || null },
         // ── THE EDGE BELONGS TO WHOEVER IS OUTGEARED, NOT TO WHOEVER PRESSED CHALLENGE ───────────────────
         // This only ever multiplied the CHALLENGER's damage. The same two loadouts therefore fought two
         // different fights depending on who happened to open: challenge someone far above you and you came in
