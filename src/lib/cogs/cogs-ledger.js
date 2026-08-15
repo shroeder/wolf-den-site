@@ -61,7 +61,15 @@ export async function insertCogs(input) {
     if (e.entryId) {
         const rows = await db.query(
             `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-             ON CONFLICT (entry_id) WHERE entry_id IS NOT NULL
+             -- ⚠️ MUST MATCH idx_cogs_entry_product EXACTLY: UNIQUE (entry_id, product) WHERE entry_id IS NOT
+             -- NULL. This said ON CONFLICT (entry_id), which matches no index, so Postgres threw "there is no
+             -- unique or exclusion constraint matching the ON CONFLICT specification" on EVERY insert. The app
+             -- counts failures silently (it only increments a success tally), so restocks looked like they saved
+             -- and the COGS ledger simply stopped gaining rows on 2026-07-30. It read as an abandoned table —
+             -- Luke was about to delete it — when it was a live screen with a broken write.
+             -- (entry_id, product) is also the right key on its own terms: a restock writes one row PER LINE
+             -- under one entry id, so conflicting on entry_id alone would have collapsed every line into one.
+             ON CONFLICT (entry_id, product) WHERE entry_id IS NOT NULL
              DO UPDATE SET occurred_on=EXCLUDED.occurred_on, product=EXCLUDED.product, quantity=EXCLUDED.quantity,
                  paid_each=EXCLUDED.paid_each, paid_total=EXCLUDED.paid_total, market_each=EXCLUDED.market_each,
                  market_total=EXCLUDED.market_total, list_each_110=EXCLUDED.list_each_110, list_total_110=EXCLUDED.list_total_110
