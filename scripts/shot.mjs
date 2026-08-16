@@ -68,6 +68,33 @@ const send = (method, params = {}) => new Promise((res) => { const i = ++id; pen
 await send("Page.enable");
 // THE ONE THAT MATTERS: a real 375-wide viewport, at 2x so the sprites are judged at phone pixel density.
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: true });
+
+// SIGNED-IN PAGES. Most of the game is behind a session, and without this the rig can only ever shoot the
+// login redirect — which looks like a perfectly good screenshot of the wrong page. Set SHOT_COOKIE to a
+// buyer-session token and the shot happens as that member.
+//   SHOT_COOKIE=<token> node scripts/shot.mjs http://localhost:3000/marketplace/market out.png
+if (process.env.SHOT_COOKIE) {
+    await send("Network.enable");
+    await send("Network.setCookie", {
+        name: "wolfden-mkt-buyer-session", value: process.env.SHOT_COOKIE,
+        domain: new URL(url).hostname, path: "/",
+    });
+}
+
+// LAUNCH MODALS COVER EVERYTHING. Every new feature ships a full-screen "X is open" announcement that shows
+// once per browser, and a fresh headless profile is always a fresh browser — so the shot is of the modal, not
+// the page. Dismissing it with a click does not work reliably either: the CLICK below returns early when WAIT
+// already matches, and WAIT usually matches because the page IS rendered, underneath the modal.
+//
+// So the markers are seeded BEFORE any page script runs. Semicolon-separated keys, each set to "1":
+//   SHOT_SEEN="wolfden-dungeons-announce-v1;wolfden-howto-market" node scripts/shot.mjs …
+if (process.env.SHOT_SEEN) {
+    const keys = process.env.SHOT_SEEN.split(";").map((k) => k.trim()).filter(Boolean);
+    await send("Page.addScriptToEvaluateOnNewDocument", {
+        source: `try { ${keys.map((k) => `localStorage.setItem(${JSON.stringify(k)}, "1");`).join(" ")} } catch (e) {}`,
+    });
+}
+
 await send("Page.navigate", { url });
 await sleep(2600); // let the remote sprites actually arrive — a blank shot proves nothing
 

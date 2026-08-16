@@ -27,6 +27,9 @@ export const GAME_EXTRA_PATHS = [
     // the file did. The other unlisted /marketplace/* dirs are checkout, auth, vendor and admin surfaces,
     // which are correctly not part of the game shell.
     "/marketplace/jeweller",
+    // The Market — owner-gated, but it still has to be a KNOWN game path or the nav and the Pathfinder strip
+    // both vanish the moment you walk in, which is the exact trap the Jewelcutter fell into above.
+    "/marketplace/market",
 ];
 
 const ALL = [...GAME_NAV_PATHS, ...GAME_EXTRA_PATHS];

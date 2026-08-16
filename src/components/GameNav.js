@@ -142,6 +142,19 @@ export default function GameNav() {
         return () => { dead = true; };
     }, [pathname]);
 
+    // The Market, same contract as the Arena and the Mine: ask the server, never guess. A non-owner simply has
+    // no Market entry while it is still owner-gated.
+    const [market, setMarket] = useState(false);
+    const [marketStalls, setMarketStalls] = useState(0);
+    useEffect(() => {
+        let dead = false;
+        fetch("/api/marketplace/market", { cache: "no-store", credentials: "same-origin" })
+            .then((r) => r.json())
+            .then((d) => { if (!dead && d?.unlocked) { setMarket(true); setMarketStalls((d?.listings || []).filter((l) => !l.mine).length); } })
+            .catch(() => { /* no market, no menu entry */ });
+        return () => { dead = true; };
+    }, [pathname]);
+
     // The Jewelcutter, same contract as everything else under construction: ask the server, never guess. The
     // endpoint answers { unlocked: false } for anyone off the allow-list, so a non-owner simply has no bench in
     // their menu — and no jewels either, since the same predicate gates the drops.
@@ -209,7 +222,8 @@ export default function GameNav() {
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
-        ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : [])];
+        ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
+        ...(market ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
     // Measure what the strip has to sit under. The site header is sticky and its height moves with the
@@ -362,6 +376,8 @@ export default function GameNav() {
         // for other recipes, and badging those would point you at the chore instead of the payoff.
         // (not plural() — that would say "dishs")
         if (href === "/marketplace/cooking" && dishesReady > 0) return { badge: dishesReady, title: `${dishesReady} dish${dishesReady === 1 ? "" : "es"} you can cook` };
+        // OTHER PEOPLE'S stalls only. Badging your own would nag you about something you did on purpose.
+        if (href === "/marketplace/market" && marketStalls > 0) return { badge: marketStalls, title: `${plural(marketStalls, "stall")} open in the market` };
         return { badge: null, title: null };
     };
     const dotFor = (href) => href === "/marketplace/sailing" && sailAttn;
@@ -393,6 +409,7 @@ export default function GameNav() {
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
+            ...(market ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },

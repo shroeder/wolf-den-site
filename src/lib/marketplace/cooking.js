@@ -642,7 +642,10 @@ export function ingredientMeta(ref, sprites = {}) {
 }
 
 /** Every sprite the Kitchen needs, in one read: cooking art keyed by ref, plus the crop art from the town. */
-async function cookingSprites() {
+// Exported for the Market, which sells the same three kinds of goods and must draw them the same way. The
+// crop keys are prefixed `crop:` and fish resolve to a path rather than a row — quietly rebuilding that
+// mapping over there would be a second, slightly-wrong version of this map.
+export async function cookingSprites() {
     const [own, crops] = await Promise.all([
         db.query(`SELECT ref, url FROM mkt_cooking_sprite`).catch(() => []),
         db.query(`SELECT art_key, url FROM mkt_town_art WHERE art_key LIKE 'crop_%_ripe'`).catch(() => []),

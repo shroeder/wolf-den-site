@@ -114,6 +114,7 @@ export const GATED_BUILDINGS = [
     // WITHOUT it is shown to everybody. The Kitchen has none because the Kitchen is public now.
     { id: "delves", emoji: "🗝️", label: "Dungeons", href: "/marketplace/dungeons", x: 30 },
     { id: "arena", emoji: "⚔️", label: "The Arena", href: "/marketplace/arena", x: 34, gate: "owner" },
+    { id: "market", emoji: "🏪", label: "The Market", href: "/marketplace/market", x: 40, gate: "owner" },
 ];
 
 // Lay the street out evenly for however many buildings the viewer can actually see.
