@@ -108,6 +108,28 @@ for (const n of nodes) {
     }
 }
 
+// ── 5. DOES THE FLAG SURVIVE THE ALLOWLIST? ──────────────────────────────────────────────────────────────
+// treeAbilities() rebuilds each active as a NEW object naming the fields it keeps. A flag the tree sets and
+// that list forgets is dropped before the engine ever sees it — silently, with the card still promising it.
+// That is exactly how Channel stopped setting anything alight, Rimeshatter stopped being able to freeze, and
+// Emberbrand — a rend that must BURN — fell through to the default and bled instead. Same shape as the foe
+// allowlist that lost The Long Road its rung.
+const FLAGS = ["burns", "bleeds", "freezes"];
+const allowStart = classes.indexOf("export function treeAbilities");
+// COMMENTS STRIPPED FIRST. The note explaining this very check names all three flags, so a plain substring
+// search found them in the prose and reported a pass with the code removed — a checker that cannot fail.
+const allow = (allowStart < 0 ? "" : classes.slice(allowStart, allowStart + 2500))
+    .split(String.fromCharCode(10)).filter((x) => !x.trim().startsWith("//")).join(" ");
+for (const f of FLAGS) {
+    // NOT a template literal with  in it: inside backticks that is a BACKSPACE character, not a
+    // word boundary, so the test never matched and this whole check could never fire.
+    const usedByTree = classes.includes(f + ": true");
+    const usedByEngine = engine.includes("ability." + f);
+    if (usedByTree && usedByEngine && !allow.includes(f)) {
+        problems.push(`FLAG DROPPED      treeAbilities() never copies "${f}" — the tree sets it and the engine reads it, so it is thrown away in between`);
+    }
+}
+
 const passives = nodes.filter((n) => n.kind === "passive").length;
 const actives = nodes.length - passives;
 if (problems.length) {

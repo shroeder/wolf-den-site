@@ -391,7 +391,22 @@ export function treeAbilities(classId, taken = {}, element = null) {
             cooldown: n.cd || 3,
             hits: n.hits || 1,
             power: n.power || 1,
-            element,
+            // ── WHAT THE MOVE LEAVES BEHIND ──────────────────────────────────────────────────────────
+            // THIS OBJECT IS AN ALLOWLIST and anything not named here is dropped before the engine ever
+            // sees it. `burns`, `bleeds` and `freezes` were not named, so every elemental identity shipped
+            // today was silently thrown away at this line: Channel set nothing alight, Rimeshatter could
+            // never freeze anybody, Rampage drew no blood, and Emberbrand — a rend that is supposed to
+            // BURN — fell through to the default and bled instead.
+            //
+            // Same failure as the foe object further along, which is where The Long Road lost `ladder`,
+            // `rung` and `reward` and paid nobody for a hundred fights. An allowlist is the right shape;
+            // forgetting to widen it when the data grows is the trap that comes with it.
+            burns: Boolean(n.burns),
+            bleeds: Boolean(n.bleeds),
+            freezes: Boolean(n.freezes),
+            // The node's OWN element wins where it states one — a fire spell is fire whatever the caster's
+            // gear is attuned to — and everything else still takes the kit's affinity.
+            element: n.element || element,
             rarity: "epic",
             rank: 2,
             defensive: n.ability === "ward" || n.ability === "riposte",

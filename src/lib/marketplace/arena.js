@@ -1590,12 +1590,16 @@ export async function fightRound(buyerId, opts = {}) {
             // AN ELEMENTAL SPELL TRADES THE PIERCE FOR ITS STATUS. Luke: "not redundant guard spells."
             // A gear signature spell is still defined by cutting guard; the Runecaller's fire and ice are
             // defined by what they LEAVE BEHIND, so they do not also cut it. Spell damage still feeds both.
-            if (ability.kind === "spell" && !ability.burns && !ability.freezes) {
-                // Magic cuts guard, paid for in raw power. It used to also re-roll the element clash off the
-                // spell's own affinity rather than the bout's; with the wheel gone there is nothing to re-roll,
-                // and what makes a spell a spell is the pierce.
-                pierce = Math.max(0.2, 0.6 - (P.pierce || 0));
+            if (ability.kind === "spell") {
+                // SPELL DAMAGE FEEDS EVERY SPELL. Tucking this inside the non-elemental branch took
+                // Attunement away from Channel and Rimeshatter — the exact two cards that now advertise
+                // "Spell damage applies". The card would have been lying again, in the other direction.
                 power *= 0.88 * (1 + (P.spellPower || 0));
+                // Only the guard-cutting kind trades power for pierce; an elemental spell bought its status
+                // effect with that instead.
+                if (!ability.burns && !ability.freezes) {
+                    pierce = Math.max(0.2, 0.6 - (P.pierce || 0));
+                }
             }
             // ── THE FIVE THAT CHANGE THE SHAPE OF A BOUT ─────────────────────────────────────────────────
             // Nine archetypes used to collapse into "one big hit", which is why a four-piece kit read as the
