@@ -656,7 +656,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             desc: <>Draws trouble — <b>+1.5%</b> chance of a marine <b>encounter</b> at your voyage&apos;s midpoint, per level.</>,
             effLabel: "Encounter chance", now: `${state.fortune?.encounterNow ?? 0}%`, next: `${state.fortune?.encounterNext ?? 0}%` },
         { action: "upgrade_rarity", art: "rarity", icon: "💎", name: "Rarity", data: state.rarity,
-            desc: <>Better loot — a chance your forged chest is bumped up a tier.</>,
+            desc: <>Better loot — a chance the chest buried on your island is <b>a tier better</b>.</>,
             effLabel: "Chest upgrade", now: `${state.rarity?.pctNow ?? 0}%`, next: `${state.rarity?.pctNext ?? 0}%` },
         { action: "upgrade_luck", art: "find", icon: "👋", name: "Luck", data: state.luck,
             desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,

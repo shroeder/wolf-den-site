@@ -408,7 +408,7 @@ const DIG_COLS = 4;
 const DIG_ROWS = 4;
 const DIG_MAX_DEPTH = 3;      // layers of dirt over every tile — you chip straight down through them
 const BASE_STAMINA = 12;      // digs per voyage (flat; extend mid-dig with "buy more digs")
-const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance that a forged chest is bumped up a tier
+const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance the chest BURIED on the island is a tier better
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 300;  // base cost of the FIRST refill; DOUBLES per refill bought this dig (board.refills)
 const digRefillCost = (n = 0) => DIG_REFILL_COST * Math.pow(2, Math.max(0, n));
@@ -448,7 +448,12 @@ const TOOL_PROC_PER_LEVEL = 0.007; // … +0.7%/level → 5% when maxed
 const TOOL_MAX_LEVEL = 5;
 const toolProcChance = (lvl = 0) => TOOL_PROC_BASE + Math.min(TOOL_MAX_LEVEL, Math.max(0, lvl)) * TOOL_PROC_PER_LEVEL;
 const toolUpgradeCost = (lvl = 0) => Math.round(250 * Math.pow(2.2, Math.max(0, lvl))); // 250 → 550 → 1210 → 2662 → 5856
-const CHEST_POINT_WEIGHT = (tierKey) => Math.min(4, Math.max(1, CHEST_ORDER.indexOf(tierKey) + 1)); // tier 1–4 → 1–4 pts
+// Tier-weighted chest points, 1-4. This used to be paid by FORGING a chest, and when forging went it
+// stopped being written by anything at all — which quietly froze the DIGGERS LEADERBOARD it ranks.
+// Kaishiern spotted the gap from the outside ("the boat upgrades need to be adjusted"). A chest you
+// dug up now scores exactly what a forged one did, so nobody's standing moved and the board is
+// climbable again.
+const CHEST_POINT_WEIGHT = (tierKey) => Math.min(4, Math.max(1, CHEST_ORDER.indexOf(tierKey) + 1));
 const unlockedTools = (points = 0) => DIG_TOOLS.filter((t) => points >= t.unlockPoints);
 const DIG_TRACK_COL = { stamina: "dig_stamina_level", pierce: "dig_pierce_level", strike: "dig_strike_level", efficient: "dig_efficient_level", detonator: "dig_detonator_level" };
 function digTrackView(row, t) {
@@ -3570,7 +3575,12 @@ async function finishDig(buyerId, board) {
     const fullyUnearthed = total > 0 && uncovered >= total;
     const exposure = total > 0 ? uncovered / total : 0;
     const chestWon = fullyUnearthed ? chestTier : null;
-    if (chestWon) await addChests(buyerId, { [chestWon]: 1 }, { source: "sail_dig", meta: { tier: chestWon } }).catch(() => {});
+    if (chestWon) {
+        await addChests(buyerId, { [chestWon]: 1 }, { source: "sail_dig", meta: { tier: chestWon } }).catch(() => {});
+        // The diggers board ranks on this. Nothing wrote it between forging being removed and here.
+        await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`,
+            [buyerId, CHEST_POINT_WEIGHT(chestWon)]).catch(() => {});
+    }
     // Trove (sea affinity), Lucky Lure and Maw (the Leviathan's perk) used to swell the shard count. There is
     // no shard count any more, so they swell the CONSOLATION instead — the only number a dig still pays by
     // degree. Left on the chest itself they would have had nothing to multiply and would have gone silently
