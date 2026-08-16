@@ -272,11 +272,37 @@ export function rewardLabel(r, art = {}) {
  * readable as a promise. `lift` (the Heat track + the Hearth Cat) nudges it up, and there's a single-rung
  * wobble so two identical runs aren't identical, but a good cook is never dumped on the bottom rung by luck.
  */
+// ── THE TOP OF THE LADDER IS A ROLL, NOT A DESTINATION ───────────────────────────────────────────────────────
+// Quality used to map STRAIGHT onto the rung, so a perfect cook paid the top prize every single time. The
+// trouble with that is the minigame is learnable: over three days 87% of all cooks landed in the top two
+// quality bands, because once you have the timing you simply have it. At ~107 cooks a day that is ninety-odd
+// jackpot payouts a day, which is how mythic chests, spins and new recipes became something you FARM.
+//
+// Luke: "cooking needs to get solved. its just far too rewarding. I really love cooking though and how
+// rewarding it is." Both of those have to survive, so this does not touch the minigame, the XP, or the middle
+// of the ladder. A good cook still pays gold, parts, seeds, treats — every rung it always did.
+//
+// What changes is that the JACKPOT BAND — the top rungs, where the mythic chest and the spins live — becomes
+// a CHANCE you become eligible for rather than a thing you are owed. Cook badly and you cannot reach it at
+// all; cook perfectly and you are rolling for it. Skill decides whether you are in the running, which is what
+// makes it feel earned, and the dice decide whether it lands, which is what stops it being a farm.
+//
+// Deliberately NOT a daily cap and NOT a cooldown: both punish the person who likes the feature most, and
+// this game does not do that. The rate comes down about fivefold; the moment stays a moment.
+const JACKPOT_RUNGS = 2;        // how many rungs off the top are the real prizes
+const JACKPOT_CHANCE = 0.22;    // ...and how often a cook good enough to reach them actually does
+
 export function rungFor(quality, n, lift = 0) {
     const q = Math.max(0, Math.min(1, Number(quality) || 0));
     const base = q * (n - 1) + lift * (n - 1);
     const wobble = Math.random() < 0.25 ? (Math.random() < 0.5 ? -1 : 1) : 0;
-    return Math.max(0, Math.min(n - 1, Math.round(base) + wobble));
+    const rung = Math.max(0, Math.min(n - 1, Math.round(base) + wobble));
+    // A short ladder has no room for a jackpot band; leave those exactly as they were.
+    const floorOfBand = n - 1 - JACKPOT_RUNGS;
+    if (n <= JACKPOT_RUNGS + 1 || rung <= floorOfBand) return rung;
+    // Earned the right to roll. Missing it drops you to the best rung BELOW the band — still a good cook,
+    // still a real reward, just not the one everybody was farming.
+    return Math.random() < JACKPOT_CHANCE ? rung : floorOfBand;
 }
 // ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
 // The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
