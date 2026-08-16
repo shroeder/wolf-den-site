@@ -668,7 +668,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const digTracks = [
         { track: "stamina", art: "stamina", icon: "⛏️", name: "Stamina", data: dg.stamina, desc: <>More digs each trip — <b>+1</b> per level.</>, effLabel: "Digs / trip", now: dg.stamina?.digsNow, next: dg.stamina?.digsNext },
         { track: "pierce", art: "pierce", icon: "🪨", name: "Pierce", data: dg.pierce, desc: <>Chance a dig breaks through <b>every layer</b> of a tile at once.</>, effLabel: "Pierce chance", now: pct(dg.pierce?.valueNow), next: pct(dg.pierce?.valueNext) },
-        { track: "strike", art: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> fragment.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
+        { track: "strike", art: "strike", icon: "✨", name: "Strike", data: dg.strike, desc: <>Chance a dig <b>strikes a lucky bonus</b> — extra doubloons.</>, effLabel: "Strike chance", now: pct(dg.strike?.valueNow), next: pct(dg.strike?.valueNext) },
         { track: "efficient", art: "tinker", icon: "🔧", name: "Tinker", data: dg.efficient, desc: <>Adds to <b>every tool&apos;s proc chance</b> while you dig.</>, effLabel: "Tool proc bonus", now: pct(dg.efficient?.valueNow), next: pct(dg.efficient?.valueNext) },
         { track: "detonator", art: "detonator", icon: "💥", name: "Detonator", data: dg.detonator, desc: <>Chance a dig <b>spawns an explosion</b> (clears a 3×3, one layer).</>, effLabel: "Explosion chance", now: pct(dg.detonator?.valueNow), next: pct(dg.detonator?.valueNext) },
     ];

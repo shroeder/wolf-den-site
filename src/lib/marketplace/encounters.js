@@ -1,4 +1,5 @@
 import { partForTier } from "@/lib/marketplace/forge-parts.js";
+import { shardCoin } from "@/lib/marketplace/dig-values.js";
 
 // ── WHAT YOU MEET AT SEA ─────────────────────────────────────────────────────────────────────────────────────
 //
@@ -165,13 +166,13 @@ export const ENCOUNTER_MARKS = [
 // The same list the payout walks, turned into something the screen can draw. Both sides read `enc.loot`, so the
 // spoils you are shown before you commit and the spoils you are handed after cannot drift apart — which is the
 // only reason to show them at all. No words beyond a name and a count: the sprite says what it is.
-const FRAG_ART = (t) => `/images/sailing/fragment-${t}.png`;
 const TITLE = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function lootPreview(loot = [], chestArt = {}, consumables = {}) {
     return loot.map((l) => {
         if (l.kind === "doubloons") return { kind: "doubloons", n: l.n, name: "Doubloons", art: "/images/sailing/doubloon.png" };
-        if (l.kind === "fragment") return { kind: "fragment", n: l.n, name: `${TITLE(l.tier)} fragment`, art: FRAG_ART(l.tier) };
+        // Pays doubloons now (see grantSeaSpoils in sailing.js) — the preview has to say what actually lands.
+        if (l.kind === "fragment") return { kind: "doubloons", n: shardCoin(l.tier, l.n), name: "doubloons", art: "/images/sailing/doubloon.png" };
         // Chest sprites are generated blobs, not files on disk — the caller already holds the map.
         if (l.kind === "chest") return { kind: "chest", n: 1, tier: l.tier, name: `${TITLE(l.tier)} chest`, art: chestArt[l.tier] || null };
         if (l.kind === "parts") { const p = partForTier(l.tier); return { kind: "parts", n: l.n, name: p?.name || `Tier ${l.tier}`, art: p?.sprite || null, color: p?.color }; }

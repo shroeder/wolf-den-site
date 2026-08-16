@@ -9,7 +9,7 @@ const HOOKS = [
     { img: "/images/sailing/boat-tier10-leviathan.png", title: "Captain your ship", body: "Upgrade from a wooden dinghy to a legendary Leviathan." },
     { img: "/images/sailing/dig-chest.png", title: "Dig for treasure", body: "Excavate buried chests, relics and gold on every voyage." },
     { img: "/images/sailing/enc-kraken.png", title: "Raid & survive", body: "Battle rival ships and sea monsters for loot." },
-    { img: "/images/sailing/fragment-gold.png", title: "Earn real rewards", body: "Level up for store credit, packs and perks at The Wolf Den." },
+    { img: "/images/sailing/doubloon.png", title: "Earn real rewards", body: "Level up for store credit, packs and perks at The Wolf Den." },
 ];
 
 export default function SailingLanding() {

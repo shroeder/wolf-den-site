@@ -72,7 +72,7 @@ const SAIL_DESC = {
 const DIG_DESC = {
     stamina: "More digs each trip — one more per level.",
     pierce: "Chance a dig breaks through every layer of a tile at once.",
-    strike: "Chance a dig strikes a lucky bonus fragment.",
+    strike: "Chance a dig strikes a lucky bonus — doubloons on top of whatever you unearth.",
     efficient: "Adds to every tool's proc chance while you dig.",
     detonator: "Chance a dig spawns an explosion, clearing a 3x3 one layer deep.",
 };
@@ -106,9 +106,9 @@ const RECORD_HINT = {
     "Waves ridden": "Passing sailors greeted at sea for XP and coin.",
     "Wind recharges": "Times you paid to refill the wind and sail again the same day.",
     "Boat XP": "Experience the boat itself has earned — what raises its form.",
-    "Chests forged": "Chests assembled out of the fragments you dug up.",
+    "Chests forged": "Chests assembled from dug-up fragments, back when chests were forged rather than dug up whole.",
     "Chest points": "Chest value banked, weighted by tier. This is what unlocks the dig tools.",
-    "Fragments held": "Dug-up pieces still waiting to be forged into a chest.",
+    "Fragments held": "Shards left over when fragments were retired. They were paid out as chests and doubloons.",
     "Line recharges": "Times you paid for more casts after the day's ran out.",
     "Best combo": "The longest unbroken run of good swings in a single descent.",
     "Best read streak": "The longest run of correctly read seams while surveying.",
@@ -165,8 +165,9 @@ const ABOUT = {
         href: "/marketplace/sailing", cta: "Set sail",
     },
     digging: {
-        what: "A patch of sand uncovered one tile at a time, with a limited number of digs per trip. What comes "
-            + "up are fragments; enough of one kind forges a whole chest back at the docks.",
+        what: "A patch of sand uncovered one tile at a time, with a limited number of digs per trip. There is a "
+            + "real chest down there — uncover all of it and it is yours, at whatever tier was buried. Run out of "
+            + "light part-way and you keep doubloons for the dirt you shifted.",
         href: "/marketplace/sailing", cta: "Go and dig",
     },
     fishing: {
@@ -277,9 +278,11 @@ const WALLS = [
             tool("Wide charge", "dig_tool_levels.wide", 3, { desc: "A charge that clears wider — a bigger patch in one blast." }),
         ],
         records: [
+            // Both of these are now HISTORICAL — nothing increments them since chests became something you
+            // dig up whole. Left on the wall on purpose: they are a record of what people did, and deleting a
+            // stat quietly rewrites everyone's history. The copy above says so rather than implying they are live.
             rec("Chests forged", "chests_forged", { rank: true }),
             rec("Chest points", "chest_points", { rank: true }),
-            rec("Fragments held", "fragments"),
         ],
     },
     {

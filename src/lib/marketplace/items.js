@@ -814,7 +814,7 @@ export const SEA_META = {
     plunder: { label: "Plunder", icon: "⚓", desc: "A fatter purse from every raid you win — up to +50%." },
     bounty: { label: "Bounty", icon: "💰", desc: "More gold from raid wins and the Gold Merchant." },
     dredge: { label: "Dredge", icon: "⛏️", desc: "Higher chance your dig tools proc while excavating." },
-    trove: { label: "Trove", icon: "🔱", desc: "Dig up more treasure fragments per excavation." },
+    trove: { label: "Trove", icon: "🔱", desc: "A chest you run out of light on pays more doubloons." },
     tailwind: { label: "Tailwind", icon: "🌬️", desc: "Faster voyages, and more sailors to greet each day." },
     angling: { label: "Angling", icon: "🎣", desc: "More casts a day, and rarer fish on the line." },
 };

@@ -43,7 +43,10 @@
 const G = (n) => ({ kind: "gold", n, worth: Math.round(n / 3), label: `${n.toLocaleString()} gold` });
 const CHEST = (tier, worth, label) => ({ kind: "chest", tier, worth, label });
 const PARTS = (tier, n, worth, label) => ({ kind: "parts", tier, n, worth, label });
-const FRAG = (tier, n, worth, label) => ({ kind: "fragment", tier, n, worth, label });
+// Crates used to roll CHEST FRAGMENTS. Fragments are gone — you dig a chest up whole now — so these rows
+// pay DOUBLOONS. Deliberately not laurels: the crate is bought WITH laurels, and a prize that hands back
+// the currency you paid is a wash dressed up as a reward.
+const DUB = (n, worth, label) => ({ kind: "doubloons", n, worth, label });
 const CONS = (id, worth, label) => ({ kind: "consumable", consumable: id, n: 1, worth, label });
 // Gem rows used to carry a STAND-IN for members who could not reach the Jewelcutter while it was gated —
 // filtering them out instead would have handed those members a different table at the same price, and because
@@ -63,7 +66,7 @@ export const CRATES = [
             { w: 24, ...G(900) },
             { w: 16, ...CHEST("iron", 340, "Iron Chest") },
             { w: 14, ...PARTS(2, 6, 240, "Iron Filings ×6") },
-            { w: 12, ...FRAG("iron", 5, 250, "Iron Fragments ×5") },
+            { w: 12, ...DUB(30, 250, "30 Doubloons") },
             { w: 10, ...CONS("scroll_wisdom", 260, "Tome of Wisdom") },
             { w: 9, ...PARTS(3, 3, 280, "Tempered Steel ×3") },
             { w: 7, ...CHEST("wooden", 130, "Wooden Chest") },
@@ -82,7 +85,7 @@ export const CRATES = [
             { w: 20, ...G(3000) },
             { w: 16, ...CHEST("gold", 900, "Gold Chest") },
             { w: 14, ...PARTS(4, 3, 840, "Mythril Dust ×3") },
-            { w: 12, ...FRAG("gold", 6, 760, "Gold Fragments ×6") },
+            { w: 12, ...DUB(95, 760, "95 Doubloons") },
             { w: 10, ...CONS("scroll_ancient", 900, "Ancient Codex") },
             { w: 9, ...GEM(2, 520, "A Flawed Jewel") },
             { w: 7, ...CONS("forge_enchant_scroll", 1100, "Enchantment Scroll") },
@@ -102,7 +105,7 @@ export const CRATES = [
             { w: 17, ...G(9000) },
             { w: 14, ...PARTS(5, 3, 2940, "Emberheart Shard ×3") },
             { w: 12, ...GEM(3, 1150, "A Polished Jewel") },
-            { w: 11, ...FRAG("mythic", 6, 2460, "Mythic Fragments ×6") },
+            { w: 11, ...DUB(300, 2460, "300 Doubloons") },
             { w: 9, ...CONS("forge_enchant_scroll", 1100, "Enchantment Scroll") },
             { w: 8, ...CHEST("gold", 1800, "Gold Chest ×2"), n: 2 },
             { w: 5, ...PARTS(5, 5, 4900, "Emberheart Shard ×5") },
@@ -133,7 +136,7 @@ export function rowArt(row, { chests = {}, consumables = {}, parts = {} } = {}) 
     if (row.kind === "chest") { const v = chests[row.tier]; return (typeof v === "string" ? v : v?.url) || null; }
     if (row.kind === "consumable") return consumables[row.consumable] || null;
     if (row.kind === "parts") return parts[row.partTier] || null;
-    if (row.kind === "fragment") return `/images/sailing/fragment-${row.tier}.png`;
+    if (row.kind === "doubloons") return "/images/sailing/doubloon.png";
     if (row.kind === "gem") return `/images/gems/ruby_t${row.gemTier}.png`;
     if (row.kind === "gold") return "/images/ui/coin.png";
     return null;

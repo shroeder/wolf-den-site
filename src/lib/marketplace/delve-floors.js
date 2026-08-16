@@ -34,6 +34,9 @@ import { equippedPowers, oneIn } from "@/lib/marketplace/ascension-powers.js";
 // The rolls live on the run but are NEVER sent to the client (publicRun exposes `awaiting`, which is the public
 // half; the weighted tables sit on `run.rolls`). Rolling on the server at resolve time is also what makes the
 // reload button worthless.
+// What a banked chest shard is worth now that chests are dug up whole rather than forged.
+const DELVE_SHARD_DOUBLOONS = 3;
+
 export async function offerChoice(ctx, run, d, floor, action, choice) {
     const { buyerId, saveRun, hurt, bank, finishRun, settle, state } = ctx;
     const ev = floor.event;
@@ -447,10 +450,11 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
     }
     if (run.banked.frags > 0) {
         // Banked chest shards used to fuse into a chest. Chests come only from digging now, so a run pays
-        // coin for them instead — 3 doubloons a shard, the wooden rate used everywhere else.
+        // coin for them instead. ONE rate, named once: the wrap card below reads the same constant, and a
+        // payout that disagrees with the card it prints is the classic copied-balance-number bug.
         try {
             const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
-            await grantDoubloons(buyerId, run.banked.frags * 3);
+            await grantDoubloons(buyerId, run.banked.frags * DELVE_SHARD_DOUBLOONS);
         } catch { /* best-effort */ }
     }
 
@@ -548,7 +552,8 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
         finished: {
             died, cleared, fled, floor: run.floor, gold: totalGold, xp: totalXp, bonusGold, bonusXp, chests,
             parts: Object.entries(parts).map(([tier, n]) => ({ tier: Number(tier), n, name: partName(Number(tier)), sprite: partSprite(Number(tier)) })),
-            frags: run.banked.frags || 0,
+            // The card shows the COIN, because coin is what actually landed in the hold.
+            doubloons: (run.banked.frags || 0) * DELVE_SHARD_DOUBLOONS,
             gear: gearOut,
             gem: gemOut,
             chestArt,

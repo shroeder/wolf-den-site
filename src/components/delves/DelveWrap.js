@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 const REWARD_ART = {
     gold: "/images/spin/prizes/coins-big.png",
     xp: "/images/spin/prizes/xp-orb.png",
-    frags: "/images/sailing/fragment-wooden.png",
+    doubloons: "/images/sailing/doubloon.png",
 };
 const CHEST_FALLBACK = {
     wooden: "/images/spin/prizes/chest-wood.png",
@@ -50,7 +50,7 @@ function ding(rarity) {
 }
 
 export default function DelveWrap({ finished, onClose }) {
-    const { cleared, floor, gold, xp, bonusGold, bonusXp, chests = [], parts = [], frags = 0, gear = [], chestArt = {} } = finished;
+    const { cleared, floor, gold, xp, bonusGold, bonusXp, chests = [], parts = [], doubloons = 0, gear = [], chestArt = {} } = finished;
     const tone = cleared ? "is-clear" : "is-dead";
     const title = cleared ? "The way is clear" : "You fell";
     const line = cleared
@@ -108,11 +108,11 @@ export default function DelveWrap({ finished, onClose }) {
                                 <b>{p.n}</b><em>{p.name}</em>
                             </span>
                         ))}
-                        {frags ? (
+                        {doubloons ? (
                             <span className="dlw-tile">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={REWARD_ART.frags} alt="" draggable="false" />
-                                <b>{frags}</b><em>shards</em>
+                                <img src={REWARD_ART.doubloons} alt="" draggable="false" />
+                                <b>{doubloons}</b><em>doubloons</em>
                             </span>
                         ) : null}
                     </div>

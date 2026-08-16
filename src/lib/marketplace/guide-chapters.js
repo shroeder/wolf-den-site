@@ -88,7 +88,7 @@ export const GUIDE_CHAPTERS = [
         steps: [
             { key: "sea_fish", label: "Land a fish", why: "Casting is free and quick. Fish pay gold, and the rare ones are worth putting on your profile.", href: "/marketplace/fishing", cta: "Go fishing", gold: 200, events: ["fish_caught"] },
             { key: "sea_sail", label: "Send the boat out", why: "A voyage runs for hours in the background and comes back loaded. Start one before you close the tab and it works while you don't.", href: "/marketplace/sailing", cta: "Set sail", gold: 250, events: ["sail_voyage"] },
-            { key: "sea_dig", label: "Dig for treasure", why: "Digging uncovers chest fragments tile by tile. Collect enough of one kind and you forge a whole chest at the docks.", href: "/marketplace/sailing", cta: "Dig", gold: 250, events: ["sail_dig"] },
+            { key: "sea_dig", label: "Dig for treasure", why: "There is a real treasure chest buried in the sand. Uncover every tile of it and the chest is yours, at whatever tier was down there — this is the only place chests come from.", href: "/marketplace/sailing", cta: "Dig", gold: 250, events: ["sail_dig"] },
         ],
         reward: { gold: 600, chest: "gold" },
     },

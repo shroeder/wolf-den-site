@@ -31,7 +31,7 @@ export const UTIL_AFFIXES = {
     raid_fury: { label: "Raid Fury", icon: "⚔️", per: 4, cap: 20, bucket: "raidDmg", blurb: "town-raid damage" },
     // ⛵ SAILING — granted as sea-affinity POINTS, converted to real effects by the sailing system
     dig_dredge: { label: "Dredge", icon: "⛏️", per: 1, cap: 5, bucket: "sea", stat: "dredge", blurb: "dig-tool procs" },
-    sea_trove: { label: "Trove", icon: "💎", per: 1, cap: 5, bucket: "sea", stat: "trove", blurb: "more dig fragments" },
+    sea_trove: { label: "Trove", icon: "💎", per: 1, cap: 5, bucket: "sea", stat: "trove", blurb: "more coin from a part-dug chest" },
     sea_wind: { label: "Tailwind", icon: "🌬️", per: 1, cap: 5, bucket: "sea", stat: "tailwind", blurb: "faster voyages + waves" },
     // ⚒️ FORGE — stacks on the Transmuter's Boon double-combine chance
     forge_yield: { label: "Forge Yield", icon: "⚗️", per: 1, cap: 5, bucket: "forgeYield", blurb: "double-combine chance" },

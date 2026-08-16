@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { addChests, CHEST_TIERS, CHEST_ORDER } from "@/lib/marketplace/chests.js";
 import { getChestArt } from "@/lib/marketplace/chest-art.js";
+import { DIG_CONSOLATION, shardCoin } from "@/lib/marketplace/dig-values.js";
 import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel } from "@/lib/marketplace/pet-sprite.js";
 import { awardXp, levelForXp } from "@/lib/marketplace/xp.js";
 import { grantConsumable, CONSUMABLES } from "@/lib/marketplace/consumables.js";
@@ -60,10 +61,9 @@ import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TR
 // few percent of where the economy already sits, PROVIDED the side-sources stop paying chest-currency. Those
 // two halves have to ship together or this is a large, quiet inflation.
 const DIG_DOUBLOONS_PER_STRIKE = 8;   // a lucky Strike used to be a bonus shard; it is coin now
-// What a chest you FAILED to finish is worth, per tier, at full exposure — scaled by how much you actually
-// got uncovered. Deliberately well under the chest itself: this is the consolation for running out of
-// stamina, not an alternative way to farm. A ship battle pays ~12, for scale.
-const DIG_CONSOLATION = { wooden: 18, iron: 30, gold: 50, mythic: 80, ascendant: 120, eternal: 180, celestial: 260, primordial: 360 };
+// What a chest you FAILED to finish is worth, per tier — scaled by how much you actually got uncovered.
+// Deliberately well under the chest itself: this is the consolation for running out of stamina, not an
+// alternative way to farm. Lives in dig-values.js because sea encounters price off the same table.
 // A dug shard's tier is rolled from the chosen voyage DURATION (longer = better), never above the cap for now.
 // wooden = common · iron = pretty rare · gold (the cap) = very rare. Higher tiers exist but don't drop yet.
 const FRAGMENT_TIER_CAP = "mythic"; // long trips reach one step past gold; short/standard stay lower
@@ -1412,7 +1412,7 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
             } else if (l.kind === "fragment") {
                 // Was a chest shard; pays coin now, scaled by the tier it would have been so a rich encounter
                 // still reads richer than a poor one.
-                const coin = Math.max(1, Math.round(((DIG_CONSOLATION[l.tier || "wooden"] || 18) / 6) * (l.n || 1)));
+                const coin = shardCoin(l.tier || "wooden", l.n || 1);
                 await grantDoubloons(buyerId, coin).catch(() => {});
                 spoils.push({ kind: "doubloons", n: coin });
             } else if (l.kind === "chest") {
@@ -2305,7 +2305,7 @@ async function payFleetReward(buyerId, reward) {
     if (reward.fragments) {
         // Was a chest shard, tiered by how hard the fight was. Pays coin now on the same curve, so sinking the
         // flagship still reads richer than sinking a fishing boat.
-        const coin = Math.max(1, Math.round(((DIG_CONSOLATION[reward.fragTier || "wooden"] || 18) / 6) * reward.fragments));
+        const coin = shardCoin(reward.fragTier || "wooden", reward.fragments);
         await grantDoubloons(buyerId, coin).catch(() => {});
         out.push({ kind: "doubloons", n: coin });
     }

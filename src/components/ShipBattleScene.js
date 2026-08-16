@@ -11,6 +11,9 @@ import { hitChance, evasionOf, ammoById, expectedDamage } from "@/lib/marketplac
 // reward. Only the kinds with art on disk appear here — anything else falls through to text, which is correct
 // rather than a gap (see public/images/ui).
 const REWARD_ART = {
+    // Battles pay doubloons where they used to pay chest shards, and the map had no entry for them — so the
+    // one reward that got MORE common after the change would have rendered with no art at all.
+    doubloons: "/images/sailing/doubloon.png",
     gold: "/images/ui/coin.png",
     goldLost: "/images/ui/coin.png",
     chest: "/images/ui/chest.png",
@@ -19,10 +22,9 @@ const REWARD_ART = {
     item: "/images/ui/gear.png",
     loot: "/images/ui/gear.png",
 };
-const FRAG_ART = (tier) => `/images/sailing/fragment-${tier || "wooden"}.png`;
 // A spoil that carries its OWN art uses it — a consumable is a specific object, not a category, and the card
 // should show the vial you were handed rather than a generic badge for "consumable".
-const rewardArt = (r) => r.sprite || (r.kind === "fragments" ? FRAG_ART(r.tier) : REWARD_ART[r.kind] || null);
+const rewardArt = (r) => r.sprite || REWARD_ART[r.kind] || null;
 
 const TIER_WORD = { wooden: "Wooden", iron: "Iron", gold: "Gold", mythic: "Mythic", ascendant: "Ascendant", eternal: "Eternal" };
 const cap1 = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1) : "");
@@ -32,7 +34,6 @@ function rewardText(r) {
         case "gold": return `+${r.n.toLocaleString()} gold`;
         case "goldLost": return `−${r.n.toLocaleString()} gold`;
         case "xp": return `+${r.n} XP`;
-        case "fragments": return `+${r.n} ${TIER_WORD[r.tier] || "Wooden"} fragment${r.n === 1 ? "" : "s"}`;
         case "parts": return `+${r.n} tier-${r.tier} parts`;
         case "chest": return `${TIER_WORD[r.tier] || cap1(r.tier)} Chest`;
         case "loot": return `${r.name} · ${cap1(r.rarity)}`;

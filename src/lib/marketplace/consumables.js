@@ -65,7 +65,7 @@ export const CONSUMABLES = {
     // your next voyage / dig / raid (see the sail_* handlers in useConsumable).
     sail_war_drum: { name: "War Drum", emoji: "🥁", kind: "relic", price: null, desc: "Beat the drums to regain one spent daily raid.", effect: { type: "sail_raid" } },
     sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next voyage is guaranteed to meet the Gold Merchant.", effect: { type: "sail_merchant" } },
-    sail_lucky_lure: { name: "Lucky Lure", emoji: "🎣", kind: "relic", price: null, desc: "Your next dig unearths +50% more fragments.", effect: { type: "sail_lure" } },
+    sail_lucky_lure: { name: "Lucky Lure", emoji: "🎣", kind: "relic", price: null, desc: "Your next dig pays +50% more doubloons for a chest you don't finish.", effect: { type: "sail_lure" } },
     sail_storm_bottle: { name: "Storm in a Bottle", emoji: "🌪️", kind: "relic", price: null, desc: "Uncork mid-voyage to HALVE the remaining sail time.", effect: { type: "sail_storm" } },
     sail_kraken_bait: { name: "Kraken Bait", emoji: "🦑", kind: "relic", price: null, desc: "Your next voyage is guaranteed a marine encounter.", effect: { type: "sail_encounter" } },
     // SPIN charges — feed the daily wheel. Tokens = extra spins; a rewind refreshes your free daily spin.
@@ -88,7 +88,7 @@ export const CONSUMABLES = {
     // all drop-only). Tailwind Charm speeds the current voyage; Prospector's Charm is a buyable dig-luck;
     // Raiding Horn a buyable raid restore.
     sail_tailwind_charm: { name: "Tailwind Charm", emoji: "🌬️", kind: "sail", desc: "Summon a gust — shave 2 hours off your current voyage.", price: 700, effect: { type: "sail_tailwind", hours: 2 } },
-    sail_prospectors_charm: { name: "Prospector's Charm", emoji: "⛏️", kind: "sail", desc: "Your next dig unearths +50% more fragments.", price: 600, effect: { type: "sail_lure" } },
+    sail_prospectors_charm: { name: "Prospector's Charm", emoji: "⛏️", kind: "sail", desc: "Your next dig pays +50% more doubloons for a chest you don't finish.", price: 600, effect: { type: "sail_lure" } },
     sail_raiding_horn: { name: "Raiding Horn", emoji: "📯", kind: "sail", desc: "Sound the horn to regain one spent daily raid.", price: 900, effect: { type: "sail_raid" } },
 };
 

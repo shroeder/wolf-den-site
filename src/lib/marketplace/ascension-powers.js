@@ -71,7 +71,7 @@ export const ASCENSION_POWERS = {
     lantern: { item: "eternal_eternal_shroud", name: "The Lantern", tier: "eternal", cls: "A", desc: "Casts made while the shop is closed pay double." },
     dredge_net: { item: "eternal_eternal_binding", name: "The Dredge Net", tier: "eternal", cls: "B", desc: "One cast in four brings up treasure instead of a fish." },
     chummed_water: { item: "eternal_eternal_walkers", name: "The Chummed Water", tier: "eternal", cls: "B", desc: "Every fifth cast is refunded." },
-    tithe_of_scales: { item: "eternal_eternal_pinions", name: "The Tithe of Scales", tier: "eternal", cls: "B", desc: "Every fish you land also gives a random chest fragment." },
+    tithe_of_scales: { item: "eternal_eternal_pinions", name: "The Tithe of Scales", tier: "eternal", cls: "B", desc: "Every fish you land also pays a purse of doubloons." },
     shipwright_s_debt: { item: "eternal_eternal_medallion", name: "The Shipwright's Debt", tier: "eternal", cls: "B", desc: "One boat upgrade in three costs you nothing." },
     beachhead: { item: "eternal_eternal_bond", name: "Beachhead", tier: "eternal", cls: "B", desc: "One dig site in three is already half uncovered when you arrive." },
     kraken_s_toll: { item: "eternal_undying_sabre", name: "The Kraken's Toll", tier: "eternal", cls: "B", desc: "Sea monsters you meet pay you to be left alone." },
@@ -132,7 +132,9 @@ export const ASCENSION_POWERS = {
     two_hooks: { item: "primordial_primordial_diadem", name: "Two Hooks", tier: "primordial", cls: "B", desc: "One cast in three lands a second fish." },
     press_ganged_crew: { item: "primordial_primordial_shroud", name: "Press-Ganged Crew", tier: "primordial", cls: "A", desc: "Voyages finish in half the time." },
     twice_landed: { item: "primordial_primordial_binding", name: "Twice-Landed", tier: "primordial", cls: "A", desc: "Every voyage makes landfall twice — two dig sites where there was one." },
-    diviner_s_rod: { item: "primordial_primordial_walkers", name: "Diviner's Rod", tier: "primordial", cls: "A", desc: "Every dig site is buried with the most fragments it can hold." },
+    // The desc has always over-promised: the Rod feeds digItemCount, i.e. the SCATTERED FINDS on the board, not
+    // the chest. It never touched fragments even when fragments existed. Says what it does now.
+    diviner_s_rod: { item: "primordial_primordial_walkers", name: "Diviner's Rod", tier: "primordial", cls: "A", desc: "Every dig site is salted with the most buried finds it can hold." },
     // WAS "half as many fragments to complete a chest". Fragments and forging are gone — chests are dug up
     // whole now — so this top-tier power would have sat there doing nothing at all. Repointed to the thing
     // that actually decides whether you get the chest: how much dirt is on top of it.
