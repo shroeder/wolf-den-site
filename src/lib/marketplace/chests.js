@@ -23,6 +23,13 @@ import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powe
 // commonest chest in the game a reliable recipe source.
 const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, ascendant: 0.060, eternal: 0.075 };
 
+// How often a chest gives a GEM instead of its ordinary contents. Deliberately in the same order of
+// magnitude as the recipe chance above — a gem should feel like a find, and gear is still what a chest is
+// FOR. Measured, not guessed: 2,037 chests were opened across the Den in the last 7 days (207 in the last
+// 24h), so at these rates this is very roughly 4-6 gems a day into a bench that has seen 28 gems TOTAL. Enough
+// to make the Jewelcutter a place you visit; nowhere near enough to make gear feel like the consolation.
+const GEM_CHEST_CHANCE = { wooden: 0.010, iron: 0.018, gold: 0.030, mythic: 0.045, ascendant: 0.055, eternal: 0.065 };
+
 // The recipe_nose companion perk, read once per open.
 async function recipeLuckFor(buyerId) {
     try {
@@ -233,6 +240,28 @@ export async function openChest(buyerId, tier) {
     // A chance at a companion PET from this chest tier — the standout reveal.
     const petDrop = await maybeGrantChestPet(buyerId, tier).catch(() => null);
     if (petDrop) return { ok: true, remaining: dec.count, pet: petDrop };
+
+    // ── A GEM, LOW TIERS ONLY ────────────────────────────────────────────────────────────────────────────
+    // Gems had no real path into the game. Mining dropped them, the wheel had a wedge, the Armoury sold one —
+    // and that was it. 28 gems had entered the world in total, against a bench of five kinds x five tiers
+    // plus the Wolf's Eye. Chests are the one reward object every system already pays in (digging, delves,
+    // the mine, raids, quests, dailies, the merchant), so this is the change that gives the Jewelcutter a
+    // supply without inventing a new drop anywhere.
+    //
+    // TIER 1-2 ONLY, deliberately. The top of the gem ladder should stay something you FUSE toward at the
+    // bench rather than something a chest hands you — that is the whole reason gems are tiered. A richer
+    // chest raises the CHANCE, never the tier.
+    const gChance = GEM_CHEST_CHANCE[tier] || 0;
+    if (gChance && Math.random() < gChance) {
+        const { GEM_KINDS, gemId } = await import("@/lib/marketplace/gems.js");
+        const { grantGem } = await import("@/lib/marketplace/jeweller.js");
+        const kind = GEM_KINDS[Math.floor(Math.random() * GEM_KINDS.length)];
+        // Tier 2 only from gold and up, and never more than that.
+        const gTier = (tier === "wooden" || tier === "iron") ? 1 : (Math.random() < 0.25 ? 2 : 1);
+        const got = await grantGem(buyerId, gemId(kind.id, gTier), 1, "chest").catch(() => null);
+        if (got?.ok) return { ok: true, remaining: dec.count, gem: got.gem };
+        // A gem that failed to grant falls through to ordinary loot rather than eating the chest.
+    }
 
     // FORGE SCROLLS — Gold+ chests can drop a Power Scroll (a free Forge enhance); RARELY an Enchantment Scroll
     // (permanently add an elemental affinity) instead.

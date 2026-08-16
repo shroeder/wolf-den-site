@@ -267,7 +267,7 @@ function StatusRow({ list, side, onPick }) {
     );
 }
 
-function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burning = false }) {
+function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield = 0, burn = null, bleed = null }) {
     const frac = maxHp ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     // ── CHIP DAMAGE ── the trailing bar every fighting game uses: the hit registers instantly on the front
     // bar, and a paler bar behind it holds the old value for a beat before sliding down to meet it. That gap
@@ -300,7 +300,7 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 
     return (
         <div className={`ar-bar${foe ? " is-foe" : ""}${active ? " is-active" : ""}${danger ? " is-danger" : ""}`
-            + `${healing ? " is-healing" : ""}${burning ? " is-burning" : ""}`}>
+            + `${healing ? " is-healing" : ""}${burn?.turns > 0 ? " is-burning" : ""}${bleed?.turns > 0 ? " is-bleeding" : ""}`}>
             <span className="ar-namerow">
                 {/* ── WHO YOU ARE SWINGING AT ─────────────────────────────────────────────────────────────
                     The row named them and stated their element, and said nothing about the one fact that
@@ -328,6 +328,25 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 {Math.max(0, hp)}<span>/{maxHp}</span>
                 {shield > 0 ? <u>+{shield}</u> : null}
             </em>
+            {/* ── WHAT IS EATING THIS BAR ──────────────────────────────────────────────────────────────────
+                The burn chip's styles have been in this file all along with NOTHING rendering them, and the
+                `burning` flag that lights the bar was never passed by either call site — so the whole
+                treatment was dead CSS. Both tracks now show the same three facts on the fighter itself: what
+                it costs a turn, how many turns are left, and the stack count when it is actually stacked. */}
+            {burn?.turns > 0 ? (
+                <em className="ar-burn" title={`Burning: ${burn.dmg} a turn for ${burn.turns} more`}>
+                    <GiFlame aria-hidden="true" /><b>{burn.dmg}</b>
+                    <u>{burn.turns}t</u>
+                    {burn.stacks > 1 ? <s>x{burn.stacks}</s> : null}
+                </em>
+            ) : null}
+            {bleed?.turns > 0 ? (
+                <em className="ar-bleed" title={`Bleeding: ${bleed.dmg} a turn for ${bleed.turns} more — straight to health, a guard does not stop it`}>
+                    <GiDroplets aria-hidden="true" /><b>{bleed.dmg}</b>
+                    <u>{bleed.turns}t</u>
+                    {bleed.stacks > 1 ? <s>x{bleed.stacks}</s> : null}
+                </em>
+            ) : null}
             <span className="ar-stats">
                 <i title="Damage on a plain swing"><b>{Math.round(f?.damage || 0)}</b> dmg</i>
                 <i title="Chance to crit, and what a crit multiplies by">
@@ -1364,7 +1383,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     <div className="ar-bars">
                         <span className="ar-barcol">
                             <FighterBar f={{ ...st.me, ...(bout.me || {}) }} hp={bout.hp} maxHp={bout.maxHp} element={bout.me?.element || null}
-                                active={yourTurn} shield={bout.shield || 0} />
+                                active={yourTurn} shield={bout.shield || 0}
+                                burn={bout.foeBleed || null} bleed={bout.foeGash || null} />
                             <StatusRow list={statusesFor(bout, "you")} side="you" onPick={(s) => setStatusPick({ kind: s.kind, side: "you" })} />
                         </span>
                         <span className={`ar-turnmark${yourTurn ? " is-you" : " is-them"}`}>
@@ -1372,7 +1392,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         </span>
                         <span className="ar-barcol is-foe">
                             <FighterBar f={bout.foe} hp={bout.foeHp} maxHp={bout.foeMaxHp} element={bout.foe?.element || null}
-                                foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0} />
+                                foe active={!yourTurn && !bout.over} shield={bout.foeShield || 0}
+                                burn={bout.bleed || null} bleed={bout.gash || null} />
                             <StatusRow list={statusesFor(bout, "them")} side="them" onPick={(s) => setStatusPick({ kind: s.kind, side: "them" })} />
                         </span>
                     </div>
@@ -2711,6 +2732,28 @@ function Styles() {
             @keyframes arBurnPulse {
                 0%, 100% { box-shadow: 0 0 8px rgba(255,110,30,0.28); }
                 50% { box-shadow: 0 0 16px rgba(255,110,30,0.6); } }
+            /* THE BLEED, the same three facts in its own colour. Blood reads red and goes STRAIGHT to health,
+               so its bar treatment is a hard pulse rather than the burn's warm glow — the two must never be
+               mistaken for each other at a glance mid-fight. */
+            .ar-bleed { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 999px;
+                margin-left: 5px; vertical-align: middle;
+                font-size: 10.5px; font-weight: 900; font-style: normal; letter-spacing: .2px; color: #ffc9c9;
+                background: linear-gradient(180deg, rgba(220,60,60,0.30), rgba(150,20,20,0.16));
+                border: 1px solid rgba(230,70,70,0.55); box-shadow: 0 0 10px rgba(220,50,50,0.35);
+                animation: arBleedPulse 1.15s ease-in-out infinite; }
+            .ar-bleed svg { font-size: 12px; color: #ff5f5f; }
+            .ar-bleed b { color: #ff8f8f; }
+            .ar-bleed u { text-decoration: none; padding-left: 4px; margin-left: 1px; color: #ffe0e0;
+                border-left: 1px solid rgba(230,70,70,0.45); }
+            .ar-bleed s { text-decoration: none; color: #ff8f8f; opacity: .75; }
+            @keyframes arBleedPulse {
+                0%, 100% { box-shadow: 0 0 8px rgba(220,50,50,0.28); }
+                50% { box-shadow: 0 0 16px rgba(220,50,50,0.6); } }
+            .ar-bar.is-bleeding .ar-hp { box-shadow: inset 0 0 12px rgba(220,50,50,0.55); }
+            .ar-bar.is-bleeding .ar-hp > i { animation: arBleedBar 1.15s ease-in-out infinite; }
+            @keyframes arBleedBar {
+                0%, 100% { filter: none; }
+                50% { filter: brightness(1.2) saturate(1.5) drop-shadow(0 0 6px rgba(230,60,60,0.75)); } }
             /* …and the bar it is eating, so the tick has a visible cause and not just a number. */
             .ar-bar.is-burning .ar-hp { box-shadow: inset 0 0 12px rgba(255,110,30,0.55); }
             .ar-bar.is-burning .ar-hp > i { animation: arBurnBar 1.15s ease-in-out infinite; }

@@ -125,11 +125,12 @@ export const CLASSES = [
         dr: 0.24,
         accuracy: 0.73,
         guard: 0.12,
-        // ── THE RUNECALLER'S FIRE OUTLASTS THE BEAT ──────────────────────────────────────────────────────
-        // Every burn they set runs one turn longer than anyone else's, before Slow Burn adds to it. Inherent
-        // for the same reason as the other two, and it is the literal reading of the class tag: they win the
-        // rounds after the one they are in.
-        burnTurns: 1,
+        // ── THE RUNECALLER SETS THINGS ALIGHT ────────────────────────────────────────────────────────────
+        // The exact mirror of the Reaver's Ragged Edge, in fire: any blow that lands can set a burn, whether
+        // or not the move is a spell. Replaces "+1 burn turn", which was real but invisible — an extra tick
+        // three turns from now is not something you can feel, and this class's whole identity is that things
+        // are on fire because of you.
+        burnChance: 0.35,
     },
 ];
 
@@ -168,7 +169,7 @@ export const classBase = (id) => {
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
         bleedChance: c?.bleedChance || 0,
-        burnTurns: c?.burnTurns || 0,
+        burnChance: c?.burnChance || 0,
     };
 };
 
@@ -202,7 +203,7 @@ export function classPassives(id) {
     if (b.accuracy !== DEFAULT_ACCURACY) out.push({ label: "Accuracy", value: `${Math.round(b.accuracy * 100)}%` });
     if (b.lifesteal) out.push({ label: "Lifedrink", value: `${Math.round(b.lifesteal * 100)}% of all damage back` });
     if (b.bleedChance) out.push({ label: "Ragged Edge", value: `${Math.round(b.bleedChance * 100)}% chance any hit opens a wound` });
-    if (b.burnTurns) out.push({ label: "Emberborn", value: `burns last +${b.burnTurns} turn` });
+    if (b.burnChance) out.push({ label: "Emberborn", value: `${Math.round(b.burnChance * 100)}% chance any hit sets a burn` });
     return out;
 }
 

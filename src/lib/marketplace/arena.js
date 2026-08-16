@@ -331,10 +331,10 @@ async function kitFor(buyerId) {
         dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
         // A share of everything you deal comes back as health. Class-inherent; see classBase.
         lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
-        // Inherent class passives, folded exactly as lifesteal is. `bleedChance` is the Reaver's ragged
-        // edge, `burnTurns` is the Runecaller's fire outlasting the beat. Both read on BOTH sides below.
+        // Inherent class passives, folded exactly as lifesteal is: the Reaver's ragged edge and the
+        // Runecaller's ember. Both read on BOTH sides below.
         bleedChance: Math.max(0, base.bleedChance || 0),
-        burnTurns: Math.max(0, base.burnTurns || 0),
+        burnChance: Math.max(0, base.burnChance || 0),
         dmgPct: Math.max(0, perks.dmgPct || 0),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
@@ -987,7 +987,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: foeKit.dr ?? DEFAULT_DR,
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
-            bleedChance: foeKit.bleedChance || 0, burnTurns: foeKit.burnTurns || 0, dmgPct: foeKit.dmgPct || 0,
+            bleedChance: foeKit.bleedChance || 0, burnChance: foeKit.burnChance || 0, dmgPct: foeKit.dmgPct || 0,
             // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
             // allowlist and their Guard silently falls back to a stranger's numbers.
             guard: foeKit.guard ?? DEFAULT_GUARD,
@@ -1018,7 +1018,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: me.dr ?? DEFAULT_DR,
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
-            bleedChance: me.bleedChance || 0, burnTurns: me.burnTurns || 0, dmgPct: me.dmgPct || 0,
+            bleedChance: me.bleedChance || 0, burnChance: me.burnChance || 0, dmgPct: me.dmgPct || 0,
             guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {},
             classId: me.classId || null },
@@ -1601,6 +1601,9 @@ export async function fightRound(buyerId, opts = {}) {
             // whether or not the move says it bleeds. Rolled once per swing, not per hit, so a
             // three-hit flurry is not three rolls at it.
             if (!gash && (b.me.bleedChance || 0) > 0 && Math.random() < b.me.bleedChance) gash = true;
+            // EMBERBORN — the Runecaller's inherent, the same shape in fire. Once per swing, and skipped when
+            // the move already burns so it cannot double up with its own spell.
+            if (!rend && (b.me.burnChance || 0) > 0 && Math.random() < b.me.burnChance) rend = true;
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
@@ -1787,7 +1790,7 @@ export async function fightRound(buyerId, opts = {}) {
             // now be a node that buys nothing at all.
             const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * (REND_TICK_CAP + (P.rendCap || 0)))));
             // SLOW BURN buys turns — what its name always said, instead of being a weaker second Runebrand.
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0) + (b.me.burnTurns || 0));
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
             b.bleed = { turns, stacks, dmg: tick };
         }
         // ── THE WOUND ── same shape as the burn and a separate track, so a fighter can carry both and the
@@ -1998,6 +2001,8 @@ export async function fightRound(buyerId, opts = {}) {
             if (theirAbility.bleeds) gashNow = true;
             // The same edge in their hands.
             if (!gashNow && (b.foe.bleedChance || 0) > 0 && Math.random() < b.foe.bleedChance) gashNow = true;
+            // The same ember in their hands.
+            if (!rendNow && (b.foe.burnChance || 0) > 0 && Math.random() < b.foe.burnChance) rendNow = true;
 
             // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
             // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of
@@ -2158,7 +2163,7 @@ export async function fightRound(buyerId, opts = {}) {
             // Offence and defence move together or the same kit is two different kits depending on who holds it.
             const stacks = (b.foeBleed?.stacks || 0) + 1;
             const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * (REND_TICK_CAP + (FP.rendCap || 0)))));
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0) + (b.foe.burnTurns || 0));
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
             b.foeBleed = { turns, stacks, dmg: tick };
         }
         if (gashNow && through > 0) {
