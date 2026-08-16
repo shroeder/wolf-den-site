@@ -79,11 +79,14 @@ export const CLASSES = [
         dr: 0.16,
         accuracy: 0.72,
         guard: 0.12,
-        // ── THE REAVER SMELLS BLOOD ──────────────────────────────────────────────────────────────────────
-        // Inherent, like the Warden's drink: you do not spend a point to be a Reaver. Everything they throw
-        // at a fighter already under half health hits harder, which is the class's whole sentence — "wants
-        // the bout over in six rounds" — expressed as a number instead of a blurb.
-        finisher: 0.20,
+        // ── THE REAVER OPENS WOUNDS ──────────────────────────────────────────────────────────────────────
+        // Inherent, like the Warden's drink: you do not spend a point to be a Reaver. Better than the damage
+        // ramp that sat here for one commit — this file has called Reaver "the blood class" since the rework
+        // and it had no bleed of its own, only nodes that could buy one.
+        //
+        // Any blow that lands can open a wound, and a bleed goes straight to health past any shield. It reads
+        // on both sides: a Reaver across the sand cuts you exactly as often.
+        bleedChance: 0.35,
     },
     {
         id: "warden",
@@ -164,7 +167,7 @@ export const classBase = (id) => {
         accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
-        finisher: c?.finisher || 0,
+        bleedChance: c?.bleedChance || 0,
         burnTurns: c?.burnTurns || 0,
     };
 };
@@ -198,7 +201,7 @@ export function classPassives(id) {
     if (b.guard !== DEFAULT_GUARD) out.push({ label: "Guard", value: `${Math.round(b.guard * 100)}% of health` });
     if (b.accuracy !== DEFAULT_ACCURACY) out.push({ label: "Accuracy", value: `${Math.round(b.accuracy * 100)}%` });
     if (b.lifesteal) out.push({ label: "Lifedrink", value: `${Math.round(b.lifesteal * 100)}% of all damage back` });
-    if (b.finisher) out.push({ label: "Bloodscent", value: `+${Math.round(b.finisher * 100)}% below half health` });
+    if (b.bleedChance) out.push({ label: "Ragged Edge", value: `${Math.round(b.bleedChance * 100)}% chance any hit opens a wound` });
     if (b.burnTurns) out.push({ label: "Emberborn", value: `burns last +${b.burnTurns} turn` });
     return out;
 }

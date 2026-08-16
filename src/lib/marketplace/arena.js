@@ -331,9 +331,9 @@ async function kitFor(buyerId) {
         dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
         // A share of everything you deal comes back as health. Class-inherent; see classBase.
         lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
-        // Inherent class passives, folded exactly as lifesteal is. `finisher` is the Reaver smelling blood,
-        // `burnTurns` is the Runecaller's fire outlasting the beat. Both read on BOTH sides below.
-        finisher: Math.max(0, base.finisher || 0),
+        // Inherent class passives, folded exactly as lifesteal is. `bleedChance` is the Reaver's ragged
+        // edge, `burnTurns` is the Runecaller's fire outlasting the beat. Both read on BOTH sides below.
+        bleedChance: Math.max(0, base.bleedChance || 0),
         burnTurns: Math.max(0, base.burnTurns || 0),
         dmgPct: Math.max(0, perks.dmgPct || 0),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
@@ -987,7 +987,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: foeKit.dr ?? DEFAULT_DR,
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
-            finisher: foeKit.finisher || 0, burnTurns: foeKit.burnTurns || 0, dmgPct: foeKit.dmgPct || 0,
+            bleedChance: foeKit.bleedChance || 0, burnTurns: foeKit.burnTurns || 0, dmgPct: foeKit.dmgPct || 0,
             // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
             // allowlist and their Guard silently falls back to a stranger's numbers.
             guard: foeKit.guard ?? DEFAULT_GUARD,
@@ -1018,7 +1018,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: me.dr ?? DEFAULT_DR,
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
-            finisher: me.finisher || 0, burnTurns: me.burnTurns || 0, dmgPct: me.dmgPct || 0,
+            bleedChance: me.bleedChance || 0, burnTurns: me.burnTurns || 0, dmgPct: me.dmgPct || 0,
             guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {},
             classId: me.classId || null },
@@ -1597,6 +1597,10 @@ export async function fightRound(buyerId, opts = {}) {
             }
             // FIRE leaves a burn, a wound bleeds — both resolved below.
             if (ability.bleeds) gash = true;
+            // RAGGED EDGE — the Reaver's inherent. Any blow that lands can open a wound on its own,
+            // whether or not the move says it bleeds. Rolled once per swing, not per hit, so a
+            // three-hit flurry is not three rolls at it.
+            if (!gash && (b.me.bleedChance || 0) > 0 && Math.random() < b.me.bleedChance) gash = true;
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
@@ -1689,12 +1693,10 @@ export async function fightRound(buyerId, opts = {}) {
             hitsLanded += 1;
             const c = Math.random() < critChance;
             if (c) crit = true;
-            // BRUTALITY is a flat damage percentage now, and FINISHER is the Reaver's inherent: everything
-            // lands harder on a fighter already under half. Both mirrored on their side of the ring.
+            // BRUTALITY is a flat damage percentage now. Mirrored on their side of the ring.
             const brutal = 1 + (b.me.dmgPct || 0);
-            const finish = b.foeHp <= b.foeMaxHp / 2 ? 1 + (b.me.finisher || 0) : 1;
             const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
-                * openMult * lowHpMult * splitMult * fever * brutal * finish * (c ? myCritMult : 1)
+                * openMult * lowHpMult * splitMult * fever * brutal * (c ? myCritMult : 1)
                 * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1);   // Dread Howl
             turned += Math.round(raw * guard);
             const landed = Math.max(1, Math.round(raw - raw * guard));
@@ -1994,6 +1996,8 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "disarm") b.noGuard = GUARD_DISABLE_TURNS;
             if (theirAbility.burns) rendNow = true;
             if (theirAbility.bleeds) gashNow = true;
+            // The same edge in their hands.
+            if (!gashNow && (b.foe.bleedChance || 0) > 0 && Math.random() < b.foe.bleedChance) gashNow = true;
 
             // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
             // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of
@@ -2085,9 +2089,8 @@ export async function fightRound(buyerId, opts = {}) {
             // is worth exactly what yours is. Offence and defence move together or the class is only real on
             // one side of the sand.
             const foeBrutal = 1 + (b.foe.dmgPct || 0);
-            const foeFinish = b.hp <= b.maxHp / 2 ? 1 + (b.foe.finisher || 0) : 1;
             const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow * foeSplit
-                * (b.foeUnderdog || 1) * foeSurgeMult * foeBrutal * foeFinish * (c ? foeCritMult : 1)
+                * (b.foeUnderdog || 1) * foeSurgeMult * foeBrutal * (c ? foeCritMult : 1)
                 * ((b.foeFrenzy || 0) > 0 ? FRENZY_DMG : 1)));
             const off = Math.round(one * myBlock);
             raw += one;
