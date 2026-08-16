@@ -223,6 +223,17 @@ export default function MarketClient({ initial }) {
                                     <b className="mk-name">{l.name}</b>
                                     <span className="mk-kind">{KIND_LABEL[l.kind] || l.kind}</span>
                                     <span className="mk-unit">{l.unitGold.toLocaleString()} gold each</span>
+                                    {/* ValkyrieSylve asked to see whether a stall feeds a recipe she owns. Only
+                                        recipes you KNOW and are actually short for, so it reads as "this is the
+                                        thing you're missing" rather than trivia about where an ingredient goes. */}
+                                    {l.forRecipe ? (
+                                        <span className={`mk-recipe${l.forRecipe.completes ? " is-completes" : ""}`}
+                                            title={l.forRecipe.names.join(" · ")}>
+                                            {l.forRecipe.completes ? "Completes " : "Toward "}
+                                            {l.forRecipe.names[0]}
+                                            {l.forRecipe.names.length > 1 ? ` +${l.forRecipe.names.length - 1}` : ""}
+                                        </span>
+                                    ) : null}
                                     <span className="mk-seller">{l.mine ? "your stall" : l.seller}</span>
                                     {l.mine ? (
                                         <button type="button" className="mk-buy is-pull" disabled={Boolean(busy)} onClick={() => doCancel(l)}>
@@ -457,6 +468,11 @@ const MARKET_CSS = `
 .mk-kind { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: color-mix(in srgb, var(--rc) 78%, #fff); }
 .mk-unit { font-size: 11px; color: #ffd75e; font-weight: 800; }
 .mk-seller { font-size: 10.5px; color: #8ea39d; }
+/* The recipe tell. "Completes" (you can cook it after this) is the loud one; "Toward" is the quieter
+   half-answer, because a stall that only dents a shortfall is worth knowing about but not shouting. */
+.mk-recipe { font-size: 10px; font-weight: 800; line-height: 1.2; padding: 2px 6px; border-radius: 999px;
+    color: #bfe7d8; background: rgba(95,208,168,0.12); border: 1px solid rgba(95,208,168,0.28); }
+.mk-recipe.is-completes { color: #062018; background: linear-gradient(180deg, #a9f0d6, #5fd0a8); border-color: transparent; }
 .mk-buy { margin-top: 5px; width: 100%; padding: 7px 4px; border-radius: 9px; border: none; cursor: pointer; font-weight: 900; font-size: 11.5px;
     color: #062018; background: linear-gradient(180deg, #7fe9c4, #3fbb92); box-shadow: 0 3px 0 #1f7a5c; }
 .mk-buy:active { transform: translateY(2px); box-shadow: 0 1px 0 #1f7a5c; }

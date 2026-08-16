@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { ingredientMeta, cookingSprites, addToPantry } from "@/lib/marketplace/cooking.js";
+import { ingredientMeta, cookingSprites, addToPantry, RECIPES } from "@/lib/marketplace/cooking.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 
@@ -59,7 +59,7 @@ const sellerName = (r) => r.display_name || (r.alias ? `@${r.alias}` : "A wolf")
 // never guess — reads this feature without a special case.
 export async function getMarketState(buyerId) {
     if (!MARKET_OPEN(buyerId)) return { unlocked: false };
-    const [open, mine, pantry, goldRow, sprites, art] = await Promise.all([
+    const [open, mine, pantry, goldRow, sprites, art, known] = await Promise.all([
         db.query(
             `SELECT l.id, l.seller_id, l.kind, l.ref, l.qty, l.unit_gold, l.created_at, b.display_name, b.alias
                FROM mkt_market_listing l JOIN mkt_buyer b ON b.id = l.seller_id
@@ -76,6 +76,8 @@ export async function getMarketState(buyerId) {
         cookingSprites().catch(() => ({})),
         // The same stall sprite the town street draws, so the square you walk into is the building you tapped.
         db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'market'`).catch(() => null),
+        // What this member can actually cook — for the "does this go in anything I own" answer below.
+        db.query(`SELECT recipe_id FROM mkt_recipe_known WHERE buyer_id = $1`, [buyerId]).catch(() => []),
     ]);
 
     // One dresser for listings and pantry rows alike, so a stall card and a "sell this" card can never
@@ -92,6 +94,36 @@ export async function getMarketState(buyerId) {
         };
     };
 
+    // ── WHAT IS THIS FOR? ────────────────────────────────────────────────────────────────────────────────
+    // ValkyrieSylve, in global chat the day the Market opened: "I would love it if we could see if any of the
+    // items for sale go to any recipes we own." Without it you are looking at a wall of produce and doing the
+    // cross-referencing in your head against a recipe book on another screen.
+    //
+    // Only recipes you KNOW, and the shortfall is measured against your own shelf, so the line answers the
+    // question you actually have — not "this is an ingredient somewhere" but "this is the thing you are short
+    // of for a dish you can already make". Recipes you have every ingredient for are left off: you don't need
+    // the market for those.
+    const held = new Map(pantry.map((r) => [r.ref, Number(r.qty) || 0]));
+    const knownIds = new Set(known.map((r) => r.recipe_id));
+    const wantedBy = new Map();   // ref -> [{ id, name, need, shortBy }]
+    for (const r of RECIPES) {
+        if (!knownIds.has(r.id)) continue;
+        for (const [ref, qty] of Object.entries(r.need || {})) {
+            const shortBy = Math.max(0, Number(qty) - (held.get(ref) || 0));
+            if (shortBy <= 0) continue;
+            if (!wantedBy.has(ref)) wantedBy.set(ref, []);
+            wantedBy.get(ref).push({ id: r.id, name: r.name, need: Number(qty), shortBy });
+        }
+    }
+    // Cheapest-first is already the sort, so the first stall that covers a shortfall is also the cheapest one.
+    const recipeUse = (ref, qty) => {
+        const uses = wantedBy.get(ref);
+        if (!uses || !uses.length) return null;
+        const covers = uses.filter((u) => qty >= u.shortBy);
+        const pick = (covers.length ? covers : uses).slice().sort((a, b) => a.shortBy - b.shortBy);
+        return { names: pick.map((u) => u.name), shortBy: pick[0].shortBy, completes: covers.length > 0 };
+    };
+
     const gold = Number(goldRow?.gold || 0);
     return {
         unlocked: true,
@@ -103,6 +135,7 @@ export async function getMarketState(buyerId) {
             seller: sellerName(r),
             mine: String(r.seller_id) === String(buyerId),
             afford: gold >= Number(r.qty) * Number(r.unit_gold),
+            forRecipe: recipeUse(r.ref, Number(r.qty)),
         })),
         mine: mine.map(dress),
         // Only the three kinds the market trades, and only what there is some of.
