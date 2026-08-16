@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { itemById, STAT_META, describeStats } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
-import { itemsOfSet } from "@/lib/marketplace/sets.js";
+import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
 import { pieceById } from "@/lib/marketplace/collection-pieces.js";
 import { getOwnedPieceIds, grantPiece } from "@/lib/marketplace/collection-owned.js";
@@ -540,6 +540,8 @@ export async function getForgeState(buyerId) {
     const claimedSet = new Set(parseClaimed(dRow?.claimed));
     const dailies = DAILIES.map((q) => { const prog = Number(dRow?.[q.field] || 0); return { key: q.key, label: q.label, need: q.need, progress: Math.min(prog, q.need), done: prog >= q.need, claimed: claimedSet.has(q.key), rewardLabel: q.rewardLabel }; });
     const equippedIds = new Set(Object.values(bySlot));
+    // Everything in the bag, for counting how much of a set a piece belongs to you already hold.
+    const ownedIds = new Set((ownedRows || []).map((r) => r.item_id));
     const enhById = new Map();
     for (const r of enhRows) enhById.set(r.item_id, { level: r.level, bonus: parseBonus(r.stat_bonus), bestGrade: r.best_grade, util: r.util });
     // Effective totals = the item's base stats plus whatever the forge added. Local rather than imported: this is
@@ -568,6 +570,21 @@ export async function getForgeState(buyerId) {
             statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
             util: describeUtil(enh?.util),
+            // ── IS THIS PART OF A SET? ────────────────────────────────────────────────────────────────────
+            // The Forge is the one screen in the game where being wrong is irreversible, and it was the one
+            // screen that would not tell you. `have` counts what you own of that set INCLUDING this piece, so
+            // the card can say "you would be down to 3 of 5" rather than making anybody do the arithmetic.
+            set: (() => {
+                const st = setOfItem(id);
+                if (!st) return null;
+                const items = st.items || [];
+                return {
+                    name: st.name,
+                    total: items.length,
+                    have: items.filter((x) => ownedIds.has(x)).length,
+                    collection: Boolean(st.collection),
+                };
+            })(),
         };
     };
     // No trophy filter: mkt_user_item holds gear only now, so a Forgeplate cannot appear in this list at all.

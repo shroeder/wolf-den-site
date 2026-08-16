@@ -1130,6 +1130,10 @@ const FORGE_CSS = `
 /* What the FORGE added — a green pill that clearly stacks ON TOP of the base stats above. */
 .forge-card-bonus { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #a6f0b4; font-weight: 900; line-height: 1.2; background: rgba(80,210,120,0.14); border: 1px solid rgba(143,227,154,0.45); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
 .forge-card-attune { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #e0c8ff; font-weight: 900; line-height: 1.2; background: rgba(150,90,255,0.16); border: 1px solid rgba(184,120,255,0.5); border-radius: 10px; padding: 3px 9px; margin-top: 3px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.forge-setchip { display: block; margin: 2px 0 0; font-size: 10px; font-weight: 800; line-height: 1.3; color: #ffd75e; }
+/* A collection piece pays for being OWNED, so melting one costs a bonus you already hold — called out
+   separately from a worn set, and louder, because it is the more expensive mistake. */
+.forge-setchip.is-coll { color: #8bf0b4; }
 .forge-card-cost { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: #b9a892; margin-top: 3px; }
 .forge-card.is-maxed { border-color: rgba(255,215,94,0.6); box-shadow: 0 0 0 1px rgba(255,215,94,0.3), 0 0 16px rgba(255,215,94,0.18); }
 .forge-card-max { color: #ffd75e; font-weight: 900; }

@@ -273,6 +273,19 @@ export function collectionsForFeature(feature, ownedIds) {
 
 // The ids in a named set. Exported so a feature that reads its own set's bonus (the Forge does) never keeps a
 // second copy of the list — one list, one owner, the same rule the collection registration follows.
+/**
+ * The set a piece belongs to, or null. Kaishiern, in global chat: "Can the salvage screen show whether or not
+ * a piece of gear is in a set or not? Not knowing and having to go back and forth in menus relying on my bad
+ * memory is a task." He is right — the Forge is the one screen where getting it wrong is irreversible.
+ *
+ * Collection sets are included: they pay for being OWNED, so melting a piece of one is MORE costly than
+ * melting a worn-set piece, not less. See the collections contract above.
+ */
+export function setOfItem(itemId) {
+    if (!itemId) return null;
+    return ITEM_SETS.find((s) => (s.items || []).includes(itemId)) || null;
+}
+
 export function itemsOfSet(setId) {
     return SET_BY_ID[setId]?.items || [];
 }
