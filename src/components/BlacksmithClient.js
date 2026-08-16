@@ -435,6 +435,18 @@ export default function BlacksmithClient({ initial }) {
                                 <ItemArt id={it.id} icon={it.icon} className="forge-art" alt={it.name} elements={it.elements} />
                                 <span className="forge-card-name">{it.name}</span>
                                 <span className="forge-card-stats" style={{ color: rc(it.rarity) }}>{it.rarity}</span>
+                                {/* ── IS THIS PART OF A SET? ────────────────────────────────────────────────
+                                    The Forge is the one screen where being wrong cannot be undone, and it was
+                                    the one screen that would not tell you what you were about to melt. Shows
+                                    how many of the set you HOLD as well as its name — the name alone still
+                                    leaves you counting somewhere else, which is the trip being complained
+                                    about. A COLLECTION piece is called out separately: those pay for being
+                                    owned, so melting one is the more expensive mistake, not the lesser. */}
+                                {it.set ? (
+                                    <span className={`forge-setchip${it.set.collection ? " is-coll" : ""}`}>
+                                        {it.set.collection ? "Collection · " : ""}{it.set.name} {it.set.have}/{it.set.total}
+                                    </span>
+                                ) : null}
                                 <span className="forge-card-cost">
                                     {parts[it.salvageTier - 1]?.sprite
                                         // eslint-disable-next-line @next/next/no-img-element
