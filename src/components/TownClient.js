@@ -19,7 +19,19 @@ import NoticeBody from "@/components/NoticeBody";
 // each system. A roster overlay lets you see who's doing what without walking. Movement is smooth via CSS
 // transitions (poll + tween — no canvas / websockets). Positions are % of the WIDE world; y is a ground band.
 
-const WORLD_W = 2900;   // px width of the whole street (x = 0..100 maps across this) — widened for 9 buildings
+// ── HOW WIDE THE STREET IS ───────────────────────────────────────────────────────────────────────────────────
+// This was a FIXED 2900px, chosen when there were nine buildings. spaceOut() spreads however many buildings you
+// can see evenly across 4..92% of it, so every new one made the street tighter rather than longer: at nine the
+// gap was 284px, comfortably clear of the 244px a sprite can occupy, but by fourteen (the Kitchen, Dungeons,
+// the Arena and the Market all arrived since) it was 182px and the buildings were overlapping each other.
+//
+// So the width is DERIVED now: hold the per-building gap at the density that was proven to work and let the
+// street grow instead. PER_SLOT is the whole design decision; at nine buildings this returns 2905px, i.e. the
+// street nobody complained about, which is the check that the arithmetic is right.
+const WORLD_MIN = 2900;
+const PER_SLOT = 284;      // px between neighbours — the nine-building spacing, kept as buildings are added
+const SPREAD = 88;         // spaceOut lays out across 4..92%, so a slot is SPREAD/(n-1) percent of the world
+const worldWidthFor = (slots) => Math.max(WORLD_MIN, Math.round((PER_SLOT * 100 * Math.max(1, slots - 1)) / SPREAD));
 const GROUND = 72;      // % from top where building BASES sit (avatars walk in front, lower/foreground)
 const spriteTransform = (flip, facing) => ((Boolean(flip) !== (facing === -1)) ? "scaleX(-1)" : "none");
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -578,6 +590,14 @@ const QuestIcon = ({ name }) => {
 
 export default function TownClient({ initial }) {
     const [state, setState] = useState(initial || null);
+    // The street's width, and everything that measures against it. Declared HERE because the camera below
+    // reads it — a hook that depends on a value declared under it is the temporal-dead-zone trap check:hook-deps
+    // exists to catch. The well rides in the same layout as the buildings, hence the +1.
+    const buildings = state?.buildings || [];
+    const WORLD_W = worldWidthFor(buildings.length + 1);
+    // Parallax rows are mirror-tiled to span the world; the counts below were sized for a 2900px street, so
+    // they scale with it or a longer street simply runs out of scenery at the far end.
+    const tiles = useCallback((base) => TILES(Math.ceil(base * (WORLD_W / WORLD_MIN))), [WORLD_W]);
     const [me, setMe] = useState(() => ({ x: initial?.you?.x ?? 50, y: initial?.you?.y ?? 80, facing: initial?.you?.facing ?? 1, moving: false, moveDist: 0, wave: false }));
     const [others, setOthers] = useState({});
     const [viewportW, setViewportW] = useState(360);
@@ -1174,7 +1194,6 @@ export default function TownClient({ initial }) {
     const you = state?.you;
     const art = state?.art || {};
     const layered = Boolean(art.sky?.url && art.cobble?.url); // parallax sky + tiling cobble (reliable) vs legacy wide bg
-    const buildings = state?.buildings || [];
     const projects = state?.projects || [];
     const townBonuses = state?.bonuses || {};
     const well = state?.well || null; // Wishing Well daily-claim state { gold, xp, claimedToday } | null until funded
@@ -1317,7 +1336,7 @@ export default function TownClient({ initial }) {
                 {/* Far parallax SKY layer (scrolls slower). Generic + mirror-tiled → seamless. */}
                 {layered ? (
                     <div className="tw-far" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.3}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {TILES(11).map((k) => (
+                        {tiles(11).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.sky.url} alt="" draggable={false} />
                         ))}
@@ -1331,7 +1350,7 @@ export default function TownClient({ initial }) {
                     const factor = Math.max(0.3, 0.47 - (n - 1) * 0.03); // farther back → slower parallax
                     return (
                         <div key={n} className="tw-depth" aria-hidden="true" style={{ opacity: Math.max(0.5, 0.92 - (n - 1) * 0.08), transform: `translateX(${-cameraPx * factor}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                            {TILES(11).map((k) => (
+                            {tiles(11).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art[`depth${n}`].url} alt="" draggable={false} />
                             ))}
@@ -1343,7 +1362,7 @@ export default function TownClient({ initial }) {
                     This is what "Grow the Plaza" deepens over time (future depth tiers swap richer art in). */}
                 {layered && art.mid?.url ? (
                     <div className="tw-mid" aria-hidden="true" style={{ transform: `translateX(${-cameraPx * 0.55}px)`, transition: dragging ? "none" : `transform ${camDur}s linear` }}>
-                        {TILES(13).map((k) => (
+                        {tiles(13).map((k) => (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img key={k} src={art.mid.url} alt="" draggable={false} />
                         ))}
@@ -1363,7 +1382,7 @@ export default function TownClient({ initial }) {
                     {/* Ground: tiling cobblestone band (layered), else the legacy wide background image */}
                     {layered ? (
                         <div className="tw-cobble" aria-hidden="true">
-                            {TILES(19).map((k) => (
+                            {tiles(19).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.cobble.url} alt="" draggable={false} />
                             ))}
@@ -1380,7 +1399,7 @@ export default function TownClient({ initial }) {
                         plaza edge (buildings & avatars draw in front of it). Ground-locked (moves with the street). */}
                     {layered && art.fg?.url ? (
                         <div className="tw-fg" aria-hidden="true">
-                            {TILES(24).map((k) => (
+                            {tiles(24).map((k) => (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img key={k} src={art.fg.url} alt="" draggable={false} />
                             ))}
