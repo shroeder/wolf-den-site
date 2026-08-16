@@ -26,6 +26,8 @@ const classes = readFileSync(join(LIB, "arena-classes.js"), "utf8");
 // arena.js AND arena-kit.js: FREE_KINDS lives in the kit, so a ward dispatched through isFreeKind()
 // looks unimplemented if you only read the engine.
 const engine = readFileSync(join(LIB, "arena.js"), "utf8") + readFileSync(join(LIB, "arena-kit.js"), "utf8");
+// The AI picker rebuilds the one move an opponent is throwing — a THIRD allowlist these flags must survive.
+const picker = readFileSync(join(LIB, "arena-ai.js"), "utf8");
 // The kit AND the class table: a folded stat may be set by classBase() in arena-classes rather than
 // by buildKit(), which reported the Warden's Footwork as buying nothing.
 const kit = engine + classes;
@@ -125,6 +127,13 @@ for (const f of FLAGS) {
     // word boundary, so the test never matched and this whole check could never fire.
     const usedByTree = classes.includes(f + ": true");
     const usedByEngine = engine.includes("ability." + f);
+    // Both rebuilds: treeAbilities() for the ability, and the picker's swing() for the move being thrown.
+    // Looks for the ASSIGNMENT, not the word: a fixed-size window around swing() got eaten by the comment
+    // explaining why the assignment is there, and a bare word search finds it in that comment either way.
+    const pickerCopies = picker.includes(`${f}: Boolean(ability`);
+    if (usedByTree && usedByEngine && !pickerCopies) {
+        problems.push(`FLAG DROPPED      the AI picker's swing() never copies "${f}" — an OPPONENT throwing that move loses it, so PvP behaves differently from PvE`);
+    }
     if (usedByTree && usedByEngine && !allow.includes(f)) {
         problems.push(`FLAG DROPPED      treeAbilities() never copies "${f}" — the tree sets it and the engine reads it, so it is thrown away in between`);
     }

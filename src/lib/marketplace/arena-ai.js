@@ -194,6 +194,18 @@ export function pickIncoming(b) {
             power: ability && !["ward", "drain"].includes(k) ? (ability.power || 1) : 1,
             hits: k === "flurry" ? Math.max(1, ability.hits || 3) : 1,
             heal: k === "drain" ? DRAIN_SHARE : 0,
+            // ── AND WHAT THE MOVE LEAVES BEHIND ──────────────────────────────────────────────────────────
+            // THIS IS THE THIRD ALLOWLIST these flags have to survive — the tree builds the ability, the bout
+            // freezes the fighter, and this rebuilds the one move being thrown. Dropping them here is why PvP
+            // and PvE behaved differently: an NPC's moves are declared in arena-npc.js and never carried these
+            // at all, so a bare `rend` correctly means a wound. A MEMBER's Emberbrand carries `burns: true`,
+            // and this line is where it was being thrown away — so an opponent's fire spell arrived as a
+            // BLEED, no burn stacks appeared, and a Runecaller's Emberdrinker (which drinks from burns) had
+            // nothing to drink. Luke: "when I'm playing other players and they use Emberbrand I don't get any
+            // burn stacks... it also appears like I'm not healing from my burn damage in PvP."
+            burns: Boolean(ability?.burns),
+            bleeds: Boolean(ability?.bleeds),
+            freezes: Boolean(ability?.freezes),
             free: free ? free.kind : null,
             freeName: free?.name || null,
             brace: false,
