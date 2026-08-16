@@ -6,7 +6,7 @@ import { COLLECTIBLES, collectibleById, isCollectibleUnlocked } from "@/lib/mark
 import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { sendBadgeAwardedEmail } from "@/lib/marketplace/email.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
-import { awardXp, getRewardsProgress, levelForXp } from "@/lib/marketplace/xp.js";
+import { awardXp, getRewardsProgress, levelForXp, SPEND_XP_PER_DOLLAR } from "@/lib/marketplace/xp.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { allowsNotify } from "@/lib/marketplace/notify-prefs.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
@@ -79,7 +79,19 @@ export async function getMemberMetrics(buyerId) {
     const xp = buyer?.xp || 0;
 
     const [spendRow, eventRow, daysRow, wishRow, friendRow, topRow, tradeRow, donationRow, bossRow, bossWonRow, messageRow, badgeRow, bountyPostRow, bountyWinRow, grantedPetRows, petLevelRows] = await Promise.all([
-        db.queryOne(`SELECT COALESCE(SUM(points), 0)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`, [buyerId]).catch(() => null),
+        // ── SPEND IS DOLLARS, NOT XP ─────────────────────────────────────────────────────────────────
+        // This summed POINTS, and points are dollars x SPEND_XP_PER_DOLLAR (5). So every spend badge fired
+        // at a FIFTH of its stated price: "Whale — $2,000 of actual money", per the comment forty lines
+        // down, was actually granted at $400. A member noticed before we did — SunflowerJinxx, in global
+        // chat, on a figure that read five times what she had spent.
+        //
+        // `amountCents` is what the order was really worth and is stored on every event since July; older
+        // ones fall back to points / SPEND_XP_PER_DOLLAR, which is the same reconstruction awardXp documents.
+        db.queryOne(
+            `SELECT COALESCE(SUM(COALESCE((meta->>'amountCents')::numeric / 100.0, points / ${SPEND_XP_PER_DOLLAR}.0)), 0)::int AS n
+               FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'purchase_spend'`,
+            [buyerId]
+        ).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'event_checkin'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_xp_event WHERE buyer_id = $1 AND action = 'daily_active'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM card_watchlist_items i JOIN card_watchers w ON w.id = i.watcher_id WHERE w.buyer_id = $1`, [buyerId]).catch(() => null),
