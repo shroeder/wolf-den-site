@@ -631,6 +631,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // showed the LAST line of an exchange — see the effect that reads it.
     const lastLogSeen = useRef(0);
     const [statusPick, setStatusPick] = useState(null);   // the effect whose detail card is open
+    // Which of THEIR skills is being read. Their abilities come out of the same builder yours do, so the card
+    // is the same card — see SkillFace.
+    const [foePick, setFoePick] = useState(null);
     const resultAtRef = useRef(0);
     const setResultAt = (v) => { resultAtRef.current = v; };
     const logEnd = useRef(null);
@@ -1520,22 +1523,46 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         three pictures that never changed, so you could not tell whether the
                                         move you were bracing for was even available this beat. A cooling
                                         skill dims and wears the turns it has left, exactly like yours. */}
+                                    {/* ── AND YOU CAN READ THEM ───────────────────────────────────────────
+                                        The set was visible and mute: a `title` tooltip, which on the screen
+                                        this is actually played on does nothing whatsoever. So you could see
+                                        that three things were coming and not one word about what any of them
+                                        did — while your own four sat there fully described.
+                                        Their abilities come out of the same builder yours do, so this is the
+                                        SAME card, not a second description that could drift from it. */}
                                     {bout.foe.abilities.map((ab) => {
                                         const cool = Number(bout.foeCd?.[ab.id] || 0);
                                         return (
-                                            <span key={ab.id} className={`ar-theirchip${cool > 0 ? " is-cooling" : ""}`}
+                                            <button type="button" key={ab.id}
+                                                className={`ar-theirchip${cool > 0 ? " is-cooling" : ""}${foePick === ab.id ? " is-open" : ""}`}
                                                 style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                                title={cool > 0 ? `${ab.name} — ready in ${cool}` : `${ab.name} — ready`}>
+                                                aria-label={`${ab.name} — ${cool > 0 ? `ready in ${cool}` : "ready"}. Tap to read it.`}
+                                                onClick={() => { Sfx.ui(); setFoePick((v) => (v === ab.id ? null : ab.id)); }}>
                                                 {ab.sprite ? (
                                                     // eslint-disable-next-line @next/next/no-img-element
                                                     <img src={ab.sprite} alt="" draggable="false" />
                                                 ) : null}
                                                 {cool > 0 ? <b className="ar-theircd">{cool}</b> : null}
-                                            </span>
+                                            </button>
                                         );
                                     })}
                                 </span>
                             ) : null}
+                            {/* Re-read off the CURRENT bout every render, so a skill that comes off cooldown
+                                while you are looking at it says so — the same lesson the status card learned
+                                when it froze a finished fight's numbers on screen. */}
+                            {(() => {
+                                if (!foePick) return null;
+                                const ab = (bout.foe?.abilities || []).find((x) => x.id === foePick);
+                                if (!ab) return null;
+                                return (
+                                    <span className="ar-theircard" role="dialog" aria-label={ab.name}
+                                        onClick={() => setFoePick(null)}>
+                                        <SkillFace ab={ab} left={Number(bout.foeCd?.[ab.id] || 0)} />
+                                        <i className="ar-theircard-tap">Tap to close</i>
+                                    </span>
+                                );
+                            })()}
                         </div>
                     ) : null}
 
@@ -2544,6 +2571,17 @@ function Styles() {
                 animation: arBurnPulse .8s ease-in-out infinite; }
             /* ICE. Deliberately the coldest thing on the screen — the burn pulses warm and fast, this one
                breathes slowly, so which of the two is on you is readable at a glance without reading a word. */
+            .ar-theirchip.is-open { border-color: var(--el, #ffd75e); box-shadow: 0 0 0 2px rgba(255,215,94,0.35); }
+            /* FIXED, not absolute. The strip lives in a flex row with no positioned ancestor nearby, so an
+               absolute card resolved against something far up the tree and rendered off-screen — present in
+               the DOM, invisible on the screen, which is the worst of both. Anchored to the viewport just
+               above the command bar it lands in the same place every time. */
+            .ar-theircard { position: fixed; right: 10px; bottom: 96px; z-index: 30; width: min(260px, 82vw);
+                display: block; padding: 9px 11px; border-radius: 12px; cursor: pointer; text-align: left;
+                background: linear-gradient(180deg, rgba(26,28,34,0.98), rgba(16,17,21,0.98));
+                border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 10px 26px rgba(0,0,0,0.55); }
+            .ar-theircard-tap { display: block; margin-top: 6px; font-style: normal; font-size: 10px;
+                letter-spacing: .06em; text-transform: uppercase; color: #7f8790; }
             .ar-stat.is-blood { color: #ff8f8f; border-color: rgba(220,70,70,0.6); background: rgba(190,40,40,0.16); }
             .ar-stat.is-ice { color: #a8e4ff; border-color: rgba(120,205,255,0.6); background: rgba(90,180,255,0.15);
                 animation: arFrostPulse 1.9s ease-in-out infinite; }
