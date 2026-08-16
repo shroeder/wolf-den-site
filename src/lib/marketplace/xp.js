@@ -159,15 +159,45 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     } catch {
         return null; // deduped (or a transient error) — never break the caller
     }
+    // What the DB actually credited once the curator's bonus was applied. Declared out here because the pet's
+    // share and this function's return value both have to be the REAL number — a pet earning 25% of the
+    // pre-bonus figure would quietly drift from its owner the fuller their trophy room got.
+    let ptsApplied = pts;
     try {
         // XP always advances the level; gold accrues separately (goldDelta) so payouts can give none.
-        const row = await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp`, [buyerId, pts, goldDelta]);
+        // ── THE CURATOR'S BONUS, APPLIED IN THE STATEMENT ────────────────────────────────────────────────
+        // How full your Trophy Room is pays a standing % on everything you earn. It is multiplied HERE, in
+        // SQL, rather than read first and applied in JS, because this function runs on every XP award in the
+        // game — the comment above celebrates removing a round-trip from this path and adding one back to
+        // fetch a percentage would undo that.
+        //
+        // The applied amounts come back out of RETURNING and are used for the level-up maths and the coin
+        // ledger below. Recomputing them in JS would be two expressions that have to agree forever, and the
+        // one that decides your level would eventually disagree with the one that moved your XP.
+        const CUR = "(1 + COALESCE(trophy_pct, 0) / 100.0)";
+        const row = flat
+            ? await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp, $2::int AS pts_got, $3::int AS gold_got`, [buyerId, pts, goldDelta])
+            : await db.queryOne(
+                `UPDATE mkt_buyer
+                    SET xp = xp + GREATEST(0, ROUND($2 * ${CUR}))::int,
+                        gold = gold + GREATEST(0, ROUND($3 * ${CUR}))::int,
+                        updated_at = NOW()
+                  WHERE id = $1
+              RETURNING xp,
+                        GREATEST(0, ROUND($2 * ${CUR}))::int AS pts_got,
+                        GREATEST(0, ROUND($3 * ${CUR}))::int AS gold_got`,
+                [buyerId, pts, goldDelta]
+            );
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
         if (row) {
-            if (goldDelta !== 0) await logCoin(buyerId, goldDelta, "xp_accrual", { meta: { action } }).catch(() => {});
+            // What ACTUALLY landed, not what was asked for — the two differ by the curator's bonus.
+            const ptsGot = Number(row.pts_got) || 0;
+            ptsApplied = ptsGot;
+            const goldGot = Number(row.gold_got) || 0;
+            if (goldGot !== 0) await logCoin(buyerId, goldGot, "xp_accrual", { meta: { action } }).catch(() => {});
             const newXp = Number(row.xp) || 0;
             const newLevel = levelForXp(newXp).level;
-            const oldLevel = levelForXp(newXp - pts).level;
+            const oldLevel = levelForXp(newXp - ptsGot).level;
             if (newLevel > oldLevel) {
                 const unlocks = unlocksAtLevel(newLevel);
                 // Don't push someone who is looking at the screen. They earned this two seconds ago by tapping
@@ -194,8 +224,8 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
         // Ledger row exists; total will self-heal on the next recompute if we ever add one.
     }
     // The member's EQUIPPED pet earns a share of this XP (25%); no-op if nothing's equipped.
-    await creditEquippedPetXp(buyerId, pts).catch(() => {});
-    return pts;
+    await creditEquippedPetXp(buyerId, ptsApplied).catch(() => {});
+    return ptsApplied;
 }
 
 // Convenience: a per-day dedupe key so an action only earns XP once per user per day.

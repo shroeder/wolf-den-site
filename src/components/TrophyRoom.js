@@ -291,6 +291,16 @@ export default function TrophyRoom({ active, initial = null }) {
                 .tr-legend { margin: 9px 2px 0; font-size: 0.775rem; line-height: 1.4; color: #a99b86; }
                 .tr-legend b { color: #ffd98a; font-weight: 700; }
                 .tr-empty { margin: 10px 0 2px; font-size: 0.86rem; color: #c0ad95; }
+.tr-curation { margin: 10px 0 4px; padding: 10px 12px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,215,94,0.10), rgba(255,215,94,0.03));
+    border: 1px solid rgba(255,215,94,0.28); }
+.tr-cur-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.tr-cur-top b { font-size: 1.05rem; font-weight: 900; color: #ffd75e; }
+.tr-cur-top span { font-size: 11px; color: #b9ac8c; font-variant-numeric: tabular-nums; }
+.tr-cur-bar { height: 6px; margin: 7px 0 6px; border-radius: 999px; overflow: hidden; background: rgba(0,0,0,0.35); }
+.tr-cur-bar span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffcf7a, #ffd75e); }
+.tr-cur-note { margin: 0; font-size: 11px; line-height: 1.4; color: #a99c84; }
+.tr-cur-note b { color: #ffd75e; }
                 .tr-loading, .tr-err { padding: 26px 12px; text-align: center; color: var(--muted, #9aa4b2); font-size: 0.88rem; }
             `}</style>
 
@@ -303,6 +313,24 @@ export default function TrophyRoom({ active, initial = null }) {
                     </em>
                 ) : null}
             </div>
+
+            {/* ── THE CURATOR'S BONUS ──────────────────────────────────────────────────────────────────────
+                The live number, in the room it is earned in — not a tooltip elsewhere explaining that a
+                bonus exists. It says what you are being paid RIGHT NOW and what one more upgrade is worth,
+                so the reason to fill a wall in is on the wall itself. */}
+            {room?.curation ? (
+                <div className="tr-curation">
+                    <div className="tr-cur-top">
+                        <b>+{room.curation.bonusPct}% XP &amp; gold</b>
+                        <span>{room.curation.built} of {room.curation.buildable} upgrades · {room.curation.pct}%</span>
+                    </div>
+                    <div className="tr-cur-bar"><span style={{ width: `${room.curation.pct}%` }} /></div>
+                    <p className="tr-cur-note">
+                        Every upgrade you buy anywhere in the Den fills this wall and raises the bonus on
+                        everything you earn — up to <b>+{room.curation.maxBonus}%</b> with the room full.
+                    </p>
+                </div>
+            ) : null}
 
             {err ? (
                 <p className="tr-err">Couldn&apos;t open the trophy room just now. Try again in a moment.</p>

@@ -553,6 +553,28 @@ export async function trophyRoom(buyerId) {
 
     const meRow = den.rows.get(buyerId);
     const lvl = levelForXp(Number(meRow?.xp) || 0).level;
+
+    // ── THE CURATOR'S BONUS ──────────────────────────────────────────────────────────────────────────────
+    // How full the wall is, over EVERY upgrade track in the game, and what that is currently paying you.
+    //
+    // It counts the tools (things you bought levels in) and not the records (things you did), because only
+    // the tools have a ceiling. A record has no denominator — "cooked 400 dishes" is not 4% of anything — so
+    // folding them in would invent a completion figure out of numbers that cannot complete.
+    //
+    // Breadth is the whole point: one maxed track out of forty moves this barely, and a level in a system you
+    // have never touched moves it exactly as much as a level in your best one. That is the behaviour worth
+    // paying for — it is the room's own argument, that everything you have ever done hangs on one wall.
+    const builtAll = shelves.reduce((n, s) => n + (s.built || 0), 0);
+    const buildableAll = shelves.reduce((n, s) => n + (s.buildable || 0), 0);
+    const curationPct = buildableAll > 0 ? Math.max(0, Math.min(100, Math.round((builtAll / buildableAll) * 100))) : 0;
+    const bonusPct = curationBonusFor(curationPct);
+
+    // Persisted so awardXp can read it for free — see the note in 381-trophy-curation.sql. Written on every
+    // visit rather than on every upgrade, because the upgrades happen in nine different modules and a hook in
+    // each of them is nine chances to forget one.
+    await db.query(`UPDATE mkt_buyer SET trophy_pct = $2 WHERE id = $1 AND trophy_pct IS DISTINCT FROM $2`,
+        [buyerId, curationPct]).catch(() => {});
+
     return {
         memberCount: eligible.size,
         level: lvl,
@@ -561,8 +583,21 @@ export async function trophyRoom(buyerId) {
         // How many of the eleven walls you have actually touched — the room's one-line summary.
         touched: shelves.filter((s) => s.touched).length,
         total: shelves.length,
+        curation: { pct: curationPct, built: builtAll, buildable: buildableAll, bonusPct, maxBonus: CURATION_MAX_PCT },
     };
 }
+
+// ── WHAT A FULL WALL IS WORTH ────────────────────────────────────────────────────────────────────────────────
+// A standing % on all XP and gold, straight-line with how full the room is. Deliberately linear and small: it
+// sits on top of Happy Hour, the Town's prosperity, Market Day and the hangout buff, all of which multiply the
+// same number, and the last thing this economy needs is a fifth multiplier that spikes.
+//
+// Straight-line rather than tiered on purpose. A tier would mean levels that pay nothing until the next
+// threshold, which is the "N more until guaranteed" shape we do not ship — every single upgrade you buy
+// anywhere in the game should move this, even if only by a fraction of a percent.
+export const CURATION_MAX_PCT = 10;
+export const curationBonusFor = (pct) =>
+    Math.round(Math.max(0, Math.min(100, Number(pct) || 0)) * CURATION_MAX_PCT) / 100;
 
 // ── THE TWO SHELVES WITH NO TABLE OF THEIR OWN ───────────────────────────────────────────────────────────────
 // Farm and Den read off counts spread across a dozen tables. Both build a Map<buyerId, rowLikeObject> so the
