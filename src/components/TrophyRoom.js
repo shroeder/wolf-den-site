@@ -321,13 +321,13 @@ export default function TrophyRoom({ active, initial = null }) {
             {room?.curation ? (
                 <div className="tr-curation">
                     <div className="tr-cur-top">
-                        <b>+{room.curation.bonusPct}% XP &amp; gold</b>
+                        <b>+{room.curation.bonusPct}% bonus XP</b>
                         <span>{room.curation.built} of {room.curation.buildable} upgrades · {room.curation.pct}%</span>
                     </div>
                     <div className="tr-cur-bar"><span style={{ width: `${room.curation.pct}%` }} /></div>
                     <p className="tr-cur-note">
-                        Every upgrade you buy anywhere in the Den fills this wall and raises the bonus on
-                        everything you earn — up to <b>+{room.curation.maxBonus}%</b> with the room full.
+                        Every upgrade you buy anywhere in the Den fills this wall and raises the XP you earn
+                        on everything — up to <b>+{room.curation.maxBonus}%</b> with the room full.
                     </p>
                 </div>
             ) : null}

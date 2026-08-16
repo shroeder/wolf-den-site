@@ -166,35 +166,39 @@ export async function awardXp(buyerId, action, { points = null, gold = undefined
     try {
         // XP always advances the level; gold accrues separately (goldDelta) so payouts can give none.
         // ── THE CURATOR'S BONUS, APPLIED IN THE STATEMENT ────────────────────────────────────────────────
-        // How full your Trophy Room is pays a standing % on everything you earn. It is multiplied HERE, in
-        // SQL, rather than read first and applied in JS, because this function runs on every XP award in the
-        // game — the comment above celebrates removing a round-trip from this path and adding one back to
-        // fetch a percentage would undo that.
+        // How full your Trophy Room is pays a standing % of BONUS XP. Multiplied HERE, in SQL, rather than
+        // read first and applied in JS, because this function runs on every XP award in the game — the
+        // comment above celebrates removing a round-trip from this path, and fetching a percentage would
+        // put one straight back.
         //
-        // The applied amounts come back out of RETURNING and are used for the level-up maths and the coin
-        // ledger below. Recomputing them in JS would be two expressions that have to agree forever, and the
-        // one that decides your level would eventually disagree with the one that moved your XP.
+        // XP ONLY, DELIBERATELY. It rode on gold too at first. Gold is the tighter of the two economies here
+        // and the one that keeps needing walking back — the ladder nerf, the flat Happy Hour, awardXp paying
+        // gold 1:1 with points unless a caller says otherwise. A permanent multiplier on every gold award in
+        // the game is exactly the shape of thing that gets discovered three weeks later in a balance pass.
+        // Levels are the safe place to be generous.
+        //
+        // The applied XP comes back out of RETURNING and is used for the level-up maths, the pet's share and
+        // the return value. Recomputing it in JS would be two expressions that have to agree forever, and the
+        // one deciding your level would eventually disagree with the one that moved your XP.
         const CUR = "(1 + COALESCE(trophy_pct, 0) / 100.0)";
         const row = flat
-            ? await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp, $2::int AS pts_got, $3::int AS gold_got`, [buyerId, pts, goldDelta])
+            ? await db.queryOne(`UPDATE mkt_buyer SET xp = xp + $2, gold = gold + $3, updated_at = NOW() WHERE id = $1 RETURNING xp, $2::int AS pts_got`, [buyerId, pts, goldDelta])
             : await db.queryOne(
                 `UPDATE mkt_buyer
                     SET xp = xp + GREATEST(0, ROUND($2 * ${CUR}))::int,
-                        gold = gold + GREATEST(0, ROUND($3 * ${CUR}))::int,
+                        gold = gold + $3,
                         updated_at = NOW()
                   WHERE id = $1
-              RETURNING xp,
-                        GREATEST(0, ROUND($2 * ${CUR}))::int AS pts_got,
-                        GREATEST(0, ROUND($3 * ${CUR}))::int AS gold_got`,
+              RETURNING xp, GREATEST(0, ROUND($2 * ${CUR}))::int AS pts_got`,
                 [buyerId, pts, goldDelta]
             );
         // If this award crossed a level boundary, celebrate it with a browser push (once, at the crossing).
         if (row) {
-            // What ACTUALLY landed, not what was asked for — the two differ by the curator's bonus.
+            // What ACTUALLY landed, not what was asked for — the two differ by the curator's bonus. Gold is
+            // untouched by it, so goldDelta is already the real figure.
             const ptsGot = Number(row.pts_got) || 0;
             ptsApplied = ptsGot;
-            const goldGot = Number(row.gold_got) || 0;
-            if (goldGot !== 0) await logCoin(buyerId, goldGot, "xp_accrual", { meta: { action } }).catch(() => {});
+            if (goldDelta !== 0) await logCoin(buyerId, goldDelta, "xp_accrual", { meta: { action } }).catch(() => {});
             const newXp = Number(row.xp) || 0;
             const newLevel = levelForXp(newXp).level;
             const oldLevel = levelForXp(newXp - ptsGot).level;

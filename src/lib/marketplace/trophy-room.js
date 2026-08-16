@@ -555,7 +555,7 @@ export async function trophyRoom(buyerId) {
     const lvl = levelForXp(Number(meRow?.xp) || 0).level;
 
     // ── THE CURATOR'S BONUS ──────────────────────────────────────────────────────────────────────────────
-    // How full the wall is, over EVERY upgrade track in the game, and what that is currently paying you.
+    // How full the wall is, over EVERY upgrade track in the game, and the bonus XP that is currently paying.
     //
     // It counts the tools (things you bought levels in) and not the records (things you did), because only
     // the tools have a ceiling. A record has no denominator — "cooked 400 dishes" is not 4% of anything — so
@@ -588,9 +588,10 @@ export async function trophyRoom(buyerId) {
 }
 
 // ── WHAT A FULL WALL IS WORTH ────────────────────────────────────────────────────────────────────────────────
-// A standing % on all XP and gold, straight-line with how full the room is. Deliberately linear and small: it
-// sits on top of Happy Hour, the Town's prosperity, Market Day and the hangout buff, all of which multiply the
-// same number, and the last thing this economy needs is a fifth multiplier that spikes.
+// A standing % of BONUS XP, straight-line with how full the room is. XP only — gold is the tighter economy
+// and the one that keeps needing walking back, so levels are the safe place to be generous. Deliberately
+// linear and small: it sits on top of Happy Hour, the Town's prosperity, Market Day and the hangout buff,
+// all of which multiply the same number, and the last thing this needs is a fifth multiplier that spikes.
 //
 // Straight-line rather than tiered on purpose. A tier would mean levels that pay nothing until the next
 // threshold, which is the "N more until guaranteed" shape we do not ship — every single upgrade you buy
