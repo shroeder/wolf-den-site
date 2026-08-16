@@ -346,6 +346,14 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
                 {(f?.accuracy ?? 1) < 1 ? (
                     <i title="Chance a plain swing connects"><b>{Math.round((f.accuracy ?? 1) * 100)}%</b> acc</i>
                 ) : null}
+                {/* SPEED, ON BOTH SIDES. It decides exactly one thing — who takes the first beat — and the
+                    bout said "you open" for a single beat without ever showing the number that caused it, so
+                    the only honest answer to "how is speed determined" lived in the source. Printing both
+                    makes the comparison the mechanic actually performs visible at a glance, and puts the
+                    number next to the gear decision that moves it. SoullessShiitake asked, 2026-08-16. */}
+                {(f?.speed || 0) > 0 ? (
+                    <i title="Initiative — the faster fighter takes the first beat (a tie goes to the challenger). 10 + 0.3 per level + 0.5 per point of Ferocity."><b>{Math.round(f.speed)}</b> speed</i>
+                ) : null}
             </span>
         </div>
     );
@@ -1267,10 +1275,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             {bout.underdog > 1 ? (
                                 <span className="ar-tag is-under">Outgunned · +{Math.round((bout.underdog - 1) * 100)}% swing</span>
                             ) : null}
-                            {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here. */}
+                            {/* Who opened, and why. Speed comes off Ferocity, which until now did nothing in here.
+                                It now shows the two numbers it compared: "you're faster" is an assertion, and
+                                18 vs 15 is the reason — and on a TIE it says so outright, because "you open"
+                                while both bars read the same number looks like a bug rather than the rule. */}
                             {bout.beat <= 1 && bout.opener ? (
                                 <span className={`ar-tag ${bout.opener === "you" ? "is-good" : "is-bad"}`}>
-                                    {bout.opener === "you" ? "You're faster — you open" : `${bout.foe.name} is faster — they open`}
+                                    {Math.round(bout.me?.speed || 0) === Math.round(bout.foe?.speed || 0)
+                                        ? `Speed tied ${Math.round(bout.me?.speed || 0)} — the challenger opens`
+                                        : `${bout.opener === "you" ? "You're faster" : `${bout.foe.name} is faster`} · speed ${Math.round(bout.me?.speed || 0)} v ${Math.round(bout.foe?.speed || 0)} — ${bout.opener === "you" ? "you" : "they"} open`}
                                 </span>
                             ) : null}
                         </span>
