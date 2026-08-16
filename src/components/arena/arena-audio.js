@@ -504,27 +504,8 @@ const HAND = [0, 2, 4, 6, 8, 10];
 const PULSES = [0, 6];
 const HARD = [9];                                   // the extra kick, once it is going badly
 
-// ── THE MELODY ── [step, degree, lengthInSteps] per bar. Degrees are Dorian steps from D; 7 is the octave.
-// It enters in bar 3, holds its peak over the IV and the v in bars 11-12, and walks home in bar 16. Bars 1, 2
-// and 8 are deliberately empty — the holes are where the drums answer, and a line with no holes is a drone.
-const MELODY = [
-    [],                                             // 1  let the gallop establish
-    [],                                             // 2
-    [[0, 7, 4], [6, 6, 4]],                         // 3  D' then C over the bVII
-    [[0, 5, 6], [8, 4, 4]],                         // 4  B over the major IV — the colour, stated plainly
-    [[0, 4, 6]],                                    // 5  A, held
-    [[0, 3, 4], [6, 4, 4]],                         // 6  G, A
-    [[0, 6, 6], [8, 5, 4]],                         // 7  C, B
-    [],                                             // 8  the answer
-    [[0, 7, 6], [8, 8, 4]],                         // 9  up into the B section
-    [[0, 6, 8]],                                    // 10 C, held
-    [[0, 5, 4], [4, 6, 4], [8, 7, 4]],              // 11 B-C-D' climbing over the IV
-    [[0, 4, 10]],                                   // 12 A over the v — the top of the arc
-    [[0, 8, 4], [6, 7, 4]],                         // 13 E'-D' coming down
-    [[0, 6, 6], [8, 5, 4]],                         // 14 C-B over the IV again
-    [[0, 4, 6], [8, 3, 4]],                         // 15 A-G
-    [[0, 2, 3], [4, 1, 3], [8, 0, 4]],              // 16 F-E-D: home, and round again
-];
+// The written melody that used to live here is deleted, not commented out — see the note in
+// scheduleStep. A tune nobody plays is just a table waiting to be switched back on by accident.
 
 /** A struck drum: a pitched body that drops fast, plus a noise transient so it has a stick on it. */
 function drum(t, { freq = 92, drop = 52, gain = 0.4, dur = 0.34, tone: toneQ = 380 }) {
@@ -597,8 +578,11 @@ function scheduleStep(i, t) {
     // ── THE GALLOP ── the spine. Big drum on the two pulses, hand drum filling the triplet underneath, so the
     // bar breathes in three rather than sitting flat.
     if (PULSES.includes(beat)) {
+        // DEEPER AND LONGER than they were. At 108Hz through a phone speaker the big drum was a knock; the
+        // low end is most of what makes a room sound large, and it is the layer that has to carry the track
+        // now that the tune is gone.
         const down = beat === 0;
-        drum(t, { freq: down ? 108 : 96, drop: down ? 44 : 54, gain: down ? 0.42 : 0.3, dur: down ? 0.36 : 0.28 });
+        drum(t, { freq: down ? 82 : 74, drop: down ? 34 : 40, gain: down ? 0.5 : 0.34, dur: down ? 0.46 : 0.34 });
     } else if (HAND.includes(beat) && lv > 0.12) {
         drum(t, { freq: 190, drop: 120, gain: 0.1 + lv * 0.05, dur: 0.1, tone: 1200 });
     }
@@ -660,26 +644,10 @@ function scheduleStep(i, t) {
         });
     }
 
-    // ── CHOIR ── detuned triangles an octave up, and ONLY in the B section. Keeping them out of A is what
-    // makes the lift at bar 9 land: you cannot raise something that was already there.
-    if (beat === 0 && bar >= 8 && lv > 0.3) {
-        [semi(chord.root), semi(chord.root + chord.third), semi(chord.root + 7)].forEach((fr) => {
-            const o = ctx.createOscillator();
-            const g = ctx.createGain();
-            const lfo = ctx.createOscillator();
-            const lg = ctx.createGain();
-            o.type = "triangle"; o.frequency.value = fr * 2;
-            lfo.type = "sine"; lfo.frequency.value = 5.4;
-            lg.gain.value = 1.8;                    // cents of vibrato, via detune
-            g.gain.setValueAtTime(0.0001, t);
-            g.gain.linearRampToValueAtTime(0.014 + lv * 0.02, t + SPB * 0.7);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 1.9);
-            lfo.connect(lg); lg.connect(o.detune);
-            o.connect(g); g.connect(musicBus);
-            o.start(t); lfo.start(t);
-            o.stop(t + SPB * 2); lfo.stop(t + SPB * 2);
-        });
-    }
+    // ── NO CHOIR EITHER ──────────────────────────────────────────────────────────────────────────────
+    // Detuned triangles an octave up with a 5.4Hz vibrato. On paper that is a choir; through a phone speaker
+    // it is a theremin, and it was the second half of what made this sound cheap. The B section lifts on the
+    // swell, the crowd and the drums now — all texture, none of it pretending to be a voice.
 
     // ── THE ANVIL ── a hammer on iron, on the second pulse, once the fight is worth watching. Two inharmonic
     // partials plus a bandpassed crack: a bell rings, an anvil CLANGS, and the difference is that the partials
@@ -697,30 +665,40 @@ function scheduleStep(i, t) {
         air(t, { from: 3200, to: 3200, q: 1.4, peak: 0.045 * lv, attack: 0.002, hold: 0.01, release: 0.08 });
     }
 
-    // ── THE MELODY ── a struck string rather than a bleep: a filtered square with a fast body plus a quiet
-    // twelfth above it, so it reads as something with a soundboard. Enters once the fight has a shape.
-    if (lv > 0.4) {
-        for (const [at, deg, len] of MELODY[bar]) {
-            if (at !== beat) continue;
-            const fr = step(deg, 1) * tr;
-            const hold = SPS * len;
-            for (const [mult, vol, wave] of [[1, 0.058, "square"], [3, 0.011, "sine"]]) {
-                const o = ctx.createOscillator();
-                const f = ctx.createBiquadFilter();
-                const g = ctx.createGain();
-                o.type = wave;
-                o.frequency.value = fr * mult;
-                f.type = "lowpass";
-                f.frequency.setValueAtTime(1400, t);
-                f.frequency.linearRampToValueAtTime(2800 + lv * 1800, t + 0.04);
-                f.frequency.linearRampToValueAtTime(1300, t + hold);
-                g.gain.setValueAtTime(0.0001, t);
-                g.gain.linearRampToValueAtTime(vol * (0.6 + lv * 0.4), t + 0.02);
-                g.gain.setValueAtTime(vol * (0.6 + lv * 0.4), t + hold * 0.7);
-                g.gain.exponentialRampToValueAtTime(0.0001, t + hold);
-                o.connect(f); f.connect(g); g.connect(musicBus);
-                o.start(t); o.stop(t + hold + 0.02);
-            }
+    // ── NO MELODY, ON PURPOSE ────────────────────────────────────────────────────────────────────────
+    // There WAS one here: a filtered square playing a written tune in Dorian over a 6/8 gallop. Luke: "the
+    // arena music is trash, everything else you made sounds great. this one is exceptionally naf."
+    //
+    // He is right, and the two halves of that sentence are the same observation. Every sound effect in this
+    // file is a TRANSIENT or a TEXTURE — an impact, a crack, a breath of noise — and synthesis is superb at
+    // those. A square wave playing a TUNE is the one thing synthesis is uniquely bad at: there is no
+    // performance in it, every note is identical, and the ear has heard exactly that timbre in a thousand
+    // free games. Drums and a drone read as a place. A melody on an oscillator reads as a ringtone.
+    //
+    // So the tune is gone rather than fixed. What is left is the room: the crowd, the gallop, the bowed
+    // drone, the anvil, and the swell below — none of which is trying to be hummable.
+
+    // ── THE SWELL ── low brass, and the only thing carrying pitch now. Two saws a fifth apart under a filter
+    // that OPENS across most of a bar, so it arrives like a section leaning in rather than a note being
+    // played. Once per half — bar 1 and bar 9 — so the form still has a shape without a tune to carry it.
+    if (beat === 0 && (bar === 0 || bar === 8) && lv > 0.22) {
+        for (const [mult, det] of [[1, -6], [1, 6], [1.5, 0]]) {
+            const o = ctx.createOscillator();
+            const f = ctx.createBiquadFilter();
+            const g = ctx.createGain();
+            o.type = "sawtooth";
+            o.frequency.value = semi(chord.root) * mult;
+            o.detune.value = det;
+            f.type = "lowpass";
+            f.frequency.setValueAtTime(180, t);
+            f.frequency.linearRampToValueAtTime(900 + lv * 900, t + SPB * 2.2);
+            f.frequency.linearRampToValueAtTime(240, t + SPB * 3.6);
+            f.Q.value = 3;
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(0.05 + lv * 0.045, t + SPB * 1.6);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + SPB * 3.8);
+            o.connect(f); f.connect(g); g.connect(musicBus);
+            o.start(t); o.stop(t + SPB * 4);
         }
     }
 
