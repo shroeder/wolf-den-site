@@ -8,7 +8,7 @@
 // stops the tree from turning into "spend gold to win": no amount of gold buys a skill point.
 export const ARENA_UPGRADES = [
     {
-        id: "conditioning", name: "Conditioning", icon: "/images/arena/track/conditioning.webp", max: 20, base: 240, stat: "health", per: 6,
+        id: "conditioning", name: "Conditioning", icon: "/images/arena/track/conditioning.webp", max: 20, base: 240, stat: "health", per: 30,
         desc: "Ring fitness. More health to spend before somebody takes it off you.",
         unit: (v) => `+${Math.round(v)} health`,
     },

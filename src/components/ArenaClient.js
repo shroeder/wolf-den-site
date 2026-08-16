@@ -5,7 +5,7 @@ import PetStoneShelf from "@/components/PetStoneShelf";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-    GiAngryEyes, GiFlame, GiDroplets, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
+    GiAngryEyes, GiFlame, GiDroplets, GiHearts, GiCrackedShield, GiCrossedSwords, GiExitDoor, GiIciclesAura, GiRingingBell, GiSpikedHalo, GiTerror, GiTombstone, GiChainedHeart, GiKnapsack, GiPadlock, GiReturnArrow, GiScrollUnfurled, GiShield, GiSoundOff, GiSoundOn, GiSpellBook, GiSwordWound,
 } from "react-icons/gi";
 
 import useScrollLock from "@/lib/useScrollLock";
@@ -1110,6 +1110,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             } else if (l.grade === "miss") {
                 sub.push({ side: target, n: null, text: "MISS", kind: "miss" });
             }
+            // The burn's own number waits a beat behind whatever swing preceded it, for the same reason.
+            if (l.grade === "burn") for (const p of sub) if (p.at == null) p.at = 260;
             // ── AND THEY BELONG TO WHOEVER EARNED THEM ──────────────────────────────────────────────────────
             // All three of these were pinned to "left", which is YOU. Damage was already handled correctly, so a
             // blow you took floated over you and a blow you landed floated over them — but a heal, a block and a
@@ -1119,7 +1121,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const mine = l.who === "you";
             const ownSide = mine ? "left" : "right";
             if (l.blocked > 0) sub.push({ side: ownSide, n: l.blocked, kind: "block", at: 120 });
-            if (l.healed > 0) sub.push({ side: ownSide, n: l.healed, kind: "heal" });
+            // ── A CONSEQUENCE ARRIVES AFTER ITS CAUSE ────────────────────────────────────────────────────
+            // Luke: "he attacks, he misses, the burn damage ticks on him, which heals me... but because it all
+            // happens at the same time, none of that is clear." Every number used to land on the same frame,
+            // so a three-part sentence — swing, then burn, then drink — read as one shapeless flash.
+            // A damage-over-time tick is a SEPARATE beat of the story from the blow it follows, and the heal it
+            // feeds is a third. Staggered far enough apart to be read in order rather than seen at once.
+            const isDot = l.grade === "burn";
+            if (l.healed > 0) sub.push({ side: ownSide, n: l.healed, kind: "heal", at: isDot ? 520 : 300 });
             // Lifesteal off thorns and ripostes lands on THEIR log line (it happens during their swing), so it
             // floats over whoever drank it rather than over the fighter whose line it is written on.
             // ALWAYS YOURS. `stolen` is only ever written on the opponent's swing line (it is your lifesteal off
@@ -1451,6 +1460,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             {it.text
                                                 ? it.text
                                                 : <>
+                                                    {/* Luke: "when anyone heals, there should be a green heart, and
+                                                        then green text that floats above them just like we do other
+                                                        text in the arena." The colour was already green; without a
+                                                        mark beside it a +14 is just a number in a fight full of them. */}
+                                                    {it.kind === "heal" ? <GiHearts className="ar-pop-dot" aria-hidden="true" /> : null}
                                                     {it.kind === "heal" ? "+" : it.kind === "block" || it.kind === "ward" || it.kind === "brace" ? "" : "−"}
                                                     {it.n}{it.kind === "brace" ? "%" : ""}
                                                 </>}

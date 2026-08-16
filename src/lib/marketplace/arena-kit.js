@@ -479,7 +479,21 @@ export const SWING_BASE = 11;
 
 // The boss fight's crit, verbatim (boss.js: 0.25 base, 2.5 multiplier). Two crit models for one player was a
 // trap on its own — a Fortune kit critted constantly in here and never against the boss.
-export const CRIT_BASE = 0.25;
+// ── EVERYBODY WAS CAPPED ─────────────────────────────────────────────────────────────────────────────────────
+// Base was 25% and the cap 65%, so gear only had FORTY points of room — and a top loadout carries 75. Ten of
+// the Den's 66 geared members sat exactly on the ceiling, which means every point of crit they owned above the
+// fortieth bought nothing, and the stat stopped being a decision for precisely the people most invested in it.
+// Luke: "it's kind of pointless at this point if everyone has 65% capped... maybe we need to nerf real gear's
+// crit chance. I know that would nerf everything across the board but I mean that's kind of the point."
+//
+// Two changes rather than one, because either alone leaves it broken:
+//   BASE 25% -> 20%   there has to be somewhere to climb FROM.
+//   GEAR /100 -> /200 the divisor is the real fix. Halving what a point is worth doubles the room without
+//                     touching a single item, so no piece of gear has to be rebalanced by hand.
+// At 75 crit stat — the best loadout in the Den — that is 20 + 37.5 = 57.5%, under the cap with headroom left.
+// The median 16 goes from 41% to 28%. Nobody is pinned, and the spread is thirty points wide instead of four.
+export const CRIT_BASE = 0.20;
+export const CRIT_PER_POINT = 200;
 // ── BOTH HALVES OF CRIT ARE CAPPED, AND THE SECOND ONE NEVER WAS ─────────────────────────────────────────────
 // Chance was capped at 0.9 and power was capped at nothing at all, which is the combination that makes a fight
 // stop being a fight: at 90% every swing is effectively a critical, so the multiplier is not a spike any more,
@@ -500,7 +514,7 @@ export const CRIT_BASE = 0.25;
 export const CRIT_CAP = 0.65;
 export const CRIT_MULT_BASE = 2.5;
 export const CRIT_MULT_CAP = 3;
-export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / 100 + bonus);
+export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / CRIT_PER_POINT + bonus);
 export const critMultFrom = (critPower = 0, bonus = 0) =>
     Math.min(CRIT_MULT_CAP, CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus);
 

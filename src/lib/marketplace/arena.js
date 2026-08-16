@@ -1829,7 +1829,7 @@ export async function fightRound(buyerId, opts = {}) {
                 b.foeHp += theyDrank;
             }
             if (tick > 0) {
-                b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend",
+                b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend", healed: theyDrank,
                     text: `You are still burning — another ${tick}.${theyDrank ? ` They drink ${theyDrank} of it back.` : ""}`,
                     ability: null });
             }
@@ -2220,7 +2220,9 @@ export async function fightRound(buyerId, opts = {}) {
                 b.hp += drank;
             }
             if (tick > 0) {
-                b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "rend",
+                // `healed` is what the SCREEN needs: the drink was in the sentence and nowhere else, so the
+                // only sign of it was the health bar moving. Naming it here is what floats the green number.
+                b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "rend", healed: drank,
                     text: `The burn takes another ${tick}.${drank ? ` You drink ${drank} of it back.` : ""}`,
                     ability: null });
             }
