@@ -184,6 +184,9 @@ const FISH_BONUS = {
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
+// Coin per step of that table now the treasure wedge pays doubloons instead of chest shards. A ship battle
+// pays ~12, so a common haul is a few coins and a mythic is most of a fight.
+const FISH_DOUBLOONS_PER_STEP = 3;
 // Which chest a chest-drop gives. Wooden is the floor so a common's rare chest hit isn't better than a raid's,
 // and gold (tier 3) is the CEILING — fishing shouldn't out-drop a raid or the boss, it should just pay out
 // more often than it did.
@@ -341,16 +344,13 @@ async function grantHaul(buyerId, kind, tier = "common") {
         };
     }
     if (kind === "fragment") {
-        const n = FRAGMENT_COUNT[tier] || 1;
-        const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-        const frag = await grantFragment(buyerId, n).catch(() => null);
-        // "Chest Fragment", NOT the "Hull Shard" this used to invent. Sailing has called these chest fragments
-        // since day one — they're pieces you forge into a treasure chest — and inventing a third name for the
-        // same object left people asking what a Hull Shard even was. It also collided with the Forge's salvage
-        // tiers (Cinder Scrap … Emberheart Shard), which are a completely unrelated currency.
-        // Name the TIER + show that tier's shard art, so it's obvious which chest these are forging toward.
-        const fname = frag?.name || "Wooden";
-        return { kind: "fragment", label: `${n > 1 ? `${n} ` : ""}${fname} Chest Fragment${n > 1 ? "s" : ""}`, emoji: "🔷", n, where: "Stored on your boat", spriteUrl: frag?.art || "/images/sailing/fragment-wooden.png" };
+        // WAS a chest shard. Chests come only from digging now, so the line pays DOUBLOONS — which suits
+        // fishing better anyway: you are hauling coin off the sea floor, not a piece of a chest that assembles
+        // itself two screens away. Scaled by the catch's rarity on the same curve the shard count used.
+        const n = (FRAGMENT_COUNT[tier] || 1) * FISH_DOUBLOONS_PER_STEP;
+        const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
+        await grantDoubloons(buyerId, n).catch(() => {});
+        return { kind: "doubloons", label: `${n} Doubloon${n === 1 ? "" : "s"}`, emoji: "🪙", n, where: "Stored on your boat", spriteUrl: "/images/sailing/doubloon.png" };
     }
     if (kind === "seed") {
         // KEPT, because this one is not a bolt-on: `seed` is a wedge in the treasure table above, so the line

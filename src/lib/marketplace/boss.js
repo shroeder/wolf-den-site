@@ -21,7 +21,7 @@ import { recordGift } from "@/lib/marketplace/gifts.js";
 import { activeDamageMult, getActiveBuff } from "@/lib/marketplace/boss-buff.js";
 import { memberDamageMult, memberBonusStrikes, activeBoosts } from "@/lib/marketplace/consumables.js";
 import { signatureStrikeBonus, signatureForcesCrit, signatureHit, signatureOnHit, beastbondMult, warbannerBonusForItem, rollCheerProcs } from "@/lib/marketplace/signatures.js";
-import { grantFragment } from "@/lib/marketplace/sailing.js";
+import { grantDoubloons } from "@/lib/marketplace/sailing.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
 import { syncEarnedBadges, grantRandomDropBadge, getBadgePassives } from "@/lib/marketplace/badges.js";
 import { grantBossTrophy } from "@/lib/marketplace/boss-trophy.js";
@@ -1436,6 +1436,9 @@ export async function unleashBoss(buyerId, max = 500) {
 export const CHEERS_PER_DAY = 3;
 const CHEER_XP = 10;
 const CHEER_GOLD = 10;
+// What the Cheer proc pays now that it cannot pay a chest shard. A ship battle pays ~12, so this is a
+// small, welcome trickle rather than a reason to farm cheers.
+const CHEER_DOUBLOONS = 6;
 const CHEER_DMG_MIN = 45;
 const CHEER_DMG_MAX = 85;
 const CHEER_DAY = "(NOW() AT TIME ZONE 'America/Chicago')::date"; // store-local day, same as the swing counter
@@ -1482,7 +1485,9 @@ export async function cheer(buyerId, targetId) {
     await awardXp(buyerId, "cheer", { points: xpGain, gold: goldGain }).catch(() => {});
     await trackActivity(buyerId, "cheer", { xp: xpGain, gold: goldGain, toId: targetId, toName: target.display_name || target.alias, damage: dmg }).catch(() => {});
     if (procs.petXp > 0) await addEquippedPetXp(buyerId, procs.petXp).catch(() => {});
-    if (procs.fragment) await grantFragment(buyerId, 1).catch(() => {});
+    // Was a chest shard. Chests come only from digging now, so the proc pays coin — the sailing merchant
+    // stocks cross-system items, so this is still worth something to a member who never sails.
+    if (procs.fragment) await grantDoubloons(buyerId, CHEER_DOUBLOONS).catch(() => {});
 
     // The cheered hero surges — bonus damage credited to THEM (kind='cheer' keeps it out of manual swing counts).
     let hp = boss.hp, maxHp = boss.max_hp;

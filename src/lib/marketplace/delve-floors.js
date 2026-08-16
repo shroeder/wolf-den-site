@@ -446,7 +446,12 @@ export async function finishDelveRun(ctx, run, { died = false, cleared = false, 
         if (n > 0) await addParts(buyerId, Number(tier), n).catch(() => {});
     }
     if (run.banked.frags > 0) {
-        try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, run.banked.frags, "wooden"); } catch { /* best-effort */ }
+        // Banked chest shards used to fuse into a chest. Chests come only from digging now, so a run pays
+        // coin for them instead — 3 doubloons a shard, the wooden rate used everywhere else.
+        try {
+            const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
+            await grantDoubloons(buyerId, run.banked.frags * 3);
+        } catch { /* best-effort */ }
     }
 
     // ── DRESS THE HAUL ───────────────────────────────────────────────────────────────────────────────────

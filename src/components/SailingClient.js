@@ -35,10 +35,13 @@ const HEAT_WORD = { 3: "HOT", 2: "WARM", 1: "COOL", 0: "COLD" };
 const BATTLE_ACTIONS = new Set(["battle"]);
 // An uncovered chest cell shows ITS SLICE of the real chest sprite (positioned like a sprite-sheet), so the
 // tiles assemble into one recognizable treasure chest as you dig it out.
-function chestSlice(cp) {
+// THE CHEST YOU ARE DIGGING UP IS THE CHEST YOU GET. This sliced one generic prop for every dig, so a gold
+// chest and a wooden one came out of the ground looking identical and the tier only appeared afterwards on a
+// results card. It takes the buried tier's REAL art now — the same sprite the chest has in your stash.
+function chestSlice(cp, art) {
     if (!cp) return undefined;
     return {
-        backgroundImage: "url(/images/sailing/dig-chest.png)",
+        backgroundImage: `url(${art || "/images/sailing/dig-chest.png"})`,
         backgroundSize: `${cp.W * 100}% ${cp.H * 100}%`,
         backgroundPosition: `${cp.W > 1 ? (cp.rc / (cp.W - 1)) * 100 : 50}% ${cp.H > 1 ? (cp.rr / (cp.H - 1)) * 100 : 50}%`,
     };
@@ -211,7 +214,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [state, setState] = useState(initial);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState(null);
-    const [forge, setForge] = useState(null); // the chest just forged from fragments
     const [levelUp, setLevelUp] = useState(null); // the new level, when an upgrade levels the boat up
     const [formUnlock, setFormUnlock] = useState(null); // the milestone form just unlocked (every 10 levels)
     const [inspectForm, setInspectForm] = useState(null); // a boat form being inspected (locked or not)
@@ -543,7 +545,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     const crossed = (d.forms || []).find((f) => f.level > prevLevel && f.level <= d.level);
                     if (crossed) { sfx.levelUp(); setFormUnlock(crossed); } else { sfx.hammer(); setLevelUp(d.level); }
                 }
-                if (d.forged) { sfx.hammer(); setForge(d.forged); } // metallic "ting" as the chest is forged
                 if (d.windRefunded) { setWindSaved(true); setTimeout(() => setWindSaved(false), 2400); }
                 if (d.waved) { sfx.gust(); const k = Date.now(); setWaveFx({ ...d.waved, k }); setTimeout(() => setWaveFx((w) => (w?.k === k ? null : w)), 2200); }
                 // A resolved battle — fleet or rival — plays out in the ship-battle scene. Clearing the target
@@ -614,6 +615,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
 
     const level = state.level;
     const dig = state.dig;
+    // The real art for the tier actually buried on THIS board, looked up from the map the state carries.
+    // Falls back to the generic prop only if a board predates the tier being named on it.
+    const buriedChestArt = (state.chestArtMap || {})[dig?.chestTier] || "/images/sailing/dig-chest.png";
     const windCost = state.windRecharge?.cost ?? 0;
     const windTooPoor = windCost > 0 && state.gold < windCost;
     const resetCost = state.raid?.reset?.cost ?? 0;
@@ -750,7 +754,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                         onClick={() => (willScan ? senseTile(r, c) : digTile(r, c))}
                                         title={bottomed ? (t.found ? "Part of the chest!" : t.item ? `Found: ${t.item.name}!` : "Empty — nothing here") : t.sense != null ? `Scan: ${HEAT_WORD[t.sense]} — the chest is ${t.sense >= 3 ? "right near here" : t.sense === 2 ? "close" : t.sense === 1 ? "a ways off" : "far away"}` : willScan ? "Tap to scan this spot" : `${t.depth} layer${t.depth === 1 ? "" : "s"} of dirt — tap to dig`}
                                     >
-                                        {t.found ? <span className="dig-chestcell" aria-hidden="true" style={chestSlice(t.chestPos)}><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
+                                        {t.found ? <span className="dig-chestcell" aria-hidden="true" style={chestSlice(t.chestPos, buriedChestArt)}><span className="dig-chest-burst">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ "--i": i }} />)}</span></span>
                                             : bottomed ? (t.item ? <span className="dig-item" title={t.item.name}>{t.item.emoji}</span> : <span className="dig-hole" aria-hidden="true" />)
                                                 : <><span className="dig-dirt" aria-hidden="true" />{t.sense != null ? <span className="dig-heat" aria-hidden="true">{t.sense >= 3 ? "🔥" : t.sense === 2 ? "♨️" : t.sense === 1 ? "❄️" : "🧊"}<small>{HEAT_WORD[t.sense]}</small></span> : null}</>}
                                         {chunk && chunk.r === r && chunk.c === c ? (
@@ -1064,52 +1068,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 {/* Boat identity — level + form come from upgrades, not digging. */}
                 <div className="sail-boatline">
                     <div><span className="sail-boatname">{boatName}</span> <Stars level={level} /><span className="muted" style={{ marginLeft: 8 }}>Lv {level} · Form {state.tier}/{state.boatTiers}</span></div>
+                    {/* Shard chips lived here. The sea pays doubloons now, so this shows the purse you can
+                        actually spend at the merchant. */}
                     <span className="muted sail-boatline-frag">
-                        {(() => {
-                            const held = (state.fragmentTiers || []).filter((f) => f.count > 0);
-                            const chips = held.length ? held : [{ tier: "wooden", art: "/images/sailing/fragment-wooden.png", count: 0 }];
-                            return chips.map((f) => (
-                                <span key={f.tier} className="sail-frag-chip"><FragmentIcon size={14} art={f.art} /> {f.count}</span>
-                            ));
-                        })()}
+                        <span className="sail-frag-chip">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/sailing/doubloon.png" alt="" width={14} height={14} style={{ objectFit: "contain", verticalAlign: "-2px" }} />
+                            {" "}{(state.doubloons || 0).toLocaleString()}
+                        </span>
                         <span className="sail-frag-gold">🪙 {state.gold.toLocaleString()}</span>
                     </span>
                 </div>
             </section>
 
             <FeatureDailies feature="sailing" refreshKey={bountyTick} />
-
-            {/* Your fragment hold — one row per shard tier, each forging its matching chest. */}
-            <section className="card sail-hold">
-                <div className="sail-hold-title">Your fragment hold</div>
-                <div className="muted sail-hold-sub">Dig shards on the island. <b>{state.fragmentsPerChest || 10}</b> of a kind forge that chest — better shards come from longer voyages.</div>
-                <div className="sail-hold-tiers">
-                    {(state.fragmentTiers || []).map((f) => {
-                        const per = f.perChest || 10;
-                        const toward = f.count % per;
-                        const ready = f.count >= per;
-                        return (
-                            <div className="sail-hold-tier" key={f.tier}>
-                                <FragmentIcon size={38} art={f.art} />
-                                <div className="sail-hold-tier-body">
-                                    <div className="sail-hold-tier-top">
-                                        <span className="sail-hold-tier-name" style={{ color: f.color }}>{f.name}</span>
-                                        <span className="sail-hold-tier-count">×{f.count}</span>
-                                    </div>
-                                    <div className="sail-hold-bar"><span style={{ width: `${Math.round((toward / per) * 100)}%`, background: f.color }} /></div>
-                                    <div className="muted sail-hold-note">{toward}/{per} toward a {f.chestLabel}{f.droppable ? "" : " · not found at sea yet"}</div>
-                                </div>
-                                {ready ? (
-                                    <button className="sail-cta sail-forge-btn" disabled={busy} onClick={() => act("forge_chest", { tier: f.tier })}>🔨 {f.chestImage
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        ? <img className="sail-forge-btn-chest" src={f.chestImage} alt="" />
-                                        : <ChestIcon tier={f.tier} size={22} />}</button>
-                                ) : null}
-                            </div>
-                        );
-                    })}
-                </div>
-            </section>
 
             {/* The sea's collection sits OUTSIDE the stations and collapsed. It belonged to the Helm only by
                 accident of where it was pasted, and open it pushed the boat upgrades a screen down — but it is
@@ -1460,14 +1432,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                 which is every items-only dig, so a haul with no fragments in it still showed a
                                 wooden fragment as its hero. No fragments now means no fragment sprite. */}
                             {result.won
-                                ? <span className="sail-recap-frag"><FragmentIcon size={70} art={result.haul?.[0]?.art || result.relic?.art || result.items?.find((i) => i.art)?.art || "/images/sailing/dig-chest.png"} /></span>
+                                ? <span className="sail-recap-frag"><FragmentIcon size={70} art={result.chest?.art || result.relic?.art || result.items?.find((i) => i.art)?.art || "/images/sailing/dig-chest.png"} /></span>
                                 : <span className="sail-recap-rock">🪨</span>}
                         </div>
                         <h2 style={{ margin: "4px 0" }}>{result.won
                             ? (result.fullArtifact ? "Chest unearthed! 🎁" : "Chest partly uncovered")
                             : "The dig came up empty"}</h2>
                         <p className="muted" style={{ marginTop: 0 }}>{result.won
-                            ? `You exposed ${result.uncovered}/${result.total} of the chest and hauled out ${result.earned} fragment${result.earned === 1 ? "" : "s"}${result.bonus ? ` (+${result.bonus} lucky strike${result.bonus === 1 ? "" : "s"})` : ""}${result.items?.length ? `, and dug up ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"}` : ""}.`
+                            ? (result.chest
+                                ? `You dug the whole thing out — the ${result.chest.name} is yours${result.doubloons ? `, plus ${result.doubloons} doubloons` : ""}${result.items?.length ? `, and you grabbed ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"} on the way` : ""}.`
+                                : `You exposed ${result.uncovered}/${result.total} of the chest before the light went — ${result.doubloons} doubloons for what you shifted${result.items?.length ? `, and you grabbed ${result.items.reduce((s, it) => s + it.n, 0)} item${result.items.reduce((s, it) => s + it.n, 0) === 1 ? "" : "s"}` : ""}.`)
                             : "Nothing but bare rock this time. Sail out and try a new island."}</p>
                         {result.reveal ? (
                             <div className="sail-reveal">
@@ -1484,12 +1458,20 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             </div>
                         ) : null}
                         <div className="sail-recap-rows">
-                            {result.won && result.haul?.length ? result.haul.map((h) => (
-                                <div className="sail-recap-row" key={h.tier}>
-                                    <span><FragmentIcon size={16} art={h.art} /> {h.name} shard{h.n === 1 ? "" : "s"}</span>
-                                    <b className="sail-recap-pos" style={{ color: h.color }}>+{h.n}</b>
+                            {/* THE CHEST, not a pile of shards toward one. */}
+                            {result.chest ? (
+                                <div className="sail-recap-row" key={result.chest.tier}>
+                                    <span><FragmentIcon size={16} art={result.chest.art} /> {result.chest.name}</span>
+                                    <b className="sail-recap-pos" style={{ color: result.chest.color }}>+1</b>
                                 </div>
-                            )) : null}
+                            ) : null}
+                            {result.doubloons > 0 ? (
+                                <div className="sail-recap-row">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <span><img src="/images/sailing/doubloon.png" alt="" width={16} height={16} style={{ objectFit: "contain", verticalAlign: "-3px" }} /> Doubloons</span>
+                                    <b className="sail-recap-pos" style={{ color: "#ffd75e" }}>+{result.doubloons}</b>
+                                </div>
+                            ) : null}
                             {/* Every consumable has painted art in mkt_consumable_sprite. These rows were
                                 rendering the emoji fallback instead — a generic gift glyph for anything the
                                 emoji table didn't cover — next to shard rows that DO use their sprite. */}
@@ -1615,28 +1597,6 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 </div>
             ) : null}
 
-            {/* Chest forged from fragments — the real chest gets HAMMERED into shape (sparks fly), then revealed. */}
-            {forge ? (
-                <div className="sail-reward-overlay">
-                    <div className="card sail-recap">
-                        <Confetti />
-                        <div className={`sail-forge-scene rar-${forge.tier}`}>
-                            {forge.image
-                                // eslint-disable-next-line @next/next/no-img-element
-                                ? <img className="sail-forge-chest" src={forge.image} alt={forge.label} width={130} height={130} style={{ objectFit: "contain" }} />
-                                : <ChestIcon tier={forge.tier} className="sail-forge-chest" size={130} />}
-                            <span className="sail-upgrade-hammer" aria-hidden="true">🔨</span>
-                            <span className="sail-upgrade-sparks" aria-hidden="true"><i /><i /><i /><i /><i /></span>
-                        </div>
-                        <h2 style={{ margin: "4px 0" }}>Chest forged!</h2>
-                        <p className="muted" style={{ marginTop: 0 }}>You fused {state.fragmentsPerChest || 10} fragments into a <b>{forge.label}</b>. It&apos;s waiting in your stash.</p>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 8 }}>
-                            <a className="sail-cta sail-cta-dig" href="/marketplace/inventory">Open it in your stash →</a>
-                            <button className="pill" onClick={() => setForge(null)}>Keep sailing</button>
-                        </div>
-                    </div>
-                </div>
-            ) : null}
 
             {/* FISHING — cast → bite → reel, plus the Log and the Den record board. The scene reports one number
                 (reel quality); the server owns the species, the size and the payout. */}

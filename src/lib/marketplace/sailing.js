@@ -40,12 +40,30 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { maybeGrantSeaFightPet } from "@/lib/marketplace/pet-drops.js";
 // Fishing lives in its own module (species table + the cast/bite/reel rules); it reads back into sailing.js only
-// via a dynamic import for grantFragment, so this static import can't cycle.
+// via a dynamic import for grantDoubloons, so this static import can't cycle.
 import { fishingView, castLine, landFish, denFishRecords, denTopCatches, FISH_TRACKS, FISH_TRACK_COL } from "@/lib/marketplace/fishing.js";
 
-// Fragments you dig up on the island fuse into a loot chest — now TIERED, one shard type per chest tier.
-// 10 shards of a tier forge THAT tier's chest. Each shard resembles its chest (art: fragment-<tier>.png).
-const FRAGMENTS_PER_CHEST = 10;
+// ── YOU DIG UP A CHEST. THAT IS THE WHOLE MODEL. ─────────────────────────────────────────────────────────────
+// It used to be shards: a dig paid 2-3 fragments, ten of a tier fused into that tier's chest, and six other
+// systems rained fragments in as well. So the thing you actually unearthed was a token for a chest, the chest
+// itself arrived later on a different screen, and "how do I get a chest" had a seven-part answer.
+//
+// Now: uncover the chest and it IS yours, at the tier that was buried. The board slices that tier's REAL art,
+// so what you are brushing the dirt off is the object you are about to own rather than a generic prop.
+//
+// CHESTS COME FROM DIGGING AND NOWHERE ELSE. Every other source that used to pay fragments pays its own
+// system's currency now (doubloons at sea, laurels in the arena) — see the note over grantSeaSpoils below.
+//
+// THE ARITHMETIC, because this looked like a fivefold buff and is not: 699 voyages have been dug on prod and
+// 607 chests were forged against them, i.e. ~0.87 chests per dig ALREADY — the shards were never the
+// bottleneck, the six side-sources were doing most of the work. One chest per completed dig lands within a
+// few percent of where the economy already sits, PROVIDED the side-sources stop paying chest-currency. Those
+// two halves have to ship together or this is a large, quiet inflation.
+const DIG_DOUBLOONS_PER_STRIKE = 8;   // a lucky Strike used to be a bonus shard; it is coin now
+// What a chest you FAILED to finish is worth, per tier, at full exposure — scaled by how much you actually
+// got uncovered. Deliberately well under the chest itself: this is the consolation for running out of
+// stamina, not an alternative way to farm. A ship battle pays ~12, for scale.
+const DIG_CONSOLATION = { wooden: 18, iron: 30, gold: 50, mythic: 80, ascendant: 120, eternal: 180, celestial: 260, primordial: 360 };
 // A dug shard's tier is rolled from the chosen voyage DURATION (longer = better), never above the cap for now.
 // wooden = common · iron = pretty rare · gold (the cap) = very rare. Higher tiers exist but don't drop yet.
 const FRAGMENT_TIER_CAP = "mythic"; // long trips reach one step past gold; short/standard stay lower
@@ -390,8 +408,6 @@ const DIG_COLS = 4;
 const DIG_ROWS = 4;
 const DIG_MAX_DEPTH = 3;      // layers of dirt over every tile — you chip straight down through them
 const BASE_STAMINA = 12;      // digs per voyage (flat; extend mid-dig with "buy more digs")
-const FRAGMENTS_BURIED = 3;   // base fragments scattered through the dirt; Fortune adds +1 buried per level
-const MAX_BURIED = 12;        // cap on buried fragments (of a 16-tile board)
 const RARITY_UPGRADE_PER_LEVEL = 0.005; // Rarity: +0.5%/level chance that a forged chest is bumped up a tier
 const DIG_REFILL = 5;         // extra digs you can buy mid-excavation
 const DIG_REFILL_COST = 300;  // base cost of the FIRST refill; DOUBLES per refill bought this dig (board.refills)
@@ -473,15 +489,17 @@ function toolsView(row) {
 // The 8 boat FORMS. Reaching each level unlocks a new hull art (BOAT_ART[tier]) + a permanent perk applied by
 // boatPerks(). Perks are cumulative and reuse the existing engine knobs so they're cheap + safe.
 const MILESTONES = [
-    { level: 10, tier: 2, name: "Swift Cutter", perk: "+1 fragment buried on every island", buried: 1 },
+    { level: 10, tier: 2, name: "Swift Cutter", perk: "The buried chest sits one dirt layer shallower", buried: 1 },
     { level: 20, tier: 3, name: "Trade Brig", perk: "Voyages are 10% faster", voyage: 0.9 },
     { level: 30, tier: 4, name: "Trade-Wind Schooner", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
     { level: 40, tier: 5, name: "Gilded Galleon", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
-    { level: 50, tier: 6, name: "Iron Man-o'-War", perk: "Your first dig each trip always strikes a fragment", surface: true },
+    { level: 50, tier: 6, name: "Iron Man-o'-War", perk: "One corner of the chest always breaks the surface", surface: true },
     { level: 60, tier: 7, name: "Arcane Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
-    { level: 70, tier: 8, name: "Dragon Ship", perk: "+1 fragment buried + 12% chest-upgrade chance", buried: 1, chest: 0.12 },
-    { level: 80, tier: 9, name: "Ghost Ship", perk: "Forge chests with 8 fragments instead of 10", forge: 8 },
-    { level: 90, tier: 10, name: "Leviathan Dreadnought", perk: "Maw of the Deep — voyages haul back +2 bonus fragments; 5% chance a dig doesn't use a charge", voyageFrags: 2, digSave: 0.05 },
+    { level: 70, tier: 8, name: "Dragon Ship", perk: "Chest one layer shallower + 12% chance it is a tier better", buried: 1, chest: 0.12 },
+    // WAS "forge chests with 8 fragments instead of 10". Forging is gone, so this became a perk that read
+    // well and moved nothing. Repointed to chest-upgrade chance, which the tier roll genuinely consumes.
+    { level: 80, tier: 9, name: "Ghost Ship", perk: "+15% chance the buried chest is a tier better", chest: 0.15 },
+    { level: 90, tier: 10, name: "Leviathan Dreadnought", perk: "Maw of the Deep — every dig hauls back bonus doubloons; 5% chance a dig doesn't use a charge", voyageFrags: 2, digSave: 0.05 },
     { level: 100, tier: 11, name: "Celestial Warship", perk: "Celestial Sovereign — +1 raid per day, a guaranteed opening critical, and a stun each fight", bonusRaids: 1, openingCrit: true, raidStun: true },
 ];
 
@@ -548,7 +566,7 @@ export async function getPublicShip(buyerId) {
 }
 // Cumulative milestone perks unlocked at this boat level.
 function boatPerks(level) {
-    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, forgeCost: FRAGMENTS_PER_CHEST, windSave: 0,
+    const p = { buried: 0, voyageMult: 1, chestBonus: 0, surface: false, windSave: 0,
         digSave: 0, raidStun: false, voyageFrags: 0, openingCrit: false, bonusRaids: 0 };
     for (const m of MILESTONES) {
         if (level < m.level) break;
@@ -556,7 +574,6 @@ function boatPerks(level) {
         if (m.voyage) p.voyageMult *= m.voyage;
         if (m.chest) p.chestBonus += m.chest;
         if (m.surface) p.surface = true;
-        if (m.forge) p.forgeCost = m.forge;
         if (m.windSave) p.windSave = Math.max(p.windSave, m.windSave);
         if (m.digSave) p.digSave = Math.max(p.digSave, m.digSave);
         if (m.raidStun) p.raidStun = true;
@@ -586,18 +603,6 @@ export function voyageDurationMs(speedLevel = 0, level = 1) {
 function upgradeCost(nextLevel) { return 100 * (nextLevel + 1) * (nextLevel + 1); }
 // Dig count is a DIGGING upgrade (not a boat lever): base budget + the Stamina track.
 function digStamina(staminaLevel = 0) { return BASE_STAMINA + Math.round(digTrackValue("stamina", staminaLevel)); }
-// Buried fragments per island — base + boat-FORM milestone bonuses. (Fortune no longer feeds this; it now
-// drives marine-encounter chance instead — see encounterChance.)
-function fragmentsBuried(level = 1) {
-    return Math.min(MAX_BURIED, FRAGMENTS_BURIED + boatPerks(level).buried);
-}
-
-// NOTE — fragmentsBuried() above is DEAD. Nothing calls it. The buried-fragment model it belongs to was
-// replaced by the chest-cells one (a 2xN chest is buried and you uncover it tile by tile), and the count that
-// actually decides what a dig is worth is now the SCATTERED ITEMS: digItemCount(tier, petFinds).
-//
-// Diviner's Rod was written against fragmentsBuried and would have done exactly nothing. It is wired to
-// digItemCount instead — see newBoard.
 // The boat's level is EARNED BY UPGRADING, not by digging: one level per upgrade level bought across 5 tracks.
 function boatLevelFromUpgrades(s = 0, f = 0, r = 0, l = 0, rd = 0) {
     return 1 + Math.max(0, s) + Math.max(0, f) + Math.max(0, r) + Math.max(0, l) + Math.max(0, rd);
@@ -755,7 +760,7 @@ function weightedPickW(weights) {
     return Object.keys(weights)[0];
 }
 
-// The shallowest a fragment can sit (in dirt layers). Luck no longer touches digging — this is a flat cap.
+// The shallowest the chest can sit (in dirt layers). Luck no longer touches digging — this is a flat cap.
 function fragMaxDepth() { return DIG_MAX_DEPTH; }
 
 // ── DIG DIFFICULTY — a "steady & matched" ramp: the board, treasure count, dirt depth all grow with your
@@ -832,6 +837,9 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // this tier + how much of the chest you expose (see finishDig) — not one fragment per cell.
     const quality = row?.voyage_quality || "standard";
     const artifactTier = rollFragmentTier(quality, row?.rarity_level || 0, level);
+    // ONE tier, named on the board. The client slices THIS tier's real chest art across the buried cells, so
+    // the thing you brush the dirt off is the object you are about to own — a gold chest looks like a gold
+    // chest while it is still in the ground.
     const fragTiers = frag.map(() => artifactTier);
     // A flat cap on how deep a chest tile can be; the "first strike guaranteed" perk forces one cell to the surface.
     const cap = Math.min(fragMaxDepth(), maxDepth);
@@ -842,7 +850,13 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // for treasure" button did nothing for everybody. `lint:undef` cannot see this: the name IS declared in
     // scope, so no-undef has nothing to say about it.
     const halfDug = boardPowers?.has?.("beachhead") && Math.random() < 1 / 3;
-    frag.forEach(([fr, fc], i) => { depth[fr][fc] = (perks.surface && i === 0) || halfDug ? 1 : (1 + randInt(cap)); });
+    // `perks.buried` shallows the chest (Swift Cutter, Dragon Ship). It used to feed fragmentsBuried(), which
+    // this file already flagged as dead — so those two milestones bought nothing at all. Here the engine
+    // reads it: fewer layers over the chest is directly more chests finished.
+    // Chartwright (primordial) reads here too. Its old effect — halving the forge cost — died with forging,
+    // and a top-tier power that moves no number is the most expensive kind of dead code in this codebase.
+    const shallow = Math.max(0, perks.buried || 0) + (boardPowers?.has?.("chartwright") ? 2 : 0);
+    frag.forEach(([fr, fc], i) => { depth[fr][fc] = (perks.surface && i === 0) || halfDug ? 1 : Math.max(1, (1 + randInt(cap)) - shallow); });
     // Scatter real consumable ITEMS (1×1) on random non-chest tiles — bonus finds you dig up along the way.
     const chestSet = new Set(frag.map(([fr, fc]) => `${fr},${fc}`));
     const free = [];
@@ -875,7 +889,7 @@ function newBoard(row, petStamina = 0, petFinds = 0, divinersRod = false, boardP
     // Unlocked tools (by chest-points) baked onto the board with each one's PROC chance, so every dig can roll them.
     const toolLevels = (row && typeof row.dig_tool_levels === "object" && row.dig_tool_levels) || {};
     const tools = unlockedTools(digUpgradeLevels(row)).map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, cols: t.cols, rows: t.rows, layers: t.layers, proc: toolProcChance(Number(toolLevels[t.id]) || 0) }));
-    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
+    return { v: 2, tier, cols, rows, depth, maxDepth, frag, fragTiers, chestTier: artifactTier, shape, artifactTier, chestBox, items, dug, sensed, stamina, maxStamina: stamina, senses: maxSenses, maxSenses, status: "active", up, tools, bonus: 0 };
 }
 
 // Resolve the board's status after a mutation. Finding the chest NO LONGER ends the dig on its own — you keep
@@ -995,7 +1009,11 @@ function boardView(board) {
     const found = board.frag.filter(([r, c]) => board.depth[r][c] === 0).length;
     const chestDone = found >= board.frag.length;
     const itemsLeft = (board.items || []).filter((it) => (board.depth[it.r]?.[it.c] ?? 0) > 0).length;
-    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1, shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null, chestDone, itemsLeft };
+    return { cols: board.cols, rows: board.rows, maxDepth, tier: board.tier || 1,
+        // WHICH CHEST IS DOWN THERE. The client slices this tier's real art across the buried cells
+        // instead of one generic prop, so a gold chest looks like a gold chest while still in the dirt.
+        chestTier: board.chestTier || board.artifactTier || "wooden",
+        shape: board.shape || null, stamina: board.stamina, maxStamina: board.maxStamina, senses: board.senses ?? 0, maxSenses: board.maxSenses ?? 0, status: board.status, tiles, buried: board.frag.length, found, bonus: board.bonus || 0, toolProc: board.toolProc || null, chestDone, itemsLeft };
 }
 
 // --- state ---------------------------------------------------------------------------------------------
@@ -1041,9 +1059,8 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         skies: SKY_BGS, // the client picks one at random per app open + scrolls it while sailing
         voyageTotalMs, // original planned trip length, for the remaining-based progress bar
         voyagesCompleted: row?.voyages_completed || 0,
-        fragments: totalFragments(row),
-        fragmentsPerChest: boatPerks(level).forgeCost,
-        fragmentTiers: fragmentsView(row, level, chestArt),
+        // Every chest tier's real art, so the dig board can draw the one that is actually buried.
+        chestArtMap: chestArt,
         // Embark duration choices — trip time + which shards each favours — for the "set sail" picker.
         voyageOptions: VOYAGE_OPTIONS.map((o) => ({
             id: o.id, label: o.label,
@@ -1393,8 +1410,11 @@ async function finishEncounterBattle(buyerId, meta, res, { reckoning = false } =
                 await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, n]).catch(() => {});
                 spoils.push({ kind: "doubloons", n });
             } else if (l.kind === "fragment") {
-                await grantFragment(buyerId, l.n, l.tier || "wooden").catch(() => {});
-                spoils.push({ kind: "fragments", n: l.n, tier: l.tier || "wooden" });
+                // Was a chest shard; pays coin now, scaled by the tier it would have been so a rich encounter
+                // still reads richer than a poor one.
+                const coin = Math.max(1, Math.round(((DIG_CONSOLATION[l.tier || "wooden"] || 18) / 6) * (l.n || 1)));
+                await grantDoubloons(buyerId, coin).catch(() => {});
+                spoils.push({ kind: "doubloons", n: coin });
             } else if (l.kind === "chest") {
                 await addChests(buyerId, { [l.tier]: 1 }, { source: "sail_encounter" }).catch(() => {});
                 spoils.push({ kind: "chest", tier: l.tier });
@@ -1650,24 +1670,6 @@ export async function sailingNeedsAttention(buyerId) {
         [buyerId],
     ).catch(() => null);
     return Boolean(row && (row.landed || row.enc || row.castsleft));
-}
-
-// Chests you could forge RIGHT NOW out of the shards already in the hold, for the nav badge. Shards don't
-// expire and the hold is two screens deep, so a fully-paid-for chest could sit there for days with nothing
-// anywhere saying so — the one piece of sailing progress that was invisible from outside sailing.
-export async function forgeableChests(buyerId) {
-    if (!buyerId) return 0;
-    const row = await readRow(buyerId).catch(() => null);
-    if (!row) return 0;
-    // Chartwright halves what a chest costs in fragments.
-    let cost = boatPerks(decorate(row).level).forgeCost;
-    if (await hasPower(buyerId, "chartwright")) cost = Math.max(1, Math.ceil(cost / 2));
-    if (!(cost > 0)) return 0;
-    const counts = (typeof row.fragments_json === "object" && row.fragments_json) || {};
-    return Object.entries(counts).reduce(
-        (n, [tier, held]) => n + (CHEST_TIERS[tier] ? Math.floor((Number(held) || 0) / cost) : 0),
-        0,
-    );
 }
 
 // Casts still unthrown today, for the nav nudge. Deliberately separate from the boolean above so the pill can
@@ -2301,12 +2303,11 @@ async function payFleetReward(buyerId, reward) {
     // gold: 0 is load-bearing — awardXp pays gold 1:1 with points otherwise, and the gold is paid above.
     if (reward.xp) { await awardXp(buyerId, "ship_battle", { points: reward.xp, gold: 0 }).catch(() => {}); out.push({ kind: "xp", n: reward.xp }); }
     if (reward.fragments) {
-        // Carry the TIER through to the recap. It always granted wooden and always said "+1 fragments", so the
-        // one reward that varies by how hard the fight was read identically whether you sank a fishing boat or
-        // the flagship.
-        const tier = reward.fragTier || "wooden";
-        await grantFragment(buyerId, reward.fragments, tier).catch(() => {});
-        out.push({ kind: "fragments", n: reward.fragments, tier });
+        // Was a chest shard, tiered by how hard the fight was. Pays coin now on the same curve, so sinking the
+        // flagship still reads richer than sinking a fishing boat.
+        const coin = Math.max(1, Math.round(((DIG_CONSOLATION[reward.fragTier || "wooden"] || 18) / 6) * reward.fragments));
+        await grantDoubloons(buyerId, coin).catch(() => {});
+        out.push({ kind: "doubloons", n: coin });
     }
     if (reward.parts) {
         try {
@@ -3457,76 +3458,24 @@ export async function rechargeWind(buyerId) {
     return { ok: true, spent: cost, shavedMinutes: Math.round(shaveMs / 60000), ...(await getSailingState(buyerId)) };
 }
 
-// Naming + art for a fragment tier, so anything that HANDS OUT shards (spin wheel, fishing, Cheer proc) can
-// say which kind you got and show that tier's real sprite instead of a generic "dig fragment".
-export function fragmentInfo(tier = "wooden") {
-    const t = CHEST_TIERS[tier] ? tier : "wooden";
-    const name = (CHEST_TIERS[t].label || t).replace(" Chest", "");
-    return { tier: t, name, label: `${name} Fragment`, art: fragmentArt(t), color: CHEST_TIERS[t].color || "#b08a52" };
-}
-
 // Grant treasure-chest fragment(s) of a TIER to a member (Cheer proc, fishing, the spin wheel). Upserts the
 // sailing row first, since a member may never have sailed. Returns the tier info so callers can name the prize.
-export async function grantFragment(buyerId, n = 1, tier = "wooden") {
-    const info = fragmentInfo(tier);
-    if (!buyerId || n <= 0) return info;
-    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    // Merge into that tier's slot of the per-tier hold.
+// ── WHAT THE OLD FRAGMENT SOURCES PAY NOW ────────────────────────────────────────────────────────────────────
+// Chests come from DIGGING and nowhere else. Six other systems used to rain chest-fragments in — fishing, the
+// fleet, sea encounters, a boss proc, delve runs and the arena ladder — which is the real reason 699 digs had
+// produced 607 chests: the shards were never the bottleneck. Each of those pays its OWN system's currency now,
+// so the reward still lands and the chest economy has exactly one tap feeding it.
+//
+// Doubloons for anything at sea. A ship battle pays ~12, which is the scale to price against.
+export async function grantDoubloons(buyerId, n = 1) {
+    const amount = Math.max(0, Math.round(Number(n) || 0));
+    if (!buyerId || amount <= 0) return 0;
     await db.query(
-        `UPDATE mkt_sailing
-            SET fragments_json = jsonb_set(
-                    COALESCE(fragments_json, '{}'::jsonb), ARRAY[$3::text],
-                    to_jsonb(COALESCE((fragments_json->>$3)::int, 0) + $2)),
-                updated_at = NOW()
-          WHERE buyer_id = $1`,
-        [buyerId, n, info.tier]
+        `INSERT INTO mkt_sailing (buyer_id, doubloons) VALUES ($1, $2)
+         ON CONFLICT (buyer_id) DO UPDATE SET doubloons = COALESCE(mkt_sailing.doubloons, 0) + $2, updated_at = NOW()`,
+        [buyerId, amount]
     ).catch(() => {});
-    return info;
-}
-
-// Spend fragments to forge a loot chest. The cost is boatPerks().forgeCost (10, or 8 at the level-80 form).
-// Rarity (+ chest milestone perks) gives a chance the forged chest is BUMPED up a tier (Iron → Gold). Atomic —
-// the WHERE guards against forging with too few (or a double-tap racing the balance).
-export async function forgeChest(buyerId, fragmentTier = "wooden") {
-    const row = await readRow(buyerId);
-    const level = decorate(row).level;
-    const cost = boatPerks(level).forgeCost;
-    if (!CHEST_TIERS[fragmentTier]) return { ok: false, error: "bad_tier", ...(await getSailingState(buyerId)) };
-    await db.query(`INSERT INTO mkt_sailing (buyer_id) VALUES ($1) ON CONFLICT (buyer_id) DO NOTHING`, [buyerId]).catch(() => {});
-    // Atomic guarded spend of `cost` shards from THIS tier's hold (the WHERE stops a double-tap overdraw).
-    const spent = await db.queryOne(
-        `UPDATE mkt_sailing
-            SET fragments_json = jsonb_set(COALESCE(fragments_json, '{}'::jsonb), $3::text[],
-                    to_jsonb(COALESCE((fragments_json->>$4)::int, 0) - $2)),
-                updated_at = NOW()
-          WHERE buyer_id = $1 AND COALESCE((fragments_json->>$4)::int, 0) >= $2
-          RETURNING fragments_json`,
-        [buyerId, cost, `{${fragmentTier}}`, fragmentTier]
-    ).catch(() => null);
-    if (!spent) return { ok: false, error: "not_enough", ...(await getSailingState(buyerId)) };
-    // Rarity roll: chance the forged chest comes out one tier ABOVE the shards you spent (a bonus, not capped).
-    const upgradeChance = Math.min(0.9, (row?.rarity_level || 0) * RARITY_UPGRADE_PER_LEVEL + boatPerks(level).chestBonus);
-    let tierKey = fragmentTier;
-    if (Math.random() < upgradeChance) {
-        const i = CHEST_ORDER.indexOf(tierKey);
-        if (i >= 0 && i < CHEST_ORDER.length - 1) tierKey = CHEST_ORDER[i + 1];
-    }
-    await addChests(buyerId, { [tierKey]: 1 }, { source: "sailing_forge" }).catch(() => {});
-    await trackActivity(buyerId, "sail_forge", { tier: tierKey, upgraded: tierKey !== fragmentTier }).catch(() => {});
-    // Chest-points (tier-weighted 1–4). These NO LONGER gate the dig tools — that moved to dig upgrade levels,
-    // which the player can actually watch climb on the same screen. Kept as a running stat (and so the column
-    // isn't silently abandoned mid-flight); nothing reads it for unlocks any more.
-    await db.query(`UPDATE mkt_sailing SET chest_points = COALESCE(chest_points, 0) + $2 WHERE buyer_id = $1`, [buyerId, CHEST_POINT_WEIGHT(tierKey)]).catch(() => {});
-    // Achievement badges (hard): forge count + forging a gold-or-better chest.
-    const forgedRow = await db.queryOne(`UPDATE mkt_sailing SET chests_forged = COALESCE(chests_forged, 0) + 1 WHERE buyer_id = $1 RETURNING chests_forged`, [buyerId]).catch(() => null);
-    if ((forgedRow?.chests_forged || 0) >= BADGE_DIG_EXCAVATOR) await grantEventBadge(buyerId, "dig_excavator").catch(() => {});
-    // Earned cosmetic: the "Buried Hoard" profile background for forging chests (idempotent).
-    if ((forgedRow?.chests_forged || 0) >= COSMETIC_HOARD_FORGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'background', 'hoard') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
-    if (CHEST_ORDER.indexOf(tierKey) >= CHEST_ORDER.indexOf("gold")) await grantEventBadge(buyerId, "dig_goldtouch").catch(() => {});
-    const tier = CHEST_TIERS[tierKey];
-    const upgraded = tierKey !== fragmentTier;
-    const chestArt = await getChestArt().catch(() => ({}));
-    return { ok: true, forged: { tier: tierKey, label: tier?.label || "Chest", emoji: tier?.emoji || "🎁", image: chestArt[tierKey] || null, upgraded, from: fragmentTier }, ...(await getSailingState(buyerId)) };
+    return amount;
 }
 
 // Buy DIG_REFILL more digs for the active excavation with gold. Atomic gold spend; only valid mid-dig.
@@ -3592,37 +3541,6 @@ function rollFragmentTier(qualityId, rarityLevel = 0, level = 1) {
     if (Math.random() < bump) tier = nextTierCapped(tier);
     return tier;
 }
-// Per-tier shard holdings for the UI: every droppable tier (up to the cap) + any tier already held.
-function fragmentsView(row, level, chestArt = {}) {
-    const counts = (row && typeof row.fragments_json === "object" && row.fragments_json) || {};
-    const perChest = boatPerks(level).forgeCost;
-    const capIdx = CHEST_ORDER.indexOf(FRAGMENT_TIER_CAP);
-    return CHEST_ORDER
-        .map((t, i) => ({ t, i }))
-        .filter(({ t, i }) => i <= capIdx || (counts[t] || 0) > 0)
-        .map(({ t, i }) => {
-            const c = CHEST_TIERS[t] || {};
-            const count = Number(counts[t]) || 0;
-            return {
-                tier: t,
-                name: (c.label || t).replace(" Chest", ""),
-                chestLabel: c.label || "Chest",
-                emoji: c.emoji || "🎁",
-                color: c.color || "#b08a52",
-                art: fragmentArt(t),
-                chestImage: chestArt[t] || null, // the REAL per-tier AI chest sprite (falls back to ChestIcon in the UI)
-                count,
-                perChest,
-                canForge: count >= perChest,
-                droppable: i <= capIdx,
-            };
-        });
-}
-function totalFragments(row) {
-    const counts = (row && typeof row.fragments_json === "object" && row.fragments_json) || {};
-    return Object.values(counts).reduce((a, b) => a + (Number(b) || 0), 0);
-}
-
 // Resolve a finished dig: each shard unearthed (+ lucky Strike bonuses) rolls a TIER from the voyage's chosen
 // duration, then merges into the per-tier hold. Clears the voyage + board.
 async function finishDig(buyerId, board) {
@@ -3642,15 +3560,30 @@ async function finishDig(buyerId, board) {
     // uncovered chest gives (2 + tier) fragments (t1=3 … t6=8), scaled down if you only got part of it.
     const total = board.frag.length;
     const uncovered = board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0).length;
-    const chestTier = (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
-    const maxFrags = 2 + ((board.tier || 1) >= 3 ? 1 : 0); // a full chest = 2 fragments (3 at high tiers) — not a pile
-    const digSea = seaEffects(await equippedSeaAffinity(buyerId)); // Trove boosts yield; Maw (ship perk) adds flat frags
-    const lureMult = row?.dig_lure === true ? 1.5 : 1; // Lucky Lure: +50% fragments this dig
-    const baseCount = uncovered > 0 ? Math.max(1, Math.round(maxFrags * (uncovered / total) * (1 + digSea.fragBonus) * lureMult)) : 0;
-    const fragCount = baseCount + (baseCount > 0 ? (boatPerks(level).voyageFrags || 0) : 0);
-    const foundTiers = Array.from({ length: fragCount }, () => chestTier);
-    for (let i = 0; i < (board.bonus || 0); i++) foundTiers.push(rollFragmentTier(quality, rarityLevel, level)); // lucky Strike bonuses
-    const earned = foundTiers.length;
+    const chestTier = board.chestTier || (board.fragTiers && board.fragTiers[0]) || rollFragmentTier(quality, rarityLevel, level);
+    const digSea = seaEffects(await equippedSeaAffinity(buyerId));
+    const lureMult = row?.dig_lure === true ? 1.5 : 1;
+    // ── THE CHEST, OR COIN FOR HOW CLOSE YOU GOT ─────────────────────────────────────────────────────────
+    // Expose every cell of it and the chest is yours, at the tier that was buried. Fall short and the dig
+    // still pays — doubloons scaled by how much dirt you moved — because a dig that pays nothing after a
+    // stamina's worth of effort is the punishing shape we don't ship.
+    const fullyUnearthed = total > 0 && uncovered >= total;
+    const exposure = total > 0 ? uncovered / total : 0;
+    const chestWon = fullyUnearthed ? chestTier : null;
+    if (chestWon) await addChests(buyerId, { [chestWon]: 1 }, { source: "sail_dig", meta: { tier: chestWon } }).catch(() => {});
+    // Trove (sea affinity), Lucky Lure and Maw (the Leviathan's perk) used to swell the shard count. There is
+    // no shard count any more, so they swell the CONSOLATION instead — the only number a dig still pays by
+    // degree. Left on the chest itself they would have had nothing to multiply and would have gone silently
+    // dead, which is this codebase's most expensive bug.
+    const consolation = fullyUnearthed || exposure <= 0 ? 0 : Math.max(1, Math.round(
+        (DIG_CONSOLATION[chestTier] || 18) * exposure * (1 + digSea.fragBonus) * lureMult
+    ));
+    const strikeCoin = (board.bonus || 0) * DIG_DOUBLOONS_PER_STRIKE;
+    const mawCoin = (boatPerks(level).voyageFrags || 0) * DIG_DOUBLOONS_PER_STRIKE;
+    const doubloonsWon = consolation + strikeCoin + (uncovered > 0 ? mawCoin : 0);
+    if (doubloonsWon > 0) {
+        await db.query(`UPDATE mkt_sailing SET doubloons = COALESCE(doubloons,0) + $2 WHERE buyer_id = $1`, [buyerId, doubloonsWon]).catch(() => {});
+    }
     // Grant every real ITEM you dug up along the way, and gather them for the recap.
     const foundItems = (board.items || []).filter((it) => board.depth[it.r]?.[it.c] === 0);
     for (const it of foundItems) await grantConsumable(buyerId, it.id, 1).catch(() => {});
@@ -3660,21 +3593,14 @@ async function finishDig(buyerId, board) {
     // fallback (a generic 🎁 for anything unmapped) for things that have real art sitting right there.
     const digArt = await consumableSpriteMap().catch(() => ({}));
     const itemsHaul = Object.entries(itemTally).map(([id, n]) => ({ id, n, name: CONSUMABLES[id]?.name || id, emoji: CONSUMABLES[id]?.emoji || "🎁", art: digArt[id] || null }));
-    const won = earned > 0 || foundItems.length > 0;
-    // Merge into the current per-tier hold.
-    const counts = { ...((row && typeof row.fragments_json === "object" && row.fragments_json) || {}) };
-    const byTier = {};
-    for (const t of foundTiers) {
-        byTier[t] = (byTier[t] || 0) + 1;
-        counts[t] = (Number(counts[t]) || 0) + 1;
-    }
+    const won = Boolean(chestWon) || doubloonsWon > 0 || foundItems.length > 0;
     // NOTE: digging does NOT level the boat — but voyages_completed drives the EXCAVATION level (tool unlocks).
     await db.query(
         `UPDATE mkt_sailing
             SET dig_state = NULL, departed_at = NULL, returns_at = NULL, voyage_quality = NULL, dig_lure = FALSE,
-                fragments_json = $2::jsonb, voyages_completed = voyages_completed + 1, updated_at = NOW()
+                voyages_completed = voyages_completed + 1, updated_at = NOW()
           WHERE buyer_id = $1`,
-        [buyerId, JSON.stringify(counts)]
+        [buyerId]
     ).catch(() => {});
     // Rare bonus find: a one-shot SAILING RELIC (kept uncommon so they stay special) — the treasure-map/drum/etc.
     // ── WHAT THE SAND GIVES UP ───────────────────────────────────────────────────────────────────────────
@@ -3701,18 +3627,18 @@ async function finishDig(buyerId, board) {
     if (voyagesNow >= COSMETIC_SAILOR_VOYAGES) await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'border', 'sailor') ON CONFLICT DO NOTHING`, [buyerId]).catch(() => {});
     if (uncovered >= total && (board.tier || 1) >= 3) await grantEventBadge(buyerId, "dig_cleansweep").catch(() => {});
     await bumpQuestProgress(buyerId, "dig_done", 1).catch(() => {}); // "Dig up buried treasure" daily quest
-    await trackActivity(buyerId, "sail_dig", { frags: fragCount, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
+    await trackActivity(buyerId, "sail_dig", { chest: chestWon, doubloons: doubloonsWon, tier: board.tier || 1, relic: relicFound || null }).catch(() => {});
     const state = await getSailingState(buyerId);
-    // byTier decorated with art/label so the recap can show what kind of shards you hauled up.
-    const haul = Object.entries(byTier).map(([tier, n]) => {
-        const c = CHEST_TIERS[tier] || {};
-        return { tier, n, name: (c.label || tier).replace(" Chest", ""), emoji: c.emoji || "🎁", color: c.color || "#b08a52", art: fragmentArt(tier) };
-    }).sort((a, b) => CHEST_ORDER.indexOf(b.tier) - CHEST_ORDER.indexOf(a.tier));
-    const fullyUnearthed = uncovered >= total;
+    // THE CHEST ITSELF, with its real art — the recap shows the thing you now own, not a pile of tokens for it.
+    const chestArt = await getChestArt().catch(() => ({}));
+    const ct = chestWon ? (CHEST_TIERS[chestWon] || {}) : null;
+    const chest = chestWon
+        ? { tier: chestWon, name: ct.label || chestWon, emoji: ct.emoji || "🎁", color: ct.color || "#b08a52", art: chestArt[chestWon] || null }
+        : null;
     // Reveal where the chest actually was, so players learn how scanning maps to the buried chest.
     const reveal = { rows: board.rows, cols: board.cols, cells: board.frag, dugCells: board.frag.filter(([fr, fc]) => board.depth[fr][fc] === 0) };
     const relic = relicFound ? { id: relicFound, name: CONSUMABLES[relicFound]?.name || relicFound, emoji: CONSUMABLES[relicFound]?.emoji || "🎁", art: digArt[relicFound] || null, desc: CONSUMABLES[relicFound]?.desc || "" } : null;
-    return { ok: true, result: { won, earned, uncovered, total, bonus: board.bonus || 0, haul, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal, stone: digStone }, ...state };
+    return { ok: true, result: { won, chest, doubloons: doubloonsWon, uncovered, total, bonus: board.bonus || 0, items: itemsHaul, relic, shape: board.shape || null, fullArtifact: fullyUnearthed, reveal, stone: digStone }, ...state };
 }
 async function persistDig(buyerId, board) {
     await db.query(`UPDATE mkt_sailing SET dig_state = $2, updated_at = NOW() WHERE buyer_id = $1`, [buyerId, JSON.stringify(board)]).catch(() => {});

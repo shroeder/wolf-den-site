@@ -30,6 +30,10 @@ import { equippedPowers, claimPowerUse } from "@/lib/marketplace/ascension-power
 // counts are strictly worse for having been counted. Every spin is now the same honest roll off the wheel's
 // own weights. `spins_since_rare` is left on mkt_buyer as dead data rather than dropped — nothing reads it.
 
+// What the old chest-shard wedge pays now, by the tier it used to give. A ship battle pays ~12, so the
+// wooden wedge is a small trickle and the gold wedge is a real prize.
+const SPIN_DOUBLOONS_BY_TIER = { wooden: 5, iron: 10, gold: 18, mythic: 30 };
+
 export const SPIN_TOKEN_COST = 400; // gold to buy one extra spin
 // Wheelwarden set "Lucky Spin" proc payout (the set only grants a CHANCE at this per spin, not every spin).
 // Bumped from 25 when the pity burst went away — the proc lost half its payload and this is all it does now.
@@ -360,12 +364,12 @@ async function grantPrize(buyerId, prize, opts = {}) {
     if (prize.kind === "xp") { await awardXp(buyerId, "spin_reward", { points: prize.amount, gold: 0, flat: true }).catch(() => {}); return { sprite, text: `${prize.amount.toLocaleString()} XP` }; }
     if (prize.kind === "consumable") { await grantConsumable(buyerId, prize.consumable, prize.n || 1).catch(() => {}); return { sprite, text: prize.label }; }
     if (prize.kind === "fragment") {
-        // Name the TIER on the result card (and use that tier's shard art) — "dig fragments" alone left people
-        // guessing which chest they were forging toward.
+        // WAS a chest shard. Chests come only from digging now, so the wedge pays doubloons — priced off the
+        // tier it used to hand out, so the good wedge is still the good wedge.
         const tier = prize.tierId || FRAGMENT_PRIZE_TIER;
-        const n = prize.n || 1;
-        try { const { grantFragment } = await import("@/lib/marketplace/sailing.js"); await grantFragment(buyerId, n, tier); } catch { /* best-effort */ }
-        return { sprite: fragSprite(tier), text: `${n} ${fragName(tier)} Chest Fragment${n === 1 ? "" : "s"}` };
+        const n = (prize.n || 1) * (SPIN_DOUBLOONS_BY_TIER[tier] || SPIN_DOUBLOONS_BY_TIER.wooden);
+        try { const { grantDoubloons } = await import("@/lib/marketplace/sailing.js"); await grantDoubloons(buyerId, n); } catch { /* best-effort */ }
+        return { sprite: "/images/sailing/doubloon.png", text: `${n} Doubloon${n === 1 ? "" : "s"}` };
     }
     if (prize.kind === "parts") {
         // Roll the tier, then show THAT tier's art on the result card — the wedge wears Tempered Steel, but a

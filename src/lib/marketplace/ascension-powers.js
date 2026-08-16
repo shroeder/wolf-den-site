@@ -133,7 +133,10 @@ export const ASCENSION_POWERS = {
     press_ganged_crew: { item: "primordial_primordial_shroud", name: "Press-Ganged Crew", tier: "primordial", cls: "A", desc: "Voyages finish in half the time." },
     twice_landed: { item: "primordial_primordial_binding", name: "Twice-Landed", tier: "primordial", cls: "A", desc: "Every voyage makes landfall twice — two dig sites where there was one." },
     diviner_s_rod: { item: "primordial_primordial_walkers", name: "Diviner's Rod", tier: "primordial", cls: "A", desc: "Every dig site is buried with the most fragments it can hold." },
-    chartwright: { item: "primordial_primordial_pinions", name: "Chartwright", tier: "primordial", cls: "A", desc: "It takes half as many fragments to complete a chest." },
+    // WAS "half as many fragments to complete a chest". Fragments and forging are gone — chests are dug up
+    // whole now — so this top-tier power would have sat there doing nothing at all. Repointed to the thing
+    // that actually decides whether you get the chest: how much dirt is on top of it.
+    chartwright: { item: "primordial_primordial_pinions", name: "Chartwright", tier: "primordial", cls: "A", desc: "Your charts run deep: the buried chest sits two dirt layers shallower." },
     deep_key: { item: "primordial_primordial_medallion", name: "The Deep Key", tier: "primordial", cls: "A", desc: "You start every descent five floors down." },
     night_cage: { item: "primordial_primordial_bond", name: "The Night Cage", tier: "primordial", cls: "A", desc: "One extra trip a day, and the first bought trip costs nothing." },
     hot_stone: { item: "primordial_firstborn_sabre", name: "The Hot Stone", tier: "primordial", cls: "B", desc: "One cook in three comes out a tier better than the recipe." },

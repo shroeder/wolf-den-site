@@ -51,6 +51,10 @@ async function spendGold(buyerId, amount, reason, meta) {
 }
 
 /** Choose a class. Only possible once, and only while the tree is empty — changing later is a class respec. */
+// A ladder rung used to hand out chest shards — a currency for a different game. It pays laurels now, at
+// 40 a shard: a rung was worth roughly a third of a chest, and an Armoury crate is priced in the hundreds.
+const LADDER_LAURELS_PER_SHARD = 40;
+
 export async function pickClass(buyerId, classId) {
     const r = await row(buyerId);
     if (!r) return { ok: false, error: "no_row" };
@@ -246,9 +250,13 @@ export async function buyArmoury(buyerId, id) {
             await addParts(buyerId, won.tier, won.n);
             got.art = partSprite(won.tier);
         } else if (won.kind === "fragment") {
-            const { grantFragment } = await import("@/lib/marketplace/sailing.js");
-            await grantFragment(buyerId, won.n, won.tier);
-            got.art = `/images/sailing/fragment-${won.tier}.png`;
+            // Was a chest shard, which made a ladder rung pay out in a currency for a different game. Chests
+            // come only from digging now, so a rung pays LAURELS — the arena's own currency, spendable at the
+            // Armoury you are already standing in.
+            const laurels = Math.max(1, (won.n || 1) * LADDER_LAURELS_PER_SHARD);
+            await db.query(`UPDATE mkt_arena SET laurels = COALESCE(laurels, 0) + $2 WHERE buyer_id = $1`, [buyerId, laurels]).catch(() => {});
+            got.kind = "laurels";
+            got.n = laurels;
         } else if (won.kind === "consumable") {
             const { grantConsumable } = await import("@/lib/marketplace/consumables.js");
             const { consumableSpriteMap } = await import("@/lib/marketplace/consumable-sprites.js");
