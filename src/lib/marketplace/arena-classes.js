@@ -79,6 +79,11 @@ export const CLASSES = [
         dr: 0.16,
         accuracy: 0.72,
         guard: 0.12,
+        // ── THE REAVER SMELLS BLOOD ──────────────────────────────────────────────────────────────────────
+        // Inherent, like the Warden's drink: you do not spend a point to be a Reaver. Everything they throw
+        // at a fighter already under half health hits harder, which is the class's whole sentence — "wants
+        // the bout over in six rounds" — expressed as a number instead of a blurb.
+        finisher: 0.20,
     },
     {
         id: "warden",
@@ -117,6 +122,11 @@ export const CLASSES = [
         dr: 0.24,
         accuracy: 0.73,
         guard: 0.12,
+        // ── THE RUNECALLER'S FIRE OUTLASTS THE BEAT ──────────────────────────────────────────────────────
+        // Every burn they set runs one turn longer than anyone else's, before Slow Burn adds to it. Inherent
+        // for the same reason as the other two, and it is the literal reading of the class tag: they win the
+        // rounds after the one they are in.
+        burnTurns: 1,
     },
 ];
 
@@ -154,6 +164,8 @@ export const classBase = (id) => {
         accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
+        finisher: c?.finisher || 0,
+        burnTurns: c?.burnTurns || 0,
     };
 };
 
@@ -170,6 +182,26 @@ export const DR_CAP = 0.60;
 // stops being a trade-off and becomes a rounding error — which is the whole mechanic gone.
 export const ACCURACY_CAP = 0.98;
 export const ACCURACY_FLOOR = 0.35;
+
+// ── WHAT A CLASS GIVES YOU FOR FREE ──────────────────────────────────────────────────────────────────────────
+// The inherent half of a class, in words, built from the SAME numbers the engine folds — never prose typed out
+// beside them. Retune the Warden's lifesteal and this line follows; type "15%" here instead and the day it
+// becomes 12% the screen starts lying, which is the copied-constant bug wearing a sentence.
+//
+// Only what differs from an unclassed fighter is listed. "Accuracy 75%" on a class that has exactly the
+// default is not an identity, it is noise pretending to be one.
+export function classPassives(id) {
+    const b = classBase(id);
+    const out = [];
+    if (b.health) out.push({ label: "Vigour", value: `+${b.health} health` });
+    if (b.dr !== DEFAULT_DR) out.push({ label: "Damage reduction", value: `${Math.round(b.dr * 100)}%` });
+    if (b.guard !== DEFAULT_GUARD) out.push({ label: "Guard", value: `${Math.round(b.guard * 100)}% of health` });
+    if (b.accuracy !== DEFAULT_ACCURACY) out.push({ label: "Accuracy", value: `${Math.round(b.accuracy * 100)}%` });
+    if (b.lifesteal) out.push({ label: "Lifedrink", value: `${Math.round(b.lifesteal * 100)}% of all damage back` });
+    if (b.finisher) out.push({ label: "Bloodscent", value: `+${Math.round(b.finisher * 100)}% below half health` });
+    if (b.burnTurns) out.push({ label: "Emberborn", value: `burns last +${b.burnTurns} turn` });
+    return out;
+}
 
 export const classById = (id) => CLASSES.find((c) => c.id === id) || null;
 
@@ -189,8 +221,11 @@ const N = (o) => ({ ranks: 1, kind: "passive", ...o });
 export const TREES = {
     // ── REAVER ── damage, criticals, volume.
     reaver: [
-        N({ id: "rv_might", tier: 0, name: "Brutality", ranks: 5, stat: "might", per: 2,
-            desc: "+2 Might per rank.", sprite: "/images/arena/node/rv_might.webp" }),
+        // WAS "+2 Might per rank". Might is a raw stat that then runs through swingFrom(), so two points of it
+        // moved a swing by an amount no card could honestly print and nobody could feel. A straight damage
+        // percentage is the same node saying what it actually does.
+        N({ id: "rv_might", tier: 0, name: "Brutality", ranks: 5, stat: "dmgPct", per: 0.05,
+            desc: "+5% damage per rank.", sprite: "/images/arena/node/rv_might.webp" }),
         // ── WAS KILLER INSTINCT (+2% crit chance a rank) ────────────────────────────────────────────────
         // Reaver had crit chance AND crit damage, which is one idea bought twice, and neither did anything
         // about the matchup the class actually loses: Warden challenging Reaver won 94% of 145 bouts.

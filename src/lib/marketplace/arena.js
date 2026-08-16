@@ -28,8 +28,7 @@ import {
     ACCURACY_CAP, ACCURACY_FLOOR, arenaLevelFor, arenaXpFor, classBase, CLASSES, classById, DEFAULT_GUARD,
     DEFAULT_ACCURACY, DEFAULT_DR, DR_CAP,
     FREE_REFUNDS_PER_DAY, RESPEC_CLASS, RESPEC_ONE, RESPEC_TREE,
-    pointsSpent, treeAbilities, treeEffects, treeState,
-} from "@/lib/marketplace/arena-classes.js";
+    pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -332,6 +331,11 @@ async function kitFor(buyerId) {
         dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
         // A share of everything you deal comes back as health. Class-inherent; see classBase.
         lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
+        // Inherent class passives, folded exactly as lifesteal is. `finisher` is the Reaver smelling blood,
+        // `burnTurns` is the Runecaller's fire outlasting the beat. Both read on BOTH sides below.
+        finisher: Math.max(0, base.finisher || 0),
+        burnTurns: Math.max(0, base.burnTurns || 0),
+        dmgPct: Math.max(0, perks.dmgPct || 0),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
@@ -567,7 +571,8 @@ export async function getArenaState(buyerId, pre = {}) {
         xp: lvl.xp, level: lvl.level, into: lvl.into, span: lvl.span,
         classId,
         cls: classById(classId),
-        classes: CLASSES,
+        // Each class carries its inherent half, so the tree screen can say what you get for free.
+        classes: CLASSES.map((c) => ({ ...c, passives: classPassives(c.id) })),
         points: { total: lvl.level, spent: spentPts, available: availPts },
         // A class is chosen the first time you have a point to spend.
         needsClass: !classId && lvl.level >= 1,
@@ -982,6 +987,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: foeKit.dr ?? DEFAULT_DR,
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
+            finisher: foeKit.finisher || 0, burnTurns: foeKit.burnTurns || 0, dmgPct: foeKit.dmgPct || 0,
             // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
             // allowlist and their Guard silently falls back to a stranger's numbers.
             guard: foeKit.guard ?? DEFAULT_GUARD,
@@ -1012,6 +1018,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             dr: me.dr ?? DEFAULT_DR,
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
+            finisher: me.finisher || 0, burnTurns: me.burnTurns || 0, dmgPct: me.dmgPct || 0,
             guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {},
             classId: me.classId || null },
@@ -1682,8 +1689,12 @@ export async function fightRound(buyerId, opts = {}) {
             hitsLanded += 1;
             const c = Math.random() < critChance;
             if (c) crit = true;
+            // BRUTALITY is a flat damage percentage now, and FINISHER is the Reaver's inherent: everything
+            // lands harder on a fighter already under half. Both mirrored on their side of the ring.
+            const brutal = 1 + (b.me.dmgPct || 0);
+            const finish = b.foeHp <= b.foeMaxHp / 2 ? 1 + (b.me.finisher || 0) : 1;
             const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
-                * openMult * lowHpMult * splitMult * fever * (c ? myCritMult : 1)
+                * openMult * lowHpMult * splitMult * fever * brutal * finish * (c ? myCritMult : 1)
                 * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1);   // Dread Howl
             turned += Math.round(raw * guard);
             const landed = Math.max(1, Math.round(raw - raw * guard));
@@ -1774,7 +1785,7 @@ export async function fightRound(buyerId, opts = {}) {
             // now be a node that buys nothing at all.
             const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * (REND_TICK_CAP + (P.rendCap || 0)))));
             // SLOW BURN buys turns — what its name always said, instead of being a weaker second Runebrand.
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0) + (b.me.burnTurns || 0));
             b.bleed = { turns, stacks, dmg: tick };
         }
         // ── THE WOUND ── same shape as the burn and a separate track, so a fighter can carry both and the
@@ -2070,8 +2081,13 @@ export async function fightRound(buyerId, opts = {}) {
             const c = Boolean(b.branded) || Math.random() < foeCritChance;
             if (b.branded) b.branded = false;
             if (c) foeCrit = true;
+            // THE SAME TWO, IN THEIR HANDS. A Reaver across the ring smells blood on YOU, and their Brutality
+            // is worth exactly what yours is. Offence and defence move together or the class is only real on
+            // one side of the sand.
+            const foeBrutal = 1 + (b.foe.dmgPct || 0);
+            const foeFinish = b.hp <= b.maxHp / 2 ? 1 + (b.foe.finisher || 0) : 1;
             const one = Math.max(1, Math.round(b.foe.damage * power * back * fever * foeOpen * foeLow * foeSplit
-                * (b.foeUnderdog || 1) * foeSurgeMult * (c ? foeCritMult : 1)
+                * (b.foeUnderdog || 1) * foeSurgeMult * foeBrutal * foeFinish * (c ? foeCritMult : 1)
                 * ((b.foeFrenzy || 0) > 0 ? FRENZY_DMG : 1)));
             const off = Math.round(one * myBlock);
             raw += one;
@@ -2139,7 +2155,7 @@ export async function fightRound(buyerId, opts = {}) {
             // Offence and defence move together or the same kit is two different kits depending on who holds it.
             const stacks = (b.foeBleed?.stacks || 0) + 1;
             const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * (REND_TICK_CAP + (FP.rendCap || 0)))));
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
+            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0) + (b.foe.burnTurns || 0));
             b.foeBleed = { turns, stacks, dmg: tick };
         }
         if (gashNow && through > 0) {

@@ -299,15 +299,23 @@ export default function SkillTree({ progress, gold = 0, busy, onAct }) {
                 itself off the screen on a phone. The tree below already IS the answer, tier by tier, and
                 tapping any node gives that node's real description. So preview shows the tree and nothing
                 else. */}
-            {!viewing && held.length ? (
+            {/* ── WHAT THE CLASS IS, BEFORE A POINT IS SPENT ──────────────────────────────────────────────
+                This was "What your points are doing" — a running list of the nodes you had bought, which is
+                the tree below said twice. What it never told you is the thing you cannot see anywhere else:
+                what the class does INHERENTLY, without spending anything. A fresh Warden drinks, a fresh
+                Reaver finishes, a fresh Runecaller's fire outlasts the beat — none of that is a node, so
+                none of it appeared on this screen at all.
+
+                Built from the class's own numbers (classBase), never from prose typed here, so retuning the
+                Warden's lifesteal moves this line with it. */}
+            {cls?.passives?.length ? (
                 <div className="skt-have">
-                    <b>What your points are doing</b>
+                    <b>{cls.name} — what you get for free</b>
                     <div className="skt-have-rows">
-                        {held.map((n) => (
-                            <span key={n.id} className="skt-have-row">
-                                <i>{n.name}</i>
-                                <u>{fmt(n)}</u>
-                                <em>{n.rank}/{n.ranks || 1}</em>
+                        {cls.passives.map((p) => (
+                            <span key={p.label} className="skt-have-row">
+                                <i>{p.label}</i>
+                                <u>{p.value}</u>
                             </span>
                         ))}
                     </div>

@@ -34,7 +34,10 @@ const kit = engine + classes;
 
 // Stats the KIT folds into a fighter's numbers before the bout starts (might, health, dr...). Those are read
 // via the kit rather than as `P.<stat>`, so they are legitimately absent from the engine's perk lookups.
-const FOLDED = new Set(["might", "health", "dr", "accuracy", "speed", "crit", "critMult", "critStat", "guard", "lifesteal"]);
+const FOLDED = new Set(["might", "health", "dr", "accuracy", "speed", "crit", "critMult", "critStat", "guard", "lifesteal",
+    // Brutality is a flat damage multiplier folded into the kit exactly as lifesteal is, then read off the
+    // fighter (b.me.dmgPct) rather than the perk bag — so the P.<stat> lookup below would never find it.
+    "dmgPct"]);
 
 const nodes = [];
 for (const m of classes.matchAll(/N\(\{([^]*?)\}\),/g)) {
