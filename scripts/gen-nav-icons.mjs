@@ -70,6 +70,11 @@ const ICONS = {
     customize: "An ornate hand mirror with a scrolled metal frame, a paintbrush crossed behind it",
     fishing: "A wooden fishing rod angled across the frame with a taut line and a bright red-and-white float bobbing below it",
     profile: "A single hooded human adventurer shown from the chest up, framed inside a thick ornate circular ring like a portrait medallion",
+    // The Market must not be another storefront: `store` is ALREADY "a wooden market stall with a striped
+    // awning", and at 18px two awnings are the same icon. So this one is the GOODS rather than the building —
+    // which is also what the screen is actually about, members trading produce and catch between themselves.
+    // Distinct at a glance from store (awning), trades (handshake) and auction (gavel).
+    market: "A woven wicker basket brimming with fresh produce — orange carrots, leafy greens and a ripe red apple — with a single silver fish laid across the rim and two gold coins leaning against the base",
 };
 
 const want = process.argv.slice(2);

@@ -10,6 +10,7 @@ import { FaDharmachakra } from "react-icons/fa6";
 import FishingLaunch from "@/components/FishingLaunch";
 import MiningLaunch from "@/components/MiningLaunch";
 import DungeonLaunch from "@/components/DungeonLaunch";
+import MarketLaunch from "@/components/MarketLaunch";
 import SurveyModal from "@/components/SurveyModal";
 import AnnouncementModal from "@/components/AnnouncementModal";
 import BadgePop from "@/components/BadgePop";
@@ -43,6 +44,7 @@ const NAV_SPRITE = {
     // the emoji fallback, and the Compendium has no emoji. It rendered an empty gap, which is exactly what
     // it looked like: the one tile in the grid with nothing above its label.
     "/marketplace/compendium": "compendium",
+    "/marketplace/market": "market",
 };
 
 // One icon, with the old emoji/react-icon kept as the fallback: a missing or not-yet-generated PNG degrades to
@@ -142,16 +144,16 @@ export default function GameNav() {
         return () => { dead = true; };
     }, [pathname]);
 
-    // The Market, same contract as the Arena and the Mine: ask the server, never guess. A non-owner simply has
-    // no Market entry while it is still owner-gated.
-    const [market, setMarket] = useState(false);
+    // The Market is PUBLIC, so unlike the Arena and the Mine its menu entry does not wait on a round trip —
+    // it rides `signedIn` like Town and Fishing. This fetch is only for the badge, and a failure just means
+    // no badge rather than no Market.
     const [marketStalls, setMarketStalls] = useState(0);
     useEffect(() => {
         let dead = false;
         fetch("/api/marketplace/market", { cache: "no-store", credentials: "same-origin" })
             .then((r) => r.json())
-            .then((d) => { if (!dead && d?.unlocked) { setMarket(true); setMarketStalls((d?.listings || []).filter((l) => !l.mine).length); } })
-            .catch(() => { /* no market, no menu entry */ });
+            .then((d) => { if (!dead && d?.unlocked) setMarketStalls((d?.listings || []).filter((l) => !l.mine).length); })
+            .catch(() => { /* no badge, the entry is still there */ });
         return () => { dead = true; };
     }, [pathname]);
 
@@ -223,7 +225,7 @@ export default function GameNav() {
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
         ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "Arena" }] : []),
-        ...(market ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
+        ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "Market" }] : [])];
     const inGame = links.some((l) => isOn(pathname, l.href)) || isGamePath(pathname);
 
     // Measure what the strip has to sit under. The site header is sticky and its height moves with the
@@ -409,7 +411,7 @@ export default function GameNav() {
             ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "The Mine", sub: "Swing for ore" }] : []),
             ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons", sub: "Ten floors down" }] : []),
             ...(arena ? [{ href: "/marketplace/arena", emoji: "⚔️", label: "The Arena", sub: "Fight with your gear" }] : []),
-            ...(market ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
+            ...(signedIn ? [{ href: "/marketplace/market", emoji: "🏪", label: "The Market", sub: "Trade crops & fish" }] : []),
         ] },
         { title: "Gear & Pets", items: [
             { href: "/marketplace/inventory", emoji: "🛡️", label: "Your Gear", sub: "Equip items" },
@@ -457,6 +459,7 @@ export default function GameNav() {
             {signedIn ? <FishingLaunch /> : null}
             {signedIn ? <MiningLaunch /> : null}
             {signedIn ? <DungeonLaunch /> : null}
+            {signedIn ? <MarketLaunch /> : null}
             {signedIn ? <SurveyModal /> : null}
             <style>{GAMENAV_CSS}</style>
             <nav className="game-nav" aria-label="Game menu">

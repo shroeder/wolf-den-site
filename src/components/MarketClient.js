@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { GiBasket, GiScrollUnfurled, GiShop } from "react-icons/gi";
 
 import HowToPlay from "@/components/HowToPlay";
 
@@ -11,6 +12,17 @@ import HowToPlay from "@/components/HowToPlay";
 //
 // The scene's motes drift and the awnings breathe on their own. Per the house rule, the animation is not
 // gated on prefers-reduced-motion: the ambience IS the feature here.
+
+// ── Permanent credit: the Market was Sunflower Jinxx's idea ──────────────────────────────────────────────────
+// She asked for it in global chat on 2026-08-15 — "trade/sell prepped food to people... so many people have
+// said they have a cool recipe, but not the prepable required thing" — and it was built the same night. Her
+// real hero sprite is enshrined at the corner of the square; tapping it tells the story. Same treatment as
+// Alstier1 in the Forge, and hard-coded to the sprite blob on purpose so a fixed dedication can never break
+// if her account or avatar changes later.
+const FOUNDER = {
+    name: "Sunflower Jinxx",
+    sprite: "https://zqwkiqdxm2nnwwst.public.blob.vercel-storage.com/marketplace/sprite/1786426256619-77678.webp",
+};
 
 const RARITY = { common: "#9aa0a6", rare: "#7ec8ff", epic: "#c9a2ff", legendary: "#ffd75e", mythic: "#ff9ec4" };
 const rarityColor = (r) => RARITY[r] || RARITY.common;
@@ -41,6 +53,7 @@ export default function MarketClient({ initial }) {
     // and landing on "no stalls yet" when you're holding thirty sellable things is a dead end by default.
     const [tab, setTab] = useState((initial?.listings || []).length ? "buy" : "sell");
     const [selling, setSelling] = useState(null); // the ref being priced up
+    const [showFounder, setShowFounder] = useState(false);
     const [qty, setQty] = useState(1);
     const [price, setPrice] = useState(10);
 
@@ -143,12 +156,42 @@ export default function MarketClient({ initial }) {
                     {/* Deliberately NOT your gold — the HUD strip above already shows it, and repeating it here
                         cost the line the room it needed for the number you can't get anywhere else. */}
                     <p className="mk-tagline">
-                        {listings.length ? `${listings.length} stall${listings.length === 1 ? "" : "s"} open` : "No stalls open yet"}
+                        {listings.length ? `${listings.length} stall${listings.length === 1 ? "" : "s"}` : "No stalls yet"}
                         {mine.length ? ` · ${mine.length} yours` : ""}
                         {sellable.length ? ` · ${sellable.length} to sell` : ""}
                     </p>
                 </div>
+
+                {/* Founder's medallion — Sunflower Jinxx's hero, enshrined for asking for the place. */}
+                <button
+                    type="button" className="mk-founder" onClick={() => setShowFounder(true)}
+                    title={`The Market was ${FOUNDER.name}'s idea`}
+                    aria-label={`About the Market — an idea by ${FOUNDER.name}`}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : <span aria-hidden="true">★</span>}
+                </button>
             </div>
+
+            {showFounder ? (
+                <div className="mk-scrim" role="dialog" aria-modal="true" onClick={() => setShowFounder(false)}>
+                    <div className="mk-founder-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="mk-founder-hero">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {FOUNDER.sprite ? <img src={FOUNDER.sprite} alt={FOUNDER.name} draggable="false" /> : null}
+                        </div>
+                        <div className="mk-founder-kicker">Founder&apos;s Tribute</div>
+                        <h3 className="mk-founder-name">{FOUNDER.name}</h3>
+                        <p className="mk-founder-body">
+                            The Market was <b>{FOUNDER.name}&apos;s</b> idea. She asked whether people could trade
+                            and sell prepped food to each other — because so many of us have a recipe we love and
+                            not the one ingredient it wants — and the square was built that same night. Her hero
+                            keeps a stall here for good. Every trade made in the Den traces back to her asking.
+                        </p>
+                        <button type="button" className="mk-confirm" onClick={() => setShowFounder(false)}>Back to the square</button>
+                    </div>
+                </div>
+            ) : null}
 
             <div className="mk-tabs" role="tablist">
                 <button type="button" role="tab" aria-selected={tab === "buy"} className={`mk-tab${tab === "buy" ? " on" : ""}`} onClick={() => setTab("buy")}>
@@ -166,7 +209,7 @@ export default function MarketClient({ initial }) {
 
             {tab === "buy" ? (
                 <section className="card mk-panel">
-                    <h3 className="mk-panel-h">🏪 Open stalls</h3>
+                    <h3 className="mk-panel-h"><GiShop aria-hidden="true" /> Open stalls</h3>
                     <p className="mk-panel-sub">Cheapest first. Buying takes the whole stall — the goods go straight to your pantry.</p>
                     {listings.length ? (
                         <div className="mk-grid">
@@ -201,7 +244,7 @@ export default function MarketClient({ initial }) {
 
             {tab === "sell" ? (
                 <section className="card mk-panel">
-                    <h3 className="mk-panel-h">🧺 Your shelf</h3>
+                    <h3 className="mk-panel-h"><GiBasket aria-hidden="true" /> Your shelf</h3>
                     <p className="mk-panel-sub">
                         Pick something to sell. You can run <b>{state?.maxOpen}</b> stalls at once — <b>{state?.openSlots}</b> free.
                     </p>
@@ -234,7 +277,7 @@ export default function MarketClient({ initial }) {
 
             {tab === "mine" ? (
                 <section className="card mk-panel">
-                    <h3 className="mk-panel-h">📜 Your stalls</h3>
+                    <h3 className="mk-panel-h"><GiScrollUnfurled aria-hidden="true" /> Your stalls</h3>
                     <p className="mk-panel-sub">These goods are already off your shelf. Pull a stall and they come straight back.</p>
                     {mine.length ? (
                         <div className="mk-grid">
@@ -364,6 +407,25 @@ const MARKET_CSS = `
     background: linear-gradient(90deg, rgba(6,14,12,0.9) 55%, transparent); border-radius: 0 0 0 16px; }
 .mk-title { margin: 0; font-size: 1.7rem; font-weight: 900; color: #d8fff0; text-shadow: 0 2px 10px rgba(40,200,150,0.5), 0 1px 3px #000; letter-spacing: 0.02em; }
 .mk-tagline { margin: 5px 0 0; font-size: 12.5px; font-weight: 600; color: #bfe7d8; text-shadow: 0 1px 4px #000; }
+
+/* ── Founder's medallion (Sunflower Jinxx) — small hero circle pinned top-right of the square ── */
+.mk-founder { position: absolute; top: 12px; right: 12px; z-index: 4; width: 46px; height: 46px; border-radius: 50%; padding: 0; cursor: pointer; overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, #16302a, #061410); border: 2px solid rgba(95,208,168,0.4);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.55), inset 0 0 8px rgba(0,0,0,0.6);
+    display: grid; place-items: center; transition: transform .18s cubic-bezier(.2,1.4,.35,1), box-shadow .18s, border-color .18s; }
+.mk-founder img { width: 112%; height: 112%; object-fit: contain; object-position: center 8%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+.mk-founder:hover, .mk-founder:focus-visible { transform: scale(1.12) rotate(-3deg); border-color: rgba(140,240,200,0.8); box-shadow: 0 5px 18px rgba(0,0,0,0.6), 0 0 16px rgba(95,208,168,0.55); outline: none; }
+.mk-founder-card { position: relative; width: 100%; max-width: 340px; text-align: center; padding: 22px 22px 18px; border-radius: 18px;
+    background: linear-gradient(180deg, #12271f, #091511); border: 1px solid rgba(95,208,168,0.45);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(40,190,140,0.26); animation: mkPop .32s cubic-bezier(.2,1.4,.35,1) both; }
+.mk-founder-hero { width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 28%, #17332c, #05100d); border: 3px solid rgba(95,208,168,0.45);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55), inset 0 0 14px rgba(0,0,0,0.6), 0 0 20px rgba(60,200,150,0.28); }
+.mk-founder-hero img { width: 108%; height: 108%; object-fit: contain; object-position: center 6%; display: block; filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+.mk-founder-kicker { font-size: 10.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #7fe0bd; }
+.mk-founder-name { margin: 3px 0 8px; font-size: 1.35rem; font-weight: 900; color: #eafff7; text-shadow: 0 2px 8px rgba(40,200,150,0.45); }
+.mk-founder-body { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #cfe8de; }
+.mk-founder-body b { color: #8fe3c4; }
 
 /* ── Tabs ── */
 .mk-tabs { display: flex; gap: 6px; }

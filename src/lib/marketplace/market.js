@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { isOwner } from "@/lib/marketplace/owner.js";
 import { ingredientMeta, cookingSprites, addToPantry } from "@/lib/marketplace/cooking.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
@@ -7,12 +6,17 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 // ── THE MARKET ───────────────────────────────────────────────────────────────────────────────────────────────
 // Members selling each other what the land produces — crops, fish and prepped ingredients — for gold.
 //
-// Kaishiern asked for it in global chat: "being able to trade the prep ingredients would be a good way to help
-// folks and support our little economy." It was only worth building once cooking's jackpot rate came down,
-// because a market is worth nothing if the goods it trades are falling out of the sky.
+// SUNFLOWER JINXX ASKED FOR THIS FIRST, in global chat on 2026-08-15: "Would it be possible to be able to
+// trade/sell prepped food to people? So many people have said they have a cool recipe, but not the prepable
+// required thing." Kaishiern seconded it four hours later ("a good way to help folks and support our little
+// economy") and GrayKitsune wanted the same for consumables. Her hero is enshrined on the screen for it, the
+// same way Alstier1's is in the Forge — so check the CHAT before crediting anyone, not your memory of it.
 //
-// OWNER-GATED while the pricing settles, and gated HERE rather than only on the screen — see the ownerOnly
-// landmine: a feature hidden in the UI and open at the API is not gated at all.
+// It was only worth building once cooking's jackpot rate came down: a market is worth nothing if the goods it
+// trades are falling out of the sky.
+//
+// PUBLIC as of 2026-08-16. The gate is "are you signed in", and it lives HERE as well as on the screen — see
+// the ownerOnly landmine: a feature gated in the UI and open at the API is not gated at all.
 //
 // ── NO TRANSACTIONS. THIS IS THE WHOLE DESIGN. ───────────────────────────────────────────────────────────────
 // neon()'s HTTP driver cannot do BEGIN/ROLLBACK, so there is no read-then-write here that holds under two
@@ -26,6 +30,10 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 //   cancel:  guarded the same way; goods come back only once the row is provably yours and provably open.
 //
 // Ordered any other way this duplicates goods or gold under load, and "load" here is two people in a shop.
+
+// The one gate the whole feature reads, in one place — same shape as the Kitchen's COOK_UNLOCKED. Open to
+// every signed-in member; put an isOwner() back in HERE to re-gate it, rather than in four call sites.
+const MARKET_OPEN = (buyerId) => Boolean(buyerId);
 
 const KINDS = new Set(["crop", "fish", "prep"]);
 const MAX_OPEN_PER_SELLER = 12;   // a board one member can flood is not a market
@@ -50,7 +58,7 @@ const sellerName = (r) => r.display_name || (r.alias ? `@${r.alias}` : "A wolf")
 // `unlocked` is the same contract the Arena, the Mine and the Dungeons use, so the nav's gate — ask the server,
 // never guess — reads this feature without a special case.
 export async function getMarketState(buyerId) {
-    if (!isOwner(buyerId)) return { unlocked: false };
+    if (!MARKET_OPEN(buyerId)) return { unlocked: false };
     const [open, mine, pantry, goldRow, sprites, art] = await Promise.all([
         db.query(
             `SELECT l.id, l.seller_id, l.kind, l.ref, l.qty, l.unit_gold, l.created_at, b.display_name, b.alias
@@ -107,7 +115,7 @@ export async function getMarketState(buyerId) {
 
 /** Post goods for sale. The pantry is debited FIRST — nothing sits on the board that isn't already escrowed. */
 export async function listOnMarket(buyerId, { ref, qty, unitGold } = {}) {
-    if (!isOwner(buyerId)) return { ok: false, error: "not_open" };
+    if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };
     const sprites = await cookingSprites().catch(() => ({}));
     const meta = metaFor(ref, sprites);
     const n = Math.round(Number(qty) || 0);
@@ -147,7 +155,7 @@ export async function listOnMarket(buyerId, { ref, qty, unitGold } = {}) {
 
 /** Buy a listing outright: claim, then pay, then deliver — in that order, for the reasons at the top. */
 export async function buyFromMarket(buyerId, listingId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "not_open" };
+    if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };
     const id = Number(listingId) || 0;
     if (!id) return { ok: false, error: "bad_listing" };
 
@@ -203,7 +211,7 @@ export async function buyFromMarket(buyerId, listingId) {
 
 /** Pull a listing off the board. The goods return only once the row is provably yours to cancel. */
 export async function cancelListing(buyerId, listingId) {
-    if (!isOwner(buyerId)) return { ok: false, error: "not_open" };
+    if (!MARKET_OPEN(buyerId)) return { ok: false, error: "not_open" };
     const id = Number(listingId) || 0;
     if (!id) return { ok: false, error: "bad_listing" };
     const row = await db.queryOne(

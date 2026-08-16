@@ -96,7 +96,10 @@ if (process.env.SHOT_SEEN) {
 }
 
 await send("Page.navigate", { url });
-await sleep(2600); // let the remote sprites actually arrive — a blank shot proves nothing
+// Let the sprites actually arrive — a blank shot proves nothing. 2600ms was not enough on a cold dev server:
+// a launch modal's art came out as an empty 82px box while a DOM probe at 5s showed it loaded and visible, so
+// the picture was wrong and looked deliberate. Cheap insurance on a tool whose whole job is being trustworthy.
+await sleep(4200);
 
 // Open whatever state is being judged.
 //
@@ -126,7 +129,10 @@ if (CLICK) {
         console.error(`shot.mjs: ${CLICK} never produced ${WAIT || "a click"} — refusing to shoot the unopened page`);
         sock.close(); chrome.kill(); process.exit(1);
     }
-    await sleep(800); // let the open animation land
+    // Let the open animation land AND the newly-revealed images arrive. 800ms covered the animation only, so
+    // a menu full of icons shot as a grid of blank tiles — the same "clean, empty, wrong picture" the settle
+    // delay above exists to prevent, just moved behind the click.
+    await sleep(2200);
 }
 
 const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });

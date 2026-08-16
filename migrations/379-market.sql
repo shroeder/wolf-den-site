@@ -1,8 +1,9 @@
 -- ── THE MARKET ───────────────────────────────────────────────────────────────────────────────────────────────
 -- Member-to-member trade in what the land actually produces: crops, fish and prepped ingredients, for gold.
--- Kaishiern asked for it in global chat ("being able to trade the prep ingredients would be a good way to help
--- folks and support our little economy"), and it only makes sense now that cooking's jackpot rate has come
--- down fivefold — a market is worth nothing if the goods it trades are falling out of the sky.
+-- Sunflower Jinxx asked for it first in global chat ("trade/sell prepped food to people... so many people have
+-- said they have a cool recipe, but not the prepable required thing"), seconded by Kaishiern hours later. It
+-- only makes sense now that cooking's jackpot rate has come down fivefold — a market is worth nothing if the
+-- goods it trades are falling out of the sky.
 --
 -- ESCROW, NOT A PROMISE. `qty` moves OUT of the seller's pantry the moment a listing is posted and lives on
 -- this row until it is bought or cancelled. Anything else lets a member list the same three Starfruit five
