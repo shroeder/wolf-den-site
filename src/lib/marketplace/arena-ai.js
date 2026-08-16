@@ -15,7 +15,7 @@
 //
 // There was never a purity to protect: arena-kit.js is itself pure ("No DB, no server-only") and the dev lab
 // already imports both modules side by side. The import costs nothing; the copies cost correctness.
-import { BRACE_LIMIT, DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS } from "@/lib/marketplace/arena-kit.js";
+import { BRACE_LIMIT, DRAIN_SHARE, guardSoakFrom, DOOM_TURNS as DOOM_BEATS, REND_TICK_CAP } from "@/lib/marketplace/arena-kit.js";
 import { DEFAULT_GUARD } from "@/lib/marketplace/arena-classes.js";
 const AI_ABILITY_CHANCE = 0.75;
 
@@ -251,7 +251,13 @@ export function pickIncoming(b) {
         const best = pool.length ? pool.reduce((top, a) => ((a.power || 1) > (top.power || 1) ? a : top), pool[0]) : null;
         return swing(best, free || null);
     };
-    const brace = (free) => (bracedLastBeat || bracesSpent ? insteadOfGuard(free) : guard());
+    // ── SHATTERED: DO NOT PICK A GUARD YOU CANNOT RAISE ──────────────────────────────────────────────────
+    // Luke: "when i prevent them from guarding 3 times, it shouldn't let them guard. right now it lets them
+    // guard and then eats their turn." Exactly right — the picker chose a brace, the engine then found the
+    // guard shattered and wasted the beat, so Shatter read as three turns of the opponent standing still
+    // rather than three turns of them unable to defend. They come at you instead now.
+    const shattered = (b.foeNoGuard || 0) > 0;
+    const brace = (free) => (bracedLastBeat || bracesSpent || shattered ? insteadOfGuard(free) : guard());
 
     // ── 1. IS THERE A KILL HERE? ─────────────────────────────────────────────────────────────────────────
     // Asked FIRST, before anything about its own health. It used to heal the moment it dropped below a third
@@ -377,8 +383,12 @@ export function pickIncoming(b) {
         // re-applied when the burn is nearly out, or when its own Kindling makes another stack worth having.
         const rendMove = of("rend");
         const burning = (b.foeBleed?.turns || 0) > 1;
-        const canStack = (b.foeBleed?.stacks || 0) < 3 + Math.round(FP.rendStacks || 0);
-        if (rendMove && (!burning || canStack)) return swing(rendMove, free);
+        // The AI used to stop stacking at 3, mirroring a cap that no longer exists — leave it and the SAME kit
+        // burns harder in your hands than in theirs, which is the offence/defence split this file exists to
+        // prevent. It keeps stacking while the ceiling is still buying something.
+        const tickCeiling = Math.max(1, Math.round(b.maxHp * (REND_TICK_CAP + (FP.rendCap || 0))));
+        const atCeiling = (b.foeBleed?.dmg || 0) >= tickCeiling;
+        if (rendMove && (!burning || !atCeiling)) return swing(rendMove, free);
         // A sunder is worth a beat only if it is not already stripped and there are beats left to swing into it.
         const sunderMove = of("sunder");
         if (sunderMove && !(b.foeSunder > 0) && runway >= 3) return swing(sunderMove, free);

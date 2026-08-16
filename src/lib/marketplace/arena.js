@@ -13,7 +13,7 @@ import {
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
     BLEED_PER_TURN, BLEED_TURNS, BLEED_MAX_STACKS, BLEED_TICK_CAP, BLEED_TURNS_CAP,
-    DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_MAX_STACKS, REND_TICK_CAP, REND_TURNS_CAP,
+    DRAIN_SHARE, REND_TURNS, REND_PER_TURN, REND_TICK_CAP, REND_TURNS_CAP,
     SUNDER_CUT, SUNDER_TURNS, RIPOSTE_SHARE,
     SHIELD_CAP, WARD_SOAK, SURGE_SWINGS, FREE_KINDS,
 } from "@/lib/marketplace/arena-kit.js";
@@ -1579,7 +1579,15 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "execute" && b.foeHp <= b.foeMaxHp * 0.35) { power *= 1.5; note += " — EXECUTE"; }
             if (ability.kind === "gamble") { power = Math.random() < 0.5 ? power * 2 : 0; note += power ? " — it pays" : " — nothing"; }
             // ── SHATTER ── not a cut, a lockout: they cannot raise a guard at all for three of their beats.
-            if (ability.kind === "disarm") { b.foeNoGuard = GUARD_DISABLE_TURNS; note += " — their guard is broken"; }
+            if (ability.kind === "disarm") {
+                b.foeNoGuard = GUARD_DISABLE_TURNS;
+                note += " — their guard is broken";
+                // THE MOVE THEY HAD ALREADY TELEGRAPHED. The foe picks its next move ahead of time, so a
+                // brace chosen BEFORE the shatter landed would still be thrown at it and wasted — the first
+                // of the three locked turns would be a free skip rather than a fight. Re-picked here so all
+                // three turns are ones they have to come at you in.
+                if (b.incoming?.brace) b.incoming = pickIncoming(b);
+            }
             // FIRE leaves a burn, a wound bleeds — both resolved below.
             if (ability.bleeds) gash = true;
             if (ability.kind === "strike") {
@@ -1756,14 +1764,15 @@ export async function fightRound(buyerId, opts = {}) {
             // RUNEBRAND MULTIPLIES, it no longer nudges. Four ranks is +120% on the tick rather than the
             // +2.4 percentage points it used to be worth.
             const per = Math.max(1, Math.round(b.foeMaxHp * REND_PER_TURN * (1 + (P.rendTick || 0))));
-            // KINDLING: "+1 burn stack per rank" was read by nothing, so two ranks of a tier-1 node did
-            // nothing at all. It raises the CEILING — the cap is what the node is worth, since a burn kit
-            // reaches the old cap of its own accord and then stops.
-            const cap = REND_MAX_STACKS + Math.round(P.rendStacks || 0);
-            const stacks = Math.min(cap, (b.bleed?.stacks || 0) + 1);
-            // The ceiling on one turn of burning, whatever the stacks and whatever the investment. An
-            // uncapped stacking burn has been shipped here once already and won 83.8% of simulated bouts.
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * REND_TICK_CAP)));
+            // ── NO STACK CEILING ── Luke: "is there a cap at 3 fire sticks? if so remove that." Stacks now
+            // build as long as you keep casting. This is NOT the uncapped burn that once won 83.8% of 3,000
+            // simulated bouts: that one had no per-turn ceiling either. The REND_TICK_CAP below still bounds
+            // what a single turn of burning can cost, so extra stacks reach the ceiling sooner rather than
+            // climbing forever, and the runaway cannot come back.
+            const stacks = (b.bleed?.stacks || 0) + 1;
+            // KINDLING raises that ceiling, which is the only limit left worth buying — as stacks it would
+            // now be a node that buys nothing at all.
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * (REND_TICK_CAP + (P.rendCap || 0)))));
             // SLOW BURN buys turns — what its name always said, instead of being a weaker second Runebrand.
             const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
             b.bleed = { turns, stacks, dmg: tick };
@@ -2126,9 +2135,10 @@ export async function fightRound(buyerId, opts = {}) {
             // does, and their burn hits the same ceiling. The same kit has to burn identically in an
             // opponent's hands or the tree is only real on one side of the ring.
             const per = Math.max(1, Math.round(b.maxHp * REND_PER_TURN * (1 + (FP.rendTick || 0))));
-            const cap = REND_MAX_STACKS + Math.round(FP.rendStacks || 0);
-            const stacks = Math.min(cap, (b.foeBleed?.stacks || 0) + 1);
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * REND_TICK_CAP)));
+            // Uncapped in their hands too, and their Kindling raises their ceiling exactly as yours does.
+            // Offence and defence move together or the same kit is two different kits depending on who holds it.
+            const stacks = (b.foeBleed?.stacks || 0) + 1;
+            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * (REND_TICK_CAP + (FP.rendCap || 0)))));
             const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
             b.foeBleed = { turns, stacks, dmg: tick };
         }

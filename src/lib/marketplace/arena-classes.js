@@ -299,8 +299,10 @@ export const TREES = {
             desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
         N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTurns", per: 0.5, needs: 3,
             desc: "Your burns last one turn longer every two ranks.", sprite: "/images/arena/node/rc_burn.webp" }),
-        N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendStacks", per: 1, needs: 3,
-            desc: "+1 burn stack per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
+        // WAS "+1 burn stack per rank". Stacks are uncapped now, so that would buy literally nothing — the
+        // per-turn CEILING is the only limit left, and this is what lifts it.
+        N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendCap", per: 0.04, needs: 3,
+            desc: "Your burn can tick 4% harder per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
 
         // The ONLY guard-facing move the class has left, and it is a different KIND of thing from a percentage:
         // for three of their beats they cannot raise a guard at all.

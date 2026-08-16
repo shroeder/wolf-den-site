@@ -193,11 +193,10 @@ export const REND_TICK_CAP = 0.20;
 // name has always said; without a cap four ranks would take a burn to seven of their beats and the class
 // would win by waiting.
 export const REND_TURNS_CAP = 5;
-// A BLEED CAP. Simulated at 3,000 bouts a cell, an uncapped stacking burn won 83.8% and ended fights in 5.7
-// beats — every extra application added another full tick forever, so the correct play was "rend, rend, rend"
-// and the bout was over before any other kind got to matter. Three stacks is still the strongest damage-over-
-// time in the game; it is just no longer a runaway.
-export const REND_MAX_STACKS = 3;
+// THE STACK CAP IS GONE (Luke, 2026-08-16: "is there a cap at 3 fire sticks? if so remove that"). Stacks build
+// as long as you keep casting. The 83.8%-win runaway this cap was written for had NO per-turn ceiling either —
+// REND_TICK_CAP above is what actually holds the line now, so extra stacks reach the ceiling faster instead of
+// climbing without end. Kindling raises that ceiling; it used to raise this.
 export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as health
 // ── RETALIATION ── what a counter-swing is worth, as a share of your normal damage. Half: it is a free
 // blow off somebody else's turn, so at four ranks (20% of their swings) it must not out-earn actually
@@ -325,7 +324,7 @@ export function effectOf(kind, power, element, hits = 1, opts = {}) {
             return {
                 head: `${Math.round(REND_PER_TURN * 100)}%`, sub: `a turn, ${REND_TURNS} turns`,
                 line: `Burns for ${REND_TURNS} more turns after it lands`,
-                tags: [{ t: `Stacks ${REND_MAX_STACKS}\u00d7`, k: "good" }],
+                tags: [{ t: "Stacks with itself", k: "good" }],
             };
         case "drain":
             return {
