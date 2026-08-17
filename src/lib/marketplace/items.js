@@ -111,6 +111,11 @@ export const STAT_META = {
     // A chance to hit back the instant their blow lands. It is the off-hand's stat because that is the hand
     // that parries — and it gives the off-hand an identity beyond being a second weapon.
     counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands.", suffix: "%" },
+    // ── DOUBLE STRIKE ────────────────────────────────────────────────────────────────────────────────────
+    // A whole extra swing, not a damage bonus. It multiplies everything the swing carries — another crit
+    // roll, another chance to pierce, another chance to set a burn — which is why a modest percentage is
+    // priced as the rarest thing in the pool alongside Lifedrink.
+    doublestrike: { label: "Double Strike", icon: "⚡", desc: "Chance your attack swings twice — a whole extra hit, with everything that comes with it.", suffix: "%" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -932,7 +937,7 @@ export function describeDepth(depth = {}) {
 // The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
 // why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
 export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
-    "vitality", "tenacity", "precision", "pierce", "lifesteal", "counter"];
+    "vitality", "tenacity", "precision", "pierce", "lifesteal", "counter", "doublestrike"];
 
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
 // more things at once.
@@ -952,7 +957,7 @@ export const affixCeiling = (rarity) => affixesBornWith(rarity) + FORGE_SLOTS;
 // because it is the counter to a whole archetype and should not be on every third item either.
 const AFFIX_RARITY = {
     might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1, precision: 1,
-    tenacity: 1.5, pierce: 2.5, counter: 4, lifesteal: 6,
+    tenacity: 1.5, pierce: 2.5, counter: 4, lifesteal: 6, doublestrike: 7,
 };
 const AFFIX_TIER = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
 // Percent-style stats carry bigger numbers than the point-style ones.

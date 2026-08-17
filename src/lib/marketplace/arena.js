@@ -236,6 +236,7 @@ async function combatStats(buyerId, gearStats, ids) {
         pierce: gearStats.pierce || 0,
         lifesteal: gearStats.lifesteal || 0,
         counter: gearStats.counter || 0,
+        doublestrike: gearStats.doublestrike || 0,
     };
 }
 
@@ -384,6 +385,8 @@ async function kitFor(buyerId) {
         bleedChance: Math.max(0, base.bleedChance || 0),
         burnChance: Math.max(0, base.burnChance || 0),
         dmgPct: Math.max(0, perks.dmgPct || 0),
+        // Gear-only, capped: a coin flip for a free swing every attack is a different game.
+        doublestrike: Math.min(0.25, Math.max(0, (Number(stats.doublestrike) || 0) / 100)),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
@@ -1042,6 +1045,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             accuracy: foeKit.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: foeKit.lifesteal || 0,
             bleedChance: foeKit.bleedChance || 0, burnChance: foeKit.burnChance || 0, dmgPct: foeKit.dmgPct || 0,
+            doublestrike: foeKit.doublestrike || 0,
             // Their brace, resolved from THEIR class and Fortune. Named here or it is dropped by the
             // allowlist and their Guard silently falls back to a stranger's numbers.
             guard: foeKit.guard ?? DEFAULT_GUARD,
@@ -1073,6 +1077,7 @@ function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDama
             accuracy: me.accuracy ?? DEFAULT_ACCURACY,
             lifesteal: me.lifesteal || 0,
             bleedChance: me.bleedChance || 0, burnChance: me.burnChance || 0, dmgPct: me.dmgPct || 0,
+            doublestrike: me.doublestrike || 0,
             guard: me.guard ?? DEFAULT_GUARD,
             gearPower: me.gearPower, level: me.level, perks: me.perks || {},
             classId: me.classId || null },
@@ -1757,6 +1762,15 @@ export async function fightRound(buyerId, opts = {}) {
             (Number(b.me.accuracy) || DEFAULT_ACCURACY) + (ability?.acc || 0)) - ((b.snare || 0) > 0 ? SNARE_ACC : 0));
         const each = [];
         let hitsLanded = 0;
+        // ── DOUBLE STRIKE ────────────────────────────────────────────────────────────────────────────────
+        // A whole extra swing, not a damage bonus — so it multiplies everything the swing carries: another
+        // crit roll, another chance to pierce, another chance to set a burn or open a wound. That is why it
+        // is priced as one of the rarest affixes despite a modest percentage.
+        //
+        // Rolled ONCE per attack rather than per hit, or a three-hit flurry would get three chances at it and
+        // the stat would read completely differently depending on which move you threw.
+        const doubled = (b.me.doublestrike || 0) > 0 && Math.random() < b.me.doublestrike;
+        if (doubled) hits += 1;
         for (let i = 0; i < hits && power > 0; i += 1) {
             if (Math.random() >= acc) { each.push(0); continue; }
             hitsLanded += 1;
@@ -2148,6 +2162,9 @@ export async function fightRound(buyerId, opts = {}) {
         let foeCrit = false;
         const foeEach = [];
         let foeLanded = 0;
+        // The same extra swing in their hands — read off their kit exactly as yours is.
+        const foeDoubled = (b.foe.doublestrike || 0) > 0 && Math.random() < b.foe.doublestrike;
+        if (foeDoubled) foeHits += 1;
         for (let i = 0; i < foeHits && power > 0; i += 1) {
             if (Math.random() >= foeAcc) { foeEach.push(0); continue; }
             foeLanded += 1;
