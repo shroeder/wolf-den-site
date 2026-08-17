@@ -3377,6 +3377,21 @@ function Styles() {
             /* The COLUMN is the positioned thing. column-reverse so the first number sits lowest and each
                extra one stacks above it — damage at the bottom, then what you blocked, healed and soaked. */
             .ar-pop.is-burn { color: #ffa04a; text-shadow: 0 0 12px rgba(255,120,30,.75); }
+            /* ── AND THE BLEED, WHICH HAD NONE ────────────────────────────────────────────────────────────
+               The tick was already tagged kind:"bleed" by the engine and already carried its droplet, but
+               there was no rule for is-bleed — so it floated in the same grey as an ordinary hit while the
+               burn beside it glowed. The one number you cannot control looked like the ones you can.
+               Its own red, its own glow, and a heavier pulse than the burn: blood goes straight to health. */
+            .ar-pop.is-bleed { color: #ff6b6b; text-shadow: 0 0 12px rgba(220,40,40,.8);
+                animation-name: arPopBleed; }
+            @keyframes arPopBleed {
+                0% { opacity: 0; transform: translateY(6px) scale(.85); }
+                18% { opacity: 1; transform: translateY(0) scale(1.18); }
+                34% { transform: translateY(-3px) scale(1); }
+                100% { opacity: 0; transform: translateY(-30px) scale(1); } }
+            /* The droplet and the flame both read as a mark, not decoration — big enough to see at a glance. */
+            .ar-pop.is-bleed .ar-pop-dot { color: #ff5f5f; filter: drop-shadow(0 0 5px rgba(220,40,40,.9)); }
+            .ar-pop.is-burn .ar-pop-dot { color: #ff8a2a; filter: drop-shadow(0 0 5px rgba(255,120,30,.9)); }
             .ar-pop-dot { font-size: .8em; margin-right: .12em; vertical-align: -.06em; }
             .ar-pop.is-thorn { color: #ff9f9f; text-shadow: 0 0 10px rgba(255,120,120,.65); }
             .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
