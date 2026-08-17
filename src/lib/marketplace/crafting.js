@@ -425,63 +425,6 @@ export async function combineAllAtTier(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
-// ── REROLL WHAT THE FORGE GAVE YOU ───────────────────────────────────────────────────────────────────────────
-// Luke: "I actually love the idea of re rolling." A forged roll is permanent and 244 items already carry one,
-// so a bad spread was a thing you were stuck with on gear you had earned — the punishing shape we do not ship.
-//
-// IT CANNOT COST YOU VALUE. The reroll keeps the item's TOTAL forged points exactly and redistributes them
-// across a fresh draw from that slot's pool. You are re-rolling the SHAPE, never the amount, so the worst
-// outcome is a spread you like no more than the one you had — never a weaker item. That is what makes it
-// something to chase rather than something to fear.
-//
-// The level, the best grade and any attunement are untouched: those are the things you actually earned by
-// striking well, and a spread is not one of them.
-export async function rerollEnhance(buyerId, itemId) {
-    const item = itemById(itemId);
-    if (!item) return { ok: false, error: "unknown_item" };
-    const cur = await db.queryOne(
-        `SELECT level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]
-    ).catch(() => null);
-    if (!cur) return { ok: false, error: "not_enhanced" };
-
-    const before = parseBonus(cur.stat_bonus);
-    const points = Object.values(before).reduce((n, v) => n + (Number(v) || 0), 0);
-    if (points <= 0) return { ok: false, error: "nothing_to_reroll" };
-
-    // Guarded spend FIRST — the neon HTTP driver has no transactions, so a reroll that rolled before it
-    // charged would be free every time the charge failed.
-    const cost = rerollCost(points);
-    const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]
-    ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_gold", cost };
-    await logCoin(buyerId, -cost, "forge_reroll", { meta: { itemId, points }, balanceAfter: paid.gold }).catch(() => {});
-
-    // Same pool and the same per-stat cap the enhance itself uses — a reroll must not be able to reach a
-    // shape an enhance could never have produced.
-    const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
-    const pool = [...new Set([...existing, ...addablePoolFor()])];
-    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
-    const next = {};
-    let left = points;
-    let guard = points * 8; // every point must land somewhere; this only stops a pathological spin
-    while (left > 0 && guard-- > 0) {
-        const k = pool[Math.floor(Math.random() * pool.length)];
-        if ((next[k] || 0) >= capOf(k)) continue;
-        next[k] = (next[k] || 0) + 1;
-        left -= 1;
-    }
-    // If the caps could not absorb every point (a tiny pool on a low-stat item), the remainder goes back onto
-    // whatever the item already had rather than evaporating.
-    if (left > 0) for (const k of (existing.length ? existing : ["might"])) { next[k] = (next[k] || 0) + left; break; }
-
-    await db.query(
-        `UPDATE mkt_item_enhance SET stat_bonus = $3::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND item_id = $2`,
-        [buyerId, itemId, JSON.stringify(next)]
-    ).catch(() => {});
-    return { ok: true, cost, points, before, after: next };
-}
-
 // ── REROLL ONE STAT, NOT THE WHOLE HAND ──────────────────────────────────────────────────────────────────────
 // Luke: "you can enhance or reroll a stat to a different one specifically." The whole-spread reroll is a
 // gamble; this is a decision. You point at the line you do not want, its points move to a different stat, and
@@ -540,10 +483,6 @@ export async function rerollStat(buyerId, itemId, stat) {
 
 // Cheaper than rerolling the whole hand, because it moves one line rather than redrawing all of them.
 export const rerollStatCost = (points = 0) => 150 + Math.max(0, Math.round(points)) * 120;
-
-// Priced off how much is actually being rerolled, so a lightly-forged item is cheap to experiment with and a
-// fully-forged one is a real decision.
-export const rerollCost = (points = 0) => 250 + Math.max(0, Math.round(points)) * 150;
 
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
@@ -724,7 +663,6 @@ export async function getForgeState(buyerId) {
                     .map(([k, v]) => ({ stat: k, label: STAT_META[k]?.label || k, n: Number(v), cost: rerollStatCost(Number(v)) }))
                 : [],
             rerollPoints: enh?.bonus ? Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0) : 0,
-            rerollCost: enh?.bonus ? rerollCost(Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0)) : 0,
             util: describeUtil(enh?.util),
             // ── IS THIS PART OF A SET? ────────────────────────────────────────────────────────────────────
             // The Forge is the one screen in the game where being wrong is irreversible, and it was the one

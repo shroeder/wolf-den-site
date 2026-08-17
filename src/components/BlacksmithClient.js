@@ -423,13 +423,6 @@ export default function BlacksmithClient({ initial }) {
                                 A sibling of the card, not a child: the card IS a button and nesting one
                                 inside another is invalid and unclickable half the time. Only offered on gear
                                 that actually HAS a forged spread — there is nothing to reroll otherwise. */}
-                            {it.rerollPoints > 0 ? (
-                                <button type="button" className="forge-reroll" disabled={Boolean(busy)}
-                                    title={`Redistribute all ${it.rerollPoints} forged points into a fresh spread. The total never changes.`}
-                                    onClick={() => { ac(); setRerolling(it); }}>
-                                    Reroll spread · {it.rerollCost.toLocaleString()}g
-                                </button>
-                            ) : null}
                             </span>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
@@ -559,21 +552,15 @@ export default function BlacksmithClient({ initial }) {
                         </div>
                         {/* The hammer still lives on the piece, so opening a card has not cost anyone the
                             action they open it for most. */}
+                        {/* THE primary action. Enhancing is what people open a piece to do; swapping a line is
+                            the considered thing you do occasionally, so it sits above as a list rather than
+                            competing with this. */}
                         {!rerolling.maxed ? (
-                            <button type="button" className="forge-swap" style={{ marginBottom: 8 }} disabled={Boolean(busy)}
+                            <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
                                 onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: !it.affordable && powerScrolls > 0 }); }}>
-                                <span>Take the hammer to it</span><em>Enhance</em>
+                                Enhance
                             </button>
                         ) : null}
-                        <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
-                            onClick={async () => {
-                                const it = rerolling; setRerolling(null);
-                                const d = await post({ action: "reroll", itemId: it.id }, "reroll");
-                                if (d?.ok) setToast({ kind: "ok", text: `${it.name} reforged — ${it.rerollPoints} points, new spread.` });
-                                else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — a full reroll costs ${it.rerollCost.toLocaleString()}g.` : "That reroll didn't go through." });
-                            }}>
-                            Reroll everything for {rerolling.rerollCost.toLocaleString()}g
-                        </button>
                         <button type="button" className="forge-daily-tag" style={{ marginTop: 8, background: "none", border: 0, cursor: "pointer" }}
                             onClick={() => setRerolling(null)}>Keep what I have</button>
                     </div>
@@ -1244,11 +1231,6 @@ const FORGE_CSS = `
 .forge-swap:disabled { opacity: 0.5; cursor: default; }
 .forge-cardwrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .forge-cardwrap > .forge-card { flex: 1 1 auto; }
-.forge-reroll { width: 100%; padding: 7px 6px; border-radius: 10px; cursor: pointer;
-    font-size: 11px; font-weight: 800; line-height: 1.2;
-    color: #ffd08a; background: rgba(255,175,75,0.12); border: 1px solid rgba(255,175,75,0.45); }
-.forge-reroll:hover:not(:disabled) { background: rgba(255,175,75,0.2); border-color: rgba(255,200,110,0.7); }
-.forge-reroll:disabled { opacity: 0.5; cursor: default; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 9px 11px; border-radius: 14px; cursor: pointer; text-align: center;
     background: linear-gradient(180deg, rgba(34,20,11,0.9), rgba(14,8,4,0.92)); border: 1px solid color-mix(in srgb, var(--rc) 60%, transparent); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
 .forge-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.5), 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); }
