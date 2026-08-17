@@ -79,6 +79,15 @@ export const STAT_META = {
     crit_power: { label: "Crit Power", icon: "💥", desc: "How much extra your critical hits deal — on both passive auto-damage and your manual strike.", suffix: "%" },
     ferocity: { label: "Ferocity", icon: "🔥", desc: "PASSIVE only: auto-damage your hero deals 24/7 on its own (doesn't affect your manual strike).", suffix: "%" },
     fortune: { label: "Fortune", icon: "🍀", desc: "More raffle tickets toward the weekly boss prize.", suffix: "%" },
+    // ── VITALITY ─────────────────────────────────────────────────────────────────────────────────────────
+    // Health, and ONLY health. Ferocity used to buy health, accuracy, initiative and 24/7 boss damage all at
+    // once, which meant every armour piece was the same decision wearing a different name and the only
+    // question between two chest pieces was whose number was bigger.
+    //
+    // It is also the first combat stat NO BADGE GRANTS. Badges are worth +356 Might against +202 for a
+    // best-in-slot loadout, so a collection could simply out-vote a wardrobe; a stat that only armour carries
+    // is one a collection cannot substitute for.
+    vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Health in the Arena — and only armour carries it.", suffix: "" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -716,6 +725,23 @@ export const ITEMS = [
     { id: "primordial_elder_tracks", name: "Elder Tracks", slot: "boots", rarity: "primordial", icon: "GiBoots", flavor: "Older than the stone it was found in.", stats: { crit_chance: 78, ferocity: 52 }, reqLevel: 127, source: "elite", sort: 1116 },
     { id: "primordial_elder_cloak", name: "Elder Cloak", slot: "back", rarity: "primordial", icon: "GiCondorEmblem", flavor: "From before there was a word for it.", stats: { fortune: 72, crit_chance: 59 }, reqLevel: 128, source: "elite", sort: 1117 },
 ];
+
+// ── ARMOUR CARRIES VITALITY ──────────────────────────────────────────────────────────────────────────────────
+// Applied as a RULE rather than typed onto 96 items, so it cannot land on 95 of them and be missed on the one
+// nobody tested. Chest, boots and belt are the armour slots, and the survey said they were already the
+// ferocity slots — 40/40 chest, 34/34 boots, 22/33 belt — so this is naming what the catalogue already does.
+//
+// Vitality EQUALS that piece's ferocity, which is what makes this safe to ship: health is computed from
+// vitality now, so an armour set that granted N health yesterday grants exactly N today. Nobody wakes up with
+// a smaller health bar. What changes is that ferocity on an AMULET no longer quietly buys health as well as
+// accuracy — the overlap this stat exists to end.
+const ARMOUR_SLOTS = new Set(["chest", "boots", "belt"]);
+for (const it of ITEMS) {
+    if (!ARMOUR_SLOTS.has(it.slot)) continue;
+    const fer = Number(it.stats?.ferocity) || 0;
+    if (fer > 0 && it.stats.vitality == null) it.stats.vitality = fer;
+}
+
 
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
 // The flat per-rarity stat budgets left dozens of items with byte-identical stat blocks (e.g. nine different

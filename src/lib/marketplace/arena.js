@@ -54,7 +54,7 @@ export const FIGHTS_PER_DAY = 10;
 // Same shape as a delve: what you bring is your level and what you are wearing. Reusing the curve deliberately
 // — a member who knows roughly how tough they are underground should not have to learn a second scale here.
 // Health comes off Ferocity — see healthFrom in arena-kit.js for why that stat and not a new one.
-export const arenaHealth = (ferocity = 0) => healthFrom(ferocity);
+export const arenaHealth = (vitality = 0) => healthFrom(vitality);
 
 /**
  * A fighter's ring card, straight off the four stats they carry. ONE function for BOTH kinds of fighter: a
@@ -65,7 +65,7 @@ export function ringStats(stats = {}) {
     return {
         // `tough` is an NPC archetype's bulk — the old hidden armour percentage, expressed as health so the
         // bar tells the truth. A member has no tough and reads as 1.
-        health: Math.round(healthFrom(Number(stats.ferocity) || 0) * (Number(stats.tough) || 1)),
+        health: Math.round(healthFrom(Number(stats.vitality) || 0) * (Number(stats.tough) || 1)),
         damage: swingFrom(Number(stats.might) || 0),
         critChance: critChanceFrom(Number(stats.crit_chance) || 0),
         critMult: critMultFrom(Number(stats.crit_power) || 0),
@@ -209,6 +209,10 @@ async function combatStats(buyerId, gearStats, ids) {
         // Fortune buys the brace now (see guardSoakFrom), so the pet's and the badges' share of it has to
         // reach the ring. It was spread through from gear alone because until now nothing in a bout read it.
         fortune: (gearStats.fortune || 0) + (ps.fortune || 0) * bb + (bs.fortune || 0),
+        // VITALITY IS GEAR-ONLY, ON PURPOSE. No pet term, no badge term. Badges are worth +356 Might against
+        // +202 for a whole best-in-slot loadout, so every stat they touch is a stat a collection can out-vote.
+        // This is the one a wardrobe wins outright — which is the entire point of adding it.
+        vitality: gearStats.vitality || 0,
     };
 }
 
@@ -313,7 +317,8 @@ async function kitFor(buyerId) {
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
         // land in `perks` and are added on top, so the engine reads one set of numbers and does not care
         // which system paid for them.
-        health: healthFrom((Number(stats.ferocity) || 0) + (perks.ferocity || 0))
+        // VITALITY is the gear half; the tree's ferocity nodes still buy health so no node loses its effect.
+        health: healthFrom((Number(stats.vitality) || 0) + (perks.ferocity || 0))
             + Math.round(perks.health || 0) + base.health,
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0)),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),

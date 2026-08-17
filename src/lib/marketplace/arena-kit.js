@@ -461,8 +461,15 @@ export function buildKit(equippedIds = [], sigMap = {}, elementOf = {}) {
 // already on gear, and does nothing in here but decide who swings first — so it is what keeps you standing.
 // Nothing is invented; a real stat is read for a second real job.
 export const HEALTH_BASE = 200;
-export const HEALTH_PER_FEROCITY = 2.5;
-export const healthFrom = (ferocity = 0) => Math.round(HEALTH_BASE + (Number(ferocity) || 0) * HEALTH_PER_FEROCITY);
+// ── HEALTH COMES OFF VITALITY NOW ────────────────────────────────────────────────────────────────────────────
+// It used to come off Ferocity, which also bought accuracy, initiative and 24/7 boss damage — one stat doing
+// four jobs, so every armour piece was the same decision and gear had no axis of its own. Vitality is health
+// and nothing else, it sits only on armour, and no badge grants it.
+//
+// The RATE IS UNCHANGED (2.5 a point) and armour's vitality is seeded equal to its ferocity, so a set that
+// gave N health yesterday gives exactly N today. This is a split, not a nerf.
+export const HEALTH_PER_VITALITY = 2.5;
+export const healthFrom = (vitality = 0) => Math.round(HEALTH_BASE + (Number(vitality) || 0) * HEALTH_PER_VITALITY);
 
 // One unarmoured swing at zero Might. Everything else is a multiplier on this, so there is exactly one number
 // to turn if bouts run long or short. See scripts/check-arena.mjs, which simulates the whole grid.

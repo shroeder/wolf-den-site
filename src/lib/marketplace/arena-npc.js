@@ -354,6 +354,8 @@ export function tierForRating(rating) {
         // same three functions the fight uses. Restating them here is how the ladder and the engine end up
         // disagreeing about how strong tier 20 is.
         const damage = swingFrom(n.might);
+        // An NPC has no armour, so its stat block's `ferocity` IS its toughness — same number, same rate
+        // through healthFrom, so splitting Vitality out of gear left every Gauntlet tier exactly where it was.
         const hp = healthFrom(n.ferocity);
         const cc = critChanceFrom(n.crit_chance);
         const cm = critMultFrom(n.crit_power);
