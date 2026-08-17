@@ -91,6 +91,22 @@ export async function enhanceDetailsFor(buyerId, itemIds = []) {
 // The ids come from sets.js so this file never keeps a second copy of the list.
 const REGALIA_IDS = itemsOfSet("regalia");
 const REGALIA_DROP = 0.001; // per-salvage chance to receive an unowned Regalia piece (0.1% — a rare treasure)
+// The affix pool a slot may take. Never extra_strike (a boss-only convenience), and never a stat the piece
+// has no business carrying — a sword does not grant health, a helm does not sharpen your edge.
+const SLOT_POOL = {
+    main_hand: ["might", "crit_chance", "crit_power", "pierce"],
+    off_hand: ["might", "crit_chance", "crit_power", "pierce"],
+    helmet: ["tenacity", "precision", "crit_chance", "ferocity"],
+    back: ["tenacity", "precision", "ferocity", "fortune"],
+    chest: ["vitality", "tenacity", "ferocity", "might"],
+    belt: ["vitality", "tenacity", "fortune", "ferocity"],
+    boots: ["vitality", "precision", "ferocity", "fortune"],
+    amulet: ["precision", "fortune", "crit_chance", "might"],
+    ring: ["precision", "crit_power", "crit_chance", "fortune"],
+};
+const DEFAULT_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune"];
+export const addablePoolFor = (slot) => SLOT_POOL[slot] || DEFAULT_POOL;
+
 function regaliaBonus(ownedCount) {
     if (ownedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
     if (ownedCount >= 3) return { tier: 1, doubleBonus: 0.1, flatParts: 0, label: "3 pieces: +10% double-parts chance" };
@@ -413,6 +429,67 @@ export async function combineAllAtTier(buyerId, tier) {
 
 // ── Enhance an equipped item — the mini-game's execution drives the roll ──
 // quality: 0..1 execution perfection · grade: headline grade (good|great|perfect|pixel) · combo: best combo run.
+// ── REROLL WHAT THE FORGE GAVE YOU ───────────────────────────────────────────────────────────────────────────
+// Luke: "I actually love the idea of re rolling." A forged roll is permanent and 244 items already carry one,
+// so a bad spread was a thing you were stuck with on gear you had earned — the punishing shape we do not ship.
+//
+// IT CANNOT COST YOU VALUE. The reroll keeps the item's TOTAL forged points exactly and redistributes them
+// across a fresh draw from that slot's pool. You are re-rolling the SHAPE, never the amount, so the worst
+// outcome is a spread you like no more than the one you had — never a weaker item. That is what makes it
+// something to chase rather than something to fear.
+//
+// The level, the best grade and any attunement are untouched: those are the things you actually earned by
+// striking well, and a spread is not one of them.
+export async function rerollEnhance(buyerId, itemId) {
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "unknown_item" };
+    const cur = await db.queryOne(
+        `SELECT level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]
+    ).catch(() => null);
+    if (!cur) return { ok: false, error: "not_enhanced" };
+
+    const before = parseBonus(cur.stat_bonus);
+    const points = Object.values(before).reduce((n, v) => n + (Number(v) || 0), 0);
+    if (points <= 0) return { ok: false, error: "nothing_to_reroll" };
+
+    // Guarded spend FIRST — the neon HTTP driver has no transactions, so a reroll that rolled before it
+    // charged would be free every time the charge failed.
+    const cost = rerollCost(points);
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", cost };
+    await logCoin(buyerId, -cost, "forge_reroll", { meta: { itemId, points }, balanceAfter: paid.gold }).catch(() => {});
+
+    // Same pool and the same per-stat cap the enhance itself uses — a reroll must not be able to reach a
+    // shape an enhance could never have produced.
+    const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
+    const pool = [...new Set([...existing, ...addablePoolFor(item.slot)])];
+    const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
+    const next = {};
+    let left = points;
+    let guard = points * 8; // every point must land somewhere; this only stops a pathological spin
+    while (left > 0 && guard-- > 0) {
+        const k = pool[Math.floor(Math.random() * pool.length)];
+        if ((next[k] || 0) >= capOf(k)) continue;
+        next[k] = (next[k] || 0) + 1;
+        left -= 1;
+    }
+    // If the caps could not absorb every point (a tiny pool on a low-stat item), the remainder goes back onto
+    // whatever the item already had rather than evaporating.
+    if (left > 0) for (const k of (existing.length ? existing : ["might"])) { next[k] = (next[k] || 0) + left; break; }
+
+    await db.query(
+        `UPDATE mkt_item_enhance SET stat_bonus = $3::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND item_id = $2`,
+        [buyerId, itemId, JSON.stringify(next)]
+    ).catch(() => {});
+    return { ok: true, cost, points, before, after: next };
+}
+
+// Priced off how much is actually being rerolled, so a lightly-forged item is cheap to experiment with and a
+// fully-forged one is a real decision.
+export const rerollCost = (points = 0) => 250 + Math.max(0, Math.round(points)) * 150;
+
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
     if (!buyerId || !item) return { ok: false, error: "bad_item" };
@@ -468,7 +545,14 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     const doubleLevel = enhancePowers.has("master_s_mark") && oneIn(3);
 
     const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
-    const ADDABLE = ["might", "crit_chance", "crit_power", "ferocity", "fortune"]; // stats a strong forge can ADD (never extra_strike)
+    // ── WHAT A FORGE MAY ADD, BY SLOT ────────────────────────────────────────────────────────────────────
+    // This was five stats for every item, which predates Vitality/Tenacity/Precision/Pierce — so the forge
+    // could not roll any of the new gear stats at all, and every item's addable pool was identical.
+    //
+    // SLOT-GATED ON PURPOSE, and it is the load-bearing rule: if a weapon can roll Vitality and a helm can
+    // roll Pierce, then after enough forging every slot does everything and slots stop meaning anything. The
+    // variance work is only preserved if the pool respects what the piece IS.
+    const ADDABLE = addablePoolFor(item.slot);
     const newPool = ADDABLE.filter((k) => !existing.includes(k));
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
     const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC)); // per-stat forge cap (added stats: +3)

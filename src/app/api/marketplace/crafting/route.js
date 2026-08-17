@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getForgeState, salvageItem, combineParts, salvageAllOfRarity, combineAllAtTier, enhanceItem, buyForgeUpgrade, claimForgeDaily } from "@/lib/marketplace/crafting.js";
+import { getForgeState, salvageItem, combineParts, salvageAllOfRarity, combineAllAtTier, enhanceItem, rerollEnhance, buyForgeUpgrade, claimForgeDaily } from "@/lib/marketplace/crafting.js";
 import { reforgeItemElement, enchantItemElement } from "@/lib/marketplace/item-element.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
@@ -33,6 +33,7 @@ export async function POST(request) {
             // Bulk. Both loop the single-item paths, so every roll, bonus and daily behaves identically.
             else if (b?.action === "salvage_all") res = await salvageAllOfRarity(buyer.id, String(b?.rarity || ""));
             else if (b?.action === "combine_all") res = await combineAllAtTier(buyer.id, Number(b?.tier));
+            else if (b?.action === "reroll") res = await rerollEnhance(buyer.id, String(b?.itemId || ""));
             else if (b?.action === "enhance") res = await enhanceItem(buyer.id, String(b?.itemId || ""), { quality: Number(b?.quality) || 0, grade: String(b?.grade || "good"), combo: Number(b?.combo) || 0, useScroll: Boolean(b?.useScroll) });
             else if (b?.action === "enchant_element") { res = await enchantItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || "")); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
             else if (b?.action === "reforge_element") { res = await reforgeItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || ""), b?.replace ? String(b.replace) : null); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
