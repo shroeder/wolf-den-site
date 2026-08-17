@@ -1169,6 +1169,18 @@ const FORGE_CSS = `
 .forge-tabs button.on svg { opacity: 1; }
 .forge-tabs button.on .forge-tab-ct { background: rgba(0,0,0,0.16); color: #2a1000; }
 .forge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(134px, 1fr)); gap: 11px; }
+/* ── THE CARD AND ITS REROLL BUTTON ──────────────────────────────────────────────────────────────────────
+   The reroll had to be a SIBLING of the card, because the card is itself a button and nesting one inside
+   another is invalid. So each card got wrapped in a span — and that wrapper shipped with no styles at all.
+   A bare span defaults to display:inline, so inside this grid it collapsed and took the button down with
+   it: endpoint working, price on the payload, button in the DOM, nothing on the screen. */
+.forge-cardwrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.forge-cardwrap > .forge-card { flex: 1 1 auto; }
+.forge-reroll { width: 100%; padding: 7px 6px; border-radius: 10px; cursor: pointer;
+    font-size: 11px; font-weight: 800; line-height: 1.2;
+    color: #ffd08a; background: rgba(255,175,75,0.12); border: 1px solid rgba(255,175,75,0.45); }
+.forge-reroll:hover:not(:disabled) { background: rgba(255,175,75,0.2); border-color: rgba(255,200,110,0.7); }
+.forge-reroll:disabled { opacity: 0.5; cursor: default; }
 .forge-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 9px 11px; border-radius: 14px; cursor: pointer; text-align: center;
     background: linear-gradient(180deg, rgba(34,20,11,0.9), rgba(14,8,4,0.92)); border: 1px solid color-mix(in srgb, var(--rc) 60%, transparent); color: #efe2d2; transition: transform .12s ease, box-shadow .12s ease; }
 .forge-card:not(:disabled):hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.5), 0 0 18px color-mix(in srgb, var(--rc) 35%, transparent); }
