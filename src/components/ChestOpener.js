@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import PetArt from "@/components/PetArt";
+import { GiCutDiamond } from "react-icons/gi";
 import ChestIcon from "@/components/ChestIcon";
 // The Den's audio engine. It lives in the arena folder because that is where it was built, but it is one
 // AudioContext, one master bus and one stored mute for the whole site — a second engine here would be the
@@ -23,6 +24,8 @@ function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     if (reveal?.pet) return reveal.pet.rarity || "rare";
     if (reveal?.recipe) return "epic";
+    // Tier 1-5 maps onto the rarity ladder so a Flawless gem gets a Flawless-sized celebration.
+    if (reveal?.gem) return ["common", "rare", "epic", "legendary", "mythic"][Math.max(0, Math.min(4, (Number(reveal.gem.tier) || 1) - 1))];
     return reveal?.item?.rarity || reveal?.rarity || "common";
 }
 
@@ -142,6 +145,14 @@ export default function ChestOpener({ onLoot }) {
     );
 }
 
+// A gem's painted sprite, falling back to the cut-diamond glyph exactly as the Jewelcutter's own GemArt does.
+function GemReveal({ gem }) {
+    const [broken, setBroken] = useState(false);
+    if (!gem?.art || broken) return <GiCutDiamond className="chest-reward-glyph" aria-hidden="true" />;
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="chest-reward-glyph" src={gem.art} alt="" draggable="false" onError={() => setBroken(true)} />;
+}
+
 // The full-screen celebration: flash → light rays + particle burst → the reward slams in.
 function RewardReveal({ reveal, onClose, onAgain }) {
     const rarity = rarityOf(reveal);
@@ -153,6 +164,12 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     // A recipe is one of the things a chest can CONTAIN now, so it gets a reveal like everything else rather
     // than riding along as a side field on whatever the chest actually gave you.
     const isRecipe = Boolean(reveal?.recipe);
+    // A GEM IS A THING A CHEST CAN CONTAIN, and nothing here knew that. openChest() has returned {gem} since
+    // chests became the Jewelcutter's supply line, but this component branched on item/consumable/pet/recipe
+    // and nothing else — so a gem fell through to the final `else`, which is the DUST branch. Four members
+    // were handed a real gem and told "You already own that gear — take the dust!" over a "+undefined gold".
+    // The gem was always granted; only the telling of it was broken.
+    const isGem = Boolean(reveal?.gem);
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -212,6 +229,12 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                             </div>
                             {reveal.item.signature ? <div className="chest-reward-sig">★ {reveal.item.signature.label} — {reveal.item.signature.desc}</div> : null}
                             {reveal.item.chargeReward ? <div className="chest-reward-sig" style={{ color: "#ffd75e" }}>🎁 Real-world reward: {reveal.item.chargeReward}</div> : null}
+                        </>
+                    ) : isGem ? (
+                        <>
+                            <GemReveal gem={reveal.gem} />
+                            <div className="chest-reward-name">{reveal.gem.name}</div>
+                            <div className="chest-reward-sub muted">{statLine(reveal.gem.stats)} &middot; socket it at the Jewelcutter</div>
                         </>
                     ) : isConsumable ? (
                         <>

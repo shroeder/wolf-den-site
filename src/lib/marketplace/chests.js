@@ -28,7 +28,10 @@ const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, 
 // FOR. Measured, not guessed: 2,037 chests were opened across the Den in the last 7 days (207 in the last
 // 24h), so at these rates this is very roughly 4-6 gems a day into a bench that has seen 28 gems TOTAL. Enough
 // to make the Jewelcutter a place you visit; nowhere near enough to make gear feel like the consolation.
-const GEM_CHEST_CHANCE = { wooden: 0.010, iron: 0.018, gold: 0.030, mythic: 0.045, ascendant: 0.055, eternal: 0.065 };
+// Celestial and primordial were missing, so the two RAREST chests in the game were the only two that could
+// never produce a gem — `|| 0` at the read site made that silent. They continue the same gentle curve.
+const GEM_CHEST_CHANCE = { wooden: 0.010, iron: 0.018, gold: 0.030, mythic: 0.045, ascendant: 0.055, eternal: 0.065,
+    celestial: 0.075, primordial: 0.085 };
 
 // The recipe_nose companion perk, read once per open.
 async function recipeLuckFor(buyerId) {

@@ -51,7 +51,11 @@ export async function grantGem(buyerId, gemId, n = 1, source = "drop") {
     ).catch(() => {});
     await db.query(
         `INSERT INTO mkt_gem_event (buyer_id, kind, gem_id, meta) VALUES ($1, $2, $3, $4::jsonb)`,
-        [buyerId, source === "drop" ? "drop" : "bought", g.id, JSON.stringify({ n, source })]
+        // Only a real PURCHASE is 'bought'. This read `source === "drop" ? "drop" : "bought"`, so every other
+        // way a gem enters the game — chest, spin, fuse, reclaimed, extracted, patience — was filed as a sale.
+        // Chest drops in particular showed up as zero, which is exactly the number you would check before
+        // deciding whether the chest supply line was working.
+        [buyerId, source === "bought" ? "bought" : "drop", g.id, JSON.stringify({ n, source })]
     ).catch(() => {});
     return { ok: true, gem: g, n };
 }
