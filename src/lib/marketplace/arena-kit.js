@@ -512,10 +512,17 @@ export const CRIT_PER_POINT = 200;
 // the same helpers, so what is printed before you commit is what the engine uses.
 export const CRIT_CAP = 0.65;
 export const CRIT_MULT_BASE = 2.5;
-export const CRIT_MULT_CAP = 3;
+// ── NO CEILING ON CRIT DAMAGE ────────────────────────────────────────────────────────────────────────────────
+// The 3x cap is gone. It was doing the job a cap does badly: gear crit power ran into it and stopped mattering,
+// and the Reaver — the class whose whole sentence is "hit hardest" — had no way to push past a number everyone
+// else also reached. Crit CHANCE keeps its ceiling (CRIT_CAP) because a fighter who always crits has deleted
+// the mechanic; crit DAMAGE is a different thing entirely, since it only pays on a roll you still have to win.
+//
+// What holds the line instead: the chance cap above, and the fact that crit damage is the one stat with no
+// floor under it — a build that pours everything into a 2x-rarer bigger number is making a real trade.
 export const critChanceFrom = (critStat = 0, bonus = 0) => Math.min(CRIT_CAP, CRIT_BASE + (Number(critStat) || 0) / CRIT_PER_POINT + bonus);
 export const critMultFrom = (critPower = 0, bonus = 0) =>
-    Math.min(CRIT_MULT_CAP, CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus);
+    CRIT_MULT_BASE + (Number(critPower) || 0) / 100 + bonus;
 
 // ── THE PIT CLOSES ───────────────────────────────────────────────────────────────────────────────────────────
 // A beat costs about 2.6 seconds of animation before anybody has decided anything, so a twenty-round bout is a

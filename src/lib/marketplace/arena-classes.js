@@ -273,6 +273,16 @@ export const TREES = {
             desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
         N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, acc: -0.10, cd: 4, needs: 7,
             desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
+        // ── OVERKILL, BACK ───────────────────────────────────────────────────────────────────────────────
+        // The Reaver used to have a crit-damage node and lost it when Retaliation took the slot, which left
+        // the class that exists to "hit hardest" with no way to buy the hardest hit. It returns here rather
+        // than in tier 1 so it is a commitment, and it is worth taking now the 3x ceiling is gone — under the
+        // cap the last two ranks would have bought nothing at all for anyone carrying crit-power gear.
+        //
+        // +0.2x a rank on a 2.5x base: four ranks is 3.3x, past where the old ceiling stood. It pays only on
+        // a roll you still have to win, which is what keeps it honest — crit CHANCE is still capped.
+        N({ id: "rv_overkill", tier: 2, name: "Overkill", ranks: 4, stat: "critMult", per: 0.2, needs: 7,
+            desc: "+0.2x critical damage per rank.", sprite: "/images/arena/node/rv_critdmg.webp" }),
 
         N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, acc: -0.14, cd: 5, needs: 12,
             desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
