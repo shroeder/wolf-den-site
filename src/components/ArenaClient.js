@@ -675,6 +675,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Stepped out of a fight that is still standing. Purely local: the bout is server-side and nothing about
     // walking away touches it, which is the whole reason this can exist at all.
     const [stepped, setStepped] = useState(false);
+    // The refusal banner, so a NO can be scrolled to the person who caused it rather than painted off-screen.
+    const errRef = useRef(null);
     // Two-tap confirm on the forfeit. It costs a loss, so it must not be reachable by a mis-tap.
     const [giveUp, setGiveUp] = useState(false);
     // ── THE END OF A FIGHT NEEDS A BEAT ──────────────────────────────────────────────────────────────────
@@ -755,12 +757,35 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 // telling them to retry sends them tapping at a button that will never open.
                 setErr(REFUSALS[r?.error]
                     || (r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again."));
+                // ── AND TELL US WHICH REFUSAL IT WAS ─────────────────────────────────────────────────────
+                // Luke: "the find a fight button is messed up, I keep clicking and nothing happens, it's super
+                // transient." A refused tap has always looked identical to a dead button, and it leaves no
+                // trace anywhere — the server records the state it returned, not that it turned somebody away,
+                // so there is nothing to read afterwards and no way to tell a refusal from a dropped request.
+                // `recovered` keeps it out of the admin push: this is a breadcrumb, not an alarm.
+                try {
+                    fetch("/api/client-error", {
+                        method: "POST", headers: { "content-type": "application/json" }, keepalive: true,
+                        body: JSON.stringify({
+                            path: `/marketplace/arena#${action}`, recovered: true,
+                            message: `arena refused "${action}": ${r?.error || (r === null ? "no response (network)" : "no error field")}`,
+                            ua: typeof navigator !== "undefined" ? navigator.userAgent : null,
+                        }),
+                    }).catch(() => {});
+                } catch { /* reporting a refusal must never become the second failure */ }
             }
             // The rank-up used to be its own overlay on a timer, stacked behind the result card. It lives
             // INSIDE the recap now — one modal, not two in sequence — so all that is left is the sting.
             /* The rank-up fanfare went with the rungs — there is no rung to climb. */
         } finally { setBusy(false); }
     }, [busy]);
+
+    // A refusal you cannot see is a dead button. Whatever screen you are on and however far you have scrolled,
+    // the sentence explaining the NO comes to you.
+    useEffect(() => {
+        if (!err || !errRef.current) return;
+        try { errRef.current.scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* older webviews */ }
+    }, [err]);
 
     const bout = st?.bout || null;
 
@@ -1860,7 +1885,12 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 nothing at all. The three carefully-worded REFUSALS above had never once been seen.
                 Above the tabs, so it sits with the thing you just pressed rather than at the end of a
                 hundred-rung list. */}
-            {err ? <p className="ar-err">{err}</p> : null}
+            {/* ── AND IT HAS TO BE SEEN, NOT JUST RENDERED ────────────────────────────────────────────────
+                Fixing "the refusal lands nowhere" by moving this above the tabs fixed half of it: the banner
+                sits at the TOP of the screen, and Find a fight is at the bottom of a long one. On a phone you
+                tap, the server says no, the sentence appears somewhere you are not looking, and the button has
+                once again done nothing. Bring the message to whoever pressed the button. */}
+            {err ? <p className="ar-err" ref={errRef}>{err}</p> : null}
 
             <div className="ar-tabs" role="tablist">
                 {[["fight", "Fight"], ["road", st.ladder ? `The Road · ${st.ladder.beaten}/${st.ladder.size}` : "The Road"], ["tree", st.progress?.points?.available ? `Skills · ${st.progress.points.available}` : "Skills"], ["train", "Training"], ["armoury", "Armoury"]].map(([k, label]) => (
@@ -2235,7 +2265,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
 
                 The lists themselves are not missed: the standings below are who is who, and the recap after a
                 bout is where an opponent actually becomes a name you remember. */}
-            <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0}
+            {/* An open bout is refused by the server every single time (`bout_in_progress`), so offering the
+                press is offering a round trip that cannot succeed. The way back in is the button above. */}
+            <button type="button" className="ar-find" disabled={busy || st.fightsLeft <= 0 || Boolean(bout && !bout.over)}
                 onClick={() => { unlock(); Sfx.ui(); setStepped(false); act("start", { target: "auto" }); }}>
                 {/* A PAINTED SPRITE, not a glyph. Line art on a solid gold plate is the one combination that
                     reads as a placeholder — the sea's equivalent button has had painted art since it shipped.
@@ -2248,10 +2280,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         which is above the fold on a phone by the time you have scrolled to the thing you press,
                         so the one place the allowance matters was the one place it was not written. Luke, who
                         wrote it: "where do I see my use count and remaining for find a fight?" */}
-                    <b>{st.fightsLeft > 0 ? `Find a fight · ${st.fightsLeft} of ${st.fightsPerDay} left` : "No fights left today"}</b>
-                    <em>{st.fightsLeft > 0
-                        ? "Someone your own size — a member of the Den, or the Gauntlet"
-                        : "They come back at 5am — the Road does not use them"}</em>
+                    {/* A PRESS HAS TO SHOW. The button looked identical mid-flight, so a slow round trip was
+                        indistinguishable from a tap that never registered — and the honest answer to "did it
+                        take my tap" is to say so on the button itself. */}
+                    <b>{busy ? "Looking for an opponent…"
+                        : bout && !bout.over ? "Finish the fight you are in"
+                            : st.fightsLeft > 0 ? `Find a fight · ${st.fightsLeft} of ${st.fightsPerDay} left` : "No fights left today"}</b>
+                    <em>{busy ? "Matching you against someone your own size"
+                        : bout && !bout.over ? `${bout.foe?.name || "Your opponent"} is still standing — one fight at a time`
+                            : st.fightsLeft > 0
+                                ? "Someone your own size — a member of the Den, or the Gauntlet"
+                                : "They come back at 5am — the Road does not use them"}</em>
                 </span>
             </button>
 
