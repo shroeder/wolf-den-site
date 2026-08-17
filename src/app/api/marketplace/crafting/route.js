@@ -33,7 +33,10 @@ export async function POST(request) {
             // Bulk. Both loop the single-item paths, so every roll, bonus and daily behaves identically.
             else if (b?.action === "salvage_all") res = await salvageAllOfRarity(buyer.id, String(b?.rarity || ""));
             else if (b?.action === "combine_all") res = await combineAllAtTier(buyer.id, Number(b?.tier));
-            else if (b?.action === "reroll_stat") res = await rerollStat(buyer.id, String(b?.itemId || ""), String(b?.stat || ""));
+            // Ships the refreshed forge state back with the result, exactly as the two element actions below
+            // do. Without it the client had nothing to call setForge() with, so the card kept rendering the
+            // pre-swap stats and the spent parts until the page was reloaded by hand.
+            else if (b?.action === "reroll_stat") { res = await rerollStat(buyer.id, String(b?.itemId || ""), String(b?.stat || "")); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
             else if (b?.action === "enhance") res = await enhanceItem(buyer.id, String(b?.itemId || ""), { quality: Number(b?.quality) || 0, grade: String(b?.grade || "good"), combo: Number(b?.combo) || 0, useScroll: Boolean(b?.useScroll) });
             else if (b?.action === "enchant_element") { res = await enchantItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || "")); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }
             else if (b?.action === "reforge_element") { res = await reforgeItemElement(buyer.id, String(b?.itemId || ""), String(b?.element || ""), b?.replace ? String(b.replace) : null); if (res?.ok) res = { ...res, ...(await getForgeState(buyer.id)) }; }

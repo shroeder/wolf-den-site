@@ -462,11 +462,19 @@ export async function rerollStat(buyerId, itemId, stat) {
     delete next[key];
     if (options.length) {
         const to = options[Math.floor(Math.random() * options.length)];
-        const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
-        next[to] = Math.min(capOf(to), points);
-        // Anything the cap would not take goes back to the stat it came from rather than evaporating.
-        const spare = points - next[to];
-        if (spare > 0) next[key] = spare;
+        // THE WHOLE VALUE MOVES. A swap is a RELOCATION of points already earned, not a new award, so the
+        // per-stat forge cap deliberately does not apply here.
+        //
+        // It used to. capOf() is `max(3, base * FRAC)` — and a swap can only ever target a stat the item does
+        // NOT have at base, so `base` was always 0 and the cap was always the floor of 3. Every swap on this
+        // screen therefore capped at +3: a hard-won +7 Crit Chance came back as +3 of something and +4 left
+        // stranded on the old line. That is the exact opposite of what a swap is for — nobody re-aims a big
+        // roll in order to shrink it — and it also QUIETLY GREW THE AFFIX COUNT, because the leftover kept the
+        // old key alive while the new one was added, pushing pieces past their rarity's ceiling one swap at a
+        // time. Carrying the full value fixes both: the line count is now exactly conserved.
+        //
+        // It cannot be used to exceed any budget, because the item's total forged points are unchanged.
+        next[to] = points;
         await db.query(
             `UPDATE mkt_item_enhance SET stat_bonus = $3::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND item_id = $2`,
             [buyerId, itemId, JSON.stringify(next)]

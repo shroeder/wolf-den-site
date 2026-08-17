@@ -49,8 +49,8 @@ function chestSlice(cp, art) {
 const deckPct = (tier) => DECK[tier] ?? 30; // shared fallback for an unseen form
 
 // Sailing: dispatch a ONE-WAY voyage to the island, then play the excavation dig minigame — a grid of dirt
-// with an Augur "hot/cold" reading, a stamina budget, and a buried treasure-chest fragment to uncover. Win or
-// fail, you land back at port and can set sail again. Server is authoritative for digs + the fragment reward.
+// with an Augur "hot/cold" reading, a stamina budget, and a buried treasure chest to uncover. Win or
+// fail, you land back at port and can set sail again. Server is authoritative for digs + the chest reward.
 
 // --- juice: tiny Web-Audio SFX (no asset files) --------------------------------------------------------
 let _ac = null;
@@ -131,7 +131,7 @@ function Confetti() {
     return <div className="sail-confetti" aria-hidden="true">{Array.from({ length: 16 }, (_, i) => <span key={i} style={{ "--i": i }} />)}</div>;
 }
 
-// Real painted art for a treasure-chest fragment (AI-gen, cel-shaded to match the boat/ocean) — replaces the
+// Real painted art for a chest or loot line (AI-gen, cel-shaded to match the boat/ocean) — replaces the
 // flat 🧩 emoji everywhere. Same API at every call size.
 function FragmentIcon({ size = 20, className = "", art = "/images/sailing/fragment-wooden.png" }) {
     return (
@@ -141,11 +141,15 @@ function FragmentIcon({ size = 20, className = "", art = "/images/sailing/fragme
     );
 }
 
-// The best shard tier actually sitting in the hold, for any place that shows a total. `fragmentTiers` arrives
-// worst-first, so the last entry with a count is the prize; an empty hold falls back to wooden.
-function bestHeldFragArt(state) {
-    const held = (state?.fragmentTiers || []).filter((f) => f.count > 0);
-    return held[held.length - 1]?.art || "/images/sailing/fragment-wooden.png";
+// The best CHEST tier actually sitting in the hold, for any place that shows a total. `chestsHeld` arrives
+// worst-first, so the last entry is the prize; an empty hold falls back to the generic dig chest.
+//
+// This read `state.fragmentTiers` until now — a key the server stopped sending when shards were deleted. It
+// did not throw: it fell through to the wooden-SHARD fallback, so the recap drew a currency that no longer
+// exists next to a total that rendered blank.
+function bestHeldChestArt(state) {
+    const held = state?.chestsHeld || [];
+    return held[held.length - 1]?.art || "/images/sailing/dig-chest.png";
 }
 
 // Tailwind gust FX: a screen flash, a burst of horizontal SPEED LINES ripping past (the main "we just surged"
@@ -949,16 +953,16 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                     </>
                 )}
 
-                {/* Embark: pick how long to be out — longer voyages roll better shard tiers. */}
+                {/* Embark: pick how long to be out — longer voyages roll better chest tiers. */}
                 {liveStatus === "idle" && (
                     <div className="sail-embark">
-                        <div className="sail-embark-title"><HelmIcon /> Choose your voyage <span className="muted">— longer trips bring better shards</span></div>
+                        <div className="sail-embark-title"><HelmIcon /> Choose your voyage <span className="muted">— longer trips bring better chests</span></div>
                         <div className="sail-embark-opts">
                             {(state.voyageOptions || []).map((o) => (
                                 <button key={o.id} className="sail-embark-opt" disabled={busy} onClick={() => act("start", { duration: o.id })}>
                                     <span className="sail-embark-opt-name">{o.label}</span>
                                     <span className="sail-embark-opt-time">🧭 {fmtLeft(o.ms)}</span>
-                                    <span className="sail-embark-opt-loot">up to <FragmentIcon size={15} art={`/images/sailing/fragment-${o.topTier}.png`} /></span>
+                                    <span className="sail-embark-opt-loot">up to <FragmentIcon size={15} art={state?.chestArtMap?.[o.topTier] || `/images/sailing/fragment-${o.topTier}.png`} /></span>
                                 </button>
                             ))}
                         </div>
@@ -1490,7 +1494,7 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                             {/* The hold total was always drawn with the WOODEN shard, whatever you were holding —
                                 so a recap could show a gold shard as its hero and a wooden one on the line
                                 directly beneath it. Use the best tier actually in the hold. */}
-                            <div className="sail-recap-row"><span>In your hold</span><b><FragmentIcon size={15} art={bestHeldFragArt(state)} /> {state.fragments}</b></div>
+                            <div className="sail-recap-row"><span>Chests in your hold</span><b><FragmentIcon size={15} art={bestHeldChestArt(state)} /> {(state.chestsHeld || []).reduce((n, c) => n + c.count, 0)}</b></div>
                             <div className="sail-recap-row"><span>Voyages completed</span><b>{state.voyagesCompleted}</b></div>
                         </div>
                         </div>

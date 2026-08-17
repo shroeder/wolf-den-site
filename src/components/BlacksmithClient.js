@@ -82,6 +82,7 @@ export default function BlacksmithClient({ initial }) {
     });
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
     const [rerolling, setRerolling] = useState(null);  // the item whose forged spread is being redistributed
+    const [swapConfirm, setSwapConfirm] = useState(null); // {item, f} — a swap is random, so it is never one tap
     const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [bulk, setBulk] = useState(null);           // the rarity awaiting a "melt them all" confirm
@@ -539,12 +540,7 @@ export default function BlacksmithClient({ initial }) {
                         <div className="forge-swaplist">
                             {(rerolling.forged || []).map((f) => (
                                 <button key={f.stat} type="button" className="forge-swap" disabled={Boolean(busy)}
-                                    onClick={async () => {
-                                        const it = rerolling; setRerolling(null);
-                                        const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
-                                        if (d?.ok) { setSwapFx({ from: f.label, to: d.toLabel || d.to, item: it.name }); }
-                                        else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${parts[f.cost.tier - 1]?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
-                                    }}>
+                                    onClick={() => { ac(); setSwapConfirm({ item: rerolling, f }); }}>
                                     <span>Swap <b>+{f.n} {f.label}</b></span>
                                     {/* Priced in the same parts the piece eats to enhance, and SHOWN the same
                                         way the enhance card shows it: the part's own sprite, then have/need
@@ -584,6 +580,49 @@ export default function BlacksmithClient({ initial }) {
             {/* ── THE SWAP, SEEN ──────────────────────────────────────────────────────────────────────────
                 A stat changing was a line of toast text while enhancing next door has sparks and a grade.
                 The old line breaks and falls, the new one lands in its place. Same sparks the anvil uses. */}
+            {/* SWAPPING IS A DICE ROLL, and the list row could not say so — it reads "Swap +3 Might", which
+                sounds like a choice of destination. This is the step that tells you it is random, and the one
+                place to say the thing people actually want to know: the VALUE comes with it. */}
+            {swapConfirm ? (
+                <div className="forge-modal" role="dialog" aria-modal="true" onClick={() => setSwapConfirm(null)}>
+                    <div className="forge-founder" onClick={(e) => e.stopPropagation()}>
+                        <p className="forge-founder-kicker">Swap a line</p>
+                        <div className="forge-swapask">
+                            <span className="forge-swapask-old">+{swapConfirm.f.n} {swapConfirm.f.label}</span>
+                            <span className="forge-swapask-arrow" aria-hidden="true">⚒</span>
+                            <span className="forge-swapask-new">+{swapConfirm.f.n} <b>?</b></span>
+                        </div>
+                        <p className="forge-founder-blurb">
+                            The forge picks the new stat <b>at random</b> from anything this piece
+                            doesn&rsquo;t already carry &mdash; you can&rsquo;t choose what it lands on.
+                            {" "}<b>The +{swapConfirm.f.n} comes with it in full</b>, so whatever it turns into,
+                            it turns into +{swapConfirm.f.n} of it.
+                        </p>
+                        {(() => {
+                            const part = parts[swapConfirm.f.cost.tier - 1];
+                            const have = Number(part?.count) || 0;
+                            const ok = have >= swapConfirm.f.cost.qty;
+                            return (
+                                <>
+                                    <button type="button" className="forge-founder-close" disabled={!ok || Boolean(busy)}
+                                        onClick={async () => {
+                                            const { item: it, f } = swapConfirm;
+                                            setSwapConfirm(null); setRerolling(null);
+                                            const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
+                                            if (d?.ok) setSwapFx({ from: `+${f.n} ${f.label}`, to: `+${d.points ?? f.n} ${d.toLabel || d.to}`, item: it.name });
+                                            else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${part?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
+                                        }}>
+                                        {ok ? <>Roll a new stat &mdash; {swapConfirm.f.cost.qty} {part?.name || "parts"}</>
+                                            : <>Need {swapConfirm.f.cost.qty} {part?.name || "parts"}</>}
+                                    </button>
+                                    <button type="button" className="forge-founder-keep" onClick={() => setSwapConfirm(null)}>Keep this stat</button>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            ) : null}
+
             {swapFx ? (
                 <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setSwapFx(null)}>
                     <div className="forge-swapfx" onClick={(e) => e.stopPropagation()}>
@@ -1236,6 +1275,13 @@ const FORGE_CSS = `
 @keyframes forgeSwapOut { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: .25; transform: translateY(10px) scale(.9); } }
 @keyframes forgeSwapHit { 0% { transform: scale(.4); opacity: 0; } 55% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes forgeSwapIn { 0% { opacity: 0; transform: scale(.5) translateY(12px); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+.forge-swapask { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0 12px; flex-wrap: wrap; }
+.forge-swapask-old { font-size: 15px; font-weight: 900; color: #9b8b76; text-decoration: line-through; }
+.forge-swapask-arrow { font-size: 18px; color: #ff8a2a; }
+.forge-swapask-new { font-size: 1.25rem; font-weight: 900; color: #ffd08a; }
+.forge-swapask-new b { color: #ff8a2a; }
+.forge-founder-keep { display: block; width: 100%; margin-top: 8px; padding: 8px; background: none; border: 0;
+    color: #b9a892; font-size: 12.5px; font-weight: 700; cursor: pointer; }
 .forge-swaplist { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
 .forge-swap { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
     padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;

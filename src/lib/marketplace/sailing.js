@@ -1516,7 +1516,7 @@ export async function getSailingState(buyerId, skyKey = null) {
     void skyKey;
     await resolveDueEncounter(buyerId).catch(() => {}); // apply a due encounter (once) so "checking back" surfaces it
     await rollMerchant(buyerId).catch(() => {}); // roll the Gold Merchant once at the arrival interstitial
-    const [row, goldRow, others, chestArt, sea, raidExtras] = await Promise.all([
+    const [row, goldRow, others, chestArt, sea, raidExtras, chestRows] = await Promise.all([
         readRow(buyerId),
         db.queryOne(`SELECT COALESCE(gold, 0) AS gold FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null),
         // Everyone else sails the horizon behind you — a REAL member riding their REAL ship + pet. Every member
@@ -1538,6 +1538,9 @@ export async function getSailingState(buyerId, skyKey = null) {
         getChestArt().catch(() => ({})),
         equippedSeaAffinity(buyerId),
         equippedRaidExtras(buyerId),
+        // What is actually in the hold. Read straight rather than through getChests(), which also runs the
+        // level-chest SYNC (a write) and re-fetches the art this batch is already fetching one line above.
+        db.query(`SELECT tier, count FROM mkt_user_chest WHERE buyer_id = $1 AND count > 0`, [buyerId]).catch(() => []),
     ]);
     const seaEff = seaEffects(sea);
     const fleetPetArt = await petArtByBuyer((others || []).map((o) => ({ buyerId: o.id, petId: o.featured_collectible })));
@@ -1602,7 +1605,12 @@ export async function getSailingState(buyerId, skyKey = null) {
         return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
     })().catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId) };
+        recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
+        chestsHeld: (() => {
+            const c = Object.fromEntries((chestRows || []).map((r) => [r.tier, Number(r.count) || 0]));
+            return CHEST_ORDER.filter((t) => c[t] > 0).map((t) => ({ tier: t, count: c[t], name: CHEST_TIERS[t]?.label || t, art: chestArt[t] || null }));
+        })() };
 }
 
 export async function startVoyage(buyerId, optionId = "standard") {
