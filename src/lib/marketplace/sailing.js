@@ -2661,16 +2661,37 @@ const RIVAL_WEIGHT = 1.5;   // a real ship is a better story than a designed one
 // emergent one — see matchOpponent for why the old weighting could and did fall to zero. A third, because the
 // fleet is fifteen hand-designed ships with names and a ladder, and one in three keeps that content alive
 // without turning the sea into a single-player game.
+// How many sorties must pass before the same captain can come up again. Seven, per Luke — long enough that
+// the sea feels populated rather than like one person in different hats.
+const RIVAL_COOLDOWN = 7;
 const FLEET_SHARE = 0.34;
 
 async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
-    const rivals = await db.query(
+    // ── NOT THE SAME CAPTAIN AGAIN ───────────────────────────────────────────────────────────────────────
+    // Luke: "if I fight in a ship battle I won't fight that same opponent for at least 7 turns." Drawing at
+    // random from thirty rivals means the same face keeps surfacing, and a sea full of members reads like a
+    // sea of one person. Anyone fought in the last RIVAL_COOLDOWN sorties is excluded outright.
+    //
+    // The exclusion is a FILTER, not a re-roll: re-rolling until you get somebody new would loop forever once
+    // a small Den has been fought through. If the cooldown empties the pool, it is dropped for this sortie —
+    // better a repeat than no fight.
+    const recent = await db.query(
+        `SELECT defender_id AS id FROM mkt_raid_defense
+          WHERE attacker_id = $1 AND defender_id IS NOT NULL
+          ORDER BY created_at DESC LIMIT $2`,
+        [buyerId, RIVAL_COOLDOWN]
+    ).catch(() => []);
+    const skip = recent.map((r) => r.id).filter(Boolean);
+    const draw = async (excluding) => db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
           WHERE b.id <> $1 AND b.alias IS NOT NULL AND (b.avatar_sprite_url IS NOT NULL OR b.avatar_url IS NOT NULL)
+            AND ($2::uuid[] IS NULL OR NOT (b.id = ANY($2::uuid[])))
           ORDER BY random() LIMIT 30`,
-        [buyerId]
+        [buyerId, excluding.length ? excluding : null]
     ).catch(() => []);
+    let rivals = await draw(skip);
+    if (!rivals.length && skip.length) rivals = await draw([]);   // tiny Den — a repeat beats no fight
 
     // NEAREST FIRST, not "near enough". Weighting every candidate by its distance from the target reads well
     // and fails badly at the edges: a brand-new captain with one gun is outmatched by the entire fleet, every

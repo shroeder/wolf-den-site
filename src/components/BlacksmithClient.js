@@ -86,6 +86,7 @@ export default function BlacksmithClient({ initial }) {
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [bulk, setBulk] = useState(null);           // the rarity awaiting a "melt them all" confirm
     const [toast, setToast] = useState(null);
+    const [swapFx, setSwapFx] = useState(null);   // the reveal after a stat is swapped
     const [reforgeFor, setReforgeFor] = useState(null); // the item whose element you're reforging (opens the picker)
     const [reforgeFx, setReforgeFx] = useState(null);   // the post-reforge reveal { item, elements, dual }
     const [showFounder, setShowFounder] = useState(false); // the Alstier1 credit medallion
@@ -391,6 +392,11 @@ export default function BlacksmithClient({ initial }) {
                             <span key={it.id} className="forge-cardwrap">
                             <button type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : (it.affordable || powerScrolls > 0) ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
                                 onClick={() => {
+                                    // ── THE PIECE IS WHAT YOU OPEN ───────────────────────────────────────
+                                    // Tapping a card used to drop you straight into the hammer, so rerolling
+                                    // was a different button in a different place for the same object. Now
+                                    // the card opens the piece and the piece offers both.
+                                    if (it.rerollPoints > 0) { ac(); setRerolling(it); return; }
                                     if (it.maxed) { setToast({ kind: "err", text: `${it.name} is at PEAK enchantment — it can't be forged any higher.` }); return; }
                                     const scroll = !it.affordable && powerScrolls > 0; // pay with a Power Scroll if you're short on parts
                                     if (!it.affordable && !scroll) { setToast({ kind: "err", text: `Not enough ${parts[it.cost.tier - 1]?.name || "parts"} — you have ${it.have}/${it.cost.qty}. Salvage, combine, or use a 📜 Power Scroll.` }); return; }
@@ -543,7 +549,7 @@ export default function BlacksmithClient({ initial }) {
                                     onClick={async () => {
                                         const it = rerolling; setRerolling(null);
                                         const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
-                                        if (d?.ok) setToast({ kind: "ok", text: `${f.label} became ${d.to} on ${it.name}.` });
+                                        if (d?.ok) { setSwapFx({ from: f.label, to: d.toLabel || d.to, item: it.name }); }
                                         else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — that swap costs ${f.cost.toLocaleString()}g.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
                                     }}>
                                     <span>Swap <b>+{f.n} {f.label}</b></span>
@@ -551,6 +557,14 @@ export default function BlacksmithClient({ initial }) {
                                 </button>
                             ))}
                         </div>
+                        {/* The hammer still lives on the piece, so opening a card has not cost anyone the
+                            action they open it for most. */}
+                        {!rerolling.maxed ? (
+                            <button type="button" className="forge-swap" style={{ marginBottom: 8 }} disabled={Boolean(busy)}
+                                onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: !it.affordable && powerScrolls > 0 }); }}>
+                                <span>Take the hammer to it</span><em>Enhance</em>
+                            </button>
+                        ) : null}
                         <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
                             onClick={async () => {
                                 const it = rerolling; setRerolling(null);
@@ -562,6 +576,21 @@ export default function BlacksmithClient({ initial }) {
                         </button>
                         <button type="button" className="forge-daily-tag" style={{ marginTop: 8, background: "none", border: 0, cursor: "pointer" }}
                             onClick={() => setRerolling(null)}>Keep what I have</button>
+                    </div>
+                </div>
+            ) : null}
+            {/* ── THE SWAP, SEEN ──────────────────────────────────────────────────────────────────────────
+                A stat changing was a line of toast text while enhancing next door has sparks and a grade.
+                The old line breaks and falls, the new one lands in its place. Same sparks the anvil uses. */}
+            {swapFx ? (
+                <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setSwapFx(null)}>
+                    <div className="forge-swapfx" onClick={(e) => e.stopPropagation()}>
+                        <span className="forge-swapfx-old">{swapFx.from}</span>
+                        <span className="forge-swapfx-arrow" aria-hidden="true">⚒</span>
+                        <span className="forge-swapfx-new">{swapFx.to}</span>
+                        <span className="sail-upgrade-sparks forge-swapfx-sparks" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+                        <em className="forge-swapfx-item">{swapFx.item}</em>
+                        <button type="button" className="forge-founder-close" onClick={() => setSwapFx(null)}>Back to the anvil</button>
                     </div>
                 </div>
             ) : null}
@@ -1191,6 +1220,20 @@ const FORGE_CSS = `
    another is invalid. So each card got wrapped in a span — and that wrapper shipped with no styles at all.
    A bare span defaults to display:inline, so inside this grid it collapsed and took the button down with
    it: endpoint working, price on the payload, button in the DOM, nothing on the screen. */
+.forge-swapfx { position: relative; width: min(340px, 100%); padding: 26px 22px 18px; border-radius: 18px; text-align: center;
+    background: linear-gradient(180deg, #2a180c, #160c06); border: 1px solid rgba(255,150,60,0.45);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.7), 0 0 34px rgba(255,140,40,0.3); overflow: hidden; }
+.forge-swapfx-old { display: block; font-size: 15px; font-weight: 900; color: #9b8b76; text-decoration: line-through;
+    animation: forgeSwapOut .5s cubic-bezier(.4,0,.9,.3) both; }
+.forge-swapfx-arrow { display: block; margin: 4px 0; font-size: 20px; color: #ff8a2a;
+    animation: forgeSwapHit .45s ease-out both; }
+.forge-swapfx-new { display: block; font-size: 1.5rem; font-weight: 900; color: #ffd08a;
+    text-shadow: 0 2px 14px rgba(255,140,40,0.7); animation: forgeSwapIn .5s cubic-bezier(.2,1.5,.35,1) .35s both; }
+.forge-swapfx-item { display: block; margin: 8px 0 14px; font-style: normal; font-size: 11.5px; color: #b9a892; }
+.forge-swapfx-sparks { position: absolute; top: 34%; left: 50%; }
+@keyframes forgeSwapOut { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: .25; transform: translateY(10px) scale(.9); } }
+@keyframes forgeSwapHit { 0% { transform: scale(.4); opacity: 0; } 55% { transform: scale(1.35); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes forgeSwapIn { 0% { opacity: 0; transform: scale(.5) translateY(12px); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
 .forge-swaplist { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
 .forge-swap { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
     padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;

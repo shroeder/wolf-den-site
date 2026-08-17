@@ -528,7 +528,9 @@ export async function rerollStat(buyerId, itemId, stat) {
             `UPDATE mkt_item_enhance SET stat_bonus = $3::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND item_id = $2`,
             [buyerId, itemId, JSON.stringify(next)]
         ).catch(() => {});
-        return { ok: true, cost, from: key, to, points: next[to] };
+        // The LABEL as well as the key, so the reveal can say "Pierce" rather than "pierce".
+        return { ok: true, cost, from: key, fromLabel: STAT_META[key]?.label || key,
+            to, toLabel: STAT_META[to]?.label || to, points: next[to] };
     }
     // Nothing left to swap into — the piece already carries everything. Refund rather than take the gold for
     // a swap that cannot happen.
