@@ -192,6 +192,16 @@ async function ladderFor(buyerId) {
  * Might, not health — a companion hits alongside you, it does not lend you its constitution — and Beastbond
  * multiplies the pet's share.
  */
+// How much damage reduction a wardrobe's Tenacity is actually worth, given what you already turn aside.
+// `points` are gear points (a best-in-slot helm + back is 14); the share of the remaining gap to DR_CAP they
+// close is what you get, so the same armour is worth more to a Reaver than to a Warden.
+function drFromTenacity(currentDr, points = 0) {
+    const p = Math.max(0, Number(points) || 0) / 100;
+    if (p <= 0) return 0;
+    const headroom = Math.max(0, 1 - (Number(currentDr) || 0) / DR_CAP);
+    return p * headroom;
+}
+
 async function combatStats(buyerId, gearStats, ids) {
     const [petBonus, badgeStats, { beastbondMult }] = await Promise.all([
         import("@/lib/marketplace/pet-combat.js").then((m) => m.getPetCombatBonus(buyerId)).catch(() => ({ stats: {} })),
@@ -213,6 +223,9 @@ async function combatStats(buyerId, gearStats, ids) {
         // +202 for a whole best-in-slot loadout, so every stat they touch is a stat a collection can out-vote.
         // This is the one a wardrobe wins outright — which is the entire point of adding it.
         vitality: gearStats.vitality || 0,
+        // Gear-only for the same reason Vitality is: a stat a badge collection can grant is a stat a wardrobe
+        // cannot win on.
+        tenacity: gearStats.tenacity || 0,
     };
 }
 
@@ -333,7 +346,13 @@ async function kitFor(buyerId) {
         //
         // It is a CLASS trait now: the class base is the identity (Warden 34, Runecaller 24, Reaver 16) and
         // Footwork adds on top from both the tree and the upgrade track, whose ranks carry over untouched.
-        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
+        // ── TENACITY FILLS THE GAP TO THE CEILING, IT DOES NOT ADD FLAT ──────────────────────────────────
+        // Flat DR is worth MORE to whoever already has the most, because it multiplies against what still
+        // gets through: +14 points would have been 23% less damage taken for a Warden and 17% for a Reaver —
+        // widening the exact matchup the telemetry says is 91/10. Scaling it by how much headroom you have
+        // left inverts that: 12% for the Reaver, 8% for the Warden. Armour helps most those who have least,
+        // and nobody sprints to the cap on gear alone.
+        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0) + drFromTenacity(base.dr + (perks.dr || 0), stats.tenacity)),
         // A share of everything you deal comes back as health. Class-inherent; see classBase.
         lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
         // Inherent class passives, folded exactly as lifesteal is: the Reaver's ragged edge and the

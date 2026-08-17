@@ -88,6 +88,10 @@ export const STAT_META = {
     // best-in-slot loadout, so a collection could simply out-vote a wardrobe; a stat that only armour carries
     // is one a collection cannot substitute for.
     vitality: { label: "Vitality", icon: "❤️", desc: "How much punishment you can take. Health in the Arena — and only armour carries it.", suffix: "" },
+    // ── TENACITY ─────────────────────────────────────────────────────────────────────────────────────────
+    // Damage reduction, from the two slots that are literally protection: the helm and what you wear on your
+    // back. Like Vitality, no badge grants it — it is a wardrobe stat, not a collection stat.
+    tenacity: { label: "Tenacity", icon: "🛡️", desc: "Turns aside a share of every blow in the Arena. Helm and back only — no badge grants it.", suffix: "" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -740,6 +744,21 @@ for (const it of ITEMS) {
     if (!ARMOUR_SLOTS.has(it.slot)) continue;
     const fer = Number(it.stats?.ferocity) || 0;
     if (fer > 0 && it.stats.vitality == null) it.stats.vitality = fer;
+}
+
+// ── THE HELM AND THE CLOAK CARRY TENACITY ────────────────────────────────────────────────────────────────────
+// By rule again, and by RARITY rather than mirroring an existing stat, because there was no damage-reduction
+// stat on gear to mirror — DR has only ever been a class trait. Helm and back are the two slots whose whole
+// job is protection and which mostly carried might/crit, i.e. they had no identity of their own.
+//
+// Scale is deliberately small: a best-in-slot helm and back together come to 14 points, which is ~12% less
+// damage taken for a Reaver. See the diminishing curve in arena.js for why that number helps the fighter with
+// the least mitigation more than the one with the most — flat DR does the opposite.
+const TENACITY_SLOTS = new Set(["helmet", "back"]);
+const TENACITY_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
+for (const it of ITEMS) {
+    if (!TENACITY_SLOTS.has(it.slot)) continue;
+    if (it.stats && it.stats.tenacity == null) it.stats.tenacity = TENACITY_BY_RARITY[it.rarity] || 1;
 }
 
 
