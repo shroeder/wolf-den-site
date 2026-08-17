@@ -1203,6 +1203,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // the pop goes where the damage went, not to whoever owns the move.
             if (l.takenBack > 0) sub.push({ side: "left", n: l.takenBack, kind: "thorn", at: 280 });
             if (l.riposted > 0) sub.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
+            // ── RETALIATION ── the last strike-back that had no number. It fired, it took health off, and
+            // nothing on the screen said so, which is indistinguishable from a node that does nothing. Same
+            // rule as every line above: the pop goes where the damage went.
+            if (l.countered > 0) sub.push({ side: "right", n: l.countered, kind: "thorn", at: 260 });
+            if (l.theirCounter > 0) sub.push({ side: "left", n: l.theirCounter, kind: "thorn", at: 260 });
             // Each line's numbers come after the previous line's, so an exchange reads as a sequence.
             for (const item of sub) pops.push({ ...item, at: (item.at || 0) + li * 150 });
         });

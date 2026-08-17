@@ -1950,7 +1950,12 @@ export async function fightRound(buyerId, opts = {}) {
             // used to arrive as one accumulated number, so the difference between Rampage and one big swing
             // was a sprite. The screen pops one number per entry now, misses included.
             each, hitsLanded, missed: hits - hitsLanded, acc: Math.round(acc * 100),
-            hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
+            // ── AND THEIR RETALIATION ─────────────────────────────────────────────────────────────────
+            // `theirCounter` was computed, taken off your health, and then never named — not on the log
+            // line, not in the sentence, not as a number on the screen. Thorns rides along here for exactly
+            // that reason and the comment below says so; the counter beside it was missed. A Reaver's
+            // answer to being hit has therefore been invisible since the node shipped, on both sides.
+            hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak, theirCounter,
             text: `${whiffed
                 ? `${ability ? ability.name : "You swing"} — ${hits > 1 ? "all " + hits + " blows miss" : "and miss"}.`
                 : dmg > 0
@@ -1960,6 +1965,7 @@ export async function fightRound(buyerId, opts = {}) {
                 + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
                 + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
                 + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`
+                + `${theirCounter ? ` ${b.foe.name} strikes back for ${theirCounter}.` : ""}`
                 + `${theirRiposte ? ` ${b.foe.name} answers for ${theirRiposte}.` : ""}`,
             takenBack: theirRiposte,
             ability: ability?.name || null });
@@ -2337,12 +2343,15 @@ export async function fightRound(buyerId, opts = {}) {
             // read — so a shield build's entire damage output came off the enemy's health bar with no number,
             // no pop and no colour, mentioned only inside a sentence at the end of THEIR log line. It works,
             // and it has always looked exactly like it does not, which is the same thing to a player.
-            riposted: sent, thorned, stolen,
+            // `countered` joins them for the same reason: your Retaliation fires on THEIR beat, took a bite
+            // out of their health, and was published nowhere — so four ranks of it looked like four dead
+            // points. Every other strike-back on this line already floats a number.
+            riposted: sent, thorned, stolen, countered,
             text: `${foeCrit ? "CRITICAL — " : ""}${foeWhiffed
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${countered ? ` YOU STRIKE BACK for ${countered}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
                 extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
                 extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
                 extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${
