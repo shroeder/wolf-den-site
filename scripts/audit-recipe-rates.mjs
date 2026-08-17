@@ -1,39 +1,40 @@
-// Re-measure recipe acquisition against real 7-day volumes, the same way BACKLOG item 1 did.
+// ── WHERE RECIPES ACTUALLY COME FROM ─────────────────────────────────────────────────────────────────────────
+// This used to MODEL the answer: parse a `RECIPE_SOURCES` table out of cooking.js, read a `chance` off each
+// source, multiply by seven days of activity events. That design is gone — a recipe is an outcome inside each
+// feature's own reward ladder now, drawn like any other prize, so there is no per-source chance left to read.
+// The script had been throwing on `match(...)[1]` of null ever since, which means the number everyone quotes
+// ("~1.9 recipes per member per week") has had nothing keeping it honest.
+//
+// So it MEASURES instead of modelling. Every learn is stamped with the source that taught it
+// (learnRecipe's `source`), which is strictly better than a model: it cannot drift from the code, it counts
+// the shop and the powers and anything else added later for free, and it needs no maintenance when a ladder
+// is retuned.
+//
+// Run:  node scripts/audit-recipe-rates.mjs [--days 7]
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
-const sql = neon(readFileSync("../accounting_app/.env","utf8").match(/^DATABASE_URL=(.*)$/m)[1].trim());
-const src = readFileSync("src/lib/marketplace/cooking.js","utf8");
-const block = src.match(/RECIPE_SOURCES = \{([\s\S]*?)\n\};/)[1];
-const rates = {};
-for (const m of block.matchAll(/(\w+):\s*\{[^}]*chance:\s*([0-9.]+)/g)) rates[m[1]] = Number(m[2]);
 
-// Map each source to the activity events that actually fire it.
-const EV = {
-  harvest:["harvest_crop"], fish:["fish_caught"], dig:["sail_dig"], dig_deep:["sail_dig_deep"],
-  spin:["daily_spin"], salvage:["craft_salvage"], forge:["craft_enhance"],
-  pet_bond:["feed_pet","pet_farm","pet_other"], gamble:["tavern_gamble"], cook:["cook"],
-  barkeep:["tavern_barkeep"], crier:["town_crier"], daily_deal:["buy_daily_deal"],
-  town_merchant:["town_merchant"], raid_win:["sail_raid"], town_raid:["town_skirmish"],
-  boss_kill:["boss_kill"],
-};
+const sql = neon(readFileSync("C:/Users/Luke/Projects/accounting_app/.env", "utf8").match(/DATABASE_URL\s*=\s*"?([^"\r\n]+)"?/)[1]);
+const i = process.argv.indexOf("--days");
+const DAYS = Math.max(1, Number(i > -1 ? process.argv[i + 1] : 7) || 7);
+
 const rows = await sql`
-  SELECT event, COUNT(*)::int n FROM mkt_activity_event
-   WHERE created_at > NOW() - INTERVAL '7 days' GROUP BY 1`;
-const cnt = Object.fromEntries(rows.map(r=>[r.event, r.n]));
-const chestRows = await sql`
-  SELECT COUNT(*)::int n FROM mkt_activity_event WHERE event = 'open_chest' AND created_at > NOW() - INTERVAL '7 days'`;
+    SELECT COALESCE(source, '(unrecorded)') AS source, COUNT(*)::int AS n
+      FROM mkt_recipe_known
+     WHERE learned_at > NOW() - (INTERVAL '1 day' * ${DAYS})
+     GROUP BY 1 ORDER BY n DESC`;
+const [{ n: members }] = await sql`
+    SELECT COUNT(DISTINCT buyer_id)::int AS n FROM mkt_activity_event
+     WHERE created_at > NOW() - (INTERVAL '1 day' * ${DAYS})`;
 
-const out = [];
-for (const [k, ch] of Object.entries(rates)) {
-  let n = 0;
-  if (k.startsWith("chest_")) n = Math.round((chestRows[0]?.n||0) * (k==="chest_wooden"?0.5:k==="chest_iron"?0.3:k==="chest_gold"?0.15:0.05));
-  else n = (EV[k]||[]).reduce((s,e)=>s+(cnt[e]||0),0);
-  out.push({ source:k, events:n, rate:(ch*100).toFixed(1)+"%", perWk:+(n*ch).toFixed(1) });
-}
-out.sort((a,b)=>b.perWk-a.perWk);
-console.table(out);
-const total = out.reduce((s,r)=>s+r.perWk,0);
-const members = (await sql`SELECT COUNT(DISTINCT buyer_id)::int n FROM mkt_activity_event WHERE created_at > NOW() - INTERVAL '7 days'`)[0].n;
-const top2 = out.slice(0,2).reduce((s,r)=>s+r.perWk,0);
-console.log(`\ntotal ${total.toFixed(1)} recipes/wk across ${members} active members = ${(total/members).toFixed(2)} per member per week`);
-console.log(`64-recipe book in ~${(64/(total/members)).toFixed(0)} weeks · top two sources = ${(top2/total*100).toFixed(0)}% of all drops`);
+const total = rows.reduce((s, r) => s + r.n, 0);
+console.table(rows.map((r) => ({ source: r.source, learned: r.n, share: `${((r.n / Math.max(1, total)) * 100).toFixed(1)}%`, perWk: +((r.n / DAYS) * 7).toFixed(1) })));
+
+const perWk = (total / DAYS) * 7;
+const each = perWk / Math.max(1, members);
+console.log(`\n${total} recipes learned in ${DAYS} days = ${perWk.toFixed(1)}/wk across ${members} active members = ${each.toFixed(2)} each per week`);
+console.log(`a 64-page book in ~${(64 / Math.max(0.01, each)).toFixed(0)} weeks`);
+// The concentration is the number worth watching: two sources carrying most of the supply is the shape that
+// made the book feel like a farming loop rather than something the whole game hands you.
+const top2 = rows.slice(0, 2).reduce((s, r) => s + r.n, 0);
+console.log(`top two sources = ${((top2 / Math.max(1, total)) * 100).toFixed(0)}% of everything learned`);

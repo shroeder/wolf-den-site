@@ -130,7 +130,6 @@ export const TIERS = [
             { kind: "seed", pool: ["strawberry", "corn", "grape"], min: 2, max: 3 },
             { kind: "gold", min: 220, max: 380 },
             { kind: "parts", partTier: 2, min: 2, max: 4 },
-            { kind: "recipe", band: "cook" },
             { kind: "consumable", id: "scroll_wisdom" },
             { kind: "consumable", id: "treat_snack" },
             { kind: "consumable", id: "sail_tailwind_charm" },
@@ -143,7 +142,6 @@ export const TIERS = [
             { kind: "seed", pool: ["pumpkin", "goldenapple"], min: 1, max: 2 },
             { kind: "gold", min: 240, max: 400 },
             { kind: "parts", partTier: 3, min: 2, max: 4 },
-            { kind: "recipe", band: "cook" },
             { kind: "consumable", id: "treat_toy" },
             { kind: "consumable", id: "farm_harvest_charm" },
             { kind: "spin", n: 1 },
@@ -479,7 +477,14 @@ export const RECIPE_BANDS = {
     dig_deep:     { min: 3, max: 4 },
     fish:         { min: 1, max: 3 },   // a sealed bottle
     spin:         { min: 1, max: 3 },
-    cook:         { min: 1, max: 3 },   // cooking teaches you the next thing to cook
+    // ── NO `cook` BAND ───────────────────────────────────────────────────────────────────────────────────
+    // Cooking used to teach recipes: a rung on the Hearty and Fine ladders, band 1-3, on the reasoning that
+    // "cooking teaches you the next thing to cook". Luke's call to remove it. A dish now pays what a dish
+    // pays — gold, parts, seeds, consumables, spins, chests — and the book is filled by the seven sources
+    // that still teach: chests, fish, seams, digs, the wheel, raids and the boss.
+    //
+    // The band is gone with the rungs deliberately. A named band with no caller reads as a live source to
+    // whoever audits the recipe economy next, and scripts/audit-recipe-rates.mjs counts exactly that.
     raid_win:     { min: 3, max: 4 },
     town_raid:    { min: 3, max: 4 },
     boss_kill:    { min: 4, max: 5 },   // weekly, shared, and the route to the top tiers
