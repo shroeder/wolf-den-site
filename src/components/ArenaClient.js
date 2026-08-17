@@ -1243,7 +1243,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // Older bouts, opened before the budget shipped, publish neither field. They get the full allowance
         // rather than a disabled button — a rule cannot be applied retroactively to a fight already running.
         const bracesLeft = bout.braces == null ? 6 : Number(bout.braces) || 0;
-        const canBrace = bracesLeft > 0 && bout.braceReady !== false;
+        // ── SHATTERED COUNTS AS "CANNOT GUARD" ───────────────────────────────────────────────────────────
+        // It did not, so the button stayed lit while the server refused every press with guard_shattered.
+        // Sunflower Jinxx, in global chat: "I think the guard is glitched when fighting the runecallers... I
+        // could do everything except guard" — then had to be told by another member that it was a skill being
+        // used on her. A rule nobody can see is indistinguishable from a bug.
+        const guardLocked = Number(bout.noGuard || 0) > 0;
+        const canBrace = bracesLeft > 0 && bout.braceReady !== false && !guardLocked;
         const wards = abilities.filter((a) => a.defensive);
         return (
             <section className="card ar ar-fight">
@@ -1737,9 +1743,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                         the shield is what the brace banks, and the pip beside the label is
                                         how many you have left. Greyed with a title when it is unavailable,
                                         because a button that silently refuses is the bug report. */}
-                                    <button type="button" className="ar-cmd is-guard"
+                                    <button type="button" className={`ar-cmd is-guard${guardLocked ? " is-shattered" : ""}`}
                                         disabled={busy || !canBrace}
-                                        title={bracesLeft <= 0 ? "No braces left this bout"
+                                        title={guardLocked ? `Their Shatter broke your guard — ${bout.noGuard} turn${bout.noGuard === 1 ? "" : "s"} before you can raise one`
+                                            : bracesLeft <= 0 ? "No braces left this bout"
                                             : !bout.braceReady ? "You braced last beat — not twice in a row"
                                             : `Brace for ${braceFor} · ${bracesLeft} left`}
                                         onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
@@ -1750,7 +1757,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                             read as broken. Luke, at round 31: "I cant defend anymore and I
                                             havent guarded for like 8 turns." He was out of braces — six is
                                             the whole bout's budget — and nothing on screen said so. */}
-                                        {bracesLeft <= 0 ? <em className="ar-cmd-sub is-off">none left</em>
+                                        {guardLocked ? <em className="ar-cmd-sub is-off is-shattered">shattered {bout.noGuard}t</em>
+                                            : bracesLeft <= 0 ? <em className="ar-cmd-sub is-off">none left</em>
                                             : !bout.braceReady ? <em className="ar-cmd-sub is-off">not twice</em>
                                             : braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
                                         {bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
@@ -3506,6 +3514,12 @@ function Styles() {
                onClick, highlighted an is-open state — and could not be tapped at all. Mid-fight you could see
                three squares under them and pressing any of them did nothing, which is exactly what it looked
                like: a dead handler. The card that opens needs it too, or it cannot be tapped closed. */
+            /* A SHATTERED GUARD LOOKS SHATTERED. Greyed-out reads as "not right now"; this is a thing an
+               opponent DID to you and it should read as damage, so the button carries the cold of the skill
+               that broke it and its own label says how long. */
+            .ar-cmd.is-shattered { border-color: rgba(150,205,255,0.5); background: rgba(60,110,150,0.16); }
+            .ar-cmd.is-shattered :global(svg) { color: #9fd4ff; opacity: .75; }
+            .ar-cmd-sub.is-shattered { color: #9fd4ff; opacity: 1; }
             .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
                 padding-left: 6px; pointer-events: auto; }
             /* A finger, not a mouse: the chip art is small, so the touch target is grown past it rather than
