@@ -11,7 +11,9 @@ import { createServerLogger } from "@/lib/server-logger";
 
 const tradeSalesLogger = createServerLogger({ source: "api", subsystem: "consignment-trade-sales" });
 
-async function loadActiveConsignorsByCategory() {
+// Exported so the cost-sync reconciler skips consigned stock by the SAME rule the trade path uses. Two copies
+// of "which categories are a consignor's" is how one of them ends up costing a consignment as a purchase.
+export async function loadActiveConsignorsByCategory() {
     const rows = await db.query(
         `SELECT id, square_category_id
            FROM consignors

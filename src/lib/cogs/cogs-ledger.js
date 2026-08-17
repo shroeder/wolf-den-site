@@ -20,6 +20,7 @@ function mapRow(r) {
         listEach110: num(r.list_each_110),
         listTotal110: num(r.list_total_110),
         entryId: r.entry_id || null,
+        variationId: r.variation_id || null,
         source: r.source,
     };
 }
@@ -45,13 +46,17 @@ function normalize(input) {
         listEach110: input.listEach110 != null ? Number(input.listEach110) : null,
         listTotal110: input.listTotal110 != null ? Number(input.listTotal110) : null,
         entryId: input.entryId ? String(input.entryId).trim() : null,
+        // Which Square variation this purchase was for. The restock knows it at write time; storing it is what
+        // lets a ledger row be matched to a catalog item by ID instead of by name — and a naive name match
+        // pairs "Pitch Black Sleeved Booster Pack" with a $40 booster BOX and invents a $32 discrepancy.
+        variationId: input.variationId ? String(input.variationId).trim() : null,
     };
 }
 
-const COLS = `occurred_on, product, quantity, paid_each, paid_total, market_each, market_total, list_each_110, list_total_110, entry_id, source`;
+const COLS = `occurred_on, product, quantity, paid_each, paid_total, market_each, market_total, list_each_110, list_total_110, entry_id, source, variation_id`;
 
 function params(e, source) {
-    return [e.occurredOn, e.product, e.quantity, e.paidEach, e.paidTotal, e.marketEach, e.marketTotal, e.listEach110, e.listTotal110, e.entryId, source];
+    return [e.occurredOn, e.product, e.quantity, e.paidEach, e.paidTotal, e.marketEach, e.marketTotal, e.listEach110, e.listTotal110, e.entryId, source, e.variationId];
 }
 
 // Insert an intake row. Rows synced from an Inventory entry carry an entry_id and upsert (dedupe);
@@ -60,7 +65,7 @@ export async function insertCogs(input) {
     const e = normalize(input);
     if (e.entryId) {
         const rows = await db.query(
-            `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
              -- ⚠️ MUST MATCH idx_cogs_entry_product EXACTLY: UNIQUE (entry_id, product) WHERE entry_id IS NOT
              -- NULL. This said ON CONFLICT (entry_id), which matches no index, so Postgres threw "there is no
              -- unique or exclusion constraint matching the ON CONFLICT specification" on EVERY insert. The app
@@ -72,14 +77,15 @@ export async function insertCogs(input) {
              ON CONFLICT (entry_id, product) WHERE entry_id IS NOT NULL
              DO UPDATE SET occurred_on=EXCLUDED.occurred_on, product=EXCLUDED.product, quantity=EXCLUDED.quantity,
                  paid_each=EXCLUDED.paid_each, paid_total=EXCLUDED.paid_total, market_each=EXCLUDED.market_each,
-                 market_total=EXCLUDED.market_total, list_each_110=EXCLUDED.list_each_110, list_total_110=EXCLUDED.list_total_110
+                 market_total=EXCLUDED.market_total, list_each_110=EXCLUDED.list_each_110, list_total_110=EXCLUDED.list_total_110,
+                 variation_id=COALESCE(EXCLUDED.variation_id, cogs_ledger.variation_id)
              RETURNING *`,
             params(e, "app"),
         );
         return mapRow(rows[0]);
     }
     const rows = await db.query(
-        `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+        `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         params(e, "app"),
     );
     return mapRow(rows[0]);
@@ -129,13 +135,13 @@ export async function replaceAllFromImport(rows) {
             }
             if (e.entryId) {
                 await client.query(
-                    `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sheets-import')
+                    `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sheets-import',NULL)
                      ON CONFLICT (entry_id) WHERE entry_id IS NOT NULL DO UPDATE SET product=EXCLUDED.product`,
                     params(e, "sheets-import").slice(0, 10),
                 );
             } else {
                 await client.query(
-                    `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sheets-import')`,
+                    `INSERT INTO cogs_ledger (${COLS}) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'sheets-import',NULL)`,
                     params(e, "sheets-import").slice(0, 10),
                 );
             }

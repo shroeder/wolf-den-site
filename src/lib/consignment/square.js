@@ -117,7 +117,9 @@ function getSquareHeaders() {
     return headers;
 }
 
-async function squareFetch(path, init = {}) {
+// Exported so the cost-sync reconciler can reuse the ONE Square client — its base url, headers, logging and
+// error shape — rather than standing up a second one that would drift from this on the first change.
+export async function squareFetch(path, init = {}) {
     const endpoint = path.split("?")[0];
 
     squareLogger.info("square.api_call.started", {
