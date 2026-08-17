@@ -10,8 +10,14 @@ function shortId(id) {
     return String(id || "").slice(0, 8).toUpperCase();
 }
 
+// ── DONE IS DONE ─────────────────────────────────────────────────────────────────────────────────────────────
+// "All" used to mean literally all, so a picked-up order sat at the top of the list forever with a live
+// "Picked up" button on it — the screen could not tell you what still needed doing, which is the only
+// question it exists to answer. The default view is ACTIVE work now; finished orders are one tab away and
+// nothing is deleted.
+const DONE = new Set(["picked_up", "cancelled"]);
 const FILTERS = [
-    { id: "all", label: "All" },
+    { id: "all", label: "Active" },
     { id: "unfulfilled", label: "Unfulfilled" },
     { id: "ready", label: "Ready" },
     { id: "shipped", label: "Shipped" },
@@ -22,7 +28,7 @@ const FILTERS = [
 export default function ShopOrdersAdminClient({ orders: initial }) {
     const [orders, setOrders] = useState(initial);
     const [filter, setFilter] = useState("all");
-    const shown = filter === "all" ? orders : orders.filter((o) => o.fulfillmentStatus === filter);
+    const shown = filter === "all" ? orders.filter((o) => !DONE.has(o.fulfillmentStatus)) : orders.filter((o) => o.fulfillmentStatus === filter);
 
     async function update(id, patch) {
         const res = await fetch(`/api/admin/shop/orders/${id}`, {
@@ -46,7 +52,9 @@ export default function ShopOrdersAdminClient({ orders: initial }) {
         <div className="stack reveal">
             <section className="card">
                 <h1>Shop Orders</h1>
-                <p className="muted">{orders.length} paid order(s). Mark them fulfilled and add tracking.</p>
+                {/* Counts what is ON SCREEN, not what exists — a header reading "2 paid orders" over a list
+                    of none is the screen arguing with itself. */}
+                <p className="muted">{shown.length} {filter === "all" ? "order(s) still to handle" : "order(s)"}. Mark them fulfilled and add tracking.</p>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
                     {FILTERS.map((f) => (
                         <button
