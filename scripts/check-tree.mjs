@@ -62,6 +62,34 @@ if (nodes.length < 30) {
 // The kinds the engine plays for free, read off the kit rather than restated here.
 const FREE_KINDS = [...(engine.match(/FREE_KINDS = new Set\(\[([^\]]*)\]/) || [])[1]?.matchAll(/"([a-z]+)"/g) || []].map((m) => m[1]);
 
+// ── A STAT READ THROUGH A SHARED HELPER IS STILL READ ────────────────────────────────────────────────────────
+// The engine used to spell out `P.rendTick` on your side and `FP.rendTick` on theirs, in two copies of the same
+// four lines, and this check simply looked for both spellings. Those copies are now ONE function taking a perk
+// bag — which is strictly better (the two sides cannot drift), and which made five live nodes report as dead
+// the moment it landed. A guard that goes red on the fix is worse than no guard, because the next person
+// silences it.
+//
+// So: find helpers shaped `function name(b, onFoe, perks)`, and count a `perks.<stat>` inside one as read on
+// whichever side that helper is actually CALLED for. Both call shapes must exist, or it is still one-sided.
+const HELPERS = [...engine.matchAll(/function (\w+)\(b, onFoe, perks[^)]*\)\s*\{([^]*?)\n\}/g)]
+    .map(([, name, body]) => ({ name, body }));
+
+function sharedReads(stat) {
+    let mine = false;
+    let theirs = false;
+    for (const h of HELPERS) {
+        if (!new RegExp(`perks\\.${stat}\\b`).test(h.body)) continue;
+        // Called with your perk bag for your side, and theirs for theirs. `true`/`false` is the `onFoe` flag:
+        // your blows land on the foe, so yours is the `true` call.
+        if (new RegExp(`${h.name}\\(b, true, P\\b`).test(engine)) mine = true;
+        if (new RegExp(`${h.name}\\(b, false, FP\\b`).test(engine)) theirs = true;
+        // A counter (or anything else) that passes the side through a variable serves both, provided the
+        // caller itself is reached from both sides — `counterBlow(b, mine)` picks the bag by side above it.
+        if (new RegExp(`${h.name}\\(b, mine, perks\\b`).test(engine)) { mine = true; theirs = true; }
+    }
+    return { mine, theirs };
+}
+
 const problems = [];
 const seenStat = new Set();
 
@@ -91,8 +119,8 @@ for (const n of nodes) {
     seenStat.add(n.stat);
 
     if (!FOLDED.has(n.stat)) {
-        const mine = new RegExp(`P\\.${n.stat}\\b`).test(engine);
-        const theirs = new RegExp(`FP\\.${n.stat}\\b`).test(engine);
+        const mine = new RegExp(`P\\.${n.stat}\\b`).test(engine) || sharedReads(n.stat).mine;
+        const theirs = new RegExp(`FP\\.${n.stat}\\b`).test(engine) || sharedReads(n.stat).theirs;
         if (!mine && !theirs) problems.push(`DEAD PASSIVE      ${n.id} (${n.name}) — "${n.stat}" is read nowhere in the engine`);
         else if (!mine) problems.push(`DEFENDER-ONLY     ${n.id} (${n.name}) — "${n.stat}" is read as FP.${n.stat} but never as P.${n.stat}`);
         else if (!theirs) problems.push(`ATTACKER-ONLY     ${n.id} (${n.name}) — "${n.stat}" is read as P.${n.stat} but never as FP.${n.stat}`);

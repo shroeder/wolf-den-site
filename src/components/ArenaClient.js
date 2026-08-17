@@ -116,6 +116,11 @@ const RESULT_MS = 1050;
 // A touch longer than the classic 6-8 frames, because this fight is watched rather than played frame by
 // frame — the freeze is the cue to LOOK, not a combo window.
 const HITSTOP_MS = 170;
+// ── HOW LONG A COUNTER WAITS ─────────────────────────────────────────────────────────────────────────────────
+// Long enough that their blow has landed and the recoil has been SEEN, short enough that it still reads as an
+// answer to it rather than a second unrelated event. Roughly the length of the recoil animation (.36s) plus a
+// held breath.
+const COUNTER_BEAT_MS = 420;
 
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
@@ -943,7 +948,40 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const t = setTimeout(() => { setShake(0); setHitSide(null); }, 360);
         const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
         const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
-        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); };
+
+        // ── THE COUNTER IS ITS OWN BEAT ──────────────────────────────────────────────────────────────────
+        // Their blow and your answer both moved a bar on the same frame, and `hitSide` is one value — so the
+        // second write won and your recoil was swallowed by your own lunge. One muddled frame instead of a
+        // story. It is two beats, so it plays as two: they hit you and you recoil, a held breath, then you
+        // come back off the freeze swinging.
+        //
+        // Their counter is the mirror, staged the same way, because being countered has to read as being
+        // answered rather than as a mystery number during your own turn.
+        const mine = Number(last?.countered) || 0;
+        const theirs = Number(last?.theirCounter) || 0;
+        const counterTimers = [];
+        if (isNew && (mine > 0 || theirs > 0)) {
+            const back = mine > 0;
+            const heavy = back ? last.counterCrit : last.theirCounterCrit;
+            // Recoil first: whoever was hit takes the frame they earned before the answer lands.
+            setHitSide(back ? "you" : "them");
+            counterTimers.push(setTimeout(() => {
+                setHitSide(back ? "them" : "you");   // now the answer — the counterer lunges in
+                setShake(heavy ? 2 : 1);
+                setStop(true);
+                setClash({ grade: "counter", move: heavy ? "RETALIATION!" : "Retaliation", mine: back, crit: Boolean(heavy) });
+                Sfx.whoosh();
+                Sfx.counter(heavy ? 0.9 : 0.55, 0.07);
+                if (heavy) { Haptic.crit(); duck(0.5, 0.3); } else { Haptic.hit(0.7); duck(0.35, 0.22); }
+            }, COUNTER_BEAT_MS));
+            counterTimers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, COUNTER_BEAT_MS + 380));
+            counterTimers.push(setTimeout(() => setClash(null), COUNTER_BEAT_MS + RESULT_MS - 80));
+        }
+
+        return () => {
+            clearTimeout(t); clearTimeout(t2); clearTimeout(t3);
+            for (const ct of counterTimers) clearTimeout(ct);
+        };
     }, [bout]);
 
     // The end of a bout is its loudest moment, and it was a three-note blip.
@@ -1203,11 +1241,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // the pop goes where the damage went, not to whoever owns the move.
             if (l.takenBack > 0) sub.push({ side: "left", n: l.takenBack, kind: "thorn", at: 280 });
             if (l.riposted > 0) sub.push({ side: "right", n: l.riposted, kind: "thorn", at: 280 });
-            // ── RETALIATION ── the last strike-back that had no number. It fired, it took health off, and
-            // nothing on the screen said so, which is indistinguishable from a node that does nothing. Same
-            // rule as every line above: the pop goes where the damage went.
-            if (l.countered > 0) sub.push({ side: "right", n: l.countered, kind: "thorn", at: 260 });
-            if (l.theirCounter > 0) sub.push({ side: "left", n: l.theirCounter, kind: "thorn", at: 260 });
+            // ── RETALIATION ── its own kind, not thorn pink: it is a swing somebody threw, and it lands on the
+            // counter's own beat (COUNTER_BEAT_MS) so the number arrives with the lunge rather than during the
+            // blow it is answering. A crit counter pops bigger, exactly as a crit swing does.
+            if (l.countered > 0) sub.push({ side: "right", n: l.countered, kind: l.counterCrit ? "counter-crit" : "counter", at: 430 });
+            if (l.theirCounter > 0) sub.push({ side: "left", n: l.theirCounter, kind: l.theirCounterCrit ? "counter-crit" : "counter", at: 430 });
+            // Their counter's Lifedrink — over them, because they are the ones who drank it.
+            if (l.theirHealed > 0) sub.push({ side: "right", n: l.theirHealed, kind: "heal", at: 520 });
             // Each line's numbers come after the previous line's, so an exchange reads as a sequence.
             for (const item of sub) pops.push({ ...item, at: (item.at || 0) + li * 150 });
         });
@@ -2983,6 +3023,22 @@ function Styles() {
             .ar-grade.is-great span { color: #8bf0b4; }
             .ar-grade.is-good span { color: #cbd3dc; }
             .ar-grade.is-miss span { color: #ff8f9a; }
+            /* ── RETALIATION ── the callout for a blow you did not spend a turn on. Struck steel: it snaps in
+               from the side you answered from rather than dropping in like a move you chose, and it is the one
+               banner that leans. A crit counter gets the full flawless-sized kick. */
+            .ar-grade.is-counter .ar-move { color: #ffe9a8; letter-spacing: .12em;
+                text-shadow: 0 2px 10px #000, 0 0 26px rgba(255,190,80,.95);
+                animation: arCounter .42s cubic-bezier(.2,1.5,.3,1) both; }
+            .ar-grade.is-counter.is-theirs .ar-move { color: #ffc9c9;
+                text-shadow: 0 2px 10px #000, 0 0 26px rgba(255,110,110,.9); animation-name: arCounterFoe; }
+            .ar-grade.is-counter.is-crit .ar-move { font-size: 1.5rem; color: #fff6cc;
+                text-shadow: 0 3px 14px #000, 0 0 30px #fff0a8, 0 0 60px rgba(255,190,60,1); }
+            @keyframes arCounter { 0% { opacity: 0; transform: translateX(-38px) skewX(-14deg) scale(.8) }
+                55% { opacity: 1; transform: translateX(4px) skewX(3deg) scale(1.08) }
+                100% { opacity: 1; transform: none } }
+            @keyframes arCounterFoe { 0% { opacity: 0; transform: translateX(38px) skewX(14deg) scale(.8) }
+                55% { opacity: 1; transform: translateX(-4px) skewX(-3deg) scale(1.08) }
+                100% { opacity: 1; transform: none } }
             @keyframes arGrade { 0% { opacity: 0; transform: scale(1.7) } 30% { opacity: 1; transform: scale(1) } 100% { opacity: 0; transform: scale(.95) translateY(-18px) } }
             .ar-clash-spark { position: absolute; width: 78px; height: 78px; border-radius: 50%;
                 background: radial-gradient(circle, rgba(255,240,190,0.95), rgba(255,180,60,0.35) 45%, transparent 70%);
@@ -3449,6 +3505,12 @@ function Styles() {
             .ar-pop.is-burn .ar-pop-dot { color: #ff8a2a; filter: drop-shadow(0 0 5px rgba(255,120,30,.9)); }
             .ar-pop-dot { font-size: .8em; margin-right: .12em; vertical-align: -.06em; }
             .ar-pop.is-thorn { color: #ff9f9f; text-shadow: 0 0 10px rgba(255,120,120,.65); }
+            /* ── A COUNTER IS NOT A THORN ── steel, not a scratch: cold white-hot rather than the pale pink a
+               passive tick wears, and a crit counter is bigger again. It shares the thorn's shape so an
+               exchange still reads as one family of "damage that came back". */
+            .ar-pop.is-counter { color: #ffe9a8; text-shadow: 0 0 12px rgba(255,190,80,.85), 0 2px 6px #000; }
+            .ar-pop.is-counter-crit { color: #fff6cc; font-size: 2.5rem; letter-spacing: .02em;
+                text-shadow: 0 0 20px rgba(255,205,90,1), 0 0 42px rgba(255,150,40,.8), 0 3px 8px #000; }
             .ar-pops { position: absolute; bottom: 34%; z-index: 21; display: flex; flex-direction: column-reverse;
                 align-items: center; gap: 6px; pointer-events: none; }
             .ar-pops.is-right { right: 18%; }

@@ -185,6 +185,26 @@ export const Sfx = {
         noise({ at: at + 0.01, dur: 0.3, gain: 0.1, type: "highpass", freq: 4200 });
     },
 
+    /**
+     * A COUNTER. Steel turned back on whoever swung first.
+     *
+     * It must not be `impact` again — a counter that sounds like every other blow is a number you have to read
+     * to notice, which is exactly what it was. The identity is the RING: two short metal partials a semitone
+     * apart, struck together and left to beat against each other, over a hit that arrives fractionally late so
+     * the parry reads before the answer. Bright and dry, where a crit is bright and long.
+     */
+    counter(weight = 0.6, at = 0) {
+        const w = Math.max(0, Math.min(1, weight));
+        // The parry itself — high, short, no body. This is the sound of the block that earns the swing.
+        tone({ at, freq: 2400, type: "square", dur: 0.05, gain: 0.05 + w * 0.05 });
+        noise({ at, dur: 0.05, gain: 0.07 + w * 0.06, type: "highpass", freq: 5200 });
+        // Then the answer, a beat later, with the two ringing partials over it.
+        Sfx.impact(0.45 + w * 0.4, at + 0.055);
+        tone({ at: at + 0.055, freq: 1480, type: "triangle", dur: 0.26 + w * 0.16, gain: 0.09 + w * 0.05 });
+        tone({ at: at + 0.062, freq: 1568, type: "triangle", dur: 0.3 + w * 0.18, gain: 0.07 + w * 0.05 });
+        if (w > 0.7) tone({ at: at + 0.07, freq: 2960, type: "sine", dur: 0.4, gain: 0.05 });
+    },
+
     // ── THE JEWELCUTTER ──────────────────────────────────────────────────────────────────────────────────
     // This module is the house synth now, not only the arena's: the bench needs three sounds and none of them
     // is worth a second AudioContext, a second mute switch or a second set of buses. Kept here, named for what

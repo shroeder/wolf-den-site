@@ -1355,6 +1355,82 @@ function drinkFor(b, amount, rate, side = "me") {
     return Math.min(Math.max(0, room), whole);
 }
 
+// ── ONE BURN AND ONE WOUND, WHOEVER LIGHTS THEM ──────────────────────────────────────────────────────────────
+// These four lines existed twice, once per side, identical but for `b.foeMaxHp`/`P` against `b.maxHp`/`FP` —
+// and the comment on the second copy is a promise that the two will always match ("the same kit has to burn
+// identically in an opponent's hands"). A counter that procs is a THIRD and FOURTH place that must light the
+// same fire, and four copies of a promise is how it gets broken. `onFoe` is who catches it.
+//
+// Naming, preserved from the engine and worth knowing: `b.bleed` is the BURN on them and `b.gash` is the
+// wound; `b.foeBleed` and `b.foeGash` are the two on you.
+function lightBurn(b, onFoe, perks = {}) {
+    const maxHp = onFoe ? b.foeMaxHp : b.maxHp;
+    const track = onFoe ? b.bleed : b.foeBleed;
+    const per = Math.max(1, Math.round(maxHp * REND_PER_TURN * (1 + (perks.rendTick || 0))));
+    const stacks = (track?.stacks || 0) + 1;
+    const next = {
+        turns: Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(perks.rendTurns || 0)),
+        stacks,
+        dmg: Math.min(per * stacks, Math.max(1, Math.round(maxHp * (REND_TICK_CAP + (perks.rendCap || 0))))),
+    };
+    if (onFoe) b.bleed = next; else b.foeBleed = next;
+    return next;
+}
+
+function openWound(b, onFoe, perks = {}) {
+    const maxHp = onFoe ? b.foeMaxHp : b.maxHp;
+    const track = onFoe ? b.gash : b.foeGash;
+    const per = Math.max(1, Math.round(maxHp * BLEED_PER_TURN * (1 + (perks.bleedTick || 0))));
+    const stacks = Math.min(BLEED_MAX_STACKS, (track?.stacks || 0) + 1);
+    const next = {
+        turns: Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(perks.bleedTurns || 0)),
+        stacks,
+        dmg: Math.min(per * stacks, Math.max(1, Math.round(maxHp * BLEED_TICK_CAP))),
+    };
+    if (onFoe) b.gash = next; else b.foeGash = next;
+    return next;
+}
+
+// ── A COUNTER IS A SWING, NOT A SUBTRACTION ──────────────────────────────────────────────────────────────────
+// It was `Math.round(damage * 0.5)` taken straight off a health bar: it could not crit, it drank nothing, it
+// lit nothing, and the damage bonus that multiplies every other blow you throw did not touch it. A Reaver
+// whose whole kit is bleeds got a counter that never bled. So it rolls everything a real blow rolls — crit,
+// Brutality, Lifedrink, and the bleed and burn chances the class carries — on both sides of the ring.
+//
+// Not doublestrike: a free swing that can spawn a second free swing off a blow you did not throw is a
+// different mechanic, and this one is already answering someone else's turn.
+function counterBlow(b, mine) {
+    const attacker = mine ? b.me : b.foe;
+    const perks = (mine ? b.me?.perks : b.foe?.perks) || {};
+    const crit = Math.random() < (attacker.critChance || 0);
+    let dmg = Math.max(1, Math.round(attacker.damage * COUNTER_POWER * (1 + (attacker.dmgPct || 0))));
+    if (crit) dmg = Math.max(1, Math.round(dmg * (attacker.critMult || 1.5)));
+
+    if (mine) b.foeHp = Math.max(0, b.foeHp - dmg);
+    else b.hp = Math.max(0, b.hp - dmg);
+
+    let drank = 0;
+    const steal = Number(attacker.lifesteal) || 0;
+    if (steal > 0) {
+        drank = drinkFor(b, dmg, steal, mine ? "me" : "foe");
+        if (mine) b.hp += drank; else b.foeHp += drank;
+    }
+
+    let burned = false;
+    if ((attacker.burnChance || 0) > 0 && Math.random() < attacker.burnChance) burned = true;
+    // Conflagration reads the same on a counter as on a swing: a critical leaves a burn behind.
+    if (crit && (perks.burnOnCrit || 0) > 0) burned = true;
+    if (burned) lightBurn(b, mine, perks);
+
+    let bled = false;
+    if ((attacker.bleedChance || 0) > 0 && Math.random() < attacker.bleedChance) {
+        openWound(b, mine, perks);
+        bled = true;
+    }
+
+    return { dmg, crit, drank, burned, bled };
+}
+
 /**
  * ONE COMMAND. The arena is turn-based, so a beat starts with a decision and only then asks for timing.
  *
@@ -1863,9 +1939,13 @@ export async function fightRound(buyerId, opts = {}) {
         }
         // ── THEIR RETALIATION ── the mirror of yours, off your whole swing, rolled on their tree's node.
         let theirCounter = 0;
+        let theirCounterCrit = false;
+        let theirCounterHeal = 0;
         if ((FP.counter || 0) > 0 && dmg > 0 && Math.random() < Math.min(0.6, FP.counter)) {
-            theirCounter = Math.max(1, Math.round(b.foe.damage * COUNTER_POWER));
-            b.hp = Math.max(0, b.hp - theirCounter);
+            const c = counterBlow(b, false);
+            theirCounter = c.dmg;
+            theirCounterCrit = c.crit;
+            theirCounterHeal = c.drank;
         }
         // ── THEIR RIPOSTE ── set on a beat they spent standing ready, spent on the first blow that lands.
         // The mirror of yours: off what actually got through their guard, and reading their Vengeance node.
@@ -1900,29 +1980,17 @@ export async function fightRound(buyerId, opts = {}) {
             // Slow Burn: each rank makes the burn tick for more of their health.
             // RUNEBRAND MULTIPLIES, it no longer nudges. Four ranks is +120% on the tick rather than the
             // +2.4 percentage points it used to be worth.
-            const per = Math.max(1, Math.round(b.foeMaxHp * REND_PER_TURN * (1 + (P.rendTick || 0))));
-            // ── NO STACK CEILING ── Luke: "is there a cap at 3 fire sticks? if so remove that." Stacks now
-            // build as long as you keep casting. This is NOT the uncapped burn that once won 83.8% of 3,000
-            // simulated bouts: that one had no per-turn ceiling either. The REND_TICK_CAP below still bounds
-            // what a single turn of burning can cost, so extra stacks reach the ceiling sooner rather than
-            // climbing forever, and the runaway cannot come back.
-            const stacks = (b.bleed?.stacks || 0) + 1;
-            // KINDLING raises that ceiling, which is the only limit left worth buying — as stacks it would
-            // now be a node that buys nothing at all.
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * (REND_TICK_CAP + (P.rendCap || 0)))));
-            // SLOW BURN buys turns — what its name always said, instead of being a weaker second Runebrand.
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(P.rendTurns || 0));
-            b.bleed = { turns, stacks, dmg: tick };
+            // ── NO STACK CEILING ── Luke: "is there a cap at 3 fire sticks? if so remove that." Stacks build
+            // as long as you keep casting. This is NOT the uncapped burn that once won 83.8% of 3,000
+            // simulated bouts: that one had no per-turn ceiling either. REND_TICK_CAP still bounds what a
+            // single turn of burning can cost, so extra stacks reach the ceiling sooner rather than climbing
+            // forever, and the runaway cannot come back. Kindling raises that ceiling and Slow Burn buys
+            // turns — all of it inside lightBurn now, so their copy cannot drift from ours.
+            lightBurn(b, true, P);
         }
         // ── THE WOUND ── same shape as the burn and a separate track, so a fighter can carry both and the
         // Reaver's nodes scale one while the Runecaller's scale the other.
-        if (gash && dmg > 0) {
-            const per = Math.max(1, Math.round(b.foeMaxHp * BLEED_PER_TURN * (1 + (P.bleedTick || 0))));
-            const stacks = Math.min(BLEED_MAX_STACKS, (b.gash?.stacks || 0) + 1);
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.foeMaxHp * BLEED_TICK_CAP)));
-            const turns = Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(P.bleedTurns || 0));
-            b.gash = { turns, stacks, dmg: tick };
-        }
+        if (gash && dmg > 0) openWound(b, true, P);
         if (sunder) b.sunder = SUNDER_TURNS;
         // ── ICE ── a rare lockout. Only on a blow that LANDED, and never onto a fighter already frozen:
         // chaining two casts into a turn they never act through is the deadlock shape this file has been
@@ -1955,7 +2023,8 @@ export async function fightRound(buyerId, opts = {}) {
             // line, not in the sentence, not as a number on the screen. Thorns rides along here for exactly
             // that reason and the comment below says so; the counter beside it was missed. A Reaver's
             // answer to being hit has therefore been invisible since the node shipped, on both sides.
-            hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak, theirCounter,
+            hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
+            theirCounter, theirCounterCrit, theirHealed: theirCounterHeal,
             text: `${whiffed
                 ? `${ability ? ability.name : "You swing"} — ${hits > 1 ? "all " + hits + " blows miss" : "and miss"}.`
                 : dmg > 0
@@ -1965,7 +2034,7 @@ export async function fightRound(buyerId, opts = {}) {
                 + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
                 + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
                 + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`
-                + `${theirCounter ? ` ${b.foe.name} strikes back for ${theirCounter}.` : ""}`
+                + `${theirCounter ? ` ${b.foe.name} strikes back${theirCounterCrit ? " — CRITICAL —" : ""} for ${theirCounter}.` : ""}`
                 + `${theirRiposte ? ` ${b.foe.name} answers for ${theirRiposte}.` : ""}`,
             takenBack: theirRiposte,
             ability: ability?.name || null });
@@ -2271,9 +2340,16 @@ export async function fightRound(buyerId, opts = {}) {
         // reason thorns is: a counter that shrank the better you blocked would pay least to the build that
         // earned it. It cannot fire on a blow that entirely missed.
         let countered = 0;
+        let counterCrit = false;
+        let counterDrank = 0;
         if ((P.counter || 0) > 0 && raw > 0 && Math.random() < Math.min(0.6, P.counter)) {
-            countered = Math.max(1, Math.round(b.me.damage * COUNTER_POWER));
-            b.foeHp = Math.max(0, b.foeHp - countered);
+            const c = counterBlow(b, true);
+            countered = c.dmg;
+            counterCrit = c.crit;
+            counterDrank = c.drank;
+            // A counter's Lifedrink is still a drink, so it floats with the rest of what you took back this
+            // beat rather than inventing a second number for the same thing.
+            stolen += counterDrank;
         }
         // ── WHAT THEIR MOVE LEAVES BEHIND ── their drain feeding them, their burn on you, their sunder on
         // your block. All three were computed on their card and then dropped: `heal` in particular was set by
@@ -2296,21 +2372,12 @@ export async function fightRound(buyerId, opts = {}) {
             // Their Runebrand multiplies exactly as yours does, their Slow Burn lengthens exactly as yours
             // does, and their burn hits the same ceiling. The same kit has to burn identically in an
             // opponent's hands or the tree is only real on one side of the ring.
-            const per = Math.max(1, Math.round(b.maxHp * REND_PER_TURN * (1 + (FP.rendTick || 0))));
             // Uncapped in their hands too, and their Kindling raises their ceiling exactly as yours does.
-            // Offence and defence move together or the same kit is two different kits depending on who holds it.
-            const stacks = (b.foeBleed?.stacks || 0) + 1;
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * (REND_TICK_CAP + (FP.rendCap || 0)))));
-            const turns = Math.min(REND_TURNS_CAP, REND_TURNS + Math.round(FP.rendTurns || 0));
-            b.foeBleed = { turns, stacks, dmg: tick };
+            // Offence and defence move together or the same kit is two different kits depending on who holds
+            // it — which is now structural rather than a promise kept by hand in two places.
+            lightBurn(b, false, FP);
         }
-        if (gashNow && through > 0) {
-            const per = Math.max(1, Math.round(b.maxHp * BLEED_PER_TURN * (1 + (FP.bleedTick || 0))));
-            const stacks = Math.min(BLEED_MAX_STACKS, (b.foeGash?.stacks || 0) + 1);
-            const tick = Math.min(per * stacks, Math.max(1, Math.round(b.maxHp * BLEED_TICK_CAP)));
-            const turns = Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(FP.bleedTurns || 0));
-            b.foeGash = { turns, stacks, dmg: tick };
-        }
+        if (gashNow && through > 0) openWound(b, false, FP);
         if (sunderNow) b.foeSunder = SUNDER_TURNS;
         let theyFroze = false;
         if (theirAbility?.freezes && through > 0 && !(b.frozen > 0) && Math.random() < FREEZE_CHANCE) {
@@ -2346,12 +2413,12 @@ export async function fightRound(buyerId, opts = {}) {
             // `countered` joins them for the same reason: your Retaliation fires on THEIR beat, took a bite
             // out of their health, and was published nowhere — so four ranks of it looked like four dead
             // points. Every other strike-back on this line already floats a number.
-            riposted: sent, thorned, stolen, countered,
+            riposted: sent, thorned, stolen, countered, counterCrit,
             text: `${foeCrit ? "CRITICAL — " : ""}${foeWhiffed
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${countered ? ` YOU STRIKE BACK for ${countered}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${countered ? ` ${counterCrit ? "YOU STRIKE BACK — CRITICAL — for" : "YOU STRIKE BACK for"} ${countered}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
                 extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
                 extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
                 extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${
