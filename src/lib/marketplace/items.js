@@ -937,6 +937,16 @@ export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fo
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
 // more things at once.
 const AFFIX_COUNT = { common: 2, rare: 2, epic: 3, legendary: 3, mythic: 4, ascendant: 4, eternal: 5, celestial: 5, primordial: 6 };
+// ── AND HOW MANY IT CAN EVER HOLD ────────────────────────────────────────────────────────────────────────────
+// AFFIX_COUNT is what a piece is BORN with. This is its ceiling — the difference between the two is the empty
+// sockets only the Forge can fill, which is the ARPG shape Luke described: some stats guaranteed, some earned.
+//
+// Two forge slots on everything, so the shape of the promise is the same at every rarity and it is the BASE
+// that makes a primordial special (6 innate + 2 forged = 8) rather than a bigger allowance. It also means a
+// common piece is worth forging at all, which it would not be if the slots scaled with rarity too.
+const FORGE_SLOTS = 2;
+export const affixesBornWith = (rarity) => AFFIX_COUNT[rarity] || 2;
+export const affixCeiling = (rarity) => affixesBornWith(rarity) + FORGE_SLOTS;
 // How scarce each affix is in the draw. 1 = ordinary, higher = rarer. Lifedrink and Riposte are the two that
 // change how a fight FEELS rather than how big a number is, so they are the prizes; Pierce sits between,
 // because it is the counter to a whole archetype and should not be on every third item either.

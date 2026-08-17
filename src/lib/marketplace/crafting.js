@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats, AFFIX_POOL } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, AFFIX_POOL, affixCeiling } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -549,7 +549,14 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // roll Pierce, then after enough forging every slot does everything and slots stop meaning anything. The
     // variance work is only preserved if the pool respects what the piece IS.
     const ADDABLE = addablePoolFor();
-    const newPool = ADDABLE.filter((k) => !existing.includes(k));
+    // ── THE FORGE FILLS EMPTY SOCKETS, IT DOES NOT DRILL NEW ONES ────────────────────────────────────────
+    // A piece is born with affixesBornWith(rarity) stats and can hold affixCeiling(rarity) — the gap is the
+    // sockets the Forge may fill, and once they are full it can only make what is there BIGGER. Without this
+    // a common item could be forged until it carried every stat in the game, which erases the rarity ladder
+    // from the other end.
+    const forgedNew = Object.keys(parseBonus(cur?.stat_bonus)).filter((k) => !existing.includes(k)).length;
+    const socketsLeft = Math.max(0, affixCeiling(item.rarity) - existing.length - forgedNew);
+    const newPool = socketsLeft > 0 ? ADDABLE.filter((k) => !existing.includes(k)) : [];
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
     const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC)); // per-stat forge cap (added stats: +3)
     const gained = {};
