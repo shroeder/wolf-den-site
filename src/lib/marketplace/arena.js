@@ -226,6 +226,8 @@ async function combatStats(buyerId, gearStats, ids) {
         // Gear-only for the same reason Vitality is: a stat a badge collection can grant is a stat a wardrobe
         // cannot win on.
         tenacity: gearStats.tenacity || 0,
+        precision: gearStats.precision || 0,
+        pierce: gearStats.pierce || 0,
     };
 }
 
@@ -322,7 +324,14 @@ async function kitFor(buyerId) {
     for (const a of abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
     return {
         level, gearPower,
-        classId, taken, perks,
+        // ── GEAR JOINS THE PERK BAG ──────────────────────────────────────────────────────────────────────
+        // The engine reads pierce off `P.pierce`, where P is this fighter's perks — a bag the skill tree used
+        // to fill alone. Folding the wardrobe's contribution in HERE means it lands on both sides of the ring
+        // for free, because an opponent's kit is built by this same function. Adding a second lookup in the
+        // engine instead would have been two places to keep in step, and the second one is always the one
+        // that gets missed.
+        classId, taken,
+        perks: { ...perks, pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100 },
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
         speed: speedOf(level, Number(stats.ferocity) || 0) + (perks.speed || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
@@ -365,7 +374,9 @@ async function kitFor(buyerId) {
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
         // swinging is also a body that lands them — and raised by the tree.
         accuracy: Math.min(ACCURACY_CAP, Math.max(ACCURACY_FLOOR,
-            base.accuracy + accuracyFromFerocity((Number(stats.ferocity) || 0) + (perks.ferocity || 0)) + (perks.accuracy || 0))),
+            // PRECISION, not Ferocity. Seeded equal to it, so nobody's aim moved the day this shipped — but
+            // from here aim and initiative are two stats that can be tuned apart, which was the point.
+            base.accuracy + accuracyFromFerocity((Number(stats.precision) || 0) + (perks.ferocity || 0)) + (perks.accuracy || 0))),
         // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
         // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
         // command lands, so the number the button prints and the number the engine banks are the same one.

@@ -92,6 +92,16 @@ export const STAT_META = {
     // Damage reduction, from the two slots that are literally protection: the helm and what you wear on your
     // back. Like Vitality, no badge grants it — it is a wardrobe stat, not a collection stat.
     tenacity: { label: "Tenacity", icon: "🛡️", desc: "Turns aside a share of every blow in the Arena. Helm and back only — no badge grants it.", suffix: "" },
+    // ── PRECISION ────────────────────────────────────────────────────────────────────────────────────────
+    // Accuracy, split off Ferocity. Ferocity was buying health, accuracy, initiative AND boss damage; Vitality
+    // took the health and this takes the aim, leaving Ferocity to mean initiative and passive boss damage.
+    precision: { label: "Precision", icon: "🎯", desc: "How often your swings connect at all in the Arena.", suffix: "" },
+    // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────────────
+    // Ignores a share of what they turn aside. The mirror of Tenacity and the only offensive stat that is
+    // worth MORE against a tankier opponent — so building into it is a read on who you fight, not a bigger
+    // number that is always correct. The engine already consumed `pierce` from the skill tree; this is the
+    // same term reaching it from a weapon.
+    pierce: { label: "Pierce", icon: "🗡️", desc: "Cuts through a share of their damage reduction in the Arena.", suffix: "" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -754,6 +764,26 @@ for (const it of ITEMS) {
 // Scale is deliberately small: a best-in-slot helm and back together come to 14 points, which is ~12% less
 // damage taken for a Reaver. See the diminishing curve in arena.js for why that number helps the fighter with
 // the least mitigation more than the one with the most — flat DR does the opposite.
+// ── PRECISION IS THE ACCURACY HALF OF FEROCITY ───────────────────────────────────────────────────────────────
+// Seeded EQUAL to each item's ferocity, on every slot that carries any, so total accuracy is exactly what it
+// was the day before — this is a split, not a nerf, the same way Vitality was. Ferocity keeps initiative and
+// its 24/7 boss damage; from here the two can be tuned apart, and a future item can carry aim without also
+// handing out speed.
+for (const it of ITEMS) {
+    const fer = Number(it.stats?.ferocity) || 0;
+    if (fer > 0 && it.stats.precision == null) it.stats.precision = fer;
+}
+
+// ── WEAPONS CUT THROUGH ──────────────────────────────────────────────────────────────────────────────────────
+// Pierce goes on the hands, by rarity. Kept smaller than Tenacity on purpose: it is subtracting from the
+// defender's mitigation, which is a sharper lever than adding to your own.
+const PIERCE_SLOTS = new Set(["main_hand", "off_hand"]);
+const PIERCE_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
+for (const it of ITEMS) {
+    if (!PIERCE_SLOTS.has(it.slot)) continue;
+    if (it.stats && it.stats.pierce == null) it.stats.pierce = PIERCE_BY_RARITY[it.rarity] || 1;
+}
+
 const TENACITY_SLOTS = new Set(["helmet", "back"]);
 const TENACITY_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
 for (const it of ITEMS) {
