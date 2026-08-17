@@ -102,6 +102,15 @@ export const STAT_META = {
     // number that is always correct. The engine already consumed `pierce` from the skill tree; this is the
     // same term reaching it from a weapon.
     pierce: { label: "Pierce", icon: "🗡️", desc: "Cuts through a share of their damage reduction in the Arena.", suffix: "" },
+    // ── LIFEDRINK ────────────────────────────────────────────────────────────────────────────────────────
+    // A share of everything you deal comes back as health. The Warden has 15% of this inherently; a ring can
+    // now buy a slice of it for anyone, which is the point — the class fantasy stops being class-exclusive
+    // and becomes something you can build toward.
+    lifesteal: { label: "Lifedrink", icon: "🩸", desc: "A share of the damage you deal comes back as health.", suffix: "%" },
+    // ── RIPOSTE ──────────────────────────────────────────────────────────────────────────────────────────
+    // A chance to hit back the instant their blow lands. It is the off-hand's stat because that is the hand
+    // that parries — and it gives the off-hand an identity beyond being a second weapon.
+    counter: { label: "Riposte", icon: "⚔️", desc: "Chance to strike back the moment their blow lands.", suffix: "%" },
     extra_strike: { label: "Extra Strike", icon: "⚡", desc: "Gives you extra manual daily strikes on the boss.", suffix: "" },
 };
 
@@ -990,4 +999,22 @@ export function describeDepth(depth = {}) {
     return Object.entries(depth).filter(([, v]) => v)
         .map(([k, v]) => { const m = DEPTH_META[k]; return m ? `${m.icon} +${v} ${m.label}` : `+${v} ${k}`; })
         .join(" · ");
+}
+
+// ── THE RING DRINKS, THE OFF-HAND PARRIES ────────────────────────────────────────────────────────────────────
+// Both scaled by the piece's own lean like everything else, so two eternal rings are still a choice. Lifedrink
+// is deliberately half-rate: the Warden carries 15% inherently and a ring should be a slice of that, not a
+// replacement for being one.
+const LIFEDRINK_SLOTS = new Set(["ring", "amulet"]);
+const RIPOSTE_SLOTS = new Set(["off_hand"]);
+for (const it of ITEMS) {
+    if (!it.stats) continue;
+    const base = TENACITY_BY_RARITY[it.rarity] || 1;
+    if (LIFEDRINK_SLOTS.has(it.slot) && it.stats.lifesteal == null) {
+        // Leans on the AGGRESSIVE half: a ring that already bites harder drinks harder.
+        it.stats.lifesteal = Math.max(1, Math.round(base * (0.4 + 1.2 * bruteLean(it.stats)) / 2));
+    }
+    if (RIPOSTE_SLOTS.has(it.slot) && it.stats.counter == null) {
+        it.stats.counter = Math.max(1, Math.round(base * (0.4 + 1.2 * defensiveLean(it.stats))));
+    }
 }

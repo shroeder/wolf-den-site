@@ -234,6 +234,8 @@ async function combatStats(buyerId, gearStats, ids) {
         tenacity: gearStats.tenacity || 0,
         precision: gearStats.precision || 0,
         pierce: gearStats.pierce || 0,
+        lifesteal: gearStats.lifesteal || 0,
+        counter: gearStats.counter || 0,
     };
 }
 
@@ -337,7 +339,14 @@ async function kitFor(buyerId) {
         // engine instead would have been two places to keep in step, and the second one is always the one
         // that gets missed.
         classId, taken,
-        perks: { ...perks, pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100 },
+        perks: {
+            ...perks,
+            pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100,
+            // Lifedrink at half rate — the Warden carries 15% inherently and a ring is a slice of that, not a
+            // way to be one. Riposte at full rate; the engine already caps it at 60%.
+            lifesteal: (perks.lifesteal || 0) + (Number(stats.lifesteal) || 0) / 200,
+            counter: (perks.counter || 0) + (Number(stats.counter) || 0) / 100,
+        },
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
         speed: speedOf(level, Number(stats.ferocity) || 0) + (perks.speed || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
