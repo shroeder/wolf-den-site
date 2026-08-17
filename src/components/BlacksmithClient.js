@@ -546,11 +546,22 @@ export default function BlacksmithClient({ initial }) {
                                         else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${parts[f.cost.tier - 1]?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
                                     }}>
                                     <span>Swap <b>+{f.n} {f.label}</b></span>
-                                    {/* Priced in the same parts the piece eats to enhance, so the two
-                                        actions compete for one pile rather than two economies. */}
-                                    <em className={(parts[f.cost.tier - 1]?.count ?? 0) >= f.cost.qty ? "" : "is-short"}>
-                                        {f.cost.qty} {parts[f.cost.tier - 1]?.name || `T${f.cost.tier}`}
-                                    </em>
+                                    {/* Priced in the same parts the piece eats to enhance, and SHOWN the same
+                                        way the enhance card shows it: the part's own sprite, then have/need
+                                        so the answer to "can I afford this" is on the row rather than found
+                                        by pressing it. */}
+                                    {(() => {
+                                        const part = parts[f.cost.tier - 1];
+                                        const have = Number(part?.count) || 0;
+                                        return (
+                                            <em className={have >= f.cost.qty ? "" : "is-short"}>
+                                                {part?.sprite
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    ? <img className="forge-cost-ico" src={part.sprite} alt="" /> : null}
+                                                {have}/{f.cost.qty} {part?.name || `T${f.cost.tier}`}
+                                            </em>
+                                        );
+                                    })()}
                                 </button>
                             ))}
                         </div>
@@ -1230,6 +1241,7 @@ const FORGE_CSS = `
     padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
     color: #e6d9c2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.3); }
 .forge-swap b { color: #ffd08a; }
+.forge-swap em { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .forge-swap em.is-short { color: #ff9f9f; }
 .forge-swap em { font-style: normal; font-weight: 800; color: #ffcf7a; }
 .forge-swap:hover:not(:disabled) { background: rgba(255,175,75,0.14); border-color: rgba(255,200,110,0.6); }
