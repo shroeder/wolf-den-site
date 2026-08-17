@@ -931,7 +931,7 @@ export function describeDepth(depth = {}) {
 //
 // The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
 // why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
-const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
+export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
     "vitality", "tenacity", "precision", "pierce", "lifesteal", "counter"];
 
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does

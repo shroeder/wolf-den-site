@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, AFFIX_POOL } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -93,19 +93,15 @@ const REGALIA_IDS = itemsOfSet("regalia");
 const REGALIA_DROP = 0.001; // per-salvage chance to receive an unowned Regalia piece (0.1% — a rare treasure)
 // The affix pool a slot may take. Never extra_strike (a boss-only convenience), and never a stat the piece
 // has no business carrying — a sword does not grant health, a helm does not sharpen your edge.
-const SLOT_POOL = {
-    main_hand: ["might", "crit_chance", "crit_power", "pierce"],
-    off_hand: ["might", "crit_chance", "crit_power", "pierce"],
-    helmet: ["tenacity", "precision", "crit_chance", "ferocity"],
-    back: ["tenacity", "precision", "ferocity", "fortune"],
-    chest: ["vitality", "tenacity", "ferocity", "might"],
-    belt: ["vitality", "tenacity", "fortune", "ferocity"],
-    boots: ["vitality", "precision", "ferocity", "fortune"],
-    amulet: ["precision", "fortune", "crit_chance", "might"],
-    ring: ["precision", "crit_power", "crit_chance", "fortune"],
-};
-const DEFAULT_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune"];
-export const addablePoolFor = (slot) => SLOT_POOL[slot] || DEFAULT_POOL;
+// ── ONE POOL, THE SAME ONE THE ITEMS USE ─────────────────────────────────────────────────────────────────────
+// This was slot-gated — weapons rolled offence, armour rolled staying-power — and that stopped being true the
+// moment items.js dropped its own slot gates on Luke's call: "there's no affixes that can only spawn on
+// certain pieces." Leaving it here would have meant a helm that CAN carry Pierce could never be forged toward
+// it, which is the two halves of one system disagreeing about the rules.
+//
+// Imported rather than restated, so there is exactly one list and the forge can never fall behind the
+// catalogue when a stat is added.
+const addablePoolFor = () => AFFIX_POOL.filter((k) => k !== "extra_strike");
 
 function regaliaBonus(ownedCount) {
     if (ownedCount >= 5) return { tier: 2, doubleBonus: 0.15, flatParts: 1, label: "Full set: +15% double-parts & +1 part per salvage" };
@@ -464,7 +460,7 @@ export async function rerollEnhance(buyerId, itemId) {
     // Same pool and the same per-stat cap the enhance itself uses — a reroll must not be able to reach a
     // shape an enhance could never have produced.
     const existing = Object.keys(item.stats || {}).filter((k) => STAT_META[k] && k !== "extra_strike");
-    const pool = [...new Set([...existing, ...addablePoolFor(item.slot)])];
+    const pool = [...new Set([...existing, ...addablePoolFor()])];
     const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
     const next = {};
     let left = points;
@@ -552,7 +548,7 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     // SLOT-GATED ON PURPOSE, and it is the load-bearing rule: if a weapon can roll Vitality and a helm can
     // roll Pierce, then after enough forging every slot does everything and slots stop meaning anything. The
     // variance work is only preserved if the pool respects what the piece IS.
-    const ADDABLE = addablePoolFor(item.slot);
+    const ADDABLE = addablePoolFor();
     const newPool = ADDABLE.filter((k) => !existing.includes(k));
     const nextBonus = { ...parseBonus(cur?.stat_bonus) };
     const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC)); // per-stat forge cap (added stats: +3)
