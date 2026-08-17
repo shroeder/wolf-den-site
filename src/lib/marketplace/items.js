@@ -749,88 +749,6 @@ export const ITEMS = [
     { id: "primordial_elder_cloak", name: "Elder Cloak", slot: "back", rarity: "primordial", icon: "GiCondorEmblem", flavor: "From before there was a word for it.", stats: { fortune: 72, crit_chance: 59 }, reqLevel: 128, source: "elite", sort: 1117 },
 ];
 
-// ── ARMOUR CARRIES VITALITY ──────────────────────────────────────────────────────────────────────────────────
-// Applied as a RULE rather than typed onto 96 items, so it cannot land on 95 of them and be missed on the one
-// nobody tested. Chest, boots and belt are the armour slots, and the survey said they were already the
-// ferocity slots — 40/40 chest, 34/34 boots, 22/33 belt — so this is naming what the catalogue already does.
-//
-// Vitality EQUALS that piece's ferocity, which is what makes this safe to ship: health is computed from
-// vitality now, so an armour set that granted N health yesterday grants exactly N today. Nobody wakes up with
-// a smaller health bar. What changes is that ferocity on an AMULET no longer quietly buys health as well as
-// accuracy — the overlap this stat exists to end.
-const ARMOUR_SLOTS = new Set(["chest", "boots", "belt"]);
-for (const it of ITEMS) {
-    if (!ARMOUR_SLOTS.has(it.slot)) continue;
-    const fer = Number(it.stats?.ferocity) || 0;
-    if (fer > 0 && it.stats.vitality == null) it.stats.vitality = fer;
-}
-
-// ── THE HELM AND THE CLOAK CARRY TENACITY ────────────────────────────────────────────────────────────────────
-// By rule again, and by RARITY rather than mirroring an existing stat, because there was no damage-reduction
-// stat on gear to mirror — DR has only ever been a class trait. Helm and back are the two slots whose whole
-// job is protection and which mostly carried might/crit, i.e. they had no identity of their own.
-//
-// Scale is deliberately small: a best-in-slot helm and back together come to 14 points, which is ~12% less
-// damage taken for a Reaver. See the diminishing curve in arena.js for why that number helps the fighter with
-// the least mitigation more than the one with the most — flat DR does the opposite.
-// ── PRECISION IS THE ACCURACY HALF OF FEROCITY ───────────────────────────────────────────────────────────────
-// Seeded EQUAL to each item's ferocity, on every slot that carries any, so total accuracy is exactly what it
-// was the day before — this is a split, not a nerf, the same way Vitality was. Ferocity keeps initiative and
-// its 24/7 boss damage; from here the two can be tuned apart, and a future item can carry aim without also
-// handing out speed.
-for (const it of ITEMS) {
-    const fer = Number(it.stats?.ferocity) || 0;
-    if (fer > 0 && it.stats.precision == null) it.stats.precision = fer;
-}
-
-// ── WEAPONS CUT THROUGH ──────────────────────────────────────────────────────────────────────────────────────
-// Pierce goes on the hands, by rarity. Kept smaller than Tenacity on purpose: it is subtracting from the
-// defender's mitigation, which is a sharper lever than adding to your own.
-// Same principle on the weapons: BRUTE force cuts through, finesse does not. A might-heavy weapon pierces
-// hard; a crit-heavy one keeps its crit and pierces little. Two eternal weapons are now a real fork — the
-// hammer that goes through a Warden, or the blade that punishes anyone squishier.
-const PIERCE_SLOTS = new Set(["main_hand", "off_hand"]);
-const PIERCE_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
-const bruteLean = (st = {}) => {
-    const brute = Number(st.might) || 0;
-    const keen = (Number(st.crit_chance) || 0) + (Number(st.crit_power) || 0);
-    if (brute + keen <= 0) return 0.5;
-    return brute / (brute + keen);
-};
-for (const it of ITEMS) {
-    if (!PIERCE_SLOTS.has(it.slot)) continue;
-    if (!it.stats || it.stats.pierce != null) continue;
-    const base = PIERCE_BY_RARITY[it.rarity] || 1;
-    it.stats.pierce = Math.max(1, Math.round(base * (0.4 + 1.2 * bruteLean(it.stats))));
-}
-
-// ── AND IT FOLLOWS THE PIECE'S OWN CHARACTER, NOT JUST ITS RARITY ────────────────────────────────────────────
-// The first version of this handed every helm of a rarity the SAME tenacity, which made two helms of that
-// rarity more interchangeable than they were before — the stat-stick problem, introduced by the fix meant to
-// add depth. The catalogue already has character: overlord_helm is pure crit, leather_cap is pure ferocity,
-// rangers_hood splits the difference. That authored lean is what decides the share now.
-//
-// A piece that reads defensive gets up to 1.6x the rarity value; a pure glass-cannon helm gets 0.4x and stays
-// a glass cannon. So two legendary helms are a CHOICE — the sturdy one turns more aside, the keen one keeps
-// its crit and does not.
-const TENACITY_SLOTS = new Set(["helmet", "back"]);
-const TENACITY_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
-// 0 = every point is offence, 1 = every point is staying-power. Ferocity is the sturdy stat; might and the
-// crit pair are the aggressive ones.
-const defensiveLean = (st = {}) => {
-    const def = Number(st.ferocity) || 0;
-    const off = (Number(st.might) || 0) + (Number(st.crit_chance) || 0) + (Number(st.crit_power) || 0);
-    if (def + off <= 0) return 0.5;
-    return def / (def + off);
-};
-for (const it of ITEMS) {
-    if (!TENACITY_SLOTS.has(it.slot)) continue;
-    if (!it.stats || it.stats.tenacity != null) continue;
-    const base = TENACITY_BY_RARITY[it.rarity] || 1;
-    it.stats.tenacity = Math.max(1, Math.round(base * (0.4 + 1.2 * defensiveLean(it.stats))));
-}
-
-
 // ── De-clone stat blocks ──────────────────────────────────────────────────────────────────────────────────
 // The flat per-rarity stat budgets left dozens of items with byte-identical stat blocks (e.g. nine different
 // epics all "might 22"). This one-time pass makes every same-rarity stat block UNIQUE by deterministically
@@ -1001,20 +919,55 @@ export function describeDepth(depth = {}) {
         .join(" · ");
 }
 
-// ── THE RING DRINKS, THE OFF-HAND PARRIES ────────────────────────────────────────────────────────────────────
-// Both scaled by the piece's own lean like everything else, so two eternal rings are still a choice. Lifedrink
-// is deliberately half-rate: the Warden carries 15% inherently and a ring should be a slice of that, not a
-// replacement for being one.
-const LIFEDRINK_SLOTS = new Set(["ring", "amulet"]);
-const RIPOSTE_SLOTS = new Set(["off_hand"]);
+// ── EVERY PIECE GETS ITS OWN HAND OF AFFIXES ─────────────────────────────────────────────────────────────────
+// Luke: "there's no affixes that can only spawn on certain pieces, and there's no pieces that always spawn
+// with certain affixes." So the slot gates are gone — any affix can land on any piece — and what makes two
+// helmets different is WHICH affixes they drew, not merely how much of each.
+//
+// Our items are STATIC, not rolled per drop, so "random" here has to mean "varied but fixed": the draw is
+// seeded from the item's own id. Same item, same hand, forever, on every server. A Math.random() at module
+// load would give the same sword different stats on different serverless instances — a bug that surfaces as
+// players arguing about what their own gear says.
+//
+// The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
+// why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
+const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
+    "vitality", "tenacity", "precision", "pierce", "lifesteal", "counter"];
+
+// The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
+// more things at once.
+const AFFIX_COUNT = { common: 2, rare: 2, epic: 3, legendary: 3, mythic: 4, ascendant: 4, eternal: 5, celestial: 5, primordial: 6 };
+const AFFIX_TIER = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
+// Percent-style stats carry bigger numbers than the point-style ones.
+const BIG_STATS = new Set(["might", "crit_chance", "crit_power", "ferocity", "fortune", "vitality"]);
+
+// A small stable hash — deterministic across processes and deploys, which Math.random() is not.
+const affixSeed = (str) => {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i += 1) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+};
+
 for (const it of ITEMS) {
     if (!it.stats) continue;
-    const base = TENACITY_BY_RARITY[it.rarity] || 1;
-    if (LIFEDRINK_SLOTS.has(it.slot) && it.stats.lifesteal == null) {
-        // Leans on the AGGRESSIVE half: a ring that already bites harder drinks harder.
-        it.stats.lifesteal = Math.max(1, Math.round(base * (0.4 + 1.2 * bruteLean(it.stats)) / 2));
-    }
-    if (RIPOSTE_SLOTS.has(it.slot) && it.stats.counter == null) {
-        it.stats.counter = Math.max(1, Math.round(base * (0.4 + 1.2 * defensiveLean(it.stats))));
+    const counted = () => Object.keys(it.stats).filter((k) => k !== "extra_strike").length;
+    const authored = Object.keys(it.stats).filter((k) => k !== "extra_strike");
+    const want = AFFIX_COUNT[it.rarity] || 2;
+    if (counted() >= want) continue;   // already richer than its rarity asks; leave the author's work alone
+
+    const seed = affixSeed(it.id);
+    const order = AFFIX_POOL
+        .map((k, i) => ({ k, w: affixSeed(`${it.id}:${k}`) ^ (seed + i) }))
+        .sort((a, b) => a.w - b.w)
+        .map((x) => x.k)
+        .filter((k) => !authored.includes(k));
+
+    const tier = AFFIX_TIER[it.rarity] || 1;
+    for (const k of order) {
+        if (counted() >= want) break;
+        // Varies per item as well as per rarity, so two pieces that drew the same affix rarely carry the
+        // same amount of it.
+        const jitter = (affixSeed(`${it.id}#${k}`) % 3) - 1;
+        it.stats[k] = BIG_STATS.has(k) ? Math.max(2, tier * 2 + jitter * 2) : Math.max(1, Math.round(tier * 0.8) + jitter);
     }
 }
