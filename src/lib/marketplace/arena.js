@@ -327,6 +327,20 @@ async function kitFor(buyerId) {
     // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
     const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
     const art = await itemSpriteMap().catch(() => ({}));
+    // ── GEAR LIFEDRINK, COMPUTED ONCE ────────────────────────────────────────────────────────────────────
+    // PAID AT THE RATE THE CARD PRINTS. This was halved (/200) on the reasoning that the Warden carries 15%
+    // inherently and a ring should be a slice of that — but the halving was never once tested, because the
+    // number it produced was never read by anything. A piece that says "+2% Lifedrink" and pays 1% is the same
+    // lie as one that pays nothing, only harder to catch. If 2% proves strong, halve it HERE and the card
+    // should say so too.
+    //
+    // It lives here rather than inline because it has to reach BOTH the perk bag and the fighter's own
+    // `lifesteal` field, and it only ever reached the first. Pierce and Counter are read off the perk bag
+    // (`P.pierce`, `P.counter`), so folding them in there is enough — but lifesteal is read off
+    // `b.me.lifesteal`, which is built below from the SKILL-TREE perks and the class base only. Nothing in
+    // the engine has ever read `perks.lifesteal`, so every point of Lifedrink a wardrobe carried has been
+    // inert since the affix shipped: rolled, priced as the rare one, printed on the card, and worth nothing.
+    const gearLifesteal = (Number(stats.lifesteal) || 0) / 100;
     // `abilities` — the ones actually in play. This looped over kit.abilities, the GEAR-derived list, which
     // stopped being what the fight uses when the tree took over: every ability in the bout went without its
     // art, and the loop dutifully decorated a list nobody read.
@@ -343,9 +357,8 @@ async function kitFor(buyerId) {
         perks: {
             ...perks,
             pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100,
-            // Lifedrink at half rate — the Warden carries 15% inherently and a ring is a slice of that, not a
-            // way to be one. Riposte at full rate; the engine already caps it at 60%.
-            lifesteal: (perks.lifesteal || 0) + (Number(stats.lifesteal) || 0) / 200,
+            // Riposte at full rate; the engine already caps it at 60%.
+            lifesteal: (perks.lifesteal || 0) + gearLifesteal,
             counter: (perks.counter || 0) + (Number(stats.counter) || 0) / 100,
         },
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
@@ -378,8 +391,10 @@ async function kitFor(buyerId) {
         // left inverts that: 12% for the Reaver, 8% for the Warden. Armour helps most those who have least,
         // and nobody sprints to the cap on gear alone.
         dr: Math.min(DR_CAP, base.dr + (perks.dr || 0) + drFromTenacity(base.dr + (perks.dr || 0), stats.tenacity)),
-        // A share of everything you deal comes back as health. Class-inherent; see classBase.
-        lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0)),
+        // A share of everything you deal comes back as health. Class base + skill tree + the wardrobe's
+        // Lifedrink — THE FIELD THE ENGINE ACTUALLY READS (`b.me.lifesteal`). The gear term was missing here,
+        // which is the whole of "I have 2% life leech and it doesn't work".
+        lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0) + gearLifesteal),
         // Inherent class passives, folded exactly as lifesteal is: the Reaver's ragged edge and the
         // Runecaller's ember. Both read on BOTH sides below.
         bleedChance: Math.max(0, base.bleedChance || 0),
@@ -1317,6 +1332,29 @@ export async function startBout(buyerId, targetId = null) {
  * The damage is computed HERE from your real stats — the client only ever reports its timing. It could lie
  * about that, and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
  */
+// ── LIFEDRINK PAYS IN WHOLE HP, SO SMALL RATES HAVE TO BANK ──────────────────────────────────────────────────
+// Every payout site rounded its own product, and a small rate never survives that: 1% of a 25-damage blow is
+// 0.25, `Math.round` makes it 0, and it makes it 0 on EVERY blow for the whole bout. A 2% ring therefore healed
+// nothing at all — the affix was arithmetic that could never produce a number.
+//
+// The fraction is carried on the bout instead (which is saved between beats), so it pays 1 HP on the fourth
+// blow rather than never. Same total, honestly paid, and no rate is too small to exist. Used by all three
+// places lifesteal lands — your own swing, what thorns take, and what a riposte sends back — because a rule
+// applied at two of three sites is the kind that gets found by whoever is missing the third.
+// `side` because BOTH fighters drink. Their passive lifesteal was built onto their card (see buildBout) and
+// read by nothing — only their drain ABILITY ever healed them — so the same wardrobe healed on your swings and
+// not on theirs, and an identical loadout fought two different fights depending on which side of the ring it
+// stood. Each side banks its own remainder.
+function drinkFor(b, amount, rate, side = "me") {
+    if (!(rate > 0) || !(amount > 0)) return 0;
+    const key = side === "foe" ? "foeDrinkBank" : "drinkBank";
+    const owed = (Number(b[key]) || 0) + amount * rate;
+    const whole = Math.floor(owed);
+    b[key] = owed - whole;                            // the remainder rides to the next blow
+    const room = side === "foe" ? (b.foeMaxHp || 0) - (b.foeHp || 0) : (b.maxHp || 0) - (b.hp || 0);
+    return Math.min(Math.max(0, room), whole);
+}
+
 /**
  * ONE COMMAND. The arena is turn-based, so a beat starts with a decision and only then asks for timing.
  *
@@ -1848,7 +1886,7 @@ export async function fightRound(buyerId, opts = {}) {
         // turn on, this is what the class does for free.
         const steal = Number(b.me.lifesteal) || 0;
         if (steal > 0 && dmg > 0) {
-            const back = Math.min(b.maxHp - b.hp, Math.round(dmg * steal));
+            const back = drinkFor(b, dmg, steal);
             b.hp += back;
             healed += back;
         }
@@ -2214,7 +2252,7 @@ export async function fightRound(buyerId, opts = {}) {
         const mySteal = Number(b.me.lifesteal) || 0;
         let stolen = 0;
         if (mySteal > 0 && thorned > 0) {
-            stolen = Math.min(b.maxHp - b.hp, Math.round(thorned * mySteal));
+            stolen = drinkFor(b, thorned, mySteal);
             b.hp += stolen;
         }
         // ── LAST STAND ── once a bout, the blow that would end you leaves you on 1 instead.
@@ -2238,6 +2276,14 @@ export async function fightRound(buyerId, opts = {}) {
         if (foeDrain > 0 && through > 0) {
             foeHealed = Math.min(b.foeMaxHp - b.foeHp, Math.round(through * foeDrain));
             b.foeHp += foeHealed;
+        }
+        // Their Lifedrink, on the blow that just landed — the defence half of the same passive. Their card has
+        // carried the number since bouts were built; nothing ever paid it out.
+        const foeSteal = Number(b.foe?.lifesteal) || 0;
+        if (foeSteal > 0 && through > 0) {
+            const theirs = drinkFor(b, through, foeSteal, "foe");
+            b.foeHp += theirs;
+            foeHealed += theirs;
         }
         if (foeCrit && (FP.burnOnCrit || 0) > 0 && through > 0) rendNow = true;
         if (rendNow && through > 0) {
@@ -2276,7 +2322,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.riposte = 0;
             // The other half of the Warden's output feeds lifesteal too.
             if (mySteal > 0) {
-                const back = Math.min(b.maxHp - b.hp, Math.round(sent * mySteal));
+                const back = drinkFor(b, sent, mySteal);
                 b.hp += back;
                 stolen += back;
             }
