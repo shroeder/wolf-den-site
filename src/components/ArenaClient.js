@@ -3500,8 +3500,19 @@ function Styles() {
             .ar-theircd { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px;
                 font-weight: 900; color: #fff; text-shadow: 0 1px 4px #000, 0 0 8px rgba(0,0,0,.9);
                 font-variant-numeric: tabular-nums; }
+            /* ── THEY HAVE TO BE TAPPABLE ─────────────────────────────────────────────────────────────────
+               This rail lives inside .ar-hud, which is pointer-events:none so the fight can be seen through
+               it. Only .ar-tag was ever exempted, so their skill chips rendered perfectly, carried a real
+               onClick, highlighted an is-open state — and could not be tapped at all. Mid-fight you could see
+               three squares under them and pressing any of them did nothing, which is exactly what it looked
+               like: a dead handler. The card that opens needs it too, or it cannot be tapped closed. */
             .ar-theirs { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
-                padding-left: 6px; }
+                padding-left: 6px; pointer-events: auto; }
+            /* A finger, not a mouse: the chip art is small, so the touch target is grown past it rather than
+               the art being blown up. */
+            .ar-theirchip { position: relative; }
+            .ar-theirchip::after { content: ""; position: absolute; inset: -6px; }
+            .ar-theircard { pointer-events: auto; }
             .ar-theirs-lab { font-style: normal; font-size: 8px; font-weight: 900; letter-spacing: .14em;
                 text-transform: uppercase; color: #7f8790; margin-right: 1px; }
             .ar-theirchip { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center;
