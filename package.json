@@ -17,6 +17,7 @@
     "check:guide": "node scripts/check-guide.mjs",
     "check:art": "node scripts/check-image-paths.mjs",
     "check:arena": "node scripts/check-arena.mjs",
+    "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",
     "check:tree": "node scripts/check-tree.mjs",
     "check:hook-deps": "node scripts/check-hook-deps.mjs"

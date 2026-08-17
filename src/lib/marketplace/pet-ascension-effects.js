@@ -455,6 +455,63 @@ export const ASCENSION_EFFECTS = {
         light: { name: "Eats the Cookbook", kind: "graft", key: "kitchen_portion", scale: 1 },
         dark: { name: "The Gourmand's Palate", kind: "amplify", mult: 2 },
     },
+
+    // ── THE MINE'S FIVE AND THE SHIP'S FIVE ──────────────────────────────────────────────────────────────────
+    // These ten were never written, so every one fell through to FALLBACK_EFFECT: Light amplify x1 — the
+    // identity, i.e. nothing — against Dark amplify x1.5. GrayKitsune, in global chat: "Ironback (tortoise
+    // thing) - lightstone/darkstone do the same thing but one is weaker then the other." That is the fallback,
+    // described exactly, and it was true of all ten: two options, same kind, one strictly worse. Not a choice.
+    // A three-week stone spent on a coin with the same face twice.
+    //
+    // The guard built to stop precisely this could not see them: check-ascension.mjs walked
+    // COLLECTIBLES.filter(PET_PERKS[id]), and these ten had no perk entry — so the check's own definition of
+    // "every pet" excluded the only pets that were broken. Both halves are fixed: they have named abilities now
+    // (pet-perks.js) and the guard walks everything that can actually be enshrined.
+    // ── THE MINE ─────────────────────────────────────────────────────────────────────────────────────────────
+    tunnel_worm: {
+        light: { name: "Spoil Sifter", kind: "graft", key: "chest_luck", scale: 0.8, note: "It eats the rock and keeps what the rock was hiding." },
+        dark: { name: "Deeper Still", kind: "amplify", mult: 2, note: "There is always more seam." },
+    },
+    pit_beetle: {
+        // `second_wind` pays a free recharge — so the card is named for getting another go, not for the shell.
+        // A name that describes armour over a mechanic that hands back a use is the small dishonesty this
+        // whole table exists to avoid.
+        light: { name: "Digs Itself Out", kind: "graft", key: "second_wind", scale: 0.8, note: "Bred where the roof comes down, and it has been under one before." },
+        dark: { name: "Pit-Fury", kind: "amplify", mult: 2.2 },
+    },
+    cinder_scarab: {
+        light: { name: "Banked Coals", kind: "graft", key: "forge_spark", scale: 0.9, note: "It carries the heat back up with it." },
+        dark: { name: "Burns Hotter", kind: "amplify", mult: 2 },
+    },
+    geode_sprite: {
+        light: { name: "Cracks Them Open", kind: "graft", key: "chest_luck", scale: 0.9, note: "It knows which stones are hollow." },
+        dark: { name: "Every Facet", kind: "amplify", mult: 2 },
+    },
+    deep_golem: {
+        light: { name: "Bedrock Patience", kind: "graft", key: "xp_gain", scale: 0.8, note: "It has been down there long enough to have learned something." },
+        dark: { name: "The Deep Itself", kind: "amplify", mult: 1.8, note: "Ascendant weight, doubled down on." },
+    },
+    // ── THE SHIP ─────────────────────────────────────────────────────────────────────────────────────────────
+    powder_monkey: {
+        light: { name: "Runs the Powder", kind: "graft", key: "sea_plunder", scale: 0.8, note: "Up the ladder, down the ladder, arms full both ways." },
+        dark: { name: "Quicker Hands", kind: "amplify", mult: 2.2 },
+    },
+    ironback: {
+        light: { name: "Shrugs It Off", kind: "graft", key: "second_wind", scale: 0.9, note: "It rides the waterline so the planks do not have to — and the first one off the shell never counted." },
+        dark: { name: "Riveted Deeper", kind: "amplify", mult: 2, note: "More plate, more shell, same unbothered turtle." },
+    },
+    stormcrow: {
+        light: { name: "Reads the Weather", kind: "graft", key: "following_sea", scale: 0.9, note: "It leaves before the sky says why." },
+        dark: { name: "Picks the Wreck Clean", kind: "amplify", mult: 2 },
+    },
+    chain_shrike: {
+        light: { name: "Shreds the Rigging", kind: "graft", key: "chain_strike", scale: 0.9, note: "A shrike leaves what it catches on the wire." },
+        dark: { name: "Both Barrels", kind: "amplify", mult: 1.9 },
+    },
+    bosun_shade: {
+        light: { name: "All Hands", kind: "graft", key: "town_rally", scale: 0.9, note: "The whistle still carries, whoever is left to hear it." },
+        dark: { name: "The Bosun's Due", kind: "amplify", mult: 1.8, note: "Ascendant, and it collects." },
+    },
 };
 
 /** The two stone effects for a pet, or null if it has none authored. */

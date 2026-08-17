@@ -117,6 +117,26 @@ export const PET_PERKS = {
     marlin: { name: "Billfish Run", key: "angler_size" },
     anglerfish: { name: "Luring Light", key: "angler_bite" },
     sea_wyrm: { name: "Wyrm's Trench", key: "sea_dredge" },
+    // ── THE TEN THAT STILL FELL THROUGH ───────────────────────────────────────────────────────────────────
+    // The mine's five and the ship's five were never added here, so petPerk() still handed them the same
+    // `{ name: "Companion", key: activeStat }` the twenty above were rescued from — an epic sea turtle whose
+    // signature ability was called "Companion". Found by GrayKitsune noticing the downstream half of it: with
+    // no authored ability there was nothing for a Lightstone to be about, so both of its stones came out of
+    // the dull fallback and one was strictly weaker than the other.
+    //
+    // Each points at the system it was earned in, exactly as the twenty do.
+    // The mine
+    tunnel_worm: { name: "Follows the Seam", key: "xp_gain" },
+    pit_beetle: { name: "Pit-Bred", key: "ferocity" },
+    cinder_scarab: { name: "Cinder Shell", key: "crit_power" },
+    geode_sprite: { name: "Geode Sense", key: "fortune" },
+    deep_golem: { name: "Weight of the Deep", key: "might" },
+    // The ship
+    powder_monkey: { name: "Powder Runner", key: "crit_chance" },
+    ironback: { name: "Ironclad Hide", key: "might" },
+    stormcrow: { name: "Storm-Picked", key: "gold_find" },
+    chain_shrike: { name: "Chainshot", key: "crit_power" },
+    bosun_shade: { name: "The Bosun's Call", key: "ferocity" },
     // Prestige achievement pets
     spirit_fox: { name: "Spirit's Favour", key: "fortune" },
     runebound_drake: { name: "Runebound", key: "forge_spark" },

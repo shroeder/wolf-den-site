@@ -15,7 +15,15 @@ import { combinePetBonuses, PET_PERKS, PERK_META, ascensionEffectView } from "..
 import { ASCENSION_EFFECTS, effectFor } from "../src/lib/marketplace/pet-ascension-effects.js";
 import { COLLECTIBLES } from "../src/lib/marketplace/collectibles.js";
 
-const PETS = COLLECTIBLES.filter((c) => PET_PERKS[c.id]);
+// ── EVERY PET THE GAME WILL ACTUALLY ENSHRINE ────────────────────────────────────────────────────────────────
+// This was COLLECTIBLES.filter((c) => PET_PERKS[c.id]) — the check's own definition of "every pet" — and it
+// was narrower than the game's. enshrinePet() accepts any collectible you own at max level; it does not ask
+// whether a perk was ever written for it. So the ten pets with no perk entry were the ONLY ten falling
+// through to the dull fallback, and the guard built to catch exactly that skipped precisely them. GrayKitsune
+// found it instead, in a tortoise.
+//
+// A gate must take its set from the thing it is guarding, never from a convenient adjacent list.
+const PETS = COLLECTIBLES;
 const flat = (b) => JSON.stringify([b.stats, b.economy, b.proc, b.system]);
 let bad = 0;
 const fail = (msg) => { bad += 1; console.log(`  FAIL  ${msg}`); };
