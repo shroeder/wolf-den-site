@@ -59,7 +59,7 @@ if (has("--bouts") || arg("--who")) {
     const n = Number(arg("--bouts", 20));
     const who = arg("--who");
     const rows = await sql`
-        SELECT ab.id, ab.created_at, ab.rounds, ab.challenger_won, ab.npc_tier, ab.telemetry AS t,
+        SELECT ab.id, ab.created_at, ab.rounds, ab.challenger_won, ab.npc_tier, ab.kind, ab.rung, ab.telemetry AS t,
                coalesce(c.display_name,c.alias) AS challenger, coalesce(d.display_name,d.alias) AS defender
           FROM mkt_arena_bout ab
           JOIN mkt_buyer c ON c.id = ab.challenger_id
@@ -72,7 +72,7 @@ if (has("--bouts") || arg("--who")) {
         { h: "when", f: (r) => r.created_at.toISOString().slice(5, 16).replace("T", " ") },
         { h: "challenger", f: (r) => r.challenger },
         { h: "", f: (r) => (r.challenger_won ? "beat" : "LOST") },
-        { h: "opponent", f: (r) => r.defender || (r.t?.rung ? `rung ${r.t.rung}` : r.npc_tier ? `tier ${r.npc_tier}` : "?") },
+        { h: "opponent", f: (r) => r.defender || (r.rung ? `rung ${r.rung}` : r.npc_tier ? `tier ${r.npc_tier}` : r.kind === "town" ? "plaza" : "?") },
         { h: "rds", f: (r) => r.rounds },
         { h: "dealt/rd", f: (r) => r.t?.perRoundDealt ?? "—" },
         { h: "taken/rd", f: (r) => r.t?.perRoundTaken ?? "—" },
@@ -83,13 +83,13 @@ if (has("--bouts") || arg("--who")) {
 
 // ── THE THREE STANDING QUESTIONS ─────────────────────────────────────────────────────────────────────────────
 table(`is each room a fight? (last ${HOURS}h)`, await sql`
-    SELECT telemetry->>'kind' AS kind, COUNT(*)::int AS bouts,
+    SELECT kind, COUNT(*)::int AS bouts,
            COUNT(*) FILTER (WHERE challenger_won)::int AS wins,
            ROUND(AVG(rounds)::numeric, 1) AS rds,
            ROUND(AVG((telemetry->>'perRoundDealt')::numeric), 0) AS dealt,
            ROUND(AVG((telemetry->>'perRoundTaken')::numeric), 0) AS taken
       FROM mkt_arena_bout
-     WHERE telemetry IS NOT NULL AND created_at > NOW() - (${String(HOURS)} || ' hours')::interval
+     WHERE kind IS NOT NULL AND created_at > NOW() - (${String(HOURS)} || ' hours')::interval
      GROUP BY 1 ORDER BY 2 DESC`, [
     { h: "room", f: (r) => r.kind },
     { h: "bouts", f: (r) => r.bouts },
@@ -100,10 +100,10 @@ table(`is each room a fight? (last ${HOURS}h)`, await sql`
 ]);
 
 table(`where is the wall on the Road? (last ${DAYS}d)`, await sql`
-    SELECT (telemetry->>'rung')::int AS rung, COUNT(*)::int AS tries,
+    SELECT rung, COUNT(*)::int AS tries,
            COUNT(*) FILTER (WHERE challenger_won)::int AS wins, ROUND(AVG(rounds)::numeric, 1) AS rds
       FROM mkt_arena_bout
-     WHERE telemetry->>'kind' = 'ladder' AND telemetry->>'rung' IS NOT NULL
+     WHERE kind = 'ladder' AND rung IS NOT NULL
        AND created_at > NOW() - (${String(DAYS)} || ' days')::interval
      GROUP BY 1 ORDER BY 1`, [
     { h: "rung", f: (r) => r.rung },

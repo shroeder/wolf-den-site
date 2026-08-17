@@ -1005,6 +1005,9 @@ function matchArenaOpponent(buyerId, myPower, board, bestTier, blocked = new Set
 // for, and the honest problem is that the baseline was set in the wrong room.
 const TOWN_EDGE = 2;
 
+// A member id, as opposed to `ladder:12` or `town:<enemy>`. Used where a value is about to meet a uuid column.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function buildBout(me, foe, foeKit, { npcTier = 0, size = 0, myPower = 0, myDamageMult = 1, extra = {} } = {}) {
     const theirPower = npcTier > 0 ? foe.gearPower : (foe.power || foeKit.gearPower || 0);
     const bout = {
@@ -2431,6 +2434,17 @@ export async function fightRound(buyerId, opts = {}) {
  * Nothing in here may throw: a telemetry bug must never cost somebody their bout payout, so every read is
  * defensive and the whole call sits inside the same catch as the insert.
  */
+// ── WHICH ROOM A FIGHT HAPPENED IN ───────────────────────────────────────────────────────────────────────────
+// One derivation, read by the telemetry blob AND by the kind/rung COLUMNS finishBout writes. It was written out
+// twice before, and the two copies are exactly how a table ends up disagreeing with itself.
+//
+// The rung falls back to `b.foe.rung` because the bout's foe object is an ALLOWLIST rebuilt field by field —
+// the payout already carries this same fallback for the same reason, and a telemetry read that lacked it would
+// file a Road fight as a member duel.
+export const boutRungOf = (b) => Number(b?.ladder?.rung) || (b?.foe?.ladder ? Number(b?.foe?.rung) || 0 : 0);
+export const boutKindOf = (b) =>
+    (b?.town ? "town" : boutRungOf(b) ? "ladder" : Number(b?.npcTier) ? "gauntlet" : "member");
+
 function boutTelemetry(b, won) {
     const log = Array.isArray(b?.log) ? b.log : [];
     const sum = (rows, f) => rows.reduce((n, l) => n + (Number(f(l)) || 0), 0);
@@ -2488,8 +2502,8 @@ function boutTelemetry(b, won) {
         won: Boolean(won),
         rounds,
         // WHICH ROOM. A five-round loss to a member and a five-round loss to a rung are different problems.
-        kind: b?.town ? "town" : b?.ladder?.rung ? "ladder" : b?.npcTier ? "gauntlet" : "member",
-        rung: b?.ladder?.rung || null,
+        kind: boutKindOf(b),
+        rung: boutRungOf(b) || null,
         npcTier: b?.npcTier || null,
         me: stat(b?.me),
         foe: stat(b?.foe),
@@ -2766,12 +2780,26 @@ async function finishBout(buyerId, row, b, won) {
     }
 
     // buyer row, so defender_id is null for a Gauntlet bout and the tier is recorded instead.
+    // ── THE ONE ROW THAT SAYS THIS FIGHT HAPPENED ────────────────────────────────────────────────────────
+    // `defender_id` is uuid REFERENCES mkt_buyer(id). This used to pass `b.foe.id` for anything that was not a
+    // Gauntlet tier — but a Long Road foe's id is `ladder:12` and a town skirmish foe's is `town:<enemy>`.
+    // Postgres raised 22P02 on the cast, and the `.catch(() => {})` below threw the whole row away. No row, no
+    // error, no sign: every Road rung and every plaza skirmish ever fought went unrecorded, which is why the
+    // balance pass that closed the Road had nothing to measure.
+    //
+    // So the id is only passed when the foe IS a member, and the shape is TESTED rather than assumed — it was
+    // an assumption that lost the data the first time.
+    const boutKind = boutKindOf(b);
+    const isMemberFoe = boutKind === "member" && UUID_RE.test(String(b.foe?.id || ""));
     await db.query(
-        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels, telemetry)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb)`,
-        [buyerId, npcTier > 0 ? null : b.foe.id, npcTier || null, won, (b.log || []).length, vp, laurels,
-            JSON.stringify(feats.map((f) => f.id)), defencePaid, JSON.stringify(boutTelemetry(b, won))]
-    ).catch(() => {});
+        `INSERT INTO mkt_arena_bout (challenger_id, defender_id, npc_tier, challenger_won, rounds, vp, laurels, feats, defender_laurels, telemetry, kind, rung)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12)`,
+        [buyerId, isMemberFoe ? b.foe.id : null, npcTier || null, won, (b.log || []).length, vp, laurels,
+            JSON.stringify(feats.map((f) => f.id)), defencePaid, JSON.stringify(boutTelemetry(b, won)),
+            boutKind, boutRungOf(b) || null]
+        // NOT swallowed. A telemetry write that fails silently is worse than no telemetry, because the empty
+        // table reads as "this never happens" instead of "this is broken".
+    ).catch((e) => console.error("arena.bout.telemetry_failed", buyerId, boutKind, e?.message || e));
 
     await trackActivity(buyerId, won ? "arena_win" : "arena_loss",
         { foe: b.foe.id, vp, laurels, npcTier: npcTier || null, feats: feats.map((f) => f.id) }).catch(() => {});
