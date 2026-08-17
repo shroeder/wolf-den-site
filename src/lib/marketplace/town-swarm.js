@@ -20,9 +20,18 @@ import { ARCHETYPES, npcPower } from "@/lib/marketplace/arena-npc.js";
 
 export const WAVES = 5;                 // then the chieftain
 export const CHIEFTAIN_WAVE = WAVES + 1;
-const BASE_FOES = 4;                    // wave 1 with a lone fighter
-const FOES_PER_FIGHTER = 2;             // each extra body on the field adds this many
-const MAX_FOES_PER_WAVE = 14;           // keep the plaza readable
+// ── ENOUGH FOES TO GO ROUND ──────────────────────────────────────────────────────────────────────────────────
+// Luke: "everyone's kind of fighting over enemies right now." The ceiling was the cause, not the per-fighter
+// rate: at 2 a head the wave hit the old cap of 14 with SIX people on the field, so the seventh through
+// twelfth fighters added nothing at all and the whole plaza queued for the same bodies.
+//
+//   6 fighters   14 foes -> 20        8 fighters   14 -> 24        12 fighters   14 -> 24
+//
+// The cap still exists because the plaza has to stay readable — it just now sits above the crowd that actually
+// turns up rather than below it.
+const BASE_FOES = 5;                    // wave 1 with a lone fighter
+const FOES_PER_FIGHTER = 3;             // each extra body on the field adds this many
+const MAX_FOES_PER_WAVE = 24;           // keep the plaza readable — but not below a real turnout
 const ABANDON_AFTER_S = 45;             // no heartbeat for this long = they've left, free their claim
 
 // Foe archetypes. They differ in what they demand of your gear and timing, so a wave has texture without

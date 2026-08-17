@@ -535,12 +535,16 @@ function spawnChanceForHour(h) {
 
 // Cron tick (every ~15 min): a WEIGHTED-RANDOM chance to spawn a random town event, biased toward the evening
 // (Central). Gated behind town_events_live (the Town is owner-only during the build). At most one event at a
-// time, and none within 3 hours of the last, so they stay special.
+// time, and none within 9 hours of the last, so they stay special.
 export async function maybeSpawnRandomEvent() {
     if (!(await townEventsLive())) return { skipped: "not_live" };
     const [active, recent] = await Promise.all([
         db.queryOne(`SELECT id FROM mkt_town_event WHERE status = 'active' LIMIT 1`).catch(() => null),
-        db.queryOne(`SELECT id FROM mkt_town_event WHERE started_at > NOW() - INTERVAL '3 hours' LIMIT 1`).catch(() => null),
+        // ── THE REAL THROTTLE ────────────────────────────────────────────────────────────────────────────
+        // Luke: "the town events are like 3x too frequent." This cooldown is what actually sets the rate, not
+        // the per-tick chance below: at a 16% roll every 15 minutes a peak-hours event fires within the first
+        // half hour the window reopens, so the gap between raids has effectively BEEN this number. Tripled.
+        db.queryOne(`SELECT id FROM mkt_town_event WHERE started_at > NOW() - INTERVAL '9 hours' LIMIT 1`).catch(() => null),
     ]);
     if (active || recent) return { skipped: "event_recent" };
     const h = Number(new Date().toLocaleString("en-US", { timeZone: "America/Chicago", hour: "2-digit", hour12: false })) % 24;
