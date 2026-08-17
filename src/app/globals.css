@@ -16025,6 +16025,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     background: rgba(10,8,14,0.5); border: 1.5px solid rgba(255,255,255,0.14); color: inherit; }
 .pens-stone.is-on { border-color: var(--stone); box-shadow: 0 0 0 1px var(--stone), 0 8px 24px -12px var(--stone); }
 .pens-stone.is-empty { opacity: 0.72; }
+/* ── THE PREVIEW, BEFORE LEVEL SIX ───────────────────────────────────────────────────────────────────────
+   Same card, but it is a div rather than a button here: it must NOT read as pressable, because there is
+   nothing to press yet. So the cursor stays default and the hover/active affordances never apply. It keeps
+   full opacity — this is the information the member came for, not a disabled control. */
+.pens-stone.is-soon { cursor: default; }
+.pens-soon .pens-kick { color: #ffd9a0; }
+.pens-soon-foot { margin: 10px 0 0; font-size: 0.74rem; text-align: center; color: rgba(255,255,255,0.55); }
 /* The form is the pitch. 96px is the smallest size at which the two are unmistakable side by side on a phone.
    THE HALO IS LOAD-BEARING, not decoration: the Darkstone form is obsidian and violet on a near-black card and
    without something behind it, the single most persuasive thing on the panel reads as a smudge. Tinted by the

@@ -55,8 +55,54 @@ export default function PetEnshrine({ pet, level, sprites, stones, enshrined, pr
         );
     }
 
-    // ── NOT THERE YET ── nothing to offer, and saying so plainly beats a greyed-out button.
-    if (level < 6) return null;
+    // ── NOT THERE YET ── but SHOW THE CHOICE ANYWAY ──────────────────────────────────────────────────────
+    // This returned null, so the whole panel — including the side-by-side effects — appeared only once the pet
+    // was already at six. That put the information after the decision it exists to inform: a stone costs 4,000
+    // doubloons or 7,500 laurels, you buy it while you are still LEVELLING, and until you arrived you had no
+    // way to know whether Light or Dark was the one worth saving for on this particular pet. soullessshiitake
+    // asked exactly this at level five, which is precisely where the question gets asked.
+    //
+    // So the effects are drawn at every level, at their real numbers, with no way to act on them yet. Nothing
+    // about the balance moves; the pet still enshrines at six and the stones still cost what they cost. The
+    // only change is that the number is now where the decision is.
+    if (level < 6) {
+        return (
+            <div className="pens pens-soon">
+                <div className="pens-head">
+                    <span className="pens-kick">Level {Math.max(0, 6 - level)} away</span>
+                    <b className="pens-h">What a stone would do to {pet.name}</b>
+                    <p className="pens-p">
+                        At level six you can spend one stone to make {pet.name}&rsquo;s ability permanent &mdash;
+                        it keeps working whether {pet.name} is equipped or not. Both stones do that much. What
+                        each does <b>on top</b> is different, and it is different on every pet. Here is what they
+                        would do to this one, so you know which is worth saving for.
+                    </p>
+                </div>
+                <div className="pens-stones pens-stones-soon">
+                    {["light", "dark"].map((id) => {
+                        const m = STONE_META[id];
+                        return (
+                            <div key={id} className="pens-stone is-soon" style={{ "--stone": m.color }}>
+                                <span className="pens-form">
+                                    <PetArt id={pet.id} url={sprites?.[id]?.url} flip={sprites?.[id]?.flip} />
+                                </span>
+                                <span className="pens-stone-kick">{m.name}</span>
+                                <b className="pens-stone-name">{m.eff?.icon} {m.eff?.name}</b>
+                                <span className="pens-stone-line">{m.eff?.desc}</span>
+                                <em className="pens-stone-best">
+                                    {m.eff?.adds ? "A second ability, on top of its own." : "Its own ability, harder."}
+                                </em>
+                                {m.eff?.note ? <span className="pens-stone-note">{m.eff.note}</span> : null}
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="pens-soon-foot">
+                    Nothing is spent and nothing is chosen yet &mdash; {pet.name} has to reach level six first.
+                </p>
+            </div>
+        );
+    }
 
     const held = { light: Number(stones?.light) || 0, dark: Number(stones?.dark) || 0 };
     const any = held.light > 0 || held.dark > 0;
