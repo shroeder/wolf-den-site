@@ -436,7 +436,7 @@ export async function rerollStat(buyerId, itemId, stat) {
     const item = itemById(itemId);
     if (!item) return { ok: false, error: "unknown_item" };
     const cur = await db.queryOne(
-        `SELECT stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]
+        `SELECT level, stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]
     ).catch(() => null);
     if (!cur) return { ok: false, error: "not_enhanced" };
 
@@ -447,12 +447,12 @@ export async function rerollStat(buyerId, itemId, stat) {
 
     // Guarded spend first — no transactions on this driver, so a swap that rolled before it charged would be
     // free every time the charge failed.
-    const cost = rerollStatCost(points);
+    const cost = rerollStatCost(item, Number(cur.level) || 0);
     const paid = await db.queryOne(
-        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]
+        `UPDATE mkt_salvage_part SET count = count - $3 WHERE buyer_id = $1 AND tier = $2 AND count >= $3 RETURNING count`,
+        [buyerId, cost.tier, cost.qty]
     ).catch(() => null);
-    if (!paid) return { ok: false, error: "not_enough_gold", cost };
-    await logCoin(buyerId, -cost, "forge_reroll_stat", { meta: { itemId, stat: key, points }, balanceAfter: paid.gold }).catch(() => {});
+    if (!paid) return { ok: false, error: "not_enough_parts", cost };
 
     // Somewhere it is not already — neither in the item's own stats nor anywhere else in the forged spread,
     // so a swap always produces a line the piece did not have.
@@ -475,14 +475,27 @@ export async function rerollStat(buyerId, itemId, stat) {
         return { ok: true, cost, from: key, fromLabel: STAT_META[key]?.label || key,
             to, toLabel: STAT_META[to]?.label || to, points: next[to] };
     }
-    // Nothing left to swap into — the piece already carries everything. Refund rather than take the gold for
-    // a swap that cannot happen.
-    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, cost]).catch(() => {});
+    // Nothing left to swap into — the piece already carries everything. Hand the parts back rather than
+    // charging for a swap that cannot happen.
+    await db.query(
+        `UPDATE mkt_salvage_part SET count = count + $3 WHERE buyer_id = $1 AND tier = $2`,
+        [buyerId, cost.tier, cost.qty]
+    ).catch(() => {});
     return { ok: false, error: "nothing_to_swap_to" };
 }
 
-// Cheaper than rerolling the whole hand, because it moves one line rather than redrawing all of them.
-export const rerollStatCost = (points = 0) => 150 + Math.max(0, Math.round(points)) * 120;
+// ── A SWAP IS PAID IN PARTS, LIKE EVERY OTHER FORGE ACTION ───────────────────────────────────────────────────
+// Luke: "swapping stats should cost fragments relative to the current upgrade level of the item." Gold was the
+// wrong currency — the Forge runs on salvaged parts and gold made a swap something you bought elsewhere and
+// spent here. Parts make it something you FORGE, and it competes with enhancing for the same pile.
+//
+// Priced off the item's own enhance level through the SAME curve that prices an enhance, at half. So a +6
+// piece costs meaningfully more to re-aim than a +1, a swap is always cheaper than the next level on that
+// piece, and the tier of part is the one that piece already eats — no second economy to learn.
+export const rerollStatCost = (item, level = 0) => {
+    const base = enhanceCost(item, Math.max(0, Number(level) || 0));
+    return { tier: base.tier, qty: Math.max(2, Math.round(base.qty / 2)) };
+};
 
 export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good", combo = 0, useScroll = false } = {}) {
     const item = itemById(itemId);
@@ -660,7 +673,7 @@ export async function getForgeState(buyerId) {
             // all-or-nothing. Each carries its own price from the same function that charges for it.
             forged: enh?.bonus
                 ? Object.entries(enh.bonus).filter(([, v]) => (Number(v) || 0) > 0)
-                    .map(([k, v]) => ({ stat: k, label: STAT_META[k]?.label || k, n: Number(v), cost: rerollStatCost(Number(v)) }))
+                    .map(([k, v]) => ({ stat: k, label: STAT_META[k]?.label || k, n: Number(v), cost: rerollStatCost(it, enh?.level || 0) }))
                 : [],
             rerollPoints: enh?.bonus ? Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0) : 0,
             util: describeUtil(enh?.util),

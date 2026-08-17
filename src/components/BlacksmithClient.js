@@ -543,10 +543,14 @@ export default function BlacksmithClient({ initial }) {
                                         const it = rerolling; setRerolling(null);
                                         const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
                                         if (d?.ok) { setSwapFx({ from: f.label, to: d.toLabel || d.to, item: it.name }); }
-                                        else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — that swap costs ${f.cost.toLocaleString()}g.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
+                                        else setToast({ kind: "err", text: d?.error === "not_enough_parts" ? `Not enough ${parts[f.cost.tier - 1]?.name || "parts"} — that swap costs ${f.cost.qty}.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
                                     }}>
                                     <span>Swap <b>+{f.n} {f.label}</b></span>
-                                    <em>{f.cost.toLocaleString()}g</em>
+                                    {/* Priced in the same parts the piece eats to enhance, so the two
+                                        actions compete for one pile rather than two economies. */}
+                                    <em className={(parts[f.cost.tier - 1]?.count ?? 0) >= f.cost.qty ? "" : "is-short"}>
+                                        {f.cost.qty} {parts[f.cost.tier - 1]?.name || `T${f.cost.tier}`}
+                                    </em>
                                 </button>
                             ))}
                         </div>
@@ -1226,6 +1230,7 @@ const FORGE_CSS = `
     padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
     color: #e6d9c2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.3); }
 .forge-swap b { color: #ffd08a; }
+.forge-swap em.is-short { color: #ff9f9f; }
 .forge-swap em { font-style: normal; font-weight: 800; color: #ffcf7a; }
 .forge-swap:hover:not(:disabled) { background: rgba(255,175,75,0.14); border-color: rgba(255,200,110,0.6); }
 .forge-swap:disabled { opacity: 0.5; cursor: default; }
