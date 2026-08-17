@@ -482,6 +482,63 @@ export async function rerollEnhance(buyerId, itemId) {
     return { ok: true, cost, points, before, after: next };
 }
 
+// ── REROLL ONE STAT, NOT THE WHOLE HAND ──────────────────────────────────────────────────────────────────────
+// Luke: "you can enhance or reroll a stat to a different one specifically." The whole-spread reroll is a
+// gamble; this is a decision. You point at the line you do not want, its points move to a different stat, and
+// everything else on the piece stays exactly where it is.
+//
+// The points are CONSERVED, same as the full reroll — a targeted swap cannot shrink the item either. What you
+// are buying is direction, so it is priced per point rather than per item.
+export async function rerollStat(buyerId, itemId, stat) {
+    const item = itemById(itemId);
+    if (!item) return { ok: false, error: "unknown_item" };
+    const cur = await db.queryOne(
+        `SELECT stat_bonus FROM mkt_item_enhance WHERE buyer_id = $1 AND item_id = $2`, [buyerId, itemId]
+    ).catch(() => null);
+    if (!cur) return { ok: false, error: "not_enhanced" };
+
+    const before = parseBonus(cur.stat_bonus);
+    const key = String(stat || "");
+    const points = Number(before[key]) || 0;
+    if (points <= 0) return { ok: false, error: "no_such_stat" };
+
+    // Guarded spend first — no transactions on this driver, so a swap that rolled before it charged would be
+    // free every time the charge failed.
+    const cost = rerollStatCost(points);
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, cost]
+    ).catch(() => null);
+    if (!paid) return { ok: false, error: "not_enough_gold", cost };
+    await logCoin(buyerId, -cost, "forge_reroll_stat", { meta: { itemId, stat: key, points }, balanceAfter: paid.gold }).catch(() => {});
+
+    // Somewhere it is not already — neither in the item's own stats nor anywhere else in the forged spread,
+    // so a swap always produces a line the piece did not have.
+    const taken = new Set([...Object.keys(item.stats || {}), ...Object.keys(before)]);
+    const options = addablePoolFor().filter((k) => !taken.has(k));
+    const next = { ...before };
+    delete next[key];
+    if (options.length) {
+        const to = options[Math.floor(Math.random() * options.length)];
+        const capOf = (k) => Math.max(3, Math.ceil((item.stats?.[k] || 0) * ENHANCE_CAP_FRAC));
+        next[to] = Math.min(capOf(to), points);
+        // Anything the cap would not take goes back to the stat it came from rather than evaporating.
+        const spare = points - next[to];
+        if (spare > 0) next[key] = spare;
+        await db.query(
+            `UPDATE mkt_item_enhance SET stat_bonus = $3::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND item_id = $2`,
+            [buyerId, itemId, JSON.stringify(next)]
+        ).catch(() => {});
+        return { ok: true, cost, from: key, to, points: next[to] };
+    }
+    // Nothing left to swap into — the piece already carries everything. Refund rather than take the gold for
+    // a swap that cannot happen.
+    await db.query(`UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1`, [buyerId, cost]).catch(() => {});
+    return { ok: false, error: "nothing_to_swap_to" };
+}
+
+// Cheaper than rerolling the whole hand, because it moves one line rather than redrawing all of them.
+export const rerollStatCost = (points = 0) => 150 + Math.max(0, Math.round(points)) * 120;
+
 // Priced off how much is actually being rerolled, so a lightly-forged item is cheap to experiment with and a
 // fully-forged one is a real decision.
 export const rerollCost = (points = 0) => 250 + Math.max(0, Math.round(points)) * 150;
@@ -658,6 +715,12 @@ export async function getForgeState(buyerId) {
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
             // What a reroll of THIS item would cost, from the same function that charges for it — a card that
             // prints one price and a server that takes another is the oldest bug in this codebase.
+            // The forged lines themselves, so the modal can offer them one at a time rather than only
+            // all-or-nothing. Each carries its own price from the same function that charges for it.
+            forged: enh?.bonus
+                ? Object.entries(enh.bonus).filter(([, v]) => (Number(v) || 0) > 0)
+                    .map(([k, v]) => ({ stat: k, label: STAT_META[k]?.label || k, n: Number(v), cost: rerollStatCost(Number(v)) }))
+                : [],
             rerollPoints: enh?.bonus ? Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0) : 0,
             rerollCost: enh?.bonus ? rerollCost(Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0)) : 0,
             util: describeUtil(enh?.util),

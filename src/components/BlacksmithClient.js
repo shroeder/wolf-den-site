@@ -523,25 +523,42 @@ export default function BlacksmithClient({ initial }) {
             {/* ── REROLL, CONFIRMED ────────────────────────────────────────────────────────────────────────
                 It says the one thing that decides whether to press it: the total never changes. A reroll
                 that looked like it might weaken the item would not get used, and it cannot. */}
+            {/* ── ONE PIECE, BOTH CHOICES ──────────────────────────────────────────────────────────────────
+                Luke: "you can enhance or reroll a stat to a different one specifically." Rerolling the whole
+                hand is a gamble; pointing at the one line you do not want is a decision. Both live here so
+                the piece is the thing you open, rather than the action being chosen before you see it. */}
             {rerolling ? (
                 <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setRerolling(null)}>
                     <div className="forge-founder-card" onClick={(e) => e.stopPropagation()}>
-                        <div className="forge-founder-kicker">Reforge the spread</div>
+                        <div className="forge-founder-kicker">Reforge</div>
                         <h3 className="forge-founder-name">{rerolling.name}</h3>
-                        <p className="forge-founder-body">
-                            Its <b>{rerolling.rerollPoints}</b> forged points are redistributed into a fresh
-                            spread from what this slot can carry. The <b>total never changes</b> — you are
-                            rerolling the shape, not the amount, so it cannot come out weaker. Its level, best
-                            grade and attunement are untouched.
+                        <p className="forge-founder-body" style={{ marginBottom: 10 }}>
+                            Its base stats never change. Only the <b>forged</b> lines below move, and the points
+                            are always conserved — nothing here can make the piece weaker.
                         </p>
+                        {/* Swap ONE line. The rest of the piece stays exactly as it is. */}
+                        <div className="forge-swaplist">
+                            {(rerolling.forged || []).map((f) => (
+                                <button key={f.stat} type="button" className="forge-swap" disabled={Boolean(busy)}
+                                    onClick={async () => {
+                                        const it = rerolling; setRerolling(null);
+                                        const d = await post({ action: "reroll_stat", itemId: it.id, stat: f.stat }, "reroll_stat");
+                                        if (d?.ok) setToast({ kind: "ok", text: `${f.label} became ${d.to} on ${it.name}.` });
+                                        else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — that swap costs ${f.cost.toLocaleString()}g.` : d?.error === "nothing_to_swap_to" ? "That piece already carries every stat it can." : "That swap didn't go through." });
+                                    }}>
+                                    <span>Swap <b>+{f.n} {f.label}</b></span>
+                                    <em>{f.cost.toLocaleString()}g</em>
+                                </button>
+                            ))}
+                        </div>
                         <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
                             onClick={async () => {
                                 const it = rerolling; setRerolling(null);
                                 const d = await post({ action: "reroll", itemId: it.id }, "reroll");
-                                if (d?.ok) { setToast({ kind: "ok", text: `${it.name} reforged — ${it.rerollPoints} points, new spread.` }); }
-                                else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — a reroll costs ${it.rerollCost.toLocaleString()}g.` : "That reroll didn't go through." });
+                                if (d?.ok) setToast({ kind: "ok", text: `${it.name} reforged — ${it.rerollPoints} points, new spread.` });
+                                else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — a full reroll costs ${it.rerollCost.toLocaleString()}g.` : "That reroll didn't go through." });
                             }}>
-                            Reroll for {rerolling.rerollCost.toLocaleString()}g
+                            Reroll everything for {rerolling.rerollCost.toLocaleString()}g
                         </button>
                         <button type="button" className="forge-daily-tag" style={{ marginTop: 8, background: "none", border: 0, cursor: "pointer" }}
                             onClick={() => setRerolling(null)}>Keep what I have</button>
@@ -1174,6 +1191,14 @@ const FORGE_CSS = `
    another is invalid. So each card got wrapped in a span — and that wrapper shipped with no styles at all.
    A bare span defaults to display:inline, so inside this grid it collapsed and took the button down with
    it: endpoint working, price on the payload, button in the DOM, nothing on the screen. */
+.forge-swaplist { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.forge-swap { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+    padding: 9px 11px; border-radius: 10px; cursor: pointer; font-size: 12px; text-align: left;
+    color: #e6d9c2; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,175,75,0.3); }
+.forge-swap b { color: #ffd08a; }
+.forge-swap em { font-style: normal; font-weight: 800; color: #ffcf7a; }
+.forge-swap:hover:not(:disabled) { background: rgba(255,175,75,0.14); border-color: rgba(255,200,110,0.6); }
+.forge-swap:disabled { opacity: 0.5; cursor: default; }
 .forge-cardwrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .forge-cardwrap > .forge-card { flex: 1 1 auto; }
 .forge-reroll { width: 100%; padding: 7px 6px; border-radius: 10px; cursor: pointer;
