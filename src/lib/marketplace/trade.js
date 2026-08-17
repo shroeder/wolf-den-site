@@ -202,6 +202,18 @@ async function moveItem(fromId, toId, itemId) {
         `INSERT INTO mkt_user_item (buyer_id, item_id, acquired_via, charges_left) VALUES ($1, $2, 'trade', $3) ON CONFLICT (buyer_id, item_id) DO NOTHING`,
         [toId, itemId, row.charges_left]
     ).catch(() => {});
+    // ── A TRADE IS AN ACQUISITION ────────────────────────────────────────────────────────────────────────
+    // The compendium says it has ONE write point, `grantItem`, "the single door every acquisition already
+    // goes through". This is the door it does not go through: a trade cannot use grantItem, because that
+    // starts an item's charges fresh and the whole job here is to carry the sender's charge state across.
+    // So it writes the bag row by hand — and the collection never heard about it. ValkyrieSylve, in global
+    // chat: "the compendium doesnt appear to be adding gear you obtain via trades that you didnt previously
+    // own." Every piece anybody has ever traded for is missing from their collection, and the milestones it
+    // pays are missing with it. The auction settles through grantItem and was never affected.
+    try {
+        const { markCollected } = await import("@/lib/marketplace/compendium.js");
+        await markCollected(toId, [itemId]);
+    } catch { /* bookkeeping: never the reason a trade fails to deliver */ }
     await transferItemEnhancement(fromId, toId, itemId); // the Forge enhancement rides with the item
     await transferItemElement(fromId, toId, itemId); // ...and any elemental reforge
     return true;
