@@ -149,10 +149,16 @@ export async function squareFetch(path, init = {}) {
                 squareCode,
             });
 
-            const error = new Error(`Square request failed for ${path} with status ${response.status}.`);
+            // Carry Square's own explanation. "status 400" alone sends you back to the API to ask what was
+            // wrong with the payload; the detail says it outright.
+            const squareDetail = payload?.errors?.[0]?.detail;
+            const error = new Error(
+                `Square request failed for ${path} with status ${response.status}.${squareDetail ? ` ${squareDetail}` : ""}`,
+            );
 
             error.squareStatus = response.status;
             error.squareCode = squareCode;
+            error.squareDetail = squareDetail;
 
             throw error;
         }
