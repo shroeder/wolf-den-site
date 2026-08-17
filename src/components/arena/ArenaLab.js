@@ -114,11 +114,29 @@ function makeServer(initial) {
             let soaked = 0;
             if (b.shield > 0) { soaked = Math.min(b.shield, through); b.shield -= soaked; through -= soaked; }
             b.hp = Math.max(0, b.hp - through);
+            // ── A COUNTER, ON DEMAND ─────────────────────────────────────────────────────────────────
+            // Retaliation fires on THEIR beat, at 5% a rank, off a node twelve points into one tree — so
+            // watching one happen in a real fight is a coin-flip inside a coin-flip inside a bout you had
+            // to win a matchmaking roll to be in. `counterEvery` makes it every beat, which is the whole
+            // reason this rig exists. It publishes exactly the fields resolveBeat publishes; nothing about
+            // the choreography is faked here, only its frequency.
+            const willCounter = b.counterEvery && through > 0;
+            let countered = 0;
+            let counterCrit = false;
+            if (willCounter) {
+                counterCrit = b.counterCrit != null ? Boolean(b.counterCrit) : Math.random() < 0.35;
+                countered = Math.max(1, Math.round(rnd(16, 26) * (counterCrit ? 2 : 1)));
+                b.foeHp = Math.max(0, b.foeHp - countered);
+            }
             b.log.push({
                 beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked,
+                countered, counterCrit, stolen: willCounter ? Math.max(1, Math.round(countered * 0.08)) : 0,
                 text: inc.isAbility
                     ? `${b.foe.name} casts ${inc.name} — you turn aside ${blocked}, ${through} lands.`
                     : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
+                // Separate, exactly as resolveBeat ships it, so the rig exercises the HOLD too — the sentence
+                // must not appear until the counter plays.
+                counterText: countered ? `${counterCrit ? "YOU STRIKE BACK — CRITICAL — for" : "YOU STRIKE BACK for"} ${countered}.` : null,
                 ability: inc.isAbility ? inc.name : null,
             });
             b.turn = "you"; b.incoming = null; b.beat += 1; cool(b, 1);

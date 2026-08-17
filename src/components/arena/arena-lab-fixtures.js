@@ -348,6 +348,18 @@ export const SCENES = {
         note: "Shown once after somebody challenged your spot overnight.",
         state: () => baseState({ away: AWAY }),
     },
+    counter: {
+        label: "Retaliation",
+        note: "Their blow lands and you answer it. `counterEvery` fires the counter on every one of their beats so the choreography can be filmed; ?counterCrit=1 forces the critical version.",
+        state: () => baseState({
+            bout: makeBout({
+                turn: "them",
+                hp: 402, maxHp: 520, foeHp: 640, foeMaxHp: 900,
+                counterEvery: true,
+                incoming: null,
+            }),
+        }),
+    },
     turn: {
         label: "Your turn",
         note: "The command deck. Attack / Skill / Guard / Item.",

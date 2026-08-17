@@ -644,6 +644,8 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
     const [pending, setPending] = useState(null); // the command you committed to, mid wind-up
     const [clash, setClash] = useState(null);
+    // The counter's sentence, held back until the counter actually plays — see the .ar-beat line.
+    const [counterHeld, setCounterHeld] = useState(false);
     const [err, setErr] = useState(null);
     const [stop, setStop] = useState(false);      // hit-stop: the whole stage freezes for a moment on contact
     const [reading, setReading] = useState(false);// their move is named on screen and you are reading it
@@ -962,6 +964,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const counterTimers = [];
         if (isNew && (mine > 0 || theirs > 0)) {
             const back = mine > 0;
+            setCounterHeld(true);
             const heavy = back ? last.counterCrit : last.theirCounterCrit;
             // Recoil first: whoever was hit takes the frame they earned before the answer lands.
             setHitSide(back ? "you" : "them");
@@ -973,6 +976,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                 Sfx.whoosh();
                 Sfx.counter(heavy ? 0.9 : 0.55, 0.07);
                 if (heavy) { Haptic.crit(); duck(0.5, 0.3); } else { Haptic.hit(0.7); duck(0.35, 0.22); }
+                setCounterHeld(false);           // and now the sentence may say what just happened
             }, COUNTER_BEAT_MS));
             counterTimers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, COUNTER_BEAT_MS + 380));
             counterTimers.push(setTimeout(() => setClash(null), COUNTER_BEAT_MS + RESULT_MS - 80));
@@ -1717,7 +1721,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         </div>
                     ) : null}
 
-                    {last && !bout.over ? <p className="ar-beat">{last.text}</p> : null}
+                    {/* ── DON'T SPOIL THE ANSWER ──────────────────────────────────────────────────────────
+                        Filmed frame by frame, the counter's whole 420ms pause was being given away here: the
+                        instant their blow landed, this line already read "…42 lands. YOU STRIKE BACK —
+                        CRITICAL — for 32", half a second before the retaliation played. The sentence is one
+                        string from the server, so the counter clause is held back and appended when the
+                        counter actually fires. */}
+                    {last && !bout.over
+                        ? <p className="ar-beat">{counterHeld && last.counterText ? last.text : `${last.text}${last.counterText ? ` ${last.counterText}` : ""}`}</p>
+                        : null}
 
                     {/* ── THE COMMAND DECK ── four commands, two of which raise the ring and two of which spend
                         the turn outright. That is the decision: swing at them, or fix yourself and let them hit
@@ -1865,9 +1877,16 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     (.ar-beat); the history is for when you want it. */}
                 {logOpen && bout.log?.length ? (
                     <div className="ar-log">
-                        {bout.log.slice(-8).map((l, i) => (
-                            <div key={i} className="ar-line"><b>{l.beat}</b> {l.text}</div>
-                        ))}
+                        {bout.log.slice(-8).map((l, i, arr) => {
+                            // Same hold as the on-field line: with the log open, the newest entry would
+                            // otherwise announce the counter before it lands.
+                            const held = counterHeld && i === arr.length - 1 && l.counterText;
+                            return (
+                                <div key={i} className="ar-line">
+                                    <b>{l.beat}</b> {held ? l.text : `${l.text}${l.counterText ? ` ${l.counterText}` : ""}`}
+                                </div>
+                            );
+                        })}
                         <div ref={logEnd} />
                     </div>
                 ) : null}

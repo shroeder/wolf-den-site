@@ -1391,6 +1391,40 @@ function openWound(b, onFoe, perks = {}) {
     return next;
 }
 
+// ── THE ATTACK ROLL, IN ONE PLACE ────────────────────────────────────────────────────────────────────────────
+// Accuracy per blow, one doublestrike roll for the whole action, a crit roll per blow, and their guard taken
+// off each one. Every term that is specific to WHAT was thrown — the timing grade, an ability's power, surge,
+// the opener, the low-health bonus, Brutality — arrives as `mult`, so this function is the roll and nothing
+// else.
+//
+// It exists because a counter has to BE an attack rather than resemble one. Luke: "I want you to fully
+// reproduce the attack roll." A second implementation would have reproduced it on the day it was written and
+// then quietly stopped: the first time doublestrike or accuracy changed, the counter would be running last
+// month's rules and nothing would say so.
+function throwBlows({ attacker, hits = 1, power = 1, acc, critChance, critMult, guard, mult = 1 }) {
+    const each = [];
+    let dmg = 0;
+    let turned = 0;
+    let crit = false;
+    let hitsLanded = 0;
+    // Rolled ONCE per action rather than per hit, or a three-hit flurry would get three chances at it and the
+    // stat would read completely differently depending on which move you threw.
+    const doubled = (attacker.doublestrike || 0) > 0 && Math.random() < attacker.doublestrike;
+    const total = hits + (doubled ? 1 : 0);
+    for (let i = 0; i < total && power > 0; i += 1) {
+        if (Math.random() >= acc) { each.push(0); continue; }
+        hitsLanded += 1;
+        const c = Math.random() < critChance;
+        if (c) crit = true;
+        const raw = attacker.damage * power * mult * (c ? critMult : 1);
+        turned += Math.round(raw * guard);
+        const landed = Math.max(1, Math.round(raw - raw * guard));
+        each.push(landed);
+        dmg += landed;
+    }
+    return { dmg, turned, crit, each, hitsLanded, doubled, hits: total };
+}
+
 // ── A COUNTER IS A SWING, NOT A SUBTRACTION ──────────────────────────────────────────────────────────────────
 // It was `Math.round(damage * 0.5)` taken straight off a health bar: it could not crit, it drank nothing, it
 // lit nothing, and the damage bonus that multiplies every other blow you throw did not touch it. A Reaver
@@ -1401,10 +1435,29 @@ function openWound(b, onFoe, perks = {}) {
 // different mechanic, and this one is already answering someone else's turn.
 function counterBlow(b, mine) {
     const attacker = mine ? b.me : b.foe;
+    const defender = mine ? b.foe : b.me;
     const perks = (mine ? b.me?.perks : b.foe?.perks) || {};
-    const crit = Math.random() < (attacker.critChance || 0);
-    let dmg = Math.max(1, Math.round(attacker.damage * COUNTER_POWER * (1 + (attacker.dmgPct || 0))));
-    if (crit) dmg = Math.max(1, Math.round(dmg * (attacker.critMult || 1.5)));
+
+    // THE SAME ROLL A PLAIN SWING MAKES, through the same function — accuracy (so it can miss), one
+    // doublestrike roll, a crit roll per blow, Brutality, and the defender's damage reduction off each one.
+    // What it does NOT carry are the terms that belong to a turn you spent: no timing grade, no ability
+    // power, no surge, no opener, no low-health bonus. A counter is a plain attack thrown on somebody
+    // else's beat.
+    const roll = throwBlows({
+        attacker,
+        hits: 1,
+        power: COUNTER_POWER,
+        acc: Math.max(ACCURACY_FLOOR, Math.min(ACCURACY_CAP, Number(attacker.accuracy) || DEFAULT_ACCURACY)),
+        critChance: attacker.critChance ?? 0.25,
+        critMult: attacker.critMult ?? 2.5,
+        guard: Math.max(0, Math.min(DR_CAP, Number(defender.dr) || 0)),
+        mult: 1 + (attacker.dmgPct || 0),
+    });
+    const dmg = roll.dmg;
+    const crit = roll.crit;
+
+    // A counter that misses is a counter: it fired, it swung, and their guard was where it needed to be.
+    if (dmg <= 0) return { dmg: 0, crit: false, drank: 0, burned: false, bled: false, doubled: roll.doubled, missed: true };
 
     if (mine) b.foeHp = Math.max(0, b.foeHp - dmg);
     else b.hp = Math.max(0, b.hp - dmg);
@@ -1428,7 +1481,7 @@ function counterBlow(b, mine) {
         bled = true;
     }
 
-    return { dmg, crit, drank, burned, bled };
+    return { dmg, crit, drank, burned, bled, doubled: roll.doubled, missed: false };
 }
 
 /**
@@ -1886,23 +1939,17 @@ export async function fightRound(buyerId, opts = {}) {
         //
         // Rolled ONCE per attack rather than per hit, or a three-hit flurry would get three chances at it and
         // the stat would read completely differently depending on which move you threw.
-        const doubled = (b.me.doublestrike || 0) > 0 && Math.random() < b.me.doublestrike;
-        if (doubled) hits += 1;
-        for (let i = 0; i < hits && power > 0; i += 1) {
-            if (Math.random() >= acc) { each.push(0); continue; }
-            hitsLanded += 1;
-            const c = Math.random() < critChance;
-            if (c) crit = true;
-            // BRUTALITY is a flat damage percentage now. Mirrored on their side of the ring.
-            const brutal = 1 + (b.me.dmgPct || 0);
-            const raw = b.me.damage * gradeAtk * power * surge * (b.underdog || 1)
-                * openMult * lowHpMult * splitMult * fever * brutal * (c ? myCritMult : 1)
-                * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1);   // Dread Howl
-            turned += Math.round(raw * guard);
-            const landed = Math.max(1, Math.round(raw - raw * guard));
-            each.push(landed);
-            dmg += landed;
-        }
+        // BRUTALITY is a flat damage percentage now. Mirrored on their side of the ring.
+        const brutal = 1 + (b.me.dmgPct || 0);
+        const roll = throwBlows({
+            attacker: b.me, hits, power, acc, critChance, critMult: myCritMult, guard,
+            mult: gradeAtk * surge * (b.underdog || 1) * openMult * lowHpMult * splitMult * fever * brutal
+                * ((b.dread || 0) > 0 ? 1 - DREAD_CUT : 1),   // Dread Howl
+        });
+        const doubled = roll.doubled;
+        dmg = roll.dmg; turned = roll.turned; crit = roll.crit; hitsLanded = roll.hitsLanded;
+        each.push(...roll.each);
+        hits = roll.hits;
         // Every blow missed. Not the same event as a blow that was fully absorbed, and it must not read as one.
         // `power > 0` for the same reason as on their side: surge throws no blows, and without this term
         // sharpening your blade announced itself as a swing and a miss.
@@ -2025,6 +2072,7 @@ export async function fightRound(buyerId, opts = {}) {
             // answer to being hit has therefore been invisible since the node shipped, on both sides.
             hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
             theirCounter, theirCounterCrit, theirHealed: theirCounterHeal,
+            counterText: theirCounter ? `${b.foe.name} strikes back${theirCounterCrit ? " — CRITICAL —" : ""} for ${theirCounter}.` : null,
             text: `${whiffed
                 ? `${ability ? ability.name : "You swing"} — ${hits > 1 ? "all " + hits + " blows miss" : "and miss"}.`
                 : dmg > 0
@@ -2034,7 +2082,7 @@ export async function fightRound(buyerId, opts = {}) {
                 + `${theirSoak ? ` Their guard bank eats ${theirSoak}.` : ""}`
                 + `${theyStood ? ` ${b.foe.name} WILL NOT FALL.` : ""}`
                 + `${theirThorns ? ` Their thorns bite for ${theirThorns}.` : ""}`
-                + `${theirCounter ? ` ${b.foe.name} strikes back${theirCounterCrit ? " — CRITICAL —" : ""} for ${theirCounter}.` : ""}`
+
                 + `${theirRiposte ? ` ${b.foe.name} answers for ${theirRiposte}.` : ""}`,
             takenBack: theirRiposte,
             ability: ability?.name || null });
@@ -2414,11 +2462,15 @@ export async function fightRound(buyerId, opts = {}) {
             // out of their health, and was published nowhere — so four ranks of it looked like four dead
             // points. Every other strike-back on this line already floats a number.
             riposted: sent, thorned, stolen, countered, counterCrit,
+            // SHIPPED SEPARATELY FROM `text`, and this is not cosmetic: the counter plays 420ms after the
+            // blow it answers, so a sentence that already names it spoils the pause the whole moment is
+            // built on. The client appends this when the retaliation actually lands.
+            counterText: countered ? `${counterCrit ? "YOU STRIKE BACK — CRITICAL — for" : "YOU STRIKE BACK for"} ${countered}.` : null,
             text: `${foeCrit ? "CRITICAL — " : ""}${foeWhiffed
                 ? `${theirAbility ? `${b.foe.name} casts ${theirAbility.name}` : `${b.foe.name} swings`} — ${foeHits > 1 ? `all ${foeHits} blows miss` : "and misses"}.`
                 : theirAbility
                 ? `${b.foe.name} casts ${theirAbility.name} — you turn aside ${blocked}, ${through} lands.`
-                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${countered ? ` ${counterCrit ? "YOU STRIKE BACK — CRITICAL — for" : "YOU STRIKE BACK for"} ${countered}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
+                : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`}${foeHealed ? ` They take ${foeHealed} back.` : ""}${rendNow && through > 0 ? ` You are burning for ${b.foeBleed.dmg}/turn.` : ""}${gashNow && through > 0 ? ` You are bleeding for ${b.foeGash.dmg}/turn.` : ""}${sunderNow ? " Your guard is stripped." : ""}${theyFroze ? " THE COLD TAKES YOU — you lose your next turn." : ""}${sent ? ` ${sent} comes straight back.` : ""}${thorned ? ` Your thorns bite for ${thorned}.` : ""}${stolen ? ` You drink ${stolen} back.` : ""}${stood ? " YOU WILL NOT FALL." : ""}${
                 extra.shattered ? ` Your brace of ${extra.shattered} is torn apart and thrown back.` : ""}${
                 extra.howl ? ` Dread settles on you — your blows land soft for ${DREAD_TURNS}.` : ""}${
                 extra.snare ? ` Chained at the ankle — your aim is off for ${SNARE_TURNS}.` : ""}${

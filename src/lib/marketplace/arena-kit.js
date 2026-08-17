@@ -198,10 +198,16 @@ export const REND_TURNS_CAP = 5;
 // REND_TICK_CAP above is what actually holds the line now, so extra stacks reach the ceiling faster instead of
 // climbing without end. Kindling raises that ceiling; it used to raise this.
 export const DRAIN_SHARE = 0.5;     // of damage dealt, returned to you as health
-// ── RETALIATION ── what a counter-swing is worth, as a share of your normal damage. Half: it is a free
-// blow off somebody else's turn, so at four ranks (20% of their swings) it must not out-earn actually
-// attacking. Read on BOTH sides in arena.js — see the counter blocks either side of the riposte.
-export const COUNTER_POWER = 0.5;
+// ── RETALIATION ── what a counter-swing is worth, as a share of your normal damage.
+//
+// It was half, on the reasoning that a free blow off somebody else's turn must not out-earn attacking. That
+// reasoning was never tested, because the counter did not reach the fighter's own lifesteal, could not crit,
+// lit nothing and — for most of its life — was not visible at all, so nobody could have judged what it was
+// worth. Luke, deciding it: "it should do damage as much as a typical attack."
+//
+// A FULL swing. What keeps it honest is the trigger, not a discount: it only fires when their blow LANDS, at
+// 5% per rank to a ceiling of 20%, off nodes twelve points into one tree. Read on BOTH sides in arena.js.
+export const COUNTER_POWER = 1;
 // ── SHATTER DOES NOT CUT GUARD ANY MORE, IT TAKES IT AWAY ────────────────────────────────────────────────────
 // The Runecaller had THREE skills that all cut guard — Channel, Shatter and Overcharge — which is one idea
 // sold three times and, between them, more guard-cutting than the game wants. Luke: "too much guard cutting
