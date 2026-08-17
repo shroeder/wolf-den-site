@@ -777,18 +777,48 @@ for (const it of ITEMS) {
 // ── WEAPONS CUT THROUGH ──────────────────────────────────────────────────────────────────────────────────────
 // Pierce goes on the hands, by rarity. Kept smaller than Tenacity on purpose: it is subtracting from the
 // defender's mitigation, which is a sharper lever than adding to your own.
+// Same principle on the weapons: BRUTE force cuts through, finesse does not. A might-heavy weapon pierces
+// hard; a crit-heavy one keeps its crit and pierces little. Two eternal weapons are now a real fork — the
+// hammer that goes through a Warden, or the blade that punishes anyone squishier.
 const PIERCE_SLOTS = new Set(["main_hand", "off_hand"]);
 const PIERCE_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
+const bruteLean = (st = {}) => {
+    const brute = Number(st.might) || 0;
+    const keen = (Number(st.crit_chance) || 0) + (Number(st.crit_power) || 0);
+    if (brute + keen <= 0) return 0.5;
+    return brute / (brute + keen);
+};
 for (const it of ITEMS) {
     if (!PIERCE_SLOTS.has(it.slot)) continue;
-    if (it.stats && it.stats.pierce == null) it.stats.pierce = PIERCE_BY_RARITY[it.rarity] || 1;
+    if (!it.stats || it.stats.pierce != null) continue;
+    const base = PIERCE_BY_RARITY[it.rarity] || 1;
+    it.stats.pierce = Math.max(1, Math.round(base * (0.4 + 1.2 * bruteLean(it.stats))));
 }
 
+// ── AND IT FOLLOWS THE PIECE'S OWN CHARACTER, NOT JUST ITS RARITY ────────────────────────────────────────────
+// The first version of this handed every helm of a rarity the SAME tenacity, which made two helms of that
+// rarity more interchangeable than they were before — the stat-stick problem, introduced by the fix meant to
+// add depth. The catalogue already has character: overlord_helm is pure crit, leather_cap is pure ferocity,
+// rangers_hood splits the difference. That authored lean is what decides the share now.
+//
+// A piece that reads defensive gets up to 1.6x the rarity value; a pure glass-cannon helm gets 0.4x and stays
+// a glass cannon. So two legendary helms are a CHOICE — the sturdy one turns more aside, the keen one keeps
+// its crit and does not.
 const TENACITY_SLOTS = new Set(["helmet", "back"]);
 const TENACITY_BY_RARITY = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
+// 0 = every point is offence, 1 = every point is staying-power. Ferocity is the sturdy stat; might and the
+// crit pair are the aggressive ones.
+const defensiveLean = (st = {}) => {
+    const def = Number(st.ferocity) || 0;
+    const off = (Number(st.might) || 0) + (Number(st.crit_chance) || 0) + (Number(st.crit_power) || 0);
+    if (def + off <= 0) return 0.5;
+    return def / (def + off);
+};
 for (const it of ITEMS) {
     if (!TENACITY_SLOTS.has(it.slot)) continue;
-    if (it.stats && it.stats.tenacity == null) it.stats.tenacity = TENACITY_BY_RARITY[it.rarity] || 1;
+    if (!it.stats || it.stats.tenacity != null) continue;
+    const base = TENACITY_BY_RARITY[it.rarity] || 1;
+    it.stats.tenacity = Math.max(1, Math.round(base * (0.4 + 1.2 * defensiveLean(it.stats))));
 }
 
 
