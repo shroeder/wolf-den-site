@@ -1254,7 +1254,11 @@ const FORGE_CSS = `
 .forge-founder-body { margin: 0 0 16px; font-size: 13px; line-height: 1.55; color: #ecd6bc; }
 .forge-founder-body b { color: #ffd08a; }
 .forge-founder-close { width: 100%; padding: 10px; border-radius: 11px; border: none; cursor: pointer; font-weight: 900; font-size: 13px; color: #2a1405; background: linear-gradient(180deg, #ffd06a, #ff9a2e); box-shadow: 0 3px 0 #b4611a; }
-.forge-founder-close:active { transform: translateY(2px); box-shadow: 0 1px 0 #b4611a; }
+.forge-founder-close:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #b4611a; }
+/* A refusal has to LOOK like one. This kept the full gold primary treatment while disabled, so "Need 56 Iron
+   Filings" read as the button you were meant to press — which is the same invitation the missing gate was
+   making, just one step later. Matches the enhance card's own locked state. */
+.forge-founder-close:disabled { cursor: default; filter: grayscale(0.7) brightness(0.66); box-shadow: none; }
 @keyframes forgeFounderFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes forgeFounderPop { from { opacity: 0; transform: scale(.9) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 /* ── Panels below the scene — the game's standard card, with a forge-warm header ── */
