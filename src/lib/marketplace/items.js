@@ -937,6 +937,13 @@ export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fo
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
 // more things at once.
 const AFFIX_COUNT = { common: 2, rare: 2, epic: 3, legendary: 3, mythic: 4, ascendant: 4, eternal: 5, celestial: 5, primordial: 6 };
+// How scarce each affix is in the draw. 1 = ordinary, higher = rarer. Lifedrink and Riposte are the two that
+// change how a fight FEELS rather than how big a number is, so they are the prizes; Pierce sits between,
+// because it is the counter to a whole archetype and should not be on every third item either.
+const AFFIX_RARITY = {
+    might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1, precision: 1,
+    tenacity: 1.5, pierce: 2.5, counter: 4, lifesteal: 6,
+};
 const AFFIX_TIER = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
 // Percent-style stats carry bigger numbers than the point-style ones.
 const BIG_STATS = new Set(["might", "crit_chance", "crit_power", "ferocity", "fortune", "vitality"]);
@@ -955,10 +962,15 @@ for (const it of ITEMS) {
     const want = AFFIX_COUNT[it.rarity] || 2;
     if (counted() >= want) continue;   // already richer than its rarity asks; leave the author's work alone
 
+    // ── SOME AFFIXES ARE RARER THAN OTHERS ───────────────────────────────────────────────────────────────
+    // Luke: "lifesteal would be a pretty rare affix." An even draw made Lifedrink as common as Might, which
+    // is the opposite of what makes an affix worth finding. WEIGHT pushes a stat down the draw order — the
+    // higher the weight the further it sinks, so it only surfaces on pieces rich enough to reach that deep.
+    // Nothing is barred from any slot; the scarce ones are simply scarce.
     const seed = affixSeed(it.id);
     const order = AFFIX_POOL
-        .map((k, i) => ({ k, w: affixSeed(`${it.id}:${k}`) ^ (seed + i) }))
-        .sort((a, b) => a.w - b.w)
+        .map((k, i) => ({ k, w: (affixSeed(`${it.id}:${k}`) ^ (seed + i)) / (AFFIX_RARITY[k] || 1) }))
+        .sort((a, b) => b.w - a.w)
         .map((x) => x.k)
         .filter((k) => !authored.includes(k));
 
@@ -969,5 +981,37 @@ for (const it of ITEMS) {
         // same amount of it.
         const jitter = (affixSeed(`${it.id}#${k}`) % 3) - 1;
         it.stats[k] = BIG_STATS.has(k) ? Math.max(2, tier * 2 + jitter * 2) : Math.max(1, Math.round(tier * 0.8) + jitter);
+    }
+}
+
+// ── AND NO TWO PIECES END UP IDENTICAL ───────────────────────────────────────────────────────────────────────
+// The affix rule above took same-slot, same-rarity duplicates from 303 items to 36 — but it SKIPS anything
+// already at its affix count, and a rare piece gets two affixes and was usually authored with exactly two. So
+// four rare main-hands still read {might 11, crit_chance 5} to the letter.
+//
+// This nudges the VALUES on the duplicates rather than adding or swapping stats: the author said this sword is
+// a might-and-crit sword and it stays one, it just is not the same might-and-crit sword as the three beside
+// it. Deterministic off the id like everything else, so a piece never changes on you.
+//
+// Only the second and later members of a duplicate group move. The first keeps the authored numbers exactly,
+// so the "canonical" version of a stat block is still the one that was written by hand.
+{
+    const seen = new Map();
+    for (const it of ITEMS) {
+        if (!it.stats) continue;
+        const keys = Object.keys(it.stats).filter((k) => k !== "extra_strike").sort();
+        if (!keys.length) continue;
+        const sig = `${it.slot}/${it.rarity}|${keys.map((k) => `${k}:${it.stats[k]}`).join(",")}`;
+        const n = seen.get(sig) || 0;
+        seen.set(sig, n + 1);
+        if (n === 0) continue;                       // first of its kind keeps the authored numbers
+        for (const k of keys) {
+            // +/-1 or 2, never below 1, and never more than ~20% off what was authored.
+            const step = ((affixSeed(`${it.id}~${k}`) % 5) - 2);
+            if (!step) continue;
+            const base = Number(it.stats[k]) || 0;
+            const bound = Math.max(1, Math.round(base * 0.2));
+            it.stats[k] = Math.max(1, base + Math.max(-bound, Math.min(bound, step)));
+        }
     }
 }
