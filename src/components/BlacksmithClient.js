@@ -566,12 +566,35 @@ export default function BlacksmithClient({ initial }) {
                         {/* THE primary action. Enhancing is what people open a piece to do; swapping a line is
                             the considered thing you do occasionally, so it sits above as a list rather than
                             competing with this. */}
-                        {!rerolling.maxed ? (
-                            <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
-                                onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: !it.affordable && powerScrolls > 0 }); }}>
-                                Enhance
-                            </button>
-                        ) : null}
+                        {!rerolling.maxed ? (() => {
+                            // ── THE SAME GATE THE CARD APPLIES ───────────────────────────────────────────
+                            // This button opened the hammer unconditionally, so a piece you could not afford
+                            // let you play all five strikes and THEN answered "not enough parts" — the cost
+                            // was never checked until the server saw it. The card two screens up has always
+                            // checked; this one skipped it, which is why the failure only ever showed up
+                            // through the modal. Same rule, same words, and the count is on the button so
+                            // "can I afford this" is answered before the anvil, not after.
+                            const part = parts[(rerolling.cost?.tier || 1) - 1];
+                            const need = rerolling.cost?.qty || 0;
+                            const have = Number(rerolling.have) || 0;
+                            const scroll = !rerolling.affordable && powerScrolls > 0;
+                            const ok = Boolean(rerolling.affordable) || scroll;
+                            return (
+                                <>
+                                    <button type="button" className="forge-founder-close" disabled={!ok || Boolean(busy)}
+                                        onClick={() => { const it = rerolling; setRerolling(null); ac(); setEnhancing({ ...it, useScroll: scroll }); }}>
+                                        {rerolling.affordable ? "Enhance" : scroll ? <>Enhance &mdash; spend a 📜 Power Scroll</> : <>Need {need} {part?.name || "parts"}</>}
+                                    </button>
+                                    <span className={`forge-card-cost forge-enhance-cost${ok ? "" : " is-short"}`}>
+                                        {part?.sprite
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            ? <img className="forge-cost-ico" src={part.sprite} alt="" /> : null}
+                                        {have}/{need} {part?.name || `T${rerolling.cost?.tier || 1}`}
+                                        {rerolling.affordable ? null : scroll ? <> &middot; 📜 {powerScrolls} in reserve</> : <> &middot; salvage or combine for more</>}
+                                    </span>
+                                </>
+                            );
+                        })() : null}
                         <button type="button" className="forge-daily-tag" style={{ marginTop: 8, background: "none", border: 0, cursor: "pointer" }}
                             onClick={() => setRerolling(null)}>Keep what I have</button>
                     </div>
@@ -1057,6 +1080,8 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
     const finished = useRef(false);
     const hitsRef = useRef({ pixel: 0, perfect: 0, great: 0, good: 0, miss: 0 }); // per-tier strike counts for the tally
     const cost = item.cost;
+    const have = Number(item.have) || 0;
+    const short = !item.useScroll && have < (cost?.qty || 0);
 
     // Marker oscillation (triangle wave) — speeds up each strike for rising tension.
     useEffect(() => {
@@ -1154,7 +1179,14 @@ function EnhanceMinigame({ item, parts, steadyHandChance = 0, onCancel, onDone, 
 
                 {!done ? (
                     <>
-                        <div className="forge-mg-cost">Cost: 🔩 {cost.qty} × {parts[cost.tier - 1]?.name || `T${cost.tier}`} · strike <b>{strikeNo + 1}</b>/{STRIKES}</div>
+                        {/* have/need, not just the price — this is the screen you are looking at while you
+                            spend the parts, and it used to name a cost without ever saying whether you had it. */}
+                        <div className={`forge-mg-cost${short ? " is-short" : ""}`}>
+                            {item.useScroll
+                                ? <>Paying with a 📜 <b>Power Scroll</b></>
+                                : <>Cost: 🔩 <b>{have}</b>/{cost.qty} {parts[cost.tier - 1]?.name || `T${cost.tier}`}</>}
+                            {" · "}strike <b>{strikeNo + 1}</b>/{STRIKES}
+                        </div>
                         {/* the anvil heat bar */}
                         <div className="forge-anvil" onPointerDown={(e) => { e.preventDefault(); strike(); }}>
                             <div className="forge-bar">
@@ -1384,6 +1416,9 @@ const FORGE_CSS = `
 .forge-mg-sub { font-size: 11px; color: #c8b79f; }
 .forge-mg-x { margin-left: auto; background: none; border: none; color: #e8d6c0; font-size: 22px; cursor: pointer; opacity: 0.7; }
 .forge-mg-cost { font-size: 11.5px; color: #cdb89f; margin: 8px 0 4px; }
+.forge-mg-cost.is-short { color: #ff8f9a; font-weight: 800; }
+/* The enhance cost sits under its button, centred, rather than inline like the card's. */
+.forge-enhance-cost { display: flex; justify-content: center; margin-top: 6px; font-size: 11px; }
 .forge-anvil { position: relative; padding: 26px 0 10px; cursor: pointer; user-select: none; touch-action: manipulation; }
 .forge-bar { position: relative; height: 26px; border-radius: 999px; overflow: visible; background: #0c0704; border: 1px solid rgba(255,150,60,0.4); box-shadow: inset 0 2px 8px rgba(0,0,0,0.7); }
 .forge-band { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: 999px; }
