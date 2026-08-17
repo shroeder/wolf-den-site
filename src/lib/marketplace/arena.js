@@ -31,6 +31,12 @@ import {
     pointsSpent, treeAbilities, treeEffects, treeState, classPassives } from "@/lib/marketplace/arena-classes.js";
 import { upgradeEffects, upgradeView } from "@/lib/marketplace/arena-upgrades.js";
 
+// ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
+// One switch, read by the challenge path AND published in the arena state so the screen can say so rather
+// than letting somebody tap a rung and get an error. Closed 2026-08-17 while the gear stats land — see the
+// note at the refusal for why a cleared rung cannot be walked back.
+const ROAD_OPEN = false;
+
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
 // one rung. Your opponents are real members with their real level, real gear and real hero — but nobody has to
@@ -648,6 +654,10 @@ export async function getArenaState(buyerId, pre = {}) {
                 size: LADDER_SIZE,
                 beaten: beaten.size,
                 next,
+                // Published off the SAME flag the challenge path refuses by, so the screen and the server can
+                // never disagree about whether the Road is walkable.
+                closed: !ROAD_OPEN,
+                closedNote: "The Road is closed while the gear rebalance lands. Your rungs are safe — nothing you have beaten is going anywhere.",
                 houses: LADDER_HOUSES,
                 foes: LADDER.map((f) => ({
                     rung: f.rung, id: f.id, name: f.name, house: f.house, champion: f.champion,
@@ -1198,6 +1208,18 @@ export async function startBout(buyerId, targetId = null) {
     let foe = null;
     let foeKit = null;
     if (rung > 0) {
+        // ── THE ROAD IS CLOSED WHILE THE GEAR REBALANCE LANDS ────────────────────────────────────────────
+        // Vitality, Tenacity, Precision and Pierce all shipped inside a day, and they are a straight buff to
+        // every geared fighter — people started clearing rungs they could not touch last week. Rungs are
+        // PERMANENT (ladder_beaten is a set you never fall out of), so a ladder cleared during a half-finished
+        // balance pass cannot be un-cleared without taking progress off people, which is the one thing we do
+        // not do. Closing the door is reversible; letting the Road be finished is not.
+        //
+        // Refused on the SERVER, not hidden on the screen — the target is a string in a POST body.
+        // FLIP THIS BACK when the stat work settles and the telemetry has a clean read.
+        if (!ROAD_OPEN) {
+            return { ok: false, error: "road_closed", ...(await getArenaState(buyerId, { board, kit: me })) };
+        }
         if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
         const beaten = new Set(row?.ladder_beaten || []);
         if (beaten.has(rung)) return { ok: false, error: "already_beaten", ...(await getArenaState(buyerId, { board, kit: me })) };

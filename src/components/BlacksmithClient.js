@@ -81,6 +81,7 @@ export default function BlacksmithClient({ initial }) {
         return ["enhance", "salvage", "attune", "upgrades"].includes(want) ? want : "enhance";
     });
     const [enhancing, setEnhancing] = useState(null); // the equipped item being enhanced (opens the mini-game)
+    const [rerolling, setRerolling] = useState(null);  // the item whose forged spread is being redistributed
     const [enhanceResult, setEnhanceResult] = useState(null); // the juiced post-enhance reveal
     const [salvaging, setSalvaging] = useState(null); // the item in the salvage preview/confirm/reveal modal
     const [bulk, setBulk] = useState(null);           // the rarity awaiting a "melt them all" confirm
@@ -387,7 +388,8 @@ export default function BlacksmithClient({ initial }) {
                 {tab === "enhance" ? (
                     <div className="forge-grid">
                         {enhance.length ? enhance.map((it) => (
-                            <button key={it.id} type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : (it.affordable || powerScrolls > 0) ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
+                            <span key={it.id} className="forge-cardwrap">
+                            <button type="button" className={`forge-card is-enhance${it.maxed ? " is-maxed" : (it.affordable || powerScrolls > 0) ? "" : " is-locked"}`} style={{ "--rc": rc(it.rarity) }} disabled={Boolean(busy)}
                                 onClick={() => {
                                     if (it.maxed) { setToast({ kind: "err", text: `${it.name} is at PEAK enchantment — it can't be forged any higher.` }); return; }
                                     const scroll = !it.affordable && powerScrolls > 0; // pay with a Power Scroll if you're short on parts
@@ -411,6 +413,18 @@ export default function BlacksmithClient({ initial }) {
                                     </span>
                                 )}
                             </button>
+                            {/* ── REROLL, AS ITS OWN CONTROL ───────────────────────────────────────────────
+                                A sibling of the card, not a child: the card IS a button and nesting one
+                                inside another is invalid and unclickable half the time. Only offered on gear
+                                that actually HAS a forged spread — there is nothing to reroll otherwise. */}
+                            {it.rerollPoints > 0 ? (
+                                <button type="button" className="forge-reroll" disabled={Boolean(busy)}
+                                    title={`Redistribute all ${it.rerollPoints} forged points into a fresh spread. The total never changes.`}
+                                    onClick={() => { ac(); setRerolling(it); }}>
+                                    Reroll spread · {it.rerollCost.toLocaleString()}g
+                                </button>
+                            ) : null}
+                            </span>
                         )) : <div className="forge-empty">Equip some gear first — enhancement works on what you&apos;re wearing.</div>}
                     </div>
                 ) : tab === "salvage" ? (
@@ -506,6 +520,34 @@ export default function BlacksmithClient({ initial }) {
 
             {enhancing ? <EnhanceMinigame item={enhancing} parts={parts} steadyHandChance={forge.steadyHandChance || 0} onCancel={() => setEnhancing(null)} onDone={(res) => applyEnhance(enhancing, res)} busy={busy} /> : null}
 
+            {/* ── REROLL, CONFIRMED ────────────────────────────────────────────────────────────────────────
+                It says the one thing that decides whether to press it: the total never changes. A reroll
+                that looked like it might weaken the item would not get used, and it cannot. */}
+            {rerolling ? (
+                <div className="forge-founder-scrim" role="dialog" aria-modal="true" onClick={() => setRerolling(null)}>
+                    <div className="forge-founder-card" onClick={(e) => e.stopPropagation()}>
+                        <div className="forge-founder-kicker">Reforge the spread</div>
+                        <h3 className="forge-founder-name">{rerolling.name}</h3>
+                        <p className="forge-founder-body">
+                            Its <b>{rerolling.rerollPoints}</b> forged points are redistributed into a fresh
+                            spread from what this slot can carry. The <b>total never changes</b> — you are
+                            rerolling the shape, not the amount, so it cannot come out weaker. Its level, best
+                            grade and attunement are untouched.
+                        </p>
+                        <button type="button" className="forge-founder-close" disabled={Boolean(busy)}
+                            onClick={async () => {
+                                const it = rerolling; setRerolling(null);
+                                const d = await post({ action: "reroll", itemId: it.id }, "reroll");
+                                if (d?.ok) { setToast({ kind: "ok", text: `${it.name} reforged — ${it.rerollPoints} points, new spread.` }); }
+                                else setToast({ kind: "err", text: d?.error === "not_enough_gold" ? `Not enough gold — a reroll costs ${it.rerollCost.toLocaleString()}g.` : "That reroll didn't go through." });
+                            }}>
+                            Reroll for {rerolling.rerollCost.toLocaleString()}g
+                        </button>
+                        <button type="button" className="forge-daily-tag" style={{ marginTop: 8, background: "none", border: 0, cursor: "pointer" }}
+                            onClick={() => setRerolling(null)}>Keep what I have</button>
+                    </div>
+                </div>
+            ) : null}
             {salvaging ? <SalvageModal item={salvaging} parts={parts} odds={forge.salvageOdds || {}} equipped={(forge.enhance || []).find((e) => e.slot === salvaging.slot) || null} onConfirm={() => doSalvage(salvaging)} onClose={() => setSalvaging(null)} /> : null}
             {/* Melting a whole rarity is irreversible and can be dozens of items, so it names the number and
                 says out loud what it is protecting before it runs. */}

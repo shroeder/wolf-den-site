@@ -2027,6 +2027,17 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const openKey = openHouse ?? next?.house ?? houses[0]?.key;
             return (
             <section className="card ar-road">
+                {/* ── CLOSED, AND SAID OUT LOUD ────────────────────────────────────────────────────────────
+                    Read off the server's own flag, so this notice and the refusal can never disagree. Said
+                    HERE, at the top of the Road, because the alternative is somebody tapping a rung and
+                    getting an error — which reads as broken rather than deliberate. It leads with the thing
+                    people will actually worry about: their rungs are safe. */}
+                {st.ladder?.closed ? (
+                    <div className="ar-road-closed" role="status">
+                        <b>The Road is closed for now</b>
+                        <em>{st.ladder.closedNote}</em>
+                    </div>
+                ) : null}
                 {/* ── THE BANNER ── one number, the ten houses as pips, and the thing you are climbing for. */}
                 <div className="ar-road-hero">
                     <div className="ar-road-hero-top">

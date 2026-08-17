@@ -653,6 +653,10 @@ export async function getForgeState(buyerId) {
             // subtracted from anything — deciding whether to melt a piece down means seeing the actual delta.
             statMap: mergeStats(it.stats || {}, enh?.bonus || {}),
             level: enh?.level || 0, bonus: enh?.bonus ? describeStats(enh.bonus) : null, bestGrade: enh?.bestGrade || null,
+            // What a reroll of THIS item would cost, from the same function that charges for it — a card that
+            // prints one price and a server that takes another is the oldest bug in this codebase.
+            rerollPoints: enh?.bonus ? Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0) : 0,
+            rerollCost: enh?.bonus ? rerollCost(Object.values(enh.bonus).reduce((n, v) => n + (Number(v) || 0), 0)) : 0,
             util: describeUtil(enh?.util),
             // ── IS THIS PART OF A SET? ────────────────────────────────────────────────────────────────────
             // The Forge is the one screen in the game where being wrong is irreversible, and it was the one

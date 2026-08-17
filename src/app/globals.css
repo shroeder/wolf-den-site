@@ -16543,6 +16543,12 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .ar-road { display: grid; gap: 12px; }
 
 /* ── THE BANNER ── one number, the ten houses as pips, and what you are climbing toward. */
+/* The Road, closed. Warm rather than red: this is a door held shut on purpose, not a fault. */
+.ar-road-closed { margin: 0 0 12px; padding: 11px 13px; border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255,180,80,0.14), rgba(255,140,40,0.05));
+    border: 1px solid rgba(255,175,75,0.42); }
+.ar-road-closed b { display: block; font-size: 13px; font-weight: 900; color: #ffd08a; }
+.ar-road-closed em { display: block; margin-top: 3px; font-style: normal; font-size: 11.5px; line-height: 1.45; color: #e2cdb0; }
 .ar-road-hero { position: relative; overflow: hidden; padding: 13px 14px 12px; border-radius: 14px;
     border: 1px solid rgba(255,215,94,0.28);
     background:
