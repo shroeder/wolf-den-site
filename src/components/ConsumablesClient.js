@@ -8,7 +8,7 @@ import ConsumableArt from "@/components/ConsumableArt";
 import ItemArt from "@/components/ItemArt";
 import useScrollLock from "@/lib/useScrollLock";
 
-const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic", farm: "Farm Supply", sail: "Voyage Gear" };
+const KIND_LABEL = { potion: "Potion", scroll: "Scroll", stone: "Magic Stone", relic: "Relic", farm: "Farm Supply", sail: "Voyage Gear", treat: "Pet Treat", dish: "Dish" };
 
 // Consumables: buy one-shot boosts with gold and use them yourself (no admin needed). Potions/stones buff
 // the boss fight, scrolls give XP, and two ultra-rare relics recharge / reset the cooldown on charged gear.

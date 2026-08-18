@@ -11,6 +11,7 @@ import { trackActivity } from "@/lib/marketplace/activity.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { applyGrowthTonic, grantSeedBundle, grantFarmFertilizer, grantHarvestLuckCharges, grantExtraPettings, grantExtraRatings } from "@/lib/marketplace/farm-consumables.js";
 import { SEED_PACKS } from "@/lib/marketplace/seed-packs.js";
+import { RECIPES } from "@/lib/marketplace/cooking-recipes.js";
 
 // CONSUMABLES — one-shot, SELF-USE boosts (the player uses them from their stash; no admin involvement).
 // Three buyable flavors (potions/scrolls/stones) plus two ultra-rare "relics" that only drop from the top
@@ -95,6 +96,59 @@ export const CONSUMABLES = {
 // Inject the tiered seed packs from the shared catalog (single source of truth for tiers/weights/prices).
 for (const p of SEED_PACKS) {
     CONSUMABLES[p.id] = { name: p.name, emoji: p.emoji, kind: "farm", desc: p.desc, price: p.price, effect: { type: "farm_seed", count: p.count, weights: p.weights } };
+}
+
+// -- DISHES YOU CAN ACTUALLY FEED SOMETHING ------------------------------------------------------------------
+// Every dish in the book is now a thing you OWN and can give to your pet. Until this, cooking a dish paid a rung
+// off its tier's reward ladder and the dish itself evaporated: sixty-four named plates with their own art, and
+// none of them existed once the animation stopped. GrayKitsune asked for something to do with output that
+// otherwise just piles up; the answer is to make the food food.
+//
+// The ladder reward is UNTOUCHED. A cook pays exactly what it always paid, and now also hands you the plate.
+//
+// -- THE NUMBERS, AND WHY THESE ONES -------------------------------------------------------------------------
+// The brief was "not crazy exp", so these are anchored to two things that already exist rather than to feel:
+//
+//   1. The TREAT LADDER above (25 / 75 / 150 / 300 / 600 / 1,200 pet XP, bought with gold). A dish arrives free
+//      alongside a reward you were already getting, so each tier sits at or below the treat you could have
+//      bought instead. Tier 5 is 350 - over a Pet Feast, well under a Golden Bone.
+//   2. What the Den actually cooks. Measured over the seven days to 18 Aug: 352 tier-1 cooks, 259 tier-2, 86
+//      tier-3, 15 tier-4 and 2 tier-5, with the heaviest cook in the game peaking at 37 dishes in a day. There
+//      is no daily cap on cooking - only ingredients - so the ceiling had to be checked against real volume,
+//      not against a limit that does not exist.
+//
+// Against those measured days: GrayKitsune's 30-dish peak pays 495 pet XP, the busiest day anyone had (37
+// dishes, into tier 4) pays 1,260. A dedicated player already earns about 710 pet XP a day from the equipped
+// share and the trickle, and a common pet needs 30,000 to reach six. So a big day at the stove is a real second
+// source and never the main one, which is the whole intent of "not crazy".
+//
+// ONE PLATE PER COOK, never multiplied by `portions`. Portions is the Seasoning track's second helping of the
+// LADDER reward; letting it double the pet XP as well would put a maxed track quietly in charge of this number.
+// The enshrinement stone on the tier-5 ladder is excluded from portions for the same reason.
+//
+// BAIT IS NOT FEEDABLE, and neither are preps. Both already have an `out` that lands in the pantry: bait is
+// spent on a cast, a prep is spent on the next recipe. Only `kind: "dish"` becomes food.
+export const DISH_PET_XP = { 1: 10, 2: 25, 3: 60, 4: 150, 5: 350 };
+export const DISH_TIER_NAME = { 1: "Simple", 2: "Hearty", 3: "Fine", 4: "Exquisite", 5: "Legendary" };
+
+// The dish's consumable id IS its recipe id - one name for one thing, so the sprite already sitting in
+// mkt_cooking_sprite under that key is the sprite the stash draws (see consumable-sprites.js). Guarded, because
+// a recipe id that collided with a real consumable would silently overwrite it.
+export const DISH_IDS = [];
+for (const r of RECIPES) {
+    if (r.kind !== "dish") continue;
+    if (CONSUMABLES[r.id]) throw new Error(`cooking recipe "${r.id}" collides with an existing consumable id`);
+    const amount = DISH_PET_XP[r.tier] || DISH_PET_XP[1];
+    CONSUMABLES[r.id] = {
+        name: r.name,
+        emoji: "🍽️",
+        kind: "dish",
+        price: null, // cooked, never bought - the Kitchen is the only source
+        tier: r.tier,
+        desc: `${DISH_TIER_NAME[r.tier]} dish. Feed your equipped pet +${amount.toLocaleString()} pet XP.`,
+        effect: { type: "pet_xp", amount },
+    };
+    DISH_IDS.push(r.id);
 }
 
 // Buyable order (shop). Relics + drop-only treats are intentionally excluded — they're chest/boss-only.

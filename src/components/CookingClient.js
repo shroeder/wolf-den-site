@@ -551,6 +551,15 @@ export default function CookingClient({ initial }) {
                                 </div>
                             </div>
                         ) : <p className="ck-reveal-desc">{result.made.desc}</p>}
+                        {/* The plate itself, which you now keep. The ladder rung above is what the cook PAID;
+                            this is the dish, and the only thing it is for is feeding your pet. Worth its own
+                            line rather than a tag — it is a second reward, not a modifier on the first. */}
+                        {result.made.petXp ? (
+                            <div className="ck-reveal-dish">
+                                <b>{result.made.name}</b> goes in your stash — feed it to your equipped pet for
+                                <b> +{result.made.petXp.toLocaleString()} pet XP</b>.
+                            </div>
+                        ) : null}
                         <div className="ck-reveal-tags">
                             {result.bumped ? <span className="ck-tag heat">The heat caught it — a tier better</span> : null}
                             {result.portions > 1 ? <span className="ck-tag season">Second helping — ×{result.portions}</span> : null}
@@ -572,6 +581,11 @@ export default function CookingClient({ initial }) {
 
 const CK_CSS = `
 .ck { --ck-line: rgba(255,255,255,0.09); }
+/* The plate you keep, called out under the ladder prize on the reveal. */
+.ck-reveal-dish { margin: 8px 0 2px; font-size: 0.82rem; line-height: 1.45; text-align: center;
+    color: rgba(255,255,255,0.82); background: rgba(126,200,255,0.10);
+    border: 1px solid rgba(126,200,255,0.28); border-radius: 10px; padding: 7px 10px; }
+.ck-reveal-dish b { color: #cfe6ff; }
 /* HERO — the building art sits behind the title, faded and pushed right, so the header has an identity
    without costing legibility. */
 .ck-hero { position: relative; overflow: hidden; }
