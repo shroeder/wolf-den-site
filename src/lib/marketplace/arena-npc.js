@@ -137,6 +137,22 @@ export function npcFor(tier) {
         archetypeName: arch.name,
         tell: arch.tell,
         // ── THE STAT LINE ── the same four a player wears, so ringStats() needs no idea which it is holding.
+        // ── VITALITY IS WHAT BUYS HEALTH NOW, AND NOTHING WAS BUYING IT ──────────────────────────────────
+        // These weights spend the LARGEST share of the budget on `ferocity` (0.22 to 0.60) because that is
+        // what health was made of when they were written — arena-kit still records the old formula, "health
+        // = HEALTH_BASE + Ferocity x 2.5". The gear rework made VITALITY the health stat and ringStats reads
+        // `vitality`; neither of the two places that build an NPC stat line ever started producing any.
+        //
+        // So every Gauntlet tier and every Road fighter in the game has been standing on the flat 200 base
+        // with its whole health budget going nowhere: 212hp at rung 5 and 212hp at rung 45, while the same
+        // budget pushed rung 45's damage to 1,324 and its crit multiplier to x62. Luke, the hour the Road
+        // reopened: "the enemies at rung 30 are like super weak now, they went from 5k hp to 300 and die
+        // including 1 shot."
+        //
+        // The ferocity weight IS the health weight — it was authored as one, and the archetype note above
+        // depends on it ("an eight-to-one health gap, so a Berserker died in two rounds and a Wall took
+        // twenty"). So it buys Vitality. `ferocity` stays for anything else that reads it.
+        vitality: Math.round(budget * arch.w.ferocity),
         might: Math.round(budget * arch.w.might),
         crit_chance: Math.round(budget * arch.w.crit_chance),
         crit_power: Math.round(budget * arch.w.crit_power),
@@ -172,6 +188,9 @@ export function statsForPower(power, archKey, element = null, seed = 0) {
     const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
     const budget = Math.max(1, Math.round(power));
     return {
+        // Vitality, for the same reason as npcFor above — this is the Road's builder, and it was missing it
+        // too, which is why a rung had the same 212 health as the tutorial.
+        vitality: Math.round(budget * arch.w.ferocity),
         might: Math.round(budget * arch.w.might),
         crit_chance: Math.round(budget * arch.w.crit_chance),
         crit_power: Math.round(budget * arch.w.crit_power),
