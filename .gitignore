@@ -16,3 +16,7 @@ road-sheet.png
 foe-sheet.png
 foe-sheet-ingame.png
 road-sheet-ingame.png
+
+# Scratch scripts from a debugging session — never part of the build.
+scripts/tmp-*.mjs
+scripts/_tmp-*.mjs
