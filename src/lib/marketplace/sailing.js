@@ -2692,6 +2692,24 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
         [buyerId, RIVAL_COOLDOWN]
     ).catch(() => []);
     const skip = recent.map((r) => r.id).filter(Boolean);
+
+    // ── AND THE FLEET, WHICH THIS RULE NEVER COVERED ─────────────────────────────────────────────────────
+    // The exclusion above reads mkt_raid_defense.defender_id, and a designed ship has no buyer row — so the
+    // fifteen fleet captains were never in it. A third of sorties are fleet (FLEET_SHARE), drawn from the
+    // THREE closest with the nearest weighted hardest, so the same captain came back roughly every third
+    // fight. Luke: "I got the same encounter like once in three fights, and I thought I told you I don't
+    // want the same encounter for at least seven fights."
+    //
+    // Every battle already records the foe by NAME in its activity row, so the same seven-sortie window works
+    // for both kinds without a schema change — and it counts SORTIES, not member-sorties, which is what the
+    // rule always meant: seven fights, whoever they were against.
+    const lastFought = await db.query(
+        `SELECT meta->>'foe' AS foe FROM mkt_activity_event
+          WHERE buyer_id = $1 AND event = 'sail_raid' AND meta->>'foe' IS NOT NULL
+          ORDER BY created_at DESC LIMIT $2`,
+        [buyerId, RIVAL_COOLDOWN]
+    ).catch(() => []);
+    const skipNames = new Set(lastFought.map((r) => r.foe).filter(Boolean));
     const draw = async (excluding) => db.query(
         `SELECT ${RAID_TARGET_COLS}
            FROM mkt_buyer b LEFT JOIN mkt_sailing s ON s.buyer_id = b.id
@@ -2710,8 +2728,10 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
     // fair wherever you stand, because it asks who is nearest rather than who is close.
     const dist = (o) => Math.abs(o - TARGET_ODDS);
     const mine = { myGuns, myHull, myAcc: myAccuracy };
-    const all = FLEET.map((f) => ({
-        kind: "fleet", rank: f.rank, boost: 1,
+    // A captain fought inside the window is dropped from the pool outright, the same filter the rivals get.
+    const fleetPool = FLEET.filter((f) => !skipNames.has(f.name));
+    const all = (fleetPool.length ? fleetPool : FLEET).map((f) => ({
+        kind: "fleet", rank: f.rank, boost: 1, name: f.name,
         // +0.1 on their accuracy, the same lift foeProfile gives a designed ship when it actually fights.
         d: dist(matchupOdds({ ...mine, guns: f.guns, hull: f.hp, acc: Math.min(0.96, f.accuracy + 0.1) })),
     }));
@@ -2737,7 +2757,10 @@ async function matchOpponent(buyerId, myGuns, myHull, myAccuracy) {
         let roll = Math.random() * weighted.reduce((sum, c) => sum + c.w, 0);
         return weighted.find((c) => (roll -= c.w) <= 0) || weighted[0] || null;
     };
-    const fleet = closest("fleet", 3);
+    // FIVE, not three. The cooldown removes whoever you just fought, but a shortlist of three weighted
+    // boost/(1+i) still puts most of the remaining weight on one ship — the two halves of "the same encounter
+    // again" are the missing filter AND the narrow pool.
+    const fleet = closest("fleet", 5);
     const rival = closest("rival", SHORTLIST);
     if (!rival) return fleet;
     if (!fleet) return rival;
