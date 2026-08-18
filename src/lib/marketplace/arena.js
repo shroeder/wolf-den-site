@@ -257,7 +257,10 @@ export async function arenaPower(buyerId) {
 // EXPORTED so a balance script can ask "how far does THIS member get" without rebuilding a fighter. The four
 // stat sources this merges (gear, tree, badges, pets) are the reason a hand-built one lies — see the note
 // above, where two of the four were missing and the Arena looked like it had broken damage.
-export async function kitFor(buyerId) {
+// `opts.skillTree` swaps in a different allocation WITHOUT writing one — for asking "how far would this person
+// get with the tree finished" without touching their account or hand-rebuilding derived numbers somewhere else
+// (which drops the upgrade perks that share the same bag, and quietly reports LOWER health than they have).
+export async function kitFor(buyerId, opts = {}) {
     const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
         import("@/lib/marketplace/inventory.js"),
         import("@/lib/marketplace/signatures.js"),
@@ -296,7 +299,7 @@ export async function kitFor(buyerId) {
         `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
     ).catch(() => null);
     const classId = prog?.arena_class || null;
-    const taken = prog?.skill_tree || {};
+    const taken = opts.skillTree || prog?.skill_tree || {};
     const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
     // A member with no class yet still has to fight, so this falls back to the neutral defaults.
     const base = classBase(classId);
