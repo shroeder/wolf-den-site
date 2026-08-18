@@ -123,6 +123,61 @@ console.table(RARITIES.map((r) => ({
     "per member/wk": +(wk(total[r]) / Math.max(1, members)).toFixed(2),
     share: `${((total[r] / Math.max(0.001, all)) * 100).toFixed(1)}%`,
 })));
+// ── WHAT A MEMBER SHOULD EXPECT IN A DAY ─────────────────────────────────────────────────────────────────────
+// The weekly figure is the fleet average and it hides the shape: most of the supply comes from the loop you
+// choose to run. So this reports per DAY, three ways — the average member, the median one, and a heavy one —
+// by taking each person's own activity counts rather than dividing one total by a headcount.
+const perMemberDaily = await sql`
+    WITH ev AS (
+        SELECT buyer_id, event, COUNT(*)::numeric AS n
+          FROM mkt_activity_event
+         WHERE created_at > NOW() - (INTERVAL '1 day' * ${DAYS})
+         GROUP BY 1, 2
+    )
+    SELECT buyer_id, event, n FROM ev`;
+const byMember = new Map();
+for (const r of perMemberDaily) {
+    if (!byMember.has(r.buyer_id)) byMember.set(r.buyer_id, {});
+    byMember.get(r.buyer_id)[r.event] = Number(r.n);
+}
+const seedsFor = (counts) => {
+    const out = { common: 0, rare: 0, epic: 0, legendary: 0, mythic: 0 };
+    for (const src of SOURCES) {
+        const by = split(src.band, (counts[src.event] || 0) * src.per);
+        for (const r of RARITIES) out[r] += by[r];
+    }
+    for (const [key, cfg] of Object.entries(TRICKLE)) {
+        if (UNMODELLED.includes(key)) continue;
+        const n = (counts[TRICKLE_EVENT[key]] || 0) * cfg.chance;
+        const sum = Object.values(cfg.band).reduce((a, b) => a + b, 0) || 1;
+        for (const r of RARITIES) out[r] += ((cfg.band[r] || 0) / sum) * n;
+    }
+    return out;
+};
+const perDay = [...byMember.values()].map((c) => {
+    const s2 = seedsFor(c);
+    const day = (n) => n / DAYS;
+    return {
+        low: day(s2.common),
+        mid: day(s2.rare + s2.epic),
+        high: day(s2.legendary + s2.mythic),
+        all: day(RARITIES.reduce((a, r) => a + s2[r], 0)),
+    };
+}).sort((a, b) => a.all - b.all);
+const at = (p) => perDay[Math.min(perDay.length - 1, Math.max(0, Math.floor(perDay.length * p)))] || { low: 0, mid: 0, high: 0, all: 0 };
+const avg = (k) => perDay.reduce((a, x) => a + x[k], 0) / Math.max(1, perDay.length);
+console.log(`
+── SEEDS PER MEMBER PER DAY ──────────────────────────────────────────────`);
+console.table([
+    { who: "quiet (25th pct)", low: +at(0.25).low.toFixed(2), mid: +at(0.25).mid.toFixed(2), high: +at(0.25).high.toFixed(3), total: +at(0.25).all.toFixed(2) },
+    { who: "typical (median)", low: +at(0.5).low.toFixed(2), mid: +at(0.5).mid.toFixed(2), high: +at(0.5).high.toFixed(3), total: +at(0.5).all.toFixed(2) },
+    { who: "average", low: +avg("low").toFixed(2), mid: +avg("mid").toFixed(2), high: +avg("high").toFixed(3), total: +avg("all").toFixed(2) },
+    { who: "keen (90th pct)", low: +at(0.9).low.toFixed(2), mid: +at(0.9).mid.toFixed(2), high: +at(0.9).high.toFixed(3), total: +at(0.9).all.toFixed(2) },
+    { who: "heaviest", low: +at(0.999).low.toFixed(2), mid: +at(0.999).mid.toFixed(2), high: +at(0.999).high.toFixed(3), total: +at(0.999).all.toFixed(2) },
+]);
+const days = (n) => (n > 0 ? `one every ${(1 / n).toFixed(1)} days` : "never");
+console.log(`A typical member: ${days(at(0.5).high)} at legendary-or-better. A keen one: ${days(at(0.9).high)}.`);
+
 const mid = wk(total.rare + total.epic) / Math.max(1, members);
 const high = wk(total.legendary + total.mythic) / Math.max(1, members);
 console.log(`\nA member averages ${(wk(all) / Math.max(1, members)).toFixed(1)} seeds a week: ${mid.toFixed(1)} mid tier (rare+epic), ${high.toFixed(2)} high (legendary+mythic).`);
