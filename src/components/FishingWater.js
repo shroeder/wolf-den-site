@@ -58,12 +58,6 @@ export default function FishingWater({
             {/* SKY — the same scrolling seascapes the voyage uses, so the rail and the crossing are the same sea. */}
             {sky ? <div className="fw-sky" style={{ backgroundImage: `url(${sky})` }} aria-hidden="true" /> : <div className="fw-sky is-plain" aria-hidden="true" />}
 
-            {/* THE WATER. Two bands moving at different speeds is the cheapest honest parallax there is. */}
-            <div className="fw-sea" aria-hidden="true">
-                <span className="fw-swell fw-swell-a" />
-                <span className="fw-swell fw-swell-b" />
-            </div>
-
             {/* WHAT IS COMING UP — behind the boat, rising through the waterline. Rendered before the hull so
                 the hull always occludes it, which is what sells the "out of the water" part. */}
             {/* ── SCALE ────────────────────────────────────────────────────────────────────────────────

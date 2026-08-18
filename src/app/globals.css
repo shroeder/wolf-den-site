@@ -16842,16 +16842,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-sky.is-plain { background: linear-gradient(180deg, #16324a, #0e2233); }
 @keyframes fwDrift { from { background-position-x: 0%; } to { background-position-x: 100%; } }
 
-/* The sea. Two bands at different speeds — the cheapest honest parallax there is. */
-/* Depth, not a sea. Transparent at the horizon so the painted waves show through, deepening toward the
-   bottom of the frame so something surfacing has water to come out of. */
-.fw-sea { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; overflow: hidden; pointer-events: none;
-    background: linear-gradient(180deg, rgba(7,28,44,0) 0%, rgba(7,28,44,0.45) 45%, rgba(4,18,30,0.82) 100%); }
-.fw-swell { position: absolute; left: -50%; width: 200%; height: 26px; border-radius: 50%;
-    background: rgba(255,255,255,0.035); }
-.fw-swell-a { top: -8px; animation: fwSwell 7s ease-in-out infinite; }
-.fw-swell-b { top: 16px; opacity: .6; animation: fwSwell 11s ease-in-out infinite reverse; }
-@keyframes fwSwell { 0%, 100% { transform: translateX(-3%); } 50% { transform: translateX(3%); } }
+/* ── NOTHING IS DRAWN OVER THE WATER ──────────────────────────────────────────────────────────────────
+   There was a depth gradient here and two pale swell bands on top of it. Both were left over from when the
+   sea was CSS; once the painted seascape filled the frame they stopped adding anything and started taking
+   something away. The gradient was dark navy at 82% over the bottom of the picture, which hid on a sunset sky
+   and turned a bright daytime one into a grey film across the water — reported, correctly, as a white
+   overlay. The swells were white ellipses laid over waves that are already painted.
+   The sprite is the sea. Nothing goes on top of it. */
 
 /* The boat rides the swell. Everything attached to it (hero, rod) rides with it because they are children. */
 .fw-boat { position: absolute; transform-origin: 50% 90%; animation: fwRide 4.6s ease-in-out infinite; }
