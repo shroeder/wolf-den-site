@@ -7,6 +7,7 @@ import { getPetSpriteData, getPetSpriteLevelData, pickPetSpriteForLevel, getPetL
 import { levelForXp } from "@/lib/marketplace/xp.js";
 import { avatarImageUrl } from "@/lib/marketplace/avatar-cosmetics.js";
 import { petLevelInfo, petMaxXp, addPetXp, levelUpPet } from "@/lib/marketplace/pet-level.js";
+import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { CONSUMABLES, listConsumables, useConsumable as applyConsumable, buyConsumable } from "@/lib/marketplace/consumables.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -498,6 +499,101 @@ export async function getFarm(ownerId, viewerId) {
         loveBoard, // own farm only: { top, mine } — the most-loved farms, for the Standing tab
         ...extras,
         ...ratingBits,
+    };
+}
+
+/**
+ * FEED THE WHOLE BAG — one tap instead of forty.
+ *
+ * Luke: "maybe a feed all, and feed all pet consumables entirely, otherwise this is going to annoy people."
+ * He is right, and dishes are what made it urgent: a cook can hold dozens of plates worth ten XP each, and
+ * the only way to spend them was one button per plate.
+ *
+ * Two shapes, one function. `consumableId` set = every copy of THAT item. `consumableId` null = every pet food
+ * in the bag.
+ *
+ * ── IT STOPS AT FULL, AND IT SPENDS THE CHEAP STUFF FIRST ────────────────────────────────────────────────
+ * The single-feed path already refuses to feed a maxed pet rather than destroying the treat for nothing. Bulk
+ * has to honour that for every item it touches, or "feed everything" becomes the fastest way to burn a Golden
+ * Bone on a pet that could not use it. So the ceiling is computed ONCE, items are walked cheapest-first, and
+ * the walk stops the moment the pet is full — leaving the good treats in the bag, which is also what anybody
+ * pressing this button actually wants.
+ *
+ * ── OWN PETS ONLY ────────────────────────────────────────────────────────────────────────────────────────
+ * Feeding a friend's pet stays one at a time. That path pays the FEEDER xp and gold per feed and shares the
+ * treat's XP to every earning pet the owner has; bulking it would multiply both, and a button that pays you
+ * per item is a button somebody empties their bag into a stranger for. The annoyance being fixed is your own
+ * forty plates.
+ *
+ * ── AMBROSIA IS NEVER SWEPT UP ───────────────────────────────────────────────────────────────────────────
+ * `pet_level` grants a whole level outright. Nobody pressing "feed everything" means "and my one instant
+ * level, too". Bulk moves pet_xp only; Ambrosia keeps its own deliberate tap.
+ */
+export async function feedPetBulk(feederId, petId, consumableId = null) {
+    if (!feederId || !petId) return { ok: false, error: "bad_request" };
+    const state = await petsState(feederId).catch(() => null);
+    if (!state || !(state.ownedIds || []).includes(petId)) return { ok: false, error: "not_owned" };
+    const def = collectibleById(petId);
+    const rarity = def?.rarity || "common";
+    const maxXp = petMaxXp(rarity);
+
+    const row = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [feederId, petId]).catch(() => null);
+    let xp = Number(row?.xp) || 0;
+    if (xp >= maxXp) return { ok: false, error: "pet_maxed", message: `${def?.name || "That pet"} is already at max level.` };
+
+    const owned = await db.query(
+        `SELECT consumable_id, count FROM mkt_user_consumable WHERE buyer_id = $1 AND count > 0`, [feederId]
+    ).catch(() => []);
+    const pool = owned
+        .filter((r) => (consumableId ? r.consumable_id === consumableId : true))
+        .map((r) => ({ id: r.consumable_id, count: Number(r.count) || 0, amount: CONSUMABLES[r.consumable_id]?.effect?.type === "pet_xp" ? Number(CONSUMABLES[r.consumable_id].effect.amount) || 0 : 0 }))
+        .filter((r) => r.amount > 0 && r.count > 0)
+        .sort((a, b) => a.amount - b.amount); // cheapest first — keep the good ones for a pet that needs them
+    if (!pool.length) return { ok: false, error: "nothing_to_feed" };
+
+    // Work out what to spend BEFORE spending any of it, so the write loop cannot half-finish into a full pet.
+    //
+    // The Pet Bond attunement on equipped gear multiplies every pet-XP grant (addPetXp applies it), so the
+    // shortfall in ITEMS is smaller than the shortfall in XP. Planning without it would feed a few more plates
+    // than the pet could use — a small waste, but this button's whole promise is that it does not waste, and a
+    // promise the code only mostly keeps is the kind that gets reported as a bug.
+    const petBond = (await getEquippedUtilTotals(feederId).catch(() => ({ petXp: 0 })))?.petXp || 0;
+    const plan = [];
+    let need = Math.ceil((maxXp - xp) / (1 + petBond / 100));
+    for (const item of pool) {
+        if (need <= 0) break;
+        const want = Math.min(item.count, Math.ceil(need / item.amount));
+        if (want <= 0) continue;
+        plan.push({ id: item.id, n: want, amount: item.amount });
+        need -= want * item.amount;
+    }
+    if (!plan.length) return { ok: false, error: "nothing_to_feed" };
+
+    let fed = 0, gained = 0;
+    for (const step of plan) {
+        // Conditional decrement: another tab feeding the same stack cannot take the count negative.
+        const dec = await db.queryOne(
+            `UPDATE mkt_user_consumable SET count = count - $3 WHERE buyer_id = $1 AND consumable_id = $2 AND count >= $3 RETURNING count`,
+            [feederId, step.id, step.n]
+        ).catch(() => null);
+        if (!dec) continue;
+        const res = await addPetXp(feederId, petId, step.amount * step.n).catch(() => null);
+        if (!res?.ok) continue;
+        fed += step.n;
+        gained += step.amount * step.n;
+    }
+    if (!fed) return { ok: false, error: "nothing_to_feed" };
+
+    await trackActivity(feederId, "feed_pet_bulk", { petId, items: fed, xp: gained }).catch(() => {});
+    await bumpQuestProgress(feederId, "feed_pet", fed).catch(() => {});
+    const after = await db.queryOne(`SELECT xp FROM mkt_pet_level WHERE buyer_id = $1::text AND pet_id = $2`, [feederId, petId]).catch(() => null);
+    xp = Number(after?.xp) || xp + gained;
+    const info = petLevelInfo(xp, rarity);
+    return {
+        ok: true, petId, fed, gained, level: info.level, xp,
+        into: info.into, span: info.span, maxed: info.maxed,
+        // What is still in the bag, so the panel can redraw without a full farm reload.
+        ...(await farmMineBits(feederId, true).catch(() => ({}))), // refreshed treats + wallet for the panel
     };
 }
 

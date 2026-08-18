@@ -213,7 +213,10 @@ export async function listConsumables(buyerId) {
     const stash = ownRows.map((r) => {
         const c = CONSUMABLES[r.consumable_id];
         if (!c) return null;
-        return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, count: r.count, target: c.target || null };
+        // `feedable` drives the stash's "Use all" — read off the EFFECT, the same question feedPetBulk asks,
+        // so a food added later is offered here without anyone remembering to update a list of kinds.
+        return { id: r.consumable_id, name: c.name, emoji: c.emoji, kind: c.kind, desc: c.desc, count: r.count,
+            target: c.target || null, feedable: c.effect?.type === "pet_xp" };
     }).filter(Boolean);
     // The member's charged gear, for the recharge / cooldown-reset target pickers.
     const now = Date.now();

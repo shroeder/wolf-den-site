@@ -527,6 +527,35 @@ export default function FarmClient({ initial, viewingAlias }) {
         if (r.petLevelUp) dispatchPetLevelUp(r.petLevelUp); // handed to the ONE global celebration modal
     }, [farm.canPet, farm.mine, farm.owner, busy, addFloater, pets]);
 
+    // ── FEED THE WHOLE STACK, OR THE WHOLE BAG ───────────────────────────────────────────────────────────
+    // `consumableId` null means every pet food you hold. The server sizes the spend so it stops the moment the
+    // pet is full and walks the cheapest food first, so this cannot dump a Golden Bone into a pet that only
+    // needed a porridge. Own farm only — see feedPetBulk on why feeding a friend stays one tap at a time.
+    const feedBulk = useCallback(async (pet, consumableId = null) => {
+        if (!farm.canPet || !farm.mine || busy) return;
+        const i = pets.findIndex((p) => p.id === pet.id);
+        setBusy(consumableId || "__all");
+        const r = await fetch("/api/marketplace/farm", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "feed_bulk", petId: pet.id, consumableId }),
+        }).then((res) => (res.ok ? res.json() : null)).catch(() => null);
+        setBusy(null);
+        if (!r?.ok) return;
+        const patch = { level: r.level, xp: r.xp, into: r.into, span: r.span, maxed: r.maxed };
+        setFarm((f) => ({
+            ...f,
+            pets: f.pets.map((p) => (p.id === pet.id ? { ...p, ...patch } : p)),
+            // The server hands back the rebuilt treats + wallet, so what is left in the bag is authoritative
+            // rather than being decremented by guesswork on the client.
+            treats: r.treats || f.treats,
+            treatShop: r.treatShop || f.treatShop,
+            wallet: r.wallet || f.wallet,
+        }));
+        setInspect((cur) => (cur && cur.id === pet.id ? { ...cur, ...patch } : cur));
+        if (i >= 0) addFloater(i, `+${(r.gained || 0).toLocaleString()} XP · ${r.fed} fed`, "#ffe27a");
+        if (r.petLevelUp) dispatchPetLevelUp(r.petLevelUp);
+    }, [farm.canPet, farm.mine, busy, addFloater, pets]);
+
     // ── Garden actions ── every response returns the fresh garden so the in-scene plots + the controls panel
     // stay in lockstep. Only wired on your own farm.
     // ── THE WALLET FOLLOWS THE SPEND ─────────────────────────────────────────────────────────────────────
@@ -1603,6 +1632,7 @@ export default function FarmClient({ initial, viewingAlias }) {
                     onPet={() => petIt(inspect)}
                     onRecharge={rechargeBudget}
                     onUseTreat={(cid) => feedTreat(inspect, cid)}
+                    onFeedBulk={(cid) => feedBulk(inspect, cid)}
                     onBuyTreat={buyTreatItem}
                     onClose={() => setInspect(null)}
                 />
@@ -2827,7 +2857,7 @@ function HarvestToast({ toast, onClose }) {
 
 // Detail card for a single pet: big sprite, rarity/level, XP progress, what it does, and — on your own farm —
 // the once-a-day "pet for XP" action.
-function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petting, wallet, treats = [], treatShop = [], busyKey, onPet, onRecharge, onUseTreat, onBuyTreat, onClose }) {
+function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petting, wallet, treats = [], treatShop = [], busyKey, onPet, onRecharge, onUseTreat, onFeedBulk, onBuyTreat, onClose }) {
     const busy = Boolean(busyKey);
     const def = collectibleById(pet.id);
     const perk = def ? petPerk(def) : null; // active (equipped) signature
@@ -2933,7 +2963,8 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                     {treats.map((t) => (
-                                        <button key={t.id} type="button" onClick={() => onUseTreat(t.id)} disabled={busy} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer", opacity: busy && busyKey !== t.id ? 0.5 : 1 }}>
+                                        <div key={t.id} className="farm-feed-row" style={{ opacity: busy && busyKey !== t.id ? 0.5 : 1 }}>
+                                        <button type="button" onClick={() => onUseTreat(t.id)} disabled={busy} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flex: "1 1 auto", minWidth: 0, padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer" }}>
                                             {/* A cooked plate says so — otherwise "Morning Porridge" sits in a
                                                 treat list with no clue where it came from or why it is there. */}
                                             {/* The SPRITE, not the glyph. Every dish has its own art and the
@@ -2945,9 +2976,27 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                                             </span>
                                             <span className="muted" style={{ fontSize: 12 }}>{busyKey === t.id ? "feeding…" : `×${t.count}`}</span>
                                         </button>
+                                        {/* ONE TAP FOR THE WHOLE STACK. Six porridges is six taps otherwise, and
+                                            a cook holds a lot more than six. Own farm only — feeding a friend's
+                                            pet pays the feeder per feed, so it stays deliberate. */}
+                                        {mine && t.count > 1 && t.xp !== "level" ? (
+                                            <button type="button" className="farm-feed-all" onClick={() => onFeedBulk?.(t.id)} disabled={busy}
+                                                title={`Feed all ${t.count} — stops when ${pet.name} is full`}>all</button>
+                                        ) : null}
+                                        </div>
                                     ))}
                                 </div>
                             )}
+                            {/* EVERYTHING, in one press. The server walks the cheapest food first and stops the
+                                moment the pet is full, so this never burns a good treat on a pet that did not
+                                need it — which is the only reason a button like this is safe to offer. */}
+                            {mine && !pet.maxed && treats.some((t) => t.xp !== "level") ? (
+                                <button type="button" className="farm-feed-everything" onClick={() => onFeedBulk?.(null)} disabled={busy}>
+                                    {busyKey === "__all" ? "Feeding…" : (
+                                        <>Feed everything<span>{treats.filter((t) => t.xp !== "level").reduce((n, t) => n + t.count, 0)} items · stops when full</span></>
+                                    )}
+                                </button>
+                            ) : null}
                         </div>
                     ) : null}
 

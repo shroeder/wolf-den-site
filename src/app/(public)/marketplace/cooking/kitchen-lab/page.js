@@ -74,7 +74,7 @@ export default async function KitchenLabPage() {
 
     const stash = held.map(({ id, count }) => ({
         id, name: CONSUMABLES[id].name, emoji: CONSUMABLES[id].emoji, kind: CONSUMABLES[id].kind,
-        desc: CONSUMABLES[id].desc, count, target: null,
+        desc: CONSUMABLES[id].desc, count, target: null, feedable: CONSUMABLES[id].effect?.type === "pet_xp",
     }));
 
     return <KitchenLab kitchen={kitchen} baits={baits} sprites={sprites} farm={farmFixture} stash={stash} />;

@@ -16793,3 +16793,31 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The feed list's item art — a dish sprite where there is one, its glyph where there is not. */
 .farm-feed-art { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; }
 .farm-feed-art .con-art-img, .farm-feed-art img { width: 24px; height: 24px; object-fit: contain; }
+
+/* ── FEEDING IN BULK ──────────────────────────────────────────────────────────────────────────────────────
+   A row is a stack now: tap the row to feed one, tap "all" to feed the stack. The small button is deliberately
+   quiet — the common action is still "feed one", and a loud second button on every row would fight it. */
+.farm-feed-row { display: flex; align-items: center; gap: 6px; }
+/* One line per row. The "all" button narrows the row, and without this the name wraps and every stack becomes
+   a different height — a list that looks ragged for no reason the reader can see. */
+.farm-feed-row > button:first-child > span { white-space: nowrap; }
+.farm-feed-all { flex: none; padding: 8px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;
+    letter-spacing: .04em; text-transform: uppercase; color: #cfe6ff; cursor: pointer;
+    background: rgba(126,200,255,0.12); border: 1px solid rgba(126,200,255,0.34); }
+.farm-feed-all:hover:not(:disabled) { background: rgba(126,200,255,0.22); border-color: rgba(126,200,255,0.6); }
+.farm-feed-all:disabled { opacity: .5; cursor: default; }
+/* The whole bag. Full width under the list, with the count on its own line so the button says what it is
+   about to spend before it spends it. */
+.farm-feed-everything { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%;
+    margin-top: 8px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 800;
+    color: #14202c; background: linear-gradient(180deg, #ffe9a6, #ffd75e); border: 1px solid rgba(255,215,94,0.7); }
+.farm-feed-everything span { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; color: rgba(20,32,44,0.72); }
+.farm-feed-everything:disabled { opacity: .6; cursor: default; }
+
+/* The stash's secondary "Use all". NOT .btn-ghost: that rule carries color:#ffd75e !important on its BASE
+   selector, so a ghost button cannot be toned down anywhere on the site — the two buttons came out the same
+   gold and read as equal choices when one is plainly the bigger commitment. Its own class, quiet on purpose. */
+.con-use-all { padding: 5px 11px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer;
+    color: #cfe6ff; background: rgba(126,200,255,0.10); border: 1px solid rgba(126,200,255,0.36); }
+.con-use-all:hover:not(:disabled) { background: rgba(126,200,255,0.2); border-color: rgba(126,200,255,0.62); }
+.con-use-all:disabled { opacity: .55; cursor: default; }

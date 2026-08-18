@@ -135,9 +135,23 @@ export default function ConsumablesClient() {
                                 <ConsumableArt id={i.id} emoji={i.emoji} className="badge-tile-icon" />
                                 <span className="badge-tile-label">{i.name} ×{i.count}</span>
                                 <span className="badge-tile-desc muted">{i.desc}</span>
-                                <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => consumeItem(i)} style={{ marginTop: 6 }}>
-                                    {busy === `use:${i.id}` ? "Using…" : "Use"}
-                                </button>
+                                <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                                    <button type="button" className="btn btn-small" disabled={busy === `use:${i.id}`} onClick={() => consumeItem(i)}>
+                                        {busy === `use:${i.id}` ? "Using…" : "Use"}
+                                    </button>
+                                    {/* PET FOOD IN A STACK GETS ONE TAP FOR THE LOT. A cook can hold dozens of
+                                        plates worth ten XP each, and feeding them one button-press at a time is
+                                        the thing that would put people off cooking. Goes to the equipped pet
+                                        (the stash has no pet picker), stops the moment it is full, and spends
+                                        the cheapest food first — the good treats stay in the bag. */}
+                                    {i.count > 1 && i.feedable ? (
+                                        <button type="button" className="con-use-all" disabled={busy === `all:${i.id}`}
+                                            title={`Feed all ${i.count} to your equipped pet — stops when it is full`}
+                                            onClick={() => post({ id: i.id, action: "use_all" }, `all:${i.id}`)}>
+                                            {busy === `all:${i.id}` ? "Feeding…" : `Use all ${i.count}`}
+                                        </button>
+                                    ) : null}
+                                </div>
                             </div>
                         ))}
                     </div>

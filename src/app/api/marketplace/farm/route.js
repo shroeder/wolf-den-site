@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getFarm, petPet, feedPetItem, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory, farmVisitors } from "@/lib/marketplace/farm.js";
+import { getFarm, petPet, feedPetItem, feedPetBulk, buyTreat, rechargePetting, claimPig, resolveFarmOwner, farmDirectory, farmVisitors } from "@/lib/marketplace/farm.js";
 import { rateFarm } from "@/lib/marketplace/farm-rating.js";
 import { buyDecoration, placeDecoration, moveDecoration, transformDecoration, removeDecoration, decoState, setSpriteBrightness } from "@/lib/marketplace/farm-decorations.js";
 import { startCustomDeco, refineCustomDeco, finalizeCustomDeco, getCustomState, saveDraftNote, suggestDecoDescription } from "@/lib/marketplace/custom-deco.js";
@@ -66,6 +66,9 @@ export async function POST(request) {
             else if (b?.action === "pet") res = await petPet(buyer.id, String(b?.petId || ""), ownerId);
             else if (b?.action === "rate") res = ownerId ? await rateFarm(buyer.id, ownerId, Number(b?.tier)) : { ok: false, error: "cant_rate_own" };
             else if (b?.action === "use_item") res = await feedPetItem(buyer.id, String(b?.petId || ""), String(b?.consumableId || ""), ownerId);
+            // Bulk feed — one item's whole stack, or every pet food in the bag. Own pets only, which is why it
+            // does not take `ownerId`: feeding a friend pays the feeder per feed and must stay one at a time.
+            else if (b?.action === "feed_bulk") res = await feedPetBulk(buyer.id, String(b?.petId || ""), b?.consumableId ? String(b.consumableId) : null);
             else if (b?.action === "buy_treat") res = await buyTreat(buyer.id, String(b?.consumableId || ""));
             else if (b?.action === "recharge") res = await rechargePetting(buyer.id);
             else if (b?.action === "pig_claim") res = await claimPig(buyer.id);
