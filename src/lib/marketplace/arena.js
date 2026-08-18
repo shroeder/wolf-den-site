@@ -1423,6 +1423,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.foeGash.turns -= 1;
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "bleed",
+                    events: [{ kind: "bleed", side: "you", n: tick }],
                     text: `Your wound opens again — ${tick}.`, ability: null });
             }
             if (b.foeGash.turns <= 0) b.foeGash = null;
@@ -1433,6 +1434,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.foeBleed.turns -= 1;
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend",
+                    events: [{ kind: "burn", side: "you", n: tick }],
                     text: `You are frozen, and still burning — another ${tick}.`, ability: null });
             }
             if (b.foeBleed.turns <= 0) b.foeBleed = null;
@@ -1966,6 +1968,7 @@ export async function fightRound(buyerId, opts = {}) {
             }
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "them", grade: "burn", damage: tick, kind: "rend", healed: theyDrank,
+                    events: [{ kind: "burn", side: "you", n: tick }, ...(theyDrank > 0 ? [{ kind: "drink", side: "them", n: theyDrank }] : [])],
                     text: `You are still burning — another ${tick}.${theyDrank ? ` They drink ${theyDrank} of it back.` : ""}`,
                     ability: null });
             }
@@ -2376,6 +2379,7 @@ export async function fightRound(buyerId, opts = {}) {
             b.gash.turns -= 1;
             if (tick > 0) {
                 b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "bleed",
+                    events: [{ kind: "bleed", side: "them", n: tick }],
                     text: `The wound opens again — ${tick}.`, ability: null });
             }
             if (b.gash.turns <= 0) b.gash = null;
@@ -2397,6 +2401,7 @@ export async function fightRound(buyerId, opts = {}) {
                 // `healed` is what the SCREEN needs: the drink was in the sentence and nowhere else, so the
                 // only sign of it was the health bar moving. Naming it here is what floats the green number.
                 b.log.push({ beat: b.beat, who: "you", grade: "burn", damage: tick, kind: "rend", healed: drank,
+                    events: [{ kind: "burn", side: "them", n: tick }, ...(drank > 0 ? [{ kind: "drink", side: "you", n: drank }] : [])],
                     text: `The burn takes another ${tick}.${drank ? ` You drink ${drank} of it back.` : ""}`,
                     ability: null });
             }
