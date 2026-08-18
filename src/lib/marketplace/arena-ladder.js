@@ -97,18 +97,43 @@ const HOUSES = [
 // FLOOR 140 -> 25. Rung 1 was pitched at roughly Gauntlet tier 12: measured against a member with starter
 // gear it was not an opening fight, it was a wall with a "1" on it. It is an opening fight now.
 //
-// GROWTH 5.4% -> 15% a rung. This is the number that decides how far apart two members end up, and it was set
-// so shallow that the gap between the newest fighter and the best-geared one spanned twenty-five rungs — one
-// stalled at 3 while the other was still winning at 28. At 15% the whole Den lands in the second stretch:
+// GROWTH 16.5% -> 3.3% a rung. THIS IS THE ONE THAT WAS BROKEN, and it was broken in a way arithmetic hides:
+// an exponential does not look wrong at the rung you are testing, it looks wrong ninety rungs later.
 //
-//     newest member  ~13     mid-tier  ~18     best-geared today  ~23
+// At 16.5% the ladder outran the game. A member's gear budget stops at 644 — that is best-in-slot, everything
+// equipped, nothing left to buy — and the curve passed it at rung 21 and kept going. Rung 100's fighter had a
+// power budget of TWO HUNDRED AND SIXTEEN MILLION. Simulated against a real best-in-slot fighter through the
+// real engine (scripts/sim-road.mjs, 250 bouts a cell):
 //
-// WHAT THIS COSTS, stated plainly because it is a real trade. A steep curve compresses everyone together and
-// makes the rest of the ladder distant: tripling your power now buys about eight rungs, where at 5.4% it
-// bought twenty-one. Rungs 30+ are future content rather than this season's content. That is the deliberate
-// choice — the alternative is the spread, where a new member is walled at rung 3 and nobody meets anybody.
+//     rung 25  won 64%        rung 30  won  5%        rung 40  won 1%        rung 50+  won 0%
+//
+// So seventy-five of the hundred rungs were not "future content", which is what the note here used to call
+// them. There is no future gear past 644. They were decoration on a wall nobody could ever climb, and the
+// member walking into rung 30 was one-shot by a fighter with nine times his health and eight times his crit
+// multiplier. Luke, finding it from the inside: "the road is really messed up and everything's overtuned right
+// now, I'm getting one shot instantly on rung 30."
+//
+// 3.3% is the rate that makes the whole ladder reachable, chosen by simulating the alternatives rather than by
+// picking a number that felt calmer — 3.0% left the summit free (best-in-slot won 57% at rung 100) and 4.2%
+// put it back out of reach (2%). At 3.3%, measured the same way:
+//
+//     rung 50   fresh 99%   mid 100%   best-in-slot 100%
+//     rung 75   fresh 55%   mid  96%   best-in-slot 100%
+//     rung 100  fresh  2%   mid   4%   best-in-slot  32%
+//
+// Which is the shape a hundred-rung ladder is supposed to have: a fresh fighter's journey ends around the
+// seventies, the summit is a real wall, and a maxed fighter beats it about a third of the time — with a good
+// element matchup, the right consumables and a clean run turning that into a win rather than a coin toss.
+//
+// WHAT THIS COSTS, stated plainly because it is a real trade. A geared member now clears the low rungs quickly
+// instead of stalling at 20. That is the correct direction for a ladder you climb from the bottom — the early
+// rungs are a warm-up you walk through once — but it does mean the middle of the Road is not where the fight
+// is. The fight is rungs 80-100, and that is deliberate.
+//
+// Re-run scripts/sim-road.mjs after touching FLOOR, GROWTH, HOUSE_STEP, the champion multiplier, ladderDr, or
+// anything in statsForPower. All six land on this table.
 const FLOOR = 30;
-const GROWTH = 1.165;
+const GROWTH = 1.033;
 
 // ── AND A STEP AT EVERY GATE ─────────────────────────────────────────────────────────────────────────────────
 // A smooth exponential has no landmarks: rung 41 is 16% harder than 40 and so is every other pair, so the ten

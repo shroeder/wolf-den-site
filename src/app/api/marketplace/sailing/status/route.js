@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { sailingNeedsAttention, unusedCasts } from "@/lib/marketplace/sailing.js";
+import { fishingUnlocked, sailingNeedsAttention, unusedCasts } from "@/lib/marketplace/sailing.js";
 import { isOwner } from "@/lib/marketplace/owner.js";
 
 export const runtime = "nodejs";
@@ -20,5 +20,12 @@ export async function GET() {
     // `casts` drives the nav nudge: a count people can act on, rather than a dot they learn to ignore. The
     // `forgeable` count went with forging itself — chests are dug up now, so there is nothing waiting to be
     // assembled on another screen.
-    return NextResponse.json({ attention, casts, forgeable: 0, owner: buyer ? isOwner(buyer.id) : false }, { headers: { "Cache-Control": "no-store" } });
+    // `fishing` is the nav's copy of the one gate (fishingUnlocked). Without it the nav kept a Fishing entry
+    // for every signed-in member while the page behind it 404s — a door to a room that is not there, which is
+    // worse than no door. Sent rather than recomputed client-side because the gate is server-only.
+    return NextResponse.json({
+        attention, casts, forgeable: 0,
+        fishing: buyer ? fishingUnlocked(buyer.id) : false,
+        owner: buyer ? isOwner(buyer.id) : false,
+    }, { headers: { "Cache-Control": "no-store" } });
 }

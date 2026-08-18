@@ -24,7 +24,8 @@
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",
     "check:tree": "node scripts/check-tree.mjs",
-    "check:hook-deps": "node scripts/check-hook-deps.mjs"
+    "check:hook-deps": "node scripts/check-hook-deps.mjs",
+    "sim:road": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-road.mjs"
   },
   "keywords": [],
   "author": "",

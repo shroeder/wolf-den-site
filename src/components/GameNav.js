@@ -102,6 +102,10 @@ export default function GameNav() {
     const pathname = usePathname() || "";
     const [menuOpen, setMenuOpen] = useState(false);
     const [signedIn, setSignedIn] = useState(false); // gates the Town link + the one-time Forge announcement — declared before `links`
+    // The nav's copy of fishingUnlocked, off the sailing status route. Fishing went back under construction on
+    // 2026-08-18 while the rework lands, and a nav entry pointing at a page that 404s is worse than no entry.
+    // Declared HERE, beside signedIn, for the same reason that one says so: `links` reads both.
+    const [fishingOn, setFishingOn] = useState(false);
     // The Kitchen is owner-gated. The nav asks the server rather than deciding locally, because "am I the owner"
     // isn't something the client knows and shouldn't be something it guesses.
     const [kitchen, setKitchen] = useState(false);
@@ -220,7 +224,7 @@ export default function GameNav() {
     const links = [...LINKS, { href: "/marketplace/farm", emoji: "🏡", label: "Farm" }, { href: "/marketplace/blacksmith", emoji: "🔨", label: "Forge" },
         { href: "/marketplace/auction", emoji: "🏛️", label: "Auction" },
         ...(signedIn ? [{ href: "/marketplace/town", emoji: "🏘️", label: "Town" }] : []),
-        ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
+        ...(signedIn && fishingOn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing" }] : []),
         ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "Kitchen" }] : []),
         ...(mine ? [{ href: "/marketplace/mining", emoji: "⛏️", label: "Mine" }] : []),
         ...(delves ? [{ href: "/marketplace/dungeons", emoji: "🗝️", label: "Dungeons" }] : []),
@@ -285,7 +289,7 @@ export default function GameNav() {
             fetch("/api/marketplace/quests", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; const qs = Array.isArray(d) ? d : (d?.quests || []); setQuestsReady(qs.filter((q) => q.done && !q.claimed).length); }).catch(() => {});
             // The status route has always returned `casts` (and now `forgeable`); this used to read only
             // `attention`, which quietly made the cast badge below dead code.
-            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setCastsLeft(d?.casts || 0); setForgeReady(d?.forgeable || 0); }).catch(() => {});
+            fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setCastsLeft(d?.casts || 0); setForgeReady(d?.forgeable || 0); setFishingOn(Boolean(d?.fishing)); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
             // Town is the one hub whose tasks are invisible from outside it — the pint, a claimable bounty and
             // the wish all sit behind a door you have to walk through. `todo=1` returns the counts alone rather
@@ -411,7 +415,7 @@ export default function GameNav() {
             { href: "/marketplace/spin", Icon: FaDharmachakra, label: "Daily Spin", sub: "Spin the wheel" },
             { href: "/marketplace/quests", emoji: "📜", label: "Quests", sub: "Daily bounties" },
             { href: "/marketplace/bounties", emoji: "🎯", label: "Bounties", sub: "Post & claim" },
-            ...(signedIn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
+            ...(signedIn && fishingOn ? [{ href: "/marketplace/fishing", emoji: "🎣", label: "Fishing", sub: "Log & records" }] : []),
             // The Kitchen is owner-gated. It has to be in the MENU as well as the scroll bar — the bar runs off
             // the side of the screen and a new entry appended to the end of it is, in practice, invisible.
             ...(kitchen ? [{ href: "/marketplace/cooking", emoji: "🍳", label: "The Kitchen", sub: "Cook what you farm" }] : []),
