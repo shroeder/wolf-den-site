@@ -97,39 +97,38 @@ const HOUSES = [
 // FLOOR 140 -> 25. Rung 1 was pitched at roughly Gauntlet tier 12: measured against a member with starter
 // gear it was not an opening fight, it was a wall with a "1" on it. It is an opening fight now.
 //
-// ── THE CURVE IS A CLIMB, NOT A LAUNCH ───────────────────────────────────────────────────────────────────────
-// It was an exponential, twice, and an exponential is the wrong shape for this no matter what rate you give it.
-// At 16.5% a rung it passed a maxed player at rung 21 and reached 216 MILLION power by rung 100. At 3.3% the
-// summit came back into reach — and a real loadout then walked to rung 89 without being troubled, because a
-// curve gentle enough not to run away is also gentle enough to be a formality.
+// ── THE CURVE IS A CLIMB, AND EVERY RUNG IS A STEP ───────────────────────────────────────────────────────────
+// Third shape, and this one is chosen from the thing the Road is actually FOR: it is a readout of your power.
+// You fail a rung, you go and improve something, you come back and get past the fighter that stopped you. That
+// only works if the exchange rate between stats and rungs is roughly constant — a few percent of gear should
+// always be worth about a rung.
 //
-// Luke, setting the actual design: "let's ensure it's a smooth curve. Ideally difficulty is more about their
-// skills etc and strategy vs sheer power level. Target rung is still around 35 where we want people to have a
-// difficult time, but we don't want it to spike ever. Each fight needs to be interesting. The whole idea
-// behind reworking stats recently and how they tie into the arena was to make it so players have more agency
-// about how they get stronger and climb the rungs."
+// The exponential failed because it ran away. The logistic that replaced it failed the other way: it flattened
+// at the top, so rungs 68 to 88 sat within half a percent of each other. Measured by sweeping a real loadout
+// (scripts/sim-road-progress.mjs), that produced the worst possible feel — a 44% gear increase bought ZERO
+// rungs, and then the next upgrade leapt twenty at once. Progress in lurches is barely better than no progress,
+// because neither one answers "did that upgrade do anything".
 //
-// That rules out every exponential. What it asks for is a curve that RISES to the limit of what a strong
-// player can handle and then stops climbing — so the answer to a late rung is what you built and how you
-// fight it, not another order of magnitude. This is a logistic, normalised so rung 1 is exactly the FLOOR and
-// rung 100 is exactly the ceiling:
+// So: a constant PERCENTAGE per rung, in two stretches, because one rate cannot serve both ends. The gap
+// between a brand-new fighter and a fully equipped one is about tenfold, and a hundred rungs of constant rate
+// across that gap makes the first rung a wall.
 //
-//     rung   1      10     20     35     50     75     100
-//     power  30     152    354    740    1066   1319   1345
+//   RUNGS 1-30    +10.9% a rung. The climb out of nothing. A new member gains power quickly, so the ladder is
+//                 allowed to as well, and this is the stretch where a single piece of gear is transformative.
+//   RUNGS 30-100  +1.39% a rung. The long haul. SOLVED, not guessed: gear converts to fighting power
+//                 sub-linearly, so the roughly sixfold gear climb still ahead of the best-equipped member is
+//                 worth well under sixfold in the ring. The rate is set so that climb lands the summit exactly
+//                 — every slot at the top tier, fully forged, and rung 100 is an even fight. First cut of this
+//                 used 2.35% and topped out at rung 77 with everything maxed, which would have made the last
+//                 twenty-three rungs decoration again.
 //
-// MID 30 and STEEP 14 put the steep part of the S right where the design wants the difficulty — the run into
-// the mid-thirties — and flatten it after. Rung 35 lands at 740, which is where a best-in-slot member measures
-// as an even fight (verified against a real loadout through kitFor, not a model). Rungs 40-100 rise by about
-// half again over sixty rungs: that stretch is meant to be won with a better BUILD and a better read of the
-// archetype in front of you, which is the whole point of the stat rework.
-const FLOOR = 30;
-const CEILING = 1345;
-const MID = 30;      // the rung the curve is steepest at
-const STEEP = 14;    // how sharply it turns — bigger is gentler
-const logistic = (r) => 1 / (1 + Math.exp(-(r - MID) / STEEP));
+// At 1.39% a rung, about 3% more gear is worth a rung: one upgraded piece moves you one or two fighters, every
+// time. Never nothing, never twenty. Crossing the back seventy is a year of upgrading, which is the intent.
 export const LADDER_SIZE = 100;
-const L1 = logistic(1);
-const LN = logistic(LADDER_SIZE);
+const FLOOR = 30;
+const KNEE = 30;         // where the newcomer's ramp hands over to the long haul
+const RAMP = 1.109;      // per-rung growth below the knee
+const TAIL = 1.0139;     // per-rung growth above it — the number that decides how long the endgame is
 
 // ── THE HOUSE STEP IS GONE ───────────────────────────────────────────────────────────────────────────────────
 // Each house used to cost an extra 5% on top of the curve, to make arriving at The Deep feel like arriving
@@ -148,11 +147,14 @@ export const ladderDr = (rung) => {
     return Math.round((0.04 + house * 0.028) * 1000) / 1000;   // 4% in the Yard, 29% at the end
 };
 
-// Normalised so rung 1 is exactly FLOOR and rung LADDER_SIZE is exactly CEILING — without it the logistic
-// starts partway up its own curve and the first fight is not the floor the design asked for.
-const powerAt = (rung) => Math.round(
-    FLOOR + (CEILING - FLOOR) * ((logistic(rung) - L1) / (LN - L1)),
-);
+// One rate below the knee, another above it, and nothing else — no house step, no champion multiplier. Two
+// neighbouring rungs are always the same distance apart in percentage terms, which is the whole point.
+const powerAt = (rung) => {
+    const r = Math.max(1, Math.min(LADDER_SIZE, Math.round(rung)));
+    const ramp = Math.pow(RAMP, Math.min(r, KNEE) - 1);
+    const tail = Math.pow(TAIL, Math.max(0, r - KNEE));
+    return Math.round(FLOOR * ramp * tail);
+};
 
 // A champion (every tenth) is the house's name-bearer.
 const isChampion = (rung) => rung % 10 === 0;

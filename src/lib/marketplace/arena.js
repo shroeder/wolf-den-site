@@ -36,9 +36,14 @@ import { arenaRating, counterBlow, drinkFor, lightBurn, openWound, ringStats, th
 
 // ── THE ROAD: OPEN OR CLOSED ─────────────────────────────────────────────────────────────────────────────────
 // One switch, read by the challenge path AND published in the arena state so the screen can say so rather
-// than letting somebody tap a rung and get an error. Closed 2026-08-17 while the gear stats land — see the
-// note at the refusal for why a cleared rung cannot be walked back.
-const ROAD_OPEN = false;
+// than letting somebody tap a rung and get an error.
+//
+// Closed 2026-08-17 because the new gear stats made the ladder clearable overnight, and a rung once beaten
+// cannot be un-beaten without taking progress off people. REOPENED 2026-08-18: the curve it was closed for has
+// been rebuilt and measured. Every rung is now a constant step above the one below it, the tenth fight of a
+// house is no longer a hidden spike, and the summit is sized to a fully equipped fighter rather than to
+// nothing anybody can reach.
+const ROAD_OPEN = true;
 // ── SHUT TO THE DEN, OPEN TO THE OWNER ───────────────────────────────────────────────────────────────────────
 // The Road was closed because the new gear stats made it clearable overnight, and a rung once beaten cannot be
 // un-beaten without taking progress off people. That reasoning is about the ninety-odd members walking it, not
