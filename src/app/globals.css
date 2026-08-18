@@ -16821,3 +16821,107 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
     color: #cfe6ff; background: rgba(126,200,255,0.10); border: 1px solid rgba(126,200,255,0.36); }
 .con-use-all:hover:not(:disabled) { background: rgba(126,200,255,0.2); border-color: rgba(126,200,255,0.62); }
 .con-use-all:disabled { opacity: .55; cursor: default; }
+
+/* ── FISHING: THE WATER ───────────────────────────────────────────────────────────────────────────────────
+   One `data-phase` on .fw drives the whole scene. Every motion below is a keyframe running on its own — the
+   component never animates in JS, so a bobber bobbing costs nothing per frame.
+   Deliberately ignores prefers-reduced-motion, like the rest of the game's scenes: the animation IS the
+   feature here, and a still bobber is not a fishing screen. */
+.fw { position: relative; width: 100%; height: 236px; border-radius: 14px; overflow: hidden;
+    background: #071019; border: 1px solid rgba(120,200,255,0.22); user-select: none; touch-action: manipulation; }
+.fw[data-phase="waiting"], .fw[data-phase="bite"] { cursor: pointer; }
+.fw-sky { position: absolute; inset: 0 0 46% 0; background-size: cover; background-position: center;
+    animation: fwDrift 60s linear infinite; }
+.fw-sky.is-plain { background: linear-gradient(180deg, #16324a, #0e2233); }
+@keyframes fwDrift { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+
+/* The sea. Two bands at different speeds — the cheapest honest parallax there is. */
+.fw-sea { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; overflow: hidden;
+    background: linear-gradient(180deg, #12496b, #071c2c); }
+.fw-swell { position: absolute; left: -50%; width: 200%; height: 26px; border-radius: 50%;
+    background: rgba(255,255,255,0.07); }
+.fw-swell-a { top: -8px; animation: fwSwell 7s ease-in-out infinite; }
+.fw-swell-b { top: 16px; opacity: .6; animation: fwSwell 11s ease-in-out infinite reverse; }
+@keyframes fwSwell { 0%, 100% { transform: translateX(-3%); } 50% { transform: translateX(3%); } }
+
+/* The boat rides the swell. Everything attached to it (hero, rod) rides with it because they are children. */
+.fw-boat { position: absolute; left: 24%; bottom: 30%; width: 132px; transform-origin: 50% 90%;
+    animation: fwRide 4.6s ease-in-out infinite; }
+.fw-hull { width: 100%; display: block; }
+.fw-hero { position: absolute; left: 46%; bottom: 56%; width: 40px; transform: translateX(-50%); }
+.fw-rod { position: absolute; right: 6px; bottom: 62%; width: 2px; height: 46px; border-radius: 2px;
+    background: linear-gradient(180deg, #d9c39a, #7d6842); transform: rotate(24deg); transform-origin: bottom; }
+@keyframes fwRide { 0%, 100% { transform: translateY(0) rotate(-1.4deg); } 50% { transform: translateY(-5px) rotate(1.4deg); } }
+
+/* THE LINE — anchored at the rod tip, running down to the bobber. */
+.fw-line { position: absolute; left: 44%; top: 40%; width: 1px; height: 22%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.15));
+    transform-origin: top; transform: rotate(-16deg); animation: fwRide 4.6s ease-in-out infinite; }
+.fw[data-phase="bite"] .fw-line { animation: fwLineTaut .28s ease-in-out infinite; }
+@keyframes fwLineTaut { 0%, 100% { transform: rotate(-16deg) scaleY(1); } 50% { transform: rotate(-19deg) scaleY(1.06); } }
+
+/* THE BOBBER. Bobs gently while waiting; goes UNDER on a bite. */
+.fw-bobber { position: absolute; left: 38%; top: 60%; width: 13px; height: 18px;
+    animation: fwBob 2.6s ease-in-out infinite; }
+.fw-bobber-top { position: absolute; inset: 0 0 45% 0; border-radius: 7px 7px 3px 3px;
+    background: linear-gradient(180deg, #ff6b6b, #c0392b); box-shadow: 0 0 6px rgba(0,0,0,0.4); }
+.fw-bobber-tip { position: absolute; inset: 55% 0 0 0; border-radius: 3px 3px 7px 7px;
+    background: linear-gradient(180deg, #f3f3f3, #cfd8e3); }
+@keyframes fwBob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-6px) rotate(4deg); } }
+/* Under it goes. Fast, repeating, unmistakable — this is the thing you are watching for. */
+.fw[data-phase="bite"] .fw-bobber { animation: fwDip .42s ease-in-out infinite; }
+@keyframes fwDip { 0%, 100% { transform: translateY(2px) rotate(0deg); } 45% { transform: translateY(15px) rotate(-14deg); opacity: .55; } }
+.fw[data-phase="hauling"] .fw-bobber, .fw[data-phase="done"] .fw-bobber,
+.fw[data-phase="hauling"] .fw-line, .fw[data-phase="done"] .fw-line { opacity: 0; transition: opacity .2s; }
+.fw[data-phase="idle"] .fw-bobber, .fw[data-phase="idle"] .fw-line { opacity: 0; }
+
+/* Rings, from where it went down. */
+.fw-rings { position: absolute; left: 38%; top: 66%; }
+.fw-rings span { position: absolute; left: 0; top: 0; width: 14px; height: 5px; margin: -2px 0 0 -1px;
+    border: 1px solid rgba(255,255,255,0.5); border-radius: 50%; opacity: 0; }
+.fw[data-phase="bite"] .fw-rings span { animation: fwRing 1.5s ease-out infinite; }
+.fw[data-phase="bite"] .fw-rings span:nth-child(2) { animation-delay: .5s; }
+.fw[data-phase="bite"] .fw-rings span:nth-child(3) { animation-delay: 1s; }
+@keyframes fwRing { 0% { opacity: .8; transform: scale(.4); } 100% { opacity: 0; transform: scale(3.6); } }
+
+/* ── OUT OF THE WATER ─────────────────────────────────────────────────────────────────────────────────────
+   Rises from below the waterline and settles. Drawn BEFORE the hull in the DOM so the boat occludes it, which
+   is the half of this that sells the surfacing. */
+.fw-haul { position: absolute; left: 50%; bottom: 22%; width: 118px; margin-left: -59px;
+    animation: fwRise 1.15s cubic-bezier(.22,.9,.3,1) forwards; }
+.fw-haul img { width: 100%; display: block; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
+@keyframes fwRise {
+    0%   { transform: translateY(96px) scale(.86); opacity: 0; }
+    45%  { opacity: 1; }
+    100% { transform: translateY(-6px) scale(1); opacity: 1; }
+}
+.fw-haul-spray { position: absolute; left: 50%; bottom: -6px; width: 92px; height: 16px; margin-left: -46px;
+    border-radius: 50%; background: radial-gradient(ellipse at center, rgba(255,255,255,0.55), transparent 70%);
+    animation: fwSpray 1.15s ease-out forwards; }
+@keyframes fwSpray { 0% { opacity: 0; transform: scaleX(.3); } 30% { opacity: 1; } 100% { opacity: 0; transform: scaleX(1.7); } }
+
+.fw-hint { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; text-align: center;
+    font-size: 12px; font-weight: 800; letter-spacing: .03em; color: rgba(255,255,255,0.82);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.fw[data-phase="bite"] .fw-hint { color: #ffe27a; animation: fwPulse .42s ease-in-out infinite; }
+@keyframes fwPulse { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+
+/* ── GEOMETRY, SOLVED ONCE ────────────────────────────────────────────────────────────────────────────
+   The first cut had three things in the wrong place and every one of them was only visible in a picture: the
+   rod floated in the sky beside the hull, the bobber sat ON the deck rather than out on the water, and the
+   catch surfaced directly behind the boat where the hull hid all of it. The line is an SVG now (see the note
+   in FishingWater) and everything else is pinned to the same two anchors: the rod tip at 47%/34% and the
+   float at 74%/62%. Move one, move both. */
+.fw-boat { left: 8%; bottom: 30%; width: 126px; }
+.fw-rod { position: absolute; left: 74%; bottom: 74%; width: 2px; height: 40px; border-radius: 2px;
+    background: linear-gradient(180deg, #e6d2ab, #7d6842); transform: rotate(38deg); transform-origin: bottom; }
+.fw-hero { left: 52%; bottom: 60%; width: 34px; }
+.fw-line { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.fw-line line { stroke: rgba(255,255,255,0.5); stroke-width: 0.35; vector-effect: non-scaling-stroke; }
+.fw[data-phase="bite"] .fw-line line { stroke: rgba(255,255,255,0.8); animation: fwTaut .28s ease-in-out infinite; }
+@keyframes fwTaut { 0%, 100% { stroke-width: 0.35; } 50% { stroke-width: 0.7; } }
+/* Out on open water, clear of the hull, at the end of the line. */
+.fw-bobber { left: 72.5%; top: 58%; }
+.fw-rings { left: 73.5%; top: 64%; }
+/* And the catch comes up WHERE THE LINE IS. Behind the boat is where it was hidden. */
+.fw-haul { left: 72%; bottom: 24%; width: 104px; margin-left: -52px; }

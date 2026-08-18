@@ -156,6 +156,66 @@ const RARE_TILT_CAP = 0.9;
 // 80% of casts bring up a FISH. The other 20% bring up TREASURE INSTEAD — you pulled something off the sea
 // floor rather than out of it. Not both: a cast is one or the other, so "what's on the line?" always has a
 // real answer and hauling up a chest is its own moment rather than a footnote under a Sardine.
+// ── SOMETHING THAT FIGHTS BACK ───────────────────────────────────────────────────────────────────────────────
+// Luke: "you can fish up monsters and get in battles... you actually see everything pop up out of the water as
+// you haul it in on your ship."
+//
+// So a cast has a third outcome. Not a fish, not a chest — a thing on the end of the line that comes up angry,
+// and the haul animation is the same one either way: whatever is hooked breaks the surface and you find out
+// what it is at the moment it clears the water.
+//
+// THE FIGHT IS THE ARENA'S, not a new one. `startFishingBout` builds these through statsForPower and
+// npcAbilities and hands the bout to the same renderer the plaza raid and the Road use (ArenaClient in
+// boutOnly mode). Your class, your tree, your gear and your element all mean exactly what they mean
+// everywhere else, and you can genuinely lose. Luke asked for the existing system and this is it — a second
+// combat model for fishing would be a second thing to balance and a second thing to get wrong.
+//
+// THE ART ALREADY EXISTED. Every one of these is a creature plate from public/images/sailing/enc, drawn for
+// the marine-encounter table. Only the CREATURES are used — that folder also holds ships (revenue cutters,
+// smugglers, corsairs), and you do not hook a sloop on a fishing line.
+//
+// Power is a gear budget in the same unit as everything else in the arena (best-in-slot is 644), so these are
+// legible against the Road: the shallow ones are an early-Road fight, the deep ones are a real one.
+export const FISH_MONSTER_CHANCE = 0.08;
+// `archetype` MUST be a real key from arena-npc's ARCHETYPES (balanced/brute/wall/duelist/berserker).
+// statsForPower falls back to Balanced for anything it does not recognise, silently — so a made-up key here
+// would ship eight monsters that all fight identically and nothing would ever say so.
+export const FISH_MONSTERS = [
+    { id: "reef_crawler", name: "Reef Crawler", tier: 1, power: 110, archetype: "wall", element: "earth",
+        art: "/images/sailing/enc/reef_crabs.png",
+        blurb: "It came up holding the hook. It does not intend to give it back." },
+    { id: "glass_eels", name: "Glass Eel Bloom", tier: 1, power: 150, archetype: "berserker", element: "water",
+        art: "/images/sailing/enc/glass_eels.png",
+        blurb: "Hundreds of them came up with the line, and they are already aboard." },
+    { id: "shalefin", name: "Shalefin", tier: 2, power: 240, archetype: "wall", element: "earth",
+        art: "/images/sailing/enc/shalefin.png",
+        blurb: "An armoured ray the size of a door, and it landed on your deck." },
+    { id: "anglerdeep", name: "The Anglerdeep", tier: 3, power: 360, archetype: "berserker", element: "shadow",
+        art: "/images/sailing/enc/anglerdeep.png",
+        blurb: "Its own light came up first. You watched it rise for a long time." },
+    { id: "reef_drake", name: "Reef Drake", tier: 3, power: 450, archetype: "duelist", element: "fire",
+        art: "/images/sailing/enc/reef_drake.png",
+        blurb: "It was not hooked. It followed the hook up to see who was pulling." },
+    { id: "gravebell", name: "Gravebell", tier: 4, power: 560, archetype: "wall", element: "shadow",
+        art: "/images/sailing/enc/gravebell.png",
+        blurb: "The tolling started before it surfaced. Everything else in the water left." },
+    { id: "kraken_young", name: "Young Kraken", tier: 4, power: 680, archetype: "berserker", element: "water",
+        art: "/images/sailing/enc/kraken_young.png",
+        blurb: "Only one arm is aboard so far." },
+    { id: "world_serpent", name: "The World Serpent", tier: 5, power: 900, archetype: "duelist", element: "storm",
+        art: "/images/sailing/enc/world_serpent.png",
+        blurb: "The line went taut and the horizon moved. You should not have caught this." },
+];
+export const fishMonsterById = (id) => FISH_MONSTERS.find((m) => m.id === String(id)) || null;
+
+// Which monster a cast turns up. `tilt` is the same rare-tilt every other roll on a cast reads — better bait
+// and a levelled Lure pull DEEPER, so the thing that comes up is the thing the water was asked for.
+export function rollFishMonster(tilt = 0) {
+    const reach = Math.max(1, Math.min(5, 1 + Math.floor(Math.max(0, tilt) / 2) + (Math.random() < 0.25 ? 1 : 0)));
+    const pool = FISH_MONSTERS.filter((m) => m.tier <= reach);
+    return pool[Math.floor(Math.random() * pool.length)] || FISH_MONSTERS[0];
+}
+
 export const TREASURE_CHANCE = 0.20;
 
 // What the treasure is, when it isn't a fish. Percentages of that 20%.
@@ -734,9 +794,15 @@ export async function castLine(buyerId, { status = "sailing", angling = 0, bait 
     if (castPowers.has("cold_bait") && firstCastToday) {
         for (let i = 0; i < 8 && species.rarity === "common"; i += 1) species = rollSpecies(rareTilt + 3);
     }
+    // ── AND SOMETIMES IT IS NOT A FISH AT ALL ────────────────────────────────────────────────────────────
+    // Rolled AFTER the species and the treasure, and it overrides both: a cast is one thing, the way treasure
+    // is one thing. `rareTilt` is passed so bait and a levelled Lure pull deeper — the water gives back what
+    // it was asked for.
+    const monster = Math.random() < FISH_MONSTER_CHANCE ? rollFishMonster(rareTilt) : null;
     const state = {
         species: species.id,
-        treasure: isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
+        monster: monster ? monster.id : null,
+        treasure: !monster && isTreasure ? { kind: rollTreasure(), tier: pickWeighted(TREASURE_TIER) } : null,
         roll: Math.round(Math.random() * 1000) / 1000,     // the luck half of the final weight
         castAt: Date.now(),
         biteAt: Date.now() + Math.round(BITE_MIN_MS + Math.random() * (BITE_MAX_MS - BITE_MIN_MS)),
@@ -822,6 +888,27 @@ export async function landFish(buyerId, { quality = 0, missed = false } = {}) {
         ).catch(() => {});
         await trackActivity(buyerId, "fish_missed", { species: species.id }).catch(() => {});
         return { ok: true, landed: false, refunded: true, message: "It stole your bait and slipped away — cast refunded." };
+    }
+
+    // ── SOMETHING THAT FIGHTS BACK ───────────────────────────────────────────────────────────────────────────
+    // The line is already cleared above, so the monster is OFF the hook and on the deck — the fight is a
+    // separate press (fish_fight) rather than being started from inside the haul. Two reasons: the haul
+    // animation has to finish and be looked at before a fight screen covers it, and a bout that begins inside
+    // a landing has no way to answer "you already have a fight open" without unwinding the catch.
+    //
+    // The cast is SPENT. Hooking a leviathan and being told the cast was refunded because you had to fight it
+    // would read as a punishment for the most interesting outcome in the water.
+    if (state.monster) {
+        const m = fishMonsterById(state.monster);
+        if (m) {
+            await trackActivity(buyerId, "fish_monster", { monster: m.id, tier: m.tier }).catch(() => {});
+            return {
+                ok: true, landed: false, monster: {
+                    id: m.id, name: m.name, tier: m.tier, blurb: m.blurb, art: m.art,
+                    element: m.element, power: m.power,
+                },
+            };
+        }
     }
 
     // ── TREASURE ─────────────────────────────────────────────────────────────────────────────────────────────

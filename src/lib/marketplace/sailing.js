@@ -1651,8 +1651,16 @@ export async function getSailingState(buyerId, skyKey = null) {
     const baits = await import("@/lib/marketplace/cooking.js")
         .then((m) => m.baitStock(buyerId))
         .catch(() => []);
+    // ── WHO IS STANDING ON THE BOAT ──────────────────────────────────────────────────────────────────────
+    // The member's own hero sprite, at the top level, because the fishing scene draws them on the deck holding
+    // the rod. It already existed inside the ship-battle payload as `me.rider` — but that is built only when a
+    // battle is open, so fishing could not reach it and was drawing a rod with nobody behind it.
+    const heroRow = await db.queryOne(
+        `SELECT avatar_sprite_url, avatar_sprite_flip FROM mkt_buyer WHERE id = $1`, [buyerId]
+    ).catch(() => null);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
         recipeShop, baits), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        hero: { art: heroRow?.avatar_sprite_url || null, flip: heroRow?.avatar_sprite_flip === true },
         // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
         chestsHeld: (() => {
             const c = Object.fromEntries((chestRows || []).map((r) => [r.tier, Number(r.count) || 0]));

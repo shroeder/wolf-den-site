@@ -9,6 +9,7 @@ import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
+import ArenaClient from "@/components/ArenaClient";
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard, { Track as ShipTrack, Dbl } from "@/components/ShipYard";
 import GunDeck from "@/components/GunDeck";
@@ -260,6 +261,9 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const [geoPrompt, setGeoPrompt] = useState(false); // show the "match my real weather" location prompt
     const [fishOpen, setFishOpen] = useState(false);       // the fishing scene (cast → bite → reel) is open
     const [fishRecords, setFishRecords] = useState(null);  // Den-wide biggest-per-species board (lazy-loaded)
+    // The bout for something hauled up on the line. Held here rather than inside FishingScene because the
+    // fight is a full-screen layer over the whole rail, not a panel inside the fishing card.
+    const [fishFight, setFishFight] = useState(null);
     const [battleTab, setBattleTab] = useState("fleet");   // which tab the one battle card is showing
     // The ship yard is a full-screen INTERFACE you open, not a card you get scrolled to. Both doors into it —
     // the Raid tile out at sea and the entry button at the helm — used to call scrollIntoView, so tapping
@@ -565,6 +569,24 @@ export default function SailingClient({ initial, hero, pet, captain }) {
     const fishLand = useCallback((extra) => act("fish_land", extra), [act]);
     // The record board is a READ, so it deliberately does NOT go through act() — act() calls setState(d) on any
     // non-error reply, and fish_records returns { ok, records } with no sailing state, which would wipe the screen.
+    // A monster surfaced. The haul animation has already finished and been looked at (FishingScene waits
+    // HAUL_MS before calling this), so the bout can take the screen now without cutting the one beat the
+    // whole rework exists for.
+    const hookMonster = useCallback(async (monster) => {
+        const r = await fetch("/api/marketplace/sailing", {
+            method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "fish_fight", monster: monster?.id }),
+        }).then((x) => x.json()).catch(() => null);
+        // `bout_in_progress` is the one refusal worth resuming rather than reporting: the fight is already
+        // open on the row, so fetch it and mount that instead of telling somebody to go and finish a bout
+        // they have no way to reach from here. Same move the plaza makes.
+        if (r?.ok) { setFishFight(r); return; }
+        if (r?.error === "bout_in_progress") {
+            const st = await fetch("/api/marketplace/arena", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+            if (st?.bout && !st.bout.over) { setFishFight(st); return; }
+        }
+    }, []);
+
     const loadFishRecords = useCallback(async () => {
         try {
             const r = await fetch("/api/marketplace/sailing", {
@@ -1622,14 +1644,28 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                 <FishingScene
                     fishing={state.fishing}
                     sky={skyType || null}
+                    boat={state.boatArt || null}
+                    hero={state.hero || null}
                     records={fishRecords}
                     gold={state.gold || 0}
                     onCast={fishCast}
                     onLand={fishLand}
                     onRecharge={() => act("fish_recharge")}
                     onLoadRecords={loadFishRecords}
+                    onMonster={hookMonster}
                     onClose={() => setFishOpen(false)}
                 />
+            ) : null}
+
+            {/* ── A THING FROM THE WATER, FIGHTING ON YOUR DECK ────────────────────────────────────────
+                ArenaClient in `boutOnly` mode: the same renderer the plaza raid and the Road use, drawing the
+                same bout off the same row, as a fixed full-screen layer over the rail. Nothing is copied and
+                nothing navigates — TownClient's note explains why the whole arena state is handed in rather
+                than just the bout (it draws YOUR fighter from `me`). Keyed on the foe so a second monster
+                mounts a FRESH fight instead of leaving the previous one on screen. */}
+            {fishFight ? (
+                <ArenaClient key={fishFight.bout?.foe?.id || "hooked"} initial={fishFight} boutOnly
+                    onLeave={() => { setFishFight(null); load(); }} />
             ) : null}
 
             {/* Arrival — "you reached the island!" modal (pops once per voyage, live or on return) */}

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
-import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, marketDay, buyRecipe, fishCast, fishLand, fishRecords, fishRecharge, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
+import { getSailingState, startVoyage, favorableWind, rechargeWind, beginDig, digAt, senseAt, buyDigs, endDig, upgradeSpeed, upgradeFortune, upgradeRarity, upgradeLuck, upgradeRaid, upgradeDig, upgradeTool, upgradeFishing, waveAtSailor, resetRaid, merchantMinigame, merchantBuy, marketDay, buyRecipe, fishCast, fishLand, fishRecords, fishRecharge, fishingUnlocked, doBattle, shipBattleVolley, buyAmmo, buyLocker, setLoadout, upgradeCombat, upgradeGun, shipBattleReckoning, buyPiece, gambleChest } from "@/lib/marketplace/sailing.js";
 import { withRequestLogging } from "@/lib/server-logger";
 
 export const runtime = "nodejs";
@@ -85,6 +85,13 @@ export async function POST(request) {
                 // id simply finds nothing on the shelf and the cast proceeds unbaited.
                 case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky, bait: body.bait || null }));
                 case "fish_land": return noStore(await fishLand(g.buyer.id, { quality: body.quality, missed: body.missed, sky: body.sky }));
+                // A monster came up on the line. The haul finishes and is LOOKED AT first; this is the
+                // separate press that opens the fight, so the reveal is never covered by a bout screen.
+                case "fish_fight": {
+                    if (!fishingUnlocked(g.buyer.id)) return noStore({ ok: false, error: "not_available" }, { status: 400 });
+                    const { startFishingBout } = await import("@/lib/marketplace/arena.js");
+                    return noStore(await startFishingBout(g.buyer.id, String(body.monster || "")));
+                }
                 case "fish_records": return noStore({ ok: true, ...(await fishRecords(g.buyer.id)) });
                 case "fish_recharge": return noStore(await fishRecharge(g.buyer.id));
                 default: return noStore({ error: "bad_action" }, { status: 400 });

@@ -1181,6 +1181,44 @@ export async function startTownBout(buyerId, eventId, enemyId) {
     return { ok: true, ...(await getArenaState(buyerId)) };
 }
 
+/**
+ * A THING YOU PULLED OUT OF THE WATER, on your deck, fighting.
+ *
+ * Modelled on startTownBout directly above and for the same reason: the fight renderer needs the WHOLE arena
+ * state, not just the bout, because it draws your own fighter from `me`. A response carrying only the bout
+ * could not mount, which is the bug that used to bounce the plaza to /marketplace/arena.
+ *
+ * The monster is built through statsForPower + npcAbilities like every other NPC in the game, so a Kraken on
+ * the deck and a Wall on the Road want the same answer out of you. Nothing here is a fishing-specific combat
+ * rule — Luke asked for the existing system, and a second one would be a second thing to balance.
+ *
+ * No TOWN_EDGE. That multiplier exists because a plaza raid is a shared wave everybody is chipping at; a
+ * hooked monster is yours alone and is sized by its own power budget.
+ */
+export async function startFishingBout(buyerId, monsterId) {
+    const row = await arenaRow(buyerId);
+    if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
+        return { ok: false, error: "bout_in_progress" };
+    }
+    const { fishMonsterById } = await import("@/lib/marketplace/fishing.js");
+    const m = fishMonsterById(monsterId);
+    if (!m) return { ok: false, error: "no_monster" };
+
+    const me = await kitFor(buyerId);
+    const st = statsForPower(m.power, m.archetype, m.element, m.tier);
+    const foe = {
+        id: `fish:${m.id}`, name: m.name, sprite: m.art, npc: true, fishing: true,
+        blurb: m.blurb, color: null, archetype: m.archetype, level: null,
+    };
+    const foeKit = { ...foe, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, m.tier * 3)) };
+    const b = buildBout(me, foe, foeKit, {
+        myPower: arenaRating(me),
+        extra: { fishing: { monster: m.id, tier: m.tier } },
+    });
+    await saveBout(buyerId, b);
+    return { ok: true, ...(await getArenaState(buyerId)) };
+}
+
 export async function startBout(buyerId, targetId = null) {
     const row = await arenaRow(buyerId);
     if (row?.bout_json && !row.bout_json.over && !staleBout(row.bout_json)) {
