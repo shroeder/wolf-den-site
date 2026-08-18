@@ -31,6 +31,7 @@ export default function FishingWater({
     sky,            // scrolling seascape behind the boat
     boat,           // the member's hull at its real tier
     hero,           // { art, flip } — their own fighter, on the deck
+    deck,           // the hull's deck line (deck-lines.js) — where a standing figure's feet go
     haul,           // { art, name, kind } once something is coming up
     onStrike,       // the one tap: hook it
     busy = false,
@@ -78,17 +79,24 @@ export default function FishingWater({
                 </div>
             ) : null}
 
-            {/* THE BOAT, and the person on it. */}
-            <div className="fw-boat" aria-hidden="true">
+            {/* ── THE BOAT, AND THE PERSON STANDING ON IT ──────────────────────────────────────────────
+                `--deck` is the hull's OWN deck line out of deck-lines.js — the percentage up the sprite where
+                a standing figure's feet belong, one number per hull, read off a contact sheet. Every hull puts
+                its deck somewhere different, so the flat percentage this used at first floated the hero a body
+                length above his own boat on some tiers and buried him in others. It is the same table and the
+                same placement the ship battle uses; there is no reason for fishing to invent a second one. */}
+            <div className="fw-boat" aria-hidden="true" style={{ "--deck": `${deck ?? 30}%` }}>
                 {boat ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img className="fw-hull" src={boat} alt="" draggable="false" />
                 ) : null}
-                {hero?.art ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="fw-hero" src={hero.art} alt="" draggable="false"
-                        style={{ transform: `translateX(-50%) scaleX(${hero.flip ? -1 : 1})` }} />
-                ) : null}
+                <span className="fw-crew">
+                    {hero?.art ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="fw-hero" src={hero.art} alt="" draggable="false"
+                            style={{ transform: hero.flip ? "scaleX(-1)" : undefined }} />
+                    ) : null}
+                </span>
                 <span className="fw-rod" />
             </div>
 

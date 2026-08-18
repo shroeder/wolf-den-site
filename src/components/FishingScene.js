@@ -255,7 +255,7 @@ const TELL_MS = 1400;
 
 
 
-export default function FishingScene({ fishing, sky, boat = null, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null }) {
+export default function FishingScene({ fishing, sky, boat = null, deck = 30, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
     const [fight, setFight] = useState("common"); // the fight profile of what is on the line (rarity only)
@@ -478,7 +478,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                             point of the feature and it was being hidden until after you pressed the button —
                             so the screen you decide to fish FROM was the least interesting one in the loop.
                             Same component, at rest: your hull, your hero, no line in the water yet. */}
-                        <FishingWater phase="idle" sky={sky} boat={boat} hero={hero} haul={null} />
+                        <FishingWater phase="idle" sky={sky} boat={boat} deck={deck} hero={hero} haul={null} />
                         {/* WAS: "tap — then hold to reel and keep the fish in the green. A good reel lands a
                             bigger fish." Every word of that described the reel minigame, which is deleted.
                             Stale copy for a mechanic that no longer exists is the exact thing the Trade-Wind
@@ -567,6 +567,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                         phase={phase}
                         sky={sky}
                         boat={boat}
+                        deck={deck}
                         hero={hero}
                         haul={haul}
                         busy={busy}
@@ -576,7 +577,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                     <div className="fish-stage">
                         {/* The miss gets the water too — an empty float back on the surface says "it got away"
                             in the same language the rest of the loop is written in. It was a 💨 emoji. */}
-                        <FishingWater phase="idle" sky={sky} boat={boat} hero={hero} haul={null} />
+                        <FishingWater phase="idle" sky={sky} boat={boat} deck={deck} hero={hero} haul={null} />
                         <p className="fish-copy">It stole your bait and slipped away.</p>
                         <p className="muted">Your cast came back — no harm done.</p>
                         <div className="fish-actions">

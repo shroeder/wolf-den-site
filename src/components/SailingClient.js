@@ -9,6 +9,7 @@ import CoinCta from "@/components/CoinCta";
 import CollectionPanel from "@/components/CollectionPanel";
 import MerchantScene from "@/components/MerchantScene";
 import FishingScene from "@/components/FishingScene";
+import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import ArenaClient from "@/components/ArenaClient";
 import ShipBattleScene from "@/components/ShipBattleScene";
 import ShipYard, { Track as ShipTrack, Dbl } from "@/components/ShipYard";
@@ -1641,10 +1642,15 @@ export default function SailingClient({ initial, hero, pet, captain }) {
             {/* FISHING — cast → bite → reel, plus the Log and the Den record board. The scene reports one number
                 (reel quality); the server owns the species, the size and the payout. */}
             {fishOpen && state.fishing ? (
+                /* `sky` is the PATH. `skyType` — which this passed at first — is the bare word pulled out of
+                   the filename for the mood classes ("goldenhour"), so it rendered no image at all and the
+                   whole scene sat on black. `deck` is the hull's own deck line, so the hero stands on the
+                   boat instead of at a flat percentage that only suits one tier. */
                 <FishingScene
                     fishing={state.fishing}
-                    sky={skyType || null}
+                    sky={sky || state.oceanBg || null}
                     boat={state.boatArt || null}
+                    deck={boatDeck(state.tier || 1)}
                     hero={state.hero || null}
                     records={fishRecords}
                     gold={state.gold || 0}

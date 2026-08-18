@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import FishingWater from "@/components/FishingWater";
+import { boatDeck } from "@/lib/marketplace/deck-lines.js";
 import FishingScene from "@/components/FishingScene";
 import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 
@@ -38,6 +39,7 @@ export default function WaterLab() {
                 fishing={IDLE_FISHING}
                 sky="/images/sailing/sky-goldenhour.png"
                 boat="/images/sailing/boat-tier5-galleon.png"
+                deck={boatDeck(5)}
                 hero={{ art: "/images/arena/ladder/rung-1.webp", flip: false }}
                 records={null} gold={12500}
                 onCast={async () => ({ ok: false })} onLand={async () => ({ ok: false })}
@@ -60,6 +62,7 @@ export default function WaterLab() {
                 phase={phase}
                 sky="/images/sailing/sky-goldenhour.png"
                 boat="/images/sailing/boat-tier5-galleon.png"
+                deck={boatDeck(5)}
                 hero={{ art: "/images/arena/ladder/rung-1.webp", flip: false }}
                 haul={haul}
                 onStrike={() => setPhase("hauling")}
