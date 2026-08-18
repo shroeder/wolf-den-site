@@ -1310,6 +1310,33 @@ export async function startBout(buyerId, targetId = null) {
  * The damage is computed HERE from your real stats — the client only ever reports its timing. It could lie
  * about that, and the ceiling on lying is one perfect swing per beat, which is what a good player gets anyway.
  */
+// ── ONE BEAT, IN THE ORDER IT HAPPENED ───────────────────────────────────────────────────────────────────────
+// A beat was published as a BAG of fields — damage, blocked, thorned, riposted, stolen, countered, healed — and
+// the screen had to guess a running order out of it, which it did with a table of hardcoded delays: ward at
+// 40ms, block at 120, thorns at 200, drink at 240, riposte at 280. Ten things inside half a second, all mounted
+// at once, while the fighters animated exactly once for the whole exchange. Luke: "everything post attack
+// happens all at once."
+//
+// The engine already knows the order — it resolved them in it. This stops throwing that away. Each event is
+// { kind, side, n }, where SIDE is the fighter it lands on, and the client plays them one at a time.
+//
+// A blow with no riders is a single event, so a plain exchange is exactly as quick as it was.
+function beatEvents(parts) {
+    const out = [];
+    for (const e of parts) {
+        if (!e) continue;
+        if (Array.isArray(e.each) && e.each.length > 1) {
+            // A flurry is genuinely several blows, and one accumulated number is what made Rampage look like
+            // a big swing with a different sprite.
+            for (const n of e.each) out.push(n > 0 ? { kind: e.crit ? "crit" : "hit", side: e.side, n } : { kind: "miss", side: e.side });
+            continue;
+        }
+        if (e.n == null || e.n === 0) continue;
+        out.push(e.crit ? { kind: e.kind, side: e.side, n: e.n, crit: true } : { kind: e.kind, side: e.side, n: e.n });
+    }
+    return out;
+}
+
 /**
  * ONE COMMAND. The arena is turn-based, so a beat starts with a decision and only then asks for timing.
  *
@@ -1899,6 +1926,17 @@ export async function fightRound(buyerId, opts = {}) {
             // line, not in the sentence, not as a number on the screen. Thorns rides along here for exactly
             // that reason and the comment below says so; the counter beside it was missed. A Reaver's
             // answer to being hit has therefore been invisible since the node shipped, on both sides.
+            // THE RUNNING ORDER of this beat, so the ring can play it as a sequence instead of painting all of
+            // it on one frame. The same numbers, arranged as they were resolved.
+            events: beatEvents([
+                { kind: whiffed ? "miss" : (crit ? "crit" : "hit"), side: "them", n: whiffed ? 1 : dmg, each, crit },
+                { kind: "ward", side: "them", n: theirSoak },
+                { kind: "drink", side: "you", n: healed },
+                { kind: "thorn", side: "you", n: theirThorns },
+                { kind: "counter", side: "you", n: theirCounter, crit: theirCounterCrit },
+                { kind: "drink", side: "them", n: theirCounterHeal },
+                { kind: "riposte", side: "you", n: theirRiposte },
+            ]),
             hits, healed, turned, kind: ability?.kind || "hit", theirThorns, theyStood, theirSoak,
             theirCounter, theirCounterCrit, theirHealed: theirCounterHeal,
             counterText: theirCounter ? `${b.foe.name} strikes back${theirCounterCrit ? " — CRITICAL —" : ""} for ${theirCounter}.` : null,
@@ -2292,6 +2330,17 @@ export async function fightRound(buyerId, opts = {}) {
             // `countered` joins them for the same reason: your Retaliation fires on THEIR beat, took a bite
             // out of their health, and was published nowhere — so four ranks of it looked like four dead
             // points. Every other strike-back on this line already floats a number.
+            // The same running order, from the other side of the ring.
+            events: beatEvents([
+                { kind: foeWhiffed ? "miss" : (foeCrit ? "crit" : "hit"), side: "you", n: foeWhiffed ? 1 : through, each: foeEach, crit: foeCrit },
+                { kind: "block", side: "you", n: blocked },
+                { kind: "ward", side: "you", n: soaked },
+                { kind: "drink", side: "them", n: foeHealed },
+                { kind: "thorn", side: "them", n: thorned },
+                { kind: "counter", side: "them", n: countered, crit: counterCrit },
+                { kind: "riposte", side: "them", n: sent },
+                { kind: "drink", side: "you", n: stolen },
+            ]),
             riposted: sent, thorned, stolen, countered, counterCrit,
             // SHIPPED SEPARATELY FROM `text`, and this is not cosmetic: the counter plays 420ms after the
             // blow it answers, so a sentence that already names it spoils the pause the whole moment is

@@ -121,6 +121,18 @@ const HITSTOP_MS = 170;
 // answer to it rather than a second unrelated event. Roughly the length of the recoil animation (.36s) plus a
 // held breath.
 const COUNTER_BEAT_MS = 420;
+// ── HOW LONG EACH PART OF A BEAT OWNS THE SCREEN ─────────────────────────────────────────────────────────────
+// One table, so pacing is a decision rather than nine hardcoded delays scattered through a builder. A blow is
+// the loudest thing and gets the longest hold; a block or a drink is a punctuation mark.
+const EVENT_MS = { hit: 300, crit: 380, counter: 380, riposte: 300, thorn: 260, bleed: 260, burn: 260, drink: 200, block: 180, ward: 180, miss: 240, default: 240 };
+// After the first two events the rest compress, so a busy exchange stays readable without the fight dragging:
+// eight events at full length would be 2.2s a beat and 16s a fight.
+const SQUEEZE = 0.62;
+const BEAT_BUDGET_MS = 1200;
+// Which events make somebody flinch — the ones that move a health bar.
+const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
+// The engine's vocabulary against the pop stylesheet's.
+const POP_KIND = { hit: "dmg", crit: "crit", counter: "counter", riposte: "thorn", thorn: "thorn", bleed: "bleed", burn: "burn", drink: "heal", block: "block", ward: "ward", miss: "miss" };
 
 const ELEMENT_COLOR = {
     fire: "#ff6b3c", water: "#4aa3ff", earth: "#6ad07a", storm: "#ffd75e", light: "#fff0a8", shadow: "#b061ff",
@@ -639,6 +651,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [hitSide, setHitSide] = useState(null);   // "you" | "them" — who is on the receiving end of it.
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
+    const [beatQueue, setBeatQueue] = useState(null);  // the beat's events, played one at a time
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
@@ -951,41 +964,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const t2 = setTimeout(() => setClash(null), RESULT_MS - 80);
         const t3 = setTimeout(() => setStop(false), HITSTOP_MS);
 
-        // ── THE COUNTER IS ITS OWN BEAT ──────────────────────────────────────────────────────────────────
-        // Their blow and your answer both moved a bar on the same frame, and `hitSide` is one value — so the
-        // second write won and your recoil was swallowed by your own lunge. One muddled frame instead of a
-        // story. It is two beats, so it plays as two: they hit you and you recoil, a held breath, then you
-        // come back off the freeze swinging.
-        //
-        // Their counter is the mirror, staged the same way, because being countered has to read as being
-        // answered rather than as a mystery number during your own turn.
-        const mine = Number(last?.countered) || 0;
-        const theirs = Number(last?.theirCounter) || 0;
-        const counterTimers = [];
-        if (isNew && (mine > 0 || theirs > 0)) {
-            const back = mine > 0;
-            setCounterHeld(true);
-            const heavy = back ? last.counterCrit : last.theirCounterCrit;
-            // Recoil first: whoever was hit takes the frame they earned before the answer lands.
-            setHitSide(back ? "you" : "them");
-            counterTimers.push(setTimeout(() => {
-                setHitSide(back ? "them" : "you");   // now the answer — the counterer lunges in
-                setShake(heavy ? 2 : 1);
-                setStop(true);
-                setClash({ grade: "counter", move: heavy ? "RETALIATION!" : "Retaliation", mine: back, crit: Boolean(heavy) });
-                Sfx.whoosh();
-                Sfx.counter(heavy ? 0.9 : 0.55, 0.07);
-                if (heavy) { Haptic.crit(); duck(0.5, 0.3); } else { Haptic.hit(0.7); duck(0.35, 0.22); }
-                setCounterHeld(false);           // and now the sentence may say what just happened
-            }, COUNTER_BEAT_MS));
-            counterTimers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, COUNTER_BEAT_MS + 380));
-            counterTimers.push(setTimeout(() => setClash(null), COUNTER_BEAT_MS + RESULT_MS - 80));
-        }
-
-        return () => {
-            clearTimeout(t); clearTimeout(t2); clearTimeout(t3);
-            for (const ct of counterTimers) clearTimeout(ct);
-        };
+        // (The counter's bespoke choreography lived here. It was the first event to get its own moment, and
+        // the queue below generalises exactly that — so keeping it meant two players firing one blow: two
+        // sounds, two shakes. One player owns the beat now.)
+        return () => { clearTimeout(t); clearTimeout(t2); clearTimeout(t3); };
     }, [bout]);
 
     // The end of a bout is its loudest moment, and it was a three-note blip.
@@ -1255,6 +1237,25 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             // Each line's numbers come after the previous line's, so an exchange reads as a sequence.
             for (const item of sub) pops.push({ ...item, at: (item.at || 0) + li * 150 });
         });
+
+        // ── THE QUEUE, WHEN THE ENGINE PUBLISHED ONE ────────────────────────────────────────────────────
+        // Everything above is the OLD path and it stays for one reason only: bouts are persisted mid-fight,
+        // so a bout opened before this shipped has log lines with no `events` on them. Those still animate
+        // the way they always did. Anything resolved since plays as a sequence instead.
+        const queue = [];
+        for (const l of fresh) {
+            for (const e of l.events || []) {
+                // The engine says WHICH FIGHTER it landed on; the ring only knows left and right.
+                queue.push({ ...e, side: e.side === "you" ? "left" : "right" });
+            }
+        }
+        if (queue.length) {
+            // Held only while a counter is actually coming — otherwise the beat's sentence would wait for a
+            // moment that never arrives.
+            setCounterHeld(queue.some((e) => e.kind === "counter"));
+            setBeatQueue({ id: bout.log.length, events: queue });
+            return undefined;
+        }
         if (!pops.length) return undefined;
         setPop({ id: bout.log.length, items: pops });
         // Outlives the animation (2.1s, crit 2.4s) rather than cutting it off — unmounting at 1000ms is what
@@ -1262,6 +1263,57 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const t = setTimeout(() => setPop(null), 2500);
         return () => clearTimeout(t);
     }, [bout?.log?.length]);
+
+    // ── PLAYING A BEAT, ONE THING AT A TIME ─────────────────────────────────────────────────────────────────
+    // The fix for "everything post attack happens all at once". Each event gets its own moment: its number,
+    // its sound, its shake, and the right fighter recoiling or lunging. Nothing shares a frame with its own
+    // cause any more.
+    //
+    // PACING IS ONE TABLE. A plain exchange — one blow, no riders — is a single event and therefore exactly
+    // as quick as it ever was. A busy one compresses rather than dragging: after the first two events every
+    // following one is scaled by SQUEEZE, and the whole beat is capped at BEAT_BUDGET_MS. Change those two
+    // numbers to make the ring slower and more cinematic or faster and tighter; nothing else needs touching.
+    useEffect(() => {
+        if (!beatQueue?.events?.length) return undefined;
+        const evs = beatQueue.events;
+        const timers = [];
+        let clock = 0;
+        evs.forEach((e, i) => {
+            const base = EVENT_MS[e.kind] ?? EVENT_MS.default;
+            const dur = i < 2 ? base : Math.max(90, Math.round(base * SQUEEZE));
+            const at = Math.min(clock, BEAT_BUDGET_MS);
+            clock += dur;
+            timers.push(setTimeout(() => {
+                setPop({ id: `${beatQueue.id}-${i}`, items: [{ side: e.side, n: e.n, kind: POP_KIND[e.kind] || e.kind, text: e.kind === "miss" ? "MISS" : null, crit: e.crit }] });
+                // The ring itself answers, every time — this is the half that was only ever played once per
+                // beat, which is why ten numbers flew while the fighters stood still.
+                const hurtSide = e.side === "left" ? "you" : "them";
+                if (DAMAGE_KINDS.has(e.kind)) {
+                    setHitSide(hurtSide);
+                    setShake(e.crit || e.kind === "counter" ? 2 : 1);
+                    setStop(true);
+                    if (e.crit) { Sfx.crit(0.8); Haptic.crit(); duck(0.5, 0.3); }
+                    else if (e.kind === "counter") {
+                        // The one event that is a MOVE somebody threw rather than a consequence, so it is
+                        // named across the middle the way a move is.
+                        setClash({ grade: "counter", move: e.crit ? "RETALIATION!" : "Retaliation", mine: e.side === "right", crit: Boolean(e.crit) });
+                        setCounterHeld(false);
+                        Sfx.whoosh();
+                        Sfx.counter(e.crit ? 0.9 : 0.55, 0.07);
+                        if (e.crit) { Haptic.crit(); duck(0.5, 0.3); } else { Haptic.hit(0.7); duck(0.35, 0.22); }
+                    }
+                    else if (e.kind === "thorn" || e.kind === "riposte") { Sfx.impact(0.45); Haptic.hit(0.5); }
+                    else if (e.kind === "bleed" || e.kind === "burn") { Sfx.burn(); }
+                    else { Sfx.impact(0.5); Haptic.hit(0.6); }
+                } else if (e.kind === "drink") { Sfx.heal?.(); Haptic.cast(); }
+                else if (e.kind === "block" || e.kind === "ward") { Sfx.block(0.4); }
+                else if (e.kind === "miss") { Sfx.block(0.3); }
+            }, at));
+            timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + Math.min(dur, 340)));
+        });
+        timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS) + 1400));
+        return () => { for (const t of timers) clearTimeout(t); };
+    }, [beatQueue]);
 
     // The shake runs for a beat and then bursts on its own; a tap skips it. Keyed on the crate so a second
     // purchase replays it rather than showing the prize immediately.

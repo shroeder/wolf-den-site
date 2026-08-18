@@ -128,9 +128,18 @@ function makeServer(initial) {
                 countered = Math.max(1, Math.round(rnd(16, 26) * (counterCrit ? 2 : 1)));
                 b.foeHp = Math.max(0, b.foeHp - countered);
             }
+            const stolen = willCounter ? Math.max(1, Math.round(countered * 0.08)) : 0;
             b.log.push({
                 beat: b.beat, who: "them", grade: "hit", damage: through, blocked, soaked,
-                countered, counterCrit, stolen: willCounter ? Math.max(1, Math.round(countered * 0.08)) : 0,
+                countered, counterCrit, stolen,
+                // The running order, exactly as resolveBeat publishes it — so the rig exercises the QUEUE
+                // rather than the old all-at-once path it replaced.
+                events: [
+                    { kind: "hit", side: "you", n: through },
+                    ...(blocked > 0 ? [{ kind: "block", side: "you", n: blocked }] : []),
+                    ...(countered > 0 ? [{ kind: "counter", side: "them", n: countered, crit: counterCrit }] : []),
+                    ...(stolen > 0 ? [{ kind: "drink", side: "you", n: stolen }] : []),
+                ],
                 text: inc.isAbility
                     ? `${b.foe.name} casts ${inc.name} — you turn aside ${blocked}, ${through} lands.`
                     : `${b.foe.name} swings — you turn aside ${blocked}, ${through} lands.`,
