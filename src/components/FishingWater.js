@@ -27,7 +27,7 @@ import { useEffect, useRef, useState } from "react";
 // write. A scene that re-renders sixty times a second to move a bobber is how the farm's pet-walk once cost a
 // whole frame budget.
 export default function FishingWater({
-    phase,          // "idle" | "waiting" | "bite" | "hauling" | "done"
+    phase,          // "idle" | "waiting" | "tell" | "bite" | "hauling" | "done"
     sky,            // scrolling seascape behind the boat
     boat,           // the member's hull at its real tier
     hero,           // { art, flip } — their own fighter, on the deck
@@ -43,7 +43,7 @@ export default function FishingWater({
         lastPhase.current = phase;
     }, [phase]);
 
-    const live = phase === "waiting" || phase === "bite";
+    const live = phase === "waiting" || phase === "tell" || phase === "bite";
     return (
         <div
             className="fw"
@@ -99,6 +99,14 @@ export default function FishingWater({
                 <span className="fw-bobber-tip" />
             </div>
 
+            {/* ── THE TELL ─────────────────────────────────────────────────────────────────────────────
+                A shadow crosses under the float a moment before it goes down. The bite used to arrive out of
+                nowhere — a random wait, then a flash — so the only skill was noticing a colour change, and
+                nothing in the water ever meant anything. Now the water tells you first, which is the whole
+                difference between watching a screen and watching a float. Purely cosmetic: the bite window
+                is unchanged and hooking still only needs the one tap. */}
+            <div className="fw-shadow" aria-hidden="true" />
+
             {/* RINGS, from where the bobber went under. Keyed on the strike so a fresh bite re-runs them. */}
             <div className="fw-rings" key={splash} aria-hidden="true">
                 <span /><span /><span />
@@ -106,6 +114,7 @@ export default function FishingWater({
 
             <p className="fw-hint">
                 {phase === "waiting" ? "Line's out. Watch the bobber."
+                    : phase === "tell" ? "Something's circling…"
                     : phase === "bite" ? "IT'S UNDER — tap!"
                         : phase === "hauling" ? "Hauling it in…"
                             : ""}

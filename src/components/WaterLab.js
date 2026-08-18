@@ -5,11 +5,11 @@ import { useState } from "react";
 import FishingWater from "@/components/FishingWater";
 
 // The fishing scene's phases, on buttons. Waiting for a real bite to look at the bite is not a workflow.
-const PHASES = ["idle", "waiting", "bite", "hauling"];
+const PHASES = ["idle", "waiting", "tell", "bite", "hauling"];
 const HAULS = [
     { art: "/images/fish/fish_kraken.png", name: "Kraken", kind: "fish" },
     { art: "/images/sailing/enc/world_serpent.png", name: "The World Serpent", kind: "monster" },
-    { art: "/images/sailing/dig-chest.png", name: "Chest", kind: "treasure" },
+    { art: "/images/sailing/dig-chest.png", name: "Gold Chest", kind: "treasure" },
 ];
 
 export default function WaterLab() {

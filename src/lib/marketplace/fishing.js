@@ -206,6 +206,36 @@ export const FISH_MONSTERS = [
         art: "/images/sailing/enc/world_serpent.png",
         blurb: "The line went taut and the horizon moved. You should not have caught this." },
 ];
+/**
+ * WHAT BEATING ONE IS WORTH.
+ *
+ * Called once, from finishBout, when a hooked monster is put down — the same shape the plaza uses, where the
+ * ARENA runs the fight and the feature that started it owns the spoils. None of the Arena's own economy (VP,
+ * laurels, the ladder, the streak) belongs to a thing you pulled out of the water, and none of it is touched.
+ *
+ * Scaled off the monster's tier and nothing else, so the payout is legible from the card you were shown before
+ * the fight started. A loss pays nothing and costs nothing beyond the cast — the cast was already spent when it
+ * surfaced, and charging twice for the most interesting outcome in the water is how you teach people to stop
+ * hooking things.
+ */
+export async function payFishingMonster(buyerId, monsterId, won) {
+    const m = fishMonsterById(monsterId);
+    if (!buyerId || !m || !won) return null;
+    const gold = 120 * m.tier;
+    const xp = 40 * m.tier;
+    // One chest, at a tier the fight earned. The same ladder the dig and the treasure table use, so a Kraken
+    // paying a gold chest means the same thing here as it does anywhere else.
+    const chest = m.tier >= 5 ? "mythic" : m.tier >= 4 ? "gold" : m.tier >= 3 ? "iron" : "wooden";
+    const paid = await db.queryOne(
+        `UPDATE mkt_buyer SET gold = gold + $2 WHERE id = $1 RETURNING gold`, [buyerId, gold]
+    ).catch(() => null);
+    await logCoin(buyerId, gold, "fishing", { balanceAfter: paid?.gold, meta: { monster: m.id } }).catch(() => {});
+    await awardXp(buyerId, "fishing", { points: xp, gold: 0, meta: { monster: m.id } }).catch(() => {});
+    await addChests(buyerId, { [chest]: 1 }, { source: "fishing", meta: { monster: m.id } }).catch(() => {});
+    await trackActivity(buyerId, "fish_monster_won", { monster: m.id, tier: m.tier, gold, xp, chest }).catch(() => {});
+    return { gold, xp, chest, name: m.name };
+}
+
 export const fishMonsterById = (id) => FISH_MONSTERS.find((m) => m.id === String(id)) || null;
 
 // Which monster a cast turns up. `tilt` is the same rare-tilt every other roll on a cast reads — better bait

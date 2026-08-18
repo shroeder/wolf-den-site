@@ -2685,6 +2685,28 @@ async function finishBout(buyerId, row, b, won) {
     // and none of it belongs to a goblin in the plaza. A town fight hands its result to duelRaidEnemy, which
     // has always owned the spoils, the shared roster, the wave, the chieftain and the raid-won celebration,
     // and returns here with nothing else touched. Recorded on the bout first so a reload cannot re-pay it.
+    // ── AND A THING OFF THE LINE IS PAID BY FISHING ──────────────────────────────────────────────────────
+    // Exactly the arrangement the raid has below: the Arena ran the fight, the feature that started it owns
+    // the spoils, and the Arena's own economy is left alone. Recorded on the bout first so a reload cannot
+    // re-pay it — the same guard, for the same reason.
+    if (b.fishing && !b.fishingPaid) {
+        b.fishingPaid = true;
+        await saveBout(buyerId, b).catch(() => {});
+        const { payFishingMonster } = await import("@/lib/marketplace/fishing.js");
+        const reward = await payFishingMonster(buyerId, b.fishing.monster, won).catch(() => null);
+        b.recap = {
+            won, foe: b.foe, fishing: true,
+            haul: reward,
+            rounds: b.beat || (b.log || []).length,
+        };
+        // The SAME return shape the raid branch below uses — the whole arena state, not the bout. finishBout's
+        // caller hands this straight to the fight renderer, which draws your own fighter off `me`; returning
+        // the bare bout would have mounted a fight screen with nobody in it.
+        await db.query(`UPDATE mkt_arena SET bout_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1`,
+            [buyerId, JSON.stringify(b)]).catch(() => {});
+        return { ok: true, ...(await getArenaState(buyerId)) };
+    }
+
     if (b.town && !b.townPaid) {
         b.townPaid = true;
         await saveBout(buyerId, b).catch(() => {});

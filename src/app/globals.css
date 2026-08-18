@@ -16925,3 +16925,19 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-rings { left: 73.5%; top: 64%; }
 /* And the catch comes up WHERE THE LINE IS. Behind the boat is where it was hidden. */
 .fw-haul { left: 72%; bottom: 24%; width: 104px; margin-left: -52px; }
+
+/* THE TELL — a shadow crossing under the float just before it goes down. Only during `tell`; the rest of the
+   time there is nothing in the water, so when there IS something it means something. */
+.fw-shadow { position: absolute; left: 96%; top: 63%; width: 54px; height: 13px; border-radius: 50%;
+    background: radial-gradient(ellipse at center, rgba(2,12,20,0.62), rgba(2,12,20,0) 72%); opacity: 0; }
+.fw[data-phase="tell"] .fw-shadow { animation: fwShadow 1.5s ease-in-out infinite; }
+@keyframes fwShadow {
+    0%   { opacity: 0;   transform: translateX(26px) scaleX(.7); }
+    35%  { opacity: .95; }
+    70%  { opacity: .95; }
+    100% { opacity: 0;   transform: translateX(-92px) scaleX(1.15); }
+}
+/* The float reacts to it before it goes under — a nudge, not the dip. */
+.fw[data-phase="tell"] .fw-bobber { animation: fwNudge .9s ease-in-out infinite; }
+@keyframes fwNudge { 0%, 100% { transform: translateY(0) rotate(-3deg); } 40% { transform: translateY(3px) rotate(6deg); } }
+.fw[data-phase="tell"] .fw-hint { color: #cfe6ff; }

@@ -248,6 +248,9 @@ const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} $
 // The rise animation's length (see .fw-haul / @keyframes fwRise). One number, so the hand-off to a fight and
 // the picture clearing the water cannot drift apart.
 const HAUL_MS = 1150;
+// How long the water hints before the float goes down. Long enough to look up, short enough that it is a
+// tell rather than a countdown.
+const TELL_MS = 1400;
 
 export default function FishingScene({ fishing, sky, boat = null, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null }) {
     const sfx = useSfx();
@@ -261,6 +264,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
     const [err, setErr] = useState(null);
     const biteTimer = useRef(null);
     const graceTimer = useRef(null);
+    const tellTimer = useRef(null);
     const castRef = useRef(null);
 
     const casts = fishing?.casts || { left: 0, max: 0, used: 0 };
@@ -268,6 +272,9 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
     const clearTimers = useCallback(() => {
         if (biteTimer.current) { clearTimeout(biteTimer.current); biteTimer.current = null; }
         if (graceTimer.current) { clearTimeout(graceTimer.current); graceTimer.current = null; }
+        // The tell rides with the other two — a leaked one would drop the scene back to "something's
+        // circling" after the fish was already on the deck.
+        if (tellTimer.current) { clearTimeout(tellTimer.current); tellTimer.current = null; }
     }, []);
     useEffect(() => clearTimers, [clearTimers]);
 
@@ -339,6 +346,10 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
         setPhase("waiting");
         sfx.plop();
         const wait = Math.max(200, Number(res.cast?.biteAt || 0) - Date.now());
+        // The water says so first. TELL_MS before the bite a shadow crosses under the float and the float
+        // nudges — cosmetic only, the bite window and the tap are unchanged, but it turns "wait, then react to
+        // a colour" into something you can actually watch for. Clamped so a very short wait still gets one.
+        tellTimer.current = setTimeout(() => setPhase("tell"), Math.max(120, wait - TELL_MS));
         biteTimer.current = setTimeout(() => {
             setPhase("bite");
             sfx.bite();
@@ -385,11 +396,16 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
             return;
         }
         if (res?.ok && res.landed) {
-            setHaul({
-                art: res.catchResult?.fish?.art || res.fish?.art || res.catchResult?.art || res.art || null,
-                name: res.catchResult?.fish?.name || res.fish?.name || null,
-                kind: "fish",
-            });
+            // ── EVERYTHING SURFACES, INCLUDING THE TREASURE ──────────────────────────────────────────
+            // A chest used to skip the water entirely and appear on a card, which made the one haul with the
+            // best art in it the only one you never watched come up. Both paths feed the same rise now: a
+            // treasure haul draws its prize's own sprite (`prize.spriteUrl`, already on every treasure the
+            // table can produce) and a fish draws its species plate, which is resolved from the id here the
+            // same way the reveal card resolves it.
+            const landedNow = res.catchResult || res;
+            setHaul(landedNow.treasure
+                ? { art: landedNow.prize?.spriteUrl || "/images/sailing/dig-chest.png", name: landedNow.prize?.label || "Treasure", kind: "treasure" }
+                : { art: landedNow.fish?.id ? `/images/fish/${landedNow.fish.id}.png` : null, name: landedNow.fish?.name || null, kind: "fish" });
             // `catchResult`, NOT `res`. fishLand returns the catch spread UNDER the whole sailing state, and
             // that state carries `gold` = the member's total balance — so `res.gold` is your wallet, not the
             // payout. A 12-gold Tiger Prawn proudly reported "+1879 🪙". XP looked fine only because the
@@ -425,6 +441,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
         const untilBite = Number(hooked.biteAt) - Date.now();
         if (untilBite > 0) {
             setPhase("waiting");
+            tellTimer.current = setTimeout(() => setPhase("tell"), Math.max(120, untilBite - TELL_MS));
             biteTimer.current = setTimeout(() => { setPhase("bite"); sfx.bite(); graceTimer.current = setTimeout(reportMiss, BITE_HOLD_MS); }, untilBite);
         } else if (Date.now() - Number(hooked.biteAt) < Number(hooked.graceMs || 12000)) {
             setPhase("bite");
@@ -512,7 +529,7 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                         </div>
                         {fishing?.totalCaught ? <p className="muted fish-tally">{fishing.totalCaught} fish landed all-time</p> : null}
                     </div>
-                ) : phase === "waiting" || phase === "bite" || phase === "hauling" ? (
+                ) : phase === "waiting" || phase === "tell" || phase === "bite" || phase === "hauling" ? (
                     /* ── THE WHOLE MINIGAME, REPLACED ────────────────────────────────────────────────────
                        Was: a text line saying "waiting for a bite", then a TAP button, then a hold-to-reel
                        bar with a moving green zone. Three screens of instruction for an action Luke was
