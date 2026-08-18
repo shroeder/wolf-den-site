@@ -260,6 +260,8 @@ export async function arenaPower(buyerId) {
 // `opts.skillTree` swaps in a different allocation WITHOUT writing one — for asking "how far would this person
 // get with the tree finished" without touching their account or hand-rebuilding derived numbers somewhere else
 // (which drops the upgrade perks that share the same bag, and quietly reports LOWER health than they have).
+// `opts.equippedStats` does the same for the wardrobe, so "what is a fully forged set worth" can be answered
+// by the engine instead of by arithmetic in a script.
 export async function kitFor(buyerId, opts = {}) {
     const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
         import("@/lib/marketplace/inventory.js"),
@@ -282,7 +284,7 @@ export async function kitFor(buyerId, opts = {}) {
     // socketed jewels, merged. Both sides of a member bout run through this same function, so the matchup
     // stays honest; the Gauntlet's tiers are fixed power, which means investment now tells against them, which
     // is the entire point of investing.
-    const gearStats = await getEquippedStats(buyerId).catch(() => ({}));
+    const gearStats = opts.equippedStats || await getEquippedStats(buyerId).catch(() => ({}));
 
     // See combatStats: gear alone is only half of what pays for a swing.
     const stats = await combatStats(buyerId, gearStats, ids);

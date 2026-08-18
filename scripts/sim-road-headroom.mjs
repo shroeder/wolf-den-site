@@ -14,6 +14,8 @@ import { ladderFoe, ladderDr, LADDER_SIZE } from "../src/lib/marketplace/arena-l
 import { statsForPower, npcAbilities } from "../src/lib/marketplace/arena-npc.js";
 import { arenaRating, ringStats } from "../src/lib/marketplace/arena-engine.js";
 import { treeFor } from "../src/lib/marketplace/arena-classes.js";
+import { itemById } from "../src/lib/marketplace/items.js";
+import { getEquippedIds, getEquippedStats } from "../src/lib/marketplace/inventory.js";
 import { db } from "../src/lib/db.js";
 import { bout } from "./lib/sim-harness.mjs";
 
@@ -53,6 +55,38 @@ const spentNow = Object.values(me.taken || {}).reduce((s, n) => s + (Number(n) |
 const spentFull = Object.values(fullTree).reduce((s, n) => s + (Number(n) || 0), 0);
 const full = await kitFor(row.id, { skillTree: fullTree });
 
+// ── AND THE WARDROBE, FULLY WORKED ───────────────────────────────────────────────────────────────────────────
+// Base gear is capped and the owner is at it. What is NOT capped is what you put INTO the gear: the Forge lets
+// every stat be raised by half its base again (ENHANCE_CAP_FRAC), and his equipped pieces sit at +2 to +7 of a
+// possible +15 with one socket filled out of ten.
+//
+// This projects the Forge lane at its ceiling — every equipped stat at its per-stat cap — on top of whatever
+// he already has, and hands it to kitFor as the wardrobe. Gems are deliberately NOT projected: their value
+// depends on which gems, and overstating a lane while measuring it is how a balance answer becomes a wish.
+const eqIds = Object.values(await getEquippedIds(row.id)).filter(Boolean);
+const nowStats = await getEquippedStats(row.id);
+// SUMMED ACROSS THE TEN PIECES, not maxed. The first cut compared a single item's projected total against
+// `nowStats`, which is already the sum of all ten — so the max was always the existing figure and the row came
+// back byte-identical to today's, quietly reporting that the Forge is worth nothing.
+const forgedStats = { ...nowStats };
+const forgeAdd = {};
+for (const id of eqIds) {
+    const base = itemById(id)?.stats || {};
+    for (const [k, v] of Object.entries(base)) {
+        const cap = Math.max(3, Math.ceil((Number(v) || 0) * 0.5)); // ENHANCE_CAP_FRAC
+        forgeAdd[k] = (forgeAdd[k] || 0) + cap;
+    }
+}
+// Whatever the Forge has already given him is inside `nowStats`, so the ceiling is base + the full cap — take
+// the higher of that and what he holds, per stat, rather than stacking his existing enhance on top of the cap.
+const baseTotal = {};
+for (const id of eqIds) for (const [k, v] of Object.entries(itemById(id)?.stats || {})) baseTotal[k] = (baseTotal[k] || 0) + (Number(v) || 0);
+for (const k of Object.keys(forgeAdd)) {
+    forgedStats[k] = Math.max(Number(nowStats[k]) || 0, (baseTotal[k] || 0) + forgeAdd[k]);
+}
+const forged = await kitFor(row.id, { equippedStats: forgedStats });
+const bothMaxed = await kitFor(row.id, { equippedStats: forgedStats, skillTree: fullTree });
+
 function walk(fighterMe) {
     let wall = 0;
     for (let rung = 1; rung <= LADDER_SIZE; rung += 1) {
@@ -71,7 +105,9 @@ console.log(`  skill points spent: ${spentNow} of ${spentFull} available
 
 const rows = [
     { lane: "as they are today", me },
+    { lane: "+ every piece fully forged", me: forged },
     { lane: "+ finished skill tree", me: full },
+    { lane: "+ both", me: bothMaxed },
 ];
 console.table(rows.map((r) => ({
     loadout: r.lane,
