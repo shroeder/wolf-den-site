@@ -254,7 +254,10 @@ export async function arenaPower(buyerId) {
 }
 
 // Everything a loadout brings to the ring: stats, affinity, abilities, and how hard their ring is to face.
-async function kitFor(buyerId) {
+// EXPORTED so a balance script can ask "how far does THIS member get" without rebuilding a fighter. The four
+// stat sources this merges (gear, tree, badges, pets) are the reason a hand-built one lies — see the note
+// above, where two of the four were missing and the Arena looked like it had broken damage.
+export async function kitFor(buyerId) {
     const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
         import("@/lib/marketplace/inventory.js"),
         import("@/lib/marketplace/signatures.js"),

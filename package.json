@@ -25,7 +25,8 @@
     "check:sets": "node scripts/check-sets.mjs",
     "check:tree": "node scripts/check-tree.mjs",
     "check:hook-deps": "node scripts/check-hook-deps.mjs",
-    "sim:road": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-road.mjs"
+    "sim:road": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-road.mjs",
+    "sim:road:me": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-me.mjs"
   },
   "keywords": [],
   "author": "",
