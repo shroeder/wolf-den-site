@@ -350,7 +350,7 @@ export default function CookingClient({ initial }) {
                                     <span className="ck-recipe-copy">
                                         <span className="ck-recipe-name">{r.name}</span>
                                         <span className="ck-recipe-tier">
-                                            {r.tierName}{r.kind === "prep" ? " · prep" : ""}{r.known && r.timesCooked ? ` · made ${r.timesCooked}×` : ""}
+                                            {r.tierName}{r.kind === "prep" ? " · prep" : r.kind === "bait" ? " · bait" : ""}{r.known && r.timesCooked ? ` · made ${r.timesCooked}×` : ""}
                                         </span>
                                     </span>
                                     {r.known
@@ -419,7 +419,7 @@ export default function CookingClient({ initial }) {
                                         {r.makes ? (
                                             <div className="ck-makes">
                                                 <Art sprite={r.makes.sprite} fallback="/images/cooking/prep.png" size={30} alt={r.makes.name} />
-                                                <span><b>{r.makes.name}</b> — a prepped ingredient other recipes call for.</span>
+                                                <span><b>{r.makes.name}</b> — {r.makes.note || "a prepped ingredient other recipes call for."}</span>
                                             </div>
                                         ) : (
                                             <div className="ck-pool">
@@ -567,7 +567,10 @@ export default function CookingClient({ initial }) {
                             <span className="ck-tag run">Timing {pctText(result.quality)} · best chain ×{result.chain} · +{result.xp} XP</span>
                         </div>
                         <button type="button" className="btn ck-reveal-btn" onClick={() => setResult(null)}>
-                            {result.made.kind === "prep" ? "Into the pantry" : "Into the stash"}
+                            {/* Bait goes to the PANTRY, like a prep — addToPantry() is what cooks it in. This
+                                asked "is it a prep?" and so told you to look in the stash for something that
+                                was never going to be there. The stash is for dishes. */}
+                            {result.made.kind === "dish" ? "Into the stash" : "Into the pantry"}
                         </button>
                     </div>
                 </div>

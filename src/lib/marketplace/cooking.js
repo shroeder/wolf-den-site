@@ -932,7 +932,14 @@ export async function getKitchenState(buyerId) {
                     : m.kind === "fish" ? { href: "/marketplace/fishing", label: "Catch it out at sea" } : null,
             };
         });
-        const outMeta = r.kind === "prep" ? ingredientMeta(r.out, sprites) : null;
+        // ── BAIT HAS AN `out` TOO ────────────────────────────────────────────────────────────────────────
+        // This asked "is it a prep?" when the real question is "does it make a specific thing?". Bait does —
+        // it is shaped exactly like a prep, which its own definition says — so it fell through to `null`, and
+        // a null `makes` is what the card treats as "this rolls a reward ladder". A bait recipe therefore
+        // opened onto the dish ladder's explanation followed by an EMPTY ladder, and never once named the bait
+        // it produces or what that bait is worth.
+        const outMeta = (r.kind === "prep" || r.kind === "bait") ? ingredientMeta(r.out, sprites) : null;
+        const outBait = r.kind === "bait" ? BAITS[r.out] : null;
         return {
             id: r.id, name: r.name, tier: r.tier, flavor: r.flavor, kind: r.kind,
             sprite: sprites[r.id] || null,
@@ -942,7 +949,14 @@ export async function getKitchenState(buyerId) {
             source: recipeSource(r),
             // A prep says exactly what it makes; a dish says which pool it rolls from. Either way there is no
             // guessing about what pressing the button gets you.
-            makes: outMeta ? { ref: outMeta.ref, name: outMeta.name, sprite: outMeta.sprite } : null,
+            // `note` is what the card says about it. A prep is an ingredient for the next recipe; a bait is
+            // spent on a cast and its whole point is the rarity it buys you, so it says the number.
+            makes: outMeta ? {
+                ref: outMeta.ref, name: outMeta.name, sprite: outMeta.sprite,
+                note: outBait
+                    ? `bait for the water, worth +${(outBait.tilt || 0).toFixed(1)} rarity on a cast.`
+                    : "a prepped ingredient other recipes call for.",
+            } : null,
             // What a dish can actually pay, with the gold floor stated separately — the roll is a bonus ON TOP
             // of a guaranteed purse, and hiding that made cooking look like a lottery with a lot of blanks.
             payout: r.kind === "dish" ? {
