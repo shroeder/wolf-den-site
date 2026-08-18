@@ -324,10 +324,57 @@ export const PREPS = {
 };
 export const prepMeta = (id) => PREPS[id] || null;
 
+// ── BAIT ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// Twenty dishes the Kitchen cooks FOR THE WATER. A bait is not a third kind of thing bolted onto cooking — it
+// is a dish whose output goes to the pantry like a prep, and whose only use is that fishing will spend one.
+//
+// WHAT IT DOES, MECHANICALLY. `tilt` is added to fishing's `rareTilt`, which is the multiplier already
+// applied to every non-common species' odds:  weight = odds * (1 + rareTilt). That is the same number the
+// Angling track, the Lure upgrade and a sea pet's bite feed, so bait is measured in a unit the game already
+// has rather than inventing a parallel one. The Lure track tops out around 3 and Full Creel — a once-a-day
+// ascension power — is worth 9, so the ladder below (1 → 7) sits deliberately underneath the best power in
+// the game and above an ordinary upgrade.
+//
+// COOKING A BAIT IS A CHOICE, NOT A FREEBIE. Every one of these eats ingredients that could have been a dish
+// instead, and the good ones eat the same legendary preps the top of the recipe book wants. That is the whole
+// trade: a Star Essence spent on bait is a Star Essence not spent on the Kitchen's own ladder.
+export const BAITS = {
+    // Tier 1 — what you make out of what the farm already gives you.
+    b_dough_ball:   { name: "Dough Ball",          rarity: "common",    tilt: 1.0, blurb: "It sinks, it swells, it works. Barely." },
+    b_worm_pot:     { name: "Potted Worms",        rarity: "common",    tilt: 1.2, blurb: "Dug out of the carrot bed. Nobody watched." },
+    b_bread_crust:  { name: "Baited Crust",        rarity: "common",    tilt: 1.4, blurb: "Yesterday's flatbread, put to better use." },
+    b_corn_kernel:  { name: "Sweet Kernels",       rarity: "common",    tilt: 1.6, blurb: "Sweet enough that something always comes." },
+    // Tier 2 — the first baits worth carrying.
+    b_jam_paste:    { name: "Berry Paste",         rarity: "rare",      tilt: 2.0, blurb: "Sticky, red, and it clouds the water beautifully." },
+    b_cockle_mash:  { name: "Cockle Mash",         rarity: "rare",      tilt: 2.3, blurb: "Brined, crushed, and frankly appalling." },
+    b_syrup_pellet: { name: "Syrup Pellets",       rarity: "rare",      tilt: 2.6, blurb: "They dissolve slow and pull things up from the dark." },
+    b_pumpkin_chum: { name: "Pumpkin Chum",        rarity: "rare",      tilt: 3.0, blurb: "A whole roast pumpkin, over the side." },
+    // Tier 3 — you are fishing for something specific now.
+    b_smoked_strip: { name: "Smoked Strips",       rarity: "epic",      tilt: 3.5, blurb: "Two days over green wood, cut thin." },
+    b_roe_cluster:  { name: "Roe Cluster",         rarity: "epic",      tilt: 3.9, blurb: "Cured roe, bound in a knot of net." },
+    b_wine_soaked:  { name: "Wine-Soaked Bait",    rarity: "epic",      tilt: 4.3, blurb: "Dark wine, six months in the barrel, wasted on fish." },
+    b_fire_oil:     { name: "Fire-Oil Drizzle",    rarity: "epic",      tilt: 4.7, blurb: "Urchin oil. The water goes warm around it." },
+    // Tier 4 — the good stuff, and it costs what the good stuff costs.
+    b_glass_minnow: { name: "Glass Minnow",        rarity: "legendary", tilt: 5.1, blurb: "Carved, oiled, and it swims better than it should." },
+    b_deep_lure:    { name: "Deepwater Lure",      rarity: "legendary", tilt: 5.5, blurb: "Weighted for the cold layer nothing ordinary visits." },
+    b_marrow_paste: { name: "Marrow Paste",        rarity: "legendary", tilt: 5.9, blurb: "Leviathan marrow. It should not smell like that." },
+    b_storm_chum:   { name: "Storm Chum",          rarity: "legendary", tilt: 6.3, blurb: "Only worth throwing when the sky is wrong." },
+    // Tier 5 — four baits that are a decision, not a stock item.
+    b_star_bait:    { name: "Star-Cut Bait",       rarity: "mythic",    tilt: 6.7, blurb: "Star fruit, cut on the cross. It glows under the surface." },
+    b_kraken_ink:   { name: "Kraken Ink Chum",     rarity: "mythic",    tilt: 7.0, blurb: "Whatever comes for this was already looking for you." },
+    b_tidewyrm_cut: { name: "Tidewyrm Cut",        rarity: "mythic",    tilt: 7.3, blurb: "You are using a monster to catch a monster." },
+    b_leviathan_ch: { name: "Leviathan's Chum",    rarity: "mythic",    tilt: 7.6, blurb: "The whole bucket. The sea notices." },
+};
+
+export const baitById = (id) => BAITS[String(id || "")] || null;
+
 // ── RECIPES ──────────────────────────────────────────────────────────────────────────────────────────────
 // `need` is { ref → qty } over crops, fish and preps alike. A recipe is either a PREP (output goes back to the
 // pantry as an ingredient) or a DISH (output is a consumable rolled from the tier's pool).
 const R = (id, name, tier, need, flavor) => ({ id, name, tier, need, flavor, kind: "dish" });
+// A BAIT recipe. Shaped exactly like a prep — it has an `out` that lands in the pantry — because that is what
+// it is: something you cook in order to spend it somewhere else. Fishing is the only thing that spends it.
+const B = (id, name, tier, need, out, flavor) => ({ id, name, tier, need, out, flavor, kind: "bait" });
 const P = (id, name, tier, need, out, flavor) => ({ id, name, tier, need, out, flavor, kind: "prep" });
 
 export const RECIPES = [
@@ -346,6 +393,28 @@ export const RECIPES = [
     P("k_chilli",  "Draw the Fire Oil",  3, { fish_urchin: 2, corn: 2 },         "p_chilli",    "Handle the spines first. Everyone forgets once."),
     P("k_essence", "Distil the Star",    4, { starfruit: 3 },                    "p_essence",   "It hums faintly against the glass."),
     P("k_marrow",  "Render the Marrow",  4, { fish_whale: 1, fish_kraken: 1 },   "p_leviathan", "Nobody agrees on how it should be done."),
+
+    // ═══ BAIT · cooked for the water, spent on a cast ═══
+    B("kb_dough_ball",  "Roll a Dough Ball",     1, { p_dough: 1 },                        "b_dough_ball",   "The first thing anybody learns to throw."),
+    B("kb_worms",       "Pot the Worms",         1, { carrot: 2, potato: 1 },              "b_worm_pot",     "The bed was full of them anyway."),
+    B("kb_crust",       "Bait the Crust",        1, { p_flour: 2, wheat: 2 },              "b_bread_crust",  "Stale bread, salt, and a little patience."),
+    B("kb_kernels",     "Sweeten the Kernels",   1, { corn: 3, p_butter: 1 },              "b_corn_kernel",  "Butter, heat, and they split open."),
+    B("kb_paste",       "Work the Berry Paste",  2, { p_jam: 1, strawberry: 3 },           "b_jam_paste",    "Thin it with water or it just sits there."),
+    B("kb_cockle",      "Mash the Cockles",      2, { p_brine: 2, fish_sardine: 2 },       "b_cockle_mash",  "Hold your breath and keep stirring."),
+    B("kb_pellets",     "Press the Pellets",     2, { p_syrup: 1, p_flour: 2 },            "b_syrup_pellet", "Rolled small so they sink slowly."),
+    B("kb_chum",        "Chum the Pumpkin",      2, { p_puree: 1, pumpkin: 2 },            "b_pumpkin_chum", "A whole one, over the side, and wait."),
+    B("kb_strips",      "Cut the Smoked Strips", 3, { p_smoked: 1, fish_mackerel: 2 },     "b_smoked_strip", "Thin enough to move in the current."),
+    B("kb_roe",         "Bind the Roe",          3, { p_roe: 1, fish_perch: 2 },           "b_roe_cluster",  "Netting, twine, and a steady hand."),
+    B("kb_wine_bait",   "Soak it in Wine",       3, { p_wine: 1, fish_herring: 3 },        "b_wine_soaked",  "A waste of good wine. It works."),
+    B("kb_fire_oil",    "Drizzle the Fire Oil",  3, { p_chilli: 1, fish_urchin: 2 },       "b_fire_oil",     "Gloves. Every time. Ask anyone."),
+    B("kb_minnow",      "Carve a Glass Minnow",  4, { p_essence: 1, fish_smelt: 3 },       "b_glass_minnow", "Carved from the inside out."),
+    B("kb_deep_lure",   "Weight a Deep Lure",    4, { p_smoked: 2, fish_lionfish: 2 },     "b_deep_lure",    "Heavy enough to reach the cold layer."),
+    B("kb_marrow",      "Render the Marrow",     4, { p_leviathan: 1, fish_squid: 2 },     "b_marrow_paste", "Rendered slow. Do not do it indoors."),
+    B("kb_storm_chum",  "Mix the Storm Chum",    4, { p_roe: 2, fish_stormpike: 1 },       "b_storm_chum",   "Made to be thrown into weather."),
+    B("kb_star_bait",   "Cut the Star Bait",     5, { starfruit: 2, p_essence: 1 },        "b_star_bait",    "On the cross, so every point catches the light."),
+    B("kb_kraken_ink",  "Draw the Kraken Ink",   5, { fish_kraken: 1, p_brine: 2 },        "b_kraken_ink",   "It stains everything it touches, permanently."),
+    B("kb_tidewyrm",    "Portion the Tidewyrm",  5, { fish_tidewyrm: 1, p_chilli: 1 },     "b_tidewyrm_cut", "One monster, cut down for another."),
+    B("kb_leviathan",   "Fill the Chum Bucket",  5, { fish_leviathan: 1, p_leviathan: 1 }, "b_leviathan_ch", "The whole bucket. Stand back."),
 
     // ═══ TIER 1 · Simple ═══
     R("r_porridge",    "Morning Porridge",   1, { wheat: 4 },                     "What the pack eats before a long day."),
@@ -639,6 +708,8 @@ const fishMeta = (ref) => FISH.find((f) => f.id === ref) || null;
 export function ingredientMeta(ref, sprites = {}) {
     const pr = PREPS[ref];
     if (pr) return { ref, kind: "prep", name: pr.name, fallback: KIND_FALLBACK.prep, rarity: pr.rarity, sprite: sprites[ref] || null };
+    const ba = BAITS[ref];
+    if (ba) return { ref, kind: "bait", name: ba.name, fallback: KIND_FALLBACK.prep, rarity: ba.rarity, sprite: sprites[ref] || null };
     const c = cropMeta(ref);
     if (c) return { ref, kind: "crop", name: c.name, fallback: KIND_FALLBACK.crop, rarity: c.rarity, sprite: sprites[`crop:${ref}`] || null };
     const f = fishMeta(ref);
@@ -671,6 +742,22 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
          ON CONFLICT (buyer_id, kind, ref) DO UPDATE SET qty = mkt_pantry.qty + EXCLUDED.qty`,
         [buyerId, kind, ref, Math.round(qty)]
     ).catch(() => {});
+}
+
+/**
+ * Take exactly one thing off the shelf, or report that it was not there.
+ *
+ * The conditional `qty >= $3` is the whole of it: two casts fired at once cannot both spend the last bait,
+ * because the second UPDATE matches no row and returns nothing. A read-then-write would have let them.
+ */
+export async function spendFromPantry(buyerId, kind, ref, qty = 1) {
+    if (!buyerId || !ref || qty <= 0) return false;
+    const got = await db.queryOne(
+        `UPDATE mkt_pantry SET qty = qty - $4
+          WHERE buyer_id = $1 AND kind = $2 AND ref = $3 AND qty >= $4 RETURNING qty`,
+        [buyerId, kind, ref, Math.round(qty)]
+    ).catch(() => null);
+    return Boolean(got);
 }
 
 // ── SUBSTITUTING OFF THE SHELF ───────────────────────────────────────────────────────────────────────────────
@@ -772,7 +859,12 @@ export async function pendingRecipeReveals(buyerId) {
             // A prep says what it produces; a dish pays from its tier's ladder.
             makes: rec.kind === "prep"
                 ? { name: PREPS[rec.out]?.name || rec.out, sprite: sprites[rec.out] || null, fallback: KIND_FALLBACK.prep }
-                : null,
+                : rec.kind === "bait"
+                    ? { name: BAITS[rec.out]?.name || rec.out, sprite: sprites[rec.out] || null, fallback: KIND_FALLBACK.prep,
+                        // The number is generated from the bait's own tilt rather than typed on the card, so a
+                        // retune can never leave the Kitchen advertising a boost fishing does not pay.
+                        note: `+${(BAITS[rec.out]?.tilt || 0).toFixed(1)} rarity when you cast with it` }
+                    : null,
         };
     }).filter(Boolean);
 }
@@ -1153,7 +1245,19 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
     };
 
     const spriteMap = await cookingSprites();
-    if (rec.kind === "prep") {
+    if (rec.kind === "bait") {
+        // ── COOKED FOR THE WATER ─────────────────────────────────────────────────────────────────────────
+        // A bait lands in the pantry like a prep, because that is the shape of it: a thing you cook in order
+        // to spend it somewhere else. It gets the portion roll for the same reason every other output does —
+        // a good cook makes more of what they were making.
+        const b = BAITS[rec.out] || {};
+        await addToPantry(buyerId, "bait", rec.out, serve(1));
+        made = {
+            kind: "bait", id: rec.out, name: b.name || rec.out,
+            desc: `Bait for the water — worth +${(b.tilt || 0).toFixed(1)} rarity on a cast.`,
+            rarity: b.rarity || "common", sprite: spriteMap[rec.out] || null,
+        };
+    } else if (rec.kind === "prep") {
         // A prep hands back an INGREDIENT, not a consumable — a good run just makes more of it.
         // Prep Cook (Copper Kettle) is its own roll on top of the portion roll — prepping is the grind, so the
         // pet that helps with it should be felt on the prep chain specifically.

@@ -29,14 +29,27 @@ const sql = neon(DB_URL);
 
 // Parsed straight out of cooking.js so this can never drift from the catalogue it's drawing.
 const src = fs.readFileSync("src/lib/marketplace/cooking.js", "utf8");
-const RECIPES = [...src.matchAll(/^\s+([RP])\("([a-z_0-9]+)",\s*"([^"]+)",\s*(\d)/gm)]
-    .map((m) => ({ ref: m[2], name: m[3], tier: Number(m[4]), kind: m[1] === "P" ? "prep" : "dish" }));
+// B() joins R and P here: twenty of the Kitchen's recipes are BAIT now, and a generator that only knew two
+// letters would have left every one of them with no art while reporting success.
+const RECIPES = [...src.matchAll(/^\s+([RPB])\("([a-z_0-9]+)",\s*"([^"]+)",\s*(\d)/gm)]
+    .map((m) => ({ ref: m[2], name: m[3], tier: Number(m[4]), kind: m[1] === "P" ? "prep" : m[1] === "B" ? "baitprep" : "dish" }));
 const PREPS = [...src.matchAll(/^\s+(p_[a-z]+):\s*\{ name: "([^"]+)"/gm)].map((m) => ({ ref: m[1], name: m[2], kind: "ingredient" }));
-const ALL = [...RECIPES, ...PREPS];
+// The bait ITEMS, which are what the pantry holds and the fishing screen shows — a separate picture from the
+// recipe that makes them, exactly as a prep and its recipe are separate.
+const BAITS = [...src.matchAll(/^\s+(b_[a-z_]+):\s*\{ name: "([^"]+)"/gm)].map((m) => ({ ref: m[1], name: m[2], kind: "bait" }));
+const ALL = [...RECIPES, ...PREPS, ...BAITS];
 
 function promptFor(item) {
     if (item.kind === "ingredient") {
         return `A single prepared cooking INGREDIENT for a fantasy cooking game: ${item.name}. Shown on its own as one clear object — a sack, jar, crock, bottle, block or bundle as suits it. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, warm rustic fantasy kitchen palette, strong readable silhouette, centered, fills most of the frame, viewed straight on. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no table, no glow, no vignette, no drop shadow, no plate under it. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
+    }
+    if (item.kind === "bait") {
+        // A bait is a thing you throw in the water, not a plated dish — same house style, different subject,
+        // or twenty of these come back looking like dinner.
+        return `A single piece of fishing BAIT for a fantasy game: ${item.name}. One clear object as suits it — a baited hook, a packed ball, a jar of chum, a carved lure, a bundle on a line. Slightly wet, coastal, workmanlike. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, weathered dockside palette of rope, brine and rust with the bait's own colour dominant, strong readable silhouette, centered, fills most of the frame, viewed straight on. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no water, no table, no glow, no vignette, no drop shadow. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
+    }
+    if (item.kind === "baitprep") {
+        return `A fantasy game icon for PREPARING fishing bait, a task called "${item.name}": the tools and raw materials of that job arranged as one compact object group on a dockside workbench — knife, twine, bucket, jar, cut ingredients. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, weathered dockside palette, strong readable silhouette, centered, fills most of the frame. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no table, no glow, no drop shadow. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
     }
     if (item.kind === "prep") {
         return `A fantasy cooking-game icon for a PREPARATION step called "${item.name}": the tools and raw materials of that task arranged as one compact object group. Bold stylized 2D game item icon, dark ink contour lines, cel-shaded flat vibrant colors, warm rustic fantasy kitchen palette, strong readable silhouette, centered, fills most of the frame. Die-cut on a FULLY TRANSPARENT background — no backdrop, no scene, no table, no glow, no drop shadow. No text, no letters, no numbers, no logo, no watermark, no border. Must stay clearly legible shrunk to 32 pixels.`;
@@ -47,7 +60,7 @@ function promptFor(item) {
 const argv = process.argv.slice(2);
 const done = new Set((await sql`SELECT ref FROM mkt_cooking_sprite`).map((r) => r.ref));
 const todo = (argv.length ? ALL.filter((x) => argv.includes(x.ref)) : ALL.filter((x) => !done.has(x.ref)));
-console.log(`catalogue: ${RECIPES.length} recipes + ${PREPS.length} prepped ingredients`);
+console.log(`catalogue: ${RECIPES.length} recipes + ${PREPS.length} prepped ingredients + ${BAITS.length} baits`);
 console.log(`generating ${todo.length} sprite(s)…`);
 
 // CONCURRENCY. The first version of this was a plain sequential loop: fire one image, wait ~15 seconds, fire

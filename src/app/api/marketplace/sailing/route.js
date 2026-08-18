@@ -81,7 +81,9 @@ export async function POST(request) {
                 case "market_day": return noStore(await marketDay(g.buyer.id));
                 // Fishing. `sky` is what the client says it's rendering — it only gates which SPECIES can bite,
                 // and the time-of-day half of that gate is recomputed server-side (see fishing.js).
-                case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky }));
+                // `bait` is a pantry ref the server verifies and SPENDS before it tilts anything — a made-up
+                // id simply finds nothing on the shelf and the cast proceeds unbaited.
+                case "fish_cast": return noStore(await fishCast(g.buyer.id, { sky: body.sky, bait: body.bait || null }));
                 case "fish_land": return noStore(await fishLand(g.buyer.id, { quality: body.quality, missed: body.missed, sky: body.sky }));
                 case "fish_records": return noStore({ ok: true, ...(await fishRecords(g.buyer.id)) });
                 case "fish_recharge": return noStore(await fishRecharge(g.buyer.id));

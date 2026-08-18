@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { baitById, spendFromPantry } from "@/lib/marketplace/cooking.js";
 import { awardXp } from "@/lib/marketplace/xp.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { addChests } from "@/lib/marketplace/chests.js";
@@ -674,7 +675,7 @@ async function bankedCasts(buyerId, dailyMax) {
     return Math.min(7, Number(row?.missed) || 0) * Math.max(1, dailyMax);
 }
 
-export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}) {
+export async function castLine(buyerId, { status = "sailing", angling = 0, bait = null } = {}) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     if (status === "digging") return { ok: false, error: "not_at_sea" }; // ashore with a shovel, not on the boat
     const row = await readFishRow(buyerId);
@@ -707,7 +708,24 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
     // the used count, which is already in hand two lines up.
     const castPowers = await equippedPowers(buyerId);
     const firstCastToday = castsUsed(row) === 0;
-    let rareTilt = anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100;
+    // ── BAIT, SPENT HERE ─────────────────────────────────────────────────────────────────────────────────
+    // The Kitchen cooks twenty of them and this is the only thing that spends one. It is CONSUMED before the
+    // roll and only if the pantry actually held it — a bait that failed to leave the shelf must not tilt the
+    // water, or the shelf becomes infinite.
+    //
+    // It adds to `rareTilt`, the multiplier already applied to every non-common species' odds, which is the
+    // same number Angling, the Lure track and a sea pet's bite feed. Measured in the game's own unit rather
+    // than a parallel one, so its worth is legible against the things beside it.
+    let baitUsed = null;
+    if (bait) {
+        const def = baitById(bait);
+        if (def) {
+            const spent = await spendFromPantry(buyerId, "bait", bait, 1).catch(() => false);
+            if (spent) baitUsed = { id: bait, name: def.name, tilt: def.tilt, rarity: def.rarity };
+        }
+    }
+    let rareTilt = anglingEffects(angling).rareTilt + fishTrackValue("lure", lv.lure) + seaPets.bite / 100
+        + (baitUsed?.tilt || 0);
     if (castPowers.has("long_haul") && oneIn(4)) rareTilt += 2;        // two tiers rarer than it rolled
     if (castPowers.has("full_creel") && firstCastToday) rareTilt += 9; // the rarest thing in the water
     let species = rollSpecies(rareTilt);
@@ -759,6 +777,10 @@ export async function castLine(buyerId, { status = "sailing", angling = 0 } = {}
             fight: state.treasure ? (state.treasure.tier || "common") : species.rarity,
         },
         castsLeft: Math.max(0, max - (Number(cast.fish_casts) || 0)),
+        // WHAT THE BAIT BOUGHT, reported by the function that spent it. It was briefly attached to the
+        // LANDING instead, which is a different function that never sees `baitUsed` — lint:undef caught that
+        // before it shipped. The cast is the moment it leaves the shelf, so the cast is what says so.
+        bait: baitUsed,
     };
 }
 

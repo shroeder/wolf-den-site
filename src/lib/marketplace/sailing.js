@@ -1866,12 +1866,14 @@ export async function waveAtSailor(buyerId) {
 // ── FISHING ────────────────────────────────────────────────────────────────────────────────────────────
 // Thin wrappers so the fishing actions return the full sailing state like every other mutator, and so the ANGLING
 // points and the voyage status are resolved here (fishing.js stays free of the sea-affinity plumbing).
-export async function fishCast(buyerId, { sky = null } = {}) {
+export async function fishCast(buyerId, { sky = null, bait = null } = {}) {
     if (!fishingUnlocked(buyerId)) return { ok: false, error: "not_available" };
     void sky; // the weather gate is resolved server-side now — see getSailingState's note
     const [row, sea] = await Promise.all([readRow(buyerId), equippedSeaAffinity(buyerId)]);
     const status = decorate(row).status;
-    const res = await castLine(buyerId, { status, angling: seaEffects(sea).angling });
+    // The bait rides through to the species roll, where it is spent. Passed rather than resolved here: this
+    // wrapper's job is the sea-affinity plumbing, and fishing.js owns what a cast is worth.
+    const res = await castLine(buyerId, { status, angling: seaEffects(sea).angling, bait });
     return { ...res, ...(await getSailingState(buyerId)) };
 }
 
