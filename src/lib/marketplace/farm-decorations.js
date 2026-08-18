@@ -83,7 +83,7 @@ export async function buyDecoration(buyerId, decoId) {
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -def.price, "deco_buy", { balanceAfter: paid.gold, meta: { decoId } }).catch(() => {});
     await grantDecoration(buyerId, decoId, 1, "shop");
-    return { ok: true, decoId, gold: paid.gold, ...(await decoState(buyerId)) };
+    return { ok: true, decoId, gold: paid.gold, goldAfter: Number(paid.gold), ...(await decoState(buyerId)) };
 }
 
 // Aggregate the placed-decoration buffs for a member (drives passive farming bonuses). Returns % per stat.

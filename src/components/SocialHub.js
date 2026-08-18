@@ -479,11 +479,35 @@ function MsgRow({ it }) {
     );
 }
 
+// ── SEARCHING YOUR OWN FRIENDS ───────────────────────────────────────────────────────────────────────────────
+// There was no search on this tab at all. The only one in the hub is on Discover, and Discover exists to meet
+// people you do NOT know — it filters out everyone you are already friends with, so typing a friend's name
+// into the one visible search box returns "you're already friends with everyone here". SoullessShiitake
+// reported it as the friends search not working, which is exactly what it looks like from outside.
+//
+// This filters the list you already have, in the browser. No request, no endpoint: the friends list is
+// on screen, and the only thing missing was a way to narrow it. Matches display name or @handle.
 function FriendsTab({ data, busyId, onMessage, onRespond }) {
+    const [q, setQ] = useState("");
     if (data === null) return <p className="muted social-empty">Loading…</p>;
     const { friends = [], incoming = [] } = data;
+    const needle = q.trim().toLowerCase().replace(/^@/, "");
+    const shownFriends = needle
+        ? friends.filter((m) => `${m.name || ""} ${m.alias || ""}`.toLowerCase().includes(needle))
+        : friends;
     return (
         <div className="social-people">
+            {friends.length > 5 ? (
+                <input
+                    className="social-search"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Filter your friends…"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                />
+            ) : null}
             {incoming.length > 0 ? (
                 <>
                     <div className="social-section-label">Friend requests</div>
@@ -505,8 +529,10 @@ function FriendsTab({ data, busyId, onMessage, onRespond }) {
             <div className="social-section-label">Your friends{friends.length ? ` (${friends.length})` : ""}</div>
             {friends.length === 0 ? (
                 <p className="muted social-empty">No friends yet — head to Discover and add some.</p>
+            ) : shownFriends.length === 0 ? (
+                <p className="muted social-empty">No friend matches &ldquo;{q.trim()}&rdquo;. To add somebody new, try Discover.</p>
             ) : (
-                friends.map((m) => (
+                shownFriends.map((m) => (
                     <MemberHeroCard
                         key={m.id}
                         member={m}
@@ -677,7 +703,7 @@ function DiscoverTab({ q, setQ, results, busyId, onAdd, onMessage, onGotoFriends
             {results === null ? (
                 <p className="muted social-empty">Find people by @handle or display name.</p>
             ) : shown.length === 0 ? (
-                <p className="muted social-empty">{results.length ? "You're already friends with everyone here — search for someone new." : "No members match that search."}</p>
+                <p className="muted social-empty">{results.length ? "You're already friends with everyone that matches — Discover only shows people you haven't added. Use the Friends tab to find one you already have." : "No members match that search."}</p>
             ) : (
                 shown.map((m) => (
                     <MemberHeroCard

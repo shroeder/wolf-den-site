@@ -120,11 +120,28 @@ export default function PetsClient() {
     // Pet level-up / evolution celebration is handled site-wide by <PetLevelUp> (mounted in the layout), so it
     // fires anywhere in the app — not just here.
 
+    // ── WHICH ONE IS NEW ─────────────────────────────────────────────────────────────────────────────────
+    // The server flags any pet granted since this member last opened the page (petsState.newPets). Two things
+    // are done with it and they answer two different complaints: the celebration overlay — the same one a
+    // gifted pet already gets — is the pop-up ValkyrieSylve asked for, and the flag on the tile is the part
+    // GrayKitsune wanted, because a pop-up you dismiss still leaves you looking at a hundred identical cards.
+    //
+    // `newIds` is captured from the FIRST load and then held for the rest of the visit. Opening the page marks
+    // it seen server-side, so a later reload returns an empty list — and the flags would vanish mid-visit.
+    const [newIds, setNewIds] = useState(null);
+    const newSet = useMemo(() => new Set(newIds || []), [newIds]);
+    const [celebrateQueue, setCelebrateQueue] = useState([]);
+
     async function load() {
         const r = await fetch("/api/marketplace/pets", { cache: "no-store" }).catch(() => null);
         const d = r?.ok ? await r.json().catch(() => null) : null;
         if (!d) return;
         setState(d);
+        if (newIds === null) {
+            const fresh = (d.newPets || []).filter((id) => collectibleById(id));
+            setNewIds(fresh);
+            if (fresh.length) setCelebrateQueue(fresh.map((id) => collectibleById(id)));
+        }
     }
     useEffect(() => { load(); }, []);
 
@@ -136,6 +153,14 @@ export default function PetsClient() {
     const [modalErr, setModalErr] = useState(null);
     const [sending, setSending] = useState(false);
     const [celebrate, setCelebrate] = useState(null); // pet to show a receive/unlock celebration for
+    // One celebration at a time — earning two pets at once should be two moments, not a pile. Declared here
+    // rather than beside the queue itself because it reads `celebrate`, which is the line above.
+    useEffect(() => {
+        if (!celebrate && celebrateQueue.length) {
+            setCelebrate(celebrateQueue[0]);
+            setCelebrateQueue((q) => q.slice(1));
+        }
+    }, [celebrate, celebrateQueue]);
     const [detail, setDetail] = useState(null); // pet whose detail PAGE is open (in-flow, not a modal)
     // Give-a-copy: folded into the detail page as an expandable member-search panel (no more @handle typing).
     const [giveOpen, setGiveOpen] = useState(false);
@@ -582,6 +607,7 @@ export default function PetsClient() {
                         const lvl = owned ? state.petLevels?.[pet.id] : null;
                         return (
                             <button type="button" key={pet.id} onClick={() => openDetail(pet)} className={`pet-card pet-card-btn rarity-${pet.rarity}${owned ? " is-owned" : " is-locked"}${isFeatured ? " is-featured" : ""}${justEquipped === pet.id ? " just-equipped" : ""}`}>
+                                {newSet.has(pet.id) ? <span className="pet-new-badge">NEW</span> : null}
                                 {isFeatured ? <span className="pet-featured-badge">★ Equipped</span> : null}
                                 {lvl ? <span className="pet-level-badge"><Stars level={lvl.level} /></span> : null}
                                 <div className="pet-icon" data-petlvl={lvl ? lvl.level : undefined} style={{ color: pet.color }}><PetArt id={pet.id} url={leveledSprite(pet.id)?.url} flip={leveledSprite(pet.id)?.flip} /></div>

@@ -64,7 +64,7 @@ export const CONSUMABLES = {
     // SAILING relics — drop-only one-shots that bend the sailing systems. Used from your stash; effects land on
     // your next voyage / dig / raid (see the sail_* handlers in useConsumable).
     sail_war_drum: { name: "War Drum", emoji: "🥁", kind: "relic", price: null, desc: "Beat the drums to regain one spent daily raid.", effect: { type: "sail_raid" } },
-    sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next voyage is guaranteed to meet the Gold Merchant.", effect: { type: "sail_merchant" } },
+    sail_treasure_map: { name: "Treasure Map", emoji: "🗺️", kind: "relic", price: null, desc: "Your next landing is guaranteed to meet the Gold Merchant — including this one, if you are already ashore.", effect: { type: "sail_merchant" } },
     sail_lucky_lure: { name: "Lucky Lure", emoji: "🎣", kind: "relic", price: null, desc: "Your next dig pays +50% more doubloons for a chest you don't finish.", effect: { type: "sail_lure" } },
     sail_storm_bottle: { name: "Storm in a Bottle", emoji: "🌪️", kind: "relic", price: null, desc: "Uncork mid-voyage to HALVE the remaining sail time.", effect: { type: "sail_storm" } },
     sail_kraken_bait: { name: "Kraken Bait", emoji: "🦑", kind: "relic", price: null, desc: "Your next voyage is guaranteed a marine encounter.", effect: { type: "sail_encounter" } },
@@ -303,7 +303,11 @@ export async function useConsumable(buyerId, id, targetItemId = null, targetPetI
         if (!dec) return { ok: false, error: "none_owned" };
         let applied = "";
         if (e.type === "sail_raid") { await db.query(`UPDATE mkt_sailing SET raid_count = GREATEST(0, raid_count - 1) WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "One daily raid restored — go raiding!"; }
-        else if (e.type === "sail_merchant") { await db.query(`UPDATE mkt_sailing SET force_merchant = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next voyage will meet the Gold Merchant."; }
+        else if (e.type === "sail_merchant") {
+            // Dynamic import: sailing.js imports THIS module for grantConsumable, so a static one is a cycle.
+            const { applyTreasureMap } = await import("@/lib/marketplace/sailing.js");
+            applied = await applyTreasureMap(buyerId).catch(() => "Your next landing will meet the Gold Merchant.");
+        }
         else if (e.type === "sail_lure") { await db.query(`UPDATE mkt_sailing SET dig_lure = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {}); applied = "Your next dig will turn up +50% fragments."; }
         else if (e.type === "sail_storm") { await db.query(`UPDATE mkt_sailing SET returns_at = NOW() + (returns_at - NOW()) / 2 WHERE buyer_id = $1 AND returns_at > NOW()`, [buyerId]).catch(() => {}); applied = "The storm hurls you homeward — sail time halved!"; }
         else if (e.type === "sail_tailwind") { const h = Math.max(1, Number(e.hours) || 2); await db.query(`UPDATE mkt_sailing SET returns_at = GREATEST(NOW(), returns_at - ($2 || ' hours')::interval) WHERE buyer_id = $1 AND dig_state IS NULL AND returns_at > NOW()`, [buyerId, String(h)]).catch(() => {}); applied = `A strong gust fills your sails — ${h} hours shaved off the voyage!`; }

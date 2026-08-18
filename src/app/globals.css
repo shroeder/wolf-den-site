@@ -10325,6 +10325,16 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 .pet-locked { font-size: 0.74rem; color: #9a93a6; margin-top: 2px; }
 .pet-btn { margin-top: 4px; padding: 6px 12px; font-size: 0.8rem; }
 .pet-featured-badge { position: absolute; top: 6px; right: 6px; font-size: 0.62rem; font-weight: 800; color: #ffd75e; }
+/* ── NEW ── a pet granted since you last opened this page. The grid is a hundred near-identical cards and an
+   achievement pet used to land in it without a mark of any kind, so the one thing this has to survive is being
+   glanced at: a filled pill, not a coloured word. It shares the top-right corner with "★ Equipped", so when
+   both are on the same card the equipped line moves down a row rather than sitting underneath. */
+.pet-new-badge { position: absolute; top: 6px; right: 6px; z-index: 2; font-size: 0.55rem; font-weight: 900;
+    letter-spacing: 0.08em; color: #14202c; background: linear-gradient(180deg, #8ee6a0, #4fc76b);
+    border-radius: 999px; padding: 2px 7px; line-height: 1.2; box-shadow: 0 0 10px rgba(79,199,107,0.55);
+    animation: petNewPulse 2.2s ease-in-out infinite; }
+.pet-new-badge + .pet-featured-badge { top: 26px; }
+@keyframes petNewPulse { 0%, 100% { box-shadow: 0 0 6px rgba(79,199,107,0.4); } 50% { box-shadow: 0 0 14px rgba(79,199,107,0.85); } }
 .pet-level-badge { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.35); border-radius: 999px; padding: 2px 6px; line-height: 1; }
 /* Star meter (1–5) */
 .pet-stars { display: inline-flex; gap: 1px; font-size: 0.62rem; letter-spacing: 0; white-space: nowrap; }

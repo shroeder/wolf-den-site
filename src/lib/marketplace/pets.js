@@ -68,6 +68,27 @@ export async function syncPetAchievements(buyerId) {
         const ins = await db.query(`INSERT INTO mkt_cosmetic_unlock (buyer_id, category, ref) VALUES ($1, 'pet', $2) ON CONFLICT DO NOTHING RETURNING ref`, [buyerId, petId]).catch(() => []);
         if (ins.length) granted.push(petId);
     }
+    // ── A PET THAT ARRIVES WITHOUT A WORD ────────────────────────────────────────────────────────────────
+    // This function has always granted silently and thrown the list away at every call site, so an achievement
+    // pet simply appeared in a grid of a hundred others with nothing marking it as new. ValkyrieSylve asked for
+    // a pop-up; GrayKitsune put it exactly: "after you own them they don't show how/when they were unlocked, so
+    // when I unlock a new one I don't know which one is new."
+    //
+    // The push goes out from HERE rather than from the pets page, because that is the only place that knows a
+    // grant was genuinely new — and because the grant can now happen on a trade (see trade.js), which is not a
+    // page the member is looking at. The callers get the list back to celebrate on screen as well.
+    for (const petId of granted) {
+        const def = collectibleById(petId);
+        if (!def) continue;
+        await sendWebPush(buyerId, {
+            kind: "pet",
+            title: "🐾 New pet unlocked!",
+            body: def.achievement ? `${def.name} — ${def.achievement}` : `You unlocked ${def.name}.`,
+            url: "/marketplace/pets",
+            tag: `pet-unlock-${petId}`,
+            data: { type: "pet_unlock", petId },
+        }).catch(() => {});
+    }
     return granted;
 }
 
@@ -162,10 +183,25 @@ export async function petsState(buyerId, { sync = false } = {}) {
             petSprites[petId] = perLevel;
         }
     }
+    // ── WHICH ONE IS NEW ─────────────────────────────────────────────────────────────────────────────────
+    // Granted pets carry unlocked_at, so "new" is "granted since you last opened this page" (pets_seen_at,
+    // migration 387). Only GRANTED pets can be flagged: the level-unlocked ones (bunny, frog, chick, kitten,
+    // fox_kit, wolf_pup) have no row in mkt_cosmetic_unlock at all and never had a moment to stamp.
+    //
+    // A member who has never opened the page gets the last week rather than their whole history — otherwise
+    // every pet they have ever earned lights up at once, which marks nothing.
+    const newPetRows = await db.query(
+        `SELECT u.ref FROM mkt_cosmetic_unlock u JOIN mkt_buyer b ON b.id = u.buyer_id
+          WHERE u.buyer_id = $1 AND u.category = 'pet'
+            AND u.unlocked_at > COALESCE(b.pets_seen_at, NOW() - INTERVAL '7 days')`,
+        [buyerId]
+    ).catch(() => []);
+    const newPets = (newPetRows || []).map((r) => r.ref).filter((id) => ownedIds.includes(id));
+
     // The stones in hand and the pets already enshrined — the whole of the level-6 surface.
     const { ascensionState } = await import("@/lib/marketplace/pet-ascension.js");
     const ascension = await ascensionState(buyerId).catch(() => null);
-    return { ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
+    return { newPets, ownedIds, tradeableIds, earnedTradeableIds, featured: buyer?.featured_collectible || null, level, gold: buyer?.gold || 0, passiveTotals, signedIn: true, incoming, outgoing, realWorld: realWorldByPet, petLevels, petSprites, ascension, petWish: buyer?.pet_wish || null, breedersEye: await hasPower(buyerId, "breeder_s_eye").catch(() => false) };
 }
 
 /**

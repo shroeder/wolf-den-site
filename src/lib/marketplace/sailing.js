@@ -378,7 +378,6 @@ async function rollMerchant(buyerId) {
     }
 
     const forced = row.force_merchant === true; // Treasure Map guarantees the merchant this landing
-    if (forced) await db.query(`UPDATE mkt_sailing SET force_merchant = FALSE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
     const chance = forced ? 1 : MERCHANT_BASE_CHANCE + await merchantFindBonus(buyerId);
     let offer = { none: true };
     if (Math.random() < chance) {
@@ -390,7 +389,14 @@ async function rollMerchant(buyerId) {
         offer = { shop: stock, minigamePlayed: false, goldWon: 0, perfect: false, petGranted: null };
     }
     // Guard on merchant_json IS NULL so concurrent reads roll it exactly once.
-    const rolled = await db.queryOne(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL RETURNING buyer_id`, [buyerId, JSON.stringify(offer)]).catch(() => null);
+    //
+    // ── THE MAP IS SPENT BY THE ROLL, NOT BEFORE IT ──────────────────────────────────────────────────────
+    // `force_merchant` used to be cleared the moment we got this far, in its own statement, twenty lines above
+    // the write that actually delivers the merchant. Anything that lost the race to that write — a second
+    // concurrent read of the same landing — therefore burned somebody's Treasure Map and produced nothing.
+    // Clearing it in the SAME guarded update means the flag and the shelf are one decision: the roll that wins
+    // spends the map, and a roll that does not win leaves it in the pack for the next landing.
+    const rolled = await db.queryOne(`UPDATE mkt_sailing SET merchant_json = $2::jsonb, force_merchant = FALSE, updated_at = NOW() WHERE buyer_id = $1 AND merchant_json IS NULL RETURNING buyer_id`, [buyerId, JSON.stringify(offer)]).catch(() => null);
     if (rolled && !offer.none) {
         await grantEventBadge(buyerId, "merchant_met").catch(() => {}); // "Gold Rush" — met the merchant
         // Count the encounter; the exclusive elephant pet unlocks on the MERCHANT_PET_ENCOUNTERS-th meeting.
@@ -496,7 +502,11 @@ function toolsView(row) {
 const MILESTONES = [
     { level: 10, tier: 2, name: "Swift Cutter", perk: "The buried chest sits one dirt layer shallower", buried: 1 },
     { level: 20, tier: 3, name: "Trade Brig", perk: "Voyages are 10% faster", voyage: 0.9 },
-    { level: 30, tier: 4, name: "Trade-Wind Schooner", perk: "+12% chance a forged chest is upgraded a tier", chest: 0.12 },
+    // WAS "a forged chest is upgraded a tier". Forging is gone — you dig the real chest up now — so this read as
+    // a perk for a thing that no longer exists, which is how GrayKitsune and ValkyrieSylve both found it. The
+    // PERK never stopped working: `chest` feeds the same buried-chest tier roll it always did (boatPerks →
+    // rarityPct). Only the sentence was left behind, the same way the Ghost Ship's was at level 80.
+    { level: 30, tier: 4, name: "Trade-Wind Schooner", perk: "+12% chance the buried chest is a tier better", chest: 0.12 },
     { level: 40, tier: 5, name: "Gilded Galleon", perk: "15% chance a tailwind isn't used up", windSave: 0.15 },
     { level: 50, tier: 6, name: "Iron Man-o'-War", perk: "One corner of the chest always breaks the surface", surface: true },
     { level: 60, tier: 7, name: "Arcane Frigate", perk: "Voyages are another 10% faster", voyage: 0.9 },
@@ -1088,9 +1098,21 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
             level: rarityLevel, max: MAX_RARITY_LEVEL, cost: upgradeCost(rarityLevel), maxed: rarityLevel >= MAX_RARITY_LEVEL,
             pctNow: rarityPct(rarityLevel), pctNext: rarityPct(rarityLevel + 1),
         },
+        // ── LUCK BUYS A WAVE EVERY FOUR LEVELS, NOT EVERY LEVEL ─────────────────────────────────────────
+        // Two things were wrong with what this card said. It excluded `bonusWaves` (Tailwind sea affinity),
+        // so it disagreed with the Waves panel three inches below it — and because a wave only lands every
+        // WAVE_LUCK_PER levels, three purchases in four showed the same number on both sides of the arrow with
+        // nothing saying why. ValkyrieSylve bought Luck 5 expecting a wave: 4 → 4, because 4 and 5 are the same
+        // step. The level was not wasted (every track level is a boat level, and boat levels unlock the forms),
+        // but the card had no way to say so.
+        //
+        // `wavesAt` is the level the NEXT wave actually arrives at, so the client can name the real price of one
+        // instead of drawing an arrow between two identical numbers.
         luck: {
             level: luckLevel, max: MAX_LUCK_LEVEL, cost: upgradeCost(luckLevel), maxed: luckLevel >= MAX_LUCK_LEVEL,
-            wavesNow: wavesPerDay(luckLevel), wavesNext: wavesPerDay(luckLevel + 1),
+            wavesNow: wavesPerDay(luckLevel) + bonusWaves, wavesNext: wavesPerDay(luckLevel + 1) + bonusWaves,
+            perLevels: WAVE_LUCK_PER,
+            wavesAt: Math.min(MAX_LUCK_LEVEL, (Math.floor(luckLevel / WAVE_LUCK_PER) + 1) * WAVE_LUCK_PER),
         },
         raiding: {
             level: raidLevel, max: MAX_RAID_LEVEL, cost: upgradeCost(raidLevel), maxed: raidLevel >= MAX_RAID_LEVEL,
@@ -2927,6 +2949,35 @@ async function finishFleetBattle(buyerId, meta, res) {
 // Once a day, claimed atomically, so a double-tap cannot produce two shelves. And only when you are ASHORE:
 // the merchant is somebody you meet on the island, and conjuring one mid-crossing would make the landing —
 // the whole beat the roll exists to decorate — mean nothing.
+/**
+ * THE TREASURE MAP, APPLIED — "your next landing meets the Gold Merchant".
+ *
+ * The map sets `force_merchant` and the landing spends it (rollMerchant). That is correct while you are still
+ * at sea, and it is silently wrong the moment you are ASHORE: the merchant for this landing has already been
+ * rolled and latched into merchant_json, so rollMerchant returns at its first guard, and the map sits in the
+ * column doing nothing you can see until some later voyage. SoullessShiitake used one and said, reasonably,
+ * that it glitched — from the outside a guarantee that produces no merchant and no explanation is a bug
+ * whichever voyage it was quietly saved for.
+ *
+ * So: at sea, the flag rides to the landing as it always did. Ashore with the shelf already rolled and no dig
+ * begun, the latch is cleared and re-rolled on the spot — the same move Market Day makes, for the same reason.
+ * Ashore and already digging, the landing is over and the map honestly belongs to the next one.
+ *
+ * Returns the sentence to show the member, so the message matches what actually happened.
+ */
+export async function applyTreasureMap(buyerId) {
+    await db.query(`UPDATE mkt_sailing SET force_merchant = TRUE WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    const row = await readRow(buyerId);
+    const ashore = row?.departed_at && row?.returns_at && !row.encounter_paused_at
+        && Date.now() >= new Date(row.returns_at).getTime();
+    if (!ashore) return "The map is in your pack — the Gold Merchant is waiting when you make landfall.";
+    if (row?.dig_state) return "You have already started digging here, so the map keeps until your next landing.";
+    // Ashore, shelf already decided: tear it up and roll again, with the map's guarantee in force.
+    await db.query(`UPDATE mkt_sailing SET merchant_json = NULL, updated_at = NOW() WHERE buyer_id = $1`, [buyerId]).catch(() => {});
+    await rollMerchant(buyerId).catch(() => {});
+    return "The Gold Merchant is on the beach — go and see what's on the cart.";
+}
+
 export async function marketDay(buyerId) {
     if (!buyerId) return { ok: false, error: "not_signed_in" };
     const row = await readRow(buyerId);

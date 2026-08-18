@@ -90,5 +90,7 @@ export async function upgradePlotTrack(buyerId, slot, key) {
          ON CONFLICT (buyer_id, slot) DO UPDATE SET attrs = $3::jsonb, updated_at = NOW()`,
         [buyerId, s, JSON.stringify(next)]
     ).catch(() => {});
-    return { ok: true, slot: s, key, level: level + 1, gold: Number(paid.gold), attrs: next };
+    // `goldAfter` is the balance-only key the farm client applies to the purse; `gold` is kept because
+    // callers already read it, but it is the same number here and the client no longer trusts the name.
+    return { ok: true, slot: s, key, level: level + 1, gold: Number(paid.gold), goldAfter: Number(paid.gold), attrs: next };
 }

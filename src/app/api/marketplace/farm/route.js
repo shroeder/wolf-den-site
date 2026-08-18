@@ -84,7 +84,7 @@ export async function POST(request) {
                 else {
                     const buy = await buyConsumable(buyer.id, packId);
                     if (!buy?.ok) res = buy; // not_enough_gold / not_for_sale
-                    else { const r = await openConsumable(buyer.id, packId); res = { ...(r?.ok ? r : {}), ok: true, bought: true, gold: buy.gold, garden: await getGarden(buyer.id) }; }
+                    else { const r = await openConsumable(buyer.id, packId); res = { ...(r?.ok ? r : {}), ok: true, bought: true, gold: buy.gold, goldAfter: buy.gold, garden: await getGarden(buyer.id) }; }
                 }
             }
             else if (b?.action === "harvest") res = await harvestPlot(buyer.id, Number(b?.slot));

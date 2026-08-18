@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { getAuthenticatedBuyer } from "@/lib/marketplace/buyer-session.js";
 import { petsState, equipPet, unequipPet, buyPet, sharePet, acceptShare, declineShare, setPetWish } from "@/lib/marketplace/pets.js";
@@ -35,6 +35,11 @@ export async function GET(request) {
             const state = await petsState(buyer?.id || null, { sync: true });
             const income = buyer?.id ? await petIncomeRate(buyer.id).catch(() => null) : null;
             const sprites = await statSprites().catch(() => ({}));
+            // Opening the page IS seeing the new pets on it, so the "New" flags clear from here. Only on the
+            // FULL read — `peek` above is the background level-up watcher, and letting that mark the page seen
+            // would retire every flag before the member ever looked at one. Stamped after the response so it
+            // never delays the render, the same way the global chat clears its unread marker.
+            if (buyer?.id) after(() => db.query(`UPDATE mkt_buyer SET pets_seen_at = NOW() WHERE id = $1`, [buyer.id]).catch(() => {}));
             return NextResponse.json({ ...state, income, incomeEarned, statSprites: sprites }, { headers: { "Cache-Control": "no-store" } });
         } catch (error) {
             return internalError(error, { event: "marketplace.pets.state.failure" });

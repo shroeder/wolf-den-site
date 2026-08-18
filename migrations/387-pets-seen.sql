@@ -1,0 +1,14 @@
+-- Per-member read marker for the Pets page, so a newly unlocked pet can be flagged as new.
+--
+-- Achievement pets have always been granted silently into mkt_cosmetic_unlock and dropped into a grid of a
+-- hundred others with nothing marking them out. GrayKitsune: "after you own them they don't show how/when
+-- they were unlocked, so when I unlock a new one I don't know which one is new." ValkyrieSylve asked for a
+-- pop-up on the same thing.
+--
+-- mkt_cosmetic_unlock already stores unlocked_at, so "new" is just "granted since you last looked". Modelled
+-- on global_chat_seen_at (migration 280) — deliberately its own column, because being on the site is not the
+-- same as having opened the Pets page.
+--
+-- NULL means "never opened Pets". That is treated as "anything from the last week is new" rather than the
+-- member's whole history, so a long-standing account does not light up every pet it has ever earned.
+ALTER TABLE mkt_buyer ADD COLUMN IF NOT EXISTS pets_seen_at TIMESTAMPTZ;

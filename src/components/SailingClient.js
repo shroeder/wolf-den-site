@@ -662,9 +662,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         { action: "upgrade_rarity", art: "rarity", icon: "💎", name: "Rarity", data: state.rarity,
             desc: <>Better loot — a chance the chest buried on your island is <b>a tier better</b>.</>,
             effLabel: "Chest upgrade", now: `${state.rarity?.pctNow ?? 0}%`, next: `${state.rarity?.pctNext ?? 0}%` },
+        // Luck is the one track whose effect does NOT move every level — a wave lands every `perLevels` levels
+        // (4). Saying "greet more sailors each day" and then drawing 4 → 4 is how somebody buys a level for a
+        // wave that was never coming. So the rule is in the description, and when the next level is not the one
+        // that pays, the card names the level that is instead of repeating the same number after an arrow.
         { action: "upgrade_luck", art: "find", icon: "👋", name: "Luck", data: state.luck,
-            desc: <>Friendlier seas — greet more passing sailors each day for extra XP, coins &amp; travel time saved.</>,
-            effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`, next: `${state.luck?.wavesNext ?? 0}` },
+            desc: <>Friendlier seas — <b>+1 wave</b> a day every <b>{state.luck?.perLevels ?? 4} Luck levels</b>. Each wave greets
+                a passing sailor for XP, coins &amp; travel time saved. (Every level still raises your boat ⭐.)</>,
+            effLabel: "Waves / day", now: `${state.luck?.wavesNow ?? 0}`,
+            next: (state.luck?.wavesNext ?? 0) > (state.luck?.wavesNow ?? 0)
+                ? `${state.luck?.wavesNext ?? 0}`
+                : `${(state.luck?.wavesNow ?? 0) + 1} at Lv ${state.luck?.wavesAt ?? "—"}` },
     ];
     // Digging upgrade tracks (separate system) — gold-leveled; the tools unlock via excavation level.
     const pct = (v) => `${Math.round((v || 0) * 100)}%`;

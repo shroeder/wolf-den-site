@@ -256,7 +256,6 @@ export default function GameNav() {
     }, [inGame, pathname]);
 
     const [chests, setChests] = useState(0);
-    const [consumables, setConsumables] = useState(0); // unused potions/treats/relics — the Gear badge counts these too
     const [townTodo, setTownTodo] = useState(null); // { total, quests, well, tavern, event } from the town
     const [spins, setSpins] = useState(0);
     const [bossStrikes, setBossStrikes] = useState(0);
@@ -288,7 +287,6 @@ export default function GameNav() {
             // `attention`, which quietly made the cast badge below dead code.
             fetch("/api/marketplace/sailing/status", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!alive) return; setSailAttn(Boolean(d?.attention)); setCastsLeft(d?.casts || 0); setForgeReady(d?.forgeable || 0); }).catch(() => {});
             fetch("/api/marketplace/feature-daily?counts=1", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.counts) setFeatureClaims(d.counts); }).catch(() => {});
-            fetch("/api/marketplace/consumables", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive) setConsumables((d?.stash || []).reduce((s2, c) => s2 + (c.count || 0), 0)); }).catch(() => {});
             // Town is the one hub whose tasks are invisible from outside it — the pint, a claimable bounty and
             // the wish all sit behind a door you have to walk through. `todo=1` returns the counts alone rather
             // than the whole plaza, so the pill costs a small query and not a full town render.
@@ -323,12 +321,21 @@ export default function GameNav() {
 
     const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
     const badgeInfo = (href) => {
-        // Gear counts chests AND unused consumables: both are "you own something you haven't spent".
-        if (href === "/marketplace/inventory" && (chests + consumables) > 0) {
-            const bits = [];
-            if (chests > 0) bits.push(plural(chests, "chest") + " to open");
-            if (consumables > 0) bits.push(plural(consumables, "item") + " to use");
-            return { badge: chests + consumables, title: bits.join(" · ") };
+        // ── A BADGE IS A TO-DO, NOT AN INVENTORY COUNT ──────────────────────────────────────────────────
+        // This counted chests AND every unused consumable, on the reading that both are "you own something you
+        // haven't spent". They are not the same thing. An unopened chest is a single action with a reward
+        // inside it — you do it once and the number goes down. A stack of growth tonics is STOCK: you are
+        // holding it deliberately, there is nothing to do about it, and the count only ever goes up.
+        //
+        // So the Gear pill wore a permanent red number that no action could clear, and it trained people to
+        // ignore the one badge that also has to report a real chest. GrayKitsune: "an unused number glaring at
+        // me like a discord dm notification". Sunflower Jinxx said she kept opening Gear thinking she had
+        // missed something. SoullessShiitake asked for exactly this and nothing more: not the red dot.
+        //
+        // Chests only. Every other pill in this function counts something you can act on today; this one now
+        // does too. (The consumables fetch went with it — nothing else read the number.)
+        if (href === "/marketplace/inventory" && chests > 0) {
+            return { badge: chests, title: `${plural(chests, "chest")} to open` };
         }
         if (href === "/marketplace/boss" && bossStrikes > 0) return { badge: bossStrikes, title: `${plural(bossStrikes, "strike")} ready` };
         if (href === "/marketplace/spin" && spins > 0) return { badge: spins, title: `${plural(spins, "spin")} ready` };

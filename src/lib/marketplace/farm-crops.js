@@ -591,7 +591,9 @@ export async function buyFertilizer(buyerId) {
     if (!paid) return { ok: false, error: "insufficient" };
     await db.query(`UPDATE mkt_buyer SET farm_fertilizer = COALESCE(farm_fertilizer,0) + 1 WHERE id = $1`, [buyerId]).catch(() => {});
     await logCoin(buyerId, -FERTILIZER_PRICE, "farm_fertilizer", { balanceAfter: paid.gold }).catch(() => {});
-    return { ok: true, garden: await getGarden(buyerId) };
+    // The balance rides back so the client purse follows the spend (see gardenAct) — this returned the garden
+    // and nothing else, so buying fertiliser left the gold on screen at whatever it was on page load.
+    return { ok: true, goldAfter: Number(paid.gold), garden: await getGarden(buyerId) };
 }
 
 // Apply one fertilizer to a growing crop: removes 40% of its remaining time (once per crop).
@@ -668,7 +670,7 @@ export async function buyUpgrade(buyerId, key) {
         const allMaxed = Object.keys(FARM_UPGRADES).every((k) => (k === key ? level + 1 : lvl(up, k)) >= FARM_UPGRADES[k].max);
         if (allMaxed) await grantEventBadge(buyerId, "farm_steward").catch(() => {});
     }
-    return { ok: true, garden: await getGarden(buyerId) };
+    return { ok: true, goldAfter: Number(paid.gold), garden: await getGarden(buyerId) };
 }
 
 // Grant a seed (or a random weighted one) to a member. Called by other game systems when they "find" a seed;

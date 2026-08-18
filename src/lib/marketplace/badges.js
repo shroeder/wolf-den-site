@@ -178,10 +178,25 @@ export async function getMemberMetrics(buyerId) {
 
     // Farm ratings RECEIVED (Well-Liked / Adored), custom creations FINALIZED (First Creation / Artisan /
     // Gallery), and converted referrals (Recruiter / Pack Builder / Pack Leader) — one cheap count each.
-    const [ratingRow, creationRow, referralRow] = await Promise.all([
+    const [ratingRow, creationRow, referralRow, playerTradeRow] = await Promise.all([
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_farm_rating WHERE owner_id = $1`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_custom_deco WHERE buyer_id = $1 AND status = 'final'`, [buyerId]).catch(() => null),
         db.queryOne(`SELECT COUNT(*)::int AS n FROM mkt_buyer WHERE referred_by = $1 AND referral_reward_at IS NOT NULL`, [buyerId]).catch(() => null),
+        // ── A TRADE IS A TRADE ───────────────────────────────────────────────────────────────────────
+        // `trade_count` only ever counted mkt_trade_claim, which is the SHOP path: you trade cards in over
+        // the counter and scan the receipt. Member-to-member trades live in mkt_trade_offer and were counted
+        // by nothing, so "Completed your first trade" and the Raccoon ("Complete 5 trades") sat unearned for
+        // people who had done dozens. ValkyrieSylve reported it after running trades with SoullessShiitake
+        // and neither side moving. Both sides of an accepted offer count, which is what a trade means.
+        //
+        // Only the COUNT joins the two paths. `cards_traded`, `trade_value` and `top_card` are card and
+        // dollar figures off a real receipt — a player trade has no equivalent, and inventing one would put
+        // a number on those badges that no receipt backs.
+        db.queryOne(
+            `SELECT COUNT(*)::int AS n FROM mkt_trade_offer
+              WHERE status = 'accepted' AND (from_buyer_id = $1 OR to_buyer_id = $1)`,
+            [buyerId]
+        ).catch(() => null),
     ]);
 
     // Elite gear owned — counts of top-rarity items (drives the Ascendant/Eternal badges + pet unlocks).
@@ -244,7 +259,7 @@ export async function getMemberMetrics(buyerId) {
         farmRatingsReceived: ratingRow?.n || 0,
         creationsMade: creationRow?.n || 0,
         referralsConverted: referralRow?.n || 0,
-        tradeCount: tradeRow?.trades || 0,
+        tradeCount: (tradeRow?.trades || 0) + (playerTradeRow?.n || 0), // shop trade-ins + member-to-member trades
         cardsTraded: tradeRow?.cards || 0,
         tradeValue: Math.round(Number(tradeRow?.value_cents || 0) / 100),
         topCard: Math.round(Number(tradeRow?.top_cents || 0) / 100),

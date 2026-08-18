@@ -528,11 +528,28 @@ export default function FarmClient({ initial, viewingAlias }) {
 
     // ── Garden actions ── every response returns the fresh garden so the in-scene plots + the controls panel
     // stay in lockstep. Only wired on your own farm.
+    // ── THE WALLET FOLLOWS THE SPEND ─────────────────────────────────────────────────────────────────────
+    // Every garden action that costs gold reports the new balance, but only two callers were reading it, so
+    // the rest left `farm.wallet.gold` on whatever it was when the page loaded. That is what SoullessShiitake
+    // hit: the PlotUpgradeModal is handed `farm.wallet.gold`, so upgrading two tracks in a row showed the
+    // pre-upgrade purse the whole time and the second price looked affordable when it was not.
+    //
+    // Applied HERE rather than in each caller, so an action added later cannot forget.
+    //
+    // ONLY `goldAfter`, never `gold`. Across the farm routes `gold` means two different things — the BALANCE
+    // after a purchase (plot_upgrade, seedpack_buy) and the amount EARNED (harvest, encounter_resolve, which
+    // return the balance separately as `goldAfter`). Reading whichever was present would have set the purse to
+    // a harvest payout. So the balance-only key is the contract, and the two purchase paths were given it.
     const gardenAct = useCallback(async (body, key) => {
         setGardenBusy(key);
         const r = await post(body);
         setGardenBusy(null);
         if (r?.garden) setGarden(r.garden);
+        const bal = r?.goldAfter;
+        if (r?.ok && bal != null) {
+            setFarm((f) => (f?.wallet ? { ...f, wallet: { ...f.wallet, gold: Number(bal) } } : f));
+            try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } // the nav purse too
+        }
         return r;
     }, [post]);
     const plantSeedAt = useCallback(async (slot, seedId) => { setPlanting(null); await gardenAct({ action: "plant", slot, seedId }, `p-${slot}`); }, [gardenAct]);
@@ -544,7 +561,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Buy a seed pack right here (no shop trip) — spends gold, opens it, seeds land in the bag. Updates the wallet.
     const buySeedPack = useCallback(async (packId) => {
         const r = await gardenAct({ action: "seedpack_buy", packId }, `bp-${packId}`);
-        if (r?.ok) { SFX?.coin?.(); if (r.gold != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.gold } } : f)); }
+        if (r?.ok) SFX?.coin?.(); // the wallet is applied by gardenAct
         return r;
     }, [gardenAct]);
     const harvestAt = useCallback(async (slot) => {
@@ -563,8 +580,7 @@ export default function FarmClient({ initial, viewingAlias }) {
     // Claim a harvest critter's gift (pure upside — server grants the pre-rolled XP + gold + loot). Updates wallet.
     const resolveEncounterAt = useCallback(async () => {
         const r = await gardenAct({ action: "encounter_resolve" }, "enc");
-        if (r?.ok) { try { window.dispatchEvent(new Event("wolfden-hud-refresh")); } catch { /* ok */ } if (r.goldAfter != null) setFarm((f) => (f.wallet ? { ...f, wallet: { ...f.wallet, gold: r.goldAfter } } : f)); }
-        return r;
+        return r; // wallet + HUD are applied by gardenAct
     }, [gardenAct]);
     const buyFert = useCallback(() => gardenAct({ action: "fertilizer_buy" }, "fbuy"), [gardenAct]);
     const buyUpgradeKey = useCallback((key) => gardenAct({ action: "farm_upgrade", key }, `u-${key}`), [gardenAct]);

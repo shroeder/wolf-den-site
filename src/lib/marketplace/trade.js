@@ -12,6 +12,8 @@ import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
 import { transferItemEnhancement } from "@/lib/marketplace/crafting.js";
 import { transferItemElement } from "@/lib/marketplace/item-element.js";
+import { syncEarnedBadges } from "@/lib/marketplace/badges.js";
+import { syncPetAchievements } from "@/lib/marketplace/pets.js";
 
 const MAX_SIDE = 12; // items per side, sanity cap
 
@@ -414,6 +416,17 @@ export async function respondTrade(userId, offerId, action) {
     for (const id of requestedItems) await voidPendingTradesForItem(userId, id);
     await Promise.all([bumpGear(o.from_buyer_id), bumpGear(userId)]);
     await trackActivity(userId, "trade_accept", { offerId, from: o.from_buyer_id, giveItems: offeredItems.length, giveGold: o.offered_gold, givePets: offeredPets.length, getItems: requestedItems.length, getGold: o.requested_gold, getPets: requestedPets.length });
+    // ── THE TRADE COUNTS, ON BOTH SIDES, NOW ─────────────────────────────────────────────────────────────
+    // The trade badges and the Raccoon read `trade_count`, which now includes member-to-member trades (see
+    // getMemberMetrics). Syncing here rather than waiting for the next session load is the difference between
+    // the badge landing WITH the trade and landing silently some time later — and a badge you did not see
+    // arrive is one you never found out you earned.
+    await Promise.all([
+        syncEarnedBadges(userId).catch(() => []),
+        syncEarnedBadges(o.from_buyer_id).catch(() => []),
+        syncPetAchievements(userId).catch(() => []),
+        syncPetAchievements(o.from_buyer_id).catch(() => []),
+    ]);
     await notifyTradeOutcome(o, userId, "accepted");
     return { ok: true, status: "accepted" };
 }
