@@ -434,6 +434,24 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
     const [picking, setPicking] = useState(false);
     const baits = Array.isArray(fishing?.baits) ? fishing.baits : [];
 
+    // ── THE LIST HAS TO LOOK UNFINISHED WHEN IT IS ───────────────────────────────────────────────────────
+    // The box holds about five rows and there are twenty baits in the game. The cut falls neatly BETWEEN
+    // rows, so a full box looks like a complete list of five — and the only thing saying otherwise is a
+    // hairline scrollbar that a phone hides entirely until you are already scrolling. You cannot pick the
+    // bait you cannot see.
+    //
+    // So the wrapper carries `data-more`, and the fade below it only exists while there is something under
+    // the fold. Measured rather than assumed (`baits.length > 5` would be a magic number that has to be kept
+    // in step with a max-height in a different file), and re-measured on scroll so it clears at the bottom.
+    const listRef = useRef(null);
+    const [more, setMore] = useState(false);
+    const measure = useCallback(() => {
+        const el = listRef.current;
+        if (!el) return;
+        setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+    }, []);
+    useEffect(() => { if (picking) measure(); }, [picking, baits.length, measure]);
+
     const cast = useCallback(async (bait = null) => {
         if (busy) return;
         setPicking(false);
@@ -550,8 +568,12 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                             bait itself, so the picker cannot advertise a boost the cast does not apply. */}
                         {picking ? (
                             <div className="fish-bait" role="dialog" aria-label="Choose a bait">
-                                <p className="fish-bait-head">What are you putting on the hook?</p>
-                                <div className="fish-bait-list">
+                                <p className="fish-bait-head">
+                                    What are you putting on the hook?
+                                    {baits.length > 1 ? <span className="fish-bait-count">{baits.length} to choose from</span> : null}
+                                </p>
+                                <div className="fish-bait-scroll" data-more={more ? "1" : undefined}>
+                                <div className="fish-bait-list" ref={listRef} onScroll={measure}>
                                     {baits.map((b) => (
                                         <button key={b.id} type="button" className={`fish-bait-row is-${b.rarity}`}
                                             disabled={busy} onClick={() => cast(b.id)}>
@@ -569,6 +591,7 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                                             </span>
                                         </button>
                                     ))}
+                                </div>
                                 </div>
                                 <button type="button" className="fish-ghost" disabled={busy} onClick={() => cast(null)}>
                                     Skip baiting — cast the bare hook

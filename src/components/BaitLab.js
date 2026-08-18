@@ -65,9 +65,10 @@ export default function BaitLab({ kitchen, baits = [], sprites = {} }) {
         recharge: { available: true, cost: 400 },
         // `qty`, not `count` — that is the key baitStock() sends and the picker reads. Getting this wrong in a
         // fixture prints "rarity · left" with the number missing, which reads exactly like an app bug.
-        baits: baits.slice(0, 7).map((b, i) => ({
+        // ?n= how many baits the member is holding, so the picker can be judged at 1 and at all 20.
+        baits: baits.slice(0, Number(new URLSearchParams(window.location.search).get("n")) || 7).map((b, i) => ({
             id: b.id, name: b.name, rarity: b.rarity, tilt: b.tilt, blurb: b.blurb || "", sprite: b.sprite,
-            qty: [4, 3, 2, 2, 1, 1, 1][i] ?? 1,
+            qty: [4, 3, 2, 2, 1, 1, 1][i] ?? ((i % 3) + 1),
         })),
     }));
 

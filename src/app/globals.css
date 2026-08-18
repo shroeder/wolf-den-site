@@ -12725,7 +12725,22 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
 /* minmax(0,1fr) and min-width:0 together, and both are load-bearing: a grid item's default min-width is AUTO,
    so a row sized itself to its longest word and ran off the right edge — taking the "+5.5 rarity · 1 left"
    column with it, which is the one thing the picker exists to tell you. Caught on a 390px shot. */
-.fish-bait-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 42vh; overflow-y: auto; margin-bottom: 8px; }
+/* ── THE PICKER'S SCROLL ──────────────────────────────────────────────────────────────────────────────────
+   The box holds ~5 rows and the game has 20 baits, and the cut falls between rows — so a full box read as a
+   finished list of five. The wrapper carries the fade; it is on the WRAPPER and not the list because anything
+   inside a scroll container scrolls away with the content it is supposed to be sitting over.
+   `data-more` is set by measurement in FishingScene, so the fade is absent when everything already fits and
+   clears once you reach the bottom, instead of permanently dimming the last row. */
+.fish-bait-scroll { position: relative; }
+.fish-bait-scroll::after { content: ""; position: absolute; left: 0; right: 0; bottom: 8px; height: 34px;
+    pointer-events: none; opacity: 0; transition: opacity .18s ease; border-radius: 0 0 11px 11px;
+    background: linear-gradient(to bottom, rgba(6,14,20,0), rgba(6,14,20,0.92)); }
+.fish-bait-scroll[data-more]::after { opacity: 1; }
+/* overscroll-behavior: contain — without it, flicking past the last bait drags the whole page behind the
+   modal, which on a phone reads as the picker having thrown you out. */
+.fish-bait-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; margin-bottom: 8px; scrollbar-width: thin; }
+/* The count, so the number is stated rather than inferred from a scrollbar. */
+.fish-bait-count { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 700; color: #7f95a6; letter-spacing: .02em; }
 .fish-bait-row { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 7px 9px; cursor: pointer; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #eaf2f8; }
 .fish-bait-row:hover:not(:disabled) { background: rgba(120,200,255,0.14); border-color: rgba(120,200,255,0.5); }
 .fish-bait-row:disabled { opacity: .5; cursor: default; }
