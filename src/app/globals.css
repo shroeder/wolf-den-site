@@ -16943,3 +16943,11 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw[data-phase="tell"] .fw-bobber { animation: fwNudge .9s ease-in-out infinite; }
 @keyframes fwNudge { 0%, 100% { transform: translateY(0) rotate(-3deg); } 40% { transform: translateY(3px) rotate(6deg); } }
 .fw[data-phase="tell"] .fw-hint { color: #cfe6ff; }
+
+/* Only shown when the bait box is empty — the picker's absence is otherwise silent. */
+.fish-nobait { margin: 8px 0 0; padding: 8px 11px; border-radius: 10px; font-size: 0.78rem; line-height: 1.5;
+    text-align: center; color: rgba(255,255,255,0.78); background: rgba(126,200,255,0.09);
+    border: 1px solid rgba(126,200,255,0.26); }
+.fish-nobait b { color: #cfe6ff; }
+/* The scene sits inside the fishing card now (idle + miss), so it needs the card's rhythm around it. */
+.fish-stage .fw { margin-bottom: 10px; }

@@ -473,10 +473,20 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                     <FishingLog log={fishing?.log} known={fishing?.speciesKnown || 0} total={fishing?.speciesTotal || 0} records={records} onClose={() => setPhase("idle")} />
                 ) : phase === "idle" ? (
                     <div className="fish-stage">
-                        <div className="fish-idle-art">🎣</div>
+                        {/* ── THE BOAT IS ON SCREEN BEFORE YOU CAST ───────────────────────────────────────
+                            This was a 🎣 emoji the size of a thumbnail. The scene it replaces is the whole
+                            point of the feature and it was being hidden until after you pressed the button —
+                            so the screen you decide to fish FROM was the least interesting one in the loop.
+                            Same component, at rest: your hull, your hero, no line in the water yet. */}
+                        <FishingWater phase="idle" sky={sky} boat={boat} hero={hero} haul={null} />
+                        {/* WAS: "tap — then hold to reel and keep the fish in the green. A good reel lands a
+                            bigger fish." Every word of that described the reel minigame, which is deleted.
+                            Stale copy for a mechanic that no longer exists is the exact thing the Trade-Wind
+                            Schooner was reported for. */}
                         <p className="fish-copy">
-                            Drop a line over the rail. When it twitches, <strong>tap</strong> — then <strong>hold to reel</strong> and
-                            keep the fish in the green. A good reel lands a bigger fish.
+                            Drop a line over the rail and watch the float. Something will circle it, then take
+                            it under — <strong>tap</strong> the moment it does. Whatever is on the end comes up
+                            beside the boat, and not all of it is a fish.
                         </p>
                         {/* ── THE BAIT STEP ── every row states what it buys, and the number comes off the
                             bait itself, so the picker cannot advertise a boost the cast does not apply. */}
@@ -518,6 +528,18 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                                 way forward somewhere else on another screen — the same button you've been
                                 tapping simply changes what it offers, the way the raid and tailwind buttons do.
                                 Only when there's genuinely nothing left to offer does it disable. */}
+                            {/* ── WHY THERE IS NO BAIT PICKER ─────────────────────────────────────────────
+                                With an empty bait box the picker simply does not appear, so the step is
+                                invisible and there is nothing anywhere saying it exists or where bait comes
+                                from. Luke hit exactly this on his own feature: "there was no bait select, is
+                                this because I have no bait?" One line, only when the box is empty. */}
+                            {!baits.length && casts.left > 0 ? (
+                                <p className="fish-nobait">
+                                    No bait in the pantry — you can still cast a bare hook. Bait is <b>cooked</b>:
+                                    the Kitchen has four you already know how to make, and each one tilts the water
+                                    toward something rarer.
+                                </p>
+                            ) : null}
                             {casts.left > 0 || !buyable ? (
                                 <button type="button" className="fish-cta" disabled={busy || casts.left <= 0}
                                     onClick={() => (baits.length ? setPicking(true) : cast(null))}>
@@ -552,7 +574,9 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
                     />
                 ) : phase === "gone" ? (
                     <div className="fish-stage">
-                        <div className="fish-idle-art">💨</div>
+                        {/* The miss gets the water too — an empty float back on the surface says "it got away"
+                            in the same language the rest of the loop is written in. It was a 💨 emoji. */}
+                        <FishingWater phase="idle" sky={sky} boat={boat} hero={hero} haul={null} />
                         <p className="fish-copy">It stole your bait and slipped away.</p>
                         <p className="muted">Your cast came back — no harm done.</p>
                         <div className="fish-actions">

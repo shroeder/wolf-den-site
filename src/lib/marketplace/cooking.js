@@ -291,6 +291,21 @@ export function rewardLabel(r, art = {}) {
 const JACKPOT_RUNGS = 2;        // how many rungs off the top are the real prizes
 const JACKPOT_CHANCE = 0.22;    // ...and how often a cook good enough to reach them actually does
 
+// ── AND THE PLAYER HAS TO BE TOLD WHICH OF THOSE HAPPENED ────────────────────────────────────────────────────
+// Sunflower Jinxx, in the plaza: "I got 100% on my timing for cooking and it only gave me rung 5. Are those
+// stuck? I just cooked like 5 different things and all of them were rung 5."
+//
+// Nothing was stuck. On a seven-rung ladder the band floor IS rung 5, so a flawless cook that rolls the 22%
+// and misses lands on 5 every time — five in a row is a 29% evening, which is to say an ordinary one. The
+// mechanic is doing exactly what it was designed to do.
+//
+// The BUG is that nothing said so. The recipe card promised "top rung for a flawless one", which is false —
+// a flawless run buys a TICKET to the top rungs, not the top rung — and the reveal showed a perfect timing
+// score beside a mid-ladder prize with no explanation, so the only available reading was "my timing did not
+// count". A hidden roll that silently overrides visible skill is indistinguishable from a broken feature, and
+// it got reported as one.
+//
+// So this returns what happened rather than just where you landed, and the reveal says it out loud.
 export function rungFor(quality, n, lift = 0) {
     const q = Math.max(0, Math.min(1, Number(quality) || 0));
     const base = q * (n - 1) + lift * (n - 1);
@@ -298,10 +313,11 @@ export function rungFor(quality, n, lift = 0) {
     const rung = Math.max(0, Math.min(n - 1, Math.round(base) + wobble));
     // A short ladder has no room for a jackpot band; leave those exactly as they were.
     const floorOfBand = n - 1 - JACKPOT_RUNGS;
-    if (n <= JACKPOT_RUNGS + 1 || rung <= floorOfBand) return rung;
+    if (n <= JACKPOT_RUNGS + 1 || rung <= floorOfBand) return { rung, reachedBand: false, missedBand: false };
     // Earned the right to roll. Missing it drops you to the best rung BELOW the band — still a good cook,
     // still a real reward, just not the one everybody was farming.
-    return Math.random() < JACKPOT_CHANCE ? rung : floorOfBand;
+    const won = Math.random() < JACKPOT_CHANCE;
+    return { rung: won ? rung : floorOfBand, reachedBand: true, missedBand: !won, chance: JACKPOT_CHANCE };
 }
 // ── PREPPED INGREDIENTS ───────────────────────────────────────────────────────────────────────────
 // The depth layer. Raw crops and fish go INTO these, and these go into the real dishes — so a legendary plate
@@ -883,8 +899,33 @@ async function kitchenRow(buyerId) {
 }
 
 /** Everything the Kitchen screen needs, in one call. */
+// ── THE FOUR PAGES EVERYBODY STARTS WITH ─────────────────────────────────────────────────────────────────────
+// Bait shipped as twenty DROP-ONLY recipes in a pool of ninety-eight, and it is the only thing that feeds the
+// fishing bait picker. Two days later the whole Den knew 564 recipes between them and exactly THREE of them
+// were bait — so for practically everybody, including the owner, the picker simply never appeared and there
+// was no way to find out why. Luke, trying his own feature: "there was no bait select, is this because I have
+// no bait?" Yes, and there was no route to any.
+//
+// The four tier-1 baits are starter pages now — a dough ball, a pot of worms, a crust and some kernels, which
+// are the tutorial of bait and read that way ("the first thing anybody learns to throw"). The other sixteen
+// still drop. Same idea as the starter seed bag: the first rung of a ladder should not be a lottery ticket.
+//
+// Written on every kitchen open rather than once at signup, so the members who already exist get them without
+// a migration and a re-run costs nothing.
+const STARTER_BAIT = ["kb_dough_ball", "kb_worms", "kb_crust", "kb_kernels"];
+async function grantStarterBait(buyerId) {
+    if (!buyerId) return;
+    await db.query(
+        `INSERT INTO mkt_recipe_known (buyer_id, recipe_id, source)
+         SELECT $1, r, 'starter' FROM unnest($2::text[]) AS r
+         ON CONFLICT DO NOTHING`,
+        [buyerId, STARTER_BAIT]
+    ).catch(() => {});
+}
+
 export async function getKitchenState(buyerId) {
     if (!COOK_UNLOCKED(buyerId)) return { unlocked: false };
+    await grantStarterBait(buyerId);
     const [row, pantryRows, knownRows, goldRow, sprites, art, conRows, chestArt, seedRows] = await Promise.all([
         kitchenRow(buyerId),
         db.query(`SELECT kind, ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND qty > 0`, [buyerId]).catch(() => []),
@@ -1193,7 +1234,8 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // Creations rather than only the consumables that happened to exist first. Gold is one of the entries,
         // not a guaranteed purse on top — cooking shouldn't mint money on a timer.
         const ladder = tierMeta(tier).rewards;
-        let rung = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        const rollOutcome = rungFor(q, ladder.length, petBonus.hot_hands || 0);
+        let rung = rollOutcome.rung;
         // The Head Chef takes the consolation rung off your ladder entirely — a floor, never a jackpot.
         if (cookPowers.has("head_chef") && ladder.length > 1) rung = Math.max(1, rung);
         const r = ladder[rung];
@@ -1277,7 +1319,7 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
                 && Object.entries(other.need).every(([ref, n]) => (rec.need[ref] || 0) >= n));
             for (const other of covered.slice(0, TASTING_MENU_MAX)) {
                 const oLadder = tierMeta(other.tier).rewards;
-                await payRung(oLadder[rungFor(q, oLadder.length, petBonus.hot_hands || 0)], other, other.tier);
+                await payRung(oLadder[rungFor(q, oLadder.length, petBonus.hot_hands || 0).rung], other, other.tier);
                 alsoMade.push({ id: other.id, name: other.name, tier: other.tier, sprite: spriteMap[other.id] || null });
             }
         }
@@ -1291,7 +1333,14 @@ export async function cookRecipe(buyerId, recipeId, { quality = null, chain = 0 
         // you actually cooked, once, so the number on the card is the number you get.
         const dishXp = DISH_PET_XP[rec.tier] || 0;
         await grantConsumable(buyerId, rec.id, 1).catch(() => {});
-        made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc, reward: { ...lbl, kind: r.kind, rung: rung + 1, rungs: ladder.length }, sprite: spriteMap[rec.id] || null, petXp: dishXp };
+        made = { kind: "dish", id: rec.id, name: rec.name, desc: lbl.desc,
+            // `missedBand` is the near-miss: you cooked well enough to be in the running for the top rungs and
+            // the roll went the other way. Sent so the reveal can SAY that, instead of showing a perfect
+            // timing score beside a mid-ladder prize and leaving the player to conclude the ladder is broken.
+            reward: { ...lbl, kind: r.kind, rung: rung + 1, rungs: ladder.length,
+                reachedBand: rollOutcome.reachedBand, missedBand: rollOutcome.missedBand,
+                bandChance: rollOutcome.chance || null },
+            sprite: spriteMap[rec.id] || null, petXp: dishXp };
     }
 
     // Big Pot rides here — the one axis Seasoning, Heat and Larder all leave alone.

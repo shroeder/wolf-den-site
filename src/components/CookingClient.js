@@ -436,9 +436,11 @@ export default function CookingClient({ initial }) {
                                                 {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
                                                     only the roll made cooking look like a lottery with a lot of blanks. */}
                                                 <p className="ck-pool-intro">
-                                                    <b>How well you cook decides which one you get.</b> Bottom rung for a rough
-                                                    run, top rung for a flawless one — and a run of {s.bump?.flawlessAt ?? 92}%+
-                                                    also bumps you onto the next tier&rsquo;s ladder entirely.
+                                                    <b>How well you cook decides how high you land.</b> Bottom rung for a
+                                                    rough run — and a flawless one puts you <b>in the running</b> for the top
+                                                    two rungs rather than handing them over, so the best prizes stay a roll you
+                                                    earned the right to make. A run of {s.bump?.flawlessAt ?? 92}%+ also bumps
+                                                    you onto the next tier&rsquo;s ladder entirely.
                                                 </p>
                                                 {/* Rendered TOP-RUNG FIRST so the best outcome is what you see, and numbered so
                                                     the ladder reads as a ladder. The old list was sorted by likelihood, which
@@ -570,6 +572,16 @@ export default function CookingClient({ initial }) {
                                 <b> +{result.made.petXp.toLocaleString()} pet XP</b>.
                             </div>
                         ) : null}
+                        {/* THE NEAR-MISS, SAID OUT LOUD. Without this a flawless run that loses the top-rung
+                            roll shows a perfect timing score next to a mid-ladder prize and reads as a broken
+                            ladder — which is exactly how it was reported. */}
+                        {result.made?.reward?.missedBand ? (
+                            <div className="ck-reveal-nearmiss">
+                                Flawless enough to be <b>in the running</b> for the top of the ladder — the roll
+                                missed it this time. That is the {Math.round((result.made.reward.bandChance || 0.22) * 100)}% shot,
+                                not your timing.
+                            </div>
+                        ) : null}
                         <div className="ck-reveal-tags">
                             {result.bumped ? <span className="ck-tag heat">The heat caught it — a tier better</span> : null}
                             {result.portions > 1 ? <span className="ck-tag season">Second helping — ×{result.portions}</span> : null}
@@ -598,6 +610,11 @@ const CK_CSS = `
 .ck-pool-feed { margin: 0 0 8px; font-size: 0.8rem; line-height: 1.45; color: rgba(255,255,255,0.82);
     background: rgba(126,200,255,0.10); border: 1px solid rgba(126,200,255,0.28); border-radius: 10px; padding: 7px 10px; }
 .ck-pool-feed b { color: #cfe6ff; }
+/* The near-miss line — a flawless cook that lost the top-rung roll. */
+.ck-reveal-nearmiss { margin: 8px 0 2px; padding: 7px 10px; border-radius: 10px; font-size: 0.8rem; line-height: 1.45;
+    text-align: center; color: rgba(255,255,255,0.86); background: rgba(255,215,94,0.10);
+    border: 1px solid rgba(255,215,94,0.32); }
+.ck-reveal-nearmiss b { color: #ffe27a; }
 /* The plate you keep, called out under the ladder prize on the reveal. */
 .ck-reveal-dish { margin: 8px 0 2px; font-size: 0.82rem; line-height: 1.45; text-align: center;
     color: rgba(255,255,255,0.82); background: rgba(126,200,255,0.10);
