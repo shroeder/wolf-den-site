@@ -20,6 +20,7 @@ export const KIND_ART = {
     // The mine is the only place jewels come from, so its screens have to be able to draw one. Reusing the
     // painted gemstone already drawn for the Trove badge stat rather than commissioning a second one.
     gem: "/images/bonus/trove.png",
+    seed: "/images/ui/seed.png",
 };
 
 // The forge parts the mine feeds. These names were HAND-TYPED here, a second copy of a catalog that already

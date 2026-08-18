@@ -103,6 +103,18 @@ export const SEED_BANDS = {
     fishing: { common: 26, rare: 44, epic: 24, legendary: 6 },
     // A won ship battle is not farming, so it reaches past what a cast can.
     ship_battle: { rare: 34, epic: 40, legendary: 22, mythic: 4 },
+    // The mine, by depth. The deep card is one of only two places a Star Fruit can come from.
+    seam: { common: 34, rare: 44, epic: 22 },
+    seam_deep: { rare: 30, epic: 42, legendary: 24, mythic: 4 },
+    // Chests, by tier. A wooden one is the farm's floor; a gold one is a real chance at something worth
+    // clearing a plot for.
+    chest_wooden: { common: 66, rare: 32, epic: 2 },
+    chest_iron: { common: 34, rare: 44, epic: 21, legendary: 1 },
+    chest_gold: { common: 12, rare: 36, epic: 36, legendary: 14, mythic: 2 },
+    // The Armoury crate. Bought with laurels off won bouts, so it sits with the ship rather than the farm.
+    arena_win: { rare: 38, epic: 40, legendary: 19, mythic: 3 },
+    // The boss: weekly, shared, and the top of the ladder.
+    boss_kill: { common: 16, rare: 34, epic: 32, legendary: 15, mythic: 3 },
 };
 
 // ── NOT DECLARED HERE UNTIL SOMETHING CALLS THEM ─────────────────────────────────────────────────────────────

@@ -24,6 +24,12 @@ function rarityOf(reveal) {
     if (reveal?.consumable) return reveal.consumable.kind === "relic" ? "eternal" : "legendary";
     if (reveal?.pet) return reveal.pet.rarity || "rare";
     if (reveal?.recipe) return "epic";
+    // A handful of seeds celebrates at the BEST one in it — a Star Fruit out of a gold chest should not be
+    // announced at the rarity of the wheat sitting next to it.
+    if (Array.isArray(reveal?.seeds) && reveal.seeds.length) {
+        const order = ["common", "rare", "epic", "legendary", "mythic"];
+        return reveal.seeds.reduce((best, x) => (order.indexOf(x.rarity) > order.indexOf(best) ? x.rarity : best), "common");
+    }
     // Tier 1-5 maps onto the rarity ladder so a Flawless gem gets a Flawless-sized celebration.
     if (reveal?.gem) return ["common", "rare", "epic", "legendary", "mythic"][Math.max(0, Math.min(4, (Number(reveal.gem.tier) || 1) - 1))];
     return reveal?.item?.rarity || reveal?.rarity || "common";
@@ -170,6 +176,12 @@ function RewardReveal({ reveal, onClose, onAgain }) {
     // were handed a real gem and told "You already own that gear — take the dust!" over a "+undefined gold".
     // The gem was always granted; only the telling of it was broken.
     const isGem = Boolean(reveal?.gem);
+    // ── AND SEEDS, WHICH A CHEST CAN NOW CONTAIN ─────────────────────────────────────────────────────────
+    // Added WITH the branch below, not before it. Everything this component does not recognise falls through
+    // to the DUST branch, and the comment two lines up is the receipt: four members were handed a real gem
+    // and told "You already own that gear — take the dust!" That is the whole cost of returning a new kind
+    // from the server without teaching the reveal about it.
+    const isSeeds = Array.isArray(reveal?.seeds) && reveal.seeds.length > 0;
 
     const particles = useMemo(() => {
         const n = PARTICLE_COUNT[rarity] || 16;
@@ -204,8 +216,19 @@ function RewardReveal({ reveal, onClose, onAgain }) {
                     ))}
                 </div>
                 <div className={`chest-reward rar-${rarity}`} style={{ "--rar": color }}>
-                    <span className="chest-rarity-tag">{isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
-                    {isRecipe ? (
+                    <span className="chest-rarity-tag">{isSeeds ? "SEEDS" : isRecipe ? "RECIPE" : isConsumable ? (reveal.consumable.kind === "relic" ? "RELIC" : "CONSUMABLE") : isPet ? "🐾 PET" : (RARITY_LABEL[rarity] || rarity)}</span>
+                    {isSeeds ? (
+                        <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/images/ui/seed.png" alt="" className="chest-reward-glyph" draggable="false" />
+                            <div className="chest-reward-name">
+                                {reveal.seeds.length > 1 ? `${reveal.seeds.length} seeds` : reveal.seeds[0].name}
+                            </div>
+                            <div className="chest-reward-sub muted">
+                                {reveal.seeds.map((x) => `${x.emoji || "🌱"} ${x.name}`).join(" · ")} — planted in your seed bag.
+                            </div>
+                        </>
+                    ) : isRecipe ? (
                         <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/images/cooking/dish.png" alt="" className="chest-reward-glyph" draggable="false" />

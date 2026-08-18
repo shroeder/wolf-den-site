@@ -1027,6 +1027,7 @@ async function finalizeBossKill(bossId) {
     // out-rewards the prizes.
     const rewardWinners = new Set([raffleWinner?.id, ...petWinners, ...itemWinners.keys()].filter(Boolean));
     const chestByBuyer = new Map();
+    const seedByBuyer = new Map();
     const recipeByBuyer = new Map();
     // Deferred: cooking.js imports chests.js which imports this file, so a static edge here is a cycle.
     const { grantRecipeReward } = await import("@/lib/marketplace/cooking.js");
@@ -1042,6 +1043,18 @@ async function finalizeBossKill(bossId) {
             const rec = await grantRecipeReward(p.id, "boss_kill").catch(() => null);
             // Knows every recipe the boss can teach? Fall through to the chest rather than paying nothing.
             if (rec) { recipeByBuyer.set(p.id, rec); continue; }
+        }
+        // SEEDS, from the same roll as the recipe and the chest — never both, exactly as the note above
+        // insists. The boss is weekly and shared, so it is the one source that can hand over something worth
+        // clearing a plot for. The old seed table listed `boss_kill` with tuned odds and nothing called it.
+        if (Math.random() < 0.16) {
+            const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+            const seeds = [];
+            for (let i = 0; i < 3; i += 1) {
+                const one = await grantSeedFromBand(p.id, "boss_kill").catch(() => null);
+                if (one) seeds.push(one);
+            }
+            if (seeds.length) { seedByBuyer.set(p.id, seeds); continue; }
         }
         const tier = Math.random() < 0.4 + ratio * 0.3 ? "iron" : "wooden"; // capped at Iron
         chestByBuyer.set(p.id, tier);
@@ -1061,6 +1074,10 @@ async function finalizeBossKill(bossId) {
         if (chestTier) { const c = CHEST_TIERS[chestTier]; bits.push(`${c.emoji} ${c.label} landed in your stash — open it!`); }
         const foundRecipe = recipeByBuyer.get(p.id) || null;
         if (foundRecipe) bits.push(`📜 A torn page off the corpse — ${foundRecipe.name}.`);
+        // Told, not just granted. A reward the member is never informed of is the same as one that did not
+        // happen — which is how the recipe roll was found to be broken in the first place.
+        const foundSeeds = seedByBuyer.get(p.id) || null;
+        if (foundSeeds?.length) bits.push(`🌱 Seeds spilled from its hoard — ${foundSeeds.map((x) => x.name).join(", ")}.`);
         if (isTop && top1Badge) bits.push(`You earned the ${top1Badge.icon || "🏅"} ${top1Badge.label} badge.`);
         if (!bits.length) bits.push(`The whole pack took down ${boss.name}! See the final stats →`);
         const title = isRaffle && boss.prize_name ? "🎟️ You won the raffle!" : wonItems.length ? "🎁 Boss reward!" : isTop ? "🥇 You topped the boss!" : chestTier ? "🎁 Boss loot!" : "☠️ Boss slain!";

@@ -228,6 +228,10 @@ const CARD_TABLE = [
     { key: "consumable", label: "An old cache", w: (d) => 3 + d * 0.6 },
     { key: "gear", label: "Something buried", w: (d) => 1 + d * 0.9 },
     { key: "chest", label: "A strongbox", w: (d) => 0.6 + d * 0.55 },
+    // A seed, as a CARD — the mine's own table decides it, weighted with everything else and drawn the same
+    // way. Deeper is better: the band below reads the depth, so a shallow scratch turns up wheat and a deep
+    // seam is the one place under the hill that can hold a Star Fruit.
+    { key: "seeds", label: "Something growing in the dark", w: (d) => 4 + d * 0.8 },
     { key: "encounter", label: "Something down here", w: (d) => 8 + d },
     { key: "nothing", label: "Bare rock", w: () => 26 },
 ];
@@ -270,6 +274,7 @@ function rollFind(card, depth, packBonus = 0, powers = null) {
             const o = oreTier(t);
             return { kind: "ore", tier: t, n: Math.max(1, Math.round((1 + Math.floor(Math.random() * 2)) * (1 + packBonus))), name: o.ore, color: o.color, art: oreArt(t) };
         }
+        case "seeds": return { kind: "seed", deep: depth >= 4, art: "/images/ui/seed.png", name: "Seeds" };
         case "gold": return { kind: "gold", n: Math.round((20 + Math.floor(Math.random() * (18 * depth + 20))) * (1 + packBonus)) };
         case "consumable": return { kind: "consumable" };
         case "gear": return { kind: "gear", depth };
@@ -480,6 +485,12 @@ async function payHaul(buyerId, haul = [], powers = null) {
         } else if (item.kind === "consumable") {
             const got = await grantMiningConsumable(buyerId);
             if (got) paid.push({ ...item, ...got });
+        } else if (item.kind === "seed") {
+            // The card already decided this is a seed; the band only decides which. A deep card reaches the
+            // top of the ladder, a shallow one does not.
+            const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+            const got = await grantSeedFromBand(buyerId, item.deep ? "seam_deep" : "seam").catch(() => null);
+            if (got) paid.push({ ...item, name: got.name, emoji: got.emoji, rarity: got.rarity });
         } else if (item.kind === "gem") {
             const { grantGem } = await import("@/lib/marketplace/jeweller.js");
             const got = await grantGem(buyerId, item.gemId, 1, "drop");

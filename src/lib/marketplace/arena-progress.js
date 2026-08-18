@@ -251,6 +251,17 @@ export async function buyArmoury(buyerId, id) {
             const { grantDoubloons } = await import("@/lib/marketplace/sailing.js");
             await grantDoubloons(buyerId, won.n || 1);
             got.art = "/images/sailing/doubloon.png";
+        } else if (won.kind === "seed") {
+            // Added WITH the row. A crate row whose kind has no branch here falls through paying nothing,
+            // which is the failure this whole seed pass was about.
+            const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+            const seeds = [];
+            for (let i = 0, n = won.n || 1; i < n; i += 1) {
+                const one = await grantSeedFromBand(buyerId, won.band || "arena_win").catch(() => null);
+                if (one) seeds.push(one);
+            }
+            got.art = "/images/ui/seed.png";
+            got.label = seeds.length ? `Seeds — ${seeds.map((x) => x.name).join(", ")}` : won.label;
         } else if (won.kind === "consumable") {
             const { grantConsumable } = await import("@/lib/marketplace/consumables.js");
             const { consumableSpriteMap } = await import("@/lib/marketplace/consumable-sprites.js");

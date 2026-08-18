@@ -22,6 +22,14 @@ import { hasPower, oneIn, claimPowerUse } from "@/lib/marketplace/ascension-powe
 // third of the first pass, and the low tiers cut most — a wooden chest coughing one up 3% of the time made the
 // commonest chest in the game a reliable recipe source.
 const RECIPE_CHANCE = { wooden: 0.008, iron: 0.014, gold: 0.025, mythic: 0.045, ascendant: 0.060, eternal: 0.075 };
+// ── AND A HANDFUL OF SEEDS, AS ONE OF THE THINGS A CHEST CONTAINS ────────────────────────────────────────────
+// Sits in the same chain as the recipe and the gem: the chest either gives you seeds or it doesn't, drawn
+// like every other outcome. It is deliberately commoner than either — seeds are a supply, not a find — and
+// banded by tier, so a wooden chest cannot hold a Star Fruit however many you open.
+//
+// The old seed table listed all three chest tiers with tuned odds and nothing ever called them.
+const SEED_CHANCE = { wooden: 0.10, iron: 0.13, gold: 0.16, mythic: 0.18, ascendant: 0.20, eternal: 0.22 };
+const SEED_COUNT = { wooden: 2, iron: 2, gold: 3, mythic: 3, ascendant: 4, eternal: 4 };
 
 // How often a chest gives a GEM instead of its ordinary contents. Deliberately in the same order of
 // magnitude as the recipe chance above — a gem should feel like a find, and gear is still what a chest is
@@ -238,6 +246,17 @@ export async function openChest(buyerId, tier) {
         // Null means they already know every recipe in this band — fall through to the ordinary loot rather
         // than paying out nothing, which is what a silent side-roll would have done.
         if (rec) return { ok: true, remaining: dec.count, recipe: rec };
+    }
+
+    if (Math.random() < (SEED_CHANCE[tier] || 0)) {
+        const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+        const seedBand = tier === "wooden" ? "chest_wooden" : tier === "iron" ? "chest_iron" : "chest_gold";
+        const got = [];
+        for (let i = 0, n = SEED_COUNT[tier] || 2; i < n; i += 1) {
+            const one = await grantSeedFromBand(buyerId, seedBand).catch(() => null);
+            if (one) got.push(one);
+        }
+        if (got.length) return { ok: true, remaining: dec.count, seeds: got };
     }
 
     // A chance at a companion PET from this chest tier — the standout reveal.

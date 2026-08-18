@@ -48,6 +48,9 @@ const PARTS = (tier, n, worth, label) => ({ kind: "parts", tier, n, worth, label
 // the currency you paid is a wash dressed up as a reward.
 const DUB = (n, worth, label) => ({ kind: "doubloons", n, worth, label });
 const CONS = (id, worth, label) => ({ kind: "consumable", consumable: id, n: 1, worth, label });
+// A row of SEEDS. The Arena is the one system with nothing to say to the farm, and a crate is exactly the
+// kind of table this belongs in — drawn against gold and parts, not rolled behind them.
+const SEEDS_ROW = (band, n, worth, label) => ({ kind: "seed", band, n, worth, label });
 // Gem rows used to carry a STAND-IN for members who could not reach the Jewelcutter while it was gated —
 // filtering them out instead would have handed those members a different table at the same price, and because
 // the gem rows sit below their crate's average, removing them silently made the crate BETTER. The bench opened
@@ -70,6 +73,7 @@ export const CRATES = [
             { w: 10, ...CONS("scroll_wisdom", 260, "Tome of Wisdom") },
             { w: 9, ...PARTS(3, 3, 280, "Tempered Steel ×3") },
             { w: 7, ...CHEST("wooden", 130, "Wooden Chest") },
+            { w: 8, ...SEEDS_ROW("arena_win", 3, 200, "Farm Seeds ×3") },
             { w: 5, ...GEM(1, 240, "A Chipped Jewel") },
             { w: 2, ...CHEST("gold", 900, "Gold Chest") },
             { w: 1, ...CONS("scroll_ancient", 900, "Ancient Codex") },
