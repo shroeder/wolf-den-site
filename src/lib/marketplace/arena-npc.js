@@ -89,11 +89,38 @@ export function npcPower(tier) {
 //
 // The archetype is PRINTED ON THE CARD with its stats, because a shape you cannot see before you commit is
 // just another hidden roll wearing a different hat.
+//
+// ── `bal` — ONE STATED POWER, ONE DIFFICULTY ─────────────────────────────────────────────────────────────
+// The weights below decide what an archetype IS. They do not decide what it is WORTH, and for a long time the
+// two were confused: a budget spent on health is not worth a budget spent on damage, so the same number
+// produced wildly different fights. Measured across all three classes at best-in-slot
+// (scripts/sim-archetype-cal.mjs, binary-searching the even fight):
+//
+//     Brute even at 1,126     Berserker 1,247     Balanced 1,339     Duelist 1,393     Wall 1,572
+//
+// A Wall therefore needed FORTY PERCENT more budget than a Brute to be the same fight, and the Road hands
+// neighbouring rungs near-identical budgets — so walking it lurched. Measured with a real loadout, rung 82
+// (Duelist) came in at 74% and rung 83 (Wall) at 98%, one step apart.
+//
+// `bal` is the correction: the reciprocal of what that archetype's power turned out to be worth. It changes
+// how much budget the archetype is HANDED, never how it spends it — so a Wall is still a Wall, it is just
+// finally the same difficulty as the Brute next to it. Luke: "we don't want it to spike ever... difficulty is
+// more about their skills and strategy vs sheer power level."
+//
+// Re-derive with sim-archetype-cal.mjs after touching any weight, `tough`, `guard`, or the engine.
+//
+// Solved against a REAL loadout (sim-archetype-cal.mjs "The Wolf Den"), because the first attempt fitted to
+// synthetic best-in-slot fighters did not hold — walked by an actual reaver the Road still swung from 24% on
+// one rung to 93% on the next.
+//
+// ⚠️ THE DIRECTION IS even/mean, NOT mean/even. `even` is the budget an archetype needs to be a fair fight, so
+// one that needs MORE than the mean is arriving too WEAK at any shared rung power and must be handed more.
+// Getting that backwards does not soften the error, it doubles it: it took the spread from 26 points to 92 and
+// turned a Wall into a 98% walkover. Measure, apply, then measure AGAIN — correcting the budget moves the
+// fight the next reading is taken from.
+const ARCH_BAL = { balanced: 1.00, brute: 0.94, wall: 1.10, duelist: 1.04, berserker: 0.93 };
+
 export const ARCHETYPES = [
-    // The spread between the highest and lowest FEROCITY weight is what decides how long a fight is, and the
-    // first cut of these ran 0.08 to 0.62 — an eight-to-one health gap, so a Berserker died in two rounds and
-    // a Wall took twenty. Compressed to 0.22-0.60. Each archetype still plainly IS itself; none of them is a
-    // different game.
     { key: "balanced", name: "Balanced", tell: "No weakness and no lever. Out-build it.",
       w: { might: 0.28, crit_chance: 0.16, crit_power: 0.16, ferocity: 0.40 }, tough: 1.11, guard: 0.22 },
     { key: "brute", name: "Brute", tell: "Hits like a falling wall. End it early.",
@@ -104,7 +131,7 @@ export const ARCHETYPES = [
       w: { might: 0.22, crit_chance: 0.24, crit_power: 0.24, ferocity: 0.30 }, tough: 1.14, guard: 0.20 },
     { key: "berserker", name: "Berserker", tell: "All edge, no armour. Survive the opening and it folds.",
       w: { might: 0.40, crit_chance: 0.18, crit_power: 0.20, ferocity: 0.22 }, tough: 1.06, guard: 0.12 },
-];
+].map((a) => ({ ...a, bal: ARCH_BAL[a.key] || 1 }));
 // The first three tiers are always Balanced. A Straw Dummy that rolled Brute is a tutorial that hits back
 // harder than the thing after it, and the archetype cycle should not apply before you have met the baseline
 // it deviates from.
@@ -186,7 +213,11 @@ export function npcFor(tier) {
  */
 export function statsForPower(power, archKey, element = null, seed = 0) {
     const arch = ARCHETYPES.find((a) => a.key === archKey) || ARCHETYPES[0];
-    const budget = Math.max(1, Math.round(power));
+    // `bal` normalises what this archetype's power is WORTH (see the note on ARCH_BAL). Applied here, at the
+    // Road's own builder, so a rung's stated power means one difficulty whichever shape it rotated onto.
+    // The Gauntlet's npcFor above carries the same latent spread and is deliberately NOT touched: it was not
+    // measured for this and re-tuning it unasked would move a balance nobody complained about.
+    const budget = Math.max(1, Math.round(power * (arch.bal || 1)));
     return {
         // Vitality, for the same reason as npcFor above — this is the Road's builder, and it was missing it
         // too, which is why a rung had the same 212 health as the tutorial.

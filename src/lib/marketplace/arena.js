@@ -1296,7 +1296,11 @@ export async function startBout(buyerId, targetId = null) {
         // A Road fighter turns aside a share of every blow, rising with the house — see ladderDr. Set BEFORE
         // ringStats, which is what reads `dr` onto the card and into the engine.
         st.dr = ladderDr(rung);
-        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(Math.max(1, Math.round(rung * 0.9)), f.archetype) };
+        // A CHAMPION'S EDGE IS ITS KIT, NOT ITS STATS. The +35% power multiplier is gone (see ladderFoe) —
+        // what makes the tenth fight of a house the tenth fight is that it brings deeper moves than the nine
+        // before it. npcAbilities gets nastier with tier, so a champion is read a tier band up.
+        const kitTier = Math.max(1, Math.round(rung * 0.9) + (f.champion ? 8 : 0));
+        foeKit = { ...f, ...st, ...ringStats(st), abilities: npcAbilities(kitTier, f.archetype) };
     } else if (npcTier > 0) {
         // Beyond your best + reach is refused HERE, not just hidden in the UI, or a crafted POST could farm
         // tier 900 for points on day one.

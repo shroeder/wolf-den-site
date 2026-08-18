@@ -97,50 +97,45 @@ const HOUSES = [
 // FLOOR 140 -> 25. Rung 1 was pitched at roughly Gauntlet tier 12: measured against a member with starter
 // gear it was not an opening fight, it was a wall with a "1" on it. It is an opening fight now.
 //
-// GROWTH 16.5% -> 3.3% a rung. THIS IS THE ONE THAT WAS BROKEN, and it was broken in a way arithmetic hides:
-// an exponential does not look wrong at the rung you are testing, it looks wrong ninety rungs later.
+// ── THE CURVE IS A CLIMB, NOT A LAUNCH ───────────────────────────────────────────────────────────────────────
+// It was an exponential, twice, and an exponential is the wrong shape for this no matter what rate you give it.
+// At 16.5% a rung it passed a maxed player at rung 21 and reached 216 MILLION power by rung 100. At 3.3% the
+// summit came back into reach — and a real loadout then walked to rung 89 without being troubled, because a
+// curve gentle enough not to run away is also gentle enough to be a formality.
 //
-// At 16.5% the ladder outran the game. A member's gear budget stops at 644 — that is best-in-slot, everything
-// equipped, nothing left to buy — and the curve passed it at rung 21 and kept going. Rung 100's fighter had a
-// power budget of TWO HUNDRED AND SIXTEEN MILLION. Simulated against a real best-in-slot fighter through the
-// real engine (scripts/sim-road.mjs, 250 bouts a cell):
+// Luke, setting the actual design: "let's ensure it's a smooth curve. Ideally difficulty is more about their
+// skills etc and strategy vs sheer power level. Target rung is still around 35 where we want people to have a
+// difficult time, but we don't want it to spike ever. Each fight needs to be interesting. The whole idea
+// behind reworking stats recently and how they tie into the arena was to make it so players have more agency
+// about how they get stronger and climb the rungs."
 //
-//     rung 25  won 64%        rung 30  won  5%        rung 40  won 1%        rung 50+  won 0%
+// That rules out every exponential. What it asks for is a curve that RISES to the limit of what a strong
+// player can handle and then stops climbing — so the answer to a late rung is what you built and how you
+// fight it, not another order of magnitude. This is a logistic, normalised so rung 1 is exactly the FLOOR and
+// rung 100 is exactly the ceiling:
 //
-// So seventy-five of the hundred rungs were not "future content", which is what the note here used to call
-// them. There is no future gear past 644. They were decoration on a wall nobody could ever climb, and the
-// member walking into rung 30 was one-shot by a fighter with nine times his health and eight times his crit
-// multiplier. Luke, finding it from the inside: "the road is really messed up and everything's overtuned right
-// now, I'm getting one shot instantly on rung 30."
+//     rung   1      10     20     35     50     75     100
+//     power  30     152    354    740    1066   1319   1345
 //
-// 3.3% is the rate that makes the whole ladder reachable, chosen by simulating the alternatives rather than by
-// picking a number that felt calmer — 3.0% left the summit free (best-in-slot won 57% at rung 100) and 4.2%
-// put it back out of reach (2%). At 3.3%, measured the same way:
-//
-//     rung 50   fresh 99%   mid 100%   best-in-slot 100%
-//     rung 75   fresh 55%   mid  96%   best-in-slot 100%
-//     rung 100  fresh  2%   mid   4%   best-in-slot  32%
-//
-// Which is the shape a hundred-rung ladder is supposed to have: a fresh fighter's journey ends around the
-// seventies, the summit is a real wall, and a maxed fighter beats it about a third of the time — with a good
-// element matchup, the right consumables and a clean run turning that into a win rather than a coin toss.
-//
-// WHAT THIS COSTS, stated plainly because it is a real trade. A geared member now clears the low rungs quickly
-// instead of stalling at 20. That is the correct direction for a ladder you climb from the bottom — the early
-// rungs are a warm-up you walk through once — but it does mean the middle of the Road is not where the fight
-// is. The fight is rungs 80-100, and that is deliberate.
-//
-// Re-run scripts/sim-road.mjs after touching FLOOR, GROWTH, HOUSE_STEP, the champion multiplier, ladderDr, or
-// anything in statsForPower. All six land on this table.
+// MID 30 and STEEP 14 put the steep part of the S right where the design wants the difficulty — the run into
+// the mid-thirties — and flatten it after. Rung 35 lands at 740, which is where a best-in-slot member measures
+// as an even fight (verified against a real loadout through kitFor, not a model). Rungs 40-100 rise by about
+// half again over sixty rungs: that stretch is meant to be won with a better BUILD and a better read of the
+// archetype in front of you, which is the whole point of the stat rework.
 const FLOOR = 30;
-const GROWTH = 1.033;
+const CEILING = 1345;
+const MID = 30;      // the rung the curve is steepest at
+const STEEP = 14;    // how sharply it turns — bigger is gentler
+const logistic = (r) => 1 / (1 + Math.exp(-(r - MID) / STEEP));
+export const LADDER_SIZE = 100;
+const L1 = logistic(1);
+const LN = logistic(LADDER_SIZE);
 
-// ── AND A STEP AT EVERY GATE ─────────────────────────────────────────────────────────────────────────────────
-// A smooth exponential has no landmarks: rung 41 is 16% harder than 40 and so is every other pair, so the ten
-// houses are ten names over one unbroken slope. Each house now costs a step to walk into on top of the curve,
-// which is what makes arriving at The Deep feel like arriving somewhere — and gives a member a natural place
-// to stop, go and build, and come back.
-const HOUSE_STEP = 0.05;
+// ── THE HOUSE STEP IS GONE ───────────────────────────────────────────────────────────────────────────────────
+// Each house used to cost an extra 5% on top of the curve, to make arriving at The Deep feel like arriving
+// somewhere. It is a spike, and the brief is that there are no spikes: a gate that is 5% harder than the rung
+// before it lands on a member as the ladder lurching, not as a landmark. The houses still have names, plates,
+// blurbs and their own fighters — that is what makes them places. Difficulty is not what a doorway is for.
 
 // ── WHAT THEY TURN ASIDE ─────────────────────────────────────────────────────────────────────────────────────
 // Gauntlet tiers carry no damage reduction at all; their bulk is health, which a health bar tells the truth
@@ -152,12 +147,14 @@ export const ladderDr = (rung) => {
     const house = Math.floor((Math.max(1, Math.min(LADDER_SIZE, Math.round(rung))) - 1) / 10);
     return Math.round((0.04 + house * 0.028) * 1000) / 1000;   // 4% in the Yard, 29% at the end
 };
-export const LADDER_SIZE = 100;
 
-const powerAt = (rung) => Math.round(FLOOR * Math.pow(GROWTH, rung - 1)
-    * (1 + HOUSE_STEP * Math.floor((rung - 1) / 10)));
+// Normalised so rung 1 is exactly FLOOR and rung LADDER_SIZE is exactly CEILING — without it the logistic
+// starts partway up its own curve and the first fight is not the floor the design asked for.
+const powerAt = (rung) => Math.round(
+    FLOOR + (CEILING - FLOOR) * ((logistic(rung) - L1) / (LN - L1)),
+);
 
-// A champion (every tenth) is a step above its own rung — the house's name is on it.
+// A champion (every tenth) is the house's name-bearer.
 const isChampion = (rung) => rung % 10 === 0;
 
 /**
@@ -188,9 +185,17 @@ export function ladderFoe(rung) {
     // The house index rides along for CHAMPIONS so they are not all the same shape. `within + 3` is constant
     // at the tenth of every house, so every champion on the road was a Wall — ten boss fights with one answer.
     const arch = ARCHETYPES[(champion ? within + 3 + Math.floor((n - 1) / 10) : within) % ARCHETYPES.length];
-    // A champion was 18% over the rung below, which after a chest and a name reads as "the same fight again".
-    // 35% is a fighter you have to come back for, which is what the tenth of a house should be.
-    const power = Math.round(powerAt(n) * (champion ? 1.35 : 1));
+    // ── A CHAMPION IS NOT A POWER SPIKE ──────────────────────────────────────────────────────────────
+    // It was +35% power, and that was the single worst discontinuity on the Road: rung 90 came out at 1,019
+    // against rung 89's 731, so the DOORWAY into a house was harder than the entire house behind it. Walked
+    // with a real loadout, rung 89 was a 56% fight and rung 90 was 13% — while rungs 91 through 99, all
+    // stronger on paper, sat between 6% and 33%. A ladder that goes up, down, and up again is not a ladder.
+    //
+    // A champion is now exactly its rung's power. What makes it the tenth fight of a house is what it IS: the
+    // house's hardest archetype (below) and a deeper kit — see the ability tier in arena.js, which is what
+    // gives it moves the nine before it did not have. That is difficulty made of skills and strategy rather
+    // than of a bigger number, which is the brief.
+    const power = powerAt(n);
     return {
         id: `ladder:${n}`,
         rung: n,

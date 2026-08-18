@@ -27,7 +27,8 @@ function roadFighter(rung) {
     const ring = ringStats({ ...st, dr: ladderDr(rung) });
     return {
         classId: null,
-        abilities: npcAbilities(Math.max(1, Math.min(20, Math.round(rung / 5)))),
+        // Mirrors arena.js: a champion is read a tier band up, which is where its edge now lives.
+        abilities: npcAbilities(Math.max(1, Math.round(rung * 0.9) + (foe.champion ? 8 : 0)), foe.archetype),
         ...ring,
         damage: ring.damage,
         perks: {}, lifesteal: 0, bleedChance: 0, burnChance: 0, dmgPct: 0, doublestrike: 0,
