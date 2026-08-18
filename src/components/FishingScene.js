@@ -246,6 +246,58 @@ export function FishingLog({ log, known, total, records, onClose }) {
 const STAT_SHORT = { might: "Might", crit_chance: "Crit", crit_power: "Crit Dmg", ferocity: "Ferocity", fortune: "Fortune", extra_strike: "Extra Strike" };
 const statLine = (stats) => Object.entries(stats || {}).map(([k, v]) => `+${v} ${STAT_SHORT[k] || k}`).join(" · ");
 
+
+// ── THE BAIT STEP, WHEREVER YOU ARE ──────────────────────────────────────────────────────────────────────────
+// Its own component because it is needed in two places now: before the first cast, and on the recap after a
+// catch. It used to live inline in the idle screen only, which is what forced "cast again" to bounce you out
+// of the recap and onto another screen to choose — a modal that said Cast again, opening a modal that said
+// Cast the line. Choosing bait and throwing again both belong on the card you are already looking at.
+//
+// It owns its own scroll state. Sitting in the parent, the measurement was shared between the two mount
+// points and the fade told the recap about the idle screen's list.
+function BaitPicker({ baits, busy, onCast }) {
+    const listRef = useRef(null);
+    const [more, setMore] = useState(false);
+    const measure = useCallback(() => {
+        const el = listRef.current;
+        if (!el) return;
+        setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+    }, []);
+    useEffect(() => { measure(); }, [baits.length, measure]);
+    return (
+        <div className="fish-bait" role="dialog" aria-label="Choose a bait">
+            <p className="fish-bait-head">
+                What are you putting on the hook?
+                {baits.length > 1 ? <span className="fish-bait-count">{baits.length} to choose from</span> : null}
+            </p>
+            <div className="fish-bait-scroll" data-more={more ? "1" : undefined}>
+                <div className="fish-bait-list" ref={listRef} onScroll={measure}>
+                    {baits.map((b) => (
+                        <button key={b.id} type="button" className={`fish-bait-row is-${b.rarity}`}
+                            disabled={busy} onClick={() => onCast(b.id)}>
+                            {b.sprite
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={b.sprite} alt="" className="fish-bait-art" draggable="false" />
+                                : <span className="fish-bait-art" aria-hidden="true">🪱</span>}
+                            <span className="fish-bait-name">
+                                <b>{b.name}</b>
+                                <em>{b.blurb}</em>
+                            </span>
+                            <span className="fish-bait-num">
+                                <b>+{b.tilt.toFixed(1)}</b>
+                                <em>rarity · {b.qty} left</em>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <button type="button" className="fish-ghost" disabled={busy} onClick={() => onCast(null)}>
+                Skip baiting — cast the bare hook
+            </button>
+        </div>
+    );
+}
+
 // The rise animation's length (see .fw-haul / @keyframes fwRise). One number, so the hand-off to a fight and
 // the picture clearing the water cannot drift apart.
 const HAUL_MS = 1150;
@@ -318,14 +370,6 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
     // So the wrapper carries `data-more`, and the fade below it only exists while there is something under
     // the fold. Measured rather than assumed (`baits.length > 5` would be a magic number that has to be kept
     // in step with a max-height in a different file), and re-measured on scroll so it clears at the bottom.
-    const listRef = useRef(null);
-    const [more, setMore] = useState(false);
-    const measure = useCallback(() => {
-        const el = listRef.current;
-        if (!el) return;
-        setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
-    }, []);
-    useEffect(() => { if (picking) measure(); }, [picking, baits.length, measure]);
 
     const cast = useCallback(async (bait = null) => {
         if (busy) return;
@@ -334,6 +378,10 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
         const res = await onCast({ sky, bait }).catch(() => null);
         setBusy(false);
         if (!res?.ok) {
+            // Back to idle on a refusal. `cast` can now be pressed FROM the recap, and the recap draws itself
+            // from `result` — which this call has already cleared, so leaving the phase alone would render a
+            // catch card with no catch in it.
+            setPhase("idle");
             setErr(res?.error === "out_of_casts" ? "You're out of casts for today — they refill tomorrow."
                 : res?.error === "already_cast" ? "Your line is already in the water."
                 : res?.error === "not_at_sea" ? "You can't fish while you're ashore digging."
@@ -372,11 +420,11 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
     // It casts now, and it makes the same decision the idle button makes: with bait in the pantry it opens the
     // picker (a bait is spent, so it must never be chosen for you), and with an empty pantry it just throws.
     const castAgain = useCallback(() => {
-        setResult(null);
-        setHaul(null);
-        setPhase("idle");
-        if (baits.length) setPicking(true); else cast(null);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // With bait, the picker opens ON the recap — you are already looking at the card, and the bait choice
+        // and the throw both belong here. Without any, there is nothing to choose, so it just throws.
+        // `cast` clears the recap and moves the scene on by itself, so nothing needs resetting first.
+        if (baits.length) { setPicking(true); return; }
+        cast(null);
     }, [baits.length, cast]);
 
     // ── THE TAP, AND THEN YOU WATCH ──────────────────────────────────────────────────────────────────────
@@ -506,38 +554,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         </p>
                         {/* ── THE BAIT STEP ── every row states what it buys, and the number comes off the
                             bait itself, so the picker cannot advertise a boost the cast does not apply. */}
-                        {picking ? (
-                            <div className="fish-bait" role="dialog" aria-label="Choose a bait">
-                                <p className="fish-bait-head">
-                                    What are you putting on the hook?
-                                    {baits.length > 1 ? <span className="fish-bait-count">{baits.length} to choose from</span> : null}
-                                </p>
-                                <div className="fish-bait-scroll" data-more={more ? "1" : undefined}>
-                                <div className="fish-bait-list" ref={listRef} onScroll={measure}>
-                                    {baits.map((b) => (
-                                        <button key={b.id} type="button" className={`fish-bait-row is-${b.rarity}`}
-                                            disabled={busy} onClick={() => cast(b.id)}>
-                                            {b.sprite
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                ? <img src={b.sprite} alt="" className="fish-bait-art" draggable="false" />
-                                                : <span className="fish-bait-art" aria-hidden="true">🪱</span>}
-                                            <span className="fish-bait-name">
-                                                <b>{b.name}</b>
-                                                <em>{b.blurb}</em>
-                                            </span>
-                                            <span className="fish-bait-num">
-                                                <b>+{b.tilt.toFixed(1)}</b>
-                                                <em>rarity · {b.qty} left</em>
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                                </div>
-                                <button type="button" className="fish-ghost" disabled={busy} onClick={() => cast(null)}>
-                                    Skip baiting — cast the bare hook
-                                </button>
-                            </div>
-                        ) : null}
+                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
                         {err ? <p className="fish-err">{err}</p> : null}
                         <div className="fish-actions">
                             {/* ONE button. Running out of casts doesn't hand you a dead control and hide the
@@ -637,7 +654,14 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         {/* Fishing pays into four other screens. Saying which one turns a reward the member
                             can't find into one they can go and use. */}
                         {result.prize?.where ? <p className="fish-where">📍 {result.prize.where}</p> : null}
+                        {/* THE NEXT CAST HAPPENS HERE. Pressing "cast again" used to close this card and open
+                            another one that also said cast — a modal advertising a throw, opening a modal
+                            advertising a throw. With bait in the pantry the picker opens right on the recap
+                            instead, so choosing what goes on the hook and throwing it are one screen and one
+                            decision, on the card you are already reading. */}
+                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
                         <div className="fish-actions">
+                            {picking ? null : (
                             <button
                                 type="button"
                                 className={`fish-cta${casts.left <= 0 && buyable ? " is-buy" : ""}`}
@@ -649,10 +673,11 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                     castAgain();
                                 }}
                             >
-                                {casts.left > 0 ? "Cast again 🎣"
+                                {casts.left > 0 ? (baits.length ? "Cast again 🎣 · pick a bait" : "Cast again 🎣")
                                     : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
                                     : "That's your last cast today"}
                             </button>
+                            )}
                             <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
                     </div>
@@ -724,7 +749,14 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 {e.stats ? <i className="fish-gear-stats">{statLine(e.stats)}</i> : null}
                             </div>
                         ))}
+                        {/* THE NEXT CAST HAPPENS HERE. Pressing "cast again" used to close this card and open
+                            another one that also said cast — a modal advertising a throw, opening a modal
+                            advertising a throw. With bait in the pantry the picker opens right on the recap
+                            instead, so choosing what goes on the hook and throwing it are one screen and one
+                            decision, on the card you are already reading. */}
+                        {picking ? <BaitPicker baits={baits} busy={busy} onCast={cast} /> : null}
                         <div className="fish-actions">
+                            {picking ? null : (
                             <button
                                 type="button"
                                 className={`fish-cta${casts.left <= 0 && buyable ? " is-buy" : ""}`}
@@ -736,10 +768,11 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                     castAgain();
                                 }}
                             >
-                                {casts.left > 0 ? "Cast again 🎣"
+                                {casts.left > 0 ? (baits.length ? "Cast again 🎣 · pick a bait" : "Cast again 🎣")
                                     : buyable ? `Buy another cast 🎣 · 🪙 ${rc.cost.toLocaleString()}${canAfford ? "" : " · not enough"}`
                                     : "That's your last cast today"}
                             </button>
+                            )}
                             <button type="button" className="fish-ghost" onClick={openLog}>📖 Fishing Log</button>
                         </div>
                     </div>
