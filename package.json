@@ -17,6 +17,7 @@
     "check:guide": "node scripts/check-guide.mjs",
     "check:art": "node scripts/check-image-paths.mjs",
     "check:arena": "node scripts/check-arena.mjs",
+    "sim": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-arena.mjs",
     "check:sim": "node scripts/check-sim-drift.mjs",
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",
     "check:sets": "node scripts/check-sets.mjs",

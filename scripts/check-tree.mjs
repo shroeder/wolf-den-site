@@ -25,7 +25,12 @@ const LIB = join(dirname(fileURLToPath(import.meta.url)), "..", "src", "lib", "m
 const classes = readFileSync(join(LIB, "arena-classes.js"), "utf8");
 // arena.js AND arena-kit.js: FREE_KINDS lives in the kit, so a ward dispatched through isFreeKind()
 // looks unimplemented if you only read the engine.
-const engine = readFileSync(join(LIB, "arena.js"), "utf8") + readFileSync(join(LIB, "arena-kit.js"), "utf8");
+// arena-engine.js too: the beat's pure arithmetic lives there now so the balance simulator can run the real
+// code, and this check reads the engine as TEXT — so a file it does not open is a mechanic it cannot see.
+// Moving the burn and wound helpers out reported five live nodes as dead until this line was updated.
+const engine = readFileSync(join(LIB, "arena.js"), "utf8")
+    + readFileSync(join(LIB, "arena-kit.js"), "utf8")
+    + readFileSync(join(LIB, "arena-engine.js"), "utf8");
 // The AI picker rebuilds the one move an opponent is throwing — a THIRD allowlist these flags must survive.
 const picker = readFileSync(join(LIB, "arena-ai.js"), "utf8");
 // The kit AND the class table: a folded stat may be set by classBase() in arena-classes rather than
