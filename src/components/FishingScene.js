@@ -363,6 +363,22 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
         }, wait);
     }, [busy, onCast, reportMiss, sfx, sky]);
 
+    // ── "CAST AGAIN" HAS TO CAST ─────────────────────────────────────────────────────────────────────────
+    // It did not. Every exit from a catch — landed a fish, hauled treasure, or it got away — ran
+    // `setPhase("idle")` and stopped there, which drops you on the idle screen with the line still in the
+    // boat. The button said "Cast again", so you pressed it, nothing went in the water, and you pressed Cast
+    // the line underneath it. Two taps for one cast, every single time, on the loop people repeat most.
+    //
+    // It casts now, and it makes the same decision the idle button makes: with bait in the pantry it opens the
+    // picker (a bait is spent, so it must never be chosen for you), and with an empty pantry it just throws.
+    const castAgain = useCallback(() => {
+        setResult(null);
+        setHaul(null);
+        setPhase("idle");
+        if (baits.length) setPicking(true); else cast(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [baits.length, cast]);
+
     // ── THE TAP, AND THEN YOU WATCH ──────────────────────────────────────────────────────────────────────
     // The struggle bar is gone. Tapping the bite hooks it and the haul begins immediately — the land call goes
     // out while the rise animation plays, so the thing clearing the water and the answer arriving are the same
@@ -581,7 +597,7 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                         <p className="fish-copy">It stole your bait and slipped away.</p>
                         <p className="muted">Your cast came back — no harm done.</p>
                         <div className="fish-actions">
-                            <button type="button" className="fish-cta" onClick={() => { setPhase("idle"); setResult(null); }}>Try again 🎣</button>
+                            <button type="button" className="fish-cta" onClick={castAgain}>Try again 🎣</button>
                         </div>
                     </div>
                 ) : result?.treasure ? (
@@ -628,9 +644,9 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 disabled={busy || (casts.left <= 0 && !(buyable && canAfford))}
                                 onClick={async () => {
                                     // Out of casts: buy one right here rather than sending them back to find a
-                                    // different button. Either way we land on idle, ready to cast.
-                                    if (casts.left <= 0 && buyable) await buyCast();
-                                    setResult(null); setPhase("idle");
+                                    // different button. Then actually cast, which is what the button says.
+                                    if (casts.left <= 0 && buyable) { await buyCast(); setResult(null); setPhase("idle"); return; }
+                                    castAgain();
                                 }}
                             >
                                 {casts.left > 0 ? "Cast again 🎣"
@@ -715,9 +731,9 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 disabled={busy || (casts.left <= 0 && !(buyable && canAfford))}
                                 onClick={async () => {
                                     // Out of casts: buy one right here rather than sending them back to find a
-                                    // different button. Either way we land on idle, ready to cast.
-                                    if (casts.left <= 0 && buyable) await buyCast();
-                                    setResult(null); setPhase("idle");
+                                    // different button. Then actually cast, which is what the button says.
+                                    if (casts.left <= 0 && buyable) { await buyCast(); setResult(null); setPhase("idle"); return; }
+                                    castAgain();
                                 }}
                             >
                                 {casts.left > 0 ? "Cast again 🎣"
