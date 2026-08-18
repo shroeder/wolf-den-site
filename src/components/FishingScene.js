@@ -424,10 +424,21 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
         try { await onRecharge?.(); } finally { setBusy(false); }
     }, [busy, canAfford, onRecharge]);
 
-    const cast = useCallback(async () => {
+    // ── BAIT FIRST, THEN THE WATER ───────────────────────────────────────────────────────────────────────
+    // Luke: "when you decide you wanna fish, you first select a bait if you have one, or you say skip
+    // baiting, and then it goes on to the actual fishing minigame."
+    //
+    // The picker is a STEP, not a setting — it opens on the tap that would have cast, and closes into the
+    // cast. Nothing is remembered between casts: a bait is SPENT, so a silent default would burn your best
+    // one on a cast you never thought about.
+    const [picking, setPicking] = useState(false);
+    const baits = Array.isArray(fishing?.baits) ? fishing.baits : [];
+
+    const cast = useCallback(async (bait = null) => {
         if (busy) return;
+        setPicking(false);
         setBusy(true); setErr(null); setResult(null);
-        const res = await onCast({ sky }).catch(() => null);
+        const res = await onCast({ sky, bait }).catch(() => null);
         setBusy(false);
         if (!res?.ok) {
             setErr(res?.error === "out_of_casts" ? "You're out of casts for today — they refill tomorrow."
@@ -535,6 +546,35 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                             Drop a line over the rail. When it twitches, <strong>tap</strong> — then <strong>hold to reel</strong> and
                             keep the fish in the green. A good reel lands a bigger fish.
                         </p>
+                        {/* ── THE BAIT STEP ── every row states what it buys, and the number comes off the
+                            bait itself, so the picker cannot advertise a boost the cast does not apply. */}
+                        {picking ? (
+                            <div className="fish-bait" role="dialog" aria-label="Choose a bait">
+                                <p className="fish-bait-head">What are you putting on the hook?</p>
+                                <div className="fish-bait-list">
+                                    {baits.map((b) => (
+                                        <button key={b.id} type="button" className={`fish-bait-row is-${b.rarity}`}
+                                            disabled={busy} onClick={() => cast(b.id)}>
+                                            {b.sprite
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                ? <img src={b.sprite} alt="" className="fish-bait-art" draggable="false" />
+                                                : <span className="fish-bait-art" aria-hidden="true">🪱</span>}
+                                            <span className="fish-bait-name">
+                                                <b>{b.name}</b>
+                                                <em>{b.blurb}</em>
+                                            </span>
+                                            <span className="fish-bait-num">
+                                                <b>+{b.tilt.toFixed(1)}</b>
+                                                <em>rarity · {b.qty} left</em>
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                                <button type="button" className="fish-ghost" disabled={busy} onClick={() => cast(null)}>
+                                    Skip baiting — cast the bare hook
+                                </button>
+                            </div>
+                        ) : null}
                         {err ? <p className="fish-err">{err}</p> : null}
                         <div className="fish-actions">
                             {/* ONE button. Running out of casts doesn't hand you a dead control and hide the
@@ -542,8 +582,9 @@ export default function FishingScene({ fishing, sky, records, gold = 0, onCast, 
                                 tapping simply changes what it offers, the way the raid and tailwind buttons do.
                                 Only when there's genuinely nothing left to offer does it disable. */}
                             {casts.left > 0 || !buyable ? (
-                                <button type="button" className="fish-cta" disabled={busy || casts.left <= 0} onClick={cast}>
-                                    {casts.left <= 0 ? "Out of casts today" : busy ? "Casting…" : "Cast the line 🎣"}
+                                <button type="button" className="fish-cta" disabled={busy || casts.left <= 0}
+                                    onClick={() => (baits.length ? setPicking(true) : cast(null))}>
+                                    {casts.left <= 0 ? "Out of casts today" : busy ? "Casting…" : baits.length ? "Bait up 🎣" : "Cast the line 🎣"}
                                 </button>
                             ) : (
                                 <button type="button" className="fish-cta is-buy" disabled={busy || !canAfford} onClick={buyCast}>

@@ -745,6 +745,28 @@ export async function addToPantry(buyerId, kind, ref, qty = 1) {
 }
 
 /**
+ * What bait this member is carrying, ready for the picker that spends it.
+ *
+ * The tilt is read off the BAITS catalog rather than stored on the row, so the number the picker shows and the
+ * number the cast applies are the same number — a bait cannot advertise a boost fishing does not pay.
+ */
+export async function baitStock(buyerId) {
+    if (!buyerId) return [];
+    const [rows, sprites] = await Promise.all([
+        db.query(`SELECT ref, qty FROM mkt_pantry WHERE buyer_id = $1 AND kind = 'bait' AND qty > 0`, [buyerId]).catch(() => []),
+        cookingSprites().catch(() => ({})),
+    ]);
+    return rows
+        .map((r) => {
+            const def = BAITS[r.ref];
+            if (!def) return null;
+            return { id: r.ref, name: def.name, rarity: def.rarity, tilt: def.tilt, blurb: def.blurb || "", qty: Number(r.qty) || 0, sprite: sprites[r.ref] || null };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.tilt - b.tilt);
+}
+
+/**
  * Take exactly one thing off the shelf, or report that it was not there.
  *
  * The conditional `qty >= $3` is the whole of it: two casts fired at once cannot both spend the last bait,

@@ -1025,7 +1025,9 @@ function boardView(board) {
 // `buyerId` is passed explicitly rather than read off `row`: a member who has never opened Sailing has NO
 // mkt_sailing row, so `row` is null and `row?.buyer_id` is undefined — which used to fail the fishing gate and
 // erase the entire feature for them. Callers that only want `.status`/`.level` can still omit it.
-function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null) {
+// `baits` is handed in for the same reason gunDeck and the recipe shelf are: it is a pantry query and this
+// function is synchronous on purpose.
+function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling = 0, sky = null, buyerId = null, collections = [], consumableArt = {}, gunDeck = null, pieces = [], hulls = null, marketDay = false, recipeShop = null, baits = []) {
     const speedLevel = row?.speed_level || 0;
     const fortuneLevel = row?.luck_level || 0; // Fortune is stored in the legacy luck_level column
     const rarityLevel = row?.rarity_level || 0;
@@ -1176,7 +1178,13 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
         // A null here removes the whole surface: SailingClient guards every fishing affordance on
         // `state.fishing`, so members see no rail button, no scene, no trace of it — which is exactly what
         // happened to the 36 members who had no sailing row when this read `row?.buyer_id`.
-        fishing: fishingUnlocked(buyerId || row?.buyer_id) ? fishingView(row, angling, status) : null,
+        // The bait shelf rides with the fishing view: the picker that spends one has to be able to list what
+        // you are carrying, and fishingView is synchronous (it reads the row) so it cannot fetch a pantry.
+        // The bait shelf rides with the fishing view, because the picker that spends one has to list what you
+        // are carrying — and each entry carries its own tilt, so the number shown is the number applied.
+        fishing: fishingUnlocked(buyerId || row?.buyer_id)
+            ? { ...fishingView(row, angling, status), baits }
+            : null,
     };
 }
 
@@ -1604,8 +1612,13 @@ export async function getSailingState(buyerId, skyKey = null) {
         const p = await recipeProgress(buyerId);
         return { price: RECIPE_PRICE_DOUBLOONS, knowsAll: p.shopKnown >= p.shopTotal, knowsBook: p.known >= p.total, ...p };
     })().catch(() => null);
+    // LAZY, like every other reach into cooking.js from this file — the note on the recipe shelf above spells
+    // out why: cooking imports SEEDS and grantSeed from farm-crops, and a static edge back would be a cycle.
+    const baits = await import("@/lib/marketplace/cooking.js")
+        .then((m) => m.baitStock(buyerId))
+        .catch(() => []);
     return { ...decorate(row, chestArt, seaEff.bonusWaves, raidExtras.bonusRaids, seaEff.angling, null, buyerId, collections, consumableArt, gunDeck, pieces, hulls, (await powerUsesLeft(buyerId, "market_day")) > 0,
-        recipeShop), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
+        recipeShop, baits), gold: goldRow?.gold || 0, fleet, sky, sea, stoneShop, owner: isOwner(buyerId),
         // CHEST_ORDER, not the row order, so "best held" means the same thing here as everywhere else.
         chestsHeld: (() => {
             const c = Object.fromEntries((chestRows || []).map((r) => [r.tier, Number(r.count) || 0]));
