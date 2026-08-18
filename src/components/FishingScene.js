@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ItemArt from "@/components/ItemArt";
 import FishingWater from "@/components/FishingWater";
+import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 import { createPortal } from "react-dom";
 
 // ── FISHING ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -252,6 +253,8 @@ const HAUL_MS = 1150;
 // tell rather than a countdown.
 const TELL_MS = 1400;
 
+
+
 export default function FishingScene({ fishing, sky, boat = null, hero = null, records, gold = 0, onCast, onLand, onRecharge, onLoadRecords, onClose, onMonster = null }) {
     const sfx = useSfx();
     const [phase, setPhase] = useState("idle");   // idle | waiting | bite | reel | result | gone | log
@@ -390,7 +393,8 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
         // does the fight open. Handing straight to the bout would cover the one frame the whole rework is
         // for. HAUL_MS matches the rise keyframe in globals.css.
         if (res?.ok && res.monster) {
-            setHaul({ art: res.monster.art, name: res.monster.name, kind: "monster" });
+            setHaul({ art: res.monster.art, name: res.monster.name, kind: "monster", tier: res.monster.tier,
+                scale: haulScale({ kind: "monster", tier: res.monster.tier }) });
             sfx.bite();
             setTimeout(() => onMonster?.(res.monster), HAUL_MS);
             return;
@@ -403,9 +407,10 @@ export default function FishingScene({ fishing, sky, boat = null, hero = null, r
             // table can produce) and a fish draws its species plate, which is resolved from the id here the
             // same way the reveal card resolves it.
             const landedNow = res.catchResult || res;
-            setHaul(landedNow.treasure
+            const h = landedNow.treasure
                 ? { art: landedNow.prize?.spriteUrl || "/images/sailing/dig-chest.png", name: landedNow.prize?.label || "Treasure", kind: "treasure" }
-                : { art: landedNow.fish?.id ? `/images/fish/${landedNow.fish.id}.png` : null, name: landedNow.fish?.name || null, kind: "fish" });
+                : { art: landedNow.fish?.id ? `/images/fish/${landedNow.fish.id}.png` : null, name: landedNow.fish?.name || null, kind: "fish", lb: landedNow.fish?.lb };
+            setHaul({ ...h, scale: haulScale(h) });
             // `catchResult`, NOT `res`. fishLand returns the catch spread UNDER the whole sailing state, and
             // that state carries `gold` = the member's total balance — so `res.gold` is your wallet, not the
             // payout. A 12-gold Tiger Prawn proudly reported "+1879 🪙". XP looked fine only because the

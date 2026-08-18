@@ -16863,10 +16863,6 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* THE BOBBER. Bobs gently while waiting; goes UNDER on a bite. */
 .fw-bobber { position: absolute; left: 38%; top: 60%; width: 13px; height: 18px;
     animation: fwBob 2.6s ease-in-out infinite; }
-.fw-bobber-top { position: absolute; inset: 0 0 45% 0; border-radius: 7px 7px 3px 3px;
-    background: linear-gradient(180deg, #ff6b6b, #c0392b); box-shadow: 0 0 6px rgba(0,0,0,0.4); }
-.fw-bobber-tip { position: absolute; inset: 55% 0 0 0; border-radius: 3px 3px 7px 7px;
-    background: linear-gradient(180deg, #f3f3f3, #cfd8e3); }
 @keyframes fwBob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-6px) rotate(4deg); } }
 /* Under it goes. Fast, repeating, unmistakable — this is the thing you are watching for. */
 .fw[data-phase="bite"] .fw-bobber { animation: fwDip .42s ease-in-out infinite; }
@@ -16924,7 +16920,13 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .fw-bobber { left: 72.5%; top: 58%; }
 .fw-rings { left: 73.5%; top: 64%; }
 /* And the catch comes up WHERE THE LINE IS. Behind the boat is where it was hidden. */
-.fw-haul { left: 72%; bottom: 24%; width: 104px; margin-left: -52px; }
+/* One base width, multiplied by what the catch is. `--haul` is set per haul (see FishingWater); the negative
+   margin has to scale with it or a big catch surfaces off-centre. */
+.fw-haul { left: 72%; bottom: 24%; width: calc(104px * var(--haul, 1)); margin-left: calc(-52px * var(--haul, 1)); }
+/* The float, at the size a float is. */
+.fw-bobber { width: 26px; height: 26px; }
+.fw-bobber img { width: 100%; height: 100%; object-fit: contain; display: block;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
 
 /* THE TELL — a shadow crossing under the float just before it goes down. Only during `tell`; the rest of the
    time there is nothing in the water, so when there IS something it means something. */

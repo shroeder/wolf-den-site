@@ -65,8 +65,13 @@ export default function FishingWater({
 
             {/* WHAT IS COMING UP — behind the boat, rising through the waterline. Rendered before the hull so
                 the hull always occludes it, which is what sells the "out of the water" part. */}
+            {/* ── SCALE ────────────────────────────────────────────────────────────────────────────────
+                `haul.scale` is worked out from what the thing actually IS (see haulScale in FishingScene) and
+                applied as a multiplier on one base width. Everything used to surface at the same 104px, so a
+                chest came up the size of a leviathan and a sardine came up the size of the chest — which made
+                the one moment the whole rework is built around say nothing about what you caught. */}
             {haul?.art ? (
-                <div className="fw-haul" key={haul.art}>
+                <div className="fw-haul" key={haul.art} style={{ "--haul": haul.scale || 1 }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={haul.art} alt={haul.name || ""} draggable="false" />
                     <span className="fw-haul-spray" aria-hidden="true" />
@@ -94,9 +99,12 @@ export default function FishingWater({
             <svg className="fw-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <line x1="47" y1="34" x2="74" y2="62" />
             </svg>
+            {/* The float is a painted object now, not two rounded divs — it sits in the middle of a scene
+                where the hull, the hero, the fish and the monsters are all art, and it was the one thing on
+                screen that plainly was not. scripts/gen-fishing-art.mjs. */}
             <div className="fw-bobber" aria-hidden="true">
-                <span className="fw-bobber-top" />
-                <span className="fw-bobber-tip" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/images/sailing/bobber.png" alt="" draggable="false" />
             </div>
 
             {/* ── THE TELL ─────────────────────────────────────────────────────────────────────────────

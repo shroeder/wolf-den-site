@@ -3,14 +3,18 @@
 import { useState } from "react";
 
 import FishingWater from "@/components/FishingWater";
+import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 
 // The fishing scene's phases, on buttons. Waiting for a real bite to look at the bite is not a workflow.
 const PHASES = ["idle", "waiting", "tell", "bite", "hauling"];
+// Scale comes from the REAL haulScale, not a number typed here — the whole point of the lab is to look at
+// what the game will actually draw.
 const HAULS = [
-    { art: "/images/fish/fish_kraken.png", name: "Kraken", kind: "fish" },
-    { art: "/images/sailing/enc/world_serpent.png", name: "The World Serpent", kind: "monster" },
+    { art: "/images/fish/fish_sardine.png", name: "Sardine", kind: "fish", lb: 0.6 },
+    { art: "/images/fish/fish_kraken.png", name: "Kraken Spawn", kind: "fish", lb: 3400 },
     { art: "/images/sailing/dig-chest.png", name: "Gold Chest", kind: "treasure" },
-];
+    { art: "/images/sailing/enc/world_serpent.png", name: "The World Serpent", kind: "monster", tier: 5 },
+].map((h) => ({ ...h, scale: haulScale(h) }));
 
 export default function WaterLab() {
     const [phase, setPhase] = useState("waiting");
