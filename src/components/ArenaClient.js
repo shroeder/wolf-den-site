@@ -129,6 +129,11 @@ const EVENT_MS = { hit: 300, crit: 380, counter: 380, riposte: 300, thorn: 260, 
 // eight events at full length would be 2.2s a beat and 16s a fight.
 const SQUEEZE = 0.62;
 const BEAT_BUDGET_MS = 1200;
+// ── A COUNTER DRAWS BACK BEFORE IT LANDS ─────────────────────────────────────────────────────────────────────
+// The recoil reads instantly because it is a red flash AND a shove; the lunge was only a shove, so a counter
+// looked soft next to the blow it answers. A blow needs an anticipation to hit against — the same reason every
+// command you press has a wind-up. Short: this is a punish, not a cast.
+const COUNTER_WIND_MS = 150;
 // Which events make somebody flinch — the ones that move a health bar.
 const DAMAGE_KINDS = new Set(["hit", "crit", "counter", "riposte", "thorn", "bleed", "burn"]);
 // The engine's vocabulary against the pop stylesheet's.
@@ -652,6 +657,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [blockReady, setBlockReady] = useState(false);  // the telegraph has played; the block ring may start
     const [pop, setPop] = useState(null);         // floating damage number off the last landed blow
     const [beatQueue, setBeatQueue] = useState(null);  // the beat's events, played one at a time
+    const [counterWind, setCounterWind] = useState(null); // "left" | "right" — who is drawing back to strike
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
     const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
@@ -1283,6 +1289,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
             const dur = i < 2 ? base : Math.max(90, Math.round(base * SQUEEZE));
             const at = Math.min(clock, BEAT_BUDGET_MS);
             clock += dur;
+            // The draw-back happens BEFORE the blow it belongs to, and the swing is heard at the start of it —
+            // the same rule the command wind-up follows. The counter's own moment shifts back by that much so
+            // the anticipation does not eat the event in front of it.
+            const wind = e.kind === "counter" ? COUNTER_WIND_MS : 0;
+            if (wind) {
+                clock += wind;
+                timers.push(setTimeout(() => { setCounterWind(e.side); Sfx.whoosh(); }, at));
+                timers.push(setTimeout(() => setCounterWind(null), at + wind + 40));
+            }
             timers.push(setTimeout(() => {
                 setPop({ id: `${beatQueue.id}-${i}`, items: [{ side: e.side, n: e.n, kind: POP_KIND[e.kind] || e.kind, text: e.kind === "miss" ? "MISS" : null, crit: e.crit }] });
                 // The ring itself answers, every time — this is the half that was only ever played once per
@@ -1292,24 +1307,28 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     setHitSide(hurtSide);
                     setShake(e.crit || e.kind === "counter" ? 2 : 1);
                     setStop(true);
-                    if (e.crit) { Sfx.crit(0.8); Haptic.crit(); duck(0.5, 0.3); }
-                    else if (e.kind === "counter") {
+                    // ── COUNTER IS CHECKED BEFORE CRIT, AND THAT ORDER IS THE WHOLE POINT ────────────
+                    // It was the other way around, so a CRITICAL counter — the loudest thing the mechanic
+                    // does — fell into the generic crit branch and lost both its banner and its voice. The
+                    // frames showed TIDECALL still on screen while the counter landed. A kind is more
+                    // specific than a modifier; the specific case has to be asked first.
+                    if (e.kind === "counter") {
                         // The one event that is a MOVE somebody threw rather than a consequence, so it is
                         // named across the middle the way a move is.
                         setClash({ grade: "counter", move: e.crit ? "RETALIATION!" : "Retaliation", mine: e.side === "right", crit: Boolean(e.crit) });
                         setCounterHeld(false);
-                        Sfx.whoosh();
                         Sfx.counter(e.crit ? 0.9 : 0.55, 0.07);
                         if (e.crit) { Haptic.crit(); duck(0.5, 0.3); } else { Haptic.hit(0.7); duck(0.35, 0.22); }
                     }
+                    else if (e.crit) { Sfx.crit(0.8); Haptic.crit(); duck(0.5, 0.3); }
                     else if (e.kind === "thorn" || e.kind === "riposte") { Sfx.impact(0.45); Haptic.hit(0.5); }
                     else if (e.kind === "bleed" || e.kind === "burn") { Sfx.burn(); }
                     else { Sfx.impact(0.5); Haptic.hit(0.6); }
                 } else if (e.kind === "drink") { Sfx.heal?.(); Haptic.cast(); }
                 else if (e.kind === "block" || e.kind === "ward") { Sfx.block(0.4); }
                 else if (e.kind === "miss") { Sfx.block(0.3); }
-            }, at));
-            timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + Math.min(dur, 340)));
+            }, at + wind));
+            timers.push(setTimeout(() => { setShake(0); setHitSide(null); setStop(false); }, at + wind + Math.min(dur, 340)));
         });
         timers.push(setTimeout(() => setPop(null), Math.min(clock, BEAT_BUDGET_MS) + 1400));
         return () => { for (const t of timers) clearTimeout(t); };
@@ -1580,11 +1599,11 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             `hitSide`, never by the intensity — see the note on the state itself. */}
                         <FighterBody f={st.me} hurt={hitSide === "you"} lunge={hitSide === "them"}
                             down={bout.over && !bout.won}
-                            wind={yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0}
+                            wind={counterWind === "left" ? COUNTER_WIND_MS : (yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0)}
                             brace={!bout.over && bout.turn === "them" && blockReady} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
-                            wind={!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0}
+                            wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
                             brace={yourTurn && Boolean(pending)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
