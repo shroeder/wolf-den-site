@@ -42,7 +42,22 @@ import { hasPower, oneIn, equippedPowers, powerRoll } from "@/lib/marketplace/as
 //
 // `lb` is the weight range in pounds. Fishing records are kept by weight everywhere in the real world, and the
 // catch screen compares yours against the species best, so weight is the unit the whole feature speaks.
-const F = (id, name, emoji, rarity, odds, lb, gold, xp) => ({ id, name, emoji, rarity, odds, lb, gold, xp });
+// ── WHAT A CAST IS WORTH ─────────────────────────────────────────────────────────────────────────────────────
+// The gold and xp columns below are the ORIGINAL hand-authored ones, kept exactly as written so the shape of
+// the table — which fish is worth more than which — stays where it was. PAYOUT is applied on top.
+//
+// Measured before touching it: a fish averaged 14 gold, a common paid FIVE, and twelve casts came to about 124
+// gold for the day. One tier-1 cooking dish pays 90-160 and cooking has no daily cap, so a full day at the rail
+// was worth roughly one cheap plate. That is not a reward, it is a rounding error, and it is why fishing read
+// as something to tick off rather than something to do.
+//
+// x3 puts a common at 15, a day at ~370, and a mythic at ~775 — in the same conversation as the other loops
+// without becoming the best of them. Deliberately not the 5x that would have matched cooking outright: fishing
+// also pays gear, chests, seeds, recipes and doubloons on the side, and those are the half people actually
+// remember.
+const PAYOUT = 3;
+const F = (id, name, emoji, rarity, odds, lb, gold, xp) => ({ id, name, emoji, rarity, odds, lb,
+    gold: Math.round(gold * PAYOUT), xp: Math.round(xp * PAYOUT) });
 
 // PAYOUT TUNING, and the story behind these numbers so nobody re-derives them from scratch:
 //
@@ -266,12 +281,19 @@ const TREASURE = { fragment: 25, seed: 26, consumable: 27, gear: 12, chest: 6, p
 // grantFishingGear skips anything already owned.
 // A common fish paid GEAR 40% of the time, so a five-cast day handed out gear most days. The bonus is still
 // there — a cast is rarely empty — it is just far more often fragments or a consumable than a weapon.
+// `nothing` WAS THE BIGGEST SLICE ON THE COMMONEST CATCH, and commons are 62% of everything landed — so about
+// a quarter of ALL casts paid five gold and no more. A quarter of a feature being a dead press is the whole
+// reason it felt like nothing was happening out there.
+//
+// Every catch gives something now. `nothing` is gone from the top three bands entirely and the weight went to
+// doubloons, which is the small, frequent, always-welcome outcome — a cast should hand you SOMETHING even when
+// it is not a story. The rarer bands keep their sweeter odds on top.
 const FISH_BONUS = {
-    common: { nothing: 52, gear: 9, fragment: 24, consumable: 15 },
-    rare: { nothing: 45, gear: 12, fragment: 25, consumable: 15, chest: 2, recipe: 1 },
-    epic: { nothing: 40, gear: 13, fragment: 26, consumable: 16, chest: 3, recipe: 2 },
-    legendary: { nothing: 23, fragment: 32, consumable: 26, gear: 12, chest: 4, recipe: 3 },
-    mythic: { nothing: 0, fragment: 30, consumable: 32, gear: 18, chest: 13, pet: 3, recipe: 4 },
+    common: { doubloons: 52, gear: 12, consumable: 22, recipe: 2, chest: 1 },
+    rare: { doubloons: 46, gear: 15, consumable: 22, chest: 4, recipe: 3 },
+    epic: { doubloons: 40, gear: 18, consumable: 22, chest: 8, recipe: 5 },
+    legendary: { doubloons: 33, consumable: 26, gear: 18, chest: 12, recipe: 8, pet: 1 },
+    mythic: { doubloons: 24, consumable: 26, gear: 20, chest: 17, pet: 4, recipe: 9 },
 };
 // How many fragments a fragment-drop is worth, by fish rarity.
 const FRAGMENT_COUNT = { common: 1, rare: 1, epic: 2, legendary: 3, mythic: 5 };
@@ -355,6 +377,8 @@ async function denIsRaining() {
 }
 
 const rollTreasure = () => pickWeighted(TREASURE);
+// `doubloons` is the same wedge the table used to call `fragment` — grantHaul has paid coin for it since
+// chests stopped being assembled from shards. Renamed here so the table says what the player receives.
 const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.common);
 
 // Grant one haul entry and describe it for the client. Best-effort throughout: failing to hand over a bonus
@@ -377,7 +401,7 @@ const rollFishBonus = (rarity) => pickWeighted(FISH_BONUS[rarity] || FISH_BONUS.
 
 async function haulSprite(kind, id = null, chestTier = null) {
     try {
-        if (kind === "fragment") {
+        if (kind === "fragment" || kind === "doubloons") {
             const r = await db.queryOne(`SELECT url FROM mkt_town_art WHERE art_key = 'chest_fragment'`).catch(() => null);
             return r?.url || null;
         }
@@ -434,7 +458,7 @@ async function grantHaul(buyerId, kind, tier = "common") {
             spriteUrl: await haulSprite("recipe", rec.id),
         };
     }
-    if (kind === "fragment") {
+    if (kind === "fragment" || kind === "doubloons") {
         // WAS a chest shard. Chests come only from digging now, so the line pays DOUBLOONS — which suits
         // fishing better anyway: you are hauling coin off the sea floor, not a piece of a chest that assembles
         // itself two screens away. Scaled by the catch's rarity on the same curve the shard count used.
@@ -483,7 +507,13 @@ async function grantHaul(buyerId, kind, tier = "common") {
 
 // How good a treasure haul is. Rolled independently of the fish table so pulling up a chest doesn't need a
 // mythic on the line — but weighted so most of what the sea gives up is ordinary.
-const TREASURE_TIER = { common: 62, rare: 26, epic: 9, legendary: 2.6, mythic: 0.4 };
+// TWO FILTERS MULTIPLIED, and that is what hid the good outcomes. The chest wedge is 6% of treasure and
+// treasure is 20% of casts — so a chest was 1.2% of casts, and at 62% common tier it was a WOODEN chest almost
+// nine times in ten. A gold chest worked out at roughly one every forty days. The interesting results existed
+// and were invisible.
+// Shifted up so the tier roll stops being a second tax on an already-rare wedge. A common haul is still the
+// usual answer; it is just no longer two thirds of everything.
+const TREASURE_TIER = { common: 44, rare: 32, epic: 17, legendary: 5.5, mythic: 1.5 };
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────────────────────────────────────
 const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0));

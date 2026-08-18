@@ -1212,22 +1212,14 @@ function decorate(row, chestArt = {}, bonusWaves = 0, raidSetBonus = 0, angling 
 
 // The single gate for the fishing minigame.
 //
-// ── BACK UNDER CONSTRUCTION, 2026-08-18 ──────────────────────────────────────────────────────────────────
-// Luke: "I want to change the fishing mini game and view — right now it's really laborious... I don't like
-// that it's not very immersive. Maybe we can put fishing under construction and make it owner gated that way
-// I could play around with it."
-//
-// So it is owner-only again while the rework lands: a bobber on a line you can actually watch, monsters that
-// come up fighting, chests and big fish breaking the surface as you haul them in. The cast/land/records
+// Shut on 2026-08-18 for the rework — a float you watch instead of a timing bar, things that come up fighting,
+// and everything breaking the surface beside the boat — and OPEN AGAIN the same day now that the rework and
+// its rewards have landed. Kept as a function rather than deleted, for the third time: the cast/land/records
 // actions, the /marketplace/fishing page, the nav entry, the rail upgrade tracks, the daily quest and the
-// profile log ALL route through this one predicate — which is exactly why it was kept as a function when
-// fishing went public rather than being deleted. One return value, not a hunt through six files.
-//
-// NOTHING IS TAKEN AWAY. Bait already cooked stays in the pantry, rail upgrade levels stay bought, and every
-// fish already logged stays in the records — the door is shut, the room is untouched. Same promise the Road
-// was closed on.
+// profile log all route through this one predicate, so closing the door is one return value rather than a
+// hunt through six files. That has been worth it twice now.
 export function fishingUnlocked(buyerId) {
-    return Boolean(buyerId) && isOwner(buyerId);
+    return Boolean(buyerId);
 }
 
 async function readRow(buyerId) {

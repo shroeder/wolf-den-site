@@ -16970,3 +16970,20 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 /* The pets board's sort row — sits under the source filters, same pill language. */
 .petx-sort { align-items: center; gap: 6px; margin-top: -4px; }
 .petx-sort-label { font-size: 0.68rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: #7a828c; margin-right: 2px; }
+
+/* ── THE HAULS WORTH A REACTION ───────────────────────────────────────────────────────────────────────────
+   A chest, a recipe or a pet used to be a text pill the same size as "+15 gold". Same card treatment gear
+   already had: real art, a label saying where it came from, and where it went. */
+.fish-prize { display: flex; align-items: center; gap: 11px; margin-top: 8px; padding: 10px 12px;
+    border-radius: 12px; text-align: left; background: rgba(255,215,94,0.08);
+    border: 1px solid rgba(255,215,94,0.34); animation: fishPrizeIn .42s cubic-bezier(.2,.8,.3,1) both; }
+.fish-prize.is-recipe { background: rgba(126,200,255,0.09); border-color: rgba(126,200,255,0.36); }
+.fish-prize.is-pet { background: rgba(255,158,196,0.10); border-color: rgba(255,158,196,0.40); }
+.fish-prize-art { width: 46px; height: 46px; flex: none; object-fit: contain; font-size: 30px; text-align: center;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.5)); }
+.fish-prize-copy { display: flex; flex-direction: column; min-width: 0; }
+.fish-prize-copy em { font-style: normal; font-size: 0.66rem; font-weight: 900; letter-spacing: .09em;
+    text-transform: uppercase; color: #9fb4c4; }
+.fish-prize-copy b { font-size: 0.95rem; line-height: 1.25; }
+.fish-prize-copy span { font-size: 0.74rem; color: #8fa2b2; }
+@keyframes fishPrizeIn { 0% { opacity: 0; transform: translateY(10px) scale(.94); } 100% { opacity: 1; transform: none; } }

@@ -482,13 +482,17 @@ export const RECIPE_PRICE_LAURELS = 2500;
  * Returns the recipe when it was new to them, else null (they already know everything in that band), so the
  * caller can fall back to another prize rather than paying out nothing.
  */
-export async function grantRecipeReward(buyerId, band, { strict = false } = {}) {
+export async function grantRecipeReward(buyerId, band, { strict = false, favour = null } = {}) {
     const def = RECIPE_BANDS[band];
     if (!buyerId || !def) return null;
+    // A page off the water leans to BAIT unless the caller says otherwise — see `favour` on rollRecipe for why
+    // it is a lean and not a lock. Defaulted by band so every fishing drop point gets it without each one
+    // having to remember; there are several and one of them would have been missed.
+    const lean = favour || (band === "fish" ? "bait" : null);
     // `band` IS the source — every caller already passes the name of the thing that dropped it (spin, fish,
     // seam_deep, boss_kill, town_raid, a chest's tier). It was being used to pick the rarity and then thrown
     // away, which is why the card could never say where the page came from.
-    return learnRecipe(buyerId, null, { min: def.min, max: def.max, strict }, band);
+    return learnRecipe(buyerId, null, { min: def.min, max: def.max, strict, favour: lean }, band);
 }
 
 /**
@@ -577,7 +581,17 @@ export async function recipeLuck(buyerId) {
  * Falls back to the full pool when the band is exhausted — once you know every Legendary recipe a boss kill
  * should still give you something rather than silently nothing.
  */
-export function rollRecipe(known = [], { min = 1, max = 5, strict = false } = {}) {
+// `favour` LEANS THE ROLL TOWARD ONE KIND OF RECIPE WITHOUT LOCKING THE OTHERS OUT.
+//
+// A page found on the water should usually be a bait: that is the thing the sea teaches, it is the one recipe
+// kind fishing itself consumes, and a bottle washing up with instructions for a Kraken Feast is a stranger
+// story than one carrying a way to bait a hook. But "usually" is the point — pulling up a dish recipe out of
+// the deep is a nice surprise and locking it to bait would turn a discovery into a vending machine.
+//
+// Implemented as a WEIGHT multiplier on the existing tier weights, so the tier bands, the already-known filter
+// and the strict fallback all keep working exactly as they did.
+const FAVOUR_MULT = 6;
+export function rollRecipe(known = [], { min = 1, max = 5, strict = false, favour = null } = {}) {
     const have = new Set(known);
     const all = RECIPES.filter((r) => !have.has(r.id));
     if (!all.length) return null;
@@ -589,9 +603,10 @@ export function rollRecipe(known = [], { min = 1, max = 5, strict = false } = {}
     // roll) would otherwise hand over a Legendary from a 2,500-laurel button that promised everyday cooking.
     if (!banded.length && strict) return null;
     const pool = banded.length ? banded : all;
-    const total = pool.reduce((s, r) => s + (DROP_WEIGHT[r.tier] || 1), 0);
+    const weigh = (r) => (DROP_WEIGHT[r.tier] || 1) * (favour && r.kind === favour ? FAVOUR_MULT : 1);
+    const total = pool.reduce((s, r) => s + weigh(r), 0);
     let n = Math.random() * total;
-    for (const r of pool) { n -= DROP_WEIGHT[r.tier] || 1; if (n <= 0) return r; }
+    for (const r of pool) { n -= weigh(r); if (n <= 0) return r; }
     return pool[pool.length - 1];
 }
 

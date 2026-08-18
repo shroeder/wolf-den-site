@@ -300,6 +300,12 @@ function BaitPicker({ baits, busy, onCast }) {
 
 // The rise animation's length (see .fw-haul / @keyframes fwRise). One number, so the hand-off to a fight and
 // the picture clearing the water cannot drift apart.
+// The haul entries that get a CARD rather than a chip — the ones worth looking up for. `gear` is in the set so
+// it is kept OUT of the chip row, but it is drawn by its own richer card further down (rarity frame, slot and
+// stat line), so the generic prize card skips it rather than drawing it twice.
+const BIG_HAUL = new Set(["gear", "chest", "recipe", "pet"]);
+const PRIZE_LABEL = { chest: "Dragged off the bottom", recipe: "A sealed bottle", pet: "It followed you home" };
+
 const HAUL_MS = 1150;
 // How long the water hints before the float goes down. Long enough to look up, short enough that it is a
 // tell rather than a countdown.
@@ -725,8 +731,9 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <span className="fish-chip gold"><img src="/images/ui/coin.png" alt="" className="fish-chip-ico" />+{result.gold}</span>
                             <span className="fish-chip xp">+{result.xp} XP</span>
-                            {/* Everything that ISN'T gear stays a chip. Gear gets its own card below. */}
-                            {(result.extras || []).filter((e) => e.kind !== "gear").map((e, i) => (
+                            {/* Chips are for the SMALL stuff — coin, xp, a handful of doubloons, a supply.
+                                Anything worth a reaction is pulled out into a card below. */}
+                            {(result.extras || []).filter((e) => !BIG_HAUL.has(e.kind)).map((e, i) => (
                                 <span key={i} className="fish-chip extra">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     {e.spriteUrl ? <img src={e.spriteUrl} alt="" className="fish-chip-ico" /> : null}
@@ -734,6 +741,23 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 </span>
                             ))}
                         </div>
+
+                        {/* ── THE THINGS WORTH A REACTION ──────────────────────────────────────────────────
+                            A chest, a recipe or a pet came up as a text pill the same size as "+15 gold" —
+                            the three outcomes anybody would actually tell somebody about, rendered as a
+                            footnote next to the coin. Gear already had a real card; these get the same. */}
+                        {(result.extras || []).filter((e) => BIG_HAUL.has(e.kind) && e.kind !== "gear").map((e, i) => (
+                            <div key={`p${i}`} className={`fish-prize is-${e.kind}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {e.spriteUrl ? <img src={e.spriteUrl} alt="" className="fish-prize-art" />
+                                    : <span className="fish-prize-art" aria-hidden="true">{e.emoji || "🎁"}</span>}
+                                <span className="fish-prize-copy">
+                                    <em>{PRIZE_LABEL[e.kind] || "Hauled up"}</em>
+                                    <b>{e.label}</b>
+                                    {e.where ? <span>{e.where}</span> : null}
+                                </span>
+                            </div>
+                        ))}
 
                         {/* GEAR, IN FULL. A piece of gear off the sea floor was a purple text pill the same size
                             as "+5 gold" — the one thing in the haul you might actually equip, rendered as a
