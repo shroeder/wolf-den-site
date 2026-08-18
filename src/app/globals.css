@@ -16858,11 +16858,15 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 @keyframes fwRide { 0%, 100% { transform: translateY(0) rotate(-1.4deg); } 50% { transform: translateY(-5px) rotate(1.4deg); } }
 
 /* THE LINE — anchored at the rod tip, running down to the bobber. */
-.fw-line { position: absolute; left: 44%; top: 40%; width: 1px; height: 22%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.15));
-    transform-origin: top; transform: rotate(-16deg); animation: fwRide 4.6s ease-in-out infinite; }
-.fw[data-phase="bite"] .fw-line { animation: fwLineTaut .28s ease-in-out infinite; }
-@keyframes fwLineTaut { 0%, 100% { transform: rotate(-16deg) scaleY(1); } 50% { transform: rotate(-19deg) scaleY(1.06); } }
+/* ── THE LINE'S OLD RULE LIVED ON AND PAINTED THE WHOLE SCENE WHITE ───────────────────────────────────
+   `.fw-line` used to be a rotated <div> with a white gradient for its background: a one-pixel-wide bar, so
+   the gradient was invisible as anything but a thread. It became an <svg> so both ends could be pinned, and
+   the new rule sets inset:0 — but this rule kept applying to the same class, and the SVG happily took the
+   white BACKGROUND and the ROTATION with it. A 1px thread turned into a 372x314 translucent white sheet lying
+   across the picture at an angle, spinning on the bite animation. Reported exactly as what it looked like: a
+   rotating white overlay that appears when a bite happens.
+   Same mistake as the hero's stale placement rule earlier in this file. Adding a rule is not replacing one —
+   the old one has to go, or its untouched properties keep winning. */
 
 /* THE BOBBER. Bobs gently while waiting; goes UNDER on a bite. */
 .fw-bobber { position: absolute; left: 38%; top: 60%; width: 13px; height: 18px;
