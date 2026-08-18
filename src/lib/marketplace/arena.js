@@ -39,6 +39,15 @@ import { arenaRating, counterBlow, drinkFor, lightBurn, openWound, ringStats, th
 // than letting somebody tap a rung and get an error. Closed 2026-08-17 while the gear stats land — see the
 // note at the refusal for why a cleared rung cannot be walked back.
 const ROAD_OPEN = false;
+// ── SHUT TO THE DEN, OPEN TO THE OWNER ───────────────────────────────────────────────────────────────────────
+// The Road was closed because the new gear stats made it clearable overnight, and a rung once beaten cannot be
+// un-beaten without taking progress off people. That reasoning is about the ninety-odd members walking it, not
+// about the one account that needs to walk it to find out whether the numbers are right yet — and with the
+// door shut on everybody, the balance pass that closed it has nothing to measure.
+//
+// ONE RULE, read by the screen and by the refusal below, so they cannot disagree about whether the Road is
+// walkable — the same reason `closed` is published off this flag rather than computed twice.
+const roadOpenFor = (buyerId) => ROAD_OPEN || isOwner(buyerId);
 
 // ── THE ARENA ────────────────────────────────────────────────────────────────────────────────────────────────
 // PvP as a LADDER. The pack is sorted weakest to strongest and you start at the bottom; every win moves you up
@@ -661,7 +670,7 @@ export async function getArenaState(buyerId, pre = {}) {
                 next,
                 // Published off the SAME flag the challenge path refuses by, so the screen and the server can
                 // never disagree about whether the Road is walkable.
-                closed: !ROAD_OPEN,
+                closed: !roadOpenFor(buyerId),
                 closedNote: "The Road is closed while the gear rebalance lands. Your rungs are safe — nothing you have beaten is going anywhere.",
                 houses: LADDER_HOUSES,
                 foes: LADDER.map((f) => ({
@@ -1227,7 +1236,7 @@ export async function startBout(buyerId, targetId = null) {
         //
         // Refused on the SERVER, not hidden on the screen — the target is a string in a POST body.
         // FLIP THIS BACK when the stat work settles and the telemetry has a clean read.
-        if (!ROAD_OPEN) {
+        if (!roadOpenFor(buyerId)) {
             return { ok: false, error: "road_closed", ...(await getArenaState(buyerId, { board, kit: me })) };
         }
         if (rung < 1 || rung > LADDER_SIZE) return { ok: false, error: "bad_target", ...(await getArenaState(buyerId, { board, kit: me })) };
