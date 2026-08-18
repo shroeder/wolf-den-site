@@ -21,7 +21,21 @@ import { npcAbilities, npcFor } from "../../src/lib/marketplace/arena-npc.js";
 
 // A member's gear budget at the level being measured. The one number this file picks, because "how geared is
 // the person we are talking about" is the question being asked, not a fact about the engine.
-export const GEAR = { fresh: 120, mid: 320, bis: 644 };
+//
+// ⚠️ `bis` WAS 644 AND THAT WAS NOT BEST-IN-SLOT. 644 is roughly what a well-geared player has TODAY. The
+// game's actual ceiling is 1,802: there are four rarity tiers above anything currently worn — ascendant,
+// eternal, celestial, primordial — and a full primordial set sums to 1,627 in base stats alone against the
+// 251 the best-equipped member is wearing.
+//
+// That mistake was load-bearing. Reading 644 as the ceiling produced the conclusion that gear was 95% spent
+// and could not matter, and very nearly a balance change to "fix" it. Walked properly, gear is worth SIXTY
+// rungs (38 -> 98) against the skill tree's twenty-two. Luke, who knew: "we have a bunch of tiers of gear no
+// one has yet."
+//
+// `top` is the real ceiling. Anything reasoning about the endgame must use it, not `bis`.
+export const GEAR = { fresh: 120, mid: 320, geared: 644, top: 1802 };
+// Kept so older call sites keep working, and named honestly for what it actually is.
+GEAR.bis = GEAR.geared;
 
 // ── BUILDING A FIGHTER, THE WAY kitFor DOES ──────────────────────────────────────────────────────────────────
 // Same formulas, imported: swingFrom, healthFrom, the crit pair, accuracy off Ferocity, the class base. What
