@@ -12712,15 +12712,18 @@ body:has(.dm-screen) main.content { padding-bottom: 0; }
    legible at a glance so a mythic bait never looks like a dough ball. */
 .fish-bait { margin: 0 0 10px; padding: 10px; border-radius: 14px; background: rgba(6,14,20,0.72); border: 1px solid rgba(120,200,255,0.28); }
 .fish-bait-head { margin: 0 0 8px; font-size: 12.5px; font-weight: 800; color: #cfe8ff; text-align: center; }
-.fish-bait-list { display: grid; gap: 6px; max-height: 42vh; overflow-y: auto; margin-bottom: 8px; }
-.fish-bait-row { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; cursor: pointer; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #eaf2f8; }
+/* minmax(0,1fr) and min-width:0 together, and both are load-bearing: a grid item's default min-width is AUTO,
+   so a row sized itself to its longest word and ran off the right edge — taking the "+5.5 rarity · 1 left"
+   column with it, which is the one thing the picker exists to tell you. Caught on a 390px shot. */
+.fish-bait-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 42vh; overflow-y: auto; margin-bottom: 8px; }
+.fish-bait-row { display: flex; align-items: center; gap: 9px; width: 100%; min-width: 0; padding: 7px 9px; cursor: pointer; border-radius: 11px; text-align: left; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14); color: #eaf2f8; }
 .fish-bait-row:hover:not(:disabled) { background: rgba(120,200,255,0.14); border-color: rgba(120,200,255,0.5); }
 .fish-bait-row:disabled { opacity: .5; cursor: default; }
 .fish-bait-art { width: 34px; height: 34px; object-fit: contain; flex: none; font-size: 24px; text-align: center; }
 .fish-bait-name { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .fish-bait-name b { font-size: 13px; }
 .fish-bait-name em { font-style: normal; font-size: 10.5px; color: #9fb4c4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fish-bait-num { display: flex; flex-direction: column; align-items: flex-end; flex: none; }
+.fish-bait-num { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; white-space: nowrap; }
 .fish-bait-num b { font-size: 14px; color: #8fe3ff; }
 .fish-bait-num em { font-style: normal; font-size: 10px; color: #7f95a6; }
 .fish-bait-row.is-rare { border-color: rgba(120,200,255,0.4); }

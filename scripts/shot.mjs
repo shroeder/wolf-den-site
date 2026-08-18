@@ -34,7 +34,13 @@ const out = process.argv[3];
 const W = Number(process.argv[4] || 375);
 const H = Number(process.argv[5] || 667);
 const PORT = 9333 + (Number(process.argv[6] || 0));
+// ── A SEQUENCE, NOT A CLICK ──────────────────────────────────────────────────────────────────────────────────
+// Some states are two taps deep — open Fishing, THEN open the bait step — and one selector cannot reach them.
+// Comma-separate them and each is clicked in turn, every one confirmed before the next is attempted, so a
+// failure still names the step that did not open rather than handing back a picture of the wrong screen.
+// The final WAIT confirms the last step, as before.
 const CLICK = process.argv[7] || null;
+const CLICKS = CLICK ? CLICK.split(",").map((x) => x.trim()).filter(Boolean) : [];
 const WAIT = process.argv[8] || null;   // what the click should have produced; the proof it actually landed
 
 const chrome = spawn(CHROME, [
@@ -108,26 +114,34 @@ await sleep(4200);
 // page sits there closed — and the screenshot comes out looking entirely reasonable. So: click, look for what
 // the click was supposed to produce, click again. Nothing matching after the window is a hard failure rather
 // than a picture of the thing not open.
-if (CLICK) {
+if (CLICKS.length) {
     await send("Runtime.enable");
     const evaluate = async (expression) =>
         (await send("Runtime.evaluate", { expression, returnByValue: true }))?.result?.value;
 
-    let opened = false;
-    for (let i = 0; i < 20 && !opened; i += 1) {
-        const state = await evaluate(`(() => {
-            if (${JSON.stringify(!!WAIT)} && document.querySelector(${JSON.stringify(WAIT || "*")})) return "open";
-            const el = document.querySelector(${JSON.stringify(CLICK)});
-            if (!el) return "missing";
-            el.click();
-            return ${JSON.stringify(!!WAIT)} ? "clicked" : "open";
-        })()`);
-        if (state === "open") opened = true;
-        else await sleep(400);
-    }
-    if (!opened) {
-        console.error(`shot.mjs: ${CLICK} never produced ${WAIT || "a click"} — refusing to shoot the unopened page`);
-        sock.close(); chrome.kill(); process.exit(1);
+    for (let step = 0; step < CLICKS.length; step += 1) {
+        const sel = CLICKS[step];
+        const last = step === CLICKS.length - 1;
+        // Each step is confirmed by what it should PRODUCE: the next selector in the chain, or WAIT for the
+        // final one. A step that cannot be confirmed fails here, naming itself.
+        const proof = last ? WAIT : CLICKS[step + 1];
+        let opened = false;
+        for (let i = 0; i < 20 && !opened; i += 1) {
+            const state = await evaluate(`(() => {
+                if (${JSON.stringify(!!proof)} && document.querySelector(${JSON.stringify(proof || "*")})) return "open";
+                const el = document.querySelector(${JSON.stringify(sel)});
+                if (!el || el.disabled) return "missing";
+                el.click();
+                return ${JSON.stringify(!!proof)} ? "clicked" : "open";
+            })()`);
+            if (state === "open") opened = true;
+            else await sleep(400);
+        }
+        if (!opened) {
+            console.error(`shot.mjs: step ${step + 1}/${CLICKS.length} — ${sel} never produced ${proof || "a click"} — refusing to shoot the unopened page`);
+            sock.close(); chrome.kill(); process.exit(1);
+        }
+        if (!last) await sleep(900);   // let the step land before reaching for the next one
     }
     // Let the open animation land AND the newly-revealed images arrive. 800ms covered the animation only, so
     // a menu full of icons shot as a grid of blank tiles — the same "clean, empty, wrong picture" the settle
