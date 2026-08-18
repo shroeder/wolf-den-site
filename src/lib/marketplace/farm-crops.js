@@ -75,19 +75,60 @@ const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity 
 // Where seeds are FOUND. Each game action rolls dropSeedFrom(buyerId, source): `chance` (before the Forager
 // boost) that a seed drops at all, then a weighted pick of which RARITY, then a random seed of that rarity.
 // Everyday actions give common seeds; big/rare events are the only way to find legendary/mythic seeds.
-const SEED_SOURCES = {
-    boss_strike: { chance: 0.18, rarities: { common: 80, rare: 19, epic: 1 } },
-    boss_kill: { chance: 0.65, rarities: { common: 26, rare: 40, epic: 24, legendary: 9, mythic: 1 } },
-    sail_dig: { chance: 0.22, rarities: { common: 62, rare: 30, epic: 8 } },
-    sail_raid: { chance: 0.28, rarities: { common: 38, rare: 42, epic: 18, legendary: 2 } },
-    spin: { chance: 0.12, rarities: { common: 54, rare: 33, epic: 11, legendary: 2 } },
-    chest_wooden: { chance: 0.5, rarities: { common: 84, rare: 16 } },
-    chest_iron: { chance: 0.6, rarities: { common: 44, rare: 42, epic: 14 } },
-    chest_gold: { chance: 0.8, rarities: { common: 14, rare: 38, epic: 33, legendary: 14, mythic: 1 } },
-    // Farm-native drops so the loop feeds itself — mostly common, with a slim rare/epic tail. Working the farm
-    // (harvesting crops + tending pets) now finds its own seeds, not just the other games.
-    harvest_crop: { chance: 0.15, rarities: { common: 78, rare: 18, epic: 4 } },
-    pet_farm: { chance: 0.1, rarities: { common: 85, rare: 14, epic: 1 } },
+// ── WHERE SEEDS COME FROM, AND THE TWO DIFFERENT ANSWERS ─────────────────────────────────────────────────────
+// This used to be one table of { chance, rarities } consulted by every caller, which made a seed a coin flip
+// bolted to the side of somebody else's feature — the same parallel lottery the recipe economy was rebuilt to
+// remove ("it wasn't the chest's loot table, it wasn't the wheel, it was a lottery nobody could see").
+//
+// It is two things now, because there are honestly two cases:
+//
+//   A TABLE DROP.  The feature already has a reward table — the wheel's wedges, a haul, a seam, a ship's
+//                  hold. The TABLE decides whether you get a seed, exactly as it decides gold or parts, and
+//                  it is drawn and shown like any other prize. All that lives here is the BAND: which
+//                  rarities that source is allowed to give. Use grantSeedFromBand().
+//
+//   A TRICKLE.     Harvesting, petting, rating a farm, hitting the boss. There is no table to put a row in —
+//                  the reward IS the action — so these keep a chance on the action itself. They are the
+//                  farm's own supply feeding itself, and they stay small and mostly common.
+//
+// MID TIER IS THE POINT. Luke: "mid to high level seeds... high high high should still be rare, but mid tier
+// seeds should be a little more common." So rare and epic carry the weight in every band below, legendary is
+// a tail, and mythic only appears where the source is genuinely a hard thing to have done.
+export const SEED_BANDS = {
+    // The wheel. A visible wedge now, not a hidden 12% rolled behind whatever you actually landed on.
+    spin: { common: 22, rare: 44, epic: 28, legendary: 6 },
+    // The bonus round reaches highest — the only wheel wedge that can turn up a Star Fruit.
+    spin_mini: { rare: 26, epic: 44, legendary: 24, mythic: 6 },
+    // A cast. The haul table decides; this decides which.
+    fishing: { common: 26, rare: 44, epic: 24, legendary: 6 },
+    // A won ship battle is not farming, so it reaches past what a cast can.
+    ship_battle: { rare: 34, epic: 40, legendary: 22, mythic: 4 },
+};
+
+// ── NOT DECLARED HERE UNTIL SOMETHING CALLS THEM ─────────────────────────────────────────────────────────────
+// The table this replaced listed ten sources — the wheel, the boss, all three chest tiers, digs, raids,
+// harvests — with tuned chances and rarity weights, and NINE of them had no caller anywhere in the codebase.
+// Every one of those was a promise the game had no way of keeping, and it is most of why seeds felt
+// impossible: the real supply was petting a pet and buying packets.
+//
+// So a band goes in here when the feature's table has a row that calls it, and not before. Still owed a row,
+// with the tables to hang them on already in place: the mine (CARD_TABLE in mining.js — a seed card belongs
+// beside "Loose ore"), the Arena (the Armoury's crate table), chests by tier, the boss, and the sea's digs
+// and raids.
+
+// ── THE TRICKLE ──────────────────────────────────────────────────────────────────────────────────────────────
+// Chance on the action, because these have no table of their own. Mostly common with a thin tail: this is the
+// farm feeding itself, not a route to Star Fruit.
+const SEED_TRICKLE = {
+    harvest_crop: { chance: 0.15, band: { common: 74, rare: 22, epic: 4 } },
+    pet_farm: { chance: 0.10, band: { common: 82, rare: 16, epic: 2 } },
+    // Rating somebody's farm. It asked for a source that was never declared, so it has paid NOTHING since it
+    // shipped — see the note on grantSeedFromBand.
+    green_thumb: { chance: 0.12, band: { common: 76, rare: 21, epic: 3 } },
+    // A companion with the seed perk, dropping one on top of a harvest. The perk card promises exactly this
+    // and the source was never declared either — the roll happened, the grant returned null, the card lied.
+    // Better than the farm's own trickle, because it cost a pet slot: mid-weighted with an epic tail.
+    pet_companion: { chance: 1, band: { common: 46, rare: 38, epic: 14, legendary: 2 } },
 };
 
 // Upgrade tracks — each 5 levels. Effects applied in the helpers below.
@@ -482,6 +523,12 @@ export async function harvestPlot(buyerId, slot) {
         await grantSeed(buyerId, claimed.seed_id).catch(() => {});
         savedSeed = true;
     }
+    // ── THE FARM'S OWN TRICKLE, WHICH HAS NEVER ONCE FIRED ───────────────────────────────────────────────
+    // `harvest_crop` has been in the seed table since it was written, with its own chance and rarity weights,
+    // under a comment promising "working the farm now finds its own seeds, not just the other games". Nothing
+    // ever called it. Nine of the ten sources that table declared had no caller at all — the wheel, the boss,
+    // every chest tier, digs, raids — so the entire seed economy was petting a pet and buying packets.
+    const harvestSeed = await dropSeedFrom(buyerId, "harvest_crop").catch(() => null);
     await trackActivity(buyerId, "harvest_crop", { seedId: claimed.seed_id, rarity, gold, loot: loot.label, tier: loot.tier }).catch(() => {});
     await bumpQuestProgress(buyerId, "harvest_crop", 1).catch(() => {});
     // Earned cosmetic: the "Harvest Crown" border at 20 lifetime harvests. Reuses the harvest_crop activity
@@ -505,6 +552,9 @@ export async function harvestPlot(buyerId, slot) {
     if (petFarm.seed > 0 && Math.random() < petFarm.seed / 100) {
         foundSeed = await dropSeedFrom(buyerId, "pet_companion").catch(() => null);
     }
+    // The farm's own find, if the companion did not already produce one — one seed per harvest, never two
+    // toasts for the same event.
+    if (!foundSeed) foundSeed = harvestSeed;
     await syncEarnedBadges(buyerId).catch(() => {}); // grant any farming badges just earned
     // A creature might RAID this harvest (chance raised by the plot's Warding Totem + rarer crops) — the client
     // fights it with a timing meter, then calls encounter_resolve for bonus loot. Server parks the pending fight.
@@ -635,19 +685,44 @@ export async function grantStarterSeeds(buyerId) {
 // Roll to drop a seed from another game system (source keys in SEED_SOURCES). Returns { seedId, name, emoji,
 // rarity } or null. Best-effort — never throws into the caller. The drop chance is scaled by the Forager
 // upgrade; the RARITY is weighted per source so rare crops only come from big events.
-export async function dropSeedFrom(buyerId, source) {
+/**
+ * A TABLE ALREADY SAID YES. This only decides WHICH seed.
+ *
+ * It cannot return null for a source it knows: the caller's own reward table has already rolled "seed" and
+ * shown it, so a second hidden roll here would be the bolt-on all over again — and worse, an outcome the
+ * player watched land that quietly paid nothing.
+ *
+ * Which is exactly what was happening. `fishing`, `ship_battle` and `green_thumb` all asked the old table for
+ * a source it never declared, got undefined, and returned null EVERY TIME. Three features advertised a seed
+ * drop and none of them could pay one, which is most of "seeds are really hard to get".
+ */
+export async function grantSeedFromBand(buyerId, band) {
     try {
-        const cfg = SEED_SOURCES[source];
-        if (!buyerId || !cfg) return null;
-        const buyer = await loadFarmBuyer(buyerId);
-        const chance = Math.min(0.95, cfg.chance * seedLuckMult(buyer?.farm_upgrades || {}));
-        if (Math.random() >= chance) return null;
-        const rarity = weightedPick(cfg.rarities);
+        const weights = typeof band === "string" ? SEED_BANDS[band] : band;
+        if (!buyerId || !weights) return null;
+        const rarity = weightedPick(weights);
         const pool = seedsOfRarity(rarity);
         const seedId = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "wheat";
         await grantSeed(buyerId, seedId);
         const def = SEEDS[seedId];
         return { seedId, name: def.name, emoji: def.emoji, rarity: def.rarity };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * THE TRICKLE. A chance on the action, for the handful of sources that have no reward table to carry a row —
+ * you harvested, you petted, you rated a farm, you hit the boss. Forager scales the chance, never the band.
+ */
+export async function dropSeedFrom(buyerId, source) {
+    try {
+        const cfg = SEED_TRICKLE[source];
+        if (!buyerId || !cfg) return null;
+        const buyer = await loadFarmBuyer(buyerId);
+        const chance = Math.min(0.95, cfg.chance * seedLuckMult(buyer?.farm_upgrades || {}));
+        if (Math.random() >= chance) return null;
+        return grantSeedFromBand(buyerId, cfg.band);
     } catch {
         return null;
     }

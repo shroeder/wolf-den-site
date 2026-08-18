@@ -35,7 +35,7 @@ import { petLevelForXp } from "@/lib/marketplace/pet-level.js";
 import { grantEventBadge, getBadgeSea } from "@/lib/marketplace/badges.js";
 import { getEquippedUtilTotals } from "@/lib/marketplace/item-affix.js";
 import { bumpQuestProgress } from "@/lib/marketplace/quests.js";
-import { dropSeedFrom } from "@/lib/marketplace/farm-crops.js";
+import { dropSeedFrom, grantSeedFromBand } from "@/lib/marketplace/farm-crops.js";
 import { trackActivity } from "@/lib/marketplace/activity.js";
 import { sendWebPush } from "@/lib/push/web-push.js";
 import { logCoin } from "@/lib/marketplace/coins.js";
@@ -2330,7 +2330,9 @@ async function payFleetReward(buyerId, reward) {
         } catch { /* the Forge is optional — a battle never fails for it */ }
     }
     if (reward.chest) { await addChests(buyerId, { [reward.chest]: 1 }, { source: "ship_battle" }).catch(() => {}); out.push({ kind: "chest", tier: reward.chest }); }
-    if (reward.seed) { const sid = await dropSeedFrom(buyerId, "ship_battle").catch(() => null); if (sid) out.push({ kind: "seed", id: sid }); }
+    // The battle's own reward table said seed; this picks which. "ship_battle" was never a declared source,
+    // so every won battle that promised a seed handed over nothing.
+    if (reward.seed) { const sid = await grantSeedFromBand(buyerId, "ship_battle").catch(() => null); if (sid) out.push({ kind: "seed", id: sid }); }
     // PLUNDER — something off their deck. Uncommon by design and weighted hard toward common: the fleet is not
     // meant to out-supply the Forge or the chests, it is meant to occasionally hand you a story. The rank sets
     // both the odds and the ceiling, so a fishing cutter can only ever cough up something ordinary.

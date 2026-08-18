@@ -63,6 +63,7 @@ const PART_ROLLS = [
 const PARTS_WEDGE_SPRITE = partSprite(3); // the wedge face; the RESULT card shows whatever tier actually landed
 
 // One-line explainer for a wheel prize — powers the "tap a reward to inspect it" card in the legend.
+const SEED_RARITY_ORDER = ["common", "rare", "epic", "legendary", "mythic"];
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 function prizeDesc(p) {
     switch (p.kind) {
@@ -111,7 +112,15 @@ const WHEELS = [
             // a wedge from something. This was the one to take. 500 XP is still on the wheel further down.
             { label: "Farm Decoration", sprite: "farm-deco", weight: 10, kind: "decoration" },
             { label: "Hearty Snack", sprite: "pet-treat", weight: 9, kind: "consumable", consumable: "treat_snack", n: 1 },
-            { label: "Seed Packet", sprite: "seed-pouch", weight: 8, kind: "consumable", consumable: "farm_seed_packet", n: 1 },
+            // ── THE SEED WEDGE, PAYING SEEDS ─────────────────────────────────────────────────────────────
+            // This slot handed over a Seed Packet: a consumable you then open, which rolls its own bundle
+            // weighted to commons. Two layers of indirection to arrive at the thing the farm already trickles.
+            // It pays SEEDS now, drawn from the wheel's band — mid-tier weighted, because commons are not
+            // what anybody is short of.
+            //
+            // It replaces the packet rather than sitting beside it: the disc art has twenty wedges and the
+            // build refuses a list that does not match it (a guard worth knowing about — it caught a 21st).
+            { label: "Farm Seeds", sprite: "seed-pouch", weight: 8, kind: "seed", band: "spin", n: 3 },
             { label: "600 gold", sprite: "coins-big", weight: 12, kind: "gold", amount: 600 },
             { label: "5 Fertilizer", sprite: "fertilizer", weight: 7, kind: "consumable", consumable: "farm_fertilizer_crate", n: 1 },
             // ── A CUT GEM, WHERE THE WOODEN SHARDS USED TO BE ────────────────────────────────────────
@@ -198,7 +207,15 @@ const MINI_WHEEL_PRIZES = [
     // rate by a fraction instead of breaking it. check-stones.mjs measures that ratio, and it is the reason
     // this number is 2 rather than a guess.
     { label: "EVOLVE STONE", sprite: "/images/pets/stone-light.png", weight: 1, rare: true, tier: "jackpot", kind: "stone" },
-    { label: "Chew Toy", sprite: "pet-treat", weight: 11, kind: "consumable", consumable: "treat_toy", n: 1 },
+    // ── THE BONUS ROUND'S SEED WEDGE ─────────────────────────────────────────────────────────────────────
+    // Luke: "the wheel should definitely have some higher tier seeds probably in the mini wheel." This is the
+    // only wheel wedge that can turn up a Star Fruit — epic-weighted, with a real legendary tail, on a round
+    // you reach about 4% of the time. The main wheel's seed wedge tops out at legendary and rarely.
+    //
+    // It takes the Chew Toy's slot rather than adding a tenth: mini-wheel.png is painted with nine wedges and
+    // the build refuses a list that does not match the art. A pet treat is also the closest thing left on
+    // this disc to the "something you would rather have skipped" the note below was written about.
+    { label: "Choice Seeds", sprite: "seed-pouch", weight: 11, rare: true, tier: "rare", kind: "seed", band: "spin_mini", n: 3 },
     // ── THE BONUS ROUND EARNS ITS NAME ───────────────────────────────────────────────────────────────────
     // "The mini wheel should have cooler prizes." It carried eight wooden shards and a wooden chest — two of
     // the weakest things in the game — on a round you only reach on about 4% of spins. A round that rare
@@ -433,10 +450,23 @@ async function grantPrize(buyerId, prize, opts = {}) {
         return { sprite: dish?.url || sprite, text: `${rec.name} — a new recipe!` };
     }
     if (prize.kind === "seed") {
-        const commons = Object.keys(SEEDS).filter((id) => SEEDS[id].rarity === "common");
-        const sid = commons[Math.floor(Math.random() * commons.length)];
-        await grantSeed(buyerId, sid).catch(() => {});
-        return { sprite, text: `${SEEDS[sid]?.name || "Common"} seed!` };
+        // ── A REAL SEED WEDGE, AT THE BAND THE WEDGE DECLARES ────────────────────────────────────────────
+        // This handler existed and could only ever pay a COMMON — the one thing nobody needs, since commons
+        // are what the farm already trickles. And no wedge on either wheel was `kind: "seed"` in the first
+        // place, so it had never run: the wheel's only seed was a Seed Packet consumable, and the seed table
+        // listed `spin` with tuned odds that nothing ever called.
+        //
+        // The wedge names its band, so the mini wheel can reach where the main wheel cannot.
+        const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+        const n = Math.max(1, Number(prize.n) || 1);
+        const got = [];
+        for (let i = 0; i < n; i += 1) {
+            const seed = await grantSeedFromBand(buyerId, prize.band || "spin").catch(() => null);
+            if (seed) got.push(seed);
+        }
+        if (!got.length) return { sprite, text: prize.label };
+        const best = got.reduce((a, b) => (SEED_RARITY_ORDER.indexOf(b.rarity) > SEED_RARITY_ORDER.indexOf(a.rarity) ? b : a));
+        return { sprite, text: got.length > 1 ? `${got.length} seeds — best: ${best.name}!` : `${best.name} seed!` };
     }
     // A FARM DECORATION. Eighteen decorations in decorations.js are declared `source: "spin"`, and the farm
     // tells you so to your face — "🎡 Win it from the Daily Spin wheel" — but no wedge had ever been able to

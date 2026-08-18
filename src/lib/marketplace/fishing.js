@@ -356,8 +356,11 @@ async function grantHaul(buyerId, kind, tier = "common") {
         // KEPT, because this one is not a bolt-on: `seed` is a wedge in the treasure table above, so the line
         // brings up a seed INSTEAD of a fragment or a chest. The bolt-on that went was a second, separate
         // dropSeedFrom fired on every cast regardless of what the haul rolled.
-        const { dropSeedFrom } = await import("@/lib/marketplace/farm-crops.js");
-        const seed = await dropSeedFrom(buyerId, "fishing").catch(() => null);
+        // The haul table has ALREADY decided this cast is a seed, so this only picks which one. It used to
+        // call dropSeedFrom("fishing") — a source the seed table never declared — so it returned null every
+        // single time and the haul paid nothing at all.
+        const { grantSeedFromBand } = await import("@/lib/marketplace/farm-crops.js");
+        const seed = await grantSeedFromBand(buyerId, "fishing").catch(() => null);
         return seed ? { kind: "seed", label: seed.name || "Seed", emoji: seed.emoji || "🌱", id: seed.id || null, where: "Added to your seed bag", spriteUrl: await haulSprite("seed", seed.id) } : null;
     }
     if (kind === "consumable") {
