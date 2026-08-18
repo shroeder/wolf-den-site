@@ -113,6 +113,8 @@ function Stars({ level = 1, max = 6, className = "", stone = null }) {
 export default function PetsClient() {
     const [state, setState] = useState(null);
     const [filter, setFilter] = useState("");
+    // "rarity" (the collection's own order) or "xp" (what you are actually levelling).
+    const [sort, setSort] = useState("rarity");
     const [busy, setBusy] = useState(null);
     const [reveal, setReveal] = useState(null);
     const [err, setErr] = useState(null);
@@ -257,19 +259,35 @@ export default function PetsClient() {
         }
     }
 
+    // ── SORT BY PROGRESS ─────────────────────────────────────────────────────────────────────────────────
+    // SoullessShiitake: "it would be cool if you could sort your pets by how much XP they have so you can
+    // compare progress a little easier." Kaishiern, straight after: "and that would make it easier for people
+    // visiting your farm to pet the ones you're working on instead of random pets."
+    //
+    // That second half is why this is worth more than a tidier grid — the pets you are ACTIVELY levelling are
+    // invisible to a visitor, so a farm guest spends their pettings at random when they meant to help.
+    //
+    // Rarity stays the default: it is what the collection is FOR, and re-ordering the board under people who
+    // know where their pets live would be its own small bug.
     const pets = useMemo(() => {
         let list = [...COLLECTIBLES];
         if (filter === "owned") list = list.filter((p) => ownedSet.has(p.id));
         else if (filter) list = list.filter((p) => p.source === filter);
-        // Owned first, then by rarity, then by name.
+        const xpOf = (id) => Number(state?.petLevels?.[id]?.xp) || 0;
         return list.sort((a, b) => {
             const ao = ownedSet.has(a.id) ? 0 : 1, bo = ownedSet.has(b.id) ? 0 : 1;
             if (ao !== bo) return ao - bo;
+            if (sort === "xp") {
+                // Most-levelled first. Falls through to rarity and name so unowned pets — which all have zero
+                // — keep the ordering they had rather than shuffling into an arbitrary heap.
+                const ax = xpOf(a.id), bx = xpOf(b.id);
+                if (ax !== bx) return bx - ax;
+            }
             const ar = RARITY_ORDER[a.rarity] ?? 0, br = RARITY_ORDER[b.rarity] ?? 0;
             if (ar !== br) return ar - br;
             return a.name.localeCompare(b.name);
         });
-    }, [filter, ownedSet]);
+    }, [filter, ownedSet, sort, state?.petLevels]);
 
     const featured = state?.featured ? collectibleById(state.featured) : null;
     const ownedCount = state?.ownedIds?.length || 0;
@@ -589,6 +607,11 @@ export default function PetsClient() {
                 {SOURCES.map((s) => (
                     <button type="button" key={s.id} className={`pill${filter === s.id ? " is-active" : ""}`} onClick={() => setFilter(s.id)}>{s.label}</button>
                 ))}
+            </div>
+            <div className="bounty-filters petx-sort">
+                <span className="petx-sort-label">Sort</span>
+                <button type="button" className={`pill${sort === "rarity" ? " is-active" : ""}`} onClick={() => setSort("rarity")}>Rarity</button>
+                <button type="button" className={`pill${sort === "xp" ? " is-active" : ""}`} onClick={() => setSort("xp")}>Progress</button>
             </div>
 
             {err ? <p style={{ color: "#e66" }}>{err}</p> : null}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import FishingWater from "@/components/FishingWater";
+import FishingScene from "@/components/FishingScene";
 import { haulScale } from "@/lib/marketplace/fishing-scale.js";
 
 // The fishing scene's phases, on buttons. Waiting for a real bite to look at the bite is not a workflow.
@@ -16,9 +17,35 @@ const HAULS = [
     { art: "/images/sailing/enc/world_serpent.png", name: "The World Serpent", kind: "monster", tier: 5 },
 ].map((h) => ({ ...h, scale: haulScale(h) }));
 
+// ?full=1 mounts the WHOLE fishing card at rest — the idle screen a member actually opens, so the polish
+// (real scene instead of an emoji, the corrected copy, the no-bait line) can be looked at rather than assumed.
+const IDLE_FISHING = {
+    available: true,
+    casts: { used: 1, max: 4, left: 3, bought: 0 },
+    recharge: { available: false, cost: 400, bought: 0, maxPerDay: 6 },
+    angling: 0, hooked: null, baits: [],
+    biteWindow: { minMs: 4000, maxMs: 20000, graceMs: 12000 },
+    tracks: [], totalCaught: 42, speciesKnown: 9, speciesTotal: 34, log: [],
+};
+
 export default function WaterLab() {
     const [phase, setPhase] = useState("waiting");
     const [haul, setHaul] = useState(null);
+    const full = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("full") === "1";
+    if (full) {
+        return (
+            <FishingScene
+                fishing={IDLE_FISHING}
+                sky="/images/sailing/sky-goldenhour.png"
+                boat="/images/sailing/boat-tier5-galleon.png"
+                hero={{ art: "/images/arena/ladder/rung-1.webp", flip: false }}
+                records={null} gold={12500}
+                onCast={async () => ({ ok: false })} onLand={async () => ({ ok: false })}
+                onRecharge={async () => ({ ok: true })} onLoadRecords={async () => ({ ok: true })}
+                onClose={() => {}}
+            />
+        );
+    }
     return (
         <div style={{ padding: 12, maxWidth: 720, margin: "0 auto" }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
