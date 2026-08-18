@@ -18,6 +18,7 @@
     "check:art": "node scripts/check-image-paths.mjs",
     "check:arena": "node scripts/check-arena.mjs",
     "sim": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/sim-arena.mjs",
+    "audit:seeds": "node scripts/audit-seed-rates.mjs",
     "check:seeds": "node scripts/check-seeds.mjs",
     "check:sim": "node scripts/check-sim-drift.mjs",
     "check:ascension": "node --experimental-loader ./scripts/lib/alias-loader.mjs scripts/check-ascension.mjs",

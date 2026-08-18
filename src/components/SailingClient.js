@@ -1485,6 +1485,12 @@ export default function SailingClient({ initial, hero, pet, captain }) {
                                     <b className="sail-recap-pos" style={{ color: "#7cffb2" }}>+{it.n}</b>
                                 </div>
                             )) : null}
+                            {result.seeds?.length ? (
+                                <div className="sail-recap-row">
+                                    <span><span style={{ fontSize: "1rem" }}>🌱</span> {result.seeds.map((x) => x.name).join(", ")} <span className="muted">· seeds from the hold</span></span>
+                                    <b className="sail-recap-pos" style={{ color: "#8bf0b4" }}>+{result.seeds.length}</b>
+                                </div>
+                            ) : null}
                             {result.relic ? (
                                 <div className="sail-recap-row sail-recap-relic" title={result.relic.desc}>
                                     <span>{result.relic.art ? <FragmentIcon size={16} art={result.relic.art} /> : <span style={{ fontSize: "1rem" }}>{result.relic.emoji}</span>} {result.relic.name} <span className="muted">· rare relic!</span></span>

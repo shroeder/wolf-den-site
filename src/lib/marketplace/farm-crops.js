@@ -91,6 +91,12 @@ const seedsOfRarity = (r) => Object.keys(SEEDS).filter((id) => SEEDS[id].rarity 
 //                  the reward IS the action — so these keep a chance on the action itself. They are the
 //                  farm's own supply feeding itself, and they stay small and mostly common.
 //
+// TRIMMED AT THE TOP, ONCE THE RATES WERE MEASURED. The first cut of these bands put a member on 1.67
+// legendary seeds a week — two Golden Apples, against a catalog that calls legendary "from gold chests + boss
+// kills only". The legendary and mythic weights came down across the six sources that were paying most of it
+// and went into rare and epic, which is where the supply is supposed to sit. Mid tier did not move.
+// scripts/audit-seed-rates.mjs measures this against real seven-day volumes; re-run it after any change here.
+//
 // MID TIER IS THE POINT. Luke: "mid to high level seeds... high high high should still be rare, but mid tier
 // seeds should be a little more common." So rare and epic carry the weight in every band below, legendary is
 // a tail, and mythic only appears where the source is genuinely a hard thing to have done.
@@ -98,21 +104,24 @@ export const SEED_BANDS = {
     // The wheel. A visible wedge now, not a hidden 12% rolled behind whatever you actually landed on.
     spin: { common: 22, rare: 44, epic: 28, legendary: 6 },
     // The bonus round reaches highest — the only wheel wedge that can turn up a Star Fruit.
-    spin_mini: { rare: 26, epic: 44, legendary: 24, mythic: 6 },
+    spin_mini: { rare: 30, epic: 51, legendary: 16, mythic: 3 },
     // A cast. The haul table decides; this decides which.
     fishing: { common: 26, rare: 44, epic: 24, legendary: 6 },
     // A won ship battle is not farming, so it reaches past what a cast can.
-    ship_battle: { rare: 34, epic: 40, legendary: 22, mythic: 4 },
+    ship_battle: { rare: 40, epic: 46, legendary: 12, mythic: 2 },
     // The mine, by depth. The deep card is one of only two places a Star Fruit can come from.
     seam: { common: 34, rare: 44, epic: 22 },
-    seam_deep: { rare: 30, epic: 42, legendary: 24, mythic: 4 },
+    seam_deep: { rare: 36, epic: 48, legendary: 14, mythic: 2 },
     // Chests, by tier. A wooden one is the farm's floor; a gold one is a real chance at something worth
     // clearing a plot for.
     chest_wooden: { common: 66, rare: 32, epic: 2 },
     chest_iron: { common: 34, rare: 44, epic: 21, legendary: 1 },
-    chest_gold: { common: 12, rare: 36, epic: 36, legendary: 14, mythic: 2 },
+    chest_gold: { common: 12, rare: 38, epic: 41, legendary: 8, mythic: 1 },
     // The Armoury crate. Bought with laurels off won bouts, so it sits with the ship rather than the farm.
-    arena_win: { rare: 38, epic: 40, legendary: 19, mythic: 3 },
+    arena_win: { rare: 42, epic: 44, legendary: 12, mythic: 2 },
+    // A dug-up chest, by board depth. The sea's own supply line into the farm.
+    sail_dig: { common: 32, rare: 44, epic: 22, legendary: 2 },
+    sail_dig_deep: { rare: 38, epic: 48, legendary: 12, mythic: 2 },
     // The boss: weekly, shared, and the top of the ladder.
     boss_kill: { common: 16, rare: 34, epic: 32, legendary: 15, mythic: 3 },
 };
