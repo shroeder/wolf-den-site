@@ -783,7 +783,9 @@ export const DOOM_MULT = 2.8;       // and what it hits for when it does
 export const FRENZY_DMG = 1.45;     // Blood Frenzy — their damage up
 export const FRENZY_DR = 0.5;       // and their guard down, which is the window
 export const FRENZY_TURNS = 3;
-export const FEAST_SHARE = 0.35;    // Bonefeast — of the health they have LOST, not of their maximum
+// Luke: "Blood feast needs to heal you a lot more health." Off health they have LOST, so it is worth nothing
+// at full and enormous at a sliver — the counter is still to kill them from high rather than grind.
+export const FEAST_SHARE = 0.60;    // Bonefeast — of the health they have LOST, not of their maximum
 export const SHATTER_SHARE = 0.6;   // Shatterguard — of the brace it eats, dealt as damage
 export const SIPHON_TURNS = 1;      // Willbreaker — turns added to everything you have cooling
 

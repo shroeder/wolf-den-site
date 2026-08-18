@@ -399,7 +399,9 @@ async function kitFor(buyerId) {
         // Runecaller's ember. Both read on BOTH sides below.
         bleedChance: Math.max(0, base.bleedChance || 0),
         burnChance: Math.max(0, base.burnChance || 0),
-        dmgPct: Math.max(0, perks.dmgPct || 0),
+        // Brutality: the class's own, plus the tree's. Reaver carries base damage the way the Warden carries
+        // base Lifedrink — "hit hardest" was a tagline the numbers did not pay for.
+        dmgPct: Math.max(0, (base.dmgPct || 0) + (perks.dmgPct || 0)),
         // Gear-only, capped: a coin flip for a free swing every attack is a different game.
         doublestrike: Math.min(0.25, Math.max(0, (Number(stats.doublestrike) || 0) / 100)),
         // ── ACCURACY ─────────────────────────────────────────────────────────────────────────────────────
@@ -1383,7 +1385,15 @@ function openWound(b, onFoe, perks = {}) {
     const per = Math.max(1, Math.round(maxHp * BLEED_PER_TURN * (1 + (perks.bleedTick || 0))));
     const stacks = Math.min(BLEED_MAX_STACKS, (track?.stacks || 0) + 1);
     const next = {
-        turns: Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(perks.bleedTurns || 0)),
+        // ── THREE TURNS, FLOOR, NO MATTER WHAT ───────────────────────────────────────────────────────────
+        // Luke: "any bleed you stack on someone should last for three turns no matter, like, at a minimum."
+        // BLEED_TURNS is 3 today, so this changes nothing right now — it is here so that it cannot stop
+        // being true by accident. A cap and a floor written at the same place is how a duration stays a
+        // promise instead of a default somebody lowers later without noticing what it meant.
+        //
+        // Re-applying REFRESHES to the full duration rather than topping up, so a second wound on a bleeding
+        // opponent always buys the whole three turns again.
+        turns: Math.max(BLEED_TURNS, Math.min(BLEED_TURNS_CAP, BLEED_TURNS + Math.round(perks.bleedTurns || 0))),
         stacks,
         dmg: Math.min(per * stacks, Math.max(1, Math.round(maxHp * BLEED_TICK_CAP))),
     };
@@ -1838,13 +1848,6 @@ export async function fightRound(buyerId, opts = {}) {
             }
             // FIRE leaves a burn, a wound bleeds — both resolved below.
             if (ability.bleeds) gash = true;
-            // RAGGED EDGE — the Reaver's inherent. Any blow that lands can open a wound on its own,
-            // whether or not the move says it bleeds. Rolled once per swing, not per hit, so a
-            // three-hit flurry is not three rolls at it.
-            if (!gash && (b.me.bleedChance || 0) > 0 && Math.random() < b.me.bleedChance) gash = true;
-            // EMBERBORN — the Runecaller's inherent, the same shape in fire. Once per swing, and skipped when
-            // the move already burns so it cannot double up with its own spell.
-            if (!rend && (b.me.burnChance || 0) > 0 && Math.random() < b.me.burnChance) rend = true;
             if (ability.kind === "strike") {
                 // Amplifies the timing band around 1.0 — a flawless strike hits far harder than a sloppy one,
                 // more so than any other kind. High variance, paid for with execution rather than power.
@@ -1882,6 +1885,16 @@ export async function fightRound(buyerId, opts = {}) {
             if (ability.kind === "sunder") sunder = true;
         }
         // Timing, then the ability, then your affinity against theirs. Surge spends itself on the next swings.
+        // ── RAGGED EDGE AND EMBERBORN — OUTSIDE THE ABILITY BRANCH, WHICH IS WHERE THEY BELONG ──────────
+        // Luke: "I'm just not able to see the bleed at all." He could not: both of these sat INSIDE
+        // `if (ability)`, so the Reaver's inherent only rolled on a cast and a plain attack — the command
+        // pressed more than all the others combined — never opened a wound. The card has always said "any hit
+        // opens a wound", and it was true only of the hits you spent a cooldown on.
+        //
+        // Rolled once per swing rather than per hit, so a three-hit flurry is not three rolls at it. The blow
+        // still has to LAND: the application below is gated on dmg > 0.
+        if (!gash && (b.me.bleedChance || 0) > 0 && Math.random() < b.me.bleedChance) gash = true;
+        if (!rend && (b.me.burnChance || 0) > 0 && Math.random() < b.me.burnChance) rend = true;
         const surge = (b.surge > 0 && !justSurged) ? 1.5 : 1;
         if (b.surge > 0 && !justSurged) b.surge -= 1;
         // Their gear defends them too. Without this the attacker always lands full and the better loadout
@@ -2201,6 +2214,12 @@ export async function fightRound(buyerId, opts = {}) {
         let gashNow = false;
         let sunderNow = false;
         let foeJustSurged = false;
+        // Their edge and their ember, rolled on any swing they throw — the mirror of the fix on your side.
+        // Left inside their ability branch, a Reaver across the sand bled you only when it cast something.
+        // (Below the declarations, not above them: lint:undef caught the first attempt as a temporal dead
+        // zone — it would have thrown on every foe beat in the game.)
+        if ((b.foe.bleedChance || 0) > 0 && Math.random() < b.foe.bleedChance) gashNow = true;
+        if ((b.foe.burnChance || 0) > 0 && Math.random() < b.foe.burnChance) rendNow = true;
         // How much of YOUR block their swing cuts through. Their Pierce, and a spell cuts guard on its own.
         let foePierce = Math.max(0.25, 1 - (FP.pierce || 0));
         // Their element against yours is the mirror of yours against theirs — including their Wheelwise, which
@@ -2243,10 +2262,6 @@ export async function fightRound(buyerId, opts = {}) {
             if (k === "disarm") b.noGuard = GUARD_DISABLE_TURNS;
             if (theirAbility.burns) rendNow = true;
             if (theirAbility.bleeds) gashNow = true;
-            // The same edge in their hands.
-            if (!gashNow && (b.foe.bleedChance || 0) > 0 && Math.random() < b.foe.bleedChance) gashNow = true;
-            // The same ember in their hands.
-            if (!rendNow && (b.foe.burnChance || 0) > 0 && Math.random() < b.foe.burnChance) rendNow = true;
 
             // ── THE TEN THEY HAVE AND YOU DO NOT ─────────────────────────────────────────────────────────
             // Resolved here and nowhere else: no tree node grants any of these, so there is no mirror of

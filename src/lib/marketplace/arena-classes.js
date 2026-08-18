@@ -76,9 +76,18 @@ export const CLASSES = [
         color: "#ff6f7d",
         emblem: "/images/arena/class/reaver.webp",
         health: 0,
-        dr: 0.16,
-        accuracy: 0.72,
+        // ── LUKE'S PASS ON THE REAVER ────────────────────────────────────────────────────────────────────
+        // "the reaver should have increased accuracy and base attack power, and maybe a little bit more
+        // damage reduction." The class that wants the bout over in six rounds was missing on 28% of its
+        // swings and taking full weight while it did.
+        //
+        // DR 0.16 → 0.21 keeps the shape (still the lightest of the three, half a Warden's 0.40) without
+        // being punished twice for the same identity. Accuracy 0.72 → 0.80 leaves the class spread intact.
+        dr: 0.21,
+        accuracy: 0.80,
         guard: 0.12,
+        // Base Brutality — the "hit hardest" half of the tagline, which nothing in the numbers paid for.
+        dmgPct: 0.12,
         // ── THE REAVER OPENS WOUNDS ──────────────────────────────────────────────────────────────────────
         // Inherent, like the Warden's drink: you do not spend a point to be a Reaver. Better than the damage
         // ramp that sat here for one commit — this file has called Reaver "the blood class" since the rework
@@ -86,7 +95,9 @@ export const CLASSES = [
         //
         // Any blow that lands can open a wound, and a bleed goes straight to health past any shield. It reads
         // on both sides: a Reaver across the sand cuts you exactly as often.
-        bleedChance: 0.35,
+        // Raised because it was invisible in play — see the fix in arena.js. A plain attack rolls it now, so
+        // this is the first version of the number anybody has actually felt.
+        bleedChance: 0.45,
     },
     {
         id: "warden",
@@ -169,6 +180,7 @@ export const classBase = (id) => {
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,
         bleedChance: c?.bleedChance || 0,
+        dmgPct: c?.dmgPct || 0,
         burnChance: c?.burnChance || 0,
     };
 };
@@ -202,6 +214,7 @@ export function classPassives(id) {
     if (b.guard !== DEFAULT_GUARD) out.push({ label: "Guard", value: `${Math.round(b.guard * 100)}% of health` });
     if (b.accuracy !== DEFAULT_ACCURACY) out.push({ label: "Accuracy", value: `${Math.round(b.accuracy * 100)}%` });
     if (b.lifesteal) out.push({ label: "Lifedrink", value: `${Math.round(b.lifesteal * 100)}% of all damage back` });
+    if (b.dmgPct) out.push({ label: "Brutality", value: `+${Math.round(b.dmgPct * 100)}% damage on everything you throw` });
     if (b.bleedChance) out.push({ label: "Ragged Edge", value: `${Math.round(b.bleedChance * 100)}% chance any hit opens a wound` });
     if (b.burnChance) out.push({ label: "Emberborn", value: `${Math.round(b.burnChance * 100)}% chance any hit sets a burn` });
     return out;
