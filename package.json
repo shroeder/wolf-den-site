@@ -29,7 +29,8 @@
     "sim:road:me": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-me.mjs",
     "sim:arch": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-archetypes.mjs",
     "sim:arch:cal": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-archetype-cal.mjs",
-    "sim:road:headroom": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-headroom.mjs"
+    "sim:road:headroom": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-headroom.mjs",
+    "sim:road:progress": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-progress.mjs"
   },
   "keywords": [],
   "author": "",
