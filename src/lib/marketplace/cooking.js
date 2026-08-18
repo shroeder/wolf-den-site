@@ -959,6 +959,10 @@ export async function getKitchenState(buyerId) {
             } : null,
             // What a dish can actually pay, with the gold floor stated separately — the roll is a bonus ON TOP
             // of a guaranteed purse, and hiding that made cooking look like a lottery with a lot of blanks.
+            // What the PLATE is worth to a pet. The ladder below is what the cook pays; this is the dish itself,
+            // which you keep and can feed. Sent per recipe so the card can state the number before you spend
+            // the ingredients — the reveal already says it afterwards, which is the wrong end for a decision.
+            petXp: r.kind === "dish" ? (DISH_PET_XP[r.tier] || 0) : 0,
             payout: r.kind === "dish" ? {
                 // In LADDER order — bottom rung first. Sorting by anything else would go straight back to
                 // implying a lottery.

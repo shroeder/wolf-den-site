@@ -295,9 +295,26 @@ async function farmMineBits(buyerId, mine = true) {
     const petting = flatBudget(rawBudget, mine);
     // listConsumables returns owned items under `stash` (NOT `owned`) — reading the wrong key is why banked
     // treats never showed and you could only buy. Feed from your real stash.
+    // ── ANYTHING THAT FEEDS A PET BELONGS IN THE FEED LIST ───────────────────────────────────────────────
+    // This filtered on `kind === "treat"`, which was the same thing as "feeds a pet" right up until dishes
+    // became food. feedPetItem — the server on the other end of these buttons — has never asked about `kind`;
+    // it asks whether the effect is pet_xp or pet_level. So the list was refusing to OFFER items the server
+    // would happily have accepted, and a member with forty cooked dishes could not feed one to a chosen pet
+    // from the only screen that lets you choose the pet.
+    //
+    // Same rule as feedPetItem, read off the effect, so a future food cannot go missing here again.
+    const feedable = (o) => {
+        const e = CONSUMABLES[o.id]?.effect;
+        return e?.type === "pet_xp" || e?.type === "pet_level";
+    };
     const treats = (cons.stash || [])
-        .filter((o) => o.kind === "treat")
-        .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), count: o.count }));
+        .filter(feedable)
+        .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), count: o.count, kind: o.kind }))
+        // Dishes first and strongest-first within each group: the plates are the ones you cooked and have most
+        // of, and the shop treats keep their ladder order underneath.
+        .sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "dish" ? -1 : 1)
+            || (b.xp === "level" ? 1 : 0) - (a.xp === "level" ? 1 : 0)
+            || (Number(b.xp) || 0) - (Number(a.xp) || 0));
     const treatShop = (cons.shop || [])
         .filter((o) => o.kind === "treat")
         .map((o) => ({ id: o.id, name: o.name, emoji: o.emoji, xp: treatXp(o.id), price: o.effectivePrice ?? o.price, canAfford: o.canAfford }));

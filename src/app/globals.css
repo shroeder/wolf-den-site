@@ -16789,3 +16789,7 @@ img.fish-reveal-art { display: block; width: 128px; height: 128px; object-fit: c
 .tw-raid-opening b { color: #f6dfae; font-size: .92rem; }
 .tw-raid-opening span { color: #b9a382; font-size: .74rem; }
 .tw-raid-note { color: #e8c9a0; font-size: .82rem; font-weight: 700; }
+
+/* The feed list's item art — a dish sprite where there is one, its glyph where there is not. */
+.farm-feed-art { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; }
+.farm-feed-art .con-art-img, .farm-feed-art img { width: 24px; height: 24px; object-fit: contain; }

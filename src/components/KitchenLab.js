@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import CookingClient from "@/components/CookingClient";
 import FishingScene from "@/components/FishingScene";
+import FarmClient from "@/components/FarmClient";
+import ConsumablesClient from "@/components/ConsumablesClient";
 
 // ── THE BAIT LAB ─────────────────────────────────────────────────────────────────────────────────────────────
 // Two scenes, both mounting the REAL component: `?scene=craft` is the Kitchen, `?scene=use` is the water.
@@ -45,7 +47,7 @@ function armCookStub(sprites) {
 const TIER_META = { 1: { name: "Simple", color: "#cfd8e3" }, 2: { name: "Hearty", color: "#7ec8ff" },
     3: { name: "Fine", color: "#c9a2ff" }, 4: { name: "Exquisite", color: "#ffd75e" }, 5: { name: "Legendary", color: "#ff9ec4" } };
 
-export default function BaitLab({ kitchen, baits = [], sprites = {} }) {
+export default function KitchenLab({ kitchen, baits = [], sprites = {}, farm = null, stash = [] }) {
     const scene = typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("scene") || "craft"
         : "craft";
@@ -66,11 +68,28 @@ export default function BaitLab({ kitchen, baits = [], sprites = {} }) {
         // `qty`, not `count` — that is the key baitStock() sends and the picker reads. Getting this wrong in a
         // fixture prints "rarity · left" with the number missing, which reads exactly like an app bug.
         // ?n= how many baits the member is holding, so the picker can be judged at 1 and at all 20.
-        baits: baits.slice(0, Number(new URLSearchParams(window.location.search).get("n")) || 7).map((b, i) => ({
+        // Guarded: a useState initializer still runs during SSR, where there is no window.
+        baits: baits.slice(0, (typeof window === "undefined"
+            ? 7
+            : Number(new URLSearchParams(window.location.search).get("n")) || 7)).map((b, i) => ({
             id: b.id, name: b.name, rarity: b.rarity, tilt: b.tilt, blurb: b.blurb || "", sprite: b.sprite,
             qty: [4, 3, 2, 2, 1, 1, 1][i] ?? ((i % 3) + 1),
         })),
     }));
+
+    // ── THE STASH ── ConsumablesClient fetches its own state, so the stub answers the GET. Armed during
+    // render for the same reason as the cook stub above.
+    if (scene === "stash" && typeof window !== "undefined" && !window.__stashArmed) {
+        window.__stashArmed = true;
+        const real = window.fetch.bind(window);
+        window.fetch = async (url, opts) => {
+            if (!String(url || "").includes("/api/marketplace/consumables")) return real(url, opts);
+            return new Response(JSON.stringify({ gold: 12500, shop: [], stash, chargedItems: [], active: [] }),
+                { status: 200, headers: { "Content-Type": "application/json" } });
+        };
+    }
+    if (scene === "stash") return <ConsumablesClient />;
+    if (scene === "feed" && farm) return <FarmClient initial={farm} />;
 
     if (scene === "use") {
         return (

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 import CoinCta from "@/components/CoinCta";
 import PetArt from "@/components/PetArt";
+import ConsumableArt from "@/components/ConsumableArt";
 import PetVisitReport from "@/components/PetVisitReport";
 import FarmRatingReport from "@/components/FarmRatingReport";
 import HowToPlay from "@/components/HowToPlay";
@@ -2926,14 +2927,22 @@ function PetInspect({ pet, mine = true, ownerName, canPet, petXp, petGold, petti
                     {/* Feed a treat you own */}
                     {canPet && !pet.maxed && treats.length ? (
                         <div style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{mine ? "🍖 Feed a treat" : `🍖 Feed a treat 💛 — a gift to ${ownerName || "them"} (earns you a little too)`}</div>
+                            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>{mine ? "🍖 Feed a treat or a dish" : `🍖 Feed a treat or a dish 💛 — a gift to ${ownerName || "them"} (earns you a little too)`}</div>
                             {pet.maxed ? (
                                 <div className="muted" style={{ fontSize: 12 }}>{pet.name} is max level — treats won&apos;t add more.</div>
                             ) : (
                                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                     {treats.map((t) => (
                                         <button key={t.id} type="button" onClick={() => onUseTreat(t.id)} disabled={busy} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, color: "inherit", cursor: busy ? "default" : "pointer", opacity: busy && busyKey !== t.id ? 0.5 : 1 }}>
-                                            <span style={{ fontSize: 13, fontWeight: 600 }}>{t.emoji} {t.name} <span className="muted" style={{ fontWeight: 400 }}>· {t.xp === "level" ? "instant level" : `+${t.xp} XP`}</span></span>
+                                            {/* A cooked plate says so — otherwise "Morning Porridge" sits in a
+                                                treat list with no clue where it came from or why it is there. */}
+                                            {/* The SPRITE, not the glyph. Every dish has its own art and the
+                                                fallback plate emoji is the same picture for all sixty-four —
+                                                six identical rows you have to read to tell apart. */}
+                                            <span style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                                                <ConsumableArt id={t.id} emoji={t.emoji} className="farm-feed-art" alt="" />
+                                                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{t.name} <span className="muted" style={{ fontWeight: 400 }}>· {t.xp === "level" ? "instant level" : `+${t.xp} XP`}{t.kind === "dish" ? " · cooked" : ""}</span></span>
+                                            </span>
                                             <span className="muted" style={{ fontSize: 12 }}>{busyKey === t.id ? "feeding…" : `×${t.count}`}</span>
                                         </button>
                                     ))}

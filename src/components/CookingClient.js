@@ -423,6 +423,16 @@ export default function CookingClient({ initial }) {
                                             </div>
                                         ) : (
                                             <div className="ck-pool">
+                                                {/* ── THE PLATE, BEFORE THE LADDER ────────────────────────────────────────
+                                                    Every dish is pet food you keep, and until this the only place that
+                                                    said so was the reveal — i.e. after the ingredients were already
+                                                    spent. Which dish to cook for a pet is a decision, so the number
+                                                    belongs on the card you make it from. */}
+                                                {r.petXp ? (
+                                                    <p className="ck-pool-feed">
+                                                        You keep <b>{r.name}</b> — feed it to a pet for <b>+{r.petXp.toLocaleString()} pet XP</b>.
+                                                    </p>
+                                                ) : null}
                                                 {/* The gold is GUARANTEED and stated first — the roll is a bonus on top. Listing
                                                     only the roll made cooking look like a lottery with a lot of blanks. */}
                                                 <p className="ck-pool-intro">
@@ -584,6 +594,10 @@ export default function CookingClient({ initial }) {
 
 const CK_CSS = `
 .ck { --ck-line: rgba(255,255,255,0.09); }
+/* The plate you keep, stated on the recipe card above the reward ladder. */
+.ck-pool-feed { margin: 0 0 8px; font-size: 0.8rem; line-height: 1.45; color: rgba(255,255,255,0.82);
+    background: rgba(126,200,255,0.10); border: 1px solid rgba(126,200,255,0.28); border-radius: 10px; padding: 7px 10px; }
+.ck-pool-feed b { color: #cfe6ff; }
 /* The plate you keep, called out under the ladder prize on the reveal. */
 .ck-reveal-dish { margin: 8px 0 2px; font-size: 0.82rem; line-height: 1.45; text-align: center;
     color: rgba(255,255,255,0.82); background: rgba(126,200,255,0.10);
