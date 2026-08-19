@@ -930,6 +930,11 @@ function publicBout(b) {
         fishing: Boolean(b.fishing),
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
+        // ── STUN AND HASTE, ON BOTH BODIES ───────────────────────────────────────────────────────────────
+        // Published for each fighter separately because the screen draws them on the fighter they belong to:
+        // a swirl over the one who cannot act, a green glow on the one who is about to act twice as often.
+        stunned: (b.stunned || 0) > 0, hasted: (b.hasteLeft || 0) > 0,
+        foeStunned: (b.foeStunned || 0) > 0, foeHasted: (b.foeHasteLeft || 0) > 0,
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,
         // ── AND THE ONES ON YOU ──────────────────────────────────────────────────────────────────────
         // These were deliberately held back as "the opponent's business". They are not: a burn eating your

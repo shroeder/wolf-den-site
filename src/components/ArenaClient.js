@@ -408,18 +408,42 @@ function FighterBar({ f, hp, maxHp, element, foe = false, active = false, shield
 // opponent. They used to be the same class, which was fine while the enemy was always the flipped one. After
 // the flip to the Final Fantasy arrangement (party right, enemy left) it meant `is-foe` marked YOU, so the
 // cast spotlight dimmed the wrong fighter and every mirrored keyframe fired on the wrong body.
-function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false }) {
+function FighterBody({ f, mirrored, foe = false, hurt, lunge, down, wind = 0, brace = false, dim = false,
+    stunned = false, hasted = false }) {
     const cls = `ar-fighter${mirrored ? " is-mirror" : ""}${foe ? " is-foe" : ""}`
         + `${hurt ? " is-hurt" : ""}${lunge ? " is-lunge" : ""}`
-        + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`;
+        + `${down ? " is-down" : ""}${wind > 0 ? " is-wind" : ""}${brace ? " is-brace" : ""}${dim ? " is-dim" : ""}`
+        + `${stunned ? " is-stunned" : ""}${hasted ? " is-hasted" : ""}`;
     return (
         <div className={cls} style={wind > 0 ? { "--wind": `${wind}ms` } : undefined}>
             {/* The contact shadow is what puts a fighter ON the ground rather than in front of a wall. */}
             <span className="ar-shadow" aria-hidden="true" />
+            {/* ── HASTE ── the glow goes BEHIND the body (z-index below .ar-hero) so it reads as light coming
+                off them rather than a film over the sprite, and the motes drift up out of the same place. */}
+            {hasted ? (
+                <span className="ar-haste" aria-hidden="true">
+                    <span className="ar-haste-glow" />
+                    {Array.from({ length: 7 }).map((_, i) => (
+                        <span key={i} className="ar-haste-mote" style={{ "--i": i }} />
+                    ))}
+                </span>
+            ) : null}
             {f?.sprite ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="ar-hero" src={f.sprite} alt="" draggable="false" />
             ) : <span className="ar-hero ar-noface" aria-hidden="true" />}
+            {/* ── STUN ── the swirl sits ABOVE the head and the word sits above that. Both are on top of the
+                sprite, because the point of the state is that you can see at a glance this fighter is not
+                going to act. */}
+            {stunned ? (
+                <span className="ar-stun" aria-hidden="true">
+                    <span className="ar-stun-swirl">
+                        <i /><i /><i />
+                    </span>
+                    <b className="ar-stun-word">STUNNED!</b>
+                </span>
+            ) : null}
+            {hasted ? <b className="ar-haste-word" aria-hidden="true">HASTE!</b> : null}
         </div>
     );
 }
@@ -1639,11 +1663,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         <FighterBody f={st.me} hurt={hitSide === "you"} lunge={hitSide === "them"}
                             down={bout.over && !bout.won}
                             wind={counterWind === "left" ? COUNTER_WIND_MS : (yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0)}
-                            brace={!bout.over && bout.turn === "them" && blockReady} />
+                            brace={!bout.over && bout.turn === "them" && blockReady}
+                            stunned={Boolean(bout.stunned)} hasted={Boolean(bout.hasted)} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
-                            brace={yourTurn && Boolean(pending)} />
+                            brace={yourTurn && Boolean(pending)}
+                            stunned={Boolean(bout.foeStunned)} hasted={Boolean(bout.foeHasted)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
                             <div className="ar-incoming" aria-live="polite">
@@ -2903,6 +2929,54 @@ function Styles() {
                still reads underneath. Wider than this and they crowd; narrower and they are back to being two
                small figures with an empty arena between them. */
             .ar-fighter { position: absolute; bottom: 0; width: 54%; height: 100%; }
+            /* ── STUNNED ─────────────────────────────────────────────────────────────────────────────────
+               Three stars on a ring above the head, the ring turning, each star bobbing on its own offset so
+               it reads as a wobble rather than a rigid spin. The word sits above them and pulses, because the
+               fighter is going to stand there for a whole swing and the screen has to say why. */
+            .ar-stun { position: absolute; left: 50%; bottom: 86%; transform: translateX(-50%);
+                z-index: 7; display: grid; justify-items: center; gap: 2px; pointer-events: none; }
+            .ar-stun-swirl { position: relative; width: 46px; height: 18px; animation: arStunSpin 1.15s linear infinite; }
+            .ar-stun-swirl i { position: absolute; top: 50%; left: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+                border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff7c2, #ffd75e 55%, rgba(255,190,60,0) 72%);
+                box-shadow: 0 0 10px rgba(255,214,94,.95); }
+            .ar-stun-swirl i:nth-child(1) { transform: rotate(0deg) translateX(21px); }
+            .ar-stun-swirl i:nth-child(2) { transform: rotate(120deg) translateX(21px); }
+            .ar-stun-swirl i:nth-child(3) { transform: rotate(240deg) translateX(21px); }
+            @keyframes arStunSpin { to { transform: rotate(360deg); } }
+            .ar-stun-word { font-size: .84rem; font-weight: 900; letter-spacing: .1em; color: #ffe27a;
+                text-shadow: 0 2px 8px #000, 0 0 16px rgba(255,214,94,.9);
+                animation: arStunPulse .78s ease-in-out infinite; }
+            @keyframes arStunPulse { 0%, 100% { opacity: .72; transform: scale(.97) } 50% { opacity: 1; transform: scale(1.06) } }
+            /* A stunned body sags and stops moving — the sprite itself says it too, not just the badge. */
+            .ar-fighter.is-stunned .ar-hero { filter: saturate(.55) brightness(.85); animation: arStunSway 1.5s ease-in-out infinite; }
+            @keyframes arStunSway { 0%, 100% { transform: rotate(-2.5deg) } 50% { transform: rotate(2.5deg) } }
+
+            /* ── HASTED ──────────────────────────────────────────────────────────────────────────────────
+               A green wash BEHIND the fighter and motes lifting off them. Both sit under the sprite in the
+               stack so the character stays the brightest thing on their own tile. */
+            .ar-haste { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+            .ar-haste-glow { position: absolute; left: 50%; bottom: 4%; width: 78%; height: 62%;
+                transform: translateX(-50%); border-radius: 50%;
+                background: radial-gradient(ellipse at center, rgba(96,240,150,.55), rgba(60,220,130,.16) 55%, transparent 74%);
+                animation: arHasteBreath 1.1s ease-in-out infinite; }
+            @keyframes arHasteBreath { 0%, 100% { opacity: .55; transform: translateX(-50%) scale(.94) }
+                50% { opacity: .95; transform: translateX(-50%) scale(1.06) } }
+            .ar-haste-mote { position: absolute; bottom: 12%; left: calc(28% + (var(--i) * 7%));
+                width: 5px; height: 5px; border-radius: 50%;
+                background: radial-gradient(circle, #b8ffd2, #4fe08a 60%, rgba(79,224,138,0) 75%);
+                box-shadow: 0 0 8px rgba(96,240,150,.9);
+                animation: arHasteRise 1.25s linear infinite; animation-delay: calc(var(--i) * -0.17s); }
+            @keyframes arHasteRise { 0% { opacity: 0; transform: translateY(0) scale(.7) }
+                18% { opacity: 1 } 100% { opacity: 0; transform: translateY(-78px) scale(1.1) } }
+            .ar-haste-word { position: absolute; left: 50%; bottom: 88%; transform: translateX(-50%); z-index: 7;
+                font-size: .84rem; font-weight: 900; letter-spacing: .1em; color: #8bf0b4; white-space: nowrap;
+                text-shadow: 0 2px 8px #000, 0 0 18px rgba(96,240,150,.95);
+                animation: arHasteWord .82s ease-in-out infinite; }
+            @keyframes arHasteWord { 0%, 100% { opacity: .78; transform: translateX(-50%) translateY(0) }
+                50% { opacity: 1; transform: translateX(-50%) translateY(-3px) } }
+            /* A hasted fighter visibly runs hot: the sprite itself picks up the tint. */
+            .ar-fighter.is-hasted .ar-hero { filter: drop-shadow(0 0 10px rgba(96,240,150,.75)); }
+
             /* SAME SAND, SAME SIZE. The enemy used to be drawn smaller and standing further up the field —
                two deliberate cues for depth, and they worked: they made the opponent read as scenery. A duel
                is two people at arm's length, and the person trying to kill you should not look like he is

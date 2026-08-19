@@ -376,6 +376,17 @@ export const SCENES = {
             }),
         }),
     },
+    // ── THE TWO EFFECT STATES, ON BOTH BODIES ────────────────────────────────────────────────────────────
+    // Stun and haste are the only states a fighter wears that they did not choose, so they have to be legible
+    // at a glance and from across the ring. Both on screen at once, one on each fighter, which is also the
+    // arrangement that catches them colliding with the health bars or with each other.
+    effects: {
+        label: "Stunned & hasted",
+        note: "The swirl and the green burn. Your fighter is hasted; theirs is stunned and about to lose a swing.",
+        state: () => baseState({
+            bout: makeBout({ hasted: true, foeStunned: true, turn: "you" }),
+        }),
+    },
     turn: {
         label: "Your turn",
         note: "The command deck. Attack / Skill / Guard / Item.",
