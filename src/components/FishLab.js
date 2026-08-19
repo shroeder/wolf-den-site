@@ -58,6 +58,15 @@ export default function FishLab({ monsters = [] }) {
         // ?haul=gear — the OTHER thing a cast can bring up. A piece of gear off the sea floor prints its stat
         // line in the haul card, and that card is only reachable by playing a cast through, so there was no
         // way to look at it. Same landed shape fishLand returns.
+        // ?haul=treasure — the card that told GrayKitsune a Growth Tonic was Mythic. A consumable prize has no
+        // rarity of its own, which is the whole point of the fix: nothing should be claimed about it.
+        if (HAUL === "treasure") {
+            return { ok: true, landed: true, catchResult: {
+                treasure: true, gold: 0, xp: 12, tier: "mythic",
+                prize: { kind: "consumable", label: "Growth Tonic", emoji: "🧴", id: "farm_growth_tonic",
+                    where: "Added to your supplies", spriteUrl: "/images/consumables/farm_growth_tonic.png" },
+            } };
+        }
         if (HAUL === "gear") {
             return { ok: true, landed: true, catchResult: {
                 fish: { id: "tiger_prawn", name: "Tiger Prawn", lb: 3.2 }, gold: 42, xp: 30,

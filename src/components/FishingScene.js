@@ -672,8 +672,19 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
                                 <span className="fish-reveal-art" style={{ fontSize: 96 }} aria-hidden="true">{result.prize?.emoji || "🗝️"}</span>
                             )}
                         </div>
-                        <div className="fish-name" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
-                        <div className="fish-rarity" style={{ color: RARITY_COLOR[result.tier] || "#cfd8e3" }}>{RARITY_LABEL[result.tier] || "Common"}</div>
+                        {/* Coloured by the PRIZE too. Tinting the name with the cast's rarity is the same claim
+                            the label made, only quieter — a Growth Tonic printed in mythic pink still says
+                            mythic. Neutral when the prize has no rarity of its own. */}
+                        <div className="fish-name" style={{ color: RARITY_COLOR[result.prize?.rarity] || "#cfd8e3" }}>{result.prize?.label || "Something"}</div>
+                        {/* THE PRIZE'S RARITY, NOT THE CAST'S. This printed RARITY_LABEL[result.tier] — how good
+                            the CAST was — directly under the prize's name, which reads as a claim about the
+                            prize. A mythic cast paying a 600-gold Growth Tonic announced "Growth Tonic /
+                            MYTHIC". GrayKitsune: "How is Growth Tonic a Mythic?" Gear and pets carry a real
+                            rarity and it is shown; a consumable, a recipe, doubloons and fragments do not have
+                            one, so nothing is claimed about them. */}
+                        {result.prize?.rarity ? (
+                            <div className="fish-rarity" style={{ color: RARITY_COLOR[result.prize.rarity] || "#cfd8e3" }}>{RARITY_LABEL[result.prize.rarity] || "Common"}</div>
+                        ) : null}
                         <p className="fish-copy">You hauled it up off the sea floor — no fish this time.</p>
                         {/* Fishing pays into four other screens. Saying which one turns a reward the member
                             can't find into one they can go and use. */}

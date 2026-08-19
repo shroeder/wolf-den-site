@@ -240,7 +240,13 @@ export async function buyRound(buyerId) {
     const paid = await db.queryOne(`UPDATE mkt_buyer SET gold = gold - $2 WHERE id = $1 AND gold >= $2 RETURNING gold`, [buyerId, ROUND_COST]).catch(() => null);
     if (!paid) return { ok: false, error: "insufficient_gold" };
     await logCoin(buyerId, -ROUND_COST, "tavern_round", { balanceAfter: paid.gold }).catch(() => {});
-    const rows = await db.query(`SELECT buyer_id FROM mkt_town_presence WHERE updated_at > NOW() - INTERVAL '5 minutes' AND buyer_id <> $1 LIMIT 25`, [buyerId]).catch(() => []);
+    // ── town_seen_at, NOT updated_at ─────────────────────────────────────────────────────────────────────
+    // `updated_at` only moves when somebody WALKS. `town_seen_at` is the heartbeat markTownSeen writes on
+    // every poll — it is what the town roster means by "in town". Reading the walk column meant a round only
+    // reached people who happened to have taken a step in the last five minutes, so a tavern with five wolves
+    // standing in it bought a drink for one. jtcollects: "usually only says it goes to 1 wolf instead of the
+    // 4-5 in town."
+    const rows = await db.query(`SELECT buyer_id FROM mkt_town_presence WHERE town_seen_at > NOW() - INTERVAL '5 minutes' AND buyer_id <> $1 LIMIT 25`, [buyerId]).catch(() => []);
     for (const r of rows) await awardXp(r.buyer_id, "tavern_cheers", { points: ROUND_GIFT_XP, gold: 0, dedupeKey: `cheers:${r.buyer_id}:${Date.now()}` }).catch(() => {});
     await awardXp(buyerId, "tavern_host", { points: ROUND_HOST_XP, gold: 0 }).catch(() => {});
     bumpTownQuest(buyerId, "patron", 1).catch(() => {});
