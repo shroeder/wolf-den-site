@@ -34,7 +34,8 @@
     "check:stats": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-labels.mjs",
     "sim:pvp": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs",
     "check:armour": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-armour-wall.mjs",
-    "check:damage": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-damage-sources.mjs"
+    "check:damage": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-damage-sources.mjs",
+    "check:statvalue": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-value.mjs"
   },
   "keywords": [],
   "author": "",
