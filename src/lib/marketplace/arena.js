@@ -227,7 +227,11 @@ function drFromTenacity(currentDr, points = 0) {
     return p * headroom;
 }
 
-async function combatStats(buyerId, gearStats, ids) {
+// EXPORTED so a balance run can ask what a member's pets, badges and compendium are worth on their own —
+// call it with an empty wardrobe and you get exactly the layer that is NOT gear. A sim built on gear alone
+// measures a game nobody plays: badges by themselves out-weigh a full set, and leaving them out makes every
+// fighter look damage-starved against their own armour.
+export async function combatStats(buyerId, gearStats, ids) {
     const [petBonus, badgeStats, { beastbondMult }] = await Promise.all([
         import("@/lib/marketplace/pet-combat.js").then((m) => m.getPetCombatBonus(buyerId)).catch(() => ({ stats: {} })),
         import("@/lib/marketplace/badges.js").then((m) => m.getBadgePassives(buyerId)).catch(() => ({})),
@@ -298,101 +302,16 @@ export async function arenaPower(buyerId) {
 // (which drops the upgrade perks that share the same bag, and quietly reports LOWER health than they have).
 // `opts.equippedStats` does the same for the wardrobe, so "what is a fully forged set worth" can be answered
 // by the engine instead of by arithmetic in a script.
-export async function kitFor(buyerId, opts = {}) {
-    const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
-        import("@/lib/marketplace/inventory.js"),
-        import("@/lib/marketplace/signatures.js"),
-        import("@/lib/marketplace/item-element.js"),
-    ]);
-    const { getEquippedStats } = await import("@/lib/marketplace/inventory.js");
-    // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine here.
-    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
-    const ids = Object.values(bySlot || {}).filter(Boolean);
-    const me = await db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
-    const level = levelForXp(Number(me?.xp) || 0).level;
-    // ── THE ARENA READS THE GEAR YOU ACTUALLY BUILT ──────────────────────────────────────────────────────
-    // This was `sumItemStats(ids)` — the CATALOG line for each equipped item and nothing else. So a Dragoncape
-    // forged to +6 fought as an unforged one, a completed set bonus did nothing, and a Flawless Ruby set into
-    // a piece changed no number in the ring at all. Every system a player invests in was invisible in the one
-    // place they go to prove it.
-    //
-    // getEquippedStats is what the boss already fights you with: base + set bonuses + forge enhancement +
-    // socketed jewels, merged. Both sides of a member bout run through this same function, so the matchup
-    // stays honest; the Gauntlet's tiers are fixed power, which means investment now tells against them, which
-    // is the entire point of investing.
-    const gearStats = opts.equippedStats || await getEquippedStats(buyerId).catch(() => ({}));
-
-    // See combatStats: gear alone is only half of what pays for a swing.
-    const stats = await combatStats(buyerId, gearStats, ids);
-    const gearPower = Object.values(stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
-    const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
-    const flat = {};
-    for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
-    // buildKit is still what decides your AFFINITY — that is a Forge decision and stays one. Its abilities
-    // are ignored: what you can DO in the ring is your class tree now, not a readout of your gear.
-    const kit = buildKit(ids, sigsById(ids), flat);
-
-    // ── THE TREE ─────────────────────────────────────────────────────────────────────────────────────────
-    const prog = await db.queryOne(
-        `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
-    ).catch(() => null);
-    // `opts.classId` lets a tool build this member's kit under another class's tree — used by
-    // scripts/check-passives.mjs to prove all thirty-six nodes reach the character.
-    const classId = opts.classId || prog?.arena_class || null;
-    const taken = opts.skillTree || prog?.skill_tree || {};
-    const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
-    // A member with no class yet still has to fight, so this falls back to the neutral defaults.
+// ── ONE FIGHTER, BUILT FROM NUMBERS ──────────────────────────────────────────────────────────────────────────
+// Every field the engine reads, derived from three things and nothing else: the merged combat stats, the perk
+// bag, and the class. It was written inline inside kitFor, which needs a member, a database and eight awaited
+// imports to reach — so anything wanting to ask "what would THIS build do" (a balance sim, a what-if, a tuning
+// pass) had to write the arithmetic out a second time, and a second copy of this is a second, quietly different
+// game. Lifted out whole: kitFor spreads it, and scripts/sim-pvp.mjs calls it directly.
+export function fighterFrom(stats = {}, perks = {}, classId = null) {
     const base = classBase(classId);
-    let abilities = treeAbilities(classId, taken, kit.element);
-    // Nobody fights empty-handed. Before a class is picked — or with every point refunded — you still get one
-    // honest move, exactly as the gear path used to guarantee.
-    if (!abilities.length) {
-        abilities = [{
-            id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
-            sprite: "/images/arena/skill-firstHitMult.webp", cooldown: 0, power: 1.9, hits: 1,
-            blurb: "No training in it. Still hurts.", element: kit.element, rarity: "common", rank: 0,
-            defensive: false,
-        }];
-    }
-    // Abilities carry their own archetype emblem (set in buildKit). The piece they came from is still named
-    // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
-    const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
-    const art = await itemSpriteMap().catch(() => ({}));
-    // ── GEAR LIFEDRINK, COMPUTED ONCE ────────────────────────────────────────────────────────────────────
-    // PAID AT THE RATE THE CARD PRINTS. This was halved (/200) on the reasoning that the Warden carries 15%
-    // inherently and a ring should be a slice of that — but the halving was never once tested, because the
-    // number it produced was never read by anything. A piece that says "+2% Lifedrink" and pays 1% is the same
-    // lie as one that pays nothing, only harder to catch. If 2% proves strong, halve it HERE and the card
-    // should say so too.
-    //
-    // It lives here rather than inline because it has to reach BOTH the perk bag and the fighter's own
-    // `lifesteal` field, and it only ever reached the first. Pierce and Counter are read off the perk bag
-    // (`P.pierce`, `P.counter`), so folding them in there is enough — but lifesteal is read off
-    // `b.me.lifesteal`, which is built below from the SKILL-TREE perks and the class base only. Nothing in
-    // the engine has ever read `perks.lifesteal`, so every point of Lifedrink a wardrobe carried has been
-    // inert since the affix shipped: rolled, priced as the rare one, printed on the card, and worth nothing.
     const gearLifesteal = (Number(stats.lifesteal) || 0) / 100;
-    // `abilities` — the ones actually in play. This looped over kit.abilities, the GEAR-derived list, which
-    // stopped being what the fight uses when the tree took over: every ability in the bout went without its
-    // art, and the loop dutifully decorated a list nobody read.
-    for (const a of abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
     return {
-        level, gearPower,
-        // ── GEAR JOINS THE PERK BAG ──────────────────────────────────────────────────────────────────────
-        // The engine reads pierce off `P.pierce`, where P is this fighter's perks — a bag the skill tree used
-        // to fill alone. Folding the wardrobe's contribution in HERE means it lands on both sides of the ring
-        // for free, because an opponent's kit is built by this same function. Adding a second lookup in the
-        // engine instead would have been two places to keep in step, and the second one is always the one
-        // that gets missed.
-        classId, taken,
-        perks: {
-            ...perks,
-            pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100,
-            // Riposte at full rate; the engine already caps it at 60%.
-            lifesteal: (perks.lifesteal || 0) + gearLifesteal,
-            counter: (perks.counter || 0) + (Number(stats.counter) || 0) / 100,
-        },
-        arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
         // `speed` rides in on the equipped weapon (items.js) the way base_damage does — only one main hand is
         // worn, so the summed value IS that weapon's rate. Attacks per second, not a tiebreak.
         speed: speedOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.speed || 0),
@@ -516,6 +435,111 @@ export async function kitFor(buyerId, opts = {}) {
         guard: guardSoakFrom(base.guard, 0, perks.guardSoak || 0),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
+    };
+}
+
+export async function kitFor(buyerId, opts = {}) {
+    const [{ getEquippedIds }, { sigsById }, { getElementOverrides }] = await Promise.all([
+        import("@/lib/marketplace/inventory.js"),
+        import("@/lib/marketplace/signatures.js"),
+        import("@/lib/marketplace/item-element.js"),
+    ]);
+    const { getEquippedStats } = await import("@/lib/marketplace/inventory.js");
+    // getEquippedIds returns a {slot -> id} OBJECT; iterating it directly is a known landmine here.
+    const bySlot = await getEquippedIds(buyerId).catch(() => ({}));
+    const ids = Object.values(bySlot || {}).filter(Boolean);
+    const me = await db.queryOne(`SELECT COALESCE(xp,0) AS xp FROM mkt_buyer WHERE id = $1`, [buyerId]).catch(() => null);
+    const level = levelForXp(Number(me?.xp) || 0).level;
+    // ── THE ARENA READS THE GEAR YOU ACTUALLY BUILT ──────────────────────────────────────────────────────
+    // This was `sumItemStats(ids)` — the CATALOG line for each equipped item and nothing else. So a Dragoncape
+    // forged to +6 fought as an unforged one, a completed set bonus did nothing, and a Flawless Ruby set into
+    // a piece changed no number in the ring at all. Every system a player invests in was invisible in the one
+    // place they go to prove it.
+    //
+    // getEquippedStats is what the boss already fights you with: base + set bonuses + forge enhancement +
+    // socketed jewels, merged. Both sides of a member bout run through this same function, so the matchup
+    // stays honest; the Gauntlet's tiers are fixed power, which means investment now tells against them, which
+    // is the entire point of investing.
+    const gearStats = opts.equippedStats || await getEquippedStats(buyerId).catch(() => ({}));
+
+    // See combatStats: gear alone is only half of what pays for a swing.
+    const stats = await combatStats(buyerId, gearStats, ids);
+    const gearPower = Object.values(stats || {}).reduce((n, v) => n + (Number(v) || 0), 0);
+    const overrides = await getElementOverrides(buyerId, ids).catch(() => ({}));
+    const flat = {};
+    for (const [id, arr] of Object.entries(overrides || {})) flat[id] = Array.isArray(arr) ? arr[0] : arr;
+    // buildKit is still what decides your AFFINITY — that is a Forge decision and stays one. Its abilities
+    // are ignored: what you can DO in the ring is your class tree now, not a readout of your gear.
+    const kit = buildKit(ids, sigsById(ids), flat);
+
+    // ── THE TREE ─────────────────────────────────────────────────────────────────────────────────────────
+    const prog = await db.queryOne(
+        `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
+    ).catch(() => null);
+    // `opts.classId` lets a tool build this member's kit under another class's tree — used by
+    // scripts/check-passives.mjs to prove all thirty-six nodes reach the character.
+    const classId = opts.classId || prog?.arena_class || null;
+    const taken = opts.skillTree || prog?.skill_tree || {};
+    const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
+    // A member with no class yet still has to fight, so this falls back to the neutral defaults.
+    const base = classBase(classId);
+    let abilities = treeAbilities(classId, taken, kit.element);
+    // Nobody fights empty-handed. Before a class is picked — or with every point refunded — you still get one
+    // honest move, exactly as the gear path used to guarantee.
+    if (!abilities.length) {
+        abilities = [{
+            id: "basic:focus", itemId: null, name: "Focused Blow", from: "your own hands", kind: "strike",
+            sprite: "/images/arena/skill-firstHitMult.webp", cooldown: 0, power: 1.9, hits: 1,
+            blurb: "No training in it. Still hurts.", element: kit.element, rarity: "common", rank: 0,
+            defensive: false,
+        }];
+    }
+    // Abilities carry their own archetype emblem (set in buildKit). The piece they came from is still named
+    // on every card, and its art rides along separately for anywhere that wants to show the gear itself.
+    const { itemSpriteMap } = await import("@/lib/marketplace/item-sprites.js");
+    const art = await itemSpriteMap().catch(() => ({}));
+    // ── GEAR LIFEDRINK, COMPUTED ONCE ────────────────────────────────────────────────────────────────────
+    // PAID AT THE RATE THE CARD PRINTS. This was halved (/200) on the reasoning that the Warden carries 15%
+    // inherently and a ring should be a slice of that — but the halving was never once tested, because the
+    // number it produced was never read by anything. A piece that says "+2% Lifedrink" and pays 1% is the same
+    // lie as one that pays nothing, only harder to catch. If 2% proves strong, halve it HERE and the card
+    // should say so too.
+    //
+    // It lives here rather than inline because it has to reach BOTH the perk bag and the fighter's own
+    // `lifesteal` field, and it only ever reached the first. Pierce and Counter are read off the perk bag
+    // (`P.pierce`, `P.counter`), so folding them in there is enough — but lifesteal is read off
+    // `b.me.lifesteal`, which is built below from the SKILL-TREE perks and the class base only. Nothing in
+    // the engine has ever read `perks.lifesteal`, so every point of Lifedrink a wardrobe carried has been
+    // inert since the affix shipped: rolled, priced as the rare one, printed on the card, and worth nothing.
+    // The perk bag the fight is resolved from: the tree's own, plus what the wardrobe contributes to the
+    // three affixes the engine reads off perks rather than off stats. Built here because BOTH the returned
+    // kit and fighterFrom need it.
+    const gearPerks = {
+        ...perks,
+        pierce: (perks.pierce || 0) + (Number(stats.pierce) || 0) / 100,
+        // Riposte at full rate; the engine already caps it at 60%.
+        lifesteal: (perks.lifesteal || 0) + (Number(stats.lifesteal) || 0) / 100,
+        counter: (perks.counter || 0) + (Number(stats.counter) || 0) / 100,
+    };
+    // `abilities` — the ones actually in play. This looped over kit.abilities, the GEAR-derived list, which
+    // stopped being what the fight uses when the tree took over: every ability in the bout went without its
+    // art, and the loop dutifully decorated a list nobody read.
+    for (const a of abilities) a.itemSprite = a.itemId ? art[a.itemId] || null : null;
+    return {
+        level, gearPower,
+        classId, taken,
+        // ── GEAR JOINS THE PERK BAG ──────────────────────────────────────────────────────────────────────
+        // The engine reads pierce off `P.pierce`, where P is this fighter's perks — a bag the skill tree used
+        // to fill alone. Folding the wardrobe's contribution in HERE means it lands on both sides of the ring
+        // for free, because an opponent's kit is built by this same function. Adding a second lookup in the
+        // engine instead would have been two places to keep in step, and the second is always the one missed.
+        perks: gearPerks,
+        arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
+        // THE RAW TREE PERKS, not gearPerks. The flat fields below already fold the wardrobe in off `stats`
+        // (gear pierce is stats.pierce, gear Lifedrink is gearLifesteal inside fighterFrom); handing in the
+        // merged bag would count the wardrobe's Lifedrink twice — once in perks.lifesteal and again as
+        // gearLifesteal. gearPerks exists for `perks` above, which is a different consumer.
+        ...fighterFrom(stats, perks, classId),
         element: kit.element, abilities,
     };
 }

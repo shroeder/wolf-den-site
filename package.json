@@ -31,7 +31,9 @@
     "sim:arch:cal": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-archetype-cal.mjs",
     "sim:road:headroom": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-headroom.mjs",
     "sim:road:progress": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-road-progress.mjs",
-    "check:stats": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-labels.mjs"
+    "check:stats": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-stat-labels.mjs",
+    "sim:pvp": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs",
+    "check:armour": "node --experimental-loader ./scripts/lib/app-loader.mjs scripts/check-armour-wall.mjs"
   },
   "keywords": [],
   "author": "",
