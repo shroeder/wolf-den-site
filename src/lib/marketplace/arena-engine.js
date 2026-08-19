@@ -302,7 +302,9 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     // Armour is the whole of mitigation now: a flat number subtracted from every blow. Damage reduction is
     // gone (it was a percentage doing the same job worse) and so is accuracy — every swing lands.
     const side = (f) => ({
-        damage: Number(f.damage) || 0,
+        // dmgPct was on the kit, on the card, and read by NOTHING — Runic Might and every point spent in it
+        // did precisely zero. Folded into the damage the engine actually swings with.
+        damage: (Number(f.damage) || 0) * (1 + Math.max(0, Number(f.dmgPct) || 0)),
         critChance: Number(f.critChance) || 0,
         critMult: Number(f.critMult) || 1,
         armor: Math.max(0, Number(f.armor) || 0),

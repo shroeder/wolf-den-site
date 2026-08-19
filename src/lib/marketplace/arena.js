@@ -351,7 +351,9 @@ export async function kitFor(buyerId, opts = {}) {
     const prog = await db.queryOne(
         `SELECT arena_xp, arena_class, skill_tree, upgrades FROM mkt_arena WHERE buyer_id = $1`, [buyerId]
     ).catch(() => null);
-    const classId = prog?.arena_class || null;
+    // `opts.classId` lets a tool build this member's kit under another class's tree — used by
+    // scripts/check-passives.mjs to prove all thirty-six nodes reach the character.
+    const classId = opts.classId || prog?.arena_class || null;
     const taken = opts.skillTree || prog?.skill_tree || {};
     const perks = mergeAdd(treeEffects(classId, taken), upgradeEffects(prog?.upgrades || {}));
     // A member with no class yet still has to fight, so this falls back to the neutral defaults.
@@ -502,10 +504,10 @@ export async function kitFor(buyerId, opts = {}) {
         // Lifedrink — THE FIELD THE ENGINE ACTUALLY READS (`b.me.lifesteal`). The gear term was missing here,
         // which is the whole of "I have 2% life leech and it doesn't work".
         lifesteal: Math.max(0, (base.lifesteal || 0) + (perks.lifesteal || 0) + gearLifesteal),
-        // Inherent class passives, folded exactly as lifesteal is: the Reaver's ragged edge and the
-        // Runecaller's ember. Both read on BOTH sides below.
-        bleedChance: Math.max(0, base.bleedChance || 0),
-        burnChance: Math.max(0, base.burnChance || 0),
+        // The inherent class bleed and burn used to be set HERE, later in the same object literal than the
+        // tree's own — so the second assignment won and Rend and Kindle, the two nodes that ARE those
+        // mechanics, were overwritten by a class implicit every single time. Now that the implicits are gone
+        // that implicit was zero, so both nodes did precisely nothing. Deleted; the tree's values above stand.
         // Brutality: the class's own, plus the tree's. Reaver carries base damage the way the Warden carries
         // base Lifedrink — "hit hardest" was a tagline the numbers did not pay for.
         dmgPct: Math.max(0, (base.dmgPct || 0) + (perks.dmgPct || 0)),
