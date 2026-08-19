@@ -16,16 +16,33 @@
 // and `autoBout` is the resolver the Arena calls. A sim that re-implements either measures a game nobody is
 // playing, which is exactly how the Long Road shipped mis-measured.
 //
+// WHICH DAILY PLAYERS. Even inside the people who turn up there is an upper echelon whose gear no ten-point
+// build can answer, and leaving them in makes every other question unreadable: a build shape that beats the
+// field mostly means it happened to sit on the two best wardrobes. `--top=N` drops the N hardest hitters so the
+// rest can be looked at as the peer group they actually are, and `--only=` runs a named handful.
+//
 //   node --experimental-loader ./scripts/lib/app-loader.mjs scripts/sim-pvp.mjs [pairings=1000] [seed=7] [days=12]
+//     --top=2                      drop the two biggest swings before building the field
+//     --only="A,B,C"               only these members
+//     --exclude="A,B"              everyone but these
 import { CLASSES, treeFor, treeEffects } from "../src/lib/marketplace/arena-classes.js";
 import { fighterFrom, combatStats } from "../src/lib/marketplace/arena.js";
 import { autoBout } from "../src/lib/marketplace/arena-engine.js";
 import { getEquippedStats, getEquippedIds } from "../src/lib/marketplace/inventory.js";
 import { db } from "../src/lib/db.js";
 
-const FIGHTS = Number(process.argv[2]) || 1000;
-const SEED = Number(process.argv[3]) || 7;
-const DAYS_REQUIRED = Number(process.argv[4]) || 12;   // of the last fourteen
+const ARGS = process.argv.slice(2);
+const flag = (name) => {
+    const hit = ARGS.find((a) => a.startsWith(`--${name}=`));
+    return hit ? hit.slice(name.length + 3) : null;
+};
+const positional = ARGS.filter((a) => !a.startsWith("--"));
+const FIGHTS = Number(positional[0]) || 1000;
+const SEED = Number(positional[1]) || 7;
+const DAYS_REQUIRED = Number(positional[2]) || 12;   // of the last fourteen
+const DROP_TOP = Number(flag("top")) || 0;
+const ONLY = flag("only") ? flag("only").split(",").map((s) => s.trim()).filter(Boolean) : null;
+const EXCLUDE = flag("exclude") ? flag("exclude").split(",").map((s) => s.trim()).filter(Boolean) : [];
 const CHARACTERS = 100;
 const POINTS = 10;
 
@@ -61,6 +78,22 @@ for (const m of daily) {
     members.push({ id: m.id, who: m.display_name, days: Number(m.days), streak: Number(m.login_streak) || 0, stats, slots: ids.length });
 }
 if (!members.length) throw new Error("nobody in the field — is DATABASE_URL set?");
+
+// ── NARROWING TO A PEER GROUP ────────────────────────────────────────────────────────────────────────────────
+// `--top` drops the hardest hitters, measured on the swing they walk in with rather than on a win rate, so the
+// cut does not depend on the tournament it is about to change. Everything downstream — class rates, build
+// shapes, the build-versus-gear question — is only readable once the people nobody can answer are out of it.
+const dropped = [];
+if (DROP_TOP > 0) {
+    const byDamage = [...members].sort((a, z) =>
+        (Number(z.stats.base_damage) || 0) * (Number(z.stats.might) || 0) - (Number(a.stats.base_damage) || 0) * (Number(a.stats.might) || 0));
+    for (const m of byDamage.slice(0, DROP_TOP)) dropped.push(m.who);
+}
+const cohort = members.filter((m) =>
+    (!ONLY || ONLY.includes(m.who)) && !EXCLUDE.includes(m.who) && !dropped.includes(m.who));
+if (!cohort.length) throw new Error("the filters left nobody in the field");
+members.length = 0;
+members.push(...cohort);
 
 // ── THE TEN BUILDS ───────────────────────────────────────────────────────────────────────────────────────────
 // Ten points is what a real member has to spend, and how they spend it is the only decision the tree offers.
@@ -115,24 +148,31 @@ const STRATEGIES = [
     { id: "shuffled", how: (t) => spend(t, [...t].sort(() => rnd() - 0.5), POINTS) },
 ];
 
-// A hundred characters over however many members turned up: every member gets builds, cycling class and shape
-// so no member is only ever seen as one class and no shape is only ever seen on one wardrobe.
+// ── A BALANCED DESIGN, NOT A HUNDRED SAMPLES ─────────────────────────────────────────────────────────────────
+// Every class has to fight on the SAME WARDROBES, or its win rate is a readout of whose gear it happened to
+// land on. Walking the member list and the class list off the same counter does not give that: nineteen
+// members against three classes put Runecaller on 435 average gear damage and Reaver on 634, and printed the
+// 24-point difference that followed as a class imbalance. It was not one.
 //
-// THE CLASS COUNTS HAVE TO COME OUT EVEN. Walking the member list with `i % members.length` while taking the
-// class from the same `i` correlates the two whenever the counts share a factor — twenty-one members and three
-// classes gave 42/37/21, and a class with half the characters of another cannot be compared to it. The member
-// index walks one extra step each pass instead, which decorrelates it from the class cycle.
+// So the field is the full cross product — every member under every class — repeated as many times as it takes
+// to get near the target size, with the build shapes cycling across it. Each class then sees each wardrobe
+// exactly as often as the others, and the count comes out a little off a round hundred, which matters less
+// than the comparison being sound.
+const REPS = Math.max(1, Math.round(CHARACTERS / (members.length * CLASSES.length)));
 const field = [];
-for (let i = 0; i < CHARACTERS; i += 1) {
-    const L = members.length;
-    const m = members[((i % L) + Math.floor(i / L)) % L];
-    const cls = CLASSES[i % CLASSES.length];
+let i = -1;
+for (const m of members) for (const cls of CLASSES) for (let rep = 0; rep < REPS; rep += 1) {
+    i += 1;
     const strat = STRATEGIES[i % STRATEGIES.length];
     const taken = strat.how(treeFor(cls.id));
     const fighter = fighterFrom(m.stats, treeEffects(cls.id, taken), cls.id);
     field.push({
         id: `c${String(i + 1).padStart(3, "0")}`, who: m.who, days: m.days, streak: m.streak,
         cls: cls.id, clsName: cls.name, strat: strat.id, taken,
+        // The wardrobe this character walked in with, BEFORE a point was spent. The control for every group
+        // below: a class whose characters happen to sit on the better gear will post a better win rate for
+        // reasons that have nothing to do with the class, and there is no way to see that from the win rate.
+        gearDmg: Math.round(((Number(m.stats.base_damage) || 0) * (Number(m.stats.might) || 0)) / 5),
         spent: Object.values(taken).reduce((a, x) => a + x, 0), fighter,
         sheet: {
             dmg: Math.round(fighter.damage), hp: fighter.health, armor: fighter.armor,
@@ -181,17 +221,25 @@ const group = (key) => {
 const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
 console.log(`\n${field.length} characters built from ${members.length} members who played ${DAYS_REQUIRED}+ of the last 14 days`);
-console.log(`in the gear they have equipped right now · ${POINTS} points each · ${bouts} bouts · seed ${SEED}\n`);
+console.log(`in the gear they have equipped right now · ${POINTS} points each · ${bouts} bouts · seed ${SEED}`);
+if (dropped.length) console.log(`upper echelon held out: ${dropped.join(", ")}`);
+if (ONLY) console.log(`restricted to: ${ONLY.join(", ")}`);
+console.log("");
 
+// Every group prints the average WARDROBE its characters walked in with. Two rows are only comparable if that
+// column matches: a class sitting on better gear wins more for reasons that are not the class, and there is no
+// way to see that from a win rate alone.
+const table = (key) => {
+    for (const [k, v] of Object.entries(group(key)).sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts)) {
+        const gear = Math.round(avg(field.filter((c) => c[key] === k).map((c) => c.gearDmg)));
+        console.log(`  ${k.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win   on avg ${String(gear).padStart(4)} gear damage`);
+    }
+};
 console.log("── BY CLASS ────────────────────────────────────────────────────");
-for (const [k, v] of Object.entries(group("cls")).sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts)) {
-    console.log(`  ${k.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win`);
-}
+table("cls");
 
 console.log("\n── BY BUILD SHAPE ──────────────────────────────────────────────");
-for (const [k, v] of Object.entries(group("strat")).sort((a, z) => z[1].w / z[1].bouts - a[1].w / a[1].bouts)) {
-    console.log(`  ${k.padEnd(12)} ${String(v.n).padStart(3)} chars   ${pct(v.w, v.bouts).padStart(6)} win`);
-}
+table("strat");
 
 // ── THE WARDROBE, WHICH IS THE THING THEY DID NOT CHOOSE TODAY ───────────────────────────────────────────────
 // Every member appears under several classes and several build shapes, so their line here is their GEAR's win
@@ -225,6 +273,41 @@ for (const [who] of mrows) {
     console.log(`  ${who.slice(0, 18).padEnd(20)} best ${tag(best).padEnd(17)} ${pct(best.w, best.bouts).padStart(6)}   worst ${tag(worst).padEnd(17)} ${pct(worst.w, worst.bouts).padStart(6)}   gap ${gap.toFixed(0)} pts`);
 }
 console.log(`  ${"".padEnd(20)} the ten points are worth ${avg(gaps).toFixed(0)} points of win rate on average`);
+
+// ── CAN A BUILD BEAT A WARDROBE? ─────────────────────────────────────────────────────────────────────────────
+// The question the ten points exist to answer, asked directly rather than through a correlation. Every pairing
+// of two DIFFERENT members is sorted by how far apart their wardrobes are — measured on the swing they walk in
+// with, before a single point is spent — and then: how often does the worse-geared fighter actually win?
+//
+// A healthy answer is a slope. Near-equal gear should be decided by the build; a wardrobe two tiers up should
+// not be. A flat line either way is the bad outcome: all gear (points are decoration) or all build (gear is).
+console.log("\n── CAN A BUILD BEAT A WARDROBE? ────────────────────────────────");
+const BUCKETS = [[0, 0.05], [0.05, 0.15], [0.15, 0.30], [0.30, 0.60], [0.60, 99]];
+const tally = BUCKETS.map(() => ({ n: 0, underdog: 0 }));
+for (const a of field) {
+    for (const b of field) {
+        if (a.who === b.who) continue;                       // same wardrobe: not a gear comparison
+        const lo = Math.min(a.sheet.dmg, b.sheet.dmg);
+        const hi = Math.max(a.sheet.dmg, b.sheet.dmg);
+        if (!lo) continue;
+        const gap = (hi - lo) / lo;
+        const i = BUCKETS.findIndex(([x, y]) => gap >= x && gap < y);
+        if (i < 0) continue;
+        const seedR = () => { let x = 991; return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; }; };
+        const weaker = a.sheet.dmg <= b.sheet.dmg ? a : b;
+        const stronger = weaker === a ? b : a;
+        const r = autoBout({ ...weaker.fighter }, { ...stronger.fighter }, { rng: seedR() });
+        tally[i].n += 1;
+        if (r.won) tally[i].underdog += 1;
+    }
+}
+console.log("  gear gap        matchups   the worse-geared fighter wins");
+BUCKETS.forEach(([x, y], i) => {
+    const t = tally[i];
+    if (!t.n) return;
+    const label = y > 90 ? `${(x * 100).toFixed(0)}%+` : `${(x * 100).toFixed(0)}-${(y * 100).toFixed(0)}%`;
+    console.log(`  ${label.padEnd(15)} ${String(t.n).padStart(7)}   ${pct(t.underdog, t.n).padStart(6)}`);
+});
 
 // ── IS IT THE GEAR OR THE BUILD? ─────────────────────────────────────────────────────────────────────────────
 // Pearson between a character's sheet and their win rate. A ladder where one number predicts the result is a
