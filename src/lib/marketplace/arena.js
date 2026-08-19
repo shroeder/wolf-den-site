@@ -39,11 +39,26 @@ import { arenaRating, counterBlow, drinkFor, lightBurn, openWound, ringStats, th
 // than letting somebody tap a rung and get an error.
 //
 // Closed 2026-08-17 because the new gear stats made the ladder clearable overnight, and a rung once beaten
-// cannot be un-beaten without taking progress off people. REOPENED 2026-08-18: the curve it was closed for has
-// been rebuilt and measured. Every rung is now a constant step above the one below it, the tenth fight of a
-// house is no longer a hidden spike, and the summit is sized to a fully equipped fighter rather than to
-// nothing anybody can reach.
-const ROAD_OPEN = true;
+// cannot be un-beaten without taking progress off people. Reopened 2026-08-18 on a rebuilt curve.
+//
+// CLOSED AGAIN 2026-08-19, and this time progress WAS taken back — to rung 29, the top of the ramp. The curve
+// was not the thing that was wrong. The measurement was.
+//
+// sim-road-progress.mjs and sim-road-me.mjs both define a member's wall as "the highest rung this fighter
+// still takes AT LEAST HALF THE TIME". Every balance decision on the Road was made against that number. It is
+// only the wall if losing costs something, and a rung costs nothing — startBout deliberately exempts the Road
+// from the ten-a-day allowance (see the note there), so a rung you win one try in five is a rung you clear in
+// five tries. The 50% threshold measured a wall the game does not have.
+//
+// What that produced, in one night: Nicholas walked from rung 24 to rung 56 on 33 wins and 32 losses — exactly
+// one win per rung, with the losses stacking as he climbed (rung 50 on the fourth attempt, rung 56 on the
+// sixth). His simulated wall was 43. Thirteen rungs of the Road were bought with retries rather than with
+// power, and the further he went the more it was retries. The Road stopped being a readout of anybody's power
+// somewhere around the fortieth rung, which is the one thing it exists to be.
+//
+// It stays shut until the curve is re-solved against the threshold members actually stop at, not the one the
+// simulator assumed.
+const ROAD_OPEN = false;
 // ── SHUT TO THE DEN, OPEN TO THE OWNER ───────────────────────────────────────────────────────────────────────
 // The Road was closed because the new gear stats made it clearable overnight, and a rung once beaten cannot be
 // un-beaten without taking progress off people. That reasoning is about the ninety-odd members walking it, not
