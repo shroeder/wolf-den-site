@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { clearBout, fightRound, forfeitBout, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
+import { clearBout, forfeitBout, getArenaState, seenArena, startBout } from "@/lib/marketplace/arena.js";
 import {
     buyArenaUpgrade, buyArmoury, buyArmouryRecipe, pickClass, purserExchange, refundNode, respecClass, respecTree, takeNode,
 } from "@/lib/marketplace/arena-progress.js";
@@ -35,12 +35,7 @@ export async function POST(request) {
             switch (String(b?.action || "")) {
                 case "start": return noStore(await startBout(buyer.id, String(b?.target || "")));
                 case "seen": return noStore(await seenArena(buyer.id));
-                case "beat": return noStore(await fightRound(buyer.id, {
-                    command: b?.command ? String(b.command) : null,
-                    off: b?.off,
-                    abilityId: b?.ability ? String(b.ability) : null,
-                    itemId: b?.item ? String(b.item) : null,
-                }));
+                // "beat" is gone with fightRound — combat is passive and a bout is resolved when it starts.
                 case "dismiss": return noStore(await clearBout(buyer.id));
                 // Leaving a fight that is still running. It resolves as a loss — see forfeitBout.
                 case "forfeit": return noStore(await forfeitBout(buyer.id));
