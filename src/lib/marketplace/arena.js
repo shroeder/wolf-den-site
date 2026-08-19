@@ -442,9 +442,10 @@ export async function kitFor(buyerId, opts = {}) {
         // widening the exact matchup the telemetry says is 91/10. Scaling it by how much headroom you have
         // left inverts that: 12% for the Reaver, 8% for the Warden. Armour helps most those who have least,
         // and nobody sprints to the cap on gear alone.
-        // Tenacity is UNWIRED from here. It multiplies armour now (see `armor` above) and granting a separate
-        // slice of damage reduction on top was the same stat paid twice. DR is the class trait plus the tree.
-        dr: Math.min(DR_CAP, base.dr + (perks.dr || 0)),
+        // DAMAGE REDUCTION IS DELETED. Armour is the whole of mitigation — a flat number off every blow —
+        // and a percentage doing the same job alongside it was two systems for one idea. Emitted as 0 so
+        // anything still reading it gets a harmless answer.
+        dr: 0,
         // A share of everything you deal comes back as health. Class base + skill tree + the wardrobe's
         // Lifedrink — THE FIELD THE ENGINE ACTUALLY READS (`b.me.lifesteal`). The gear term was missing here,
         // which is the whole of "I have 2% life leech and it doesn't work".
@@ -462,14 +463,16 @@ export async function kitFor(buyerId, opts = {}) {
         // The chance a swing connects at all, before whatever penalty the skill itself carries. Class base,
         // nudged by Ferocity — the same stat that already buys health and speed, so a body built to keep
         // swinging is also a body that lands them — and raised by the tree.
-        accuracy: Math.min(ACCURACY_CAP, Math.max(ACCURACY_FLOOR,
-            // PRECISION, not Ferocity. Seeded equal to it, so nobody's aim moved the day this shipped — but
-            // from here aim and initiative are two stats that can be tuned apart, which was the point.
-            base.accuracy + accuracyFromFerocity(Number(stats.precision) || 0) + (perks.accuracy || 0))),
+        // ACCURACY IS DELETED. Every swing lands, so precision has nothing to buy.
+        accuracy: 1,
         // ── THE BRACE ────────────────────────────────────────────────────────────────────────────────────
         // Class base x Fortune, plus Fortress flat on top. Computed once here rather than at the moment the
         // command lands, so the number the button prints and the number the engine banks are the same one.
-        guard: guardSoakFrom(base.guard, (Number(stats.fortune) || 0) + (perks.fortune || 0), perks.guardSoak || 0),
+        // ── FORTUNE IS OUT OF COMBAT ─────────────────────────────────────────────────────────────────────
+        // It used to swell what a brace banked. Luke's call: it does nothing in a fight. The guard is the
+        // class's own number plus whatever the tree adds, and fortune is left to the systems outside the ring
+        // that already read it. It is still carried on the kit below so those systems keep working.
+        guard: guardSoakFrom(base.guard, 0, perks.guardSoak || 0),
         might: (Number(stats.might) || 0) + (perks.might || 0),   // the raw stat, for the card
         fortune: (Number(stats.fortune) || 0) + (perks.fortune || 0),
         element: kit.element, abilities,

@@ -851,6 +851,9 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
     for (const it of ITEMS) {
         const tier = Math.max(0, RARITY_LADDER.indexOf(String(it.rarity || "common")));
         const stats = { ...(it.stats || {}) };
+        // Precision bought accuracy and accuracy no longer exists, so the affix is stripped rather than
+        // left on 24 items as a number that does nothing.
+        delete stats.precision;
         if (it.slot === "main_hand") {
             stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
             stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;

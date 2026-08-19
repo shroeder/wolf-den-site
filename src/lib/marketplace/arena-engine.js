@@ -34,10 +34,12 @@ export function ringStats(stats = {}) {
         damage: swingFrom(Number(stats.might) || 0),
         critChance: critChanceFrom(Number(stats.crit_chance) || 0),
         critMult: critMultFrom(Number(stats.crit_power) || 0),
-        // Damage reduction is a class trait and NPCs have no class, so theirs is 0 and their toughness is in
-        // the health above. See arena-npc.js.
-        dr: Math.min(DR_CAP, Number(stats.dr) || 0),
-        accuracy: Number(stats.accuracy) || DEFAULT_ACCURACY,
+        // Damage reduction and accuracy are both retired. They are still emitted as constants so any older
+        // code path reading them gets a harmless answer rather than undefined: nothing is turned aside by a
+        // percentage any more, and nothing misses.
+        dr: 0,
+        accuracy: 1,
+        armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
         // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
         guard: Number(stats.guard) || DEFAULT_GUARD,
@@ -269,12 +271,13 @@ export function counterBlow(b, mine) {
 // gets their multiples here too), then the defender's damage reduction. Skills, guards, items and abilities
 // are deliberately not here.
 export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {}) {
+    // Armour is the whole of mitigation now: a flat number subtracted from every blow. Damage reduction is
+    // gone (it was a percentage doing the same job worse) and so is accuracy — every swing lands.
     const side = (f) => ({
         damage: Number(f.damage) || 0,
         critChance: Number(f.critChance) || 0,
         critMult: Number(f.critMult) || 1,
-        acc: Math.max(0, Math.min(1, Number(f.accuracy ?? 1))),
-        dr: Math.max(0, Math.min(0.95, Number(f.dr) || 0)),
+        armor: Math.max(0, Number(f.armor) || 0),
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -288,11 +291,10 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     let swings = 0;
 
     const swing = (att, def, who) => {
-        const hit = rng() < att.acc;
-        if (!hit) { log.push({ t, who, miss: true }); return; }
         const stacks = critStacks(att.critChance, rng);
         const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
-        const dealt = Math.max(1, Math.round(raw * (1 - def.dr)));
+        // Flat. A blow always does at least 1, so armour can blunt a fight but never make one unwinnable.
+        const dealt = Math.max(1, Math.round(raw - def.armor));
         def.hp -= dealt;
         log.push({ t, who, dmg: dealt, crit: stacks > 0, stacks });
     };
