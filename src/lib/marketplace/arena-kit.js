@@ -701,7 +701,7 @@ export const mightMult = (might = 0) => (Math.max(0, Number(might) || 0) / MIGHT
 export const WEAPON_BASE_REF = 100;
 // The weapon's base is divided by this before Might multiplies it. Without it the two numbers were both
 // damage and multiplied each other into the tens of thousands.
-export const WEAPON_BASE_DIVISOR = 50;
+export const WEAPON_BASE_DIVISOR = 100;
 export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
     ((Number(baseDamage) || WEAPON_BASE_REF) / WEAPON_BASE_DIVISOR) * mightMult(might);
 
