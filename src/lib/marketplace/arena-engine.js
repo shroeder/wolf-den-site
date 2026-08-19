@@ -39,6 +39,12 @@ export const HASTE_RATE = 2;         // and how much faster they come
 // they step up to swing, they lose blood first.
 export const BLEED_TICKS = 3;
 export const BLEED_SHARE = 0.20;
+// A burn is a bleed in a different colour: same three ticks, same fifth of the blow, same contempt for armour.
+// Tracked separately so a fighter can be burning AND bleeding, and so the two read differently on screen.
+export const BURN_TICKS = 3;
+export const BURN_SHARE = 0.20;
+// Runic Overflow: every Nth swing of your own is a Surge.
+export const SURGE_EVERY = 5;
 
 export function ringStats(stats = {}) {
     return {
@@ -335,9 +341,24 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         guardSize: Math.max(0, Number(f.guardSize) || 0),
         regen: Math.max(0, Number(f.regen) || 0),
         thorns: Math.max(0, Number(f.thorns) || 0),
+        iceThorns: Math.max(0, Number(f.iceThorns) || 0),
         grudge: Math.max(0, Number(f.grudge) || 0),
+        // ── THE RUNECALLER'S ───────────────────────────────────────────────────────────────────────────
+        burnChance: Math.max(0, Math.min(1, Number(f.burnChance) || 0)),
+        burnDamage: Math.max(0, Number(f.burnDamage) || 0),
+        burnLeech: Math.max(0, Math.min(1, Number(f.burnLeech) || 0)),
+        freeze: Math.max(0, Math.min(1, Number(f.freeze) || 0)),
+        chill: Math.max(0, Math.min(0.9, Number(f.chill) || 0)),
+        ward: Math.max(0, Number(f.ward) || 0),
+        wardRefill: Math.max(0, Number(f.wardRefill) || 0),
+        surge: Math.max(0, Number(f.surge) || 0),
+        soulfire: Math.max(0, Number(f.soulfire) || 0),
+        cataclysm: Math.max(0, Math.min(1, Number(f.cataclysm) || 0)),
         shield: 0,
         banked: 0,
+        burnLeft: 0,
+        burnPer: 0,
+        swingsTaken: 0,
         // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
         // from an affix.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
@@ -351,6 +372,13 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     });
     const A = side(me);
     const B = side(foe);
+    // AETHER WARD stands from the opening bell rather than being rolled for — that is the whole difference
+    // between it and the Warden's Bastion.
+    A.shield += Math.round(A.maxHp * A.ward);
+    B.shield += Math.round(B.maxHp * B.ward);
+    // CHILL slows the OTHER fighter's clock. Applied once, to the speed the whole fight is paced off.
+    if (A.chill > 0) B.speed = Math.max(0.0001, B.speed * (1 - A.chill));
+    if (B.chill > 0) A.speed = Math.max(0.0001, A.speed * (1 - B.chill));
     const log = [];
     let t = 0;
     // A hasted fighter's swings come HASTE_RATE times as fast, for HASTE_ATTACKS of their own swings.
@@ -377,10 +405,15 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         // The grudge is spent on THIS swing and the bank cleared, whether or not the blow lands well.
         const grudgeBonus = att.grudge > 0 ? att.banked * att.grudge : 0;
         att.banked = 0;
+        // RUNIC OVERFLOW — every fifth swing of your own, counted rather than rolled, so it is a thing you
+        // can see coming.
+        att.swingsTaken += 1;
+        const surging = att.surge > 0 && att.swingsTaken % SURGE_EVERY === 0;
         for (let i = 0; i < hits; i += 1) {
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
-            const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1);
+            const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1)
+                * (surging ? 1 + att.surge : 1);
             // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────
             // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour
             // in full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter
@@ -438,13 +471,34 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             if (wild === "haste") att.hasteLeft = HASTE_ATTACKS;
         }
         // A fresh wound REFRESHES rather than stacks — stacking is a Reaver tree node, not the base rule.
+        // SOULFIRE — a share of what landed, dealt again as magic that armour and shields both ignore. It
+        // goes straight to health, which is what makes it different from pierce.
+        let soul = 0;
+        if (att.soulfire > 0 && dealt > 0 && def.hp > 0) {
+            soul = Math.max(1, Math.round(dealt * att.soulfire));
+            def.hp -= soul;
+        }
+        // CATACLYSM lights and freezes at once, guaranteed, rather than rolling each.
+        const cata = att.cataclysm > 0 && def.hp > 0 && rng() < att.cataclysm;
+        let burned = false;
+        let frozen = false;
+        if (def.hp > 0 && (cata || (att.burnChance > 0 && rng() < att.burnChance))) {
+            def.burnLeft = BURN_TICKS;
+            def.burnPer = dealt * (BURN_SHARE + att.burnDamage);
+            burned = true;
+        }
+        if (def.hp > 0 && (cata || (att.freeze > 0 && rng() < att.freeze))) { def.stunned += 1; frozen = true; }
         if (att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
             def.bleedLeft = BLEED_TICKS;
             def.bleedPer = dealt * (BLEED_SHARE + att.bleedDamage);
             bled = true;
         }
-        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
-            meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+        log.push({ t, who, dmg: dealt + soul, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
+            burned, frozen, surge: surging, soul,
+            meBleed: A.bleedLeft, foeBleed: B.bleedLeft, meBurn: A.burnLeft, foeBurn: B.burnLeft });
+        // RIMEGUARD answers EVERY blow rather than only a blocked one — that is the difference between the
+        // Runecaller's thorns and the Warden's.
+        if (def.iceThorns > 0 && dealt > 0 && att.hp > 0) thornsBack += Math.round(dealt * def.iceThorns);
         // Thorns are logged AFTER the blow that set them off — they are the answer to it, and playing them
         // first put the reply on screen before the question.
         if (thornsBack > 0 && att.hp > 0) {
@@ -492,6 +546,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
             if (att.hp <= 0) return;
         }
+        if (att.burnLeft > 0) {
+            const tick = Math.max(1, Math.round(att.burnPer));
+            att.hp -= tick;
+            att.burnLeft -= 1;
+            const lighter = att === A ? B : A;
+            if (lighter.burnLeech > 0 && lighter.hp > 0) {
+                lighter.hp = Math.min(lighter.maxHp, lighter.hp + Math.round(tick * lighter.burnLeech));
+            }
+            log.push({ t, who, burnTick: true, dmg: tick, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+            if (att.hp <= 0) return;
+        }
         if (att.stunned > 0) {
             att.stunned -= 1;
             log.push({ t, who, stunnedSkip: true });
@@ -499,6 +564,9 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         }
         // MENDING and BASTION both happen on your own swing: you patch yourself up and may raise a shield.
         if (att.regen > 0 && att.hp > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(att.maxHp * att.regen));
+        if (att.wardRefill > 0) {
+            att.shield = Math.min(Math.round(att.maxHp * att.ward), att.shield + Math.round(att.maxHp * att.wardRefill));
+        }
         if (att.guardChance > 0 && rng() < att.guardChance) {
             att.shield += Math.round(att.maxHp * att.guardSize);
             log.push({ t, who, guard: true, shield: att.shield, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });

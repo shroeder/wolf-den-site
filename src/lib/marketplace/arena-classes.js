@@ -288,51 +288,49 @@ export const TREES = {
             desc: "+20% to the size of every guard you raise. Bastion decides how often; this decides how much.",
             sprite: "/images/arena/node/wd_aegis.webp" }),
     ],
+    // ── RUNECALLER ── fire, frost, and a ward that is simply up. It wins the rounds after the one it is in.
     runecaller: [
-        N({ id: "rc_power", tier: 0, name: "Attunement", ranks: 5, stat: "spellPower", per: 0.05,
-            desc: "+5% spell damage per rank.", sprite: "/images/arena/node/rc_power.webp" }),
-        // Was "Wheelwise", +3% element edge a rank. The wheel is gone from the ring, so the node had nothing
-        // left to modify — a passive that reads well and does nothing is the bug this file keeps being fixed
-        // for. Same id and same rank count, so anyone who bought it keeps every point; only what it buys has
-        // changed, to the other half of what a Runecaller is.
-        N({ id: "rc_edge", tier: 0, name: "Runebrand", ranks: 4, stat: "rendTick", per: 0.30,
-            desc: "Your burns tick 30% harder per rank.", sprite: "/images/arena/node/rc_edge.webp" }),
-        // ── FIRE ── Channel used to be a third guard-cutter. It is the class's bread-and-butter BURN now, which
-        // is what "Burn it down" on the class card has always promised. Still `spell` kind, so Attunement
-        // (spell damage) applies to it — the thing no card previously told you.
-        N({ id: "rc_spell", tier: 0, kind: "active", ability: "spell", element: "fire", burns: true, name: "Channel", power: 1.45, acc: -0.08, cd: 4,
-            desc: "Fire. It sets them burning.", sprite: "/images/arena/node/rc_spell.webp" }),
+        // TIER 1 — kindle.
+        N({ id: "rc_kindle", tier: 0, name: "Kindle", ranks: 5, stat: "burnChance", per: 0.06,
+            desc: "+6% chance a blow sets a burn. A burn ticks three times for a fifth of the blow and armour never sees it.",
+            sprite: "/images/arena/node/rc_burn.webp" }),
+        N({ id: "rc_ember", tier: 0, name: "Emberheart", ranks: 5, stat: "burnDamage", per: 0.04,
+            desc: "+4% of the blow to every burn tick, on top of the base fifth.",
+            sprite: "/images/arena/node/rc_ember.webp" }),
+        N({ id: "rc_immolate", tier: 0, name: "Immolate", ranks: 5, stat: "burnLeech", per: 0.03,
+            desc: "+3% of all burn damage healed back to you.", sprite: "/images/arena/node/rc_leech.webp" }),
 
-        // A `rend` that BURNS. The damage-over-time is a property of the ABILITY, not of its kind — which is the
-        // whole fix: "Ragged Cut" is a rend too, and a knife wound has no business setting anybody on fire.
-        N({ id: "rc_rend", tier: 1, kind: "active", ability: "rend", burns: true, name: "Emberbrand", power: 1.35, cd: 3, needs: 3,
-            desc: "Keeps burning for three of their turns.", sprite: "/images/arena/node/rc_rend.webp" }),
-        N({ id: "rc_burn", tier: 1, name: "Slow Burn", ranks: 4, stat: "rendTurns", per: 0.5, needs: 3,
-            desc: "Your burns last one turn longer every two ranks.", sprite: "/images/arena/node/rc_burn.webp" }),
-        // WAS "+1 burn stack per rank". Stacks are uncapped now, so that would buy literally nothing — the
-        // per-turn CEILING is the only limit left, and this is what lifts it.
-        N({ id: "rc_stacks", tier: 1, name: "Kindling", ranks: 2, stat: "rendCap", per: 0.04, needs: 3,
-            desc: "Your burn can tick 4% harder per rank.", sprite: "/images/arena/node/rc_stacks.webp" }),
+        // TIER 2 — the cold.
+        N({ id: "rc_frost", tier: 1, name: "Frostbite", ranks: 5, stat: "freeze", per: 0.02, needs: 3,
+            desc: "+2% chance a blow freezes — they lose the swing that was due.",
+            sprite: "/images/arena/node/rc_freeze.webp" }),
+        N({ id: "rc_chill", tier: 1, name: "Chill", ranks: 5, stat: "chill", per: 0.02, needs: 3,
+            desc: "-2% to the enemy's attack speed. It slows their clock rather than stopping it.",
+            sprite: "/images/arena/node/rc_chill.webp" }),
+        N({ id: "rc_rime", tier: 1, name: "Rimeguard", ranks: 5, stat: "iceThorns", per: 0.03, needs: 3,
+            desc: "+3% of the damage done to you is sent back. Every blow, not only the ones you block.",
+            sprite: "/images/arena/node/rc_thorns.webp" }),
 
-        // The ONLY guard-facing move the class has left, and it is a different KIND of thing from a percentage:
-        // for three of their beats they cannot raise a guard at all.
-        N({ id: "rc_sunder", tier: 2, kind: "active", ability: "disarm", name: "Shatter", power: 1.50, acc: -0.07, cd: 3, needs: 7,
-            desc: "They cannot guard at all for three turns.", sprite: "/images/arena/node/rc_sunder.webp" }),
-        N({ id: "rc_cd", tier: 2, name: "Emberdrinker", ranks: 3, stat: "burnLeech", per: 0.10, needs: 7,
-            desc: "You drink back 10% of your burn damage as health, per rank.", sprite: "/images/arena/node/rc_cd.webp" }),
-        N({ id: "rc_pierce", tier: 2, name: "Runebreak", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
-            desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rc_pierce.webp" }),
+        // TIER 3 — the ward.
+        N({ id: "rc_ward", tier: 2, name: "Aether Ward", ranks: 5, stat: "ward", per: 0.02, needs: 7,
+            desc: "+2% of your maximum health as a shield, standing from the opening bell. It eats damage before your health does.",
+            sprite: "/images/arena/node/rc_ward.webp" }),
+        N({ id: "rc_reservoir", tier: 2, name: "Runic Reservoir", ranks: 5, stat: "wardRefill", per: 0.01, needs: 7,
+            desc: "Your ward refills 1% of your maximum health every time you swing.",
+            sprite: "/images/arena/node/rc_reservoir.webp" }),
+        N({ id: "rc_overflow", tier: 2, name: "Runic Overflow", ranks: 5, stat: "surge", per: 0.20, needs: 7,
+            desc: "Every fifth swing of yours is a Surge, dealing +20% more. Counted, not rolled — you can see it coming.",
+            sprite: "/images/arena/node/rc_surge.webp" }),
 
-        // ── ICE ── the capstone, and the only thing in the game that can take a turn off somebody.
-        N({ id: "rc_overcharge", tier: 3, kind: "active", ability: "spell", element: "ice", freezes: true, name: "Rimeshatter", power: 2.05, acc: -0.16, cd: 6, needs: 12,
-            desc: "Ice, hard enough that they may lose their next turn.", sprite: "/images/arena/node/rc_overcharge.webp" }),
-        N({ id: "rc_spread", tier: 3, name: "Conflagration", ranks: 1, stat: "burnOnCrit", per: 1, needs: 12,
-            desc: "Your criticals leave a burn behind.", sprite: "/images/arena/node/rc_spread.webp" }),
-        // Was "+8 Fortune per rank — the arena's critical stat", which stopped being true the moment the ring
-        // started reading the boss fight's crit model. Fortune is the raffle stat and nothing else; this node
-        // now buys the stat whose name says what it does.
-        N({ id: "rc_fortune", tier: 3, name: "Runes of Fortune", ranks: 3, stat: "accuracy", per: 0.03, needs: 12,
-            desc: "+3% accuracy per rank.", sprite: "/images/arena/node/rc_fortune.webp" }),
+        // TIER 4 — capstones.
+        N({ id: "rc_might", tier: 3, name: "Runic Might", ranks: 5, stat: "dmgPct", per: 0.03, needs: 12,
+            desc: "+3% damage.", sprite: "/images/arena/node/rc_might.webp" }),
+        N({ id: "rc_soulfire", tier: 3, name: "Soulfire", ranks: 5, stat: "soulfire", per: 0.02, needs: 12,
+            desc: "+2% of every blow is dealt AGAIN as pure magic — past armour and past shields both.",
+            sprite: "/images/arena/node/rc_soulfire.webp" }),
+        N({ id: "rc_cata", tier: 3, name: "Cataclysm", ranks: 5, stat: "cataclysm", per: 0.01, needs: 12,
+            desc: "+1% chance a swing burns AND freezes at once, both guaranteed.",
+            sprite: "/images/arena/node/rc_cata.webp" }),
     ],
 };
 
