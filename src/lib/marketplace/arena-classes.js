@@ -246,76 +246,51 @@ const N = (o) => ({ ranks: 1, kind: "passive", ...o });
 
 export const TREES = {
     // ── REAVER ── damage, criticals, volume.
+    // ── REAVER ── bleed, speed, criticals and procs. Everything good about melee and nothing that defends.
+    // Twelve nodes, four tiers of three, five ranks each. One lever per node on purpose: a node that moves two
+    // numbers is a node nobody can weigh against its neighbours.
     reaver: [
-        // WAS "+2 Might per rank". Might is a raw stat that then runs through swingFrom(), so two points of it
-        // moved a swing by an amount no card could honestly print and nobody could feel. A straight damage
-        // percentage is the same node saying what it actually does.
-        N({ id: "rv_might", tier: 0, name: "Brutality", ranks: 5, stat: "dmgPct", per: 0.05,
-            desc: "+5% damage per rank.", sprite: "/images/arena/node/rv_might.webp" }),
-        // ── WAS KILLER INSTINCT (+2% crit chance a rank) ────────────────────────────────────────────────
-        // Reaver had crit chance AND crit damage, which is one idea bought twice, and neither did anything
-        // about the matchup the class actually loses: Warden challenging Reaver won 94% of 145 bouts.
-        // This is the answer to a turtle. It fires ONLY on beats where their brace is actually up — "any
-        // amount of guard" is always true (everyone has 12% base), so a bonus keyed on that is just flat
-        // damage wearing a condition. Keyed on the brace, it is a real decision on both sides: they choose
-        // when to guard, and you choose when to swing into it.
-        // Same id and rank count, so anyone holding Killer Instinct keeps every point.
-        N({ id: "rv_crit", tier: 0, name: "Shieldsplitter", ranks: 5, stat: "guardBreak", per: 0.06,
-            desc: "+6% damage per rank while their brace is up.", sprite: "/images/arena/node/rv_crit.webp" }),
-        // WAS A PLAIN STRIKE. "A committed blow. One big hit." was the most generic thing in the game and
-        // there was no reason to take it over Rampage. Reaver is the blood class and had no sustain at all;
-        // it drinks now. Weaker than it was and weaker than the Warden's Tithe (x1.55, tier 3) on purpose —
-        // this sits at tier 1, so it buys sustain earlier and pays for it in power.
-        N({ id: "rv_strike", tier: 0, kind: "active", ability: "drain", name: "Bloodfeast", power: 1.25, acc: -0.06, cd: 3,
-            desc: "Tear it out of them and swallow it.", sprite: "/images/arena/node/rv_strike.webp" }),
+        // TIER 1 — open the artery.
+        N({ id: "rv_rend", tier: 0, name: "Rend", ranks: 5, stat: "bleedChance", per: 0.06,
+            desc: "+6% chance a blow opens a bleed. A wound ticks three times for a fifth of the blow and armour never sees it.",
+            sprite: "/images/arena/node/rv_might.webp" }),
+        N({ id: "rv_quick", tier: 0, name: "Quickblade", ranks: 5, stat: "speed", per: 0.06,
+            desc: "+0.06 attacks per second. Speed is the clock — every swing you gain is another roll at everything else.",
+            sprite: "/images/arena/node/rv_strike.webp" }),
+        N({ id: "rv_edge", tier: 0, name: "Killing Edge", ranks: 5, stat: "crit", per: 0.03,
+            desc: "+3% critical chance.", sprite: "/images/arena/node/rv_crit.webp" }),
 
-        // ── WAS OVERKILL (crit damage) ──────────────────────────────────────────────────────────────────
-        // The other half of the crit pair. A counter is the aggressive answer to being hit that the Warden
-        // already has as an active (Answer) and a passive (Iron Thorns) — Reaver had neither, so a Reaver
-        // being ground down had nothing happening on their opponent's beat at all.
-        N({ id: "rv_critdmg", tier: 1, name: "Retaliation", ranks: 4, stat: "counter", per: 0.05, needs: 3,
-            desc: "5% chance per rank to strike back when their blow lands.", sprite: "/images/arena/node/rv_critdmg.webp" }),
-        // ── RAMPAGE, RETUNED ────────────────────────────────────────────────────────────────────────────
-        // 0.95 x 3 = 285% on a three-turn cooldown, against Cleave's 230% on the SAME cooldown — more damage,
-        // and three separate crit rolls, from the same class. There was no reason to ever take Cleave.
-        //
-        // 0.50 x 3 = 150% and every blow can miss. That is the trade an all-out attack should be: more total
-        // damage than a single committed swing only if it lands, and three chances for it not to.
-        N({ id: "rv_flurry", tier: 1, kind: "active", ability: "flurry", bleeds: true, name: "Rampage", power: 0.52, hits: 3, acc: -0.10, cd: 3, needs: 3,
-            desc: "Three wild blows — each can miss, each can crit, and they leave them bleeding.", sprite: "/images/arena/node/rv_flurry.webp" }),
-        N({ id: "rv_speed", tier: 1, name: "Bloodrush", ranks: 3, stat: "bleedTurns", per: 0.5, needs: 3,
-            desc: "Your bleeds last one turn longer every two ranks.", sprite: "/images/arena/node/rv_speed.webp" }),
-        // The answer to Rampage's penalty: a Reaver who wants the wild swing can pay for it to land.
-        N({ id: "rv_aim", tier: 1, name: "Killer's Eye", ranks: 4, stat: "accuracy", per: 0.02, needs: 3,
-            desc: "+2% accuracy per rank.", sprite: "/images/arena/node/rv_crit.webp" }),
+        // TIER 2 — make it hurt.
+        N({ id: "rv_deep", tier: 1, name: "Deep Cuts", ranks: 5, stat: "bleedDamage", per: 0.04, needs: 3,
+            desc: "+4% of the blow to every bleed tick, on top of the base fifth.",
+            sprite: "/images/arena/node/rv_rend.webp" }),
+        N({ id: "rv_letting", tier: 1, name: "Bloodletting", ranks: 5, stat: "lifestealBonus", per: 0.05, needs: 3,
+            desc: "+5% of what you land, healed back.", sprite: "/images/arena/node/rv_drain.webp" }),
+        N({ id: "rv_savage", tier: 1, name: "Savagery", ranks: 5, stat: "critMult", per: 0.10, needs: 3,
+            desc: "+10% critical damage.", sprite: "/images/arena/node/rv_critdmg.webp" }),
 
-        N({ id: "rv_surge", tier: 2, kind: "active", ability: "surge", name: "Warcry", cd: 3, needs: 7,
-            desc: "Sharpens your next three swings. Costs you the turn you spend on it.", sprite: "/images/arena/node/rv_surge.webp" }),
-        N({ id: "rv_pierce", tier: 2, name: "Sunder Guard", ranks: 4, stat: "pierce", per: 0.03, needs: 7,
-            desc: "Bypass 3% more of their guard per rank.", sprite: "/images/arena/node/rv_pierce.webp" }),
-        N({ id: "rv_execute", tier: 2, kind: "active", ability: "execute", name: "Finisher", power: 1.75, acc: -0.10, cd: 4, needs: 7,
-            desc: "Ordinary — until they are hurt.", sprite: "/images/arena/node/rv_execute.webp" }),
-        // ── OVERKILL, BACK ───────────────────────────────────────────────────────────────────────────────
-        // The Reaver used to have a crit-damage node and lost it when Retaliation took the slot, which left
-        // the class that exists to "hit hardest" with no way to buy the hardest hit. It returns here rather
-        // than in tier 1 so it is a commitment, and it is worth taking now the 3x ceiling is gone — under the
-        // cap the last two ranks would have bought nothing at all for anyone carrying crit-power gear.
-        //
-        // +0.2x a rank on a 2.5x base: four ranks is 3.3x, past where the old ceiling stood. It pays only on
-        // a roll you still have to win, which is what keeps it honest — crit CHANCE is still capped.
-        N({ id: "rv_overkill", tier: 2, name: "Overkill", ranks: 4, stat: "critMult", per: 0.2, needs: 7,
-            desc: "+0.2x critical damage per rank.", sprite: "/images/arena/node/rv_critdmg.webp" }),
+        // TIER 3 — the procs.
+        N({ id: "rv_riposte", tier: 2, name: "Riposte", ranks: 5, stat: "counterBonus", per: 0.03, needs: 7,
+            desc: "+3% chance to answer a blow with one of your own. A counter is a real swing and rolls its own crit.",
+            sprite: "/images/arena/node/rv_counter.webp" }),
+        N({ id: "rv_concuss", tier: 2, name: "Concussive", ranks: 5, stat: "stunBonus", per: 0.02, needs: 7,
+            desc: "+2% chance a blow stuns — they lose the swing that was due.",
+            sprite: "/images/arena/node/rv_stun.webp" }),
+        N({ id: "rv_frenzy", tier: 2, name: "Frenzy", ranks: 5, stat: "doublestrikeBonus", per: 0.02, needs: 7,
+            desc: "+2% chance the swing lands twice. Each blow rolls its own crit.",
+            sprite: "/images/arena/node/rv_flurry.webp" }),
 
-        N({ id: "rv_gamble", tier: 3, kind: "active", ability: "gamble", name: "Last Coin", power: 1.95, acc: -0.14, cd: 5, needs: 12,
-            desc: "Double, or nothing at all.", sprite: "/images/arena/node/rv_gamble.webp" }),
-        // Was +6% damage on round one. The NAME was always about opening a wound, and now the class has one.
-        N({ id: "rv_open", tier: 3, name: "First Blood", ranks: 3, stat: "bleedTick", per: 0.25, needs: 12,
-            desc: "Your bleeds tick 25% harder per rank.", sprite: "/images/arena/node/rv_open.webp" }),
-        N({ id: "rv_cap", tier: 3, name: "Bloodlust", ranks: 1, stat: "lowHpDmg", per: 0.18, needs: 12,
-            desc: "+18% damage while under a third of your health.", sprite: "/images/arena/node/rv_cap.webp" }),
+        // TIER 4 — capstones.
+        N({ id: "rv_scent", tier: 3, name: "Bloodscent", ranks: 5, stat: "hasteBonus", per: 0.02, needs: 12,
+            desc: "+2% chance a swing hastes you: five swings at double speed.",
+            sprite: "/images/arena/node/rv_haste.webp" }),
+        N({ id: "rv_exsang", tier: 3, name: "Exsanguinate", ranks: 5, stat: "bleedLeech", per: 0.03, needs: 12,
+            desc: "+3% of all bleed damage healed back to you. Rend starts it, Deep Cuts deepens it, this drinks it.",
+            sprite: "/images/arena/node/rv_leech.webp" }),
+        N({ id: "rv_harvest", tier: 3, name: "Red Harvest", ranks: 5, stat: "wildProc", per: 0.01, needs: 12,
+            desc: "+1% chance on any swing to fire one of doublestrike, counter or haste at random.",
+            sprite: "/images/arena/node/rv_wild.webp" }),
     ],
-
-    // ── WARDEN ── mitigation, counters, sustain.
     warden: [
         N({ id: "wd_vigour", tier: 0, name: "Conditioning", ranks: 5, stat: "health", per: 12,
             desc: "+12 max Health per rank.", sprite: "/images/arena/node/wd_vigour.webp" }),

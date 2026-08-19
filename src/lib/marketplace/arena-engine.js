@@ -303,12 +303,13 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         // 1 point of pierce = 0.5% of your damage that armour never sees. Capped at all of it.
         pierce: Math.max(0, Math.min(1, (Number(f.pierce) || 0) * PIERCE_PER_POINT)),
         // 1 point = 0.25% chance to answer a blow with one of your own. Item-exclusive.
-        counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT)),
+        // Points from gear, plus a straight share from the tree. Two sources, one number.
+        counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT + (Number(f.counterBonus) || 0))),
         // 1 point = 0.5% chance the swing lands twice. Uncapped, like crit chance: past 100% it is simply
         // always two, and the surplus rolls for a third.
-        doublestrike: Math.max(0, (Number(f.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT),
+        doublestrike: Math.max(0, (Number(f.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT + (Number(f.doublestrikeBonus) || 0)),
         // 1 point = 0.25% of whatever you actually inflict, healed back.
-        lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT),
+        lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT + (Number(f.lifestealBonus) || 0)),
         // A shield's block chance, and what a block is worth to THIS fighter — the Warden blocks harder.
         blockChance: Math.max(0, Math.min(1, Number(f.blockChance) || 0)),
         blockReduction: Number(f.blockReduction) > 0 ? Number(f.blockReduction) : 0.35,
@@ -318,8 +319,14 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         blockStackMax: Math.max(0, Number(f.blockStackMax) || 0),
         stacks: 0,
         // 1 point = 0.5% to stun on a landed blow, and 0.5% that a swing casts haste on yourself.
-        stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT)),
-        haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT)),
+        stun: Math.max(0, Math.min(1, (Number(f.stun) || 0) * STUN_PER_POINT + (Number(f.stunBonus) || 0))),
+        haste: Math.max(0, Math.min(1, (Number(f.haste) || 0) * HASTE_PER_POINT + (Number(f.hasteBonus) || 0))),
+        // ── THE THREE TREE-ONLY EFFECTS ──────────────────────────────────────────────────────────────
+        // bleedDamage deepens the wound, bleedLeech turns it into sustain, and wildProc is the one node
+        // that does not know what it is going to do until it fires.
+        bleedDamage: Math.max(0, Number(f.bleedDamage) || 0),
+        bleedLeech: Math.max(0, Math.min(1, Number(f.bleedLeech) || 0)),
+        wildProc: Math.max(0, Math.min(1, Number(f.wildProc) || 0)),
         // Chance a blow of theirs opens a bleed. A share, not points — it comes from the tree rather than
         // from an affix.
         bleedChance: Math.max(0, Math.min(1, Number(f.bleedChance) || 0)),
@@ -389,19 +396,39 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         let stunned = false;
         let hasted = false;
         let bled = false;
+        let wild = null;
         if (att.stun > 0 && def.hp > 0 && rng() < att.stun) { def.stunned += 1; stunned = true; }
         if (att.haste > 0 && rng() < att.haste) { att.hasteLeft = HASTE_ATTACKS; hasted = true; }
+        // ── THE WILD PROC ────────────────────────────────────────────────────────────────────────────
+        // One roll, and only then does it decide which of the three it is. Rolled after the blow so the
+        // extra swing it can grant lands on the NEXT one rather than compounding inside this one.
+        if (att.wildProc > 0 && rng() < att.wildProc) {
+            const pick = Math.floor(rng() * 3);
+            if (pick === 0) wild = "doublestrike";
+            else if (pick === 1) wild = "counter";
+            else wild = "haste";
+            if (wild === "haste") att.hasteLeft = HASTE_ATTACKS;
+        }
         // A fresh wound REFRESHES rather than stacks — stacking is a Reaver tree node, not the base rule.
         if (att.bleedChance > 0 && def.hp > 0 && rng() < att.bleedChance) {
             def.bleedLeft = BLEED_TICKS;
-            def.bleedPer = dealt * BLEED_SHARE;
+            def.bleedPer = dealt * (BLEED_SHARE + att.bleedDamage);
             bled = true;
         }
-        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted, bled,
+        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked, stunned, hasted, bled, wild,
             meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
+        // A wild "doublestrike" is an extra blow right now; a wild "counter" makes the attacker swing again.
+        if (wild === "doublestrike" || wild === "counter") {
+            const cs = critStacks(att.critChance, rng);
+            const craw = att.damage * (cs > 0 ? att.critMult * cs : 1);
+            const cthrough = craw * att.pierce;
+            const extra = Math.max(1, Math.round(cthrough + Math.max(0, craw - cthrough - def.armor)));
+            def.hp -= extra;
+            log.push({ t, who, dmg: extra, crit: cs > 0, wild, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
+        }
         if (def.hp > 0 && def.counter > 0 && rng() < def.counter) {
             const cs = critStacks(def.critChance, rng);
             const craw = def.damage * (cs > 0 ? def.critMult * cs : 1);
@@ -420,6 +447,12 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             const tick = Math.max(1, Math.round(att.bleedPer));
             att.hp -= tick;
             att.bleedLeft -= 1;
+            // Whoever OPENED the wound drinks from it. The bleeding fighter is the one paying, so the leech
+            // belongs to the other side of the ring.
+            const cutter = att === A ? B : A;
+            if (cutter.bleedLeech > 0 && cutter.hp > 0) {
+                cutter.hp = Math.min(cutter.maxHp, cutter.hp + Math.round(tick * cutter.bleedLeech));
+            }
             log.push({ t, who, bleedTick: true, dmg: tick,
                 meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
             if (att.hp <= 0) return;

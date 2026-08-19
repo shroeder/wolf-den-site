@@ -431,8 +431,19 @@ export async function kitFor(buyerId, opts = {}) {
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
         // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
         counter: Number(stats.counter) || 0,
-        // A share, from the tree — the Reaver opens wounds, nobody else does by default.
+        // ── THE TREE'S SHARE OF THE FIGHT ────────────────────────────────────────────────────────────────
+        // Gear pays in POINTS and the tree pays in SHARES, and the engine adds them. Keeping the two apart is
+        // what lets a node say "+3% counter" and mean it, without anyone having to know that a gear point is
+        // worth a quarter of one.
         bleedChance: Math.max(0, Math.min(1, perks.bleedChance || 0)),
+        bleedDamage: perks.bleedDamage || 0,
+        bleedLeech: perks.bleedLeech || 0,
+        wildProc: perks.wildProc || 0,
+        counterBonus: perks.counterBonus || 0,
+        stunBonus: perks.stunBonus || 0,
+        doublestrikeBonus: perks.doublestrikeBonus || 0,
+        hasteBonus: perks.hasteBonus || 0,
+        lifestealBonus: perks.lifestealBonus || 0,
         // Raw points; the engine turns them into chances (STUN_PER_POINT / HASTE_PER_POINT).
         stun: Number(stats.stun) || 0,
         haste: Number(stats.haste) || 0,
