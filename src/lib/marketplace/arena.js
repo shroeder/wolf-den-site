@@ -841,6 +841,11 @@ function publicBout(b) {
         // ladder rung and offered "Back to the ladder" to somebody who had walked in from the town — which is
         // where they were then stranded. The rider itself stays server-side; only the fact of it is published.
         town: Boolean(b.town),
+        // AND WHICH ROOM A HOOKED MONSTER IS IN. Same reason, one floor down: the ring draws a colosseum
+        // behind whoever is fighting, so a Kraken you had just pulled over the rail was answered on hot sand
+        // under bunting. The rider (which monster, what tier) stays server-side — the screen only needs to
+        // know that this fight is happening on the deck.
+        fishing: Boolean(b.fishing),
         // The new lingering states. Without these the burn ticking their bar and the stripped guard would be
         // things the server knew about and the player could only infer from the log.
         bleed: b.bleed || null, sunder: b.sunder || 0, riposte: b.riposte || 0,

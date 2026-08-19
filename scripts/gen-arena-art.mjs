@@ -32,6 +32,19 @@ const OBJ = `A single fantasy ARENA item game icon, three-quarter view, centered
 const ART = {
     // Unlabelled on purpose — the moment a bottle gets a paper label the model writes crooked nonsense on it.
     "item-poultice": [`${OBJ} A squat round field-medicine jar of thick amber glass with a cork stopper and a leather cord wound round its neck, filled with deep red liquid, a sprig of green herb tucked under the cord.`, "icon"],
+    // ── THE DECK ────────────────────────────────────────────────────────────────────────────────────────
+    // A monster hauled up on your line was fighting in the colosseum, which is where every other arena bout
+    // happens — mechanically right and a plain fiction break: you pulled the thing out of the sea and then
+    // stood in a stone amphitheatre with bunting to hit it. Same plate treatment as the colosseum, same
+    // framing and horizon, so the two are interchangeable behind the fighters.
+    "deck-bg": [`A wide atmospheric SHIP DECK background plate, empty of characters: the weathered planking of a
+        large wooden sailing ship's main deck in the foreground running to the viewer, a heavy wooden rail and
+        rigging ropes along the sides, a mast base and coiled rope to one side, open sea and a low horizon
+        beyond the rail, spray and wet timber catching the light, deep perspective across the boards. Painterly
+        cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting,
+        fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no
+        watermark, no UI, no border.`, "scene"],
+
     "arena-bg": [`A wide atmospheric fantasy COLOSSEUM INTERIOR background plate, empty of characters: a sunlit sand arena floor in the foreground, curved tiers of weathered honey-coloured stone seating rising behind, deep shadowed archways around the ring, colourful triangular pennants strung above, dust motes in warm low sunlight, deep perspective. Painterly cel-shaded 2D video-game art, bold clean outlines, rich saturated colour, dramatic moody lighting, fantasy action-RPG style. No characters, no creatures, no people, no text, no words, no logo, no watermark, no UI, no border.`, "scene"],
     // ── SKILL ICONS ── one per ARCHETYPE, so an ability is represented by the MOVE rather than by the ring
     // or cape it happens to come from. Element colour is applied in CSS on top, so nineteen icons cover every

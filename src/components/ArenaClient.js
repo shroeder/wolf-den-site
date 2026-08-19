@@ -485,8 +485,15 @@ function Recap({ bout, busy, onClose }) {
     // rendered "+0 Victory Points", an empty reward list and "Streak 0" over a fight that had in fact just
     // paid out. Members read that, correctly, as having been given nothing.
     const raid = r?.town ? (r.raid || null) : null;
-    const reward = raid ? raid.reward : (r?.reward || bout?.reward || null);
-    const loot = raid ? (raid.loot || []) : [];
+    // ── AND A THING OFF THE LINE IS PAID BY FISHING ──────────────────────────────────────────────────────
+    // Identical in shape to the raid case above and here for identical reasons: payFishingMonster hangs the
+    // spoils on `recap.haul`, and this screen only knew how to read the Arena's own economy. A Kraken paid
+    // gold, XP and a chest, and the recap said "+0 Victory Points · Streak 0" over it.
+    const haul = r?.fishing ? (r.haul || null) : null;
+    const reward = raid ? raid.reward : haul || r?.reward || bout?.reward || null;
+    const loot = raid ? (raid.loot || [])
+        : haul?.chest ? [{ kind: "chest", label: `${haul.chest} chest`, rarity: "off the line" }]
+            : [];
 
     return (
         <Portal>
@@ -501,7 +508,7 @@ function Recap({ bout, busy, onClose }) {
             }}
             onClick={() => { if (!busy) onClose(); }}>
             <button type="button" className="ar-recap-x" onClick={(e) => { e.stopPropagation(); onClose(); }}
-                aria-label={raid ? "Back to the plaza" : "Back to the ladder"}>Close</button>
+                aria-label={raid ? "Back to the plaza" : r?.fishing ? "Back to the water" : "Back to the ladder"}>Close</button>
             <div className="ar-recap-card" onClick={(e) => e.stopPropagation()}>
                 <div className="ar-rays" aria-hidden="true">
                     {Array.from({ length: won ? 24 : 12 }).map((_, i) => (
@@ -542,6 +549,12 @@ function Recap({ bout, busy, onClose }) {
                     <div className="ar-vp">
                         <span className="ar-vp-num">{reward?.coin ? `+${money(reward.coin)}` : "—"}</span>
                         <span className="ar-vp-lab">{reward?.coin ? "Gold" : "No spoils this time"}</span>
+                    </div>
+                ) : haul || r?.fishing ? (
+                    /* A hooked monster pays no Victory Points either — the headline is what it was carrying. */
+                    <div className="ar-vp">
+                        <span className="ar-vp-num">{haul?.gold ? `+${money(haul.gold)}` : "—"}</span>
+                        <span className="ar-vp-lab">{haul?.gold ? "Gold" : "It slipped the line"}</span>
                     </div>
                 ) : (
                     /* THE POINTS. */
@@ -611,14 +624,15 @@ function Recap({ bout, busy, onClose }) {
                     {reward?.xp ? <span><i>XP</i><b>+{money(reward.xp)}</b></span> : null}
                     {/* No streak line on a raid: the Arena's streak is not touched by a plaza fight, so printing
                         "Streak 0" under one was the screen reporting a number that does not apply as a loss. */}
-                    {raid ? null : (
+                    {raid || haul ? null : (
                         <span><i>Streak</i><b>{r?.streak || 0}{(r?.streak || 0) > 0 && r.streak >= (r.bestStreak || 0) ? " · best" : ""}</b></span>
                     )}
                 </div>
 
                 <div className="ar-recap-foot">
                     <button type="button" className="ar-btn ar-recap-go" disabled={busy} onClick={onClose}>
-                        {raid ? "Back to the plaza" : won ? "Next fight" : "Back to the ladder"}
+                        {raid ? "Back to the plaza" : r?.fishing ? "Back to the water"
+                            : won ? "Next fight" : "Back to the ladder"}
                     </button>
                 </div>
             </div>
@@ -824,7 +838,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // Dismissed first and awaited: navigating straight off the tap unloads the page with the dismiss in
     // flight, and the finished bout stays in the row for the next visit to open on.
     const leaveBout = useCallback(async () => {
+        // ── HOSTED FIGHTS HAND THEMSELVES BACK ───────────────────────────────────────────────────────────
+        // Two pages mount this renderer over themselves: the plaza for a raid, and the deck for something you
+        // hooked. Only the plaza was recognised here, so a finished monster fight ran `dismiss` and then took
+        // the `!toTown` early return — the bout was cleared on the server and the overlay stayed on screen
+        // with nothing left to fight. The rule is the same for both: if another page is hosting us, give the
+        // fight back to it rather than navigating.
         const toTown = Boolean(bout?.town || bout?.recap?.town);
+        const toDeck = Boolean(bout?.fishing || bout?.recap?.fishing);
+        const hosted = toTown || toDeck;
         // ── LEAVE A FIGHT WHERE YOU STARTED IT ───────────────────────────────────────────────────────────
         // A raid already hands you back to the plaza; a rung dropped you on the Fight tab, which is not
         // where you were. Walking the Road is a sequence — beat one, look at the next — and the tab you
@@ -833,14 +855,14 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         const toRoad = Boolean(bout?.foe?.ladder);
         await act("dismiss");
         if (toRoad) setTab("road");
-        if (!toTown) return;
+        if (!hosted) return;
         // Hosted by the plaza: hand it back rather than going anywhere. Only a raid bout that somehow ends up
         // on the Arena page — one opened before this shipped, and found in progress — still has to walk.
         // Hand the finished bout back with it. The plaza needs the recap to know what that fight paid and
         // how many foes this member has now felled — it has no other way to find out, since the kill is
         // booked inside the arena engine.
         if (onLeave) onLeave(bout);
-        else window.location.href = "/marketplace/town";
+        else window.location.href = toDeck ? "/marketplace/sailing" : "/marketplace/town";
     }, [act, bout, onLeave, setTab]);
 
     // Nothing underneath a full-screen fight should move when you swipe — but ONLY while that fight is on
@@ -1404,8 +1426,15 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     + `${casting ? " is-casting is-on-you" : ""}${foeCasting ? " is-casting is-on-them" : ""}`}>
                     {/* The engine writes this node's transform; the panel follows it. */}
                     <span ref={shakeRef} className="ar-quake" aria-hidden="true" />
+                    {/* ── WHERE THIS FIGHT IS HAPPENING ───────────────────────────────────────────────
+                        One hardcoded colosseum served every bout, including the ones you start by hauling a
+                        thing out of the sea on a rope. You reeled a Young Kraken over the rail and then both
+                        of you were standing on sand under strung pennants. The fight is on the boat; the
+                        backdrop is the only part of the ring that has to know it. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="ar-ring-bg" src="/images/arena/arena-bg.webp" alt="" draggable="false" />
+                    <img className="ar-ring-bg"
+                        src={bout.fishing ? "/images/arena/deck-bg.webp" : "/images/arena/arena-bg.webp"}
+                        alt="" draggable="false" />
                     <span className="ar-ring-scrim" aria-hidden="true" />
                     {/* ── AMBIENT ── dust turning in the light over the sand. A turn-based fight spends most of
                         its life waiting for you to decide, and with nothing moving at all the ring read as a
@@ -1777,7 +1806,9 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                                 have a visible way out somewhere on the screen — and it has to lead back to the
                                 room you came from, which for a raider is the plaza. */}
                             <button type="button" className="ar-btn is-sm" disabled={busy}
-                                onClick={leaveBout}>{bout.town ? "Back to the plaza" : "Back to the ladder"}</button>
+                                onClick={leaveBout}>
+                                {bout.fishing ? "Back to the water" : bout.town ? "Back to the plaza" : "Back to the ladder"}
+                            </button>
                         </div>
                     ) : null}
 
