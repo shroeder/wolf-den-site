@@ -466,7 +466,24 @@ export default function FishingScene({ fishing, sky, boat = null, deck = 30, her
             setHaul({ art: res.monster.art, name: res.monster.name, kind: "monster", tier: res.monster.tier,
                 scale: haulScale({ kind: "monster", tier: res.monster.tier }) });
             sfx.bite();
-            setTimeout(() => onMonster?.(res.monster), HAUL_MS);
+            // ── AND THEN THE SCENE HAS TO LET GO OF IT ───────────────────────────────────────────────
+            // This handed off to the fight and returned, leaving the scene parked on `hauling` forever. The
+            // fish path below moves itself on (`setPhase("result")`); this one never moved at all. Nothing
+            // was visibly wrong while the fight covered it — but a fight ENDS, the overlay closes, and what
+            // was underneath the whole time is a frozen "Hauling it in…" with the monster still up and no
+            // way forward but the X. aannw hit it the moment she came back from a battle.
+            //
+            // The cast is finished at this point either way, so the scene goes back to the water. Coming out
+            // of the fight lands on the cast screen with the right number of casts left, which is where you
+            // were going anyway.
+            setTimeout(async () => {
+                const opened = await onMonster?.(res.monster);
+                setHaul(null);
+                setPhase("idle");
+                // A refusal is not silence. If the fight could not be opened the cast is still spent, and
+                // saying so is the difference between a bug and a bad roll.
+                if (opened === false) setErr("It shook the hook before you could get it aboard — that cast is spent.");
+            }, HAUL_MS);
             return;
         }
         if (res?.ok && res.landed) {

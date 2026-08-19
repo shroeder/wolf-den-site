@@ -581,11 +581,17 @@ export default function SailingClient({ initial, hero, pet, captain }) {
         // `bout_in_progress` is the one refusal worth resuming rather than reporting: the fight is already
         // open on the row, so fetch it and mount that instead of telling somebody to go and finish a bout
         // they have no way to reach from here. Same move the plaza makes.
-        if (r?.ok) { setFishFight(r); return; }
+        if (r?.ok) { setFishFight(r); return true; }
         if (r?.error === "bout_in_progress") {
             const st = await fetch("/api/marketplace/arena", { cache: "no-store" }).then((x) => x.json()).catch(() => null);
-            if (st?.bout && !st.bout.over) { setFishFight(st); return; }
+            if (st?.bout && !st.bout.over) { setFishFight(st); return true; }
         }
+        // ── AND A REFUSAL HAS TO BE REPORTED ─────────────────────────────────────────────────────────────
+        // Every path above returned nothing on failure, so a dropped request — a phone on a bad bar, a 500,
+        // anything that is not `bout_in_progress` — ended here in silence: no fight, no message, and a rail
+        // still saying "Hauling it in…" over a monster that was never going to be fought. The caller resets
+        // the scene on `false` and says the cast is gone.
+        return false;
     }, []);
 
     const loadFishRecords = useCallback(async () => {
