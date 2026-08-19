@@ -1031,7 +1031,7 @@ export function describeDepth(depth = {}) {
 // The AUTHORED stats stay and count toward the hand. That is the piece's character, hand-written, and it is
 // why a Warhammer reads as a Warhammer. Rarity decides how many lines it ends up with; the rest are drawn.
 export const AFFIX_POOL = ["might", "crit_chance", "crit_power", "ferocity", "fortune",
-    "vitality", "tenacity", "precision", "pierce", "lifesteal", "counter", "doublestrike"];
+    "vitality", "tenacity", "pierce", "lifesteal", "counter", "doublestrike"];
 
 // The ladder that makes rarity mean more than bigger numbers: a legendary is not a stronger epic, it does
 // more things at once.
@@ -1049,10 +1049,27 @@ export const affixCeiling = (rarity) => affixesBornWith(rarity) + FORGE_SLOTS;
 // How scarce each affix is in the draw. 1 = ordinary, higher = rarer. Lifedrink and Riposte are the two that
 // change how a fight FEELS rather than how big a number is, so they are the prizes; Pierce sits between,
 // because it is the counter to a whole archetype and should not be on every third item either.
+// Luke's order, hardest first: counter and doublestrike are the two prizes and sit level with each other,
+// lifesteal is next, then pierce. Everything above them is ordinary. Higher = scarcer.
 const AFFIX_RARITY = {
-    might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1, precision: 1,
-    tenacity: 1.5, pierce: 2.5, counter: 4, lifesteal: 6, doublestrike: 7,
+    might: 1, crit_chance: 1, crit_power: 1, ferocity: 1, fortune: 1, vitality: 1,
+    tenacity: 1.5, pierce: 3, lifesteal: 5, counter: 7, doublestrike: 7,
 };
+
+// ── AND THE SAME SCARCITY WHEN YOU REFORGE ───────────────────────────────────────────────────────────────────
+// The draw order above only governs what a piece is BORN with. Reforging picked uniformly at random from
+// whatever the piece did not already have, so every swap was an even chance at Doublestrike — the rarest
+// affix in the game was the easiest thing to reforge into, which is the opposite of the ladder.
+//
+// Weight is 1/rarity, so an ordinary stat comes up seven times as often as a prize.
+export function pickWeightedAffix(pool, rand = Math.random) {
+    if (!pool || !pool.length) return null;
+    const weights = pool.map((k) => 1 / (AFFIX_RARITY[k] || 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = rand() * total;
+    for (let i = 0; i < pool.length; i += 1) { r -= weights[i]; if (r <= 0) return pool[i]; }
+    return pool[pool.length - 1];
+}
 const AFFIX_TIER = { common: 1, rare: 2, epic: 3, legendary: 4, mythic: 5, ascendant: 6, eternal: 7, celestial: 8, primordial: 9 };
 // Percent-style stats carry bigger numbers than the point-style ones.
 const BIG_STATS = new Set(["might", "crit_chance", "crit_power", "ferocity", "fortune", "vitality"]);

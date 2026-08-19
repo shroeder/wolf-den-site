@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { itemById, STAT_META, describeStats, AFFIX_POOL, affixCeiling } from "@/lib/marketplace/items.js";
+import { itemById, STAT_META, describeStats, AFFIX_POOL, affixCeiling, pickWeightedAffix } from "@/lib/marketplace/items.js";
 import { PART_TIERS } from "@/lib/marketplace/forge-parts.js";
 import { itemsOfSet, setOfItem } from "@/lib/marketplace/sets.js";
 import { getEquippedIds, grantItem } from "@/lib/marketplace/inventory.js";
@@ -461,7 +461,8 @@ export async function rerollStat(buyerId, itemId, stat) {
     const next = { ...before };
     delete next[key];
     if (options.length) {
-        const to = options[Math.floor(Math.random() * options.length)];
+        // Weighted, not uniform: a swap should not be an even chance at the rarest affix in the game.
+        const to = pickWeightedAffix(options);
         // THE WHOLE VALUE MOVES. A swap is a RELOCATION of points already earned, not a new award, so the
         // per-stat forge cap deliberately does not apply here.
         //
@@ -583,7 +584,14 @@ export async function enhanceItem(buyerId, itemId, { quality = 0, grade = "good"
     if (scenario > 0) {
         // Reach `scenario` DISTINCT stats: existing first, then (T3+) add brand-new stats to fill the count.
         const targets = existing.slice(0, scenario);
-        if (scenario >= 3) { const pool = [...newPool]; while (targets.length < scenario && pool.length) targets.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]); }
+        if (scenario >= 3) {
+            const pool = [...newPool];
+            // Same rule filling an empty socket as swapping one.
+            while (targets.length < scenario && pool.length) {
+                const pick = pickWeightedAffix(pool);
+                targets.push(pool.splice(pool.indexOf(pick), 1)[0]);
+            }
+        }
         const stack = targets.length ? targets : (existing.length ? existing : ["might"]);
         targets.forEach(apply);
         for (let i = 0, extra = scenario - targets.length; i < extra; i += 1) apply(stack[i % stack.length]); // leftover points double up (e.g. a 1-stat item at T2)

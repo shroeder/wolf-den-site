@@ -26,6 +26,7 @@ import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marke
 // it is measuring a different creature. Pure — it reads a stat bag and returns numbers.
 export const DEFAULT_SPEED = 10;
 export const PIERCE_PER_POINT = 0.005;
+export const COUNTER_PER_POINT = 0.0025;
 
 export function ringStats(stats = {}) {
     return {
@@ -42,6 +43,7 @@ export function ringStats(stats = {}) {
         accuracy: 1,
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         pierce: Number(stats.pierce) || 0,
+        counter: Number(stats.counter) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
         // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
         guard: Number(stats.guard) || DEFAULT_GUARD,
@@ -282,6 +284,8 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         armor: Math.max(0, Number(f.armor) || 0),
         // 1 point of pierce = 0.5% of your damage that armour never sees. Capped at all of it.
         pierce: Math.max(0, Math.min(1, (Number(f.pierce) || 0) * PIERCE_PER_POINT)),
+        // 1 point = 0.25% chance to answer a blow with one of your own. Item-exclusive.
+        counter: Math.max(0, Math.min(1, (Number(f.counter) || 0) * COUNTER_PER_POINT)),
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -306,6 +310,17 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         const dealt = Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
         def.hp -= dealt;
         log.push({ t, who, dmg: dealt, crit: stacks > 0, stacks });
+        // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
+        // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
+        // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
+        if (def.hp > 0 && def.counter > 0 && rng() < def.counter) {
+            const cs = critStacks(def.critChance, rng);
+            const craw = def.damage * (cs > 0 ? def.critMult * cs : 1);
+            const cthrough = craw * def.pierce;
+            const cdealt = Math.max(1, Math.round(cthrough + Math.max(0, craw - cthrough - att.armor)));
+            att.hp -= cdealt;
+            log.push({ t, who: who === "me" ? "foe" : "me", dmg: cdealt, crit: cs > 0, stacks: cs, counter: true });
+        }
     };
 
     while (A.hp > 0 && B.hp > 0 && swings < maxSwings) {

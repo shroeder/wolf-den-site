@@ -425,6 +425,9 @@ export async function kitFor(buyerId, opts = {}) {
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         // Raw points; the engine turns them into a share (PIERCE_PER_POINT).
         pierce: (Number(stats.pierce) || 0) + (perks.pierceStat || 0),
+        // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
+        // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
+        counter: Number(stats.counter) || 0,
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),
