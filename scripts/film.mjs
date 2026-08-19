@@ -27,6 +27,15 @@ const url = process.argv[2];
 const outBase = process.argv[3] || "frames";
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > -1 ? process.argv[i + 1] : d; };
 const CLICK = arg("--click", null);
+// ── A SEAM TAKES MORE THAN ONE STEP ──────────────────────────────────────────────────────────────────────────
+// Filming the hand-off from a cast to a fight needs three things this rig could not do: press a button, WAIT
+// for the moment worth filming to arrive on its own clock (a bite lands ~2.6s after the line goes out, and no
+// fixed sleep is honest about that), and then TAP — pointerdown, not click. The water's hook handler is
+// onPointerDown, so `el.click()` dispatches into nothing and the film comes out as a page sitting still, which
+// is exactly the failure mode the click-retry above was written to stop.
+const AWAIT = arg("--await", null);   // wait for this selector after the click, before the tap
+const TAP = arg("--tap", null);       // pointerdown/up + click, for handlers that listen to pointers
+const AWAIT_MS = Number(arg("--await-ms", 15000));
 const FRAMES = Number(arg("--frames", 24));
 const FRAME_MS = Number(arg("--every", 60));
 const W = Number(arg("--w", 390));
@@ -38,7 +47,7 @@ const SETTLE = Number(arg("--settle", 4200));
 const DPR = Number(arg("--dpr", 1));
 const DELAY = Number(arg("--delay", 0));
 
-if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--frames n] [--every ms]");
+if (!url) throw new Error("usage: node scripts/film.mjs <url> <outBase> [--click sel] [--await sel] [--tap sel] [--frames n] [--every ms]");
 if (!existsSync(dirname(outBase)) && dirname(outBase) !== ".") mkdirSync(dirname(outBase), { recursive: true });
 
 const chrome = spawn(CHROME, [
@@ -104,6 +113,38 @@ if (CLICK) {
         if (!fired) await sleep(250);
     }
     if (!fired) { chrome.kill(); throw new Error(`nothing clickable matched ${CLICK} — nothing was filmed`); }
+}
+
+// WAIT FOR THE MOMENT, rather than guessing at it with a sleep. Polled in the page so the condition is the
+// real DOM, and it fails loudly: a film that starts before the thing being filmed is a film of nothing.
+if (AWAIT) {
+    let seen = false;
+    for (let i = 0; i < Math.ceil(AWAIT_MS / 100) && !seen; i += 1) {
+        seen = await evaluate(`Boolean(document.querySelector(${JSON.stringify(AWAIT)}))`);
+        if (!seen) await sleep(100);
+    }
+    if (!seen) { chrome.kill(); throw new Error(`${AWAIT} never appeared within ${AWAIT_MS}ms — nothing was filmed`); }
+}
+
+// THE TAP. Same retry-and-confirm rule as the click, and the full pointer sequence rather than a bare click,
+// because a React onPointerDown handler never sees a click.
+if (TAP) {
+    let tapped = false;
+    for (let i = 0; i < 20 && !tapped; i += 1) {
+        tapped = await evaluate(`(() => {
+            const el = document.querySelector(${JSON.stringify(TAP)});
+            if (!el) return false;
+            const r = el.getBoundingClientRect();
+            const o = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+                pointerId: 1, pointerType: "touch", isPrimary: true, button: 0 };
+            el.dispatchEvent(new PointerEvent("pointerdown", o));
+            el.dispatchEvent(new PointerEvent("pointerup", o));
+            el.dispatchEvent(new MouseEvent("click", o));
+            return true;
+        })()`);
+        if (!tapped) await sleep(150);
+    }
+    if (!tapped) { chrome.kill(); throw new Error(`nothing matched ${TAP} to tap — nothing was filmed`); }
 }
 
 if (DELAY) await sleep(DELAY);   // let a wind-up play out before the part worth filming
