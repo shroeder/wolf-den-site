@@ -847,6 +847,7 @@ const vary = (id, salt) => {
 const lerpGeo = (lo, hi, tier) => lo * Math.pow(hi / lo, tier / 8);
 const ARMOR_SLOT_WEIGHT = { chest: 1.0, off_hand: 0.8, helmet: 0.7, back: 0.6, boots: 0.5, belt: 0.4 };
 const TENACITY_SHARE_OF_ARMOUR_FEROCITY = 0.4;
+const MIGHT_SHARE_TO_VITALITY = 0.45;
 const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test(`${it.name || ""} ${it.icon || ""}`);
 
 (() => {
@@ -867,6 +868,17 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
         // It was on 8 items. Weapons carry it as a matter of course from rare upward — going through armour
         // is what a weapon is for — and the rarest non-weapons can roll it too, about half of them, so it
         // stays a thing you notice on a chest piece rather than a line every item has.
+        // MIGHT AND VITALITY IN EQUAL MEASURE. A best-in-slot loadout carried 143 might against 38
+        // vitality — the offensive stat at nearly four times the defensive one — so a share of every
+        // item's might is moved across. Done here rather than by editing 264 stat lines: one number to
+        // turn, and the catalogue above stays the thing a designer edits.
+        const m0 = Number(stats.might) || 0;
+        if (m0 > 0) {
+            const move = Math.max(1, Math.round(m0 * MIGHT_SHARE_TO_VITALITY));
+            stats.vitality = (Number(stats.vitality) || 0) + move;
+            const keptM = m0 - move;
+            if (keptM > 0) stats.might = keptM; else delete stats.might;
+        }
         const pierceTier = RARITY_LADDER.indexOf(String(it.rarity || "common"));
         if (it.slot === "main_hand" && pierceTier >= 1) {
             stats.pierce = Math.max(1, Math.round(lerpGeo(2, 20, tier) * vary(it.id, "prc")));
@@ -876,7 +888,8 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
         if (it.slot === "main_hand") {
             stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
             stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;
-        } else if (ARMOR_SLOT_WEIGHT[it.slot]) {
+        }
+        if (ARMOR_SLOT_WEIGHT[it.slot]) {
             // ── ARMOUR TRADES SPEED FOR TOUGHNESS ────────────────────────────────────────────────────
             // Tenacity was on 17 items in the whole catalogue and on NONE of the slots you would armour a
             // fighter with — no helmet, no chest, no boots, no shield. It multiplies armour now, so it

@@ -437,7 +437,7 @@ export const SYSTEM_PERK_KEYS = new Set([
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null, lingeringPet = null) {
     // `add()` drops anything not already a key here, so tenacity has to be seeded or the six pets
     // carrying it would read beautifully on the card and grant nothing.
-    const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, tenacity: 0, pierce: 0, extra_strike: 0 };
+    const stats = { might: 0, vitality: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, tenacity: 0, pierce: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
     // System perks land here rather than in stats/economy, which only know about combat. `add()` silently

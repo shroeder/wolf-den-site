@@ -236,44 +236,29 @@ async function combatStats(buyerId, gearStats, ids) {
     const bb = beastbondMult(ids);
     const ps = petBonus?.stats || {};
     const bs = badgeStats || {};
-    return {
-        ...gearStats,
-        // `ps.ferocity` is gone from here — it buys vitality below rather than being a second helping of Might.
-        might: (gearStats.might || 0) + (ps.might || 0) * bb + (bs.might || 0),
-        crit_chance: (gearStats.crit_chance || 0) + (ps.crit_chance || 0) * bb + (bs.crit_chance || 0),
-        crit_power: (gearStats.crit_power || 0) + (ps.crit_power || 0) * bb + (bs.crit_power || 0),
-        // Fortune buys the brace now (see guardSoakFrom), so the pet's and the badges' share of it has to
-        // reach the ring. It was spread through from gear alone because until now nothing in a bout read it.
-        fortune: (gearStats.fortune || 0) + (ps.fortune || 0) * bb + (bs.fortune || 0),
-        // ── VITALITY IS NO LONGER GEAR-ONLY ──────────────────────────────────────────────────────────────
-        // It was, on purpose: badges were worth +356 Might against +202 for a best-in-slot loadout, so every
-        // stat they touched was a stat a collection could out-vote, and vitality was the one the wardrobe won
-        // outright. That reasoning was sound and it is being reversed knowingly.
-        //
-        // What it missed: across 131 badges with a combat bonus, the pet system and the compendium, vitality
-        // appeared NOWHERE. Every permanent point of power in the game was offence — might, crit chance, crit
-        // power. So a veteran hit harder every month and was no harder to kill, fights compressed as accounts
-        // aged, and "power" on the Long Road could only ever mean damage. A game with no permanent defensive
-        // progression cannot have a difficulty curve that reads as a climb.
-        //
-        // Tenacity stays gear-only, so the wardrobe keeps a stat no collection can out-vote.
-        //
-        // The pet term is FEROCITY, not a new field: a pet's ferocity used to be poured into Might along with
-        // its might (the line above), which is why nothing on a pet ever made you tougher. It buys health now,
-        // which is what the stat reads like it should do.
-        vitality: (gearStats.vitality || 0) + (ps.ferocity || 0) * bb + (bs.vitality || 0),
-        // Badges pay tenacity now, so it has to reach the ring the way every other stat does. It was gear-only
-        // for the same reason vitality was, and it is being opened for the same reason: nothing permanent in
-        // the game made anybody harder to kill.
-        tenacity: (gearStats.tenacity || 0) + (ps.tenacity || 0) * bb + (bs.tenacity || 0),
-        precision: gearStats.precision || 0,
-        pierce: (gearStats.pierce || 0) + (ps.pierce || 0) * bb + (bs.pierce || 0),
-        lifesteal: gearStats.lifesteal || 0,
-        counter: gearStats.counter || 0,
-        stun: gearStats.stun || 0,
-        haste: gearStats.haste || 0,
-        doublestrike: gearStats.doublestrike || 0,
-    };
+    // ── ONE STAT ADDS TO ITSELF ──────────────────────────────────────────────────────────────────────────
+    // A pet is an extension of you, not a creature with its own sheet: whatever stat a pet's card names is the
+    // stat of yours it raises. The same for a badge. This used to be hand-written line by line and every line
+    // was a chance to get it wrong — pet ferocity was folded into MIGHT for years (a second helping of damage
+    // from a stat that means attack speed everywhere else), and lifesteal, counter, stun, haste and
+    // doublestrike simply had no pet or badge term at all, so a pet granting one granted nothing.
+    //
+    // Written as one loop instead. A stat added to the pool anywhere is carried by all three sources for free,
+    // which is the whole class of bug this file keeps producing.
+    //
+    // `bb` is Beastbond, which multiplies the PET's share only.
+    const out = { ...gearStats };
+    const KEYS = new Set([
+        ...Object.keys(gearStats || {}), ...Object.keys(ps), ...Object.keys(bs),
+    ]);
+    for (const k of KEYS) {
+        const gear = Number(gearStats?.[k]) || 0;
+        const pet = (Number(ps[k]) || 0) * bb;
+        const badge = Number(bs[k]) || 0;
+        const total = gear + pet + badge;
+        if (total) out[k] = total;
+    }
+    return out;
 }
 
 // The power figure the LADDER sorts on and the profile prints. Same source as the fight itself — a member

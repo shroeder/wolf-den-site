@@ -55,8 +55,8 @@ export const PET_PASSIVE_STAT = {
     bunny: "seedLuck", frog: "pierce", chick: "petXp", kitten: "pierce", fox_kit: "gold_find",
     wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "pierce", serpent: "pierce",
     fawn: "petXp", bat: "ferocity", scorpion: "tenacity", tiger_cub: "crit_chance", seahorse: "seedLuck",
-    eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "tenacity", hydra: "crit_power",
-    griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "pierce", baby_rex: "might",
+    eagle: "vitality", lion_cub: "ferocity", gorilla: "crit_power", croc: "tenacity", hydra: "crit_power",
+    griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "vitality", pegasus: "pierce", baby_rex: "vitality",
     sky_whale: "xp_gain", chameleon: "pierce", elder_dragon: "crit_power",
     // Shop
     penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "tenacity", turtle: "growSpeed",
@@ -71,9 +71,9 @@ export const PET_PASSIVE_STAT = {
     pantry_mouse: "thrifty", copper_kettle: "prep_cook", hearth_cat: "hot_hands", spice_moth: "generous", gourmand_dragon: "kitchen_master",
     // Chest
     tropical_fish: "seafaring", axolotl: "reelStrength", butterfly: "xp_gain", squid: "seafaring", jellyfish: "seafaring", octopus: "seafaring",
-    corsair_parrot: "crit_chance", marlin: "might", anglerfish: "pierce", sea_wyrm: "crit_power",
+    corsair_parrot: "crit_chance", marlin: "vitality", anglerfish: "pierce", sea_wyrm: "crit_power",
     // Boss
-    vulture: "might", minotaur: "tenacity", centaur: "might", imp: "crit_chance", polar_bear: "tenacity",
+    vulture: "might", minotaur: "tenacity", centaur: "vitality", imp: "crit_chance", polar_bear: "tenacity",
     mammoth: "tenacity", wyvern: "pierce", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",

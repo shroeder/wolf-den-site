@@ -336,18 +336,20 @@ async function rewardBadgeEarned(buyerId, slug) {
 // Half of what a badge is worth stays offence; the rest splits between the two defensive stats, vitality
 // first. Most badges are worth 1-3 points, so a share-of-a-share rounds badly at that size — carving the
 // remainder directly keeps both stats present instead of one of them taking every small badge.
+// What a badge is worth splits evenly between MIGHT and VITALITY, with tenacity taking a smaller cut. Vitality
+// is meant to be exactly as common as might across gear, pets and badges alike — a game where the permanent
+// layer only ever made you hit harder is the reason fights collapsed as accounts aged.
 let CARVE_FLIP = 0;
 const C = (might = 0, crit_chance = 0, crit_power = 0) => {
     const o = {};
-    const mig = Math.ceil(might * 0.5);
-    const rest = might - mig;
-    // Most badges are worth 1-3, so `rest` is usually a single point and whichever stat is written first
-    // takes every one of them — vitality ended up with 114 against tenacity's 35 for exactly that reason.
-    // Alternating who gets the odd point splits them evenly. Deterministic: the object literal below is
-    // evaluated once, in source order, so a given badge always lands the same way.
+    // Most badges are worth 1-3 points, so a share-of-a-share rounds badly at that size and whichever stat is
+    // written first takes every leftover. The odd point alternates instead; the object literal below is
+    // evaluated once in source order, so a given badge always lands the same way.
     const odd = (CARVE_FLIP++ % 2) === 0;
-    const vitality = odd ? Math.ceil(rest / 2) : Math.floor(rest / 2);
-    const tenacity = rest - vitality;
+    const tenacity = Math.floor(might * 0.25);
+    const rest = might - tenacity;
+    const mig = odd ? Math.ceil(rest / 2) : Math.floor(rest / 2);
+    const vitality = rest - mig;
     if (mig) o.might = mig;
     if (vitality) o.vitality = vitality;
     if (tenacity) o.tenacity = tenacity;

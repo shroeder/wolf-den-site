@@ -699,8 +699,11 @@ export const mightMult = (might = 0) => (Math.max(0, Number(might) || 0) / MIGHT
 
 // damage = base damage x the might calculation
 export const WEAPON_BASE_REF = 100;
+// The weapon's base is divided by this before Might multiplies it. Without it the two numbers were both
+// damage and multiplied each other into the tens of thousands.
+export const WEAPON_BASE_DIVISOR = 10;
 export const swingFrom = (might = 0, baseDamage = WEAPON_BASE_REF) =>
-    (Number(baseDamage) || WEAPON_BASE_REF) * mightMult(might);
+    ((Number(baseDamage) || WEAPON_BASE_REF) / WEAPON_BASE_DIVISOR) * mightMult(might);
 
 // ── FEROCITY IS THE ACCURACY STAT ────────────────────────────────────────────────────────────────────────────
 // It used to buy four points at 200 Ferocity, which is not a stat, it is a rounding error — and that was the
