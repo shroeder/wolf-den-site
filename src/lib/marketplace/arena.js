@@ -8,7 +8,7 @@ import { isOwner } from "@/lib/marketplace/owner.js";
 import {
     accuracyFromFerocity, buildKit, elementClash, healthFrom, swingFrom, critChanceFrom, critMultFrom, underdogEdge, pitFever,
     arenaWinGold, arenaWinXp, PVP_GOLD_MIN, PVP_GOLD_MAX, PVP_XP_MIN, PVP_XP_MAX,
-    BATTLE_ITEMS, BLOCK, BLOCK_CAP, guardSoakFrom, GUARD_COOL, speedOf,
+    BATTLE_ITEMS, BLOCK, BLOCK_CAP, BLOCK_REDUCTION, guardSoakFrom, GUARD_COOL, speedOf,
     DREAD_CUT, DREAD_TURNS, SNARE_ACC, SNARE_TURNS, BIND_CUT, BIND_TURNS, DOOM_TURNS, DOOM_MULT,
     FRENZY_DMG, FRENZY_DR, FRENZY_TURNS, FEAST_SHARE, SHATTER_SHARE, SIPHON_TURNS,
     COUNTER_POWER, GUARD_DISABLE_TURNS, FREEZE_CHANCE, FREEZE_TURNS,
@@ -405,7 +405,9 @@ export async function kitFor(buyerId, opts = {}) {
             counter: (perks.counter || 0) + (Number(stats.counter) || 0) / 100,
         },
         arenaLevel: arenaLevelFor(Number(prog?.arena_xp) || 0).level,
-        speed: speedOf(level, Number(stats.ferocity) || 0) + (perks.speed || 0),
+        // `speed` rides in on the equipped weapon (items.js) the way base_damage does — only one main hand is
+        // worn, so the summed value IS that weapon's rate. Attacks per second, not a tiebreak.
+        speed: speedOf(Number(stats.speed) || undefined, Number(stats.ferocity) || 0) + (perks.speed || 0),
         // ── FOUR NUMBERS, ALL OFF REAL STATS, ALL PRINTABLE ──────────────────────────────────────────────
         // Nothing here is derived from `gearPower` (the raw sum of every stat, which made a point of Fortune
         // as good for you as a point of Might) and nothing here is rolled. The tree and the upgrade tracks
@@ -428,6 +430,11 @@ export async function kitFor(buyerId, opts = {}) {
         // ITEM-EXCLUSIVE, on Luke's call: no pet term and no badge term, so a wardrobe is the only way to
         // get one. Raw points; the engine turns them into a chance (COUNTER_PER_POINT).
         counter: Number(stats.counter) || 0,
+        // A shield's block chance, as a share. Item-exclusive like counter.
+        blockChance: (Number(stats.block_chance) || 0) + (perks.blockChance || 0),
+        blockReduction: base.blockReduction ?? BLOCK_REDUCTION,
+        blockStack: base.blockStack || 0,
+        blockStackMax: base.blockStackMax || 0,
         // Raw points; LIFESTEAL_PER_POINT turns them into a share of what you inflict.
         lifesteal: (Number(stats.lifesteal) || 0) + (perks.lifestealStat || 0),
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),

@@ -868,4 +868,15 @@ export const BLOCK_CAP = 0.70;      // the ceiling on block + Footwork together
 // 24/7 passive boss damage — worth nothing in here. It decides initiative now: the faster fighter takes the
 // first beat, and on a tie the challenger keeps it. Landing the opening blow in a ten-beat fight is a real
 // edge, so there is finally a reason to build for it.
-export const speedOf = (level = 1, ferocity = 0) => Math.round(10 + level * 0.3 + ferocity * 0.5);
+// ── ATTACKS PER SECOND ───────────────────────────────────────────────────────────────────────────────────────
+// The weapon's own base attack speed, plus ferocity. That is the whole of it: `10 + level*0.3 + ferocity*0.5`
+// was a number that existed to break the tie for who swung first, and under auto-attack speed is the clock,
+// so it is the weapon that sets it and ferocity that sharpens it.
+//
+// A bare-handed fighter (every NPC) swings at BARE_ATTACK_SPEED.
+// What a successful block takes off the blow. The Warden's own is higher — see arena-classes.js.
+export const BLOCK_REDUCTION = 0.35;
+export const BARE_ATTACK_SPEED = 1;
+export const FEROCITY_PER_SPEED = 500;
+export const speedOf = (baseAttackSpeed = BARE_ATTACK_SPEED, ferocity = 0) =>
+    (Number(baseAttackSpeed) || BARE_ATTACK_SPEED) + Math.max(0, Number(ferocity) || 0) / FEROCITY_PER_SPEED;

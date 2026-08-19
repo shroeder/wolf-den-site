@@ -108,6 +108,12 @@ export const CLASSES = [
         emblem: "/images/arena/class/warden.webp",
         health: 110,
         dr: 0.40,
+        // THE WARDEN BLOCKS HARDER AND MORE OFTEN. Half the blow instead of the usual 35%, and every blow
+        // that gets through raises the next block's odds by 3%, up to five times — so a Warden under fire
+        // becomes progressively harder to hit through, and a block spends the lot.
+        blockReduction: 0.50,
+        blockStack: 0.03,
+        blockStackMax: 5,
         accuracy: 0.75,
         // ── THE BRACE IS THEIRS ──────────────────────────────────────────────────────────────────────────
         // Double everyone else's, inherent, before a point is spent — and then multiplied by Fortune like
@@ -176,6 +182,9 @@ export const classBase = (id) => {
     return {
         health: c?.health || 0,
         dr: c?.dr ?? DEFAULT_DR,
+        blockReduction: c?.blockReduction ?? null,
+        blockStack: c?.blockStack ?? 0,
+        blockStackMax: c?.blockStackMax ?? 0,
         accuracy: c?.accuracy ?? DEFAULT_ACCURACY,
         lifesteal: c?.lifesteal || 0,
         guard: c?.guard ?? DEFAULT_GUARD,

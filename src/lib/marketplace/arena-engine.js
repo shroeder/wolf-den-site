@@ -46,6 +46,7 @@ export function ringStats(stats = {}) {
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
         pierce: Number(stats.pierce) || 0,
         counter: Number(stats.counter) || 0,
+        blockChance: Number(stats.block_chance) || 0,
         doublestrike: Number(stats.doublestrike) || 0,
         lifesteal: Number(stats.lifesteal) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
@@ -295,6 +296,14 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         doublestrike: Math.max(0, (Number(f.doublestrike) || 0) * DOUBLESTRIKE_PER_POINT),
         // 1 point = 0.25% of whatever you actually inflict, healed back.
         lifesteal: Math.max(0, (Number(f.lifesteal) || 0) * LIFESTEAL_PER_POINT),
+        // A shield's block chance, and what a block is worth to THIS fighter — the Warden blocks harder.
+        blockChance: Math.max(0, Math.min(1, Number(f.blockChance) || 0)),
+        blockReduction: Number(f.blockReduction) > 0 ? Number(f.blockReduction) : 0.35,
+        // The Warden's escalating guard: every blow that gets through adds `blockStack` to the chance, up to
+        // `blockStackMax` times, and a successful block spends the lot. A fighter without it has 0 and 0.
+        blockStack: Math.max(0, Number(f.blockStack) || 0),
+        blockStackMax: Math.max(0, Number(f.blockStackMax) || 0),
+        stacks: 0,
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -320,6 +329,7 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         const hits = blows(att.doublestrike);
         let dealt = 0;
         let anyCrit = false;
+        let blocked = 0;
         for (let i = 0; i < hits; i += 1) {
             const stacks = critStacks(att.critChance, rng);
             if (stacks > 0) anyCrit = true;
@@ -330,12 +340,24 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             // with no pierce is exactly where they were.
             const through = raw * att.pierce;
             const rest = raw - through;
-            dealt += Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
+            let blow = Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
+            // ── THE SHIELD ───────────────────────────────────────────────────────────────────────────
+            // Rolled per blow, so a doublestrike gets two chances to be blocked rather than one verdict on
+            // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
+            const chance = def.blockChance + def.blockStack * def.stacks;
+            if (chance > 0 && rng() < chance) {
+                blow = Math.max(1, Math.round(blow * (1 - def.blockReduction)));
+                def.stacks = 0;
+                blocked += 1;
+            } else if (def.blockStackMax > 0) {
+                def.stacks = Math.min(def.blockStackMax, def.stacks + 1);
+            }
+            dealt += blow;
         }
         def.hp -= dealt;
         // Lifedrink is off what you ACTUALLY inflict, not what you swung for — armour eats the healing too.
         if (att.lifesteal > 0) att.hp = Math.min(att.maxHp, att.hp + Math.round(dealt * att.lifesteal));
-        log.push({ t, who, dmg: dealt, crit: anyCrit, hits });
+        log.push({ t, who, dmg: dealt, crit: anyCrit, hits, blocked });
         // ── AND THE DEFENDER MAY ANSWER ──────────────────────────────────────────────────────────────
         // A counter is a real swing, not a subtraction: it rolls its own crit and meets the attacker's
         // armour like any other blow. It never counters a counter — that is a loop, not a mechanic.
