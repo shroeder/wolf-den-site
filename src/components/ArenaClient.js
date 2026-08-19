@@ -703,8 +703,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     const [counterWind, setCounterWind] = useState(null); // "left" | "right" — who is drawing back to strike
     const [fx, setFx] = useState(null);           // the particle burst for the beat that just resolved
     const [castDone, setCastDone] = useState(true); // the cast cinematic has finished; the blow may land
-    const [menu, setMenu] = useState(null);       // which submenu is open: skill | item
-    const [pending, setPending] = useState(null); // the command you committed to, mid wind-up
+    // `pending` and `menu` are gone with the deck — there is no command to commit to and no submenu.
     const [clash, setClash] = useState(null);
     // The counter's sentence, held back until the counter actually plays — see the .ar-beat line.
     const [counterHeld, setCounterHeld] = useState(false);
@@ -775,29 +774,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // instead of queueing behind it (see the wind-up effect). `busy` is still raised for the whole flight, so
     // the buttons lock exactly as before and a double-tap cannot send two beats.
     // The in-flight guard is a REF, not the `busy` state, and both callbacks take no dependencies. If they
-    // depended on `busy` their identity would change the moment a beat set it — and they are in the wind-up
-    // effect's dependency list, so that change would tear the effect down and run it again mid-swing, firing
-    // a SECOND beat for one tap. The ref guards re-entrancy; the state still drives the disabled buttons.
-    const beatFlight = useRef(false);
-    const sendBeat = useCallback(async (extra) => {
-        if (beatFlight.current) return null;
-        beatFlight.current = true;
-        setBusy(true); setErr(null);
-        return fetch("/api/marketplace/arena", {
-            method: "POST", headers: { "content-type": "application/json" },
-            body: JSON.stringify({ action: "beat", ...extra }),
-        }).then((x) => x.json()).catch(() => null);
-    }, []);
-
-    const applyBeat = useCallback((r) => {
-        beatFlight.current = false;
-        setBusy(false);
-        if (!r) return;                     // a torn-down swing: nothing to apply, and busy is already clear
-        if (r?.unlocked) { setSt(r); return; }
-        setErr(REFUSALS[r?.error]
-            || (r?.error ? `That didn't go through (${r.error}). Try again.` : "That didn't go through. Try again."));
-    }, []);
-
+    // sendBeat / applyBeat are gone with the deck: there is no beat to send.
     // Every action goes through here, and it now says so when one fails. A tap that silently does nothing is
     // the worst outcome available: somebody sat on a finished bout tapping "Back to the ladder" with no
     // message, no spinner and no way out.
@@ -1050,42 +1027,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     // here, not just skills: the two effects this replaces sent a skill down a 1250ms cinematic and every
     // other command straight to the network on the same tick, which is why Attack — the button you press more
     // than all the others combined — had no animation whatsoever.
-    useEffect(() => {
-        if (!pending || !bout || bout.over || bout.turn !== "you") { setCastDone(true); return undefined; }
-        const p2 = pending;
-        const ms = WINDUP[p2.command] ?? 380;
-        setCastDone(p2.command !== "skill");
-
-        // The swing itself is heard at the start of the wind-up, not at the end — the sound of something being
-        // drawn back is the cue that a blow is coming.
-        if (p2.command === "skill") {
-            const ab = (bout.me?.abilities || []).find((a) => a.id === p2.ability);
-            castSound(ab?.kind, ab?.element);
-        } else if (p2.command === "attack") Sfx.whoosh();
-        Haptic.cast();
-
-        // ── THE REQUEST RIDES ALONG WITH THE WIND-UP, IT DOES NOT QUEUE BEHIND IT ────────────────────────
-        // This used to wait out the animation and only THEN touch the network, so every beat cost the
-        // wind-up PLUS the round trip end to end, and the wait landed at the worst possible moment: after the
-        // swing had visibly started, with the screen holding still. That is the whole of "the arena is
-        // server-bound and janky" — not slow rendering, just latency nobody thought to overlap.
-        //
-        // The blow is decided on the server either way, and nothing here guesses at the outcome; the request
-        // simply leaves at the same instant the sword does. Whichever finishes last decides when the result
-        // shows, so on a normal connection the round trip is free — it fits inside 420ms of wind-up — and on
-        // a bad one the fight degrades to exactly the behaviour it had before.
-        let dead = false;
-        const flight = sendBeat({ command: p2.command, ability: p2.ability || null, item: p2.item || null });
-        const wound = new Promise((r) => { setTimeout(r, ms); });
-        Promise.all([flight, wound]).then(([r]) => {
-            // Torn down mid-swing: still release the flight, or `busy` latches on and the deck stays dead.
-            if (dead) { applyBeat(null); return; }
-            setCastDone(true);
-            setPending(null); setMenu(null);
-            applyBeat(r);
-        });
-        return () => { dead = true; };
-    }, [pending, bout?.turn, bout?.beat, bout?.over, sendBeat, applyBeat]);
+    // The wind-up effect is gone: it existed to play a chosen command and then send the beat.
 
     // ── THEIR BEAT, IN THREE PARTS ───────────────────────────────────────────────────────────────────────
     // result → telegraph → blow. The middle step used to begin the instant your own swing resolved, so their
@@ -1105,28 +1047,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
     }, [bout?.beat, bout?.turn, bout?.over]);
 
     // Their blow lands once you have had the telegraph to read.
-    useEffect(() => {
-        if (!bout || bout.over || bout.turn !== "them" || !blockReady || busy) return undefined;
-        const t = setTimeout(() => act("beat", { command: "block" }), 140);
-        return () => clearTimeout(t);
-    }, [bout?.turn, bout?.beat, bout?.over, blockReady, busy, act]);
+    // The block window is gone with the brace.
 
     // THE CAST'S OWN EFFECT — fired while the camera is on whoever is casting, before the blow. Pure
     // spectacle (the damage still resolves later, off the server), so it is keyed to the declaration rather
     // than to a log entry. The SOUND is not fired here: it belongs to the start of the wind-up, where the
     // gesture begins, and playing it in both places double-struck every cast.
-    useEffect(() => {
-        const mineCast = bout?.turn === "you" && pending?.command === "skill" && !castDone
-            ? (bout.me?.abilities || []).find((a) => a.id === pending.ability) : null;
-        const theirCast = bout?.turn === "them" && reading && bout?.incoming?.isAbility ? bout.incoming : null;
-        const c = mineCast || theirCast;
-        if (!c) return undefined;
-        if (theirCast) castSound(c.kind, c.element);
-        // A gathering on the CASTER at reduced power — the wind-up half of cause and effect.
-        fxRef.current?.play({ kind: "surge", element: c.element,
-            side: mineCast ? "you" : "them", power: 0.55, crit: false });
-        return undefined;
-    }, [pending?.ability, pending?.command, castDone, reading, bout?.turn, bout?.beat]);
+    // Nothing casts any more, so nothing tracks a cast.
 
     // Particles fire off the RESOLVED beat, same as the damage number — so an effect can never play for a
     // hit the server did not deal.
@@ -1424,9 +1351,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
         // The move you just committed to, declared and lit BEFORE the ring — a skill announcing itself after
         // it has already resolved is a receipt, not a moment.
         const abilities = bout.me?.abilities || [];
-        const casting = yourTurn && pending?.command === "skill" && !castDone
-            ? (abilities.find((a) => a.id === pending.ability) || null)
-            : null;
+        // Nothing casts, so nothing is mid-cast. Kept as a constant because the ring's class list and a
+        // few CSS hooks still read it, and threading `false` through every one of them is a bigger edit than
+        // the mechanic deserves.
+        const casting = null;
         // Their cast gets the same treatment — the telegraph window IS their cinematic, so a skill coming at
         // you is as legible as one you throw.
         const foeCasting = reading && bout.incoming?.isAbility ? bout.incoming : null;
@@ -1662,13 +1590,13 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                             `hitSide`, never by the intensity — see the note on the state itself. */}
                         <FighterBody f={st.me} hurt={hitSide === "you"} lunge={hitSide === "them"}
                             down={bout.over && !bout.won}
-                            wind={counterWind === "left" ? COUNTER_WIND_MS : (yourTurn && pending ? (WINDUP[pending.command] ?? 380) : 0)}
-                            brace={!bout.over && bout.turn === "them" && blockReady}
+                            wind={counterWind === "left" ? COUNTER_WIND_MS : 0}
+                            brace={false}
                             stunned={Boolean(bout.stunned)} hasted={Boolean(bout.hasted)} />
                         <FighterBody f={bout.foe} foe mirrored hurt={hitSide === "them"} lunge={hitSide === "you"}
                             down={bout.over && bout.won}
                             wind={counterWind === "right" ? COUNTER_WIND_MS : (!bout.over && bout.turn === "them" && reading ? TELEGRAPH_MS : 0)}
-                            brace={yourTurn && Boolean(pending)}
+                            brace={false}
                             stunned={Boolean(bout.foeStunned)} hasted={Boolean(bout.foeHasted)} />
                         {/* THE WARNING. Their whole move, named, before a ring appears. */}
                         {reading ? (
@@ -1735,100 +1663,7 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                     <ArenaFx ref={fxRef} onShake={onShake} />
 
 
-
-                    {/* WHAT'S READY. Cooldowns, guard and surge live ON the field — combat state, not page
-                        furniture. Focus was a single pool that made every skill interchangeable and could lock
-                        you out of your own gear after one bad round; each skill keeps its own clock now. */}
-                    {!bout.over ? (
-                        <div className="ar-focus">
-                            {/* QUICK CAST. The rail already showed what was ready; making it tappable turns
-                                three taps (Skill, scroll, pick) into one for a move you already know. On their
-                                beat a ward here braces instead — the same shortcut for the defensive half. */}
-                            {(bout.me?.abilities || []).map((ab) => {
-                                const left = bout.cd?.[ab.id] || 0;
-                                const canCast = !left && !busy && !bout.over
-                                    && (yourTurn ? !pending : (bout.turn === "them" && ab.defensive && reading));
-                                const fire = () => {
-                                    if (!canCast) return;
-                                    setMenu(null);
-                                    if (yourTurn) setPending({ command: "skill", ability: ab.id, label: ab.name, short: ab.name });
-                                    else act("beat", { command: "defend", ability: ab.id });
-                                };
-                                return (
-                                    <button key={ab.id} type="button"
-                                        className={`ar-cdchip${left ? "" : " is-ready"}${canCast ? " is-live" : ""}`}
-                                        style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                        disabled={!canCast}
-                                        title={left ? `${ab.name} — ready in ${left}` : ab.name}
-                                        aria-label={left ? `${ab.name}, ready in ${left} turns` : `Cast ${ab.name}`}
-                                        onClick={fire}>
-                                        {ab.sprite ? (
-                                            // eslint-disable-next-line @next/next/no-img-element
-                                            <img src={ab.sprite} alt="" draggable="false" />
-                                        ) : null}
-                                        {left ? <i>{left}</i> : null}
-                                    </button>
-                                );
-                            })}
-                            {bout.surge > 0 ? <span className="ar-buff is-surge">Sharpened &times;{bout.surge}</span> : null}
-
-                            {/* ── WHAT THEY ARE CARRYING ──────────────────────────────────────────────────
-                                You could see your own four moves and nothing at all of theirs, so every blow
-                                that was not a plain swing arrived as a surprise. In a fight against another
-                                member the two sides should be readable to the same standard.
-                                These are deliberately NOT shown as cooldowns. A defender is asleep; the server
-                                picks their move at random from this list rather than running a rotation, so
-                                there is no cooldown to show and inventing one would be a lie you could plan
-                                around. What is true is the SET — this is what can come at you. */}
-                            {bout.foe?.abilities?.length ? (
-                                <span className="ar-theirs">
-                                    <i className="ar-theirs-lab">Theirs</i>
-                                    {/* THEIR CLOCKS, NOT JUST THEIR ICONS. Your rail counts down; theirs was
-                                        three pictures that never changed, so you could not tell whether the
-                                        move you were bracing for was even available this beat. A cooling
-                                        skill dims and wears the turns it has left, exactly like yours. */}
-                                    {/* ── AND YOU CAN READ THEM ───────────────────────────────────────────
-                                        The set was visible and mute: a `title` tooltip, which on the screen
-                                        this is actually played on does nothing whatsoever. So you could see
-                                        that three things were coming and not one word about what any of them
-                                        did — while your own four sat there fully described.
-                                        Their abilities come out of the same builder yours do, so this is the
-                                        SAME card, not a second description that could drift from it. */}
-                                    {bout.foe.abilities.map((ab) => {
-                                        const cool = Number(bout.foeCd?.[ab.id] || 0);
-                                        return (
-                                            <button type="button" key={ab.id}
-                                                className={`ar-theirchip${cool > 0 ? " is-cooling" : ""}${foePick === ab.id ? " is-open" : ""}`}
-                                                style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                                aria-label={`${ab.name} — ${cool > 0 ? `ready in ${cool}` : "ready"}. Tap to read it.`}
-                                                onClick={() => { Sfx.ui(); setFoePick((v) => (v === ab.id ? null : ab.id)); }}>
-                                                {ab.sprite ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img src={ab.sprite} alt="" draggable="false" />
-                                                ) : null}
-                                                {cool > 0 ? <b className="ar-theircd">{cool}</b> : null}
-                                            </button>
-                                        );
-                                    })}
-                                </span>
-                            ) : null}
-                            {/* Re-read off the CURRENT bout every render, so a skill that comes off cooldown
-                                while you are looking at it says so — the same lesson the status card learned
-                                when it froze a finished fight's numbers on screen. */}
-                            {(() => {
-                                if (!foePick) return null;
-                                const ab = (bout.foe?.abilities || []).find((x) => x.id === foePick);
-                                if (!ab) return null;
-                                return (
-                                    <span className="ar-theircard" role="dialog" aria-label={ab.name}
-                                        onClick={() => setFoePick(null)}>
-                                        <SkillFace ab={ab} left={Number(bout.foeCd?.[ab.id] || 0)} />
-                                        <i className="ar-theircard-tap">Tap to close</i>
-                                    </span>
-                                );
-                            })()}
-                        </div>
-                    ) : null}
+                    {/* The quick-cast rail is gone with the deck: nothing is cast, so nothing is ready. */}
 
                     {/* The moment it ends, called across the ring rather than dumped on a new screen. */}
                     {bout.over ? (
@@ -1869,129 +1704,10 @@ export default function ArenaClient({ initial, boutOnly = false, onLeave = null 
                         ? <p className="ar-beat">{counterHeld && last.counterText ? last.text : `${last.text}${last.counterText ? ` ${last.counterText}` : ""}`}</p>
                         : null}
 
-                    {/* ── THE COMMAND DECK ── four commands, two of which raise the ring and two of which spend
-                        the turn outright. That is the decision: swing at them, or fix yourself and let them hit
-                        you once. A menu of four ways to attack would not be a decision at all. */}
-                    {!bout.over ? (
-                        <div className="ar-deck">
-                            {bout.turn === "them" ? (
-                                <>
-                                    <p className="ar-prompt is-def">
-                                        {reading ? <><b>{bout.incoming?.name || "a heavy swing"}</b> — incoming</> : <>You brace&hellip;</>}
-                                    </p>
-                                    {/* Wards are playable HERE, against the blow you can see coming — and they
-                                        don't cost you the beat, you still block afterwards. */}
-                                    {reading && wards.length ? (
-                                        <div className="ar-wards">
-                                            {wards.map((w) => {
-                                                const wl = bout.cd?.[w.id] || 0;
-                                                return (
-                                                    <button key={w.id} type="button"
-                                                        className={`ar-ward${wl ? " is-poor" : ""}`}
-                                                        disabled={Boolean(wl) || busy}
-                                                        onClick={() => act("beat", { command: "defend", ability: w.id })}>
-                                                        <GiShield aria-hidden="true" />
-                                                        <span>{w.name}</span>
-                                                        <u>{wl ? `Ready in ${wl}` : "Brace"}</u>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : null}
-                                </>
-                            ) : pending ? (
-                                <p className="ar-prompt is-atk">{pending.label}&hellip;</p>
-                            ) : menu === "skill" ? (
-                                <div className="ar-sub">
-                                    {abilities.map((ab) => {
-                                        const left = bout.cd?.[ab.id] || 0;
-                                        const afford = left === 0;
-                                        return (
-                                            <button key={ab.id} type="button"
-                                                className={`ar-pick${afford ? "" : " is-poor"}`}
-                                                style={{ "--el": ELEMENT_COLOR[ab.element] || "#9aa0a6" }}
-                                                disabled={!afford || busy}
-                                                onClick={() => setPending({ command: "skill", ability: ab.id, label: ab.name, short: ab.name })}>
-                                                {ab.sprite ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img className="ar-pick-art" src={ab.sprite} alt="" draggable="false" />
-                                                ) : <span className="ar-pick-art ar-pick-none"><GiSwordWound /></span>}
-                                                <SkillFace ab={ab} left={left} />
-                                            </button>
-                                        );
-                                    })}
-                                    <button type="button" className="ar-back" onClick={() => setMenu(null)}>
-                                        <GiReturnArrow /> Back
-                                    </button>
-                                </div>
-                            ) : menu === "item" ? (
-                                <div className="ar-sub">
-                                    {BATTLE_ITEMS.map((it) => {
-                                        const left = bout.items?.[it.id] || 0;
-                                        return (
-                                            <button key={it.id} type="button" className={`ar-pick${left ? "" : " is-poor"}`}
-                                                style={{ "--el": "#8bf0b4" }} disabled={!left || busy}
-                                                onClick={() => { unlock(); setMenu(null); setPending({ command: "item", item: it.id, label: it.name }); }}>
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                <img className="ar-pick-art" src={it.sprite} alt="" draggable="false" />
-                                                <span className="ar-pick-body">
-                                                    <b>{it.name}</b>
-                                                    <em>{it.blurb}</em>
-                                                    <i>Spends your turn</i>
-                                                </span>
-                                                <u className="ar-pick-cost">&times;{left}</u>
-                                            </button>
-                                        );
-                                    })}
-                                    <button type="button" className="ar-back" onClick={() => setMenu(null)}>
-                                        <GiReturnArrow /> Back
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="ar-cmds">
-                                    <button type="button" className="ar-cmd is-atk" disabled={busy}
-                                        onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "attack", label: "Attack", short: "Strike" }); }}>
-                                        <GiCrossedSwords aria-hidden="true" /><span>Attack</span>
-                                    </button>
-                                    <button type="button" className="ar-cmd is-skill" disabled={busy || !abilities.length}
-                                        onClick={() => { unlock(); Sfx.ui(); setMenu("skill"); }}>
-                                        <GiSpellBook aria-hidden="true" /><span>Skill</span>
-                                    </button>
-                                    {/* ── ONE RULE ON THE BRACE, NOT TWO ──────────────────────────────────────
-                                        The six-a-bout budget is gone; all that is left is never twice running.
-                                        The reason still has to be ON the button rather than discovered by
-                                        pressing it — a button that silently refuses is the bug report — but
-                                        there is no count to show any more, so the pip only appears if a bout
-                                        somehow still carries a ration. */}
-                                    <button type="button" className={`ar-cmd is-guard${guardLocked ? " is-shattered" : ""}`}
-                                        disabled={busy || !canBrace}
-                                        title={guardLocked ? `Their Shatter broke your guard — ${bout.noGuard} turn${bout.noGuard === 1 ? "" : "s"} before you can raise one`
-                                            : bracesLeft <= 0 ? "No braces left this bout"
-                                            : !bout.braceReady ? "You braced last beat — not twice in a row"
-                                            : braceRationed ? `Brace for ${braceFor} · ${bracesLeft} left`
-                                            : `Brace for ${braceFor}`}
-                                        onClick={() => { unlock(); Sfx.ui(); Haptic.tap(); setPending({ command: "guard", label: "Guard" }); }}>
-                                        <GiShield aria-hidden="true" /><span>Guard</span>
-                                        {/* ── SAY WHY IT IS OFF, ON THE BUTTON ────────────────────────────
-                                            The reason lived only in `title`, which does not exist on a phone:
-                                            the button just greyed out still showing what it WOULD soak, so it
-                                            read as broken. Luke, at round 31: "I cant defend anymore and I
-                                            havent guarded for like 8 turns." He was out of braces — six is
-                                            the whole bout's budget — and nothing on screen said so. */}
-                                        {guardLocked ? <em className="ar-cmd-sub is-off is-shattered">shattered {bout.noGuard}t</em>
-                                            : bracesLeft <= 0 ? <em className="ar-cmd-sub is-off">none left</em>
-                                            : !bout.braceReady ? <em className="ar-cmd-sub is-off">not twice</em>
-                                            : braceFor > 0 ? <em className="ar-cmd-sub">{braceFor}</em> : null}
-                                        {braceRationed && bracesLeft > 0 ? <em className="ar-cmd-pips">{bracesLeft}</em> : null}
-                                    </button>
-                                    <button type="button" className="ar-cmd is-item" disabled={busy || !haveItems}
-                                        onClick={() => { unlock(); Sfx.ui(); setMenu("item"); }}>
-                                        <GiKnapsack aria-hidden="true" /><span>Item</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : null}
+                    {/* ── THE COMMAND DECK IS GONE ────────────────────────────────────────────────────
+                        Attack, Skill, Guard and Item, the ward panel, the skill list and the item pouch — all
+                        of it removed. Combat is passive: the bout is resolved the moment it starts and this
+                        screen plays back the log. There is nothing here to press. */}
                 </div>
 
                 {/* THE WAY OUT. This render was dropped in the rock-paper-scissors rewrite, and nothing caught
