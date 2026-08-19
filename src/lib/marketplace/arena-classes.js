@@ -67,87 +67,39 @@ export const RESPEC_CLASS = (spent = 0) => 120 + spent * 22;
 // ── THE THREE CLASSES ────────────────────────────────────────────────────────────────────────────────────────
 // One per way of winning a bout, drawn from the eleven kinds the engine already has: hit harder, outlast, or
 // grind them down. Every class can reach every archetype it needs to function — none of them is a trap.
+// ── A CLASS IS ITS TREE, AND NOTHING ELSE ────────────────────────────────────────────────────────────────────
+// Every class used to carry hidden combat stats before a point was spent: the Warden had 110 extra health,
+// 0.40 damage reduction, a 50% block against everyone else's 35%, an escalating block chance and 15% inherent
+// lifesteal; the Reaver had 12% bonus damage and a 45% chance to open a wound; the Runecaller had a 35% burn.
+// None of it was on screen anywhere.
+//
+// Luke's call: all of it goes. Three fighters who have chosen three different classes and spent nothing are
+// now mechanically IDENTICAL, and the class is purely which twelve perks you may reach. Anything a class does
+// is a node you can point at, with a number you can read.
 export const CLASSES = [
     {
         id: "reaver",
         name: "Reaver",
         tag: "Hit first, hit hardest",
-        blurb: "Damage and criticals. A Reaver wants the bout over in six rounds and builds every point toward that.",
+        blurb: "Bleed, speed and criticals. A Reaver wants the bout over quickly and builds every point toward that.",
         color: "#ff6f7d",
         emblem: "/images/arena/class/reaver.webp",
-        health: 0,
-        // ── LUKE'S PASS ON THE REAVER ────────────────────────────────────────────────────────────────────
-        // "the reaver should have increased accuracy and base attack power, and maybe a little bit more
-        // damage reduction." The class that wants the bout over in six rounds was missing on 28% of its
-        // swings and taking full weight while it did.
-        //
-        // DR 0.16 → 0.21 keeps the shape (still the lightest of the three, half a Warden's 0.40) without
-        // being punished twice for the same identity. Accuracy 0.72 → 0.80 leaves the class spread intact.
-        dr: 0.21,
-        accuracy: 0.80,
-        guard: 0.12,
-        // Base Brutality — the "hit hardest" half of the tagline, which nothing in the numbers paid for.
-        dmgPct: 0.12,
-        // ── THE REAVER OPENS WOUNDS ──────────────────────────────────────────────────────────────────────
-        // Inherent, like the Warden's drink: you do not spend a point to be a Reaver. Better than the damage
-        // ramp that sat here for one commit — this file has called Reaver "the blood class" since the rework
-        // and it had no bleed of its own, only nodes that could buy one.
-        //
-        // Any blow that lands can open a wound, and a bleed goes straight to health past any shield. It reads
-        // on both sides: a Reaver across the sand cuts you exactly as often.
-        // Raised because it was invisible in play — see the fix in arena.js. A plain attack rolls it now, so
-        // this is the first version of the number anybody has actually felt.
-        bleedChance: 0.45,
     },
     {
         id: "warden",
         name: "Warden",
         tag: "Nothing gets through",
-        blurb: "Wards, ripostes and sustain. A Warden wins by still being standing, and makes swinging at them a mistake.",
+        blurb: "Blocks, counters and sustain. A Warden wins by still being standing, and makes swinging at them a mistake.",
         color: "#6fd0ff",
         emblem: "/images/arena/class/warden.webp",
-        health: 110,
-        dr: 0.40,
-        // THE WARDEN BLOCKS HARDER AND MORE OFTEN. Half the blow instead of the usual 35%, and every blow
-        // that gets through raises the next block's odds by 3%, up to five times — so a Warden under fire
-        // becomes progressively harder to hit through, and a block spends the lot.
-        blockReduction: 0.50,
-        blockStack: 0.03,
-        blockStackMax: 5,
-        accuracy: 0.75,
-        // ── THE BRACE IS THEIRS ──────────────────────────────────────────────────────────────────────────
-        // Double everyone else's, inherent, before a point is spent — and then multiplied by Fortune like
-        // anyone's (see guardSoakFrom in arena-kit.js). Guard used to be a flat share of health every class
-        // got identically, which made the one command a shield build exists to press the one command a
-        // shield build could not improve. Fortress still stacks flat on top of this.
-        guard: 0.24,
-        // ── THE WARDEN DRINKS ────────────────────────────────────────────────────────────────────────────
-        // A share of everything they put on the other fighter comes back as health — INCLUDING thorns and
-        // ripostes, which is where 84% of a Warden's damage actually comes from. So the class heals by being
-        // hit and answering, which is the fantasy the rest of the tree already describes and nothing
-        // delivered: the sheet had nine defensive passives, no damage passives, and one weak active.
-        //
-        // Inherent rather than a node, because it is what the class IS. You do not spend a point to be a
-        // Warden.
-        lifesteal: 0.15,
     },
     {
         id: "runecaller",
         name: "Runecaller",
         tag: "Burn it down",
-        blurb: "Affinity, burns and broken guard. A Runecaller wins the rounds after the one they are in.",
+        blurb: "Affinity and burns. A Runecaller wins the rounds after the one they are in.",
         color: "#b061ff",
         emblem: "/images/arena/class/runecaller.webp",
-        health: 30,
-        dr: 0.24,
-        accuracy: 0.73,
-        guard: 0.12,
-        // ── THE RUNECALLER SETS THINGS ALIGHT ────────────────────────────────────────────────────────────
-        // The exact mirror of the Reaver's Ragged Edge, in fire: any blow that lands can set a burn, whether
-        // or not the move is a spell. Replaces "+1 burn turn", which was real but invisible — an extra tick
-        // three turns from now is not something you can feel, and this class's whole identity is that things
-        // are on fire because of you.
-        burnChance: 0.35,
     },
 ];
 
