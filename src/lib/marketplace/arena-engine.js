@@ -416,13 +416,14 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
             if (stacks > 0) anyCrit = true;
             const raw = (att.damage + grudgeBonus) * (stacks > 0 ? att.critMult * stacks : 1)
                 * (surging ? 1 + att.surge : 1);
-            // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────
-            // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour
-            // in full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter
-            // with no pierce is exactly where they were.
-            const through = raw * att.pierce;
-            const rest = raw - through;
-            let blow = Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
+            // ── PIERCE THINS THE ARMOUR ──────────────────────────────────────────────────────────────
+            // It used to route a share of the blow AROUND the armour and send the rest through it in full,
+            // which is algebraically nothing: `raw*p + (raw - raw*p - armour)` collapses to `raw - armour`
+            // for any blow whose un-pierced share still exceeds the armour, and that is nearly every blow.
+            // Pierce did literally zero for the entire game and the audit is the only thing that saw it.
+            //
+            // It reduces the armour instead. 50% pierce means half their armour is not there.
+            let blow = Math.max(1, Math.round(raw - def.armor * (1 - att.pierce)));
             // ── THE SHIELD ───────────────────────────────────────────────────────────────────────────
             // Rolled per blow, so a doublestrike gets two chances to be blocked rather than one verdict on
             // both. A block takes blockReduction off THIS blow and clears whatever the guard had banked.
@@ -515,16 +516,14 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         if (wild === "doublestrike" || wild === "counter") {
             const cs = critStacks(att.critChance, rng);
             const craw = att.damage * (cs > 0 ? att.critMult * cs : 1);
-            const cthrough = craw * att.pierce;
-            const extra = Math.max(1, Math.round(cthrough + Math.max(0, craw - cthrough - def.armor)));
+            const extra = Math.max(1, Math.round(craw - def.armor * (1 - att.pierce)));
             def.hp -= extra;
             log.push({ t, who, dmg: extra, crit: cs > 0, wild, meBleed: A.bleedLeft, foeBleed: B.bleedLeft });
         }
         if (def.hp > 0 && def.counter > 0 && rng() < def.counter) {
             const cs = critStacks(def.critChance, rng);
             const craw = def.damage * (cs > 0 ? def.critMult * cs : 1);
-            const cthrough = craw * def.pierce;
-            const cdealt = Math.max(1, Math.round(cthrough + Math.max(0, craw - cthrough - att.armor)));
+            const cdealt = Math.max(1, Math.round(craw - att.armor * (1 - def.pierce)));
             att.hp -= cdealt;
             log.push({ t, who: who === "me" ? "foe" : "me", dmg: cdealt, crit: cs > 0, stacks: cs, counter: true });
         }
