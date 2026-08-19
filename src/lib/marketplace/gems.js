@@ -13,12 +13,20 @@
 
 // The five, each married to one stat from STAT_META. Colours are the gem's own, and they are what the socket
 // glows once something is in it.
+// ── THE FIVE, RE-CHOSEN ──────────────────────────────────────────────────────────────────────────────────────
+// Luke's list. What they were before was a set from an older combat model, and two of the five had stopped
+// being combat stats at all: Emerald paid Fortune, which does nothing in a fight by design, and Sapphire paid
+// Ferocity, which needs about a hundred points in one lump to remove a single swing from a bout — so a Flawless
+// one was +3% attack speed and, in practice, nothing. Half the gem table was a dead socket.
+//
+// These five are the ones a fighter is actually built out of: what you hit for, what you can take, what your
+// armour is worth, how often it spikes, and how often you turn a blow aside.
 export const GEM_KINDS = [
     { id: "ruby", name: "Ruby", stat: "might", color: "#ff5a6a", blurb: "Blood-red, and it hits like it." },
-    { id: "sapphire", name: "Sapphire", stat: "ferocity", color: "#4aa3ff", blurb: "Cold fire. It never stops working." },
-    { id: "emerald", name: "Emerald", stat: "fortune", color: "#4fd18b", blurb: "Luck, cut into facets." },
-    { id: "topaz", name: "Topaz", stat: "crit_chance", color: "#ffc042", blurb: "Finds the gap in the armour." },
-    { id: "amethyst", name: "Amethyst", stat: "crit_power", color: "#b98cff", blurb: "Makes the good ones hurt." },
+    { id: "amethyst", name: "Amethyst", stat: "vitality", color: "#b98cff", blurb: "You last longer holding it." },
+    { id: "topaz", name: "Topaz", stat: "tenacity", color: "#ffc042", blurb: "Every plate you wear counts for more." },
+    { id: "sapphire", name: "Sapphire", stat: "crit_chance", color: "#4aa3ff", blurb: "Cold, and it finds the gap." },
+    { id: "emerald", name: "Emerald", stat: "block_chance", color: "#4fd18b", blurb: "Turns the blade aside." },
 ];
 
 // ── THE SIXTH ────────────────────────────────────────────────────────────────────────────────────────────────
@@ -27,6 +35,13 @@ export const GEM_KINDS = [
 // deep dark of the mine. Nothing in the game advertises it — the first anyone hears of it should be the moment
 // one lands in their bag.
 export const WOLF_EYE = { id: "wolfeye", name: "Wolf's Eye", stat: "all", color: "#e8dcc6", blurb: "It is looking back." };
+
+// ── BLOCK CHANCE IS A FRACTION, NOT A POINT COUNT ────────────────────────────────────────────────────────────
+// Every other stat here is counted in points; block chance is stored 0..1 and rendered as a percentage. A
+// Flawless Emerald written at face value would be `block_chance: 16` — sixteen hundred percent — so its tier
+// value is read as percentage points instead. Sixteen becomes 0.16, which is what the card already says.
+const FRACTIONAL = new Set(["block_chance"]);
+const gemValue = (stat, value) => (FRACTIONAL.has(stat) ? Math.round(value) / 100 : value);
 
 // Chipped is a common drop; Flawless is a run of luck you tell people about. The curve is deliberately steep
 // at the top so the last tier stays worth chasing after the first four have stopped being exciting.
@@ -55,8 +70,8 @@ export const GEMS = [...GEM_KINDS, WOLF_EYE].flatMap((k) =>
         // What it actually pays, in the same vocabulary the rest of the game's stats use.
         art: `/images/gems/${gemId(k.id, t.tier)}.png`,
         stats: k.stat === "all"
-            ? Object.fromEntries(GEM_KINDS.map((x) => [x.stat, t.all]))
-            : { [k.stat]: t.value },
+            ? Object.fromEntries(GEM_KINDS.map((x) => [x.stat, gemValue(x.stat, t.all)]))
+            : { [k.stat]: gemValue(k.stat, t.value) },
     })));
 
 /** Where a gem's painted sprite lives. Thirty of them — the CUT carries the tier, the colour carries the kind,

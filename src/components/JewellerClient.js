@@ -34,7 +34,7 @@ function GemArt({ gem, className = "" }) {
 
 const RARITY = { common: "#c9d1d9", rare: "#6bb8ff", epic: "#c98bff", legendary: "#ffb648", mythic: "#ff6b8a",
     ascendant: "#ff8ad8", eternal: "#ffce6b" };
-import { STAT_SHORT as STAT, describeStats } from "@/lib/marketplace/items.js";
+import { STAT_SHORT as STAT, describeStats, statValue } from "@/lib/marketplace/items.js";
 const money = (n) => (Number(n) || 0).toLocaleString();
 const describe = (stats) => describeStats(stats, { bonus: true });
 
@@ -284,11 +284,13 @@ export default function JewellerClient({ initial }) {
                                 const was = Number(reveal.before?.[k] || 0);
                                 return (
                                     <p key={k} className="jwr-row" style={{ animationDelay: `${0.55 + i * 0.11}s` }}>
+                                        {/* statValue, not the raw number: block chance is stored 0..1, so a
+                                            Flawless Emerald read "0 → 0.16" here instead of "0% → 16%". */}
                                         <i>{STAT[k] || k}</i>
-                                        <s>{was}</s>
+                                        <s>{statValue(k, was)}</s>
                                         <em>→</em>
-                                        <b>{was + v}</b>
-                                        <u>+{v}</u>
+                                        <b>{statValue(k, was + v)}</b>
+                                        <u>+{statValue(k, v)}</u>
                                     </p>
                                 );
                             })}
