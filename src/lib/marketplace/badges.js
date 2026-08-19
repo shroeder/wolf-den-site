@@ -359,6 +359,8 @@ const C = (might = 0, crit_chance = 0, crit_power = 0) => {
     // felt in every column. At 4 and above a badge also carries ferocity and fortune, so the prestigious end
     // of the collection touches all six combat stats rather than three.
     if (might >= 4) { o.ferocity = Math.max(1, Math.round(might * 0.4)); o.fortune = Math.max(1, Math.round(might * 0.4)); }
+    // Pierce only at the very top — the badges almost nobody has.
+    if (might >= 5) o.pierce = Math.max(1, Math.round(might * 0.6));
     else if (might >= 3) { o.ferocity = 1; }
     return { combat: o };
 };

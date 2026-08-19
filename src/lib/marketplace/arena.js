@@ -268,7 +268,7 @@ async function combatStats(buyerId, gearStats, ids) {
         // the game made anybody harder to kill.
         tenacity: (gearStats.tenacity || 0) + (ps.tenacity || 0) * bb + (bs.tenacity || 0),
         precision: gearStats.precision || 0,
-        pierce: gearStats.pierce || 0,
+        pierce: (gearStats.pierce || 0) + (ps.pierce || 0) * bb + (bs.pierce || 0),
         lifesteal: gearStats.lifesteal || 0,
         counter: gearStats.counter || 0,
         doublestrike: gearStats.doublestrike || 0,
@@ -423,6 +423,8 @@ export async function kitFor(buyerId, opts = {}) {
         // Tenacity is not its own damage reduction any more — it is what makes the armour you are already
         // wearing worth more, so 500 tenacity doubles the plate rather than granting a separate percentage.
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
+        // Raw points; the engine turns them into a share (PIERCE_PER_POINT).
+        pierce: (Number(stats.pierce) || 0) + (perks.pierceStat || 0),
         damage: swingFrom((Number(stats.might) || 0) + (perks.might || 0), Number(stats.base_damage) || undefined),
         critChance: critChanceFrom((Number(stats.crit_chance) || 0) + (perks.critStat || 0), perks.crit || 0),
         critMult: critMultFrom((Number(stats.crit_power) || 0) + (perks.critPower || 0), perks.critMult || 0),

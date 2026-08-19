@@ -854,6 +854,16 @@ const isShield = (it) => /shield|bulwark|aegis|barrier|wall|rampart|targe/i.test
         // Precision bought accuracy and accuracy no longer exists, so the affix is stripped rather than
         // left on 24 items as a number that does nothing.
         delete stats.precision;
+        // ── PIERCE ───────────────────────────────────────────────────────────────────────────────────
+        // It was on 8 items. Weapons carry it as a matter of course from rare upward — going through armour
+        // is what a weapon is for — and the rarest non-weapons can roll it too, about half of them, so it
+        // stays a thing you notice on a chest piece rather than a line every item has.
+        const pierceTier = RARITY_LADDER.indexOf(String(it.rarity || "common"));
+        if (it.slot === "main_hand" && pierceTier >= 1) {
+            stats.pierce = Math.max(1, Math.round(lerpGeo(2, 20, tier) * vary(it.id, "prc")));
+        } else if (pierceTier >= 5 && vary(it.id, "prcroll") > 1.0) {
+            stats.pierce = Math.max(1, Math.round(lerpGeo(2, 12, tier) * vary(it.id, "prc")));
+        }
         if (it.slot === "main_hand") {
             stats.base_damage = Math.max(1, Math.round(lerpGeo(10, 100, tier) * vary(it.id, "dmg")));
             stats.speed = Math.round(lerpGeo(0.8, 1.4, tier) * vary(it.id, "spd") * 100) / 100;

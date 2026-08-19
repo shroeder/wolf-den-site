@@ -52,17 +52,17 @@ export const PET_PASSIVE_STAT = {
     // anglingEffects; `reelStrength` is its partner on the landing side.
     reef_seahorse: "angling", lantern_jelly: "angling", deep_angler: "reelStrength", tidecaller: "reelStrength",
     // Level
-    bunny: "seedLuck", frog: "fortune", chick: "petXp", kitten: "fortune", fox_kit: "gold_find",
-    wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "crit_chance", serpent: "crit_power",
+    bunny: "seedLuck", frog: "pierce", chick: "petXp", kitten: "pierce", fox_kit: "gold_find",
+    wolf_pup: "ferocity", owl: "petXp", bear_cub: "crit_power", raven: "pierce", serpent: "pierce",
     fawn: "petXp", bat: "ferocity", scorpion: "tenacity", tiger_cub: "crit_chance", seahorse: "seedLuck",
     eagle: "might", lion_cub: "ferocity", gorilla: "crit_power", croc: "tenacity", hydra: "crit_power",
-    griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "fortune", baby_rex: "might",
-    sky_whale: "xp_gain", chameleon: "fortune", elder_dragon: "crit_power",
+    griffin: "crit_chance", unicorn: "xp_gain", dragon_whelp: "might", pegasus: "pierce", baby_rex: "might",
+    sky_whale: "xp_gain", chameleon: "pierce", elder_dragon: "crit_power",
     // Shop
     penguin: "angling", hedgehog: "gold_find", sheep: "xp_gain", crab: "tenacity", turtle: "growSpeed",
-    parrot: "fortune", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
+    parrot: "pierce", dolphin: "growSpeed", monkey: "gold_find", panda: "growSpeed", kangaroo: "crit_power",
     // Achievement
-    ladybug: "seedLuck", bee: "xp_gain", sloth: "fortune", beaver: "gold_find", raccoon: "gold_find",
+    ladybug: "seedLuck", bee: "xp_gain", sloth: "pierce", beaver: "gold_find", raccoon: "gold_find",
     flamingo: "xp_gain", toucan: "gold_find",
     // Forge (earned by using The Forge) — FORGE passives that improve your smithing odds (crafting.js), fitting
     // how each is earned: salvagers → part yield, enhancers → enhance odds.
@@ -71,10 +71,10 @@ export const PET_PASSIVE_STAT = {
     pantry_mouse: "thrifty", copper_kettle: "prep_cook", hearth_cat: "hot_hands", spice_moth: "generous", gourmand_dragon: "kitchen_master",
     // Chest
     tropical_fish: "seafaring", axolotl: "reelStrength", butterfly: "xp_gain", squid: "seafaring", jellyfish: "seafaring", octopus: "seafaring",
-    corsair_parrot: "crit_chance", marlin: "might", anglerfish: "fortune", sea_wyrm: "crit_power",
+    corsair_parrot: "crit_chance", marlin: "might", anglerfish: "pierce", sea_wyrm: "crit_power",
     // Boss
     vulture: "might", minotaur: "tenacity", centaur: "might", imp: "crit_chance", polar_bear: "tenacity",
-    mammoth: "tenacity", wyvern: "crit_power", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
+    mammoth: "tenacity", wyvern: "pierce", sea_serpent: "seafaring", fairy: "xp_gain", kraken: "seafaring",
     // Elite
     molten_phoenix: "crit_power", eternal_wolf: "ferocity", bounty_hound: "gold_find",
     // Merchant (sailing-exclusive)
@@ -381,7 +381,7 @@ export function petSpecialPassive(pet) {
 // not the same pet with a different picture, and so a given animal's spread never changes between restarts.
 // Each extra stat is worth half the pet's own passive, so breadth is a bonus rather than a multiplier on it.
 const PET_BREADTH = { mythic: 2, ascendant: 3, eternal: 6, celestial: 6, primordial: 6 };
-const BREADTH_POOL = ["might", "vitality", "tenacity", "crit_chance", "crit_power", "ferocity", "fortune"];
+const BREADTH_POOL = ["might", "vitality", "tenacity", "crit_chance", "crit_power", "ferocity", "pierce"];
 
 export function petBroadPassives(pet) {
     const n = PET_BREADTH[pet?.rarity] || 0;

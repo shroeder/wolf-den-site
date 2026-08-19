@@ -25,6 +25,7 @@ import { critChanceFrom, critMultFrom, healthFrom, swingFrom } from "@/lib/marke
 // Moved here with the rest of the maths: the simulator has to build a fighter the same way the engine does, or
 // it is measuring a different creature. Pure — it reads a stat bag and returns numbers.
 export const DEFAULT_SPEED = 10;
+export const PIERCE_PER_POINT = 0.005;
 
 export function ringStats(stats = {}) {
     return {
@@ -40,6 +41,7 @@ export function ringStats(stats = {}) {
         dr: 0,
         accuracy: 1,
         armor: Math.round((Number(stats.armor) || 0) * (1 + (Number(stats.tenacity) || 0) / 500)),
+        pierce: Number(stats.pierce) || 0,
         // A Gauntlet foe has no class and no Fortune, so their brace is the flat non-Warden base unless the
         // archetype asked for more. Without this they would guard for `undefined` and bank nothing.
         guard: Number(stats.guard) || DEFAULT_GUARD,
@@ -278,6 +280,8 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
         critChance: Number(f.critChance) || 0,
         critMult: Number(f.critMult) || 1,
         armor: Math.max(0, Number(f.armor) || 0),
+        // 1 point of pierce = 0.5% of your damage that armour never sees. Capped at all of it.
+        pierce: Math.max(0, Math.min(1, (Number(f.pierce) || 0) * PIERCE_PER_POINT)),
         speed: Math.max(0.0001, Number(f.speed) || 1),
         hp: Number(f.health) || 0,
         maxHp: Number(f.health) || 0,
@@ -293,8 +297,13 @@ export function autoBout(me, foe, { rng = Math.random, maxSwings = 10000 } = {})
     const swing = (att, def, who) => {
         const stacks = critStacks(att.critChance, rng);
         const raw = att.damage * (stacks > 0 ? att.critMult * stacks : 1);
-        // Flat. A blow always does at least 1, so armour can blunt a fight but never make one unwinnable.
-        const dealt = Math.max(1, Math.round(raw - def.armor));
+        // ── PIERCE GOES ROUND THE ARMOUR, IT DOES NOT THIN IT ────────────────────────────────────────
+        // A share of the blow is simply not mitigated: that part lands whole. The REST meets the armour in
+        // full. So pierce is worth most to a big hit against a heavily armoured target, and a fighter with
+        // no pierce is exactly where they were.
+        const through = raw * att.pierce;
+        const rest = raw - through;
+        const dealt = Math.max(1, Math.round(through + Math.max(0, rest - def.armor)));
         def.hp -= dealt;
         log.push({ t, who, dmg: dealt, crit: stacks > 0, stacks });
     };

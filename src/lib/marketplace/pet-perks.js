@@ -32,6 +32,7 @@ export const PERK_META = {
     crit_power: { icon: "💥", kind: "stat" },
     ferocity: { icon: "🔥", kind: "stat" },
     tenacity: { icon: "🛡️", kind: "stat" },
+    pierce: { icon: "🗡️", kind: "stat" },
     fortune: { icon: "🍀", kind: "stat" },
     extra_strike: { icon: "⚡", kind: "strike" },
     first_hit: { icon: "🗡️", kind: "proc" },
@@ -269,6 +270,7 @@ function perkDesc(key, v, level = 1) {
         case "crit_chance": return `+${v}% crit chance — passive and your daily strike`;
         case "crit_power": return `+${v}% crit damage — passive and your daily strike`;
         case "tenacity": return `+${v} Tenacity — multiplies the armour you are wearing`;
+        case "pierce": return `+${v} Pierce — ${(v * 0.5).toFixed(1)}% of your damage ignores armour`;
         case "ferocity": return `+${v}% PASSIVE auto-damage only (24/7)`;
         case "fortune": return `+${v * TICKETS_PER_FORTUNE_PER_DAY} boss-raffle tickets per day (banked all week)`;
         case "extra_strike": { const c = Math.min(100, 20 + 20 * (Math.max(1, level) - 1)); return `${c}% chance for an extra daily strike${c < 100 ? " — rises to 100% by Lv 5" : " (maxed — every day!)"}`; }
@@ -435,7 +437,7 @@ export const SYSTEM_PERK_KEYS = new Set([
 export function combinePetBonuses(ownedPets = [], equippedPet = null, levelByPet = {}, enshrined = [], powers = null, lingeringPet = null) {
     // `add()` drops anything not already a key here, so tenacity has to be seeded or the six pets
     // carrying it would read beautifully on the card and grant nothing.
-    const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, tenacity: 0, extra_strike: 0 };
+    const stats = { might: 0, crit_chance: 0, crit_power: 0, ferocity: 0, fortune: 0, tenacity: 0, pierce: 0, extra_strike: 0 };
     const economy = { xp_gain: 0, gold_find: 0 };
     const proc = {};
     // System perks land here rather than in stats/economy, which only know about combat. `add()` silently
